@@ -45,7 +45,7 @@ const (
 func EnrichEBEnvironmentHealth(ctx context.Context, clients *ServiceClients, resources []resource.Resource, _ resource.ResourceCache) (IssueEnricherResult, error) {
 	result := IssueEnricherResult{
 		Findings:     make(map[string][]domain.Finding),
-		TruncatedIDs: make(map[string]bool),
+		TruncatedIDs: make(map[string]string),
 	}
 	if clients.ElasticBeanstalk == nil {
 		return result, nil

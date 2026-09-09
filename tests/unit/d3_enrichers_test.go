@@ -358,7 +358,7 @@ func TestD3LambdaWithoutAPolicyIsNotUnknown(t *testing.T) {
 		&awsclient.ServiceClients{Lambda: fake, Region: "us-east-1"},
 		[]resource.Resource{d3LambdaResource("acme-private-fn")}, nil)
 
-	if res.TruncatedIDs["acme-private-fn"] {
+	if _, marked := res.TruncatedIDs["acme-private-fn"]; marked {
 		t.Errorf("a function with no resource policy was marked unknown; having none is an answer")
 	}
 	w4AssertNoCode(t, res.Findings["acme-private-fn"], d3CodeLambdaPublic)
@@ -438,7 +438,7 @@ func TestD3EveryKeyFailingMarksTheUserOnce(t *testing.T) {
 	if err == nil {
 		t.Error("every key failing returned no error")
 	}
-	if !res.TruncatedIDs["acme-batch-user"] {
+	if _, marked := res.TruncatedIDs["acme-batch-user"]; !marked {
 		t.Errorf("TruncatedIDs[acme-batch-user] = false; no key could be read")
 	}
 	w4AssertNoCode(t, res.Findings["acme-batch-user"], d3CodeUserKeyUnused)

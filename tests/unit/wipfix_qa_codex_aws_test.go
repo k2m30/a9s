@@ -63,7 +63,7 @@ func TestEnrichLambdaPosture_FailedVerifierMarksTheRowUninspected(t *testing.T) 
 				&awsclient.ServiceClients{Lambda: fake}, wipfixLambdaRow(), nil)
 			_ = err
 
-			if !res.TruncatedIDs["example-fn"] {
+			if _, marked := res.TruncatedIDs["example-fn"]; !marked {
 				t.Errorf("TruncatedIDs[example-fn] = false after GetFunction failed with %v — "+
 					"the verifier never answered, so nothing about this function's posture was "+
 					"established and the row must not read as clean", tc.err)
@@ -84,7 +84,7 @@ func TestEnrichLambdaPosture_SuccessfulVerifierBranchesUnchanged(t *testing.T) {
 	if err != nil {
 		t.Fatalf("deleted function: %v", err)
 	}
-	if !gone.TruncatedIDs["example-fn"] {
+	if _, marked := gone.TruncatedIDs["example-fn"]; !marked {
 		t.Error("a function GetFunction confirms is absent is no longer recorded as a race")
 	}
 
@@ -93,7 +93,7 @@ func TestEnrichLambdaPosture_SuccessfulVerifierBranchesUnchanged(t *testing.T) {
 	if err != nil {
 		t.Fatalf("live function: %v", err)
 	}
-	if live.TruncatedIDs["example-fn"] {
+	if _, marked := live.TruncatedIDs["example-fn"]; marked {
 		t.Error("a live policy-less function is marked uninspected — that is the healthy answer")
 	}
 }

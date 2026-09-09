@@ -302,7 +302,7 @@ func TestEnrichMSKCluster_APIErrorMarksRowTruncatedIDNotBadge(t *testing.T) {
 	if result.Truncated {
 		t.Error("Truncated must stay false: msk only emits \"~\" findings, so an API error marks the row via TruncatedIDs, never the aggregate issue badge")
 	}
-	if !result.TruncatedIDs[mskName1] {
+	if _, marked := result.TruncatedIDs[mskName1]; !marked {
 		t.Errorf("TruncatedIDs[%q] must be true — the DescribeClusterV2 error must mark that cluster's row with a \"?\" coverage gap", mskName1)
 	}
 }

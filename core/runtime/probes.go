@@ -53,7 +53,7 @@ type ProbeEnrichmentResult struct {
 	Findings         map[string][]domain.Finding
 	AttentionDetails map[string]map[domain.FindingCode]domain.AttentionDetail
 	FieldUpdates     map[string]map[string]string
-	TruncatedIDs     map[string]bool
+	TruncatedIDs     map[string]string
 	Err              error
 }
 

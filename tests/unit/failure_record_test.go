@@ -133,7 +133,7 @@ func TestEnricher_DeniedPerItemCall_OneLineWithActionCountAndExample(t *testing.
 
 	result, err := awsclient.EnrichDynamoDBPITR(context.Background(), clients, resources, nil)
 	for _, r := range resources {
-		if !result.TruncatedIDs[r.ID] {
+		if _, marked := result.TruncatedIDs[r.ID]; !marked {
 			t.Errorf("%s: a denied check must leave the row uninspected, not clean", r.ID)
 		}
 	}
@@ -355,7 +355,7 @@ func TestEnricher_UninspectedUser_SaysWhy(t *testing.T) {
 	}
 
 	result, err := awsclient.EnrichIAMUserMFA(context.Background(), clients, resources, nil)
-	if !result.TruncatedIDs["acme-deploy"] {
+	if _, marked := result.TruncatedIDs["acme-deploy"]; !marked {
 		t.Error("a user whose keys could not be read must render \"?\"")
 	}
 	if err == nil {
@@ -383,7 +383,7 @@ func TestEnricher_TableWithNoPolicy_IsNotAFailure(t *testing.T) {
 	if err != nil {
 		t.Errorf("a table with no resource policy reported a failure: %v", err)
 	}
-	if result.TruncatedIDs["acme-orders"] {
+	if _, marked := result.TruncatedIDs["acme-orders"]; marked {
 		t.Error("a table with no resource policy was marked uninspected")
 	}
 }

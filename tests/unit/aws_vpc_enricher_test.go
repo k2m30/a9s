@@ -231,7 +231,7 @@ func TestEnrichVPCFlowLogs_APIErrorMarksRowTruncatedIDFindsOtherVPCNoBadge(t *te
 	if result.Truncated {
 		t.Error("Truncated must stay false: vpc is a \"~\"-only enricher, so a DescribeFlowLogs error marks the row via TruncatedIDs, never the aggregate issue badge")
 	}
-	if !result.TruncatedIDs["vpc-00000001"] {
+	if _, marked := result.TruncatedIDs["vpc-00000001"]; !marked {
 		t.Error("TruncatedIDs[\"vpc-00000001\"] must be true — the DescribeFlowLogs error must mark that VPC's row with a \"?\" coverage gap")
 	}
 	if _, ok := result.Findings["vpc-00000001"]; ok {

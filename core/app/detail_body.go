@@ -258,15 +258,28 @@ func relocateDetailCursor(was detailLayout, cursor int, built detailItems) int {
 	return cursor
 }
 
-// detailNotInspected reports whether this detail's row is one the Wave-2
-// enricher could not inspect. It reads the same session set the list's Status
-// cell reads (Controller.listUninspectedIDs), so the two surfaces can never
-// disagree about whether a row's posture is known.
-func (c *Controller) detailNotInspected(ds *DetailState) bool {
+// detailNotInspected returns the Attention entry's phrase for a row the Wave-2
+// enricher could not inspect, and "" for a row it answered for. It reads the
+// same session set the list's Status cell reads
+// (Controller.listUninspectedIDs), so the two surfaces can never disagree
+// about whether a row's posture is known.
+//
+// The check the recorder carried is named after the phrase, because "a check
+// did not answer" and "DescribeInstanceStatus was refused" are different facts
+// and only the second one is actionable. A row marked by a recorder that had
+// no name to give keeps the bare phrase.
+func (c *Controller) detailNotInspected(ds *DetailState) string {
 	if ds == nil || ds.Resource.ID == "" || ds.ResourceType == "" {
-		return false
+		return ""
 	}
-	return c.listUninspectedIDs(ds.ResourceType)[ds.Resource.ID]
+	check, ok := c.listUninspectedIDs(ds.ResourceType)[ds.Resource.ID]
+	switch {
+	case !ok:
+		return ""
+	case check == "":
+		return domain.NotInspectedPhrase
+	}
+	return domain.NotInspectedPhrase + ": " + check
 }
 
 // quotedSections name the sections that reproduce a document a9s did not
@@ -451,13 +464,13 @@ func wrapSentence(s string, width int) []string {
 // (warning), stable otherwise — the SAME order both the renderer and the
 // prepend-count calculation must observe, so they extract from this one
 // function rather than deriving the order independently in two places.
-func buildAttentionEntries(findings []domain.Finding, attentionDetails map[domain.FindingCode]domain.AttentionDetail, width int, notInspected bool) []attentionEntry {
+func buildAttentionEntries(findings []domain.Finding, attentionDetails map[domain.FindingCode]domain.AttentionDetail, width int, notInspected string) []attentionEntry {
 	var entries []attentionEntry
-	if notInspected {
+	if notInspected != "" {
 		entries = append(entries, attentionEntry{
 			tier:          "~",
 			code:          "not-inspected",
-			primary:       domain.NotInspectedPhrase,
+			primary:       notInspected,
 			detailLines:   wrapSentence("The attention checks for this row did not answer (a cap or an API error), so its posture is unknown rather than clean.", width),
 			splitKeyValue: true,
 		})
@@ -502,7 +515,7 @@ func buildAttentionEntries(findings []domain.Finding, attentionDetails map[domai
 // issue-severity findings, and one identity per row it emits. It is the only
 // place the block is built: the renderer paints the rows it returns. Returns
 // nil, nil when there is nothing to attend to.
-func buildAttentionSectionDetail(ds *DetailState, td *resource.ResourceTypeDef, notInspected bool) ([]fieldpath.FieldItem, []string) {
+func buildAttentionSectionDetail(ds *DetailState, td *resource.ResourceTypeDef, notInspected string) ([]fieldpath.FieldItem, []string) {
 	entries := buildAttentionEntries(ds.Findings, ds.AttentionDetails, ds.ViewportWidth, notInspected)
 	if len(entries) == 0 {
 		return nil, nil

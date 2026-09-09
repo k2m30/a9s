@@ -97,7 +97,8 @@ func (c *Controller) applyResourcesLoaded(ls *ListState, typeName string, resour
 		answeredByLatest := len(c.listEnrichmentFindings(typeName)) > 0
 		uninspected := c.listUninspectedIDs(typeName)
 		for i := range resources {
-			if answeredByLatest && !uninspected[resources[i].ID] {
+			_, skipped := uninspected[resources[i].ID]
+			if answeredByLatest && !skipped {
 				continue
 			}
 			f, ok := priorFindings[resources[i].ID]
@@ -535,7 +536,7 @@ type listBodyBuild struct {
 	instance        domain.Gen
 	columns         []ColumnDef
 	findings        map[string][]domain.Finding
-	uninspected     map[string]bool
+	uninspected     map[string]string
 	enrichGen       uint64
 	fallbackRowsGen domain.Gen
 }
@@ -617,7 +618,7 @@ func (b listBodyBuild) run() listBodyMemo {
 		// already reports something concrete is not "unknown". The colour is
 		// deliberately left alone — an uninspected row is not an issue, so it
 		// must neither tint the row nor bump a badge.
-		if statusCol >= 0 && statusCol < len(cells) && !phrased && b.uninspected[r.ID] {
+		if _, skipped := b.uninspected[r.ID]; statusCol >= 0 && statusCol < len(cells) && !phrased && skipped {
 			cells[statusCol] = domain.NotInspectedPhrase
 		}
 		rows = append(rows, ListRow{
@@ -710,7 +711,7 @@ func (c *Controller) buildListFrameTitle(ctx runtime.ScreenContext, ls *ListStat
 	typeName := ctx.ResourceType
 	name := typeName
 
-	td := resource.FindResourceType(typeName)
+	td := c.typeDefForLocked(typeName)
 	if td != nil && td.ListTitle != "" {
 		name = td.ListTitle
 	}
@@ -962,11 +963,7 @@ func (c *Controller) applyListFieldUpdates(typeName string, updates map[string]m
 		if s.ID != runtime.ScreenResourceList && s.ID != runtime.ScreenChildList {
 			continue
 		}
-		st := s.Ctx.ResourceType
-		if td := resource.FindResourceType(st); td != nil {
-			st = td.ShortName
-		}
-		if st != canon || s.State.List == nil {
+		if resource.CanonicalShortName(s.Ctx.ResourceType) != canon || s.State.List == nil {
 			continue
 		}
 		applyFieldUpdatesToSlice(s.State.List.Rows, updates)
@@ -1025,11 +1022,7 @@ func (c *Controller) clearRowFindings(typeName string) {
 		if s.ID != runtime.ScreenResourceList && s.ID != runtime.ScreenChildList {
 			continue
 		}
-		st := s.Ctx.ResourceType
-		if td := resource.FindResourceType(st); td != nil {
-			st = td.ShortName
-		}
-		if st != canon || s.State.List == nil {
+		if resource.CanonicalShortName(s.Ctx.ResourceType) != canon || s.State.List == nil {
 			continue
 		}
 		clearSlice(s.State.List.Rows)
@@ -1077,14 +1070,11 @@ func (c *Controller) clearRowFindings(typeName string) {
 // which rows the result speaks for; deciding it here as well is how a
 // timed-out probe could strip a finding from the screen while the file it
 // was saved to kept it.
-func (c *Controller) applyRowFindings(typeName string, findings map[string][]domain.Finding, details map[string]map[domain.FindingCode]domain.AttentionDetail, uninspected map[string]bool) {
-	canon := typeName
-	var td resource.ResourceTypeDef
-	if t := resource.FindResourceType(typeName); t != nil {
-		canon = t.ShortName
+func (c *Controller) applyRowFindings(typeName string, findings map[string][]domain.Finding, details map[string]map[domain.FindingCode]domain.AttentionDetail, uninspected map[string]string) {
+	canon := resource.CanonicalShortName(typeName)
+	td := resource.ResourceTypeDef{ShortName: canon}
+	if t := c.typeDefForLocked(typeName); t != nil {
 		td = *t
-	} else {
-		td = resource.ResourceTypeDef{ShortName: canon}
 	}
 
 	applySlice := func(rows []resource.Resource) {
@@ -1096,11 +1086,7 @@ func (c *Controller) applyRowFindings(typeName string, findings map[string][]dom
 		if s.ID != runtime.ScreenResourceList && s.ID != runtime.ScreenChildList {
 			continue
 		}
-		st := s.Ctx.ResourceType
-		if t := resource.FindResourceType(st); t != nil {
-			st = t.ShortName
-		}
-		if st != canon || s.State.List == nil {
+		if resource.CanonicalShortName(s.Ctx.ResourceType) != canon || s.State.List == nil {
 			continue
 		}
 		applySlice(s.State.List.Rows)
@@ -1156,11 +1142,8 @@ func listHasBadgeFinding(r resource.Resource) bool {
 // The session keys the set by ShortName (Core.handleEnrichmentChecked
 // canonicalizes msg.ResourceType before the write), so a screen opened under
 // an alias has to canonicalize its own query to find it.
-func (c *Controller) listUninspectedIDs(typeName string) map[string]bool {
-	if td := resource.FindResourceType(typeName); td != nil {
-		typeName = td.ShortName
-	}
-	return c.core.EnrichmentTruncatedIDs(typeName)
+func (c *Controller) listUninspectedIDs(typeName string) map[string]string {
+	return c.core.EnrichmentTruncatedIDs(resource.CanonicalShortName(typeName))
 }
 
 // PushChildListScreen pushes a ScreenChildList for the given resource type

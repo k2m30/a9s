@@ -136,8 +136,8 @@ func TestProbeEnrichment_PartialSuccess(t *testing.T) {
 	partialErr := errors.New("partial: enrichment call timed out for 1 resource")
 	partialResult := awsclient.IssueEnricherResult{
 		Truncated: true,
-		TruncatedIDs: map[string]bool{
-			"res-pe-002": true,
+		TruncatedIDs: map[string]string{
+			"res-pe-002": "",
 		},
 		Findings: map[string][]domain.Finding{
 			"res-pe-001": {{Code: "rds.pending-maintenance", Phrase: "maintenance window overdue", Severity: domain.SevBroken, Source: "wave2:test-pe-partial"}},

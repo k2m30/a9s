@@ -157,7 +157,7 @@ func TestEnrichLambdaPosture_OneSlowVerificationDoesNotStallTheBatch(t *testing.
 	res := <-done
 
 	// The results are the same ones the serialised batch would have produced.
-	if res.TruncatedIDs["slow-fn"] {
+	if _, marked := res.TruncatedIDs["slow-fn"]; marked {
 		t.Error("slow-fn is recorded uninspected — its verification succeeded and found it present")
 	}
 	if got := codesOf(res.Findings["slow-fn"]); len(got) != 0 {

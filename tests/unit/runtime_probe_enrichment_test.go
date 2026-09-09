@@ -52,7 +52,7 @@ func TestCoreProbeEnrichment_DispatchesRegisteredEnricher(t *testing.T) {
 	sentinelFieldUpdates := map[string]map[string]string{
 		"sentinel-res-1": {"sentinel-field": "sentinel-value"},
 	}
-	sentinelTruncatedIDs := map[string]bool{"sentinel-res-1": true}
+	sentinelTruncatedIDs := map[string]string{"sentinel-res-1": ""}
 
 	sentinelResult := awsclient.IssueEnricherResult{
 		Truncated:        true,

@@ -342,7 +342,7 @@ func TestEnrichCloudFrontDistribution_APIErrorMarksRowTruncatedIDNotBadge(t *tes
 	if result.Truncated {
 		t.Error("Truncated must stay false: cf is a \"~\"-only enricher, so an API error marks the row via TruncatedIDs, never the aggregate issue badge")
 	}
-	if !result.TruncatedIDs[cfDistroID1] {
+	if _, marked := result.TruncatedIDs[cfDistroID1]; !marked {
 		t.Errorf("TruncatedIDs[%q] must be true — the GetDistributionConfig error must mark that distribution's row with a \"?\" coverage gap", cfDistroID1)
 	}
 }

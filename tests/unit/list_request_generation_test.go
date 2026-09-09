@@ -31,6 +31,12 @@ import (
 
 const listGenType = "ec2"
 
+// listGenScreen is the list screen instance these sequences are drawn for.
+// The ordering guard keys by the issuing screen (runtime8 row 4), so a test
+// that hands out two sequences has to hand them out to one screen for them to
+// order against each other.
+const listGenScreen domain.Gen = 1
+
 // listGenRows builds n synthetic ec2 rows whose IDs carry prefix, so two
 // pages of the same size are still distinguishable by content.
 func listGenRows(n int, prefix string) []resource.Resource {
@@ -45,18 +51,21 @@ func listGenRows(n int, prefix string) []resource.Resource {
 // listGenFetchSeq returns the list-fetch sequence stamped on the first
 // KindFetchResources task in tasks — what the executor echoes onto the
 // messages.ResourcesLoaded that fetch eventually produces.
-func listGenFetchSeq(t *testing.T, tasks []runtime.TaskRequest, what string) domain.Gen {
+// Returns the screen the fetch was issued by alongside its sequence: the
+// ordering guard is keyed by the screen (runtime8 row 4), so a result replayed
+// with a sequence and no screen is compared against a counter nobody drew from.
+func listGenFetchSeq(t *testing.T, tasks []runtime.TaskRequest, what string) (domain.Gen, domain.Gen) {
 	t.Helper()
 	for _, task := range tasks {
 		if task.Key.Kind == runtime.KindFetchResources {
 			if task.ListSeq == 0 {
 				t.Fatalf("%s: KindFetchResources task carries ListSeq 0 — every canonical list fetch is stamped at dispatch", what)
 			}
-			return task.ListSeq
+			return task.ListSeq, task.ScreenID
 		}
 	}
 	t.Fatalf("%s: no KindFetchResources task dispatched, got %d task(s)", what, len(tasks))
-	return 0
+	return 0, 0
 }
 
 // seedListGenDiskFile writes the on-disk type file the reviewer described: a
@@ -97,10 +106,10 @@ func TestListFetch_StaleEntryVerificationLosesToLaterRefresh(t *testing.T) {
 	ctrl, _ := newDetailParityHeadlessController(t)
 
 	_, entryTasks := ctrl.Apply(app.Action{Kind: app.ActionCommand, Arg: listGenType})
-	entrySeq := listGenFetchSeq(t, entryTasks, "on-entry verification")
+	entrySeq, entryScreen := listGenFetchSeq(t, entryTasks, "on-entry verification")
 
 	_, refreshTasks := ctrl.Apply(app.Action{Kind: app.ActionRefresh})
-	refreshSeq := listGenFetchSeq(t, refreshTasks, "ctrl+R refresh")
+	refreshSeq, refreshScreen := listGenFetchSeq(t, refreshTasks, "ctrl+R refresh")
 
 	if refreshSeq == entrySeq {
 		t.Fatalf("refresh reused the entry verification's sequence %d — a later dispatch must outrank an earlier one", entrySeq)
@@ -113,6 +122,7 @@ func TestListFetch_StaleEntryVerificationLosesToLaterRefresh(t *testing.T) {
 		Pagination:   &resource.PaginationMeta{IsTruncated: false},
 		Provenance:   messages.FetchProvenanceCanonicalList,
 		ListSeq:      refreshSeq,
+		ScreenID:     refreshScreen,
 	})
 
 	// The superseded on-entry verification arrives afterwards.
@@ -122,6 +132,7 @@ func TestListFetch_StaleEntryVerificationLosesToLaterRefresh(t *testing.T) {
 		Pagination:   &resource.PaginationMeta{IsTruncated: false},
 		Provenance:   messages.FetchProvenanceCanonicalList,
 		ListSeq:      entrySeq,
+		ScreenID:     entryScreen,
 	})
 
 	rows := ctrl.GetListAllResources()
@@ -142,7 +153,7 @@ func TestListFetch_LatestResultStillApplies(t *testing.T) {
 	ctrl, _ := newDetailParityHeadlessController(t)
 
 	_, entryTasks := ctrl.Apply(app.Action{Kind: app.ActionCommand, Arg: listGenType})
-	entrySeq := listGenFetchSeq(t, entryTasks, "on-entry verification")
+	entrySeq, entryScreen := listGenFetchSeq(t, entryTasks, "on-entry verification")
 
 	ctrl.Handle(messages.ResourcesLoaded{
 		ResourceType: listGenType,
@@ -150,6 +161,7 @@ func TestListFetch_LatestResultStillApplies(t *testing.T) {
 		Pagination:   &resource.PaginationMeta{IsTruncated: false},
 		Provenance:   messages.FetchProvenanceCanonicalList,
 		ListSeq:      entrySeq,
+		ScreenID:     entryScreen,
 	})
 
 	if got := len(ctrl.GetListAllResources()); got != 2 {

@@ -426,7 +426,7 @@ func TestS3_Enrich_UnknownAPIError_NoFinding(t *testing.T) {
 	if _, ok := result.Findings["error-bucket"]; ok {
 		t.Error("expected no finding when GetPublicAccessBlock returns generic error (data is incomplete)")
 	}
-	if !result.TruncatedIDs["error-bucket"] {
+	if _, marked := result.TruncatedIDs["error-bucket"]; !marked {
 		t.Error("TruncatedIDs[error-bucket] must be true when enrichment incomplete due to API error")
 	}
 }
@@ -660,7 +660,7 @@ func TestS3_Enrich_NoSuchBucket_SilentTruncation_NoFinding(t *testing.T) {
 	if _, ok := result.FieldUpdates[deletedBucket]; ok {
 		t.Error("expected no FieldUpdates for a deleted bucket (NoSuchBucket)")
 	}
-	if !result.TruncatedIDs[deletedBucket] {
+	if _, marked := result.TruncatedIDs[deletedBucket]; !marked {
 		t.Error("TruncatedIDs[deleted-bucket] must be true — data incomplete because the bucket no longer exists")
 	}
 	if !result.Truncated {
@@ -689,7 +689,7 @@ func TestS3_Enrich_NotFound_SilentTruncation_NoFinding(t *testing.T) {
 	if _, ok := result.FieldUpdates[deletedBucket]; ok {
 		t.Error("expected no FieldUpdates for a deleted bucket (NotFound)")
 	}
-	if !result.TruncatedIDs[deletedBucket] {
+	if _, marked := result.TruncatedIDs[deletedBucket]; !marked {
 		t.Error("TruncatedIDs[gone-empty-body-bucket] must be true — data incomplete because the bucket no longer exists")
 	}
 	if !result.Truncated {
@@ -739,7 +739,7 @@ func TestS3_Enrich_NonNotFoundErrors_StillAggregate(t *testing.T) {
 			if fs, ok := result.Findings[c.bucket]; ok {
 				t.Errorf("expected no finding for %s; got %v", c.name, fs)
 			}
-			if !result.TruncatedIDs[c.bucket] {
+			if _, marked := result.TruncatedIDs[c.bucket]; !marked {
 				t.Errorf("TruncatedIDs[%s] must be true for %s", c.bucket, c.name)
 			}
 		})

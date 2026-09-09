@@ -254,7 +254,7 @@ func TestEnrichECSServices_APIErrorSetsTruncated(t *testing.T) {
 	if !result.Truncated {
 		t.Error("expected Truncated=true on DescribeServices API error")
 	}
-	if !result.TruncatedIDs["svc-err"] {
+	if _, marked := result.TruncatedIDs["svc-err"]; !marked {
 		t.Error("svc-err must be in TruncatedIDs when its DescribeServices batch failed — a skipped batch must surface a per-row \"?\", not vanish")
 	}
 }
@@ -463,7 +463,7 @@ func TestEnrichECSClusters_BatchErrorMarksRowsTruncatedIDsNotBadge(t *testing.T)
 	// The whole batch was skipped by the API error — each cluster in it must be
 	// marked in TruncatedIDs so its row shows a "?" coverage gap. Without this the
 	// batch failure is completely invisible (no finding, no badge, no "?").
-	if !result.TruncatedIDs["err-cluster"] {
+	if _, marked := result.TruncatedIDs["err-cluster"]; !marked {
 		t.Error("err-cluster must be in TruncatedIDs when its DescribeClusters batch failed — a skipped batch must surface a per-row \"?\", not vanish")
 	}
 }
@@ -661,10 +661,10 @@ func TestEnrichECSTasks_BatchErrorMarksRowsTruncatedIDsNotBadgeAndReturnsErr(t *
 	if err == nil {
 		t.Fatal("enricher must surface a composite error when DescribeTasks fails")
 	}
-	if !result.TruncatedIDs["id1"] {
+	if _, marked := result.TruncatedIDs["id1"]; !marked {
 		t.Error("id1 must be in TruncatedIDs when its DescribeTasks batch failed — a skipped batch must surface a per-row \"?\", not vanish")
 	}
-	if !result.TruncatedIDs["id2"] {
+	if _, marked := result.TruncatedIDs["id2"]; !marked {
 		t.Error("id2 must be in TruncatedIDs when its DescribeTasks batch failed — a skipped batch must surface a per-row \"?\", not vanish")
 	}
 }
@@ -839,7 +839,7 @@ func TestEnrichCFNStackEvents_APIErrorSetsPerResourceTruncation(t *testing.T) {
 	if !result.Truncated {
 		t.Error("expected Truncated=true on DescribeStackEvents API error")
 	}
-	if !result.TruncatedIDs[stackID] {
+	if _, marked := result.TruncatedIDs[stackID]; !marked {
 		t.Errorf("expected TruncatedIDs[%q]=true; got map: %v", stackID, result.TruncatedIDs)
 	}
 }
@@ -1013,7 +1013,7 @@ func TestEnrichELBAttributes_APIErrorMarksRowTruncatedIDNotBadge(t *testing.T) {
 	if result.Truncated {
 		t.Error("Truncated must stay false: elb only emits \"~\" findings, so a DescribeLoadBalancerAttributes API error marks the row via TruncatedIDs, never the aggregate issue badge")
 	}
-	if !result.TruncatedIDs[lbName] {
+	if _, marked := result.TruncatedIDs[lbName]; !marked {
 		t.Errorf("expected TruncatedIDs[%q]=true; got map: %v", lbName, result.TruncatedIDs)
 	}
 }
@@ -1151,7 +1151,7 @@ func TestEnrichEBEnvironmentHealth_APIErrorMarksRowTruncatedIDNotBadge(t *testin
 	if result.Truncated {
 		t.Error("Truncated must stay false: eb is a \"~\"-only enricher, so a DescribeEnvironmentHealth error marks the row via TruncatedIDs, never the aggregate issue badge")
 	}
-	if !result.TruncatedIDs[envID] {
+	if _, marked := result.TruncatedIDs[envID]; !marked {
 		t.Errorf("expected TruncatedIDs[%q]=true; got map: %v", envID, result.TruncatedIDs)
 	}
 }

@@ -202,7 +202,7 @@ func TestW2S3NoBucketPolicyIsNotPublicAndNotTruncated(t *testing.T) {
 	res := w2S3Run(t, &w2S3Posture{noPolicy: map[string]bool{"acme-nopolicy": true}}, "acme-nopolicy")
 
 	w2AssertNoCode(t, res.Findings["acme-nopolicy"], w2S3CodePublic)
-	if res.TruncatedIDs["acme-nopolicy"] {
+	if _, marked := res.TruncatedIDs["acme-nopolicy"]; marked {
 		t.Error("NoSuchBucketPolicy marked the bucket unknown; it is a definite not-public answer")
 	}
 }
@@ -329,7 +329,7 @@ func TestW2S3CrossRegionBucketIsUnknownNotHealthy(t *testing.T) {
 	}
 	res := w2S3Run(t, fake, "acme-elsewhere", "acme-local")
 
-	if !res.TruncatedIDs["acme-elsewhere"] {
+	if _, marked := res.TruncatedIDs["acme-elsewhere"]; !marked {
 		t.Error("cross-region bucket not marked in TruncatedIDs")
 	}
 	if len(res.Findings["acme-elsewhere"]) != 0 {
@@ -355,7 +355,7 @@ func TestW2S3PerBucketErrorDoesNotSinkTheBatch(t *testing.T) {
 		t.Errorf("composite error miscounts the batch: %v", err)
 	}
 
-	if !res.TruncatedIDs["acme-denied"] {
+	if _, marked := res.TruncatedIDs["acme-denied"]; !marked {
 		t.Error("AccessDenied bucket not marked in TruncatedIDs")
 	}
 	w2AssertFinding(t, res.Findings["acme-ok"], w2S3CodeAccessLoggingOff, "access logging off", domain.SevWarn, w2S3Source)

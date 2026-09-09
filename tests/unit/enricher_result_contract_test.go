@@ -18,15 +18,20 @@ import (
 )
 
 // TestIssueEnricherResult_HasTruncatedIDsField verifies that IssueEnricherResult carries a
-// TruncatedIDs field of type map[string]bool. Fails with a compile error on the
-// field reference until the coder adds it.
+// TruncatedIDs field of type map[string]string — resource ID to the check that
+// did not answer for it.
+//
+// INVERTED for runtime8 row 2 (backlog w95/w129). It required map[string]bool
+// until then: a set of rows nobody looked at, with no room for the reason. A
+// bare bool reaches the detail view as "a check failed" and cannot say which,
+// which is the half the operator can act on. Do not "restore" the bool.
 func TestIssueEnricherResult_HasTruncatedIDsField(t *testing.T) {
 	rt := reflect.TypeOf(awsclient.IssueEnricherResult{})
 	f, ok := rt.FieldByName("TruncatedIDs")
 	if !ok {
 		t.Fatal("IssueEnricherResult is missing required field TruncatedIDs — add it to core/aws/issue_enrichment.go")
 	}
-	want := reflect.TypeOf(map[string]bool{})
+	want := reflect.TypeOf(map[string]string{})
 	if f.Type != want {
 		t.Errorf("TruncatedIDs has type %v, want %v", f.Type, want)
 	}

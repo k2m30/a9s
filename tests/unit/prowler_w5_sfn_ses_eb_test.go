@@ -382,7 +382,7 @@ func TestW5_SFN_APIErrorOnOneMachineTruncatesOnlyThatMachine(t *testing.T) {
 	)
 	w2AssertEnricherShape(t, res)
 
-	if !res.TruncatedIDs[broken] {
+	if _, marked := res.TruncatedIDs[broken]; !marked {
 		t.Errorf("TruncatedIDs[%q] = false; a state machine that could not be described is unknown", broken)
 	}
 	w2AssertNoCode(t, res.Findings[broken], "sfn.logging-off")
@@ -568,7 +568,7 @@ func TestW5_SESDKIMOff_APIErrorOnOneIdentityTruncatesOnlyThatIdentity(t *testing
 	)
 	w2AssertEnricherShape(t, res)
 
-	if !res.TruncatedIDs[broken] {
+	if _, marked := res.TruncatedIDs[broken]; !marked {
 		t.Errorf("TruncatedIDs[%q] = false; an identity that could not be read is unknown, not signed", broken)
 	}
 	w2AssertNoCode(t, res.Findings[broken], "ses.dkim-off")
@@ -869,7 +869,7 @@ func TestW5_EB_APIErrorOnOneEnvironmentTruncatesOnlyThatEnvironment(t *testing.T
 	)
 	w2AssertEnricherShape(t, res)
 
-	if !res.TruncatedIDs["e-"+broken] {
+	if _, marked := res.TruncatedIDs["e-"+broken]; !marked {
 		t.Errorf("TruncatedIDs[%q] = false; an environment whose settings could not be read is unknown", broken)
 	}
 	for _, code := range []string{"eb.managed-updates-off", "eb.enhanced-health-off", "eb.cloudwatch-logs-off"} {

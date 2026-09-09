@@ -201,7 +201,7 @@ func TestW2EFSPublicPolicy(t *testing.T) {
 	w2AssertFindingDef(t, "efs", w2EFSCodePublicPolicy, "file system policy open to anyone", domain.SevBroken, "wave2")
 
 	w2AssertNoCode(t, res.Findings["fs-0acme00000000003"], w2EFSCodePublicPolicy)
-	if res.TruncatedIDs["fs-0acme00000000003"] {
+	if _, marked := res.TruncatedIDs["fs-0acme00000000003"]; marked {
 		t.Error("PolicyNotFound marked the file system unknown; it is a definite no-policy answer")
 	}
 }
@@ -277,7 +277,7 @@ func TestW2EFSMountTargetSignalSurvivesTheNewCalls(t *testing.T) {
 	}
 
 	w2AssertFinding(t, res.Findings["fs-0acme00000000001"], w2EFSCodePublicPolicy, "file system policy open to anyone", domain.SevBroken, w2EFSSource)
-	if !res.TruncatedIDs["fs-0acme00000000002"] {
+	if _, marked := res.TruncatedIDs["fs-0acme00000000002"]; !marked {
 		t.Error("file system whose mount targets could not be read was not marked in TruncatedIDs")
 	}
 }
@@ -294,7 +294,7 @@ func TestW2EFSPolicyErrorMarksTruncatedAndSparesTheRest(t *testing.T) {
 		t.Error("a denied policy read was not folded into the composite error")
 	}
 
-	if !res.TruncatedIDs["fs-0acme00000000002"] {
+	if _, marked := res.TruncatedIDs["fs-0acme00000000002"]; !marked {
 		t.Error("file system whose policy could not be read was not marked in TruncatedIDs")
 	}
 	w2AssertNoCode(t, res.Findings["fs-0acme00000000002"], w2EFSCodePublicPolicy)

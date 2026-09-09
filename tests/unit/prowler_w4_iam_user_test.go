@@ -437,7 +437,7 @@ func TestW4UserBatchErrorLeavesSiblingsEvaluated(t *testing.T) {
 		t.Fatal("a failed ListAccessKeys returned no error")
 	}
 
-	if !res.TruncatedIDs["acme-broken-user"] {
+	if _, marked := res.TruncatedIDs["acme-broken-user"]; !marked {
 		t.Errorf("TruncatedIDs[acme-broken-user] = false, want true")
 	}
 	if len(res.Findings["acme-broken-user"]) != 0 {

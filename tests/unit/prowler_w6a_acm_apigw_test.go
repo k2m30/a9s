@@ -494,7 +494,7 @@ func TestW6AAPIGW_StageFailureTruncatesTheAPI(t *testing.T) {
 		w6aHTTPRes("htp003noauth", "acme-orders-http"),
 	)
 
-	if !res.TruncatedIDs["rst013gone"] {
+	if _, marked := res.TruncatedIDs["rst013gone"]; !marked {
 		t.Error("a REST API whose stages could not be listed was not marked truncated")
 	}
 	w2AssertNoCode(t, res.Findings["rst013gone"], w6aAPIGWNoAccessLogs)

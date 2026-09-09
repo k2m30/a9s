@@ -245,7 +245,7 @@ func TestLateReplace_DoesNotStompDeeperList(t *testing.T) {
 	ctrl.Apply(app.Action{Kind: app.ActionCommand, Arg: "s3"})
 
 	// The entry fetch is dispatched and lands.
-	page1Seq := core.NextListFetchSeq("s3")
+	page1Seq := core.NextListFetchSeq(ctrl.GetListInstance())
 
 	page1 := page1Resources(50)
 	ctrl.Handle(messages.ResourcesLoaded{
@@ -260,13 +260,14 @@ func TestLateReplace_DoesNotStompDeeperList(t *testing.T) {
 		Append:     false,
 		Gen:        0, // AcceptZeroGen=true
 		ListSeq:    page1Seq,
+		ScreenID:   ctrl.GetListInstance(),
 		Provenance: messages.FetchProvenanceCanonicalList,
 	})
 
 	// The verify-refetch is dispatched next and the load-more after it, so the
 	// verify's own result is a straggler by the time it arrives.
-	verifySeq := core.NextListFetchSeq("s3")
-	page2Seq := core.NextListFetchSeq("s3")
+	verifySeq := core.NextListFetchSeq(ctrl.GetListInstance())
+	page2Seq := core.NextListFetchSeq(ctrl.GetListInstance())
 
 	page2 := page2Resources(50, 5)
 	ctrl.Handle(messages.ResourcesLoaded{
@@ -281,6 +282,7 @@ func TestLateReplace_DoesNotStompDeeperList(t *testing.T) {
 		Append:     true,
 		Gen:        0,
 		ListSeq:    page2Seq,
+		ScreenID:   ctrl.GetListInstance(),
 		Provenance: messages.FetchProvenanceCanonicalList,
 	})
 
@@ -313,6 +315,7 @@ func TestLateReplace_DoesNotStompDeeperList(t *testing.T) {
 		Append:     false,
 		Gen:        0,
 		ListSeq:    verifySeq,
+		ScreenID:   ctrl.GetListInstance(),
 		Provenance: messages.FetchProvenanceCanonicalList,
 	})
 

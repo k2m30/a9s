@@ -280,7 +280,7 @@ func TestW5_MSK_APIErrorOnOneClusterTruncatesOnlyThatCluster(t *testing.T) {
 	)
 	w2AssertEnricherShape(t, res)
 
-	if !res.TruncatedIDs[broken] {
+	if _, marked := res.TruncatedIDs[broken]; !marked {
 		t.Errorf("TruncatedIDs[%q] = false; a cluster that could not be described is unknown, not healthy", broken)
 	}
 	if len(res.Findings[broken]) != 0 {
@@ -561,13 +561,13 @@ func TestW5_Kinesis_APIErrorOnOneStreamTruncatesOnlyThatStream(t *testing.T) {
 	)
 	w2AssertEnricherShape(t, res)
 
-	if !res.TruncatedIDs[broken] {
+	if _, marked := res.TruncatedIDs[broken]; !marked {
 		t.Errorf("TruncatedIDs[%q] = false; a stream that could not be described is unknown, not healthy", broken)
 	}
 	w2AssertNoCode(t, res.Findings[broken], "kinesis.unencrypted")
 	w2AssertNoCode(t, res.Findings[broken], "kinesis.min-retention")
 
-	if res.TruncatedIDs[plain] {
+	if _, marked := res.TruncatedIDs[plain]; marked {
 		t.Errorf("TruncatedIDs[%q] = true; one stream's failure must not mark the others unknown", plain)
 	}
 	w2AssertFinding(t, res.Findings[plain], "kinesis.unencrypted",
@@ -598,7 +598,7 @@ func TestW5_Kinesis_NotFoundMarksTruncatedWithoutFailing(t *testing.T) {
 	)
 	w2AssertEnricherShape(t, res)
 
-	if !res.TruncatedIDs[missing] {
+	if _, marked := res.TruncatedIDs[missing]; !marked {
 		t.Errorf("TruncatedIDs[%q] = false; a stream that no longer exists is unknown", missing)
 	}
 	if err != nil {

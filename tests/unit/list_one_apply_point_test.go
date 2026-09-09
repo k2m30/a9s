@@ -69,9 +69,9 @@ func TestListFetch_SupersededResultNeverReachesRowStore(t *testing.T) {
 	ctrl, core := newDetailParityHeadlessController(t)
 
 	_, entryTasks := ctrl.Apply(app.Action{Kind: app.ActionCommand, Arg: listGenType})
-	entrySeq := listGenFetchSeq(t, entryTasks, "on-entry verification")
+	entrySeq, entryScreen := listGenFetchSeq(t, entryTasks, "on-entry verification")
 	_, refreshTasks := ctrl.Apply(app.Action{Kind: app.ActionRefresh})
-	refreshSeq := listGenFetchSeq(t, refreshTasks, "ctrl+R refresh")
+	refreshSeq, refreshScreen := listGenFetchSeq(t, refreshTasks, "ctrl+R refresh")
 
 	ctrl.Handle(messages.ResourcesLoaded{
 		ResourceType: listGenType,
@@ -79,6 +79,7 @@ func TestListFetch_SupersededResultNeverReachesRowStore(t *testing.T) {
 		Pagination:   &resource.PaginationMeta{IsTruncated: false},
 		Provenance:   messages.FetchProvenanceCanonicalList,
 		ListSeq:      refreshSeq,
+		ScreenID:     refreshScreen,
 	})
 	ctrl.Handle(messages.ResourcesLoaded{
 		ResourceType: listGenType,
@@ -86,6 +87,7 @@ func TestListFetch_SupersededResultNeverReachesRowStore(t *testing.T) {
 		Pagination:   &resource.PaginationMeta{IsTruncated: false},
 		Provenance:   messages.FetchProvenanceCanonicalList,
 		ListSeq:      entrySeq,
+		ScreenID:     entryScreen,
 	})
 
 	entry, ok := core.ResourceCache(listGenType)
@@ -108,23 +110,25 @@ func TestListFetch_CtrlRResetWinsOverAnExactScreen(t *testing.T) {
 	ctrl, _ := newDetailParityHeadlessController(t)
 
 	_, entryTasks := ctrl.Apply(app.Action{Kind: app.ActionCommand, Arg: listGenType})
-	entrySeq := listGenFetchSeq(t, entryTasks, "on-entry verification")
+	entrySeq, entryScreen := listGenFetchSeq(t, entryTasks, "on-entry verification")
 	ctrl.Handle(messages.ResourcesLoaded{
 		ResourceType: listGenType,
 		Resources:    listGenRows(6, "i-page"),
 		Pagination:   &resource.PaginationMeta{IsTruncated: false},
 		Provenance:   messages.FetchProvenanceCanonicalList,
 		ListSeq:      entrySeq,
+		ScreenID:     entryScreen,
 	})
 
 	_, refreshTasks := ctrl.Apply(app.Action{Kind: app.ActionRefresh})
-	refreshSeq := listGenFetchSeq(t, refreshTasks, "ctrl+R refresh")
+	refreshSeq, refreshScreen := listGenFetchSeq(t, refreshTasks, "ctrl+R refresh")
 	ctrl.Handle(messages.ResourcesLoaded{
 		ResourceType: listGenType,
 		Resources:    listGenRows(3, "i-page"),
 		Pagination:   &resource.PaginationMeta{IsTruncated: true, NextToken: "next"},
 		Provenance:   messages.FetchProvenanceCanonicalList,
 		ListSeq:      refreshSeq,
+		ScreenID:     refreshScreen,
 	})
 
 	if got := len(ctrl.GetListAllResources()); got != 3 {

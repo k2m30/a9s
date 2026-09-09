@@ -332,10 +332,10 @@ func TestEnrichWAFLogging_ListResourcesErrorMarksRowTruncatedIDNotBadge(t *testi
 	if result.Truncated {
 		t.Error("Truncated must stay false: waf only emits \"~\" findings, so a ListResourcesForWebACL error marks the row via TruncatedIDs, never the aggregate issue badge")
 	}
-	if !result.TruncatedIDs[wafACLARN1] {
+	if _, marked := result.TruncatedIDs[wafACLARN1]; !marked {
 		t.Errorf("TruncatedIDs[%q] must be true", wafACLARN1)
 	}
-	if !result.TruncatedIDs[wafACLARN2] {
+	if _, marked := result.TruncatedIDs[wafACLARN2]; !marked {
 		t.Errorf("TruncatedIDs[%q] must be true", wafACLARN2)
 	}
 }
@@ -593,7 +593,7 @@ func TestEnrichLogsMetricFilters_DescribeMetricFiltersErrorMarksRowNotBadge(t *t
 	if result.Truncated {
 		t.Error("Truncated must stay false: logs is a \"~\"-only enricher, so a DescribeMetricFilters error marks the row via TruncatedIDs, never the aggregate issue badge")
 	}
-	if !result.TruncatedIDs[auditGroup] {
+	if _, marked := result.TruncatedIDs[auditGroup]; !marked {
 		t.Errorf("TruncatedIDs[%q] must be true", auditGroup)
 	}
 }

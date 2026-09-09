@@ -263,7 +263,7 @@ func TestEnrichSNSSubscriptions_APIErrorMarksRowTruncatedIDNotBadge(t *testing.T
 	if result.Truncated {
 		t.Error("Truncated must stay false: sns is a \"~\"-only enricher, so an API error marks the row via TruncatedIDs, never the aggregate issue badge")
 	}
-	if !result.TruncatedIDs[topic1] {
+	if _, marked := result.TruncatedIDs[topic1]; !marked {
 		t.Errorf("TruncatedIDs[%q] must be true — the ListSubscriptionsByTopic error must mark that topic's row with a \"?\" coverage gap", topic1)
 	}
 }

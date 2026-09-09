@@ -39,7 +39,7 @@ const (
 func EnrichRedshiftPosture(ctx context.Context, clients *ServiceClients, resources []resource.Resource, _ resource.ResourceCache) (IssueEnricherResult, error) {
 	result := IssueEnricherResult{
 		Findings:     make(map[string][]domain.Finding),
-		TruncatedIDs: make(map[string]bool),
+		TruncatedIDs: make(map[string]string),
 		FieldUpdates: make(map[string]map[string]string),
 	}
 	if clients == nil || clients.Redshift == nil {
@@ -74,10 +74,6 @@ func EnrichRedshiftPosture(ctx context.Context, clients *ServiceClients, resourc
 			MarkSkipped(&result, r.ID, &failures, sslErr)
 		}
 		switch {
-		case logErr != nil && IsNotFoundErr(logErr):
-			// The cluster went away between the list call and this one: a
-			// race, not a failure to log.
-			result.TruncatedIDs[r.ID] = true
 		case logErr != nil:
 			MarkSkipped(&result, r.ID, &failures, logErr)
 		case !aws.ToBool(logging.LoggingEnabled):

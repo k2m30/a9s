@@ -92,8 +92,18 @@ func TestLoadMore_OnClientSideRelatedList_AppendsToThatList(t *testing.T) {
 	if payload.Provenance.CanonicalList() {
 		t.Errorf("the continuation calls itself a canonical-list fetch — its owner is a related drill (EscPops), and handle.go's symmetric gate refuses a canonical result on a non-canonical screen")
 	}
-	if task.ListSeq != 0 {
-		t.Errorf("the continuation was stamped list sequence %d — only a canonical-list fetch takes one, or a drill's load-more supersedes the verification of the list beneath it", task.ListSeq)
+	// INVERTED for runtime8 row 4. It required ListSeq 0 here, because one
+	// counter served the whole type and a drill drawing from it superseded the
+	// verification of the list beneath. The counter is keyed by the issuing
+	// screen now, so the drill's sequence orders the drill's own requests and
+	// reaches no other screen. Do not "restore" the zero: without a sequence
+	// the drill cannot order its own two refreshes, which is row 4's defect.
+	if task.ListSeq == 0 {
+		t.Error("the drill's continuation drew no list sequence — the drill cannot order it against " +
+			"its own next request")
+	}
+	if task.ScreenID == 0 {
+		t.Error("the drill's continuation names no screen — the sequence it drew belongs to nobody")
 	}
 
 	// The continuation's own result, carrying the lane the task recorded.
@@ -105,6 +115,7 @@ func TestLoadMore_OnClientSideRelatedList_AppendsToThatList(t *testing.T) {
 		Pagination:   &resource.PaginationMeta{IsTruncated: false},
 		Provenance:   payload.Provenance,
 		ListSeq:      task.ListSeq,
+		ScreenID:     task.ScreenID,
 	})
 
 	body := ctrl.Snapshot().Body.List

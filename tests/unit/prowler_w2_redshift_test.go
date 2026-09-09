@@ -227,7 +227,7 @@ func TestW2RedshiftErrorOnOneClusterKeepsTheRest(t *testing.T) {
 		t.Error("a denied logging-status read was not folded into the composite error")
 	}
 
-	if !res.TruncatedIDs["acme-denied"] {
+	if _, marked := res.TruncatedIDs["acme-denied"]; !marked {
 		t.Error("cluster whose logging status could not be read was not marked in TruncatedIDs")
 	}
 	w2AssertNoCode(t, res.Findings["acme-denied"], w2RedshiftCodeAuditLoggingOff)
@@ -247,7 +247,7 @@ func TestW2RedshiftParameterGroupErrorMarksItsClustersUnknown(t *testing.T) {
 		t.Error("a denied parameter-group read was not folded into the composite error")
 	}
 
-	if !res.TruncatedIDs["acme-reporting"] {
+	if _, marked := res.TruncatedIDs["acme-reporting"]; !marked {
 		t.Error("cluster on an unreadable parameter group was not marked in TruncatedIDs")
 	}
 	w2AssertNoCode(t, res.Findings["acme-reporting"], w2RedshiftCodeRequireSSLOff)

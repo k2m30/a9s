@@ -42,7 +42,7 @@ func EnrichLambdaPosture(ctx context.Context, clients *ServiceClients, resources
 	result := IssueEnricherResult{
 		Findings:         make(map[string][]domain.Finding),
 		AttentionDetails: make(map[string]map[domain.FindingCode]domain.AttentionDetail),
-		TruncatedIDs:     make(map[string]bool),
+		TruncatedIDs:     make(map[string]string),
 		FieldUpdates:     make(map[string]map[string]string),
 	}
 	if clients.Lambda == nil {
@@ -107,8 +107,9 @@ func EnrichLambdaPosture(ctx context.Context, clients *ServiceClients, resources
 			MarkSkipped(&result, r.ID, &failures, verifyErr)
 		case absent:
 			// Gone between the list call and this one: a race, not a failure
-			// to log, and nothing was inspected either.
-			result.TruncatedIDs[r.ID] = true
+			// to log, and nothing was inspected either. GetFunction is the
+			// call that settled it, so it is the check the row names.
+			markUninspected(&result, r.ID, "GetFunction")
 		}
 	})
 

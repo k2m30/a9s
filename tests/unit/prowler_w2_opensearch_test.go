@@ -97,7 +97,7 @@ func w2OSRun(t *testing.T, domains ...ostypes.DomainStatus) (map[string]resource
 	res := awsclient.IssueEnricherResult{
 		Findings:         map[string][]domain.Finding{},
 		AttentionDetails: map[string]map[domain.FindingCode]domain.AttentionDetail{},
-		TruncatedIDs:     map[string]bool{},
+		TruncatedIDs:     map[string]string{},
 	}
 	for _, r := range rs {
 		if len(r.Findings) > 0 {

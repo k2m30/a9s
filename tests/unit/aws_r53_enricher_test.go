@@ -266,10 +266,10 @@ func TestEnrichRoute53Zone_APIErrorMarksRowTruncatedIDNotBadge(t *testing.T) {
 	if result.Truncated {
 		t.Error("Truncated must stay false: r53 only emits \"~\" findings, so an API error marks the row via TruncatedIDs, never the aggregate issue badge")
 	}
-	if !result.TruncatedIDs[r53ZoneID1] {
+	if _, marked := result.TruncatedIDs[r53ZoneID1]; !marked {
 		t.Errorf("TruncatedIDs[%q] must be true", r53ZoneID1)
 	}
-	if !result.TruncatedIDs[r53ZoneID2] {
+	if _, marked := result.TruncatedIDs[r53ZoneID2]; !marked {
 		t.Errorf("TruncatedIDs[%q] must be true", r53ZoneID2)
 	}
 }

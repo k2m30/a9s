@@ -199,10 +199,17 @@ type ResourceTypeDef struct {
 // registered types have non-nil Color (invariant #7); the fallback exists
 // only for ad-hoc test doubles.
 func (d ResourceTypeDef) ResolveColor(r domain.Resource) domain.Color {
-	if d.Color == nil {
-		return colorFallback(r.Fields["status"])
+	if d.Color != nil {
+		return d.Color(r)
 	}
-	return d.Color(r)
+	// A row's colour derives from its findings, and that rule does not stop
+	// at the types with their own classifier: a child type is registered
+	// outside the catalog and carries no Color func, so without this a Wave-2
+	// finding lands on the row and the row still renders healthy.
+	if top, ok := domain.TopFinding(r.Findings); ok {
+		return top.Severity.Color()
+	}
+	return colorFallback(r.Fields["status"])
 }
 
 // FindingDef is a declarative entry in a resource type's findings table.

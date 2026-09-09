@@ -17,20 +17,6 @@ import (
 // The intrinsic ResolveColor fallback used by
 // catalog.ResourceTypeDef.ResolveColor stays in core/catalog.
 
-// colorFromSeverity maps a domain.Severity to the corresponding display Color.
-func colorFromSeverity(sev domain.Severity) domain.Color {
-	switch sev {
-	case domain.SevBroken:
-		return domain.ColorBroken
-	case domain.SevWarn:
-		return domain.ColorWarning
-	case domain.SevDim:
-		return domain.ColorDim
-	default:
-		return domain.ColorHealthy
-	}
-}
-
 // colorFromAnyFinding returns the Color for the worst-severity Finding on r
 // (wave1 or wave2, source prefix "wave2:") and ok=true. ok=false signals no
 // Finding at all — the caller should fall through to its structural
@@ -42,7 +28,7 @@ func colorFromAnyFinding(r domain.Resource) (domain.Color, bool) {
 	if !ok {
 		return domain.ColorHealthy, false
 	}
-	return colorFromSeverity(top.Severity), true
+	return top.Severity.Color(), true
 }
 
 // hasFinding reports whether findings carries code. A fetcher attaching the

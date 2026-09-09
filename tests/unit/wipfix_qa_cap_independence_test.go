@@ -94,7 +94,7 @@ func TestEnrichEFS_CappedMountTargetWalkKeepsPolicyFinding(t *testing.T) {
 		t.Fatalf("precondition: DescribeFileSystemPolicy called %d times, want 1", fake.policyCalls)
 	}
 
-	if res.TruncatedIDs["fs-0123456789abcdef0"] {
+	if _, marked := res.TruncatedIDs["fs-0123456789abcdef0"]; marked {
 		t.Errorf("TruncatedIDs[fs-0123456789abcdef0] = true — a mount-target page cap must not " +
 			"mark the file system uninspected: FoldWave2Rows skips every id in this map, " +
 			"so the efs.public-policy finding below never reaches the row")
@@ -135,7 +135,7 @@ func TestEnrichEFS_HealthyPolicyOnCappedWalkRaisesNothing(t *testing.T) {
 	if got := codesOf(res.Findings["fs-0123456789abcdef1"]); len(got) != 0 {
 		t.Errorf("findings for a healthy, page-capped file system = %v, want none", got)
 	}
-	if res.TruncatedIDs["fs-0123456789abcdef1"] {
+	if _, marked := res.TruncatedIDs["fs-0123456789abcdef1"]; marked {
 		t.Errorf("TruncatedIDs[fs-0123456789abcdef1] = true on a page cap alone, want false")
 	}
 }
@@ -186,7 +186,7 @@ func TestEnrichEventBridgeRule_CappedTargetWalkKeepsFoundRows(t *testing.T) {
 			fake.calls, awsclient.PerParentPageCap)
 	}
 
-	if res.TruncatedIDs["example-nightly-rule"] {
+	if _, marked := res.TruncatedIDs["example-nightly-rule"]; marked {
 		t.Errorf("TruncatedIDs[example-nightly-rule] = true — a target-walk page cap must not " +
 			"mark the rule uninspected: the dead-letter verdicts below were computed from " +
 			"targets that really exist, and FoldWave2Rows drops every one of them")

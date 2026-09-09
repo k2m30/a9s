@@ -56,7 +56,7 @@ func TestRefreshListEnrichment_EnricherRegisteredType_TokenAdvancesTruncatedClea
 
 	c.HandleEvent(messages.EnrichmentChecked{
 		ResourceType: rt,
-		TruncatedIDs: map[string]bool{"res-001": true},
+		TruncatedIDs: map[string]string{"res-001": ""},
 	})
 	if got := c.EnrichmentTruncatedIDs(rt); len(got) == 0 {
 		t.Fatalf("precondition failed: EnrichmentTruncatedIDs(%q) empty after seeding via HandleEvent, got %v", rt, got)

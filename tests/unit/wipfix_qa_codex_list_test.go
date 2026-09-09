@@ -21,64 +21,69 @@ import (
 
 // --- row 44: a canonical sequence for a lane that is not canonical ---------
 
-// TestStampListFetchSeq_OnlyTheCanonicalLaneTakesASequence pins row 44. The
-// sequence orders the type's canonical list against itself. A related fetch
-// declares its own lane and must not draw one, or it supersedes a canonical
-// refresh in flight and is superseded by the next.
-func TestStampListFetchSeq_OnlyTheCanonicalLaneTakesASequence(t *testing.T) {
+// TestStampListFetchSeq_EveryLaneTakesItsOwnScreensSequence is row 44's rule
+// re-stated for the key runtime8 row 4 moved the guard to.
+//
+// INVERTED for runtime8 row 4. It used to require that ONLY the canonical lane
+// draws a sequence, because one counter served the whole type and a drill
+// drawing from it superseded the canonical refresh in flight. The counter is
+// now keyed by the issuing screen, so a drill's sequence orders the drill's own
+// requests and reaches no other screen — every lane draws one, and the lane is
+// not consulted at all. What decides is whether a screen owns the task. Do not
+// "restore" the lane test: with the per-screen key it would leave every drill
+// unable to order its own two refreshes, which is the defect row 4 fixes.
+func TestStampListFetchSeq_EveryLaneTakesItsOwnScreensSequence(t *testing.T) {
 	b := newWipfixBench(t)
 
+	const drill domain.Gen = 7
 	for _, lane := range []messages.FetchProvenance{
 		messages.FetchProvenanceFilteredList,
 		messages.FetchProvenanceChild,
+		messages.FetchProvenanceCanonicalList,
 	} {
 		req := runtime.TaskRequest{
-			Key:     runtime.TaskKey{Kind: runtime.KindFetchResources, Scope: "s3"},
-			Payload: runtime.FetchResourcesPayload{Provenance: lane},
+			Key:      runtime.TaskKey{Kind: runtime.KindFetchResources, Scope: "s3"},
+			Payload:  runtime.FetchResourcesPayload{Provenance: lane},
+			ScreenID: drill,
 		}
 		b.core.StampListFetchSeq(&req)
-		if req.ListSeq != 0 {
-			t.Errorf("a %v fetch was stamped list sequence %d — the sequence orders the "+
-				"canonical list against itself, and drawing one here supersedes a canonical "+
-				"refresh in flight", lane, req.ListSeq)
+		if req.ListSeq == 0 {
+			t.Errorf("a %v fetch issued by a list screen drew no sequence — the screen cannot "+
+				"order its own two refreshes against each other", lane)
 		}
 	}
 
-	// The two that must keep drawing one: the canonical lane, and a payload
-	// that declares no lane at all (the legacy default).
-	canonical := runtime.TaskRequest{
-		Key:     runtime.TaskKey{Kind: runtime.KindFetchResources, Scope: "s3"},
-		Payload: runtime.FetchResourcesPayload{Provenance: messages.FetchProvenanceCanonicalList},
-	}
-	b.core.StampListFetchSeq(&canonical)
-	if canonical.ListSeq == 0 {
-		t.Error("a canonical fetch was not stamped — it is the lane the sequence exists for")
-	}
-	unstamped := runtime.TaskRequest{Key: runtime.TaskKey{Kind: runtime.KindFetchResources, Scope: "s3"}}
-	b.core.StampListFetchSeq(&unstamped)
-	if unstamped.ListSeq == 0 {
-		t.Error("a fetch declaring no lane was not stamped — the legacy default is canonical")
+	// A task no list screen owns has nothing to be ordered against.
+	orphan := runtime.TaskRequest{Key: runtime.TaskKey{Kind: runtime.KindFetchResources, Scope: "s3"}}
+	b.core.StampListFetchSeq(&orphan)
+	if orphan.ListSeq != 0 {
+		t.Errorf("a fetch no list screen issued was stamped sequence %d — there is no screen whose "+
+			"requests it could supersede or be superseded by", orphan.ListSeq)
 	}
 }
 
 // TestRelatedFetchDoesNotSupersedeACanonicalRefresh is row 44's scenario:
-// both results have to land.
+// both results have to land. It holds by the key rather than by the lane now —
+// the two fetches are two screens, so neither draws from the other's counter.
 func TestRelatedFetchDoesNotSupersedeACanonicalRefresh(t *testing.T) {
 	b := newWipfixBench(t)
 
+	const parent, drill domain.Gen = 1, 2
 	canonical := runtime.TaskRequest{
-		Key:     runtime.TaskKey{Kind: runtime.KindFetchResources, Scope: "s3"},
-		Payload: runtime.FetchResourcesPayload{Provenance: messages.FetchProvenanceCanonicalList},
+		Key:      runtime.TaskKey{Kind: runtime.KindFetchResources, Scope: "s3"},
+		Payload:  runtime.FetchResourcesPayload{Provenance: messages.FetchProvenanceCanonicalList},
+		ScreenID: parent,
 	}
 	b.core.StampListFetchSeq(&canonical)
 
 	related := runtime.TaskRequest{
-		Key:     runtime.TaskKey{Kind: runtime.KindFetchResources, Scope: "s3"},
-		Payload: runtime.FetchResourcesPayload{Provenance: messages.FetchProvenanceFilteredList},
+		Key:      runtime.TaskKey{Kind: runtime.KindFetchResources, Scope: "s3"},
+		Payload:  runtime.FetchResourcesPayload{Provenance: messages.FetchProvenanceFilteredList},
+		ScreenID: drill,
 	}
 	b.core.StampListFetchSeq(&related)
 
-	if b.core.ListResultSuperseded("s3", canonical.ListSeq) {
+	if b.core.ListResultSuperseded(parent, canonical.ListSeq) {
 		t.Error("a related fetch superseded the canonical refresh already in flight — " +
 			"the canonical result is discarded and its screen keeps loading")
 	}

@@ -193,7 +193,7 @@ func TestApplyDetailFinding_CursorStaysOnSameFieldWhenNotInspectedMarkArrivesToo
 	// truncation mark for the same row.
 	intents, _ := core.HandleEvent(messages.EnrichmentChecked{
 		ResourceType: "ec2",
-		TruncatedIDs: map[string]bool{row.ID: true},
+		TruncatedIDs: map[string]string{row.ID: ""},
 		Findings: map[string][]domain.Finding{row.ID: {{
 			Code:     "ec2.impaired",
 			Phrase:   "system check failed",
@@ -302,7 +302,7 @@ func deliverEnrichment(t *testing.T, c *app.Controller, core *runtime.Core, id s
 		// runtime writes the session set before the controller applies the
 		// intent — so by then no rebuild can reproduce the block the cursor
 		// was indexed against.
-		ev.TruncatedIDs = map[string]bool{id: true}
+		ev.TruncatedIDs = map[string]string{id: ""}
 	}
 	intents, _ := core.HandleEvent(ev)
 	c.ApplyIntents(intents)

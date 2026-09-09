@@ -127,7 +127,7 @@ func TestASGLaunchConfigPosture_PageErrorLeavesEveryGroupUninspected(t *testing.
 		if fs := result.Findings[id]; len(fs) != 0 {
 			t.Errorf("%s carries %d finding(s) from a partial read, want none: %+v", id, len(fs), fs)
 		}
-		if !result.TruncatedIDs[id] {
+		if _, marked := result.TruncatedIDs[id]; !marked {
 			t.Errorf("%s is not marked uninspected, so its row renders as inspected-and-clean", id)
 		}
 	}
@@ -168,7 +168,7 @@ func TestASGLaunchConfigPosture_ReadsEveryPage(t *testing.T) {
 		if fs[0].Phrase != "launch configuration allows IMDSv1" {
 			t.Errorf("%s phrase = %q, want %q", id, fs[0].Phrase, "launch configuration allows IMDSv1")
 		}
-		if result.TruncatedIDs[id] {
+		if _, marked := result.TruncatedIDs[id]; marked {
 			t.Errorf("%s is marked uninspected although its page was read", id)
 		}
 	}
@@ -256,14 +256,14 @@ func TestASGLaunchConfigPosture_PageCapMarksOnlyTheGroupsItNeverRead(t *testing.
 	if arrived[0].Phrase != "launch configuration allows IMDSv1" {
 		t.Errorf("asg-arrived phrase = %q, want %q", arrived[0].Phrase, "launch configuration allows IMDSv1")
 	}
-	if result.TruncatedIDs["asg-arrived"] {
+	if _, marked := result.TruncatedIDs["asg-arrived"]; marked {
 		t.Error("asg-arrived is marked uninspected although its configuration arrived — the finding it earned would render as a bare \"?\"")
 	}
 
 	if fs := result.Findings["asg-behind-the-cap"]; len(fs) != 0 {
 		t.Errorf("asg-behind-the-cap carries %d finding(s) although its configuration was never read: %+v", len(fs), fs)
 	}
-	if !result.TruncatedIDs["asg-behind-the-cap"] {
+	if _, marked := result.TruncatedIDs["asg-behind-the-cap"]; !marked {
 		t.Error("asg-behind-the-cap is not marked uninspected, so it renders as inspected-and-clean on a check that never ran")
 	}
 }

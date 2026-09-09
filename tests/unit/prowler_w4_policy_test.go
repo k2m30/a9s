@@ -220,7 +220,7 @@ func TestW4PolicyPrivEscDocumentFetchFailureIsUnknown(t *testing.T) {
 		w4PolicyResource("acme-lambda-deployer", escARN),
 	})
 
-	if !res.TruncatedIDs[deniedARN] {
+	if _, marked := res.TruncatedIDs[deniedARN]; !marked {
 		t.Errorf("TruncatedIDs[%s] = false, want true", deniedARN)
 	}
 	// INVERTED for the "skipped" spec row 5: the helper used to fail the test

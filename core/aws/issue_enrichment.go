@@ -12,9 +12,12 @@ package aws
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"slices"
 	"strings"
+
+	"github.com/aws/smithy-go"
 
 	"github.com/k2m30/a9s/v3/core/catalog"
 	"github.com/k2m30/a9s/v3/core/domain"
@@ -52,7 +55,7 @@ func InFetcherWave2Sentinel(_ context.Context, _ *ServiceClients, _ []resource.R
 	return IssueEnricherResult{
 		Findings:         map[string][]domain.Finding{},
 		AttentionDetails: map[string]map[domain.FindingCode]domain.AttentionDetail{},
-		TruncatedIDs:     map[string]bool{},
+		TruncatedIDs:     map[string]string{},
 		FieldUpdates:     map[string]map[string]string{},
 		Truncated:        false,
 	}, nil
@@ -211,11 +214,48 @@ func wave2Finding(code domain.FindingCode, values ...string) domain.Finding {
 // IsNotFoundErr's contract, and putting it at one site is what keeps every
 // enricher's aggregate honest without each of them remembering the rule.
 func MarkSkipped(result *IssueEnricherResult, id string, failures *[]Failure, err error) {
-	result.TruncatedIDs[id] = true
+	markUninspected(result, id, checkOf(err))
 	if IsNotFoundErr(err) {
 		return
 	}
 	*failures = append(*failures, FailedCall(id, err))
+}
+
+// checkOf names the check an error came from: the SDK writes the operation
+// into the error's own fields, so the call that refused is read off the error
+// rather than repeated at each of the seventy-odd mark sites. Returns "" when
+// the error names no operation — a row whose check has no name is still
+// uninspected, and every surface says so without the ": <check>" half.
+func checkOf(err error) string {
+	if opErr, ok := errors.AsType[*smithy.OperationError](err); ok {
+		return opErr.OperationName
+	}
+	return ""
+}
+
+// checkCap is what a row records when nothing refused: a9s stopped at one of
+// its own bounds before reaching the row, so the row was never looked at and
+// there is no failing call to name.
+const checkCap = "stopped at the inspection cap"
+
+// markUninspected is the one writer of result.TruncatedIDs. check names what
+// did not answer for this row — the failing API call, or checkCap when a9s's
+// own bound is what stopped short. Every other recorder in this file routes
+// through it, and no enricher writes the set itself: a direct write reaches
+// the session with the row and without the check, which is the shape the
+// operator cannot act on.
+//
+// A row already carrying a named check keeps it: the first check to refuse is
+// the one the operator chases, and a later cap on the same row would otherwise
+// overwrite a real denial with a bound.
+func markUninspected(result *IssueEnricherResult, id, check string) {
+	if id == "" {
+		return
+	}
+	if prev, ok := result.TruncatedIDs[id]; ok && prev != "" {
+		return
+	}
+	result.TruncatedIDs[id] = check
 }
 
 // MarkUnusable records an item the service answered for without the field the
@@ -223,7 +263,7 @@ func MarkSkipped(result *IssueEnricherResult, id string, failures *[]Failure, er
 // come back with. There is no error to classify, so a9s states the cause
 // itself; the row is uninspected either way.
 func MarkUnusable(result *IssueEnricherResult, id string, failures *[]Failure, cause string) {
-	result.TruncatedIDs[id] = true
+	markUninspected(result, id, cause)
 	*failures = append(*failures, UnusableAnswer(id, cause))
 }
 
@@ -270,9 +310,7 @@ func capAtEnrichmentCap[T any](result *IssueEnricherResult, items []T, idsOf fun
 	}
 	for _, item := range items[EnrichmentCap:] {
 		for _, id := range idsOf(item) {
-			if id != "" {
-				result.TruncatedIDs[id] = true
-			}
+			markUninspected(result, id, checkCap)
 		}
 	}
 	SetTruncated(result, true)
@@ -326,7 +364,7 @@ func Finish(result *IssueEnricherResult, failures []Failure, total int, op strin
 // success — initialize each with `make(...)` before returning.
 type IssueEnricherResult struct {
 	Truncated    bool
-	TruncatedIDs map[string]bool
+	TruncatedIDs map[string]string
 	Findings     map[string][]domain.Finding
 	// AttentionDetails carries per-resource, per-Code supporting rows for the
 	// Wave-2 Finding(s) emitted in Findings. Keyed by Resource.ID then by the
@@ -494,8 +532,8 @@ func walkAccountPages[T any](
 		}
 	}
 	for _, r := range resources {
-		if r.ID != "" && (rule == manyItemsPerRow || !seen[r.ID]) {
-			result.TruncatedIDs[r.ID] = true
+		if rule == manyItemsPerRow || !seen[r.ID] {
+			markUninspected(result, r.ID, checkCap)
 		}
 	}
 	return items, pages, true, err

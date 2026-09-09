@@ -301,10 +301,10 @@ func TestEnrichWAFLogging_APIErrorMarksRowTruncatedIDNotBadge(t *testing.T) {
 	if result.Truncated {
 		t.Error("Truncated must stay false: waf only emits \"~\" findings, so an API error marks the row via TruncatedIDs, never the aggregate issue badge")
 	}
-	if !result.TruncatedIDs[wafACLARN1] {
+	if _, marked := result.TruncatedIDs[wafACLARN1]; !marked {
 		t.Errorf("TruncatedIDs[%q] must be true", wafACLARN1)
 	}
-	if !result.TruncatedIDs[wafACLARN2] {
+	if _, marked := result.TruncatedIDs[wafACLARN2]; !marked {
 		t.Errorf("TruncatedIDs[%q] must be true", wafACLARN2)
 	}
 }

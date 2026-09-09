@@ -457,10 +457,10 @@ func TestASG_LaunchConfigurationErrorMarksTheAffectedGroups(t *testing.T) {
 		pw1ASGWithLaunchConfig("acme-asg-denied", "acme-lc-denied"),
 		pw1ASGGroup("acme-asg-template"),
 	)
-	if !res.TruncatedIDs["acme-asg-denied"] {
+	if _, marked := res.TruncatedIDs["acme-asg-denied"]; !marked {
 		t.Errorf("TruncatedIDs missing acme-asg-denied after a failed DescribeLaunchConfigurations")
 	}
-	if res.TruncatedIDs["acme-asg-template"] {
+	if _, marked := res.TruncatedIDs["acme-asg-template"]; marked {
 		t.Errorf("a launch-template group was marked truncated by a launch-configuration failure")
 	}
 }

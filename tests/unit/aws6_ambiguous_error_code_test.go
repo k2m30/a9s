@@ -98,12 +98,12 @@ func TestMarkSkippedReportsAMalformedRequest(t *testing.T) {
 		t.Run(c.service, func(t *testing.T) {
 			const id = "acme-not-in-any-fixture"
 
-			raceResult := awsclient.IssueEnricherResult{TruncatedIDs: map[string]bool{}}
+			raceResult := awsclient.IssueEnricherResult{TruncatedIDs: map[string]string{}}
 			var raceFailures []awsclient.Failure
 			awsclient.MarkSkipped(&raceResult, id,
 				&raceFailures, &smithy.GenericAPIError{Code: c.code, Message: c.notFoundMsg})
 
-			if !raceResult.TruncatedIDs[id] {
+			if _, marked := raceResult.TruncatedIDs[id]; !marked {
 				t.Errorf("%s: a skipped row must still be marked uninspected so it renders \"?\"", c.service)
 			}
 			if len(raceFailures) != 0 {
@@ -111,12 +111,12 @@ func TestMarkSkippedReportsAMalformedRequest(t *testing.T) {
 					c.service, len(raceFailures), raceFailures)
 			}
 
-			badResult := awsclient.IssueEnricherResult{TruncatedIDs: map[string]bool{}}
+			badResult := awsclient.IssueEnricherResult{TruncatedIDs: map[string]string{}}
 			var badFailures []awsclient.Failure
 			awsclient.MarkSkipped(&badResult, id,
 				&badFailures, &smithy.GenericAPIError{Code: c.code, Message: c.malformed})
 
-			if !badResult.TruncatedIDs[id] {
+			if _, marked := badResult.TruncatedIDs[id]; !marked {
 				t.Errorf("%s: a row whose call was malformed is uninspected too and still renders \"?\"", c.service)
 			}
 			if len(badFailures) != 1 {

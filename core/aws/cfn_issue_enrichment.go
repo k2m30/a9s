@@ -31,7 +31,7 @@ const (
 func EnrichCFNStackEvents(ctx context.Context, clients *ServiceClients, resources []resource.Resource, _ resource.ResourceCache) (IssueEnricherResult, error) {
 	result := IssueEnricherResult{
 		Findings:     make(map[string][]domain.Finding),
-		TruncatedIDs: make(map[string]bool),
+		TruncatedIDs: make(map[string]string),
 	}
 	if clients.CloudFormation == nil {
 		return result, nil
@@ -153,7 +153,7 @@ func EnrichCFNCombined(ctx context.Context, clients *ServiceClients, resources [
 		maps.Copy(mergedUpdates[id], kvMap)
 	}
 	// Merge TruncatedIDs: union of both sub-enricher maps.
-	mergedTruncatedIDs := make(map[string]bool, len(eventsResult.TruncatedIDs)+len(driftResult.TruncatedIDs))
+	mergedTruncatedIDs := make(map[string]string, len(eventsResult.TruncatedIDs)+len(driftResult.TruncatedIDs))
 	maps.Copy(mergedTruncatedIDs, eventsResult.TruncatedIDs)
 	maps.Copy(mergedTruncatedIDs, driftResult.TruncatedIDs)
 	return IssueEnricherResult{
@@ -170,7 +170,7 @@ func EnrichCFNCombined(ctx context.Context, clients *ServiceClients, resources [
 func EnrichCFNDrift(ctx context.Context, clients *ServiceClients, resources []resource.Resource, _ resource.ResourceCache) (IssueEnricherResult, error) {
 	result := IssueEnricherResult{
 		Findings:     make(map[string][]domain.Finding),
-		TruncatedIDs: make(map[string]bool),
+		TruncatedIDs: make(map[string]string),
 		FieldUpdates: make(map[string]map[string]string),
 	}
 	if clients.CloudFormation == nil {

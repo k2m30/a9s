@@ -609,13 +609,13 @@ func TestEC2_UserDataSecret_PerItemErrorMarksOnlyThatRow(t *testing.T) {
 		pw1Instance(bad, "running", "", ec2types.HttpTokensStateRequired),
 		pw1Instance(good, "running", "", ec2types.HttpTokensStateRequired),
 	)
-	if !res.TruncatedIDs[bad] {
+	if _, marked := res.TruncatedIDs[bad]; !marked {
 		t.Errorf("TruncatedIDs missing %s; a failed user-data read must render ? not vanish", bad)
 	}
 	pw1RequireNoFinding(t, res.Findings[bad], pw1EC2CodeUserDataSecret)
 	pw1RequireFinding(t, res.Findings[good], pw1EC2CodeUserDataSecret,
 		"credential in user data", domain.SevBroken, "wave2")
-	if res.TruncatedIDs[good] {
+	if _, marked := res.TruncatedIDs[good]; marked {
 		t.Errorf("healthy neighbour %s wrongly marked truncated", good)
 	}
 }

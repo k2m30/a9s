@@ -35,7 +35,7 @@ type trailLogBucketAPI interface {
 func EnrichTrailLogBucket(ctx context.Context, clients *ServiceClients, resources []resource.Resource, _ resource.ResourceCache) (IssueEnricherResult, error) {
 	result := IssueEnricherResult{
 		Findings:     make(map[string][]domain.Finding),
-		TruncatedIDs: make(map[string]bool),
+		TruncatedIDs: make(map[string]string),
 	}
 	api, ok := clients.S3.(trailLogBucketAPI)
 	if !ok {
@@ -69,10 +69,6 @@ func EnrichTrailLogBucket(ctx context.Context, clients *ServiceClients, resource
 		switch {
 		case statusErr == nil || isS3APIErrCode(statusErr, "NoSuchBucketPolicy"):
 			// No policy at all is an answer, not a gap.
-		case IsNotFoundErr(statusErr):
-			// The log bucket is gone: a race with whoever deleted it, not a
-			// failure to log.
-			result.TruncatedIDs[r.ID] = true
 		default:
 			MarkSkipped(&result, r.ID, &failures, statusErr)
 		}
@@ -81,9 +77,6 @@ func EnrichTrailLogBucket(ctx context.Context, clients *ServiceClients, resource
 		}
 
 		switch {
-		case loggingErr != nil && IsNotFoundErr(loggingErr):
-			// The log bucket is gone: a race, not a failure to log.
-			result.TruncatedIDs[r.ID] = true
 		case loggingErr != nil:
 			MarkSkipped(&result, r.ID, &failures, loggingErr)
 		case logging.LoggingEnabled == nil:

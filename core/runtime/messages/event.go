@@ -444,7 +444,7 @@ type EnrichmentChecked struct {
 	// TruncatedIDs carries the per-resource truncation signal from the enricher.
 	// Keyed by Resource.ID. Rows in this set are rendered as "?" because the
 	// enricher could not fully inspect them (per-resource API error or page cap).
-	TruncatedIDs map[string]bool
+	TruncatedIDs map[string]string
 	Err          error      // enrichment error (nil on success)
 	Gen          domain.Gen // session-wide generation counter (stale probe protection; profile/region switch)
 	TypeGen      domain.Gen // per-type generation counter; bumped on every rerun for that type. Stale

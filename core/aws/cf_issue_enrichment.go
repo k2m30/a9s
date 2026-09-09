@@ -183,7 +183,7 @@ func cachedBucketNames(cache resource.ResourceCache) map[string]bool {
 func EnrichCloudFrontDistribution(ctx context.Context, clients *ServiceClients, resources []resource.Resource, cache resource.ResourceCache) (IssueEnricherResult, error) {
 	result := IssueEnricherResult{
 		Findings:     make(map[string][]domain.Finding),
-		TruncatedIDs: make(map[string]bool),
+		TruncatedIDs: make(map[string]string),
 	}
 	if clients.CloudFront == nil {
 		return result, nil

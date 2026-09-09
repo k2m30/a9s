@@ -56,7 +56,12 @@ type ResourcesLoadedEvent struct {
 	// is currently outstanding, and a result can hold the current rerun token
 	// while a later request has already superseded it.
 	ListSeq domain.Gen
-	Err     error
+	// ScreenID names the list screen instance whose own fetch produced this
+	// result (messages.ResourcesLoaded.ScreenID). It is the key the ordering
+	// guard draws sequences per, so a drill and the list under it order their
+	// own requests and not each other's.
+	ScreenID domain.Gen
+	Err      error
 	// Provenance identifies which fetch pipeline produced this event — mirrors
 	// messages.ResourcesLoaded.Provenance verbatim (every production caller
 	// forwards it unchanged: internal/tui/runtime_adapter_resources.go,
@@ -128,7 +133,7 @@ func (c *Core) HandleResourcesLoaded(ev ResourcesLoadedEvent) ([]UIIntent, []Tas
 	// the result reads it (StampListResult) rather than asking again. A
 	// superseded result still reaches that screen state, which owes the
 	// discarded request the retirement of the activity flag it raised.
-	superseded := c.ListResultSuperseded(resType, ev.ListSeq)
+	superseded := c.ListResultSuperseded(ev.ScreenID, ev.ListSeq)
 	verdict := ListResultVerdict{ResourceType: resType, Superseded: superseded}
 	if superseded {
 		return []UIIntent{verdict}, nil
@@ -235,7 +240,7 @@ func (c *Core) StampListFailure(msg messages.APIError) messages.APIError {
 		return msg
 	}
 	msg.ResourceType = resource.CanonicalShortName(msg.ResourceType)
-	msg.Superseded = c.ListResultSuperseded(msg.ResourceType, msg.ListSeq)
+	msg.Superseded = c.ListResultSuperseded(msg.ScreenID, msg.ListSeq)
 	return msg
 }
 

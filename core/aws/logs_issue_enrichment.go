@@ -34,7 +34,7 @@ const (
 func EnrichLogsMetricFilters(ctx context.Context, clients *ServiceClients, resources []resource.Resource, _ resource.ResourceCache) (IssueEnricherResult, error) {
 	result := IssueEnricherResult{
 		Findings:     make(map[string][]domain.Finding),
-		TruncatedIDs: make(map[string]bool),
+		TruncatedIDs: make(map[string]string),
 		FieldUpdates: make(map[string]map[string]string),
 	}
 	if clients.CloudWatchLogs == nil {

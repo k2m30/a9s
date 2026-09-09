@@ -143,7 +143,7 @@ func r53DanglingRecords(records []r53types.ResourceRecordSet, held map[string]st
 func EnrichRoute53Zone(ctx context.Context, clients *ServiceClients, resources []resource.Resource, cache resource.ResourceCache) (IssueEnricherResult, error) {
 	result := IssueEnricherResult{
 		Findings:     make(map[string][]domain.Finding),
-		TruncatedIDs: make(map[string]bool),
+		TruncatedIDs: make(map[string]string),
 	}
 	if clients.Route53 == nil {
 		return result, nil
@@ -174,14 +174,6 @@ func EnrichRoute53Zone(ctx context.Context, clients *ServiceClients, resources [
 		mu.Lock()
 		defer mu.Unlock()
 		if err != nil {
-			// A zone deleted between ListHostedZones and this per-zone call
-			// is an operational race, not a failure. See IsNotFoundErr.
-			if IsNotFoundErr(err) {
-				// The zone went away between the list call and this one: a
-				// race, not a failure to log.
-				result.TruncatedIDs[r.ID] = true
-				return
-			}
 			MarkSkipped(&result, r.ID, &failures, err)
 			return
 		}

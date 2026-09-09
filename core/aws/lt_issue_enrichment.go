@@ -44,7 +44,7 @@ func EnrichLTDeprecatedAMI(_ context.Context, _ *ServiceClients, resources []res
 	result := IssueEnricherResult{
 		Findings:         make(map[string][]domain.Finding),
 		AttentionDetails: make(map[string]map[domain.FindingCode]domain.AttentionDetail),
-		TruncatedIDs:     make(map[string]bool),
+		TruncatedIDs:     make(map[string]string),
 	}
 
 	// The default version is already in hand from Wave 1 — no API call — so

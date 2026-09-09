@@ -212,7 +212,7 @@ func TestEBSSnap_Public_APIErrorMarksEveryRowUninspected(t *testing.T) {
 
 	res := pw1EnrichEBSSnap(t, fake, pw1EBSCache("vol-0aaaa1111bbbb2222"), a, b)
 	for _, id := range []string{"snap-0errora00aaaa1", "snap-0errorb00aaaa1"} {
-		if !res.TruncatedIDs[id] {
+		if _, marked := res.TruncatedIDs[id]; !marked {
 			t.Errorf("TruncatedIDs missing %s after the public-snapshot query failed", id)
 		}
 		pw1RequireNoFinding(t, res.Findings[id], pw1EBSSnapCodePublic)

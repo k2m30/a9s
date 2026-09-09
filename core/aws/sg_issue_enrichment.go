@@ -33,7 +33,7 @@ func EnrichSGUsage(_ context.Context, _ *ServiceClients, resources []resource.Re
 	result := IssueEnricherResult{
 		Findings:         make(map[string][]domain.Finding),
 		AttentionDetails: make(map[string]map[domain.FindingCode]domain.AttentionDetail),
-		TruncatedIDs:     make(map[string]bool),
+		TruncatedIDs:     make(map[string]string),
 	}
 
 	eniEntry, eniLoaded := cache["eni"]

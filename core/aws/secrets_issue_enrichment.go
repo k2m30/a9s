@@ -35,7 +35,7 @@ const (
 func EnrichSecretsPolicy(ctx context.Context, clients *ServiceClients, resources []resource.Resource, _ resource.ResourceCache) (IssueEnricherResult, error) {
 	result := IssueEnricherResult{
 		Findings:     make(map[string][]domain.Finding),
-		TruncatedIDs: make(map[string]bool),
+		TruncatedIDs: make(map[string]string),
 		FieldUpdates: make(map[string]map[string]string),
 	}
 	if clients.SecretsManager == nil {
@@ -73,12 +73,6 @@ func EnrichSecretsPolicy(ctx context.Context, clients *ServiceClients, resources
 		mu.Lock()
 		defer mu.Unlock()
 		if err != nil {
-			if IsNotFoundErr(err) {
-				// The secret went away between the list call and this one: a
-				// race, not a failure to log.
-				result.TruncatedIDs[r.ID] = true
-				return
-			}
 			MarkSkipped(&result, r.ID, &failures, err)
 			return
 		}

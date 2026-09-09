@@ -44,7 +44,7 @@ func TestEnrichRoute53Zone_TypedNoSuchHostedZone_SilentTruncation(t *testing.T) 
 	if len(result.Findings) != 0 {
 		t.Errorf("expected 0 findings for a deleted zone, got %d: %v", len(result.Findings), result.Findings)
 	}
-	if !result.TruncatedIDs[r53ZoneID1] {
+	if _, marked := result.TruncatedIDs[r53ZoneID1]; !marked {
 		t.Errorf("TruncatedIDs[%q] must be true — zone deleted between list and enrichment", r53ZoneID1)
 	}
 }
@@ -68,7 +68,7 @@ func TestEnrichRoute53Zone_GenericNoSuchHostedZone_SilentTruncation(t *testing.T
 	if len(result.Findings) != 0 {
 		t.Errorf("expected 0 findings for a deleted zone, got %d: %v", len(result.Findings), result.Findings)
 	}
-	if !result.TruncatedIDs[r53ZoneID1] {
+	if _, marked := result.TruncatedIDs[r53ZoneID1]; !marked {
 		t.Errorf("TruncatedIDs[%q] must be true — zone deleted between list and enrichment", r53ZoneID1)
 	}
 }
@@ -102,7 +102,7 @@ func TestEnrichRoute53Zone_AccessDenied_StillAggregates(t *testing.T) {
 	if len(result.Findings) != 0 {
 		t.Errorf("expected 0 findings on AccessDenied, got %d", len(result.Findings))
 	}
-	if !result.TruncatedIDs[r53ZoneID1] {
+	if _, marked := result.TruncatedIDs[r53ZoneID1]; !marked {
 		t.Errorf("TruncatedIDs[%q] must be true", r53ZoneID1)
 	}
 }

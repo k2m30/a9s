@@ -167,7 +167,7 @@ func TestW4KMSPolicyFetchFailureIsUnknown(t *testing.T) {
 	if err == nil {
 		t.Error("a refused GetKeyPolicy returned no error")
 	}
-	if !res.TruncatedIDs[w4KMSPrivateKeyID] {
+	if _, marked := res.TruncatedIDs[w4KMSPrivateKeyID]; !marked {
 		t.Errorf("TruncatedIDs[%s] = false, want true", w4KMSPrivateKeyID)
 	}
 	w4AssertNoCode(t, res.Findings[w4KMSPrivateKeyID], w4CodeKMSPublicPolicy)

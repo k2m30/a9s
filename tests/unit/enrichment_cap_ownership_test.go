@@ -79,10 +79,10 @@ func TestPageCap_RowBeyondTheLastWalkedPageIsNotInspected(t *testing.T) {
 		t.Errorf("DescribeInstanceStatus called %d times, want at most %d — the walk is not bounded",
 			fake.instanceStatusCallCount, awsclient.EnrichmentCap)
 	}
-	if !result.TruncatedIDs[unseen] {
+	if _, marked := result.TruncatedIDs[unseen]; !marked {
 		t.Errorf("row %q is not in TruncatedIDs — its answer sat past the last walked page, so it renders as inspected-and-healthy", unseen)
 	}
-	if result.TruncatedIDs[seen] {
+	if _, marked := result.TruncatedIDs[seen]; marked {
 		t.Errorf("row %q is marked uninspected although page 1 answered for it", seen)
 	}
 	if !result.Truncated {
@@ -127,14 +127,14 @@ func TestPageCap_CompletedWalkMarksNoRowUninspected(t *testing.T) {
 // without a failure must still report the cut: Finish's zero-failure case, and
 // every later pass, compose with the flag rather than overwrite it.
 func TestSetTruncated_NeverLowersAFlagAlreadyRaised(t *testing.T) {
-	result := awsclient.IssueEnricherResult{TruncatedIDs: map[string]bool{}}
+	result := awsclient.IssueEnricherResult{TruncatedIDs: map[string]string{}}
 	awsclient.SetTruncated(&result, true)
 	awsclient.SetTruncated(&result, false)
 	if !result.Truncated {
 		t.Error("SetTruncated(result, false) lowered a flag an earlier pass raised")
 	}
 
-	fresh := awsclient.IssueEnricherResult{TruncatedIDs: map[string]bool{}}
+	fresh := awsclient.IssueEnricherResult{TruncatedIDs: map[string]string{}}
 	awsclient.SetTruncated(&fresh, false)
 	if fresh.Truncated {
 		t.Error("SetTruncated(result, false) raised the flag on an untouched result")
@@ -293,10 +293,10 @@ func TestECSTasks_CapBitesBeforeTheBatchIsSized(t *testing.T) {
 			len(fake.askedAt), awsclient.EnrichmentCap)
 	}
 	dropped := resources[awsclient.EnrichmentCap].ID
-	if !result.TruncatedIDs[dropped] {
+	if _, marked := result.TruncatedIDs[dropped]; !marked {
 		t.Errorf("task %q fell outside the cap but is not in TruncatedIDs — it renders as inspected-and-healthy", dropped)
 	}
-	if result.TruncatedIDs[resources[0].ID] {
+	if _, marked := result.TruncatedIDs[resources[0].ID]; marked {
 		t.Errorf("task %q is inside the cap but was marked uninspected", resources[0].ID)
 	}
 }

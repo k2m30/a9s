@@ -182,11 +182,12 @@ func TestHandleResourcesLoaded_SupersededResultDispatchesNoEnrichTask(t *testing
 	s.Region = "us-east-1"
 	core := runtime.New(s, nil)
 
-	first := runtime.TaskRequest{Key: runtime.TaskKey{Kind: runtime.KindFetchResources, Scope: "s3"}}
+	const screen domain.Gen = 1
+	first := runtime.TaskRequest{Key: runtime.TaskKey{Kind: runtime.KindFetchResources, Scope: "s3"}, ScreenID: screen}
 	core.StampListFetchSeq(&first)
-	second := runtime.TaskRequest{Key: runtime.TaskKey{Kind: runtime.KindFetchResources, Scope: "s3"}}
+	second := runtime.TaskRequest{Key: runtime.TaskKey{Kind: runtime.KindFetchResources, Scope: "s3"}, ScreenID: screen}
 	core.StampListFetchSeq(&second)
-	if !core.ListResultSuperseded("s3", first.ListSeq) {
+	if !core.ListResultSuperseded(screen, first.ListSeq) {
 		t.Fatalf("precondition: sequence %d is not reported superseded after %d was handed out",
 			first.ListSeq, second.ListSeq)
 	}
@@ -195,6 +196,7 @@ func TestHandleResourcesLoaded_SupersededResultDispatchesNoEnrichTask(t *testing
 		ResourceType: "s3",
 		Resources:    wipfixS3Rows(2),
 		ListSeq:      first.ListSeq,
+		ScreenID:     screen,
 		Provenance:   messages.FetchProvenanceCanonicalList,
 	})
 	for _, task := range tasks {

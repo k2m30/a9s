@@ -94,7 +94,7 @@ func TestEnrichCodeArtifact_CappedPackageCountKeepsThePolicyVerdict(t *testing.T
 	}
 
 	id := "example-domain/example-repo"
-	if res.TruncatedIDs[id] {
+	if _, marked := res.TruncatedIDs[id]; marked {
 		t.Errorf("TruncatedIDs[%s] = true — an informational count cap must not mark the row "+
 			"uninspected: FoldWave2Rows skips every id in this map and the policy finding "+
 			"below never reaches the row", id)
@@ -183,7 +183,7 @@ func TestEnrichSNS_CappedSubscriptionWalkStillReadsPosture(t *testing.T) {
 			"stays unencrypted however many subscribers it has",
 			codesOf(res.Findings[wipfixSNSTopicARN]))
 	}
-	if res.TruncatedIDs[wipfixSNSTopicARN] {
+	if _, marked := res.TruncatedIDs[wipfixSNSTopicARN]; marked {
 		t.Errorf("TruncatedIDs[%s] = true — a subscriber-count cap must not mark the row "+
 			"uninspected: FoldWave2Rows skips every id in this map, so the posture findings "+
 			"above would never reach the row", wipfixSNSTopicARN)

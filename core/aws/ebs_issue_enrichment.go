@@ -25,7 +25,7 @@ const (
 func EnrichEBSVolumeStatus(ctx context.Context, clients *ServiceClients, resources []resource.Resource, cache resource.ResourceCache) (IssueEnricherResult, error) {
 	result := IssueEnricherResult{
 		Findings:     make(map[string][]domain.Finding),
-		TruncatedIDs: make(map[string]bool),
+		TruncatedIDs: make(map[string]string),
 	}
 
 	// Both cache-only joins run before the client guard below: a session with

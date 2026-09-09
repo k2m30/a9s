@@ -68,7 +68,7 @@ func EnrichEC2InstanceStatus(ctx context.Context, clients *ServiceClients, resou
 	result := IssueEnricherResult{
 		Findings:         make(map[string][]domain.Finding),
 		AttentionDetails: make(map[string]map[domain.FindingCode]domain.AttentionDetail),
-		TruncatedIDs:     make(map[string]bool),
+		TruncatedIDs:     make(map[string]string),
 	}
 	if clients.EC2 == nil {
 		return result, nil
@@ -324,12 +324,6 @@ func ec2UserDataSecrets(ctx context.Context, clients *ServiceClients, resources 
 		mu.Lock()
 		defer mu.Unlock()
 		if err != nil {
-			if IsNotFoundErr(err) {
-				// The instance went away between the list call and this one:
-				// a race, not a failure to log.
-				result.TruncatedIDs[r.ID] = true
-				return
-			}
 			MarkSkipped(result, r.ID, &failures, err)
 			return
 		}

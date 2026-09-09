@@ -136,7 +136,7 @@ func EnrichSnapshotCrossRef(cfg SnapshotCrossRefConfig) IssueEnricherFunc {
 		result := IssueEnricherResult{
 			Findings:         make(map[string][]domain.Finding),
 			AttentionDetails: make(map[string]map[domain.FindingCode]domain.AttentionDetail),
-			TruncatedIDs:     make(map[string]bool),
+			TruncatedIDs:     make(map[string]string),
 			FieldUpdates:     make(map[string]map[string]string),
 		}
 
@@ -260,13 +260,7 @@ func enrichSnapshotPublicShare(
 		attrs, err := cfg.PublicAttr(ctx, clients, res)
 		mu.Lock()
 		defer mu.Unlock()
-		switch {
-		case err != nil && IsNotFoundErr(err):
-			// The snapshot went away between the list call and this one —
-			// data incomplete for that row, not a failure to log.
-			result.TruncatedIDs[res.ID] = true
-			return
-		case err != nil:
+		if err != nil {
 			MarkSkipped(result, res.ID, &failures, err)
 			return
 		}

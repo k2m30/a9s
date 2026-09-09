@@ -36,7 +36,7 @@ func EnrichVpcPeerRoutes(_ context.Context, _ *ServiceClients, resources []resou
 	result := IssueEnricherResult{
 		Findings:         make(map[string][]domain.Finding),
 		AttentionDetails: make(map[string]map[domain.FindingCode]domain.AttentionDetail),
-		TruncatedIDs:     make(map[string]bool),
+		TruncatedIDs:     make(map[string]string),
 	}
 
 	rtbList, truncated, ok := cachedTypedRows[ec2types.RouteTable](cache, "rtb")

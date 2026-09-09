@@ -267,7 +267,7 @@ func TestLambda_PublicPolicy_NoPolicyIsHealthyNotAFailure(t *testing.T) {
 		t.Fatalf("a function without a resource policy must not fail the enricher: %v", err)
 	}
 	pw1RequireNoFinding(t, res.Findings[name], pw1LambdaCodePublicPolicy)
-	if res.TruncatedIDs[name] {
+	if _, marked := res.TruncatedIDs[name]; marked {
 		t.Errorf("%s marked truncated for having no resource policy", name)
 	}
 	if res.Truncated {
@@ -286,12 +286,12 @@ func TestLambda_PublicPolicy_ErrorMarksOnlyThatFunction(t *testing.T) {
 	}
 	res := pw1EnrichLambda(t, fake, bad, good)
 
-	if !res.TruncatedIDs[bad] {
+	if _, marked := res.TruncatedIDs[bad]; !marked {
 		t.Errorf("TruncatedIDs missing %s after a failed GetPolicy", bad)
 	}
 	pw1RequireFinding(t, res.Findings[good], pw1LambdaCodePublicPolicy,
 		"invokable by anyone", domain.SevBroken, "wave2")
-	if res.TruncatedIDs[good] {
+	if _, marked := res.TruncatedIDs[good]; marked {
 		t.Errorf("healthy neighbour %s wrongly marked truncated", good)
 	}
 }

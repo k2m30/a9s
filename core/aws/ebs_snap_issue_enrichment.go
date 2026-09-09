@@ -41,7 +41,7 @@ func enrichEBSSnapCrossRef(ctx context.Context, clients *ServiceClients, resourc
 		result.Findings = make(map[string][]domain.Finding)
 	}
 	if result.TruncatedIDs == nil {
-		result.TruncatedIDs = make(map[string]bool)
+		result.TruncatedIDs = make(map[string]string)
 	}
 	publicErr := ebsSnapPublicShares(ctx, clients, resources, &result)
 	if err != nil {

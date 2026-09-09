@@ -228,7 +228,7 @@ func TestW4SecretPolicyFetchFailureIsUnknown(t *testing.T) {
 		t.Errorf("composite error does not name the failed secret: %v", err)
 	}
 
-	if !res.TruncatedIDs["acme-denied-secret"] {
+	if _, marked := res.TruncatedIDs["acme-denied-secret"]; !marked {
 		t.Errorf("TruncatedIDs[acme-denied-secret] = false, want true")
 	}
 	if len(res.Findings["acme-denied-secret"]) != 0 {

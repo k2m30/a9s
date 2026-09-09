@@ -265,7 +265,7 @@ func TestBackupJobs_CutWalkLeavesASightedPlanUninspected(t *testing.T) {
 	if err != nil {
 		t.Fatalf("EnrichBackupJobs: %v", err)
 	}
-	if !result.TruncatedIDs[planID] {
+	if _, marked := result.TruncatedIDs[planID]; !marked {
 		t.Fatalf("plan %s is not in TruncatedIDs after a cut walk (%d pages read)\n"+
 			"finding 4: one sighting on an early page is not the plan's whole answer; "+
 			"a failed job of the same plan may be on a page the cap stopped short of",
@@ -289,7 +289,7 @@ func TestBackupJobs_CompletedWalkAnswersEveryPlan(t *testing.T) {
 	if err != nil {
 		t.Fatalf("EnrichBackupJobs: %v", err)
 	}
-	if result.TruncatedIDs[planID] {
+	if _, marked := result.TruncatedIDs[planID]; marked {
 		t.Errorf("plan %s marked uninspected though the walk read every page", planID)
 	}
 }
@@ -341,7 +341,7 @@ func TestEBSSnapPublic_CutWalkMarksTheUnansweredSnapshot(t *testing.T) {
 	res, _ := e.Fn(context.Background(), &awsclient.ServiceClients{EC2: fake}, rows,
 		pw1EBSCache("vol-0aaaa1111bbbb2222"))
 
-	if !res.TruncatedIDs[aws.ToString(snap.SnapshotId)] {
+	if _, marked := res.TruncatedIDs[aws.ToString(snap.SnapshotId)]; !marked {
 		t.Fatalf("snapshot %s is not in TruncatedIDs after a cut walk (%d pages read)\n"+
 			"finding 5: the cap sets only the aggregate Truncated flag, so a snapshot past "+
 			"it renders private rather than unknown", aws.ToString(snap.SnapshotId), fake.calls)

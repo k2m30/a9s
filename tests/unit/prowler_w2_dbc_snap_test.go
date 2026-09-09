@@ -186,7 +186,7 @@ func TestW2DBCSnapErrorOnOneClientLeavesTheOtherAnswered(t *testing.T) {
 		t.Errorf("a snapshot that vanished between the list call and the attribute call was reported as a run failure: %v", err)
 	}
 
-	if !res.TruncatedIDs[docID] {
+	if _, marked := res.TruncatedIDs[docID]; !marked {
 		t.Error("vanished DocumentDB snapshot not marked in TruncatedIDs")
 	}
 	w2AssertNoCode(t, res.Findings[docID], w2DBCSnapCodePublic)

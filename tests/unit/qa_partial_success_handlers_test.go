@@ -205,7 +205,7 @@ func TestHandleEnrichmentChecked_PartialErrAppliesState(t *testing.T) {
 		Truncated:    true,
 		Findings:     findings,
 		FieldUpdates: fieldUpdates,
-		TruncatedIDs: map[string]bool{"i-partial-002": true},
+		TruncatedIDs: map[string]string{"i-partial-002": ""},
 		Gen:          0,
 		TypeGen:      0,
 	})

@@ -54,7 +54,7 @@ func ecsTaskGone(lastStatus string) bool {
 func EnrichECSTasks(ctx context.Context, clients *ServiceClients, resources []resource.Resource, _ resource.ResourceCache) (IssueEnricherResult, error) {
 	result := IssueEnricherResult{
 		Findings:     make(map[string][]domain.Finding),
-		TruncatedIDs: make(map[string]bool),
+		TruncatedIDs: make(map[string]string),
 	}
 	if clients.ECS == nil || len(resources) == 0 {
 		return result, nil
@@ -204,12 +204,6 @@ func ecsTaskDefinitionPosture(ctx context.Context, clients *ServiceClients, resu
 		defer mu.Unlock()
 		if err != nil || out == nil || out.TaskDefinition == nil {
 			for _, taskID := range tasksByDef[defARN] {
-				if err != nil && IsNotFoundErr(err) {
-					// The definition was deregistered between the two calls:
-					// a race, not a failure to log.
-					result.TruncatedIDs[taskID] = true
-					continue
-				}
 				MarkSkipped(result, taskID, &failures, err)
 			}
 			return

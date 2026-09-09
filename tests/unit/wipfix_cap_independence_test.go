@@ -138,7 +138,7 @@ func TestEnrichSNS_CappedSubscriptionWalkStillReadsPosture(t *testing.T) {
 		t.Errorf("findings for the capped topic = %v, want sns.no-kms — an unencrypted topic stays unencrypted however many subscribers it has",
 			findingCodes(result.Findings[arn]))
 	}
-	if result.TruncatedIDs[arn] {
+	if _, marked := result.TruncatedIDs[arn]; marked {
 		t.Errorf("TruncatedIDs[%q] = true — a subscriber-count cap must not mark the row uninspected: FoldWave2Rows skips every id in this map, so the posture findings above would never reach the row", arn)
 	}
 	if got := result.FieldUpdates[arn]["subs_count"]; !strings.HasSuffix(got, "+") {
@@ -217,7 +217,7 @@ func TestEnrichCodeArtifact_CappedPackageCountKeepsPolicyVerdict(t *testing.T) {
 	if len(result.Findings[repoID]) == 0 {
 		t.Errorf("no findings for %q — the public-policy verdict came from GetRepositoryPermissionsPolicy, which the package-count cap says nothing about", repoID)
 	}
-	if result.TruncatedIDs[repoID] {
+	if _, marked := result.TruncatedIDs[repoID]; marked {
 		t.Errorf("TruncatedIDs[%q] = true — an informational count cap must not mark the row uninspected: FoldWave2Rows would drop the policy finding above", repoID)
 	}
 	if got := result.FieldUpdates[repoID]["package_count"]; !strings.HasSuffix(got, "+") {
@@ -302,7 +302,7 @@ func TestEnrichAPIGateway_CappedStageWalkKeepsAuthorizerFinding(t *testing.T) {
 	if len(result.Findings[apiID]) == 0 {
 		t.Errorf("no findings for %q — an API with zero authorizers is unauthenticated whatever its stage count", apiID)
 	}
-	if result.TruncatedIDs[apiID] {
+	if _, marked := result.TruncatedIDs[apiID]; marked {
 		t.Errorf("TruncatedIDs[%q] = true — an informational stage-count cap must not mark the row uninspected: FoldWave2Rows would drop the authorizer finding above", apiID)
 	}
 	if got := result.FieldUpdates[apiID]["stages_count"]; !strings.HasSuffix(got, "+") {

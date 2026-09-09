@@ -38,16 +38,20 @@ type profilesLoadedMsg struct {
 //
 // lane is the screen's own lane, from core/app's one owner (GetListLane) for
 // a refresh of an open list, or the constant the call site knows for a fresh
-// list open. It decides two things together, exactly as the continuation lane
-// does: which screen the delivery gate will accept this result on, and whether
-// the fetch takes a list sequence at all — only the type's canonical list can
-// supersede, so a drill's refresh must never hand out one and overtake the
-// verification of the list beneath it.
+// list open. It decides which screen the delivery gate will accept this result
+// on.
+//
+// The sequence is drawn for the screen that issued the fetch, and every lane
+// draws one: the guard is keyed by the screen instance, so a drill's refresh
+// orders the drill's own requests and reaches no other screen. A fetch with no
+// list screen on top draws none — there is nothing for it to be ordered
+// against.
 func (m *Model) fetchResources(resourceType string, gen domain.Gen, lane messages.FetchProvenance) tea.Cmd {
 	ctx, clients := m.appCtx, m.core.Clients()
+	screen := m.ctrl.GetListInstance()
 	var seq domain.Gen
-	if lane.CanonicalList() {
-		seq = m.core.NextListFetchSeq(resourceType)
+	if screen != 0 {
+		seq = m.core.NextListFetchSeq(screen)
 	}
 	return func() tea.Msg {
 		res, err := m.core.FetchResources(ctx, clients, resourceType)
@@ -65,6 +69,7 @@ func (m *Model) fetchResources(resourceType string, gen domain.Gen, lane message
 			Err:          err,
 			Gen:          gen,
 			ListSeq:      seq,
+			ScreenID:     screen,
 			Provenance:   lane,
 		}
 	}
@@ -166,9 +171,10 @@ func (m *Model) fetchMoreResources(msg messages.LoadMore) tea.Cmd {
 	if provenance == messages.FetchProvenanceUnknown {
 		provenance = messages.ProvenanceForContinuation(msg.ParentContext, msg.FetchFilter)
 	}
+	screen := m.ctrl.GetListInstance()
 	var seq domain.Gen
-	if provenance.CanonicalList() {
-		seq = m.core.NextListFetchSeq(msg.ResourceType)
+	if screen != 0 {
+		seq = m.core.NextListFetchSeq(screen)
 	}
 	return func() tea.Msg {
 		res, err := m.core.FetchMoreResources(ctx, clients, p)
@@ -184,6 +190,7 @@ func (m *Model) fetchMoreResources(msg messages.LoadMore) tea.Cmd {
 			Err:          err,
 			Gen:          gen,
 			ListSeq:      seq,
+			ScreenID:     screen,
 			Provenance:   provenance,
 		}
 	}

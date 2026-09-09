@@ -423,7 +423,7 @@ func TestW2DBIEngineLookupErrorMarksTruncated(t *testing.T) {
 	}
 	w2AssertEnricherShape(t, res)
 
-	if !res.TruncatedIDs["acme-denied-db"] {
+	if _, marked := res.TruncatedIDs["acme-denied-db"]; !marked {
 		t.Error("instance whose engine lookup failed was not marked in TruncatedIDs")
 	}
 	w2AssertNoCode(t, res.Findings["acme-denied-db"], w2DBICodeEngineDeprecated)

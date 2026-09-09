@@ -348,7 +348,7 @@ func TestEnrichAPIGatewayStage_APIErrorMarksRowTruncatedIDNotBadge(t *testing.T)
 	if result.Truncated {
 		t.Error("Truncated must stay false: apigw is a \"~\"-only enricher, so an API error marks the row via TruncatedIDs, never the aggregate issue badge")
 	}
-	if !result.TruncatedIDs[apigwAPIID1] {
+	if _, marked := result.TruncatedIDs[apigwAPIID1]; !marked {
 		t.Errorf("TruncatedIDs[%q] must be true — the GetStages error must mark that API's row with a \"?\" coverage gap", apigwAPIID1)
 	}
 }

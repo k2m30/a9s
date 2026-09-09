@@ -126,13 +126,7 @@ func (c *Controller) buildDetailFooterHints(ds *DetailState) []KeyHint {
 		if cursor >= 0 && cursor < len(visibleRows) {
 			selected := visibleRows[cursor]
 			if isActionableDetailRow(selected) {
-				displayName := selected.TargetType
-				if rt := resource.FindResourceType(selected.TargetType); rt != nil {
-					displayName = rt.Name
-				} else if ct := resource.GetChildType(selected.TargetType); ct != nil {
-					displayName = ct.Name
-				}
-				hints = append(hints, KeyHint{Key: "enter", Help: displayName})
+				hints = append(hints, KeyHint{Key: "enter", Help: c.targetDisplayName(selected.TargetType)})
 			}
 		}
 		hints = append(hints, KeyHint{Key: "tab", Help: "Fields"})
@@ -152,13 +146,7 @@ func (c *Controller) buildDetailFooterHints(ds *DetailState) []KeyHint {
 	if fc >= 0 && fc < len(items) {
 		item := items[fc]
 		if item.IsNavigable && item.TargetType != "" {
-			displayName := item.TargetType
-			if rt := resource.FindResourceType(item.TargetType); rt != nil {
-				displayName = rt.Name
-			} else if ct := resource.GetChildType(item.TargetType); ct != nil {
-				displayName = ct.Name
-			}
-			hints = append(hints, KeyHint{Key: "enter", Help: displayName})
+			hints = append(hints, KeyHint{Key: "enter", Help: c.targetDisplayName(item.TargetType)})
 		}
 	}
 
@@ -183,4 +171,18 @@ func (c *Controller) buildDetailFooterHints(ds *DetailState) []KeyHint {
 	hints = append(hints, KeyHint{Key: "w", Help: "Wrap"})
 
 	return hints
+}
+
+// targetDisplayName is the human name the enter hint shows for a navigable
+// row's target type. The target is a type the screen is not showing, so it is
+// resolved through the same owner every other typeDef on this screen comes
+// from — the fallback, catalog and child rungs in one place — rather than the
+// catalog-then-child cascade this file used to spell out at both hint sites.
+// A type nothing answers for keeps its short name: an unnamed hint is worse
+// than a terse one.
+func (c *Controller) targetDisplayName(targetType string) string {
+	if td := c.typeDefForLocked(targetType); td != nil && td.Name != "" {
+		return td.Name
+	}
+	return targetType
 }

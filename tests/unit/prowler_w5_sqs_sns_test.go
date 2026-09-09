@@ -385,13 +385,13 @@ func TestW5_SQSPublicPolicy_APIErrorOnOneQueueTruncatesOnlyThatQueue(t *testing.
 	)
 	w2AssertEnricherShape(t, res)
 
-	if !res.TruncatedIDs[broken] {
+	if _, marked := res.TruncatedIDs[broken]; !marked {
 		t.Errorf("TruncatedIDs[%q] = false; a queue whose attribute call failed is unknown, not healthy", broken)
 	}
 	if len(res.Findings[broken]) != 0 {
 		t.Errorf("failed queue %q carries findings %v; nothing was observed about it", broken, w2Codes(res.Findings[broken]))
 	}
-	if res.TruncatedIDs[healthy] {
+	if _, marked := res.TruncatedIDs[healthy]; marked {
 		t.Errorf("TruncatedIDs[%q] = true; one queue's failure must not mark the others unknown", healthy)
 	}
 	w2AssertFinding(t, res.Findings[healthy], "sqs.public-policy",
@@ -685,13 +685,13 @@ func TestW5_SNSTopicAttributes_APIErrorTruncatesOnlyThatTopic(t *testing.T) {
 	)
 	w2AssertEnricherShape(t, res)
 
-	if !res.TruncatedIDs[brokenARN] {
+	if _, marked := res.TruncatedIDs[brokenARN]; !marked {
 		t.Errorf("TruncatedIDs[%q] = false; a topic whose attributes could not be read is unknown, not healthy", broken)
 	}
 	w2AssertNoCode(t, res.Findings[brokenARN], "sns.public-policy")
 	w2AssertNoCode(t, res.Findings[brokenARN], "sns.no-kms")
 
-	if res.TruncatedIDs[healthyARN] {
+	if _, marked := res.TruncatedIDs[healthyARN]; marked {
 		t.Errorf("TruncatedIDs[%q] = true; one topic's failure must not mark the others unknown", healthy)
 	}
 	w2AssertFinding(t, res.Findings[healthyARN], "sns.public-policy",

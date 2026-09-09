@@ -27,17 +27,17 @@ func TestMarkSkipped_AVanishedResourceIsUninspectedNotAFailure(t *testing.T) {
 
 	result := awsclient.IssueEnricherResult{
 		Findings:     map[string][]domain.Finding{},
-		TruncatedIDs: map[string]bool{},
+		TruncatedIDs: map[string]string{},
 	}
 	var failures []awsclient.Failure
 
 	awsclient.MarkSkipped(&result, "vanished", &failures, gone)
 	awsclient.MarkSkipped(&result, "refused", &failures, denied)
 
-	if !result.TruncatedIDs["vanished"] {
+	if _, marked := result.TruncatedIDs["vanished"]; !marked {
 		t.Error("a vanished row must still render uninspected")
 	}
-	if !result.TruncatedIDs["refused"] {
+	if _, marked := result.TruncatedIDs["refused"]; !marked {
 		t.Error("a refused row must render uninspected")
 	}
 	if len(failures) != 1 {
@@ -97,10 +97,10 @@ func TestEnrichIAMRoleLastUsed_VanishedRoleIsARace(t *testing.T) {
 		t.Errorf("err = %v, want nil — a role deleted between the list call and "+
 			"the per-role call is a race, not a failure to report", err)
 	}
-	if !res.TruncatedIDs["acme-gone-role"] {
+	if _, marked := res.TruncatedIDs["acme-gone-role"]; !marked {
 		t.Error("TruncatedIDs[acme-gone-role] = false; the row must render \"?\", not clean")
 	}
-	if res.TruncatedIDs["acme-live-role"] {
+	if _, marked := res.TruncatedIDs["acme-live-role"]; marked {
 		t.Error("the role that answered must not be marked uninspected")
 	}
 }
@@ -122,7 +122,7 @@ func TestEnrichIAMRoleLastUsed_RefusedRoleIsStillAFailure(t *testing.T) {
 	if !awsclient.IsAccessDenied(err) {
 		t.Errorf("class = %q, want %q", awsclient.ErrClass(err), awsclient.ClassAccessDenied)
 	}
-	if !res.TruncatedIDs["acme-denied-role"] {
+	if _, marked := res.TruncatedIDs["acme-denied-role"]; !marked {
 		t.Error("a refused row must still render uninspected")
 	}
 }

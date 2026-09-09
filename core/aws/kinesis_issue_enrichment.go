@@ -37,7 +37,7 @@ const kinesisDefaultRetentionHours int32 = 24
 func EnrichKinesisStreamSummary(ctx context.Context, clients *ServiceClients, resources []resource.Resource, _ resource.ResourceCache) (IssueEnricherResult, error) {
 	result := IssueEnricherResult{
 		Findings:     make(map[string][]domain.Finding),
-		TruncatedIDs: make(map[string]bool),
+		TruncatedIDs: make(map[string]string),
 		FieldUpdates: make(map[string]map[string]string),
 	}
 	if clients.Kinesis == nil {
@@ -85,7 +85,7 @@ func EnrichKinesisStreamSummary(ctx context.Context, clients *ServiceClients, re
 			}
 			// The stream went away between the listing and this call: a race,
 			// not a failure to log.
-			result.TruncatedIDs[r.ID] = true
+			markUninspected(&result, r.ID, checkOf(err))
 			return
 		}
 		sum := out.StreamDescriptionSummary

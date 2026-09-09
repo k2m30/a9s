@@ -569,7 +569,7 @@ func TestW7Tags_FailedReadReportsNothing(t *testing.T) {
 		w7CacheWith(w7Plan("", "", "backup=nightly")))
 
 	w4AssertNoCode(t, res.Findings["acme-orders"], awsclient.CodeDDBNotInBackupPlan)
-	if !res.TruncatedIDs["acme-orders"] {
+	if _, marked := res.TruncatedIDs["acme-orders"]; !marked {
 		t.Error("the table whose tag read failed is not marked skipped, so the row renders as judged rather than as unknown")
 	}
 }
@@ -586,11 +586,11 @@ func TestW7Tags_FailedReadOnOneTableStillJudgesTheOthers(t *testing.T) {
 	// acme-sessions is taken in by the selection's ARN, so no tag read was
 	// needed and it is judged covered.
 	w4AssertNoCode(t, res.Findings["acme-sessions"], awsclient.CodeDDBNotInBackupPlan)
-	if res.TruncatedIDs["acme-sessions"] {
+	if _, marked := res.TruncatedIDs["acme-sessions"]; marked {
 		t.Error("a table the ARN selection already covers was marked skipped")
 	}
 	w4AssertNoCode(t, res.Findings["acme-orders"], awsclient.CodeDDBNotInBackupPlan)
-	if !res.TruncatedIDs["acme-orders"] {
+	if _, marked := res.TruncatedIDs["acme-orders"]; !marked {
 		t.Error("the table whose read failed is not marked skipped")
 	}
 }
@@ -609,7 +609,7 @@ func TestW7Tags_TokenThatNeverClearsIsBounded(t *testing.T) {
 		w7CacheWith(w7Plan("", "", "backup=nightly")))
 
 	w4AssertNoCode(t, res.Findings["acme-orders"], awsclient.CodeDDBNotInBackupPlan)
-	if !res.TruncatedIDs["acme-orders"] {
+	if _, marked := res.TruncatedIDs["acme-orders"]; !marked {
 		t.Error("a table whose tags could not be read to the end is not marked skipped")
 	}
 	if n := fake.callCount(); n > awsclient.PerParentPageCap {

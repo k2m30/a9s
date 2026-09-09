@@ -255,7 +255,7 @@ func TestW6BECR_NoRepositoryPolicy_IsHealthyNotTruncated(t *testing.T) {
 	res := w6bECREnrichOK(t, fake, name)
 
 	w2AssertNoCode(t, res.Findings[name], string(w6bECRCodePublicPolicy))
-	if res.TruncatedIDs[name] {
+	if _, marked := res.TruncatedIDs[name]; marked {
 		t.Error("RepositoryPolicyNotFound marked the repository unknown; it is a definite no-policy answer")
 	}
 }
@@ -297,7 +297,7 @@ func TestW6BECR_NoLifecyclePolicy_NotFoundIsTheFinding(t *testing.T) {
 	w2AssertFinding(t, res.Findings[name], string(w6bECRCodeNoLifecycle),
 		w6bECRPhraseNoLifecycle, domain.SevWarn, w6bECRSource)
 	w2AssertNoRows(t, res, name, string(w6bECRCodeNoLifecycle))
-	if res.TruncatedIDs[name] {
+	if _, marked := res.TruncatedIDs[name]; marked {
 		t.Error("LifecyclePolicyNotFound marked the repository unknown; the absence is the answer, not a failed read")
 	}
 }
@@ -324,13 +324,13 @@ func TestW6BECR_PolicyReadError_MarksOnlyThatRepoUnknown(t *testing.T) {
 	}
 	res, _ := w6bECREnrich(t, fake, broken, healthy)
 
-	if !res.TruncatedIDs[broken] {
+	if _, marked := res.TruncatedIDs[broken]; !marked {
 		t.Errorf("a repository whose policy could not be read must be marked unknown, got TruncatedIDs=%v", res.TruncatedIDs)
 	}
 	w2AssertNoCode(t, res.Findings[broken], string(w6bECRCodePublicPolicy))
 	w2AssertFinding(t, res.Findings[healthy], string(w6bECRCodePublicPolicy),
 		w6bECRPhrasePublicPolicy, domain.SevBroken, w6bECRSource)
-	if res.TruncatedIDs[healthy] {
+	if _, marked := res.TruncatedIDs[healthy]; marked {
 		t.Error("one repository's failure marked an unrelated repository unknown")
 	}
 }
@@ -350,12 +350,12 @@ func TestW6BECR_ImagesReadError_DoesNotSinkTheOtherRepos(t *testing.T) {
 	}
 	res, _ := w6bECREnrich(t, fake, broken, neighbour)
 
-	if !res.TruncatedIDs[broken] {
+	if _, marked := res.TruncatedIDs[broken]; !marked {
 		t.Errorf("the repository whose read failed must be marked unknown, got %v", res.TruncatedIDs)
 	}
 	w2AssertFinding(t, res.Findings[neighbour], string(w6bECRCodeNoLifecycle),
 		w6bECRPhraseNoLifecycle, domain.SevWarn, w6bECRSource)
-	if res.TruncatedIDs[neighbour] {
+	if _, marked := res.TruncatedIDs[neighbour]; marked {
 		t.Error("one repository's failed read marked its neighbour unknown")
 	}
 }

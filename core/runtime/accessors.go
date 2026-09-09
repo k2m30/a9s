@@ -202,7 +202,7 @@ func (c *Core) DeleteEnrichmentRan(rt string) { c.session.EnrichmentRanDelete(rt
 // EnrichmentTruncatedIDs returns the truncated-ID set for the given
 // resource type, or nil when no enrichment has retained truncation data
 // for the type.
-func (c *Core) EnrichmentTruncatedIDs(rt string) map[string]bool {
+func (c *Core) EnrichmentTruncatedIDs(rt string) map[string]string {
 	return c.session.EnrichmentTruncatedIDs[rt]
 }
 
@@ -217,7 +217,7 @@ func (c *Core) DeleteEnrichmentTruncatedIDs(rt string) {
 func (c *Core) ResetEnrichmentMaps() {
 	c.session.EnrichmentRanReset()
 	c.session.EnrichmentTypeGenReset()
-	c.session.EnrichmentTruncatedIDs = make(map[string]map[string]bool)
+	c.session.EnrichmentTruncatedIDs = make(map[string]map[string]string)
 }
 
 // ResetProbeMaps clears the Wave-1 retained-probe row-store entries so the

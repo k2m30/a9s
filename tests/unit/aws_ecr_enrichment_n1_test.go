@@ -291,7 +291,7 @@ func TestEnrichECRRepository_N1_DescribeImagesErrorSurfaces(t *testing.T) {
 	if !result.Truncated {
 		t.Error("expected Truncated=true when any repo fails")
 	}
-	if !result.TruncatedIDs[errRepo] {
+	if _, marked := result.TruncatedIDs[errRepo]; !marked {
 		t.Errorf("expected TruncatedIDs[%q]=true", errRepo)
 	}
 	// The successful repo still produces its finding (partial success preserved).

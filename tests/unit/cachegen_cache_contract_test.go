@@ -202,7 +202,7 @@ func TestEnrichmentPartial_KeepsFindingsForUninspectedIDs(t *testing.T) {
 	core.HandleEvent(messages.EnrichmentChecked{
 		ResourceType: "s3",
 		Findings:     map[string][]domain.Finding{},
-		TruncatedIDs: map[string]bool{uninspected: true},
+		TruncatedIDs: map[string]string{uninspected: ""},
 	})
 
 	got, _ := core.ProbeResources("s3")
@@ -743,7 +743,7 @@ func TestEnrichmentFailure_KeepsRenderedFindingOnTheList(t *testing.T) {
 	ctrl.Handle(messages.EnrichmentChecked{
 		ResourceType: "s3",
 		Err:          errors.New("operation timed out"),
-		TruncatedIDs: map[string]bool{id: true},
+		TruncatedIDs: map[string]string{id: ""},
 	})
 
 	after := cachegenRowFor(t, cachegenListBody(t, ctrl), id)
@@ -977,7 +977,7 @@ func TestFreshFetch_KeepsUninspectedRowsFinding(t *testing.T) {
 	ctrl.Handle(messages.EnrichmentChecked{
 		ResourceType: "s3",
 		Findings:     map[string][]domain.Finding{answered: {cachegenWave2Finding("s3-public-read")}},
-		TruncatedIDs: map[string]bool{uninspected: true},
+		TruncatedIDs: map[string]string{uninspected: ""},
 		Err:          errors.New("operation timed out"),
 	})
 

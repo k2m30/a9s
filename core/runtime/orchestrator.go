@@ -164,6 +164,7 @@ func (c *Core) HandleEvent(ev Event) ([]UIIntent, []TaskRequest) {
 			Append:       msg.Append,
 			TypeGen:      msg.TypeGen,
 			ListSeq:      msg.ListSeq,
+			ScreenID:     msg.ScreenID,
 			Err:          msg.Err,
 			Provenance:   msg.Provenance,
 		})

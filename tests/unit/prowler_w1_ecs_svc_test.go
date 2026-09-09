@@ -162,7 +162,7 @@ func TestECSSvc_PublicIP_BatchErrorMarksEveryServiceInTheBatch(t *testing.T) {
 	fake := &pw1ECSSvcFake{err: errors.New("AccessDeniedException: ecs:DescribeServices")}
 	res := pw1EnrichECSSvc(t, fake, "acme-a", "acme-b")
 	for _, name := range []string{"acme-a", "acme-b"} {
-		if !res.TruncatedIDs[name] {
+		if _, marked := res.TruncatedIDs[name]; !marked {
 			t.Errorf("TruncatedIDs missing %q after a failed DescribeServices batch", name)
 		}
 		pw1RequireNoFinding(t, res.Findings[name], pw1ECSSvcCodePublicIP)

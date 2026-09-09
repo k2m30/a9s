@@ -600,7 +600,7 @@ func TestW3ELBListeners_FailureMarksOnlyThatBalancer(t *testing.T) {
 
 	res := w3RunELBEnrich(t, fake, bad, good)
 
-	if !res.TruncatedIDs[bad.ID] {
+	if _, marked := res.TruncatedIDs[bad.ID]; !marked {
 		t.Errorf("TruncatedIDs = %v, want %s marked so its row renders unknown rather than healthy", res.TruncatedIDs, bad.ID)
 	}
 	if _, ok := w3FindingByCode(res.Findings[bad.ID], w3CodeELBPlainHTTP); ok {
@@ -609,7 +609,7 @@ func TestW3ELBListeners_FailureMarksOnlyThatBalancer(t *testing.T) {
 	if _, ok := w3FindingByCode(res.Findings[good.ID], w3CodeELBPlainHTTP); !ok {
 		t.Errorf("one failed balancer suppressed the others; %s findings=%+v", good.ID, res.Findings[good.ID])
 	}
-	if res.TruncatedIDs[good.ID] {
+	if _, marked := res.TruncatedIDs[good.ID]; marked {
 		t.Errorf("healthy-path balancer %s was marked truncated", good.ID)
 	}
 }

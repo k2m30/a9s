@@ -109,7 +109,7 @@ func TestW2DBISnapSharedWithNamedAccountsIsNotPublic(t *testing.T) {
 func TestW2DBISnapPrivateSnapshotIsClean(t *testing.T) {
 	res := w2DBISnapEnrich(t, &w2DBISnapAttrFake{}, "acme-orders-db-2026-02-02")
 	w2AssertNoCode(t, res.Findings["acme-orders-db-2026-02-02"], w2DBISnapCodePublic)
-	if res.TruncatedIDs["acme-orders-db-2026-02-02"] {
+	if _, marked := res.TruncatedIDs["acme-orders-db-2026-02-02"]; marked {
 		t.Error("a private snapshot was marked unknown; the empty restore list is a definite answer")
 	}
 }
@@ -129,7 +129,7 @@ func TestW2DBISnapNotFoundIsTruncatedNotFailure(t *testing.T) {
 		t.Errorf("a snapshot that vanished between the list call and the attribute call was reported as a run failure: %v", err)
 	}
 
-	if !res.TruncatedIDs["acme-orders-db-gone"] {
+	if _, marked := res.TruncatedIDs["acme-orders-db-gone"]; !marked {
 		t.Error("vanished snapshot not marked in TruncatedIDs")
 	}
 	w2AssertNoCode(t, res.Findings["acme-orders-db-gone"], w2DBISnapCodePublic)
@@ -150,7 +150,7 @@ func TestW2DBISnapDeniedOnOneItemKeepsTheRestEvaluated(t *testing.T) {
 		t.Error("a denied attribute read was not folded into the composite error")
 	}
 
-	if !res.TruncatedIDs["acme-orders-db-denied"] {
+	if _, marked := res.TruncatedIDs["acme-orders-db-denied"]; !marked {
 		t.Error("denied snapshot not marked in TruncatedIDs")
 	}
 	w2AssertFinding(t, res.Findings["acme-orders-db-2026-02-01"], w2DBISnapCodePublic, "shared with all AWS accounts", domain.SevBroken, "wave2")

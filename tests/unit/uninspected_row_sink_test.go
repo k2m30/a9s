@@ -383,11 +383,11 @@ func TestEnrichmentCap_TailIsMarkedUninspected(t *testing.T) {
 	}
 
 	tail := keys[awsclient.EnrichmentCap].ID
-	if !result.TruncatedIDs[tail] {
+	if _, marked := result.TruncatedIDs[tail]; !marked {
 		t.Errorf("row %d (%q) is not in TruncatedIDs — the tail past EnrichmentCap carries no per-row mark, so it renders as inspected-and-healthy", total, tail)
 	}
 	for _, r := range keys[:awsclient.EnrichmentCap] {
-		if result.TruncatedIDs[r.ID] {
+		if _, marked := result.TruncatedIDs[r.ID]; marked {
 			t.Errorf("row %q is inside the cap but was marked uninspected", r.ID)
 		}
 	}

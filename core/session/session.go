@@ -310,7 +310,7 @@ type Session struct {
 	// field directly outside enrichmentRanMu.
 	EnrichmentRan          map[string]bool
 	enrichmentRanMu        sync.Mutex
-	EnrichmentTruncatedIDs map[string]map[string]bool
+	EnrichmentTruncatedIDs map[string]map[string]string
 
 	// EnrichmentTypeGen is the per-type Wave-2 enrichment counter, guarded by
 	// enrichmentTypeGenMu — like ProbeStatus above, a dispatch-time snapshot
@@ -324,15 +324,24 @@ type Session struct {
 	EnrichmentTypeGen   map[string]domain.Gen
 	enrichmentTypeGenMu sync.Mutex
 
-	// listFetchSeq is the per-type canonical-list fetch dispatch counter,
-	// guarded by listFetchSeqMu. Every canonical top-level list fetch takes
-	// the next value for its type at dispatch time and carries it to the
-	// apply point, which accepts only the value it last handed out — the
-	// ordering the content-shape heuristic in core/app/list_body.go cannot
-	// see. Monotonic for the process lifetime rather than reset on Rotate:
-	// a counter that restarted could hand a post-rotate fetch the same value
-	// a pre-rotate straggler is still carrying.
-	listFetchSeq   map[string]domain.Gen
+	// listFetchSeq is the per-SCREEN list fetch dispatch counter, guarded by
+	// listFetchSeqMu and keyed by the issuing screen's instance identity.
+	// Every list fetch takes the next value for its screen at dispatch time
+	// and carries it to the apply point, which accepts only the value that
+	// screen was last handed — the ordering the content-shape heuristic in
+	// core/app/list_body.go cannot see.
+	//
+	// Per screen and not per type: a drill sits on top of the list it was
+	// opened from and the two are the same type, so one counter for the type
+	// hands a screen's refresh a number the other screen has already moved on,
+	// and each of them supersedes the other's requests. Ordering is a question
+	// about one screen's own requests, and the key is the only identity that
+	// makes it one.
+	//
+	// Monotonic for the process lifetime rather than reset on Rotate: a
+	// counter that restarted could hand a post-rotate fetch the same value a
+	// pre-rotate straggler is still carrying.
+	listFetchSeq   map[domain.Gen]domain.Gen
 	listFetchSeqMu sync.Mutex
 
 	// RowStore is the session-scoped, per-type row store (task #17 wave 1/3 —
@@ -463,8 +472,8 @@ func New() *Session {
 		PendingRefresh:         true,
 		EnrichmentRan:          make(map[string]bool),
 		EnrichmentTypeGen:      make(map[string]domain.Gen),
-		listFetchSeq:           make(map[string]domain.Gen),
-		EnrichmentTruncatedIDs: make(map[string]map[string]bool),
+		listFetchSeq:           make(map[domain.Gen]domain.Gen),
+		EnrichmentTruncatedIDs: make(map[string]map[string]string),
 		ScanHealthLogged:       make(map[string]bool),
 		RowStore:               NewRowStore(),
 		RelatedCache:           NewRelatedCacheLRU(MaxRelatedCacheEntries),
@@ -829,24 +838,23 @@ func (s *Session) EnrichmentTypeGenBump(shortName string) domain.Gen {
 	return s.EnrichmentTypeGen[shortName]
 }
 
-// ListFetchSeqNext hands out shortName's next canonical-list fetch sequence.
-// Called synchronously at dispatch time, never from the goroutine that runs
-// the fetch: two fetches dispatched in a known order must receive their
-// values in that same order for the apply point's comparison to mean
-// anything.
-func (s *Session) ListFetchSeqNext(shortName string) domain.Gen {
+// ListFetchSeqNext hands out screen's next list fetch sequence. Called
+// synchronously at dispatch time, never from the goroutine that runs the
+// fetch: two fetches dispatched in a known order must receive their values in
+// that same order for the apply point's comparison to mean anything.
+func (s *Session) ListFetchSeqNext(screen domain.Gen) domain.Gen {
 	s.listFetchSeqMu.Lock()
 	defer s.listFetchSeqMu.Unlock()
-	s.listFetchSeq[shortName]++
-	return s.listFetchSeq[shortName]
+	s.listFetchSeq[screen]++
+	return s.listFetchSeq[screen]
 }
 
-// ListFetchSeqLatest returns the value ListFetchSeqNext last handed out for
-// shortName, or zero when no canonical list fetch has been dispatched for it.
-func (s *Session) ListFetchSeqLatest(shortName string) domain.Gen {
+// ListFetchSeqLatest returns the value ListFetchSeqNext last handed out to
+// screen, or zero when that screen has dispatched no list fetch.
+func (s *Session) ListFetchSeqLatest(screen domain.Gen) domain.Gen {
 	s.listFetchSeqMu.Lock()
 	defer s.listFetchSeqMu.Unlock()
-	return s.listFetchSeq[shortName]
+	return s.listFetchSeq[screen]
 }
 
 // EnrichmentTypeGenSnapshot returns a defensive copy of every per-type
@@ -1033,7 +1041,7 @@ func (s *Session) Rotate() {
 	s.EnrichmentRanReset()
 	s.ScanHealthLogged = make(map[string]bool)
 	s.EnrichmentTypeGenReset()
-	s.EnrichmentTruncatedIDs = make(map[string]map[string]bool)
+	s.EnrichmentTruncatedIDs = make(map[string]map[string]string)
 	// EnrichSweepMembers/EnrichListOpenPending: a prior profile/region's
 	// in-flight sweep-window/list-open bookkeeping must not leak into the
 	// next pair's scan — same rationale as EnrichmentRan/EnrichmentTypeGen

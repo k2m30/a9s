@@ -163,12 +163,12 @@ func TestEnrichIAMGroup_TruncatedIDsPopulatedOnPerResourceErrorNotBadge(t *testi
 	if result.TruncatedIDs == nil {
 		t.Fatal("TruncatedIDs must not be nil when a per-resource error occurs")
 	}
-	if !result.TruncatedIDs[secondGroup] {
+	if _, marked := result.TruncatedIDs[secondGroup]; !marked {
 		t.Errorf("TruncatedIDs[%q] = false, want true (GetGroup returned error)", secondGroup)
 	}
 
 	// The first group succeeded; it must NOT appear in TruncatedIDs (or be false).
-	if result.TruncatedIDs[firstGroup] {
+	if _, marked := result.TruncatedIDs[firstGroup]; marked {
 		t.Errorf("TruncatedIDs[%q] = true, want false (GetGroup succeeded)", firstGroup)
 	}
 }
@@ -231,7 +231,7 @@ func TestEnrichEventBridgeRuleTargets_CapHitIsCountedNotUninspected(t *testing.T
 	if result.TruncatedIDs == nil {
 		t.Fatal("TruncatedIDs must not be nil")
 	}
-	if result.TruncatedIDs[ruleName] {
+	if _, marked := result.TruncatedIDs[ruleName]; marked {
 		t.Errorf("TruncatedIDs[%q] = true, want false — a page cap on the target COUNT is reported "+
 			"by the \"+\" on target_count, not by marking the row uninspected", ruleName)
 	}

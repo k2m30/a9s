@@ -741,7 +741,7 @@ func (c *Core) handleEnrichmentChecked(msg messages.EnrichmentChecked) ([]UIInte
 		c.session.EnrichmentRanSet(msg.ResourceType)
 
 		if c.session.EnrichmentTruncatedIDs == nil {
-			c.session.EnrichmentTruncatedIDs = make(map[string]map[string]bool)
+			c.session.EnrichmentTruncatedIDs = make(map[string]map[string]string)
 		}
 		c.session.EnrichmentTruncatedIDs[msg.ResourceType] = msg.TruncatedIDs
 

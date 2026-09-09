@@ -87,6 +87,21 @@ func (c *Controller) GetListLane() messages.FetchProvenance {
 	return listLane(c.topScreenID(), c.topListState())
 }
 
+// GetListInstance exposes the top list screen's instance identity — the key
+// the ordering guard draws a fetch sequence per. The TUI builds some of its own
+// fetch commands rather than going through the controller's dispatch, and must
+// stamp the same screen the controller would so those fetches order against the
+// screen's other requests instead of against nothing. Zero when no list screen
+// is on top.
+func (c *Controller) GetListInstance() domain.Gen {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	if ls := c.topListState(); ls != nil {
+		return ls.instance
+	}
+	return 0
+}
+
 // pushByIDPlaceholderList pushes a placeholder ScreenResourceList for
 // targetType and always sets EscPops (this screen is a related/filtered/by-ID
 // drill, never the type's canonical top-level list — isTopLevelCanonicalList

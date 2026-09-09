@@ -290,7 +290,7 @@ func TestEnrichLambdaPosture_DeletedFunctionIsRecordedAsUninspected(t *testing.T
 		t.Fatalf("EnrichLambdaPosture returned an error for a vanished function: %v — "+
 			"a deleted resource is a race, not a failure to report", err)
 	}
-	if !res.TruncatedIDs["example-fn"] {
+	if _, marked := res.TruncatedIDs["example-fn"]; !marked {
 		t.Errorf("TruncatedIDs[example-fn] = false for a function that no longer exists — " +
 			"nothing about its posture was inspected, so the row must not read as clean")
 	}
@@ -308,7 +308,7 @@ func TestEnrichLambdaPosture_PolicylessLiveFunctionIsClean(t *testing.T) {
 	if err != nil {
 		t.Fatalf("EnrichLambdaPosture: %v", err)
 	}
-	if res.TruncatedIDs["example-fn"] {
+	if _, marked := res.TruncatedIDs["example-fn"]; marked {
 		t.Errorf("TruncatedIDs[example-fn] = true for a live function with no resource policy — " +
 			"that is the healthy answer, fully inspected")
 	}

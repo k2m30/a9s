@@ -41,7 +41,7 @@ func (c *Core) applyEnrichment(
 	resourceType string,
 	findings map[string][]domain.Finding,
 	attentionDetails map[string]map[domain.FindingCode]domain.AttentionDetail,
-	uninspected map[string]bool,
+	uninspected map[string]string,
 ) {
 	canon := resourceType
 	var td resource.ResourceTypeDef
@@ -85,10 +85,10 @@ func FoldWave2Rows(
 	td resource.ResourceTypeDef,
 	findings map[string][]domain.Finding,
 	attentionDetails map[string]map[domain.FindingCode]domain.AttentionDetail,
-	uninspected map[string]bool,
+	uninspected map[string]string,
 ) {
 	for i := range rows {
-		if uninspected[rows[i].ID] {
+		if _, skip := uninspected[rows[i].ID]; skip {
 			continue
 		}
 		ApplyWave2ToRow(&rows[i], td, findings, attentionDetails)

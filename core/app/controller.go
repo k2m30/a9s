@@ -377,6 +377,15 @@ func (c *Controller) stampDispatchSnapshotLocked(tasks []runtime.TaskRequest) []
 		screen = top.instance
 	}
 	for i := range tasks {
+		// The list screen on top is the one whose action produced these tasks,
+		// so its own fetches carry its identity and their results come back to
+		// it rather than to whichever screen of that type is topmost when they
+		// land. A task no list screen owns keeps zero and is routed by type and
+		// lane as before. Stamped before the sequence, which is drawn per
+		// screen and needs the identity to draw from.
+		if tasks[i].ScreenID == 0 && runtime.TaskProducesListResult(tasks[i].Key.Kind) {
+			tasks[i].ScreenID = screen
+		}
 		c.core.StampListFetchSeq(&tasks[i])
 		// The flag this dispatch raised on the screen belongs to this request:
 		// record which, so a completion that no longer owns it leaves it up
@@ -387,14 +396,6 @@ func (c *Controller) stampDispatchSnapshotLocked(tasks []runtime.TaskRequest) []
 			} else {
 				top.loadingSeq = tasks[i].ListSeq
 			}
-		}
-		// The list screen on top is the one whose action produced these tasks,
-		// so its own fetches carry its identity and their results come back to
-		// it rather than to whichever screen of that type is topmost when they
-		// land. A task no list screen owns keeps zero and is routed by type and
-		// lane as before.
-		if tasks[i].ScreenID == 0 && runtime.TaskProducesListResult(tasks[i].Key.Kind) {
-			tasks[i].ScreenID = screen
 		}
 	}
 	return tasks

@@ -305,7 +305,7 @@ func TestW6AR53_RecordListingFailureTruncatesTheZone(t *testing.T) {
 	res := w6aEnrichR53(t, fake, w6aAddressCache(false, []string{"203.0.113.10"}, nil, nil),
 		w6aZoneRes("Z0FAIL00000000000000", "acme-corp.com."))
 
-	if !res.TruncatedIDs["Z0FAIL00000000000000"] {
+	if _, marked := res.TruncatedIDs["Z0FAIL00000000000000"]; !marked {
 		t.Error("a zone whose records could not be listed was not marked truncated")
 	}
 	w2AssertNoCode(t, res.Findings["Z0FAIL00000000000000"], w6aR53Dangling)
@@ -766,7 +766,7 @@ func TestW6AR53_RecordWalkStopsAtThePageCapAndSaysSo(t *testing.T) {
 		t.Errorf("ListResourceRecordSets called %d times, want PerParentPageCap (%d)",
 			fake.recordCalls, awsclient.PerParentPageCap)
 	}
-	if !res.TruncatedIDs["Z0LONGZONE0000000000"] {
+	if _, marked := res.TruncatedIDs["Z0LONGZONE0000000000"]; !marked {
 		t.Error("a zone longer than the page cap was not marked truncated")
 	}
 	w2AssertFinding(t, res.Findings["Z0LONGZONE0000000000"], w6aR53Dangling,

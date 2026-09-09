@@ -245,7 +245,7 @@ func TestEnrichSQSAttributes_APIErrorMarksRowTruncatedIDNotBadge(t *testing.T) {
 	if result.Truncated {
 		t.Error("Truncated must stay false: sqs only emits \"~\" findings, so an API error marks the row via TruncatedIDs, never the aggregate issue badge")
 	}
-	if !result.TruncatedIDs["my-queue-1"] {
+	if _, marked := result.TruncatedIDs["my-queue-1"]; !marked {
 		t.Error("TruncatedIDs[\"my-queue-1\"] must be true — the GetQueueAttributes error must mark that queue's row with a \"?\" coverage gap")
 	}
 }

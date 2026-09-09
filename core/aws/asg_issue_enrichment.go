@@ -32,7 +32,7 @@ const (
 func EnrichASGScalingActivities(ctx context.Context, clients *ServiceClients, resources []resource.Resource, _ resource.ResourceCache) (IssueEnricherResult, error) {
 	result := IssueEnricherResult{
 		Findings:     make(map[string][]domain.Finding),
-		TruncatedIDs: make(map[string]bool),
+		TruncatedIDs: make(map[string]string),
 	}
 	if clients.AutoScaling == nil {
 		return result, nil
@@ -179,8 +179,7 @@ func asgLaunchConfigurationPosture(ctx context.Context, clients *ServiceClients,
 				continue
 			}
 			for _, id := range groupsByLC[name] {
-				// The page cap stopped the walk; there is no error to record.
-				result.TruncatedIDs[id] = true
+				markUninspected(result, id, checkCap)
 			}
 		}
 	}

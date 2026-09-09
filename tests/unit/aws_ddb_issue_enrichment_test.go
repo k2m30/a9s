@@ -291,7 +291,7 @@ func TestDDB_Enrich_ErrorPath_TruncatedIDNotBadge(t *testing.T) {
 	if result.Truncated {
 		t.Errorf("Truncated = true, want false: ddb is a \"~\"-only enricher, so a sub-call error marks the row via TruncatedIDs, never the aggregate issue badge")
 	}
-	if !result.TruncatedIDs[errorTableID] {
+	if _, marked := result.TruncatedIDs[errorTableID]; !marked {
 		t.Errorf("TruncatedIDs[%q] = false, want true (error on this table)", errorTableID)
 	}
 	// The table with an error must NOT have a finding (partial data unusable).

@@ -53,14 +53,14 @@ func partialAccessDenied() error {
 // so it must carry the per-row truncation marker the list renders as "?".
 func partialAssertUninspected(t *testing.T, res awsclient.IssueEnricherResult, id string) {
 	t.Helper()
-	if !res.TruncatedIDs[id] {
+	if _, marked := res.TruncatedIDs[id]; !marked {
 		t.Errorf("%s is not in TruncatedIDs; a check that could not be run renders the row clean instead of \"?\"", id)
 	}
 }
 
 func partialAssertInspected(t *testing.T, res awsclient.IssueEnricherResult, id string) {
 	t.Helper()
-	if res.TruncatedIDs[id] {
+	if _, marked := res.TruncatedIDs[id]; marked {
 		t.Errorf("%s is in TruncatedIDs; every check on it answered, so the row is not a coverage gap", id)
 	}
 }

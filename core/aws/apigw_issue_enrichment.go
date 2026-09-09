@@ -54,7 +54,7 @@ func EnrichAPIGatewayStage(ctx context.Context, clients *ServiceClients, resourc
 	result := IssueEnricherResult{
 		Findings:     make(map[string][]domain.Finding),
 		FieldUpdates: make(map[string]map[string]string),
-		TruncatedIDs: make(map[string]bool),
+		TruncatedIDs: make(map[string]string),
 	}
 	if clients.APIGatewayV2 == nil {
 		return result, nil

@@ -120,7 +120,7 @@ func TestEnrichLambdaPosture_RealErrorNeverReachesTheVerifier(t *testing.T) {
 		t.Errorf("GetFunction was called %d time(s) for a row whose policy read failed outright — "+
 			"there is nothing for it to settle", verified)
 	}
-	if !res.TruncatedIDs["example-fn"] {
+	if _, marked := res.TruncatedIDs["example-fn"]; !marked {
 		t.Error("a row whose policy read was denied is not marked uninspected")
 	}
 }
@@ -160,7 +160,7 @@ func TestEnrichLambdaPosture_OneVerificationPerRowThatNeedsIt(t *testing.T) {
 		if fake.calls[id] != 1 {
 			t.Errorf("%s was verified %d time(s), want exactly 1", id, fake.calls[id])
 		}
-		if res.TruncatedIDs[id] {
+		if _, marked := res.TruncatedIDs[id]; marked {
 			t.Errorf("%s is uninspected though its verification succeeded and found it present", id)
 		}
 	}

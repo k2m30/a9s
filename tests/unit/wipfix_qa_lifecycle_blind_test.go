@@ -198,12 +198,15 @@ func TestDrillLoadMore_AppendsToTheDrillThatAskedForIt(t *testing.T) {
 			"lands nowhere")
 	}
 
+	// INVERTED for runtime8 row 4: see the same inversion in
+	// wipfix_list_lifecycle_test.go. The sequence is drawn per issuing screen,
+	// so the drill's continuation takes one and it orders nothing but the
+	// drill's own requests.
 	stamped := loadMore[0]
 	b.core.StampListFetchSeq(&stamped)
-	if stamped.ListSeq != 0 {
-		t.Errorf("the drill's continuation was stamped list sequence %d — only a canonical-list "+
-			"fetch takes one, or the drill supersedes the verification of the list beneath it",
-			stamped.ListSeq)
+	if stamped.ScreenID != 0 && stamped.ListSeq == 0 {
+		t.Error("the drill's continuation drew no list sequence — the drill cannot order it against " +
+			"its own next request")
 	}
 
 	b.pump(t, loadMore)

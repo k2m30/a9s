@@ -78,6 +78,7 @@ func (m Model) handleResourcesLoaded(msg messages.ResourcesLoaded) (tea.Model, t
 		Append:       msg.Append,
 		TypeGen:      msg.TypeGen,
 		ListSeq:      msg.ListSeq,
+		ScreenID:     msg.ScreenID,
 		Err:          msg.Err,
 		Provenance:   msg.Provenance,
 	})

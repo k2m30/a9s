@@ -497,12 +497,12 @@ func TestECSTask_TaskDefinitionErrorMarksOnlyItsOwnTasks(t *testing.T) {
 	}
 	res := pw1EnrichECSTasks(t, fake, pw1ECSTaskResource(badID, badARN), pw1ECSTaskResource(goodID, pw1TaskDefARN))
 
-	if !res.TruncatedIDs[badID] {
+	if _, marked := res.TruncatedIDs[badID]; !marked {
 		t.Errorf("TruncatedIDs missing %s after its task definition could not be read", badID)
 	}
 	pw1RequireFinding(t, res.Findings[goodID], pw1ECSTaskCodePrivileged,
 		"privileged container", domain.SevBroken, "wave2")
-	if res.TruncatedIDs[goodID] {
+	if _, marked := res.TruncatedIDs[goodID]; marked {
 		t.Errorf("healthy neighbour %s wrongly marked truncated", goodID)
 	}
 }

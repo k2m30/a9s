@@ -160,11 +160,11 @@ func TestD3KeyLastUsedErrorMarksTheUserUnknown(t *testing.T) {
 	if err == nil {
 		t.Error("a key whose last use could not be read returned no error")
 	}
-	if !res.TruncatedIDs["acme-batch-user"] {
+	if _, marked := res.TruncatedIDs["acme-batch-user"]; !marked {
 		t.Errorf("TruncatedIDs[acme-batch-user] = false; an unreadable key is unknown, not clean")
 	}
 	w4AssertNoCode(t, res.Findings["acme-batch-user"], d3CodeUserKeyUnused)
-	if res.TruncatedIDs["acme-ci-user"] {
+	if _, marked := res.TruncatedIDs["acme-ci-user"]; marked {
 		t.Errorf("the sibling user was marked unknown by another user's failure")
 	}
 	// Inverted for spec row "phrase": the idle days were in the phrase, so one

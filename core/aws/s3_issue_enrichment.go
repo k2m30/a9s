@@ -85,7 +85,7 @@ const (
 func EnrichS3Posture(ctx context.Context, clients *ServiceClients, resources []resource.Resource, _ resource.ResourceCache) (IssueEnricherResult, error) {
 	result := IssueEnricherResult{
 		Findings:     make(map[string][]domain.Finding),
-		TruncatedIDs: make(map[string]bool),
+		TruncatedIDs: make(map[string]string),
 		FieldUpdates: make(map[string]map[string]string),
 	}
 	if clients.S3 == nil {
@@ -109,11 +109,11 @@ func EnrichS3Posture(ctx context.Context, clients *ServiceClients, resources []r
 
 		mu.Lock()
 		defer mu.Unlock()
-		if p.unreachable {
+		if p.unreachable != nil {
 			truncated = true
 			// Cross-region bucket or a bucket deleted between ListBuckets and
 			// this call: data incomplete, but neither is a failure to log.
-			result.TruncatedIDs[r.ID] = true
+			markUninspected(&result, r.ID, checkOf(p.unreachable))
 			return
 		}
 		// One entry per distinct cause, not per failed call: the six calls
@@ -154,9 +154,11 @@ type s3PostureFinding struct {
 // fired, the per-call errors worth logging, and whether the bucket was
 // reachable from this client's region at all.
 type s3BucketPosture struct {
-	findings      []s3PostureFinding
-	failures      []error
-	unreachable   bool
+	findings []s3PostureFinding
+	failures []error
+	// unreachable holds the error that made the bucket unreachable, so the row
+	// can name the call that refused rather than only that something did.
+	unreachable   error
 	pabIncomplete bool
 }
 
@@ -191,7 +193,7 @@ func scanS3BucketPosture(ctx context.Context, api s3PostureAPI, bucket string) s
 			add(s3CodePublicAccessBlockIncomplete, rows)
 		}
 	case IsNotFoundErr(err), isS3CrossRegionErr(err):
-		p.unreachable = true
+		p.unreachable = err
 		return p
 	default:
 		p.failures = append(p.failures, err)
@@ -209,7 +211,7 @@ func scanS3BucketPosture(ctx context.Context, api s3PostureAPI, bucket string) s
 	// A bucket with no policy at all cannot be public by policy.
 	case isS3APIErrCode(err, "NoSuchBucketPolicy"):
 	case IsNotFoundErr(err), isS3CrossRegionErr(err):
-		p.unreachable = true
+		p.unreachable = err
 		return p
 	default:
 		p.failures = append(p.failures, err)
@@ -232,7 +234,7 @@ func scanS3BucketPosture(ctx context.Context, api s3PostureAPI, bucket string) s
 			add(s3CodeMFADeleteOff, nil)
 		}
 	case IsNotFoundErr(err), isS3CrossRegionErr(err):
-		p.unreachable = true
+		p.unreachable = err
 		return p
 	default:
 		p.failures = append(p.failures, err)
@@ -247,7 +249,7 @@ func scanS3BucketPosture(ctx context.Context, api s3PostureAPI, bucket string) s
 			add(s3CodeAccessLoggingOff, nil)
 		}
 	case IsNotFoundErr(err), isS3CrossRegionErr(err):
-		p.unreachable = true
+		p.unreachable = err
 		return p
 	default:
 		p.failures = append(p.failures, err)
@@ -271,7 +273,7 @@ func scanS3BucketPosture(ctx context.Context, api s3PostureAPI, bucket string) s
 				[]domain.DetailRow{{Label: "Lifecycle rules", Value: strconv.Itoa(enabled), Tier: "~"}})
 		}
 	case IsNotFoundErr(err), isS3CrossRegionErr(err):
-		p.unreachable = true
+		p.unreachable = err
 		return p
 	default:
 		p.failures = append(p.failures, err)
@@ -288,7 +290,7 @@ func scanS3BucketPosture(ctx context.Context, api s3PostureAPI, bucket string) s
 			add(s3CodeNoObjectLock, nil)
 		}
 	case IsNotFoundErr(err), isS3CrossRegionErr(err):
-		p.unreachable = true
+		p.unreachable = err
 		return p
 	default:
 		p.failures = append(p.failures, err)

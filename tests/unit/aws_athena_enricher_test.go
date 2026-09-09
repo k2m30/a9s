@@ -266,7 +266,7 @@ func TestEnrichAthenaWorkGroup_APIErrorMarksRowTruncatedIDNotBadge(t *testing.T)
 	if result.Truncated {
 		t.Error("Truncated must stay false: athena is a \"~\"-only enricher, so an API error marks the row via TruncatedIDs, never the aggregate issue badge")
 	}
-	if !result.TruncatedIDs[athenaWG1] {
+	if _, marked := result.TruncatedIDs[athenaWG1]; !marked {
 		t.Errorf("TruncatedIDs[%q] must be true — the GetWorkGroup error must mark that workgroup's row with a \"?\" coverage gap", athenaWG1)
 	}
 }

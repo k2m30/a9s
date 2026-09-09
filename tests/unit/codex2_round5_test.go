@@ -53,7 +53,7 @@ func TestEnrichDBI_RefusedEngineVersionLookupReachesTheOperator(t *testing.T) {
 		t.Fatal("a refused DescribeDBEngineVersions must reach the operator through " +
 			"the composite error, not only as a Truncated flag")
 	}
-	if !res.TruncatedIDs["acme-legacy-db"] {
+	if _, marked := res.TruncatedIDs["acme-legacy-db"]; !marked {
 		t.Error("the row must still render uninspected")
 	}
 	// The refusal says nothing about the engine, so no finding may be claimed.

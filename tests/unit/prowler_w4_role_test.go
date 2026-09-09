@@ -598,7 +598,7 @@ func TestW4RoleAdminAttachedAPIErrorIsUnknown(t *testing.T) {
 	if err == nil {
 		t.Fatal("a denied ListAttachedRolePolicies must reach the operator through the composite error")
 	}
-	if !res.TruncatedIDs["acme-denied-role"] {
+	if _, marked := res.TruncatedIDs["acme-denied-role"]; !marked {
 		t.Errorf("TruncatedIDs[acme-denied-role] = false, want true")
 	}
 	w4AssertNoCode(t, res.Findings["acme-denied-role"], w4CodeRoleAdminAttached)

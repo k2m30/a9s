@@ -84,64 +84,44 @@ func (c *Core) CaptureDispatch() DispatchSnapshot {
 	}
 }
 
-// StampListFetchSeq gives task the next per-type list fetch sequence when it
-// is a canonical-list fetch that does not already carry one. Call it
-// synchronously at dispatch time — the values must be handed out in the order
-// the fetches were requested, which the goroutines that later run them do not
-// preserve.
+// StampListFetchSeq gives task the next list fetch sequence for the screen
+// that issued it, when it produces a list result and does not already carry
+// one. Call it synchronously at dispatch time — the values must be handed out
+// in the order the fetches were requested, which the goroutines that later run
+// them do not preserve.
 //
-// A task is a canonical-list fetch when its result will carry
-// messages.FetchProvenanceCanonicalList — for both KindFetchResources and
-// KindFetchMore that is what the payload's own lane says, with an undeclared
-// lane meaning the canonical list (the legacy default). Anything else keeps ListSeq zero — those
-// results never reach a canonical list screen, and stamping them would let a
-// child list's load-more supersede an in-flight verification of the list
-// beneath it.
+// The lane a task's result will carry is not consulted. It had to be while the
+// counter was per type, because a child list's load-more drawing a number
+// there superseded an in-flight verification of the list beneath it; keyed by
+// the issuing screen, a drill's sequence orders the drill's own requests and
+// reaches no other screen, so every lane is stamped and every list screen
+// guards itself.
+//
+// A task no list screen owns (ScreenID zero) keeps ListSeq zero: there is no
+// screen whose requests it could be ordered against, and a zero sequence
+// carries no ordering claim.
 func (c *Core) StampListFetchSeq(task *TaskRequest) {
-	if task.ListSeq != 0 {
+	if task.ListSeq != 0 || task.ScreenID == 0 || !TaskProducesListResult(task.Key.Kind) {
 		return
 	}
-	switch task.Key.Kind {
-	case KindFetchResources:
-		// A filtered or child fetch produces a result no canonical screen will
-		// accept, so a sequence drawn here orders nothing — it only moves the
-		// type's latest value on, which supersedes the canonical refresh
-		// already in flight and is itself superseded by the next one. A
-		// payload that declares no lane keeps the legacy default: every
-		// production dispatch stamps its provenance, and an unstamped one is
-		// the canonical list.
-		if p, ok := task.Payload.(FetchResourcesPayload); ok &&
-			p.Provenance != messages.FetchProvenanceUnknown && !p.Provenance.CanonicalList() {
-			return
-		}
-	case KindFetchMore:
-		p, ok := task.Payload.(FetchMorePayload)
-		if !ok || !p.Lane().CanonicalList() {
-			return
-		}
-	default:
-		return
-	}
-	task.ListSeq = c.NextListFetchSeq(task.Key.Scope)
+	task.ListSeq = c.NextListFetchSeq(task.ScreenID)
 }
 
-// NextListFetchSeq hands out shortName's next canonical-list fetch sequence,
-// resolving an alias to the canonical short name the apply point compares
-// against.
-func (c *Core) NextListFetchSeq(shortName string) domain.Gen {
-	return c.session.ListFetchSeqNext(resource.CanonicalShortName(shortName))
+// NextListFetchSeq hands out screen's next list fetch sequence.
+func (c *Core) NextListFetchSeq(screen domain.Gen) domain.Gen {
+	return c.session.ListFetchSeqNext(screen)
 }
 
-// LatestListFetchSeq returns the newest canonical-list fetch sequence handed
-// out for shortName — the only value the apply point accepts.
-func (c *Core) LatestListFetchSeq(shortName string) domain.Gen {
-	return c.session.ListFetchSeqLatest(resource.CanonicalShortName(shortName))
+// LatestListFetchSeq returns the newest list fetch sequence handed out to
+// screen — the only value the apply point accepts from it.
+func (c *Core) LatestListFetchSeq(screen domain.Gen) domain.Gen {
+	return c.session.ListFetchSeqLatest(screen)
 }
 
-// ListResultSuperseded reports whether a list result dispatched for shortName
-// at sequence seq has been overtaken by a later request for the same list —
-// seq is no longer the newest value StampListFetchSeq handed out for the
-// type. The single ordering rule for list results, and it is asked once per
+// ListResultSuperseded reports whether a list result dispatched by screen at
+// sequence seq has been overtaken by a later request from that same screen —
+// seq is no longer the newest value StampListFetchSeq handed it. The single
+// ordering rule for list results, and it is asked once per
 // message: Core.HandleResourcesLoaded is the seam every lane routes a
 // messages.ResourcesLoaded through, and its answer travels on the message
 // (StampListResult) to the screen state that would otherwise ask again. The
@@ -151,8 +131,8 @@ func (c *Core) LatestListFetchSeq(shortName string) domain.Gen {
 // A zero seq carries no ordering claim — a cache-seed replay, a
 // filtered/child/by-ID result, a synthetic construction — and is never
 // superseded.
-func (c *Core) ListResultSuperseded(shortName string, seq domain.Gen) bool {
-	return seq != 0 && seq != c.LatestListFetchSeq(shortName)
+func (c *Core) ListResultSuperseded(screen, seq domain.Gen) bool {
+	return seq != 0 && seq != c.LatestListFetchSeq(screen)
 }
 
 // ExecuteTask runs a task using a snapshot captured now. Synchronous callers

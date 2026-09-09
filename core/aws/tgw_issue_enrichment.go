@@ -31,7 +31,7 @@ const (
 func EnrichTGWAttachments(ctx context.Context, clients *ServiceClients, resources []resource.Resource, _ resource.ResourceCache) (IssueEnricherResult, error) {
 	result := IssueEnricherResult{
 		Findings:     make(map[string][]domain.Finding),
-		TruncatedIDs: make(map[string]bool),
+		TruncatedIDs: make(map[string]string),
 		FieldUpdates: make(map[string]map[string]string),
 	}
 	if clients.EC2 == nil {
@@ -92,8 +92,7 @@ func EnrichTGWAttachments(ctx context.Context, clients *ServiceClients, resource
 			if fetchErr {
 				MarkSkipped(&result, r.ID, &failures, lastErr)
 			} else {
-				// A page cap, not a failed call: there is no error to record.
-				result.TruncatedIDs[r.ID] = true
+				markUninspected(&result, r.ID, checkCap)
 			}
 			return
 		}

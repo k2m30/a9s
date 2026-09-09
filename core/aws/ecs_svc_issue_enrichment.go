@@ -70,7 +70,7 @@ func ecsEventReason(message string) string {
 func EnrichECSServices(ctx context.Context, clients *ServiceClients, resources []resource.Resource, _ resource.ResourceCache) (IssueEnricherResult, error) {
 	result := IssueEnricherResult{
 		Findings:     make(map[string][]domain.Finding),
-		TruncatedIDs: make(map[string]bool),
+		TruncatedIDs: make(map[string]string),
 	}
 	if clients.ECS == nil || len(resources) == 0 {
 		return result, nil

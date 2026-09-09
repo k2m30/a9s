@@ -468,7 +468,7 @@ func TestEnrichmentFinding_KeptEnricherFindingsAreNeverBare(t *testing.T) {
 func bareEnricherFake(_ context.Context, _ *awsclient.ServiceClients, resources []resource.Resource, _ resource.ResourceCache) (awsclient.IssueEnricherResult, error) {
 	res := awsclient.IssueEnricherResult{
 		Findings:     make(map[string][]domain.Finding),
-		TruncatedIDs: make(map[string]bool),
+		TruncatedIDs: make(map[string]string),
 	}
 	for _, r := range resources {
 		res.Findings[r.Name] = []domain.Finding{{

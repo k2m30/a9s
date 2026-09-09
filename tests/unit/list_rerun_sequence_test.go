@@ -30,11 +30,11 @@ func TestRerunReseed_SupersededRequestNeverReseeds(t *testing.T) {
 	if typeGen == 0 {
 		t.Fatalf("RefreshListEnrichment(%q) returned 0 — this type has no issue enricher, so the rerun branch is unreachable", listGenType)
 	}
-	refreshSeq := core.NextListFetchSeq(listGenType)
+	refreshSeq := core.NextListFetchSeq(listGenScreen)
 
 	// The operator hits `m` before the refresh answers. The load-more takes
 	// the newer sequence and its page lands first.
-	loadMoreSeq := core.NextListFetchSeq(listGenType)
+	loadMoreSeq := core.NextListFetchSeq(listGenScreen)
 	deep := listGenRows(6, "i-deep")
 	core.ObserveRows(listGenType, deep, &resource.PaginationMeta{IsTruncated: false}, session.OriginFetch, false)
 	if loadMoreSeq <= refreshSeq {
@@ -49,6 +49,7 @@ func TestRerunReseed_SupersededRequestNeverReseeds(t *testing.T) {
 		Pagination:   &resource.PaginationMeta{IsTruncated: true, NextToken: "n"},
 		TypeGen:      typeGen,
 		ListSeq:      refreshSeq,
+		ScreenID:     listGenScreen,
 	})
 
 	entry, ok := core.ResourceCache(listGenType)
@@ -69,7 +70,7 @@ func TestRerunReseed_LatestRequestStillReseeds(t *testing.T) {
 	core.ObserveRows(listGenType, listGenRows(6, "i-deep"), &resource.PaginationMeta{IsTruncated: false}, session.OriginFetch, false)
 
 	typeGen := core.RefreshListEnrichment(listGenType)
-	refreshSeq := core.NextListFetchSeq(listGenType)
+	refreshSeq := core.NextListFetchSeq(listGenScreen)
 
 	_, tasks := core.HandleResourcesLoaded(runtime.ResourcesLoadedEvent{
 		ResourceType: listGenType,
@@ -77,6 +78,7 @@ func TestRerunReseed_LatestRequestStillReseeds(t *testing.T) {
 		Pagination:   &resource.PaginationMeta{IsTruncated: false},
 		TypeGen:      typeGen,
 		ListSeq:      refreshSeq,
+		ScreenID:     listGenScreen,
 	})
 
 	entry, ok := core.ResourceCache(listGenType)

@@ -310,7 +310,7 @@ func TestW6ATrailLogBucket_UnreadableBucketIsUnknownNotClean(t *testing.T) {
 	if err == nil || !strings.Contains(err.Error(), "acme-denied-trail") {
 		t.Errorf("trail enricher err = %v, want it to name the trail whose bucket it could not read", err)
 	}
-	if !res.TruncatedIDs["acme-denied-trail"] {
+	if _, marked := res.TruncatedIDs["acme-denied-trail"]; !marked {
 		t.Error("a trail whose bucket posture could not be read was not marked truncated")
 	}
 	w2AssertNoCode(t, res.Findings["acme-denied-trail"], w6aTrailBucketPublic)
@@ -526,7 +526,7 @@ func TestW6ATrailLogBucket_MissingBucketIsSkippedNotUnlogged(t *testing.T) {
 		w6aTrailRes("acme-orphan-bucket-trail", "acme-deleted-audit-logs"),
 	)
 
-	if !res.TruncatedIDs["acme-orphan-bucket-trail"] {
+	if _, marked := res.TruncatedIDs["acme-orphan-bucket-trail"]; !marked {
 		t.Error("a trail whose log bucket does not exist was not marked truncated")
 	}
 	w2AssertNoCode(t, res.Findings["acme-orphan-bucket-trail"], w6aTrailBucketNoAccess)

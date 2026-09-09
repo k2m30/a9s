@@ -213,7 +213,7 @@ func TestW2DDBPublicPolicy(t *testing.T) {
 
 	// A table with no policy at all is clean and not unknown.
 	w2AssertNoCode(t, res.Findings["acme-billing"], w2DDBCodePublicPolicy)
-	if res.TruncatedIDs["acme-billing"] {
+	if _, marked := res.TruncatedIDs["acme-billing"]; marked {
 		t.Error("PolicyNotFoundException marked the table unknown; it is a definite no-policy answer")
 	}
 }
@@ -281,7 +281,7 @@ func TestW2DDBPolicyErrorMarksTruncatedAndSparesTheRest(t *testing.T) {
 		t.Error("a denied policy read was not folded into the composite error")
 	}
 
-	if !res.TruncatedIDs["acme-denied"] {
+	if _, marked := res.TruncatedIDs["acme-denied"]; !marked {
 		t.Error("table whose policy could not be read was not marked in TruncatedIDs")
 	}
 	w2AssertNoCode(t, res.Findings["acme-denied"], w2DDBCodePublicPolicy)
