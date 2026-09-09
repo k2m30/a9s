@@ -30,3 +30,13 @@
 
 - A timestamp shown in a status cell reads as the day, the way every other
   date on the screen does. One trail row showed the raw value the SDK returned.
+
+- Fifty attention signals that described a condition and stopped now say what
+  to do about it, or say plainly that nothing can be done for a state nobody
+  can act on. A row whose details could not be read says which permission to
+  grant, instead of only that the name is all a9s can show.
+
+- The six broken Redshift cluster states read as what is wrong rather than as
+  the colour and the API's status word: `out of storage`, `node hardware
+  failed`, `parameter group rejected`, `restore did not complete`, `subnet
+  group cannot host the cluster`, `encryption key store unreachable`.

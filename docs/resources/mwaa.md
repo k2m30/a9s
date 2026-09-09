@@ -236,21 +236,21 @@ mwaa — DATA & ANALYTICS. Status key: `status` — the key the status cell read
 <!-- BEGIN GENERATED: findings -->
 | Code | Phrase | Severity | Source | Detail |
 | --- | --- | --- | --- | --- |
-| mwaa.warn.creating | creating | warn | wave1 | Environment is being provisioned; Airflow is not yet reachable. |
-| mwaa.warn.creating\_snapshot | creating snapshot | warn | wave1 | The environment is snapshotting its metadata database before an update or upgrade. |
-| mwaa.warn.pending | pending: awaiting VPC endpoints | warn | wave1 | Creation is paused until the required VPC endpoints exist in your VPC. |
-| mwaa.warn.updating | updating | warn | wave1 | Environment update in progress; workers may be replaced. |
-| mwaa.warn.rolling\_back | rolling back: update failed | warn | wave1 | Update or upgrade failed; the environment is restoring the latest metadata snapshot. |
-| mwaa.warn.maintenance | maintenance in progress | warn | wave1 | Scheduled maintenance is running; the environment may be briefly unavailable. |
-| mwaa.broken.create\_failed | create failed | broken | wave1 | Environment creation failed and the environment was not created. |
-| mwaa.broken.update\_failed | update failed: rolled back | broken | wave1 | Update failed; environment was restored to its previous state and is usable. |
-| mwaa.broken.unavailable | unavailable: not stable | broken | wave1 | Environment failed and did not return to a stable state; contact AWS support. |
+| mwaa.warn.creating | creating | warn | wave1 | The environment is still being provisioned, so Airflow is not reachable and nothing it schedules is running yet. Wait for it to become available; provisioning takes tens of minutes and a much longer wait points at the VPC endpoints or the execution role. |
+| mwaa.warn.creating\_snapshot | creating snapshot | warn | wave1 | The metadata database is being snapshotted before an update, so the environment is briefly read-only and scheduling is paused. Nothing to do; let it finish before starting another change. |
+| mwaa.warn.pending | pending: awaiting VPC endpoints | warn | wave1 | Creation is waiting for the VPC endpoints the environment needs, so it will sit here indefinitely until they exist. Create the required interface endpoints in the environment's VPC, or let AWS create them by using a VPC with the right access mode. |
+| mwaa.warn.updating | updating | warn | wave1 | An update is being applied, so workers and the web server are being replaced and a task can be interrupted and retried. Confirm your pipelines tolerate a retry, and wait for the environment to become available before starting another change. |
+| mwaa.warn.rolling\_back | rolling back: update failed | warn | wave1 | An update failed and the environment is restoring its previous metadata snapshot, so scheduling is stopped until it finishes. Wait for it to come back, then read the logs for what the update tripped on before retrying. |
+| mwaa.warn.maintenance | maintenance in progress | warn | wave1 | AWS is applying scheduled maintenance, so the environment can be briefly unavailable and a task running across the window may be retried. Nothing to fix; move the maintenance window if it keeps landing on your peak. |
+| mwaa.broken.create\_failed | create failed | broken | wave1 | The environment never came up, so no Airflow scheduler, web server or worker exists and every scheduled pipeline behind it has stopped. Read the environment's CloudWatch logs for the failing step, usually the execution role or the VPC endpoints, then delete it and create it again. |
+| mwaa.broken.update\_failed | update failed: rolled back | broken | wave1 | The update did not take and the environment was rolled back, so it is running and serving on its previous configuration while the change you asked for is not applied. Read the logs for what the update tripped on before retrying it. |
+| mwaa.broken.unavailable | unavailable: not stable | broken | wave1 | The environment failed and did not recover on its own, so it is neither serving nor going to. Open a support case; an environment in this state cannot be repaired from the console and recreating it is the usual outcome. |
 | mwaa.dim.deleting | deleting — environment teardown | dim | wave1 | — |
 | mwaa.dim.deleted | deleted | dim | wave1 | — |
 | mwaa.warn.last\_update\_failed | last update failed | warn | wave1 | The last update to this environment failed, so it is still running its previous configuration; the error code and message are listed below. Fix the cause and update again. |
 | mwaa.warn.webserver\_public | webserver public | warn | wave1 | The Airflow web server answers from the public internet, so its login page is reachable by anyone; the access mode is listed below. Switch the environment to private-only access from your VPC. |
-| mwaa.warn.details\_denied | details denied | warn | wave1 | Access to environment details was denied; only the name is visible. |
-| mwaa.warn.details\_unavailable | details unavailable | warn | wave1 | Details could not be retrieved; only the name is visible. |
+| mwaa.warn.details\_denied | details denied | warn | wave1 | Reading this environment was denied, so its configuration and health are unjudged rather than clean. Grant the role you browse with permission to read the environment, then refresh. |
+| mwaa.warn.details\_unavailable | details unavailable | warn | wave1 | The per-item describe call for this row failed, so a9s can show its name and nothing about its posture — the row is unjudged, not healthy. Retry the refresh; if it persists, check the service's health and whether the call is being throttled. |
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->

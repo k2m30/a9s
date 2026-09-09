@@ -453,8 +453,8 @@ func TestFetchMWAAEnvironmentsPage_PartialGetFailure(t *testing.T) {
 	// "details unavailable". A not-found environment must never read as an
 	// IAM denial (docs/resources/mwaa.md §4; the shared DegradedDetails split).
 	wantByID := map[string]struct{ phrase, detail string }{
-		"env-denied":  {"details denied", "Access to environment details was denied; only the name is visible."},
-		"env-missing": {"details unavailable", "Details could not be retrieved; only the name is visible."},
+		"env-denied":  {"details denied", "Reading this environment was denied, so its configuration and health are unjudged rather than clean. Grant the role you browse with permission to read the environment, then refresh."},
+		"env-missing": {"details unavailable", "The per-item describe call for this row failed, so a9s can show its name and nothing about its posture — the row is unjudged, not healthy. Retry the refresh; if it persists, check the service's health and whether the call is being throttled."},
 	}
 	for _, r := range result.Resources {
 		want, ok := wantByID[r.ID]

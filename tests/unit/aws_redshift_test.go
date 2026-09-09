@@ -171,24 +171,24 @@ func TestRedshift_Fetch_Transitional_Rebooting(t *testing.T) {
 // TestRedshift_Fetch_Broken_IncompatibleNetwork asserts ClusterStatus=incompatible-network.
 func TestRedshift_Fetch_Broken_IncompatibleNetwork(t *testing.T) {
 	r := fetchSingleCluster(t, redshiftFixtureByID(t, fixtures.RedshiftIncompatibleNetworkID))
-	assertStatus(t, r, "broken: incompatible-network")
-	assertFindings(t, r, []string{"broken: incompatible-network"})
+	assertStatus(t, r, "subnet group cannot host the cluster")
+	assertFindings(t, r, []string{"subnet group cannot host the cluster"})
 	assertClusterStatusField(t, r, "incompatible-network")
 }
 
 // TestRedshift_Fetch_Broken_HardwareFailure asserts ClusterStatus=hardware-failure.
 func TestRedshift_Fetch_Broken_HardwareFailure(t *testing.T) {
 	r := fetchSingleCluster(t, redshiftFixtureByID(t, fixtures.RedshiftHardwareFailureID))
-	assertStatus(t, r, "broken: hardware-failure")
-	assertFindings(t, r, []string{"broken: hardware-failure"})
+	assertStatus(t, r, "node hardware failed")
+	assertFindings(t, r, []string{"node hardware failed"})
 	assertClusterStatusField(t, r, "hardware-failure")
 }
 
 // TestRedshift_Fetch_Broken_StorageFull asserts ClusterStatus=storage-full.
 func TestRedshift_Fetch_Broken_StorageFull(t *testing.T) {
 	r := fetchSingleCluster(t, redshiftFixtureByID(t, fixtures.RedshiftStorageFullID))
-	assertStatus(t, r, "broken: storage-full")
-	assertFindings(t, r, []string{"broken: storage-full"})
+	assertStatus(t, r, "out of storage")
+	assertFindings(t, r, []string{"out of storage"})
 	assertClusterStatusField(t, r, "storage-full")
 }
 
@@ -319,8 +319,8 @@ func TestRedshift_Fetch_MultiW1_Two_Warnings_Suffix_Plus_1(t *testing.T) {
 // ClusterAvailabilityStatus=Modifying — only the Broken phrase surfaces.
 func TestRedshift_Fetch_Broken_ClusterStatus_Beats_Availability_Modifying(t *testing.T) {
 	r := fetchSingleCluster(t, redshiftFixtureByID(t, fixtures.RedshiftBrokenWithWarningHiddenID))
-	assertStatus(t, r, "broken: storage-full")
-	assertFindings(t, r, []string{"broken: storage-full"})
+	assertStatus(t, r, "out of storage")
+	assertFindings(t, r, []string{"out of storage"})
 	assertClusterStatusField(t, r, "storage-full")
 	// The Findings slice must NOT contain any Warning phrases.
 	for _, f := range r.Findings {

@@ -234,7 +234,7 @@ func TestFetchVpcPeeringConnectionsPage_StatePhrase_Expired(t *testing.T) {
 	if f.Severity != domain.SevWarn {
 		t.Errorf("Severity = %v, want SevWarn", f.Severity)
 	}
-	const wantDetail = "The peering request expired unaccepted; recreate it if still needed."
+	const wantDetail = "The peering request was never answered and has lapsed, so no traffic crosses and the connection cannot be accepted now. Delete it and raise a new request once the other account is ready to accept."
 	if f.Detail != wantDetail {
 		t.Errorf("Detail = %q, want %q", f.Detail, wantDetail)
 	}
@@ -391,7 +391,7 @@ func TestFetchVpcPeeringConnectionsPage_StatePhrase_Provisioning(t *testing.T) {
 	if f.Severity != domain.SevWarn {
 		t.Errorf("Severity = %v, want SevWarn", f.Severity)
 	}
-	const wantDetail = "Peering connection is being provisioned."
+	const wantDetail = "The connection is being set up and does not carry traffic yet. Wait for it to become active, then add routes on both sides before expecting anything to cross."
 	if f.Detail != wantDetail {
 		t.Errorf("Detail = %q, want %q", f.Detail, wantDetail)
 	}
@@ -620,7 +620,7 @@ func TestEnrichVpcPeerRoutes_NoLocalRoute(t *testing.T) {
 	if f.Severity != domain.SevWarn {
 		t.Errorf("Severity = %v, want SevWarn (the \"~\" tier)", f.Severity)
 	}
-	const wantDetail = "No loaded route table routes to this peering connection."
+	const wantDetail = "The connection is active but no loaded route table sends anything to it, so it carries no traffic and looks connected while behaving as if it were not. Add a route to the peer's address range in the route tables of the subnets that need it."
 	if f.Detail != wantDetail {
 		t.Errorf("Detail = %q, want %q", f.Detail, wantDetail)
 	}
@@ -653,7 +653,7 @@ func TestEnrichVpcPeerRoutes_RouteBlackholed(t *testing.T) {
 	if f.Severity != domain.SevWarn {
 		t.Errorf("Severity = %v, want SevWarn (the \"~\" tier)", f.Severity)
 	}
-	const wantDetail = "A route references this connection but its state is blackhole."
+	const wantDetail = "A route points at this connection and its state is blackhole, so packets matching it are dropped silently, which reads as a firewall problem from the instance's side. Repoint the route at a live target or remove it."
 	if f.Detail != wantDetail {
 		t.Errorf("Detail = %q, want %q", f.Detail, wantDetail)
 	}

@@ -232,8 +232,8 @@ ddb — DATABASES & STORAGE. Status key: `status` — the key the status cell re
 | ddb.cross-account-policy | resource policy grants another account | warn | wave2 | The table's resource policy grants access to an AWS account outside this one. Confirm each account belongs to a partner you meant to share with, and remove the rest. |
 | ddb.public-policy | resource policy open to anyone | broken | wave2 | The table's resource policy allows any AWS principal, so anyone with an AWS account can reach it. Replace the wildcard principal with the specific roles that need access. |
 | ddb.not-in-backup-plan | not covered by a backup plan | warn | wave2 | No backup plan selects this table, so nothing is scheduled to copy it and point-in-time recovery alone will not survive the table being deleted. Add it to a plan by ARN, or give it a tag one of your plans already selects on. |
-| ddb.warn.details\_denied | details denied | warn | wave1 | Access to resource details was denied; only the name is visible. |
-| ddb.warn.details\_unavailable | details unavailable | warn | wave1 | Details could not be retrieved; only the name is visible. |
+| ddb.warn.details\_denied | details denied | warn | wave1 | The per-item describe call for this row was denied, so a9s can show its name and nothing about its posture — the row is unjudged, not healthy. Grant the read-only describe permission for this type to the role you browse with, then refresh. |
+| ddb.warn.details\_unavailable | details unavailable | warn | wave1 | The per-item describe call for this row failed, so a9s can show its name and nothing about its posture — the row is unjudged, not healthy. Retry the refresh; if it persists, check the service's health and whether the call is being throttled. |
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->

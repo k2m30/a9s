@@ -147,7 +147,7 @@ athena — DATA & ANALYTICS. Status key: `state` — the key the status cell rea
 <!-- BEGIN GENERATED: findings -->
 | Code | Phrase | Severity | Source | Detail |
 | --- | --- | --- | --- | --- |
-| athena.workgroup-disabled | disabled | warn | wave1 | Workgroup is administratively disabled — queries submitted against it are rejected until re-enabled. |
+| athena.workgroup-disabled | disabled | warn | wave1 | Every query submitted to this workgroup is rejected, so whatever schedules work through it is failing rather than running slowly. Re-enable the workgroup if that was not deliberate, or repoint the callers at a workgroup that is accepting queries. |
 | athena.settings-not-enforced | settings can be overridden per query | warn | wave2 | Every query submitted to this workgroup may override the settings it defines, so the result location and encryption configured here are advisory rather than binding. Turn on the workgroup's configuration enforcement so its settings apply to every query. |
 | athena.results-unencrypted | query results stored unencrypted | warn | wave2 | Query results are written to S3 with no encryption configured, so whatever a query returns is readable by anyone who can read the results bucket. Set an encryption option on the workgroup's result configuration. |
 <!-- END GENERATED: findings -->

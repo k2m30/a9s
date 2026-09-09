@@ -34,10 +34,10 @@ import (
 
 const (
 	detailsDeniedPhrase = "details denied"
-	detailsDeniedDetail = "Access to resource details was denied; only the name is visible."
+	detailsDeniedDetail = "The per-item describe call for this row was denied, so a9s can show its name and nothing about its posture — the row is unjudged, not healthy. Grant the read-only describe permission for this type to the role you browse with, then refresh."
 
 	detailsUnavailablePhrase = "details unavailable"
-	detailsUnavailableDetail = "Details could not be retrieved; only the name is visible."
+	detailsUnavailableDetail = "The per-item describe call for this row failed, so a9s can show its name and nothing about its posture — the row is unjudged, not healthy. Retry the refresh; if it persists, check the service's health and whether the call is being throttled."
 )
 
 // DetailsDeniedCode returns the per-type FindingCode for the degraded row

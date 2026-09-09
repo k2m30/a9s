@@ -486,7 +486,7 @@ func TestOpenSearch_Fetch_MultiW2UpdatePlusEncryptionSuffix(t *testing.T) {
 			code:     "opensearch.update-forced",
 			phrase:   "software update forced soon",
 			severity: domainpkg.SevWarn,
-			detail:   "AWS will apply this update automatically once the scheduled date passes; upgrade on your own schedule before then to control the maintenance window.",
+			detail:   "AWS will apply this service software update itself once the scheduled date passes, taking whatever maintenance window it chooses. Apply it yourself before that date so the blue/green deployment lands at a time you picked.",
 		},
 		{
 			code:     "opensearch.encryption-off",

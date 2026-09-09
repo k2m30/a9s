@@ -59,9 +59,9 @@ func TestScenario_RedshiftVisual(t *testing.T) {
 	scenario.ExpectRowStatusEquals(demofixtures.RedshiftRebootingID, "rebooting")
 
 	// ClusterStatus broken
-	scenario.ExpectRowStatusEquals(demofixtures.RedshiftIncompatibleNetworkID, "broken: incompatible-network")
-	scenario.ExpectRowStatusEquals(demofixtures.RedshiftHardwareFailureID, "broken: hardware-failure")
-	scenario.ExpectRowStatusEquals(demofixtures.RedshiftStorageFullID, "broken: storage-full")
+	scenario.ExpectRowStatusEquals(demofixtures.RedshiftIncompatibleNetworkID, "subnet group cannot host the cluster")
+	scenario.ExpectRowStatusEquals(demofixtures.RedshiftHardwareFailureID, "node hardware failed")
+	scenario.ExpectRowStatusEquals(demofixtures.RedshiftStorageFullID, "out of storage")
 
 	// ClusterAvailabilityStatus broken
 	scenario.ExpectRowStatusEquals(demofixtures.RedshiftAvailUnavailableID, "unavailable")
@@ -91,7 +91,7 @@ func TestScenario_RedshiftVisual(t *testing.T) {
 	// U8 — Broken severity beats Warning. Even when public/unencrypted warnings
 	// coexist with a Broken ClusterStatus / ClusterAvailabilityStatus, only the
 	// Broken phrase surfaces; no `(+N)` suffix.
-	scenario.ExpectRowStatusEquals(demofixtures.RedshiftBrokenWithWarningHiddenID, "broken: storage-full")
+	scenario.ExpectRowStatusEquals(demofixtures.RedshiftBrokenWithWarningHiddenID, "out of storage")
 	scenario.ExpectRowStatusEquals(demofixtures.RedshiftAvailUnavailableWithWarningHiddenID, "unavailable")
 
 	// -----------------------------------------------------------------
@@ -251,7 +251,7 @@ func TestScenario_RedshiftVisual_HealthyRowsHaveNoIssuesPhrases(t *testing.T) {
 
 	wave1Phrases := []string{
 		"resizing", "rebooting",
-		"broken: incompatible-", "broken: hardware-failure", "broken: storage-full",
+		"broken: incompatible-", "node hardware failed", "out of storage",
 		"unavailable", "failed", "maintenance", "modifying",
 		"pending change queued", "maintenance deferred",
 		"public endpoint", "unencrypted at rest",

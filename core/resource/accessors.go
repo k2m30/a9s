@@ -26,9 +26,6 @@ type ParentContext = domain.ParentContext
 // Populated by SetFieldKeysForTest calls in each aws/*.go init().
 var fieldKeyRegistry = map[string][]string{}
 
-// childTypes maps child type short names to their type definitions.
-var childTypes = map[string]*ResourceTypeDef{}
-
 // SetFieldKeysForTest records the valid Fields keys for a resource type.
 // Called from init() in each aws/*.go file alongside SetPaginatedForTest.
 func SetFieldKeysForTest(shortName string, keys []string) {
@@ -195,11 +192,12 @@ func CleanupFieldAliasesForTest(shortName string) {
 	delete(fieldAliasBuiltins, shortName)
 }
 
-// SetChildTypeForTest stores a child type definition in the child types registry.
-// Called from init() in each aws/*.go file for sub-resource types.
+// SetChildTypeForTest registers a child type for the duration of a test.
+// It is a pass-through: the registry is the catalog's, so a test registration
+// and the installed children are one map under one guard, and a production
+// reader resolving a name cannot race a test registering one.
 func SetChildTypeForTest(def ResourceTypeDef) {
-	copy := def
-	childTypes[def.ShortName] = &copy
+	catalog.SetChildTypeForTest(def)
 }
 
 // TypeDef resolves a type name the way every reader of a declaration must:
@@ -218,16 +216,11 @@ func TypeDef(shortName string) *ResourceTypeDef {
 }
 
 // GetChildType returns the child type definition for the given short name,
-// or nil if no child type is registered. Legacy-first: test overrides via
-// SetChildTypeForTest take effect; otherwise reads catalog.ChildOnly.
+// or nil if no child type is registered. One registry: a test registration
+// lands in the same map the installed children live in, so there is no
+// precedence question to get wrong and no second map to read first.
 func GetChildType(shortName string) *ResourceTypeDef {
-	if def, ok := childTypes[shortName]; ok {
-		return def
-	}
-	if ct := catalog.ChildOnly(shortName); ct != nil {
-		return ct
-	}
-	return nil
+	return catalog.ChildOnly(shortName)
 }
 
 // AllChildTypes returns all registered child type definitions.
@@ -238,42 +231,25 @@ func GetChildType(shortName string) *ResourceTypeDef {
 // walks it for the same reason: an enumeration over the parents alone answers
 // for half the catalog.
 func AllChildTypes() []ResourceTypeDef {
-	result := make([]ResourceTypeDef, 0, len(childTypes))
-	seen := make(map[string]struct{}, len(childTypes))
-	for name, def := range childTypes {
-		result = append(result, *def)
-		seen[name] = struct{}{}
-	}
-	for _, ct := range catalog.AllChildren() {
-		if _, ok := seen[ct.ShortName]; ok {
-			continue
-		}
-		result = append(result, ct)
-	}
-	return result
+	return catalog.AllChildren()
 }
 
 // AllChildShortNamesForTest returns the ShortName of every registered child
 // type. Includes both legacy registry entries and catalog child entries.
 // Test-only: no production caller.
 func AllChildShortNamesForTest() []string {
-	seen := make(map[string]struct{}, len(childTypes))
-	for name := range childTypes {
-		seen[name] = struct{}{}
-	}
-	for _, ct := range catalog.AllChildren() {
-		seen[ct.ShortName] = struct{}{}
-	}
-	names := make([]string, 0, len(seen))
-	for name := range seen {
-		names = append(names, name)
+	children := catalog.AllChildren()
+	names := make([]string, 0, len(children))
+	for _, ct := range children {
+		names = append(names, ct.ShortName)
 	}
 	return names
 }
 
-// CleanupChildTypeForTest removes a child type. Used only in tests for cleanup.
+// CleanupChildTypeForTest removes a child type registered by
+// SetChildTypeForTest. Pass-through, same reason.
 func CleanupChildTypeForTest(shortName string) {
-	delete(childTypes, shortName)
+	catalog.CleanupChildTypeForTest(shortName)
 }
 
 // PaginatedFetcher returns a single page of resources.

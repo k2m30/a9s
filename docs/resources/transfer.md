@@ -203,15 +203,15 @@ transfer — NETWORKING. Status key: `status` — the key the status cell reads,
 <!-- BEGIN GENERATED: findings -->
 | Code | Phrase | Severity | Source | Detail |
 | --- | --- | --- | --- | --- |
-| transfer.warn.offline | offline: not accepting transfers | warn | wave1 | Server is offline; partners cannot connect until it is started. |
-| transfer.warn.starting | starting | warn | wave1 | Server is starting; not yet fully able to respond. |
-| transfer.warn.stopping | stopping | warn | wave1 | Server is stopping; transfers are draining. |
-| transfer.broken.start\_failed | start failed | broken | wave1 | Server failed to come online; partner transfers are down. |
-| transfer.warn.stop\_failed | stop failed | warn | wave1 | Stop failed; the server may still be serving transfers. |
+| transfer.warn.offline | offline: not accepting transfers | warn | wave1 | The server is not accepting connections, so partners fail to connect rather than seeing an error they can act on. Start it if that was not deliberate, and tell the partners if it is going to stay down. |
+| transfer.warn.starting | starting | warn | wave1 | The server is coming up and is not answering yet, so a partner connecting now is refused. Wait for it to come online before rerunning a failed transfer. |
+| transfer.warn.stopping | stopping | warn | wave1 | The server is draining and will stop accepting connections shortly, so in-flight transfers are finishing and new ones are not. Confirm nothing is scheduled into the window before it goes down. |
+| transfer.broken.start\_failed | start failed | broken | wave1 | The server could not come online, so every partner connecting to it is being refused and any transfer schedule behind it has stopped. Check the endpoint's VPC and address configuration and its identity provider, then start it again. |
+| transfer.warn.stop\_failed | stop failed | warn | wave1 | The stop did not take, so the server may still be accepting connections while its state says otherwise, and anything relying on it being down is wrong. Try the stop again and confirm the state before assuming it is off. |
 | transfer.warn.legacy\_policy | legacy security policy | warn | wave1 | The server's security policy still allows weak ciphers and old TLS versions, so a client can be steered onto a breakable connection. Move the server to a current security policy. |
-| transfer.warn.no\_logging | no activity logging | warn | wave1 | Neither a logging role nor structured log destinations are configured. |
-| transfer.warn.details\_denied | details denied | warn | wave1 | Access to server details was denied; only the listed fields are visible. |
-| transfer.warn.details\_unavailable | details unavailable | warn | wave1 | Details could not be retrieved; only the name is visible. |
+| transfer.warn.no\_logging | no activity logging | warn | wave1 | The server records nothing about who connected or what moved, so a disputed or missing transfer cannot be reconstructed afterwards. Attach a logging role or configure a structured log destination. |
+| transfer.warn.details\_denied | details denied | warn | wave1 | Reading this server was denied, so its endpoint, logging and identity-provider settings are unjudged rather than clean. Grant the role you browse with permission to describe the server, then refresh. |
+| transfer.warn.details\_unavailable | details unavailable | warn | wave1 | The per-item describe call for this row failed, so a9s can show its name and nothing about its posture — the row is unjudged, not healthy. Retry the refresh; if it persists, check the service's health and whether the call is being throttled. |
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->

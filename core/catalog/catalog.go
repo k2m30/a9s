@@ -5,6 +5,7 @@ package catalog
 import (
 	"fmt"
 	"strings"
+	"sync/atomic"
 )
 
 // registry is the installed top-level catalog. Populated exactly once by
@@ -17,19 +18,20 @@ import (
 // computed at package-init time in this file.
 var registry []ResourceTypeDef //nolint:gochecknoglobals // process-scope catalog: set once at startup
 
-// childRegistry is the installed child-type catalog. Populated exactly once by
-// SetChildTypes. Same lifecycle as registry.
-var childRegistry map[string]ResourceTypeDef //nolint:gochecknoglobals // process-scope catalog: set once at startup
+// childRegistry is the installed child-type catalog, and the only registry of
+// child types there is. A nil pointer means no child catalog is installed.
+//
+// It is an atomic pointer to an immutable map rather than a plain map because
+// SetChildTypeForTest writes it while production goroutines read it: the
+// enrichment path resolves a type name on the cache-writer goroutine, and a
+// test registering a child type raced it. Writers copy the map and swap the
+// pointer, so a reader holds a map nobody will write to again.
+var childRegistry atomic.Pointer[map[string]ResourceTypeDef] //nolint:gochecknoglobals // process-scope catalog
 
 // installed records whether SetTypes has been called. Used to surface a
 // loud panic from Find / All if a binary forgets the install (typically a
 // test package whose TestMain does not call aws.Install).
 var installed bool //nolint:gochecknoglobals // process-scope catalog: set once at startup
-
-// childInstalled records whether SetChildTypes has been called. Independent
-// of installed so packages that only need top-level access can skip child
-// installation without tripping the panic in FindChild.
-var childInstalled bool //nolint:gochecknoglobals // process-scope catalog: set once at startup
 
 // SetTypes installs the top-level catalog. MUST be called exactly once at
 // program start (main() / TestMain) BEFORE any Find / All call. Idempotent
@@ -52,8 +54,8 @@ func SetTypes(types []ResourceTypeDef) {
 // Idempotent on identical input; panics on a second call with different data.
 func SetChildTypes(children []ResourceTypeDef) {
 	validateRelatedDefs(children)
-	if childInstalled {
-		if !sameChildren(childRegistry, children) {
+	if existing := childRegistry.Load(); existing != nil {
+		if !sameChildren(*existing, children) {
 			panic("catalog.SetChildTypes called twice with different data — refusing to overwrite installed child catalog")
 		}
 		return
@@ -62,8 +64,7 @@ func SetChildTypes(children []ResourceTypeDef) {
 	for _, c := range children {
 		m[c.ShortName] = c
 	}
-	childRegistry = m
-	childInstalled = true
+	childRegistry.Store(&m)
 	indexDetails(children)
 }
 
@@ -123,13 +124,61 @@ func AllShortNames() []string {
 //
 // Panics if SetChildTypes has not been called.
 func findChild(name string) *ResourceTypeDef {
-	if !childInstalled {
-		panic("catalog.SetChildTypes not called — programmer must invoke aws.Install() before any child-catalog accessor")
-	}
-	if c, ok := childRegistry[name]; ok {
+	if c, ok := (*loadChildren())[name]; ok {
 		return &c
 	}
 	return nil
+}
+
+// loadChildren returns the installed child map, panicking if none is
+// installed. The returned map is never written to again — writers copy it —
+// so a caller may read it without a lock.
+func loadChildren() *map[string]ResourceTypeDef {
+	m := childRegistry.Load()
+	if m == nil {
+		panic("catalog.SetChildTypes not called — programmer must invoke aws.Install() before any child-catalog accessor")
+	}
+	return m
+}
+
+// SetChildTypeForTest registers or replaces one child type, for a test that
+// needs a type the catalog does not ship. It lives here, on the one registry,
+// because a second registry in front of this one is what a production reader
+// raced against.
+//
+// Copy-on-write: the map a reader already holds is never touched.
+func SetChildTypeForTest(def ResourceTypeDef) {
+	swapChildren(func(m map[string]ResourceTypeDef) { m[def.ShortName] = def })
+}
+
+// CleanupChildTypeForTest removes a child type registered by
+// SetChildTypeForTest. Same copy-on-write rule.
+func CleanupChildTypeForTest(shortName string) {
+	swapChildren(func(m map[string]ResourceTypeDef) { delete(m, shortName) })
+}
+
+// swapChildren applies edit to a copy of the installed child map and swaps it
+// in, retrying if another writer got there first. A plain load-copy-store
+// would lose one of two concurrent registrations, and a lost registration
+// surfaces as "no such type" in whichever test the scheduler robbed.
+//
+// A nil current map means nothing is installed, and registering a child type
+// is installing a child catalog as far as any reader is concerned.
+func swapChildren(edit func(map[string]ResourceTypeDef)) {
+	for {
+		current := childRegistry.Load()
+		next := map[string]ResourceTypeDef{}
+		if current != nil {
+			next = make(map[string]ResourceTypeDef, len(*current)+1)
+			for k, v := range *current {
+				next[k] = v
+			}
+		}
+		edit(next)
+		if childRegistry.CompareAndSwap(current, &next) {
+			return
+		}
+	}
 }
 
 // FindAny returns the type a view name refers to, parent or child, or nil.
@@ -161,11 +210,9 @@ func ChildOnly(name string) *ResourceTypeDef { return findChild(name) }
 //
 // Panics if SetChildTypes has not been called.
 func AllChildren() []ResourceTypeDef {
-	if !childInstalled {
-		panic("catalog.SetChildTypes not called — programmer must invoke aws.Install() before any child-catalog accessor")
-	}
-	out := make([]ResourceTypeDef, 0, len(childRegistry))
-	for _, c := range childRegistry {
+	children := *loadChildren()
+	out := make([]ResourceTypeDef, 0, len(children))
+	for _, c := range children {
 		out = append(out, c)
 	}
 	return out

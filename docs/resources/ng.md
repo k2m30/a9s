@@ -221,8 +221,8 @@ ng — CONTAINERS. Status key: `status` — the key the status cell reads, and t
 | ng.state.delete-failed | delete failed | broken | wave1 | The node group could not be removed and is stuck part-deleted, still billing for whatever instances remain. Check its health issues, clear whatever blocks the deletion — often a load balancer or a network interface left by a service — then delete it again. |
 | ng.state.degraded | degraded | broken | wave1 | The node group is degraded, so some nodes are failing or not joining; every health issue AWS reports is a row under this finding. Fix the cause, usually IAM, subnet capacity or the launch template, and let the group reconcile. |
 | ng.health-issue | health issue | warn | wave1 | The node group reports a health issue while its state says nothing is wrong; every reported code is a row under this finding. Nodes may be failing to join or to stay healthy until it clears. |
-| ng.warn.details\_denied | details denied | warn | wave1 | Access to resource details was denied; only the name is visible. |
-| ng.warn.details\_unavailable | details unavailable | warn | wave1 | Details could not be retrieved; only the name is visible. |
+| ng.warn.details\_denied | details denied | warn | wave1 | The per-item describe call for this row was denied, so a9s can show its name and nothing about its posture — the row is unjudged, not healthy. Grant the read-only describe permission for this type to the role you browse with, then refresh. |
+| ng.warn.details\_unavailable | details unavailable | warn | wave1 | The per-item describe call for this row failed, so a9s can show its name and nothing about its posture — the row is unjudged, not healthy. Retry the refresh; if it persists, check the service's health and whether the call is being throttled. |
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->

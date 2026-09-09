@@ -195,7 +195,7 @@ func TestFetchLaunchTemplatesPage_IMDSv1Explicit(t *testing.T) {
 	if f.Severity != domain.SevWarn {
 		t.Errorf("Severity = %v, want SevWarn", f.Severity)
 	}
-	const wantDetail = "Instance metadata does not require session tokens; IMDSv1 credentials are exposed to SSRF."
+	const wantDetail = "Instances launched from this template answer metadata requests without a session token, so a request-forgery bug in anything they run can read the attached role's credentials. Set the template's metadata options to require tokens, then launch a new version."
 	if f.Detail != wantDetail {
 		t.Errorf("Detail = %q, want %q", f.Detail, wantDetail)
 	}
@@ -246,7 +246,7 @@ func TestFetchLaunchTemplatesPage_UnencryptedExplicit(t *testing.T) {
 	if f.Severity != domain.SevWarn {
 		t.Errorf("Severity = %v, want SevWarn", f.Severity)
 	}
-	const wantDetail = "A block device explicitly sets Encrypted=false; launched instances get unencrypted volumes."
+	const wantDetail = "A block device in this template sets encryption off explicitly, so every instance launched from it gets an unencrypted volume however the account default is configured. Remove the override, or set it to encrypted, and publish a new template version."
 	if f.Detail != wantDetail {
 		t.Errorf("Detail = %q, want %q", f.Detail, wantDetail)
 	}
@@ -434,7 +434,7 @@ func TestFetchLaunchTemplatesPage_DetailsDeniedRich(t *testing.T) {
 	if f.Severity != domain.SevWarn {
 		t.Errorf("Findings[0].Severity = %v, want SevWarn", f.Severity)
 	}
-	const wantDetail = "Access to the default version was denied; only the listed fields are visible."
+	const wantDetail = "Reading this template's default version was denied, so its metadata, block-device and image settings are unjudged rather than clean. Grant the role you browse with permission to read launch template versions, then refresh."
 	if f.Detail != wantDetail {
 		t.Errorf("Findings[0].Detail = %q, want %q (lt-specific S5 sentence, not the generic degraded_resource.go text)", f.Detail, wantDetail)
 	}
@@ -736,7 +736,7 @@ func TestEnrichLTDeprecatedAMI_DeprecatedFindsFinding(t *testing.T) {
 	if f.Severity != domain.SevWarn {
 		t.Errorf("Severity = %v, want SevWarn", f.Severity)
 	}
-	const wantDetail = "The default version references an AMI past its deprecation time."
+	const wantDetail = "The template's default version launches an image AWS has deprecated, so every instance this template creates starts from something no longer maintained. Update the default version to a current image before the next scale-out uses it."
 	if f.Detail != wantDetail {
 		t.Errorf("Detail = %q, want %q", f.Detail, wantDetail)
 	}

@@ -185,12 +185,12 @@ lt — COMPUTE. Status key: `status` — the key the status cell reads, and the 
 <!-- BEGIN GENERATED: findings -->
 | Code | Phrase | Severity | Source | Detail |
 | --- | --- | --- | --- | --- |
-| lt.warn.imdsv1 | IMDSv1 allowed | warn | wave1 | Instance metadata does not require session tokens; IMDSv1 credentials are exposed to SSRF. |
-| lt.warn.unencrypted | EBS encryption disabled | warn | wave1 | A block device explicitly sets Encrypted=false; launched instances get unencrypted volumes. |
-| lt.warn.deprecated\_ami | deprecated AMI | warn | wave2 | The default version references an AMI past its deprecation time. |
+| lt.warn.imdsv1 | IMDSv1 allowed | warn | wave1 | Instances launched from this template answer metadata requests without a session token, so a request-forgery bug in anything they run can read the attached role's credentials. Set the template's metadata options to require tokens, then launch a new version. |
+| lt.warn.unencrypted | EBS encryption disabled | warn | wave1 | A block device in this template sets encryption off explicitly, so every instance launched from it gets an unencrypted volume however the account default is configured. Remove the override, or set it to encrypted, and publish a new template version. |
+| lt.warn.deprecated\_ami | deprecated AMI | warn | wave2 | The template's default version launches an image AWS has deprecated, so every instance this template creates starts from something no longer maintained. Update the default version to a current image before the next scale-out uses it. |
 | lt.user-data-secret | credential in user data | broken | wave2 | A credential is pasted into the default version's user data, so it is readable by anyone who can call ec2:DescribeLaunchTemplateVersions and lands on every instance launched from this template. Move the value to Secrets Manager or Systems Manager Parameter Store and rotate it. |
-| lt.warn.details\_denied | details denied | warn | wave1 | Access to the default version was denied; only the listed fields are visible. |
-| lt.warn.details\_unavailable | details unavailable | warn | wave1 | Details could not be retrieved; only the name is visible. |
+| lt.warn.details\_denied | details denied | warn | wave1 | Reading this template's default version was denied, so its metadata, block-device and image settings are unjudged rather than clean. Grant the role you browse with permission to read launch template versions, then refresh. |
+| lt.warn.details\_unavailable | details unavailable | warn | wave1 | The per-item describe call for this row failed, so a9s can show its name and nothing about its posture — the row is unjudged, not healthy. Retry the refresh; if it persists, check the service's health and whether the call is being throttled. |
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->

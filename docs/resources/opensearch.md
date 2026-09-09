@@ -220,13 +220,13 @@ opensearch — DATABASES & STORAGE. Status key: `status` — the key the status 
 | opensearch.dim.deleting | deleting: removal in progress | dim | wave1 | — |
 | opensearch.broken.isolated | isolated: quarantined by AWS | broken | wave1 | AWS has isolated this domain, which it does when a cluster is unstable or out of disk, and a domain in that state serves no requests. Check its storage and shard health, free space or scale up, then work with AWS support to bring it back. |
 | opensearch.warn.processing | processing: config change in flight | warn | wave1 | A configuration change is being applied to the domain, which moves shards between nodes and can slow queries or briefly reject them. Wait for it to complete before making another change or judging the domain's performance. |
-| opensearch.update-forced | software update forced soon | warn | wave1 | AWS will apply this update automatically once the scheduled date passes; upgrade on your own schedule before then to control the maintenance window. |
+| opensearch.update-forced | software update forced soon | warn | wave1 | AWS will apply this service software update itself once the scheduled date passes, taking whatever maintenance window it chooses. Apply it yourself before that date so the blue/green deployment lands at a time you picked. |
 | opensearch.encryption-off | encryption at rest off | warn | wave1 | Data at rest is stored unencrypted. Enabling encryption at rest requires creating a new domain and migrating data — it cannot be turned on in place. |
 | opensearch.public | reachable outside a VPC | broken | wave1 | The domain sits outside a VPC and its access policy allows any principal, so the search endpoint is reachable from the internet. Move the domain into a VPC, or scope the access policy to named principals. |
 | opensearch.https-not-enforced | HTTPS not enforced | warn | wave1 | The domain accepts plaintext HTTP, so queries and results can be read off the wire. Turn on Require HTTPS in the domain's endpoint options. |
 | opensearch.node-to-node-tls-off | node-to-node encryption off | warn | wave1 | Traffic between the domain's own nodes is unencrypted. Node-to-node encryption can only be enabled on a domain that already has it configured at creation — recreate the domain if this data is sensitive. |
-| opensearch.warn.details\_denied | details denied | warn | wave1 | Access to resource details was denied; only the name is visible. |
-| opensearch.warn.details\_unavailable | details unavailable | warn | wave1 | Details could not be retrieved; only the name is visible. |
+| opensearch.warn.details\_denied | details denied | warn | wave1 | The per-item describe call for this row was denied, so a9s can show its name and nothing about its posture — the row is unjudged, not healthy. Grant the read-only describe permission for this type to the role you browse with, then refresh. |
+| opensearch.warn.details\_unavailable | details unavailable | warn | wave1 | The per-item describe call for this row failed, so a9s can show its name and nothing about its posture — the row is unjudged, not healthy. Retry the refresh; if it persists, check the service's health and whether the call is being throttled. |
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->

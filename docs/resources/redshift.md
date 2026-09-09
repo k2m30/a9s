@@ -210,9 +210,9 @@ One row per signal from §3:
 
 | Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) |
 |---|---|---|---|---|---|
-| `ClusterStatus == incompatible-parameters` | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `broken: incompatible-parameters` |
-| `ClusterStatus==hardware-failure` | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `broken: hardware-failure` |
-| `ClusterStatus==storage-full` | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `broken: storage-full` |
+| `ClusterStatus == incompatible-parameters` | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `parameter group rejected` |
+| `ClusterStatus==hardware-failure` | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `node hardware failed` |
+| `ClusterStatus==storage-full` | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `out of storage` |
 | `ClusterAvailabilityStatus==Unavailable` | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `unavailable` |
 | `ClusterAvailabilityStatus==Failed` | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `failed` |
 | `ClusterAvailabilityStatus==Maintenance` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `maintenance` |
@@ -222,9 +222,9 @@ One row per signal from §3:
 | `DeferredMaintenanceWindows[]` active | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `maintenance deferred` |
 | `PubliclyAccessible==true` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `public endpoint` |
 | `Encrypted==false` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `unencrypted at rest` |
-| `ClusterStatus == incompatible-hsm` | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `broken: incompatible-hsm` |
-| `ClusterStatus == incompatible-network` | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `broken: incompatible-network` |
-| `ClusterStatus == incompatible-restore` | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `broken: incompatible-restore` |
+| `ClusterStatus == incompatible-hsm` | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `encryption key store unreachable` |
+| `ClusterStatus == incompatible-network` | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `subnet group cannot host the cluster` |
+| `ClusterStatus == incompatible-restore` | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `restore did not complete` |
 | `ClusterStatus == creating` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `creating` |
 | `ClusterStatus == resizing` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `resizing` |
 | `ClusterStatus == rebooting` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `rebooting` |
@@ -235,7 +235,7 @@ One row per signal from §3:
 
 ## 4.1 UX review (two sentences)
 
-At 3am, glancing at the list, can the operator tell what's wrong with a problem row without opening detail? Yes — every non-healthy row carries a short cause in the Status column (`broken: storage-full`, `unavailable`, `public endpoint`, `pending change queued`, `maintenance deferred`) rather than a bare state keyword; operator can triage without opening detail, and the detail line adds one sentence of context rather than repeating the column.
+At 3am, glancing at the list, can the operator tell what's wrong with a problem row without opening detail? Yes — every non-healthy row carries a short cause in the Status column (`out of storage`, `unavailable`, `public endpoint`, `pending change queued`, `maintenance deferred`) rather than a bare state keyword; operator can triage without opening detail, and the detail line adds one sentence of context rather than repeating the column.
 
 ## 5. Out of Scope
 
@@ -273,12 +273,12 @@ redshift — DATABASES & STORAGE. Status key: `status` — the key the status ce
 <!-- BEGIN GENERATED: findings -->
 | Code | Phrase | Severity | Source | Detail |
 | --- | --- | --- | --- | --- |
-| redshift.broken.incompatible\_hsm | broken: incompatible-hsm | broken | wave1 | The cluster cannot reach the hardware security module holding its encryption key, so it will not come up. Check the client certificate for that module and the network path to it, then restore the connection. |
-| redshift.broken.incompatible\_network | broken: incompatible-network | broken | wave1 | The cluster's subnet group no longer provides what it needs — free addresses, or the Availability Zone it was created in — so it cannot start. Fix the subnet group, then restore the cluster. |
-| redshift.broken.incompatible\_parameters | broken: incompatible-parameters | broken | wave1 | A value in this cluster's parameter group is rejected, so the cluster will not come up with it applied. Correct the parameter group and reboot the cluster. |
-| redshift.broken.incompatible\_restore | broken: incompatible-restore | broken | wave1 | The restore from snapshot failed, so this cluster holds no usable data. Check the snapshot's node type and encryption against the target, then restore again. |
-| redshift.broken.hardware\_failure | broken: hardware-failure | broken | wave1 | A node's underlying hardware failed. Redshift replaces the node itself, but the cluster is degraded or unavailable until it does; watch the events and restore from the latest snapshot if it does not recover. |
-| redshift.broken.storage\_full | broken: storage-full | broken | wave1 | The cluster has no disk left, so queries that need to spill fail and loads are rejected. Delete or unload cold tables, vacuum to reclaim space, then resize to more storage. |
+| redshift.broken.incompatible\_hsm | encryption key store unreachable | broken | wave1 | The cluster cannot reach the hardware security module holding its encryption key, so it will not come up. Check the client certificate for that module and the network path to it, then restore the connection. |
+| redshift.broken.incompatible\_network | subnet group cannot host the cluster | broken | wave1 | The cluster's subnet group no longer provides what it needs — free addresses, or the Availability Zone it was created in — so it cannot start. Fix the subnet group, then restore the cluster. |
+| redshift.broken.incompatible\_parameters | parameter group rejected | broken | wave1 | A value in this cluster's parameter group is rejected, so the cluster will not come up with it applied. Correct the parameter group and reboot the cluster. |
+| redshift.broken.incompatible\_restore | restore did not complete | broken | wave1 | The restore from snapshot failed, so this cluster holds no usable data. Check the snapshot's node type and encryption against the target, then restore again. |
+| redshift.broken.hardware\_failure | node hardware failed | broken | wave1 | A node's underlying hardware failed. Redshift replaces the node itself, but the cluster is degraded or unavailable until it does; watch the events and restore from the latest snapshot if it does not recover. |
+| redshift.broken.storage\_full | out of storage | broken | wave1 | The cluster has no disk left, so queries that need to spill fail and loads are rejected. Delete or unload cold tables, vacuum to reclaim space, then resize to more storage. |
 | redshift.broken.unavailable | unavailable | broken | wave1 | The cluster is not answering queries, so every dashboard and job behind it is failing. Check the cluster events for the cause, and its most recent snapshot, before deciding between waiting and restoring. |
 | redshift.broken.failed | failed | broken | wave1 | The cluster is in a failed state and will not serve queries again in place. Restore the most recent snapshot into a new cluster and repoint the applications at it. |
 | redshift.warn.creating | creating | warn | wave1 | The cluster is still being provisioned and cannot take connections yet. Wait for it to become available before loading data or pointing tools at the endpoint. |

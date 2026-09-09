@@ -168,27 +168,27 @@ func TestFetchTransferServersPage_StatePhrases(t *testing.T) {
 	}{
 		{
 			fixtures.WarnTransferOfflineID, "offline: not accepting transfers",
-			"Server is offline; partners cannot connect until it is started.",
+			"The server is not accepting connections, so partners fail to connect rather than seeing an error they can act on. Start it if that was not deliberate, and tell the partners if it is going to stay down.",
 			domain.SevWarn, "OFFLINE",
 		},
 		{
 			fixtures.WarnTransferStartingID, "starting",
-			"Server is starting; not yet fully able to respond.",
+			"The server is coming up and is not answering yet, so a partner connecting now is refused. Wait for it to come online before rerunning a failed transfer.",
 			domain.SevWarn, "STARTING",
 		},
 		{
 			fixtures.WarnTransferStoppingID, "stopping",
-			"Server is stopping; transfers are draining.",
+			"The server is draining and will stop accepting connections shortly, so in-flight transfers are finishing and new ones are not. Confirm nothing is scheduled into the window before it goes down.",
 			domain.SevWarn, "STOPPING",
 		},
 		{
 			fixtures.BrokenTransferStartFailedID, "start failed",
-			"Server failed to come online; partner transfers are down.",
+			"The server could not come online, so every partner connecting to it is being refused and any transfer schedule behind it has stopped. Check the endpoint's VPC and address configuration and its identity provider, then start it again.",
 			domain.SevBroken, "START_FAILED",
 		},
 		{
 			fixtures.WarnTransferStopFailedID, "stop failed",
-			"Stop failed; the server may still be serving transfers.",
+			"The stop did not take, so the server may still be accepting connections while its state says otherwise, and anything relying on it being down is wrong. Try the stop again and confirm the state before assuming it is off.",
 			domain.SevWarn, "STOP_FAILED",
 		},
 	}
@@ -282,7 +282,7 @@ func TestFetchTransferServersPage_NoLoggingFinding(t *testing.T) {
 	if finding.Severity != domain.SevWarn {
 		t.Errorf("Severity = %v, want SevWarn", finding.Severity)
 	}
-	const wantDetail = "Neither a logging role nor structured log destinations are configured."
+	const wantDetail = "The server records nothing about who connected or what moved, so a disputed or missing transfer cannot be reconstructed afterwards. Attach a logging role or configure a structured log destination."
 	if finding.Detail != wantDetail {
 		t.Errorf("Detail = %q, want %q", finding.Detail, wantDetail)
 	}
@@ -339,7 +339,7 @@ func TestFetchTransferServersPage_DetailsDeniedRich(t *testing.T) {
 	if f.Severity != domain.SevWarn {
 		t.Errorf("Findings[0].Severity = %v, want SevWarn", f.Severity)
 	}
-	const wantDetail = "Access to server details was denied; only the listed fields are visible."
+	const wantDetail = "Reading this server was denied, so its endpoint, logging and identity-provider settings are unjudged rather than clean. Grant the role you browse with permission to describe the server, then refresh."
 	if f.Detail != wantDetail {
 		t.Errorf("Findings[0].Detail = %q, want %q (transfer-specific — rows are rich, not name-only)", f.Detail, wantDetail)
 	}

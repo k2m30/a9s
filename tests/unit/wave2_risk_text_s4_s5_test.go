@@ -86,7 +86,7 @@ import (
 // 4. logs retention-nil (docs/resources/logs.md §4).
 // Pinned strings:
 //   Phrase (S4): "retention: never expire"
-//   Detail (S5): "No retention policy set — events kept forever, billed indefinitely."
+//   Detail (S5): "Events in this group are kept forever and billed forever, and an unbounded audit log is also a growing pile of whatever the application logged. Set a retention period that matches how far back anyone actually looks."
 // ---------------------------------------------------------------------------
 
 // logsRetentionNilFake implements CWLogsDescribeLogGroupsAPI, returning a
@@ -143,8 +143,8 @@ func TestWave2_Logs_RetentionNil_PinsS4S5Strings(t *testing.T) {
 	if f.Phrase != "retention: never expire" {
 		t.Errorf("logs retention-nil Phrase (S4) = %q, want %q (docs/resources/logs.md §4)", f.Phrase, "retention: never expire")
 	}
-	if f.Detail != "No retention policy set — events kept forever, billed indefinitely." {
-		t.Errorf("logs retention-nil Detail (S5) = %q, want %q (docs/resources/logs.md §4)", f.Detail, "No retention policy set — events kept forever, billed indefinitely.")
+	if f.Detail != "Events in this group are kept forever and billed forever, and an unbounded audit log is also a growing pile of whatever the application logged. Set a retention period that matches how far back anyone actually looks." {
+		t.Errorf("logs retention-nil Detail (S5) = %q, want %q (docs/resources/logs.md §4)", f.Detail, "Events in this group are kept forever and billed forever, and an unbounded audit log is also a growing pile of whatever the application logged. Set a retention period that matches how far back anyone actually looks.")
 	}
 }
 
@@ -153,7 +153,7 @@ func TestWave2_Logs_RetentionNil_PinsS4S5Strings(t *testing.T) {
 // enricher EnrichS3Posture.
 // Pinned strings:
 //   Phrase (S4): "public access block incomplete"
-//   Detail (S5): "Bucket-level public access block is missing or partial — account-level PAB may still apply."
+//   Detail (S5): "This bucket does not set all four public-access settings, so it relies on the account-level block to stop a future policy or ACL from making it public, and that block may not be set either. Turn on all four settings on the bucket itself so it is safe regardless of the account."
 // ---------------------------------------------------------------------------
 
 // TestWave2_S3_PABIncomplete_PinsS4S5Strings drives the real
@@ -188,8 +188,8 @@ func TestWave2_S3_PABIncomplete_PinsS4S5Strings(t *testing.T) {
 	if finding.Phrase != "public access block incomplete" {
 		t.Errorf("s3 PAB Phrase (S4) = %q, want %q", finding.Phrase, "public access block incomplete")
 	}
-	if finding.Detail != "Bucket-level public access block is missing or partial — account-level PAB may still apply." {
-		t.Errorf("s3 PAB Detail (S5) = %q, want %q", finding.Detail, "Bucket-level public access block is missing or partial — account-level PAB may still apply.")
+	if finding.Detail != "This bucket does not set all four public-access settings, so it relies on the account-level block to stop a future policy or ACL from making it public, and that block may not be set either. Turn on all four settings on the bucket itself so it is safe regardless of the account." {
+		t.Errorf("s3 PAB Detail (S5) = %q, want %q", finding.Detail, "This bucket does not set all four public-access settings, so it relies on the account-level block to stop a future policy or ACL from making it public, and that block may not be set either. Turn on all four settings on the bucket itself so it is safe regardless of the account.")
 	}
 }
 
@@ -199,7 +199,7 @@ func TestWave2_S3_PABIncomplete_PinsS4S5Strings(t *testing.T) {
 // Pinned strings (quoted verbatim from docs/resources/ec2.md §4 row
 // "SystemStatus.Status == impaired"):
 //   Phrase (S4): "impaired: system checks failing"
-//   Detail (S5): "AWS reports this instance is impaired — system or instance status checks are failing."
+//   Detail (S5): "AWS's own checks of the host or the instance are failing, which means the problem is below your software: the hypervisor, the network path, or the instance's ability to boot. Stop and start the instance so it moves to different hardware, and read the system log first if you need the cause on record."
 // ---------------------------------------------------------------------------
 
 type ec2ImpairedFake struct {
@@ -254,8 +254,8 @@ func TestWave2_EC2_SystemStatusImpaired_PinsS4S5Strings(t *testing.T) {
 	if finding.Phrase != "impaired: system checks failing" {
 		t.Errorf("ec2 impaired Phrase (S4) = %q, want %q (docs/resources/ec2.md §4)", finding.Phrase, "impaired: system checks failing")
 	}
-	if finding.Detail != "AWS reports this instance is impaired — system or instance status checks are failing." {
-		t.Errorf("ec2 impaired Detail (S5) = %q, want %q (docs/resources/ec2.md §4)", finding.Detail, "AWS reports this instance is impaired — system or instance status checks are failing.")
+	if finding.Detail != "AWS's own checks of the host or the instance are failing, which means the problem is below your software: the hypervisor, the network path, or the instance's ability to boot. Stop and start the instance so it moves to different hardware, and read the system log first if you need the cause on record." {
+		t.Errorf("ec2 impaired Detail (S5) = %q, want %q (docs/resources/ec2.md §4)", finding.Detail, "AWS's own checks of the host or the instance are failing, which means the problem is below your software: the hypervisor, the network path, or the instance's ability to boot. Stop and start the instance so it moves to different hardware, and read the system log first if you need the cause on record.")
 	}
 }
 
