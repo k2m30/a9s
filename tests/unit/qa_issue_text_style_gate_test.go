@@ -67,6 +67,10 @@ import (
 // and all-caps abbreviations lacking humanization ("ADMIN_ALL", "NO_MFA"),
 // while never matching a normal English word (which always has a lowercase
 // letter) or a humanized phrase ("create failed", "alarm triggered").
+// rfc3339Pattern matches a timestamp in the shape the AWS SDK hands back, which
+// is never the shape a9s shows one in.
+var rfc3339Pattern = regexp.MustCompile(`\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}`)
+
 var rawEnumTokenPattern = regexp.MustCompile(`^[A-Z][A-Z0-9_]+$`)
 
 // knownAcronymExemptions are short, industry-standard acronyms and service
@@ -277,7 +281,7 @@ func TestIssueTextStyleGate_CatalogPhrasesNeverRawEnum(t *testing.T) {
 				case violating:
 					newlyRegressed = append(newlyRegressed, key)
 					t.Errorf(
-						"NEW VIOLATION (not allowlisted): %s: FindingDef.Phrase %q contains raw AWS enum token(s) %v — "+
+						"NEW VIOLATION (not allowlisted): %s: FindingDef.Phrase %q contains raw SDK token(s) %v — "+
 							"a user-facing cause text must never show a raw SDK enum; use domain.HumanizeStatusPhrase "+
 							"or rewrite the literal to lowercase prose. If this is pre-existing debt, add %q to styleGateAllowlist "+
 							"naming the exact reason it cannot be fixed in this wave.",
@@ -339,6 +343,16 @@ func TestIssueTextStyleGate_RenderedSurfacesNeverRawEnum(t *testing.T) {
 			t.Run(testName, func(t *testing.T) {
 				statusCell, _ := listStatusCellFor(t, td, merged, res.ID)
 				statusViolations := findRawEnumViolations(statusCell, res.ID, res.Name)
+				// A status cell is text a9s composes: a declared phrase with
+				// its slots filled, every one of which passes through
+				// config.CanonicalValue. So an SDK timestamp standing in one is
+				// unambiguously a9s pasting a machine value, and the token scan
+				// cannot see it — extractTokens splits
+				// "2026-01-01T00:00:00Z" into digit runs, none enum-shaped.
+				// Deliberately not applied to the Attention rows: a row can
+				// carry a sentence the service wrote, and CanonicalValue
+				// declines to rewrite a word inside a document by contract.
+				statusViolations = append(statusViolations, rfc3339Pattern.FindAllString(statusCell, -1)...)
 				checkStyleGateSurface(t, td.ShortName, res.ID, "list-status", statusCell, statusViolations,
 					&newlyRegressed, &readyForBurnDown, &stillGapped)
 
@@ -388,8 +402,9 @@ func checkStyleGateSurface(
 	case violating:
 		*newlyRegressed = append(*newlyRegressed, key)
 		t.Errorf(
-			"NEW VIOLATION (not allowlisted): %s: %s=%q contains raw AWS enum token(s) %v for resource %q (type=%s). "+
-				"A user-facing cause text must never show a raw SDK enum; route it through domain.HumanizeStatusPhrase. "+
+			"NEW VIOLATION (not allowlisted): %s: %s=%q contains raw SDK token(s) %v for resource %q (type=%s). "+
+				"A user-facing cause text must never show a raw SDK enum or timestamp; route an enum through "+
+				"domain.HumanizeStatusPhrase and a value that becomes cell text through config.CanonicalValue. "+
 				"If this is pre-existing debt, add %q to styleGateAllowlist naming the exact reason it cannot be fixed in this wave.",
 			key, surface, text, violations, resourceID, shortName, key,
 		)

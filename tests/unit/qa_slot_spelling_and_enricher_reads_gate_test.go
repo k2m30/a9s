@@ -45,22 +45,26 @@ var phraseSlot = regexp.MustCompile(`<([^<>]*)>`)
 // instructions rather than as wording: the count tokens and the list token.
 // They are capitals because they are not prose, and they are the only capitals
 // a slot may hold.
-var slotMachineryTokens = []string{"LIST", "N", "M"}
+var slotMachineryTokens = map[string]bool{"LIST": true, "N": true, "M": true}
+
+// slotWord splits a slot's content into the words the case rule judges. Whole
+// words, not substrings: stripping the machinery tokens as substrings let a
+// slot spelled "NM" strip itself to nothing and pass, and would have let
+// "MONTH" through as "OTH" had that not still read as capitals by luck.
+var slotWord = regexp.MustCompile(`[A-Za-z]+`)
 
 func TestEveryPhraseSlotIsLowercaseProse(t *testing.T) {
 	var wrong []string
 	for _, td := range append(catalog.All(), catalog.AllChildren()...) {
 		for _, def := range td.Findings {
 			for _, slot := range phraseSlot.FindAllStringSubmatch(def.Phrase, -1) {
-				body := slot[1]
-				for _, tok := range slotMachineryTokens {
-					body = strings.ReplaceAll(body, tok, "")
+				for _, word := range slotWord.FindAllString(slot[1], -1) {
+					if slotMachineryTokens[word] || strings.ToLower(word) == word {
+						continue
+					}
+					wrong = append(wrong, fmt.Sprintf("%s %s phrase=%q slot=%q word=%q",
+						td.ShortName, def.Code, def.Phrase, slot[0], word))
 				}
-				if strings.ToLower(body) == body {
-					continue
-				}
-				wrong = append(wrong, fmt.Sprintf("%s %s phrase=%q slot=%q",
-					td.ShortName, def.Code, def.Phrase, slot[0]))
 			}
 		}
 	}
@@ -138,5 +142,33 @@ func TestEveryCrossRefEnricherDeclaresTheCachesItReads(t *testing.T) {
 			"it, and the finding simply never appears. Add the cache to Reads on the "+
 			"catalog's Wave2 registration:\n  %s",
 			len(undeclared), strings.Join(undeclared, "\n  "))
+	}
+}
+
+// TestStripAWSErrorCodeKeepsTheSentence pins the strip against the shapes AWS
+// actually returns. The acronym-led codes are the ones that matter: a
+// CamelCase-only rule reads "AccessDenied" and misses "KMSKeyNotFound", which
+// is the more common shape for exactly the errors a trail reports.
+func TestStripAWSErrorCodeKeepsTheSentence(t *testing.T) {
+	cases := []struct{ in, want string }{
+		{"AccessDenied: The S3 bucket policy denies CloudTrail writes", "The S3 bucket policy denies CloudTrail writes"},
+		{"KMSKeyNotFound: the key is gone", "the key is gone"},
+		{"AccessDeniedException: nope", "nope"},
+		{"InvalidParameterValue: a: b", "a: b"},
+		// Not codes: one word, so the colon belongs to the sentence.
+		{"Error: something", "Error: something"},
+		{"Note: the bucket policy denies writes", "Note: the bucket policy denies writes"},
+		{"S3: short", "S3: short"},
+		{"lowercase: still a sentence", "lowercase: still a sentence"},
+		// Nothing after the code is nothing to keep.
+		{"AccessDenied:", "AccessDenied:"},
+		{"AccessDenied: ", "AccessDenied: "},
+		{"no colon at all", "no colon at all"},
+		{"", ""},
+	}
+	for _, c := range cases {
+		if got := awsclient.StripAWSErrorCode(c.in); got != c.want {
+			t.Errorf("StripAWSErrorCode(%q) = %q, want %q", c.in, got, c.want)
+		}
 	}
 }

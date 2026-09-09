@@ -105,7 +105,7 @@ func TestSortableIsReadOrGone(t *testing.T) {
 // reads, so every column says where the value comes from.
 func TestEveryCatalogColumnNamesItsValueSource(t *testing.T) {
 	var offenders []string
-	for _, td := range append(resource.AllResourceTypes(), resource.AllChildTypesForTest()...) {
+	for _, td := range append(resource.AllResourceTypes(), resource.AllChildTypes()...) {
 		for _, col := range td.Columns {
 			if col.Key != "" || col.Path != "" {
 				continue

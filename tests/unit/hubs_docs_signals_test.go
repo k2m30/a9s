@@ -57,7 +57,7 @@ func TestAttentionSignals_GeneratedBlockCarriesEveryFindingDef(t *testing.T) {
 	}
 
 	rows := strings.Split(generated, "\n")
-	for _, td := range append(resource.AllResourceTypes(), resource.AllChildTypesForTest()...) {
+	for _, td := range append(resource.AllResourceTypes(), resource.AllChildTypes()...) {
 		for _, fd := range td.Findings {
 			cell := fmt.Sprintf("| `%s` |", td.ShortName)
 			found := false
@@ -106,7 +106,7 @@ func TestAttentionSignals_CodeSpansAreNotEscaped(t *testing.T) {
 // disagrees with the app on screen.
 func TestAttentionSignals_CategoryHeadingsMatchTheCatalog(t *testing.T) {
 	known := map[string]bool{"Other": true}
-	for _, td := range append(resource.AllResourceTypes(), resource.AllChildTypesForTest()...) {
+	for _, td := range append(resource.AllResourceTypes(), resource.AllChildTypes()...) {
 		if td.Category != "" {
 			known[td.Category] = true
 		}

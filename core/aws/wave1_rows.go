@@ -12,6 +12,7 @@ import (
 	"testing"
 
 	"github.com/k2m30/a9s/v3/core/catalog"
+	"github.com/k2m30/a9s/v3/core/config"
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 	"github.com/k2m30/a9s/v3/core/secretscan"
@@ -118,6 +119,13 @@ func countTokenIn(slot string) string {
 // the emit site, so a wording and its singular live in the same declaration
 // and an emitter passes the number or the list and nothing else.
 func fillSlot(slot, value string) string {
+	// A slot value becomes cell text, so it reads the way every other cell
+	// reads: config.CanonicalValue is the one place those conventions live,
+	// and a phrase slot was the one route onto the surface that bypassed it.
+	// A timestamp arrived at the status cell as the RFC3339 the SDK returned
+	// while the list's own time columns, which go through the same function,
+	// showed the day and the time of day one column over.
+	value = config.CanonicalValue(value)
 	if value == "" {
 		if testing.Testing() {
 			panic(fmt.Sprintf("finding phrase slot %q filled with an empty value — "+

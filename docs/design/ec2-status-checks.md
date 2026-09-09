@@ -146,10 +146,30 @@ from `DescribeInstances` requires 2 `DescribeInstanceStatus` calls
 ```
 
 Row colors:
+
+<!-- BEGIN GENERATED: colors -->
+
+A row takes the colour of the finding it carries, and the catalog
+decides that. An instance an operator stopped and one AWS stopped
+itself are two findings at two severities, so they are two colours.
+
+| Finding | Phrase on the row | Severity | Row colour | Hex |
+| --- | --- | --- | --- | --- |
+| `ec2.state.pending` | pending | warn | YELLOW | `#e0af68` |
+| `ec2.state.stopping` | stopping | warn | YELLOW | `#e0af68` |
+| `ec2.state.stopped` | stopped | warn | YELLOW | `#e0af68` |
+| `ec2.state.stopped.server` | stopped by AWS | broken | RED | `#f7768e` |
+| `ec2.state.terminated` | terminated | dim | DIM | `#565f89` |
+
+Every other row is GREEN `#9ece6a` when its type reports it healthy and
+PLAIN `#c0caf5` when the type has nothing to say about it.
+
+<!-- END GENERATED: colors -->
+
 - `api-prod-01`, `api-prod-02`, `bastion`: GREEN row, no indicator (healthy or not in problem set)
 - `worker-01`: GREEN row text, but `!` prefix in **RED** — system or instance check impaired
 - `worker-02`: GREEN row text, but `~` prefix in **YELLOW** — checks still initializing
-- `old-worker`: RED row (stopped), no indicator
+- `old-worker`: YELLOW row (stopped by request), no indicator
 - `legacy-app`: DIM row (terminated), no indicator
 
 ### 4.2 List View — All Healthy (common case)

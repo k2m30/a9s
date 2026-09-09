@@ -176,7 +176,7 @@ check-readme:
 # regeneration changes anything — i.e. a catalog edit landed without its doc
 # regeneration. It refuses to run over already-dirty generated docs so a
 # failure diff is unambiguously catalogen's.
-CATALOGEN_DOCS = docs/attention-signals.md docs/related-resources.md docs/resources
+CATALOGEN_DOCS = docs/attention-signals.md docs/related-resources.md docs/resources docs/design/design.md docs/design/ec2-status-checks.md
 check-catalogen:
 	@if ! git diff --quiet -- $(CATALOGEN_DOCS); then \
 		echo "FAIL: uncommitted changes under $(CATALOGEN_DOCS) — commit or revert before check-catalogen"; exit 1; \

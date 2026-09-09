@@ -43,7 +43,7 @@ func GetFieldKeys(shortName string) []string {
 	if keys, ok := fieldKeyRegistry[shortName]; ok {
 		return keys
 	}
-	if ct := typeDef(shortName); ct != nil && len(ct.FieldKeys) > 0 {
+	if ct := TypeDef(shortName); ct != nil && len(ct.FieldKeys) > 0 {
 		return ct.FieldKeys
 	}
 	return nil
@@ -88,7 +88,7 @@ func GetIssueEnricherFieldKeys(shortName string) []string {
 	if keys, ok := issueEnricherFieldKeysRegistry[shortName]; ok {
 		return keys
 	}
-	if ct := typeDef(shortName); ct != nil && len(ct.IssueEnricherFieldKeys) > 0 {
+	if ct := TypeDef(shortName); ct != nil && len(ct.IssueEnricherFieldKeys) > 0 {
 		return ct.IssueEnricherFieldKeys
 	}
 	return nil
@@ -152,7 +152,7 @@ func ApplyFieldAliases(shortName string, fields map[string]string) map[string]st
 		aliases = fieldAliasBuiltins[shortName]
 	}
 	if len(aliases) == 0 {
-		if ct := typeDef(shortName); ct != nil && len(ct.FieldAliases) > 0 {
+		if ct := TypeDef(shortName); ct != nil && len(ct.FieldAliases) > 0 {
 			aliases = ct.FieldAliases
 		}
 	}
@@ -202,14 +202,15 @@ func SetChildTypeForTest(def ResourceTypeDef) {
 	childTypes[def.ShortName] = &copy
 }
 
-// typeDef resolves a type name the way every reader of a declaration must:
+// TypeDef resolves a type name the way every reader of a declaration must:
 // the child registry first, so a type a test registered is a type, then the
 // installed catalog, parents and children alike (catalog.FindAny). Every
 // getter below and in related.go and enricher.go asks here, so none of them
 // answers for half the catalog — a child type's Related and Navigable were
 // declarations nothing read, because the getters that read them looked among
-// the parents only.
-func typeDef(shortName string) *ResourceTypeDef {
+// the parents only. Exported because core/aws's Wave 2 lookup is one of those
+// readers and had the same half-catalog bug.
+func TypeDef(shortName string) *ResourceTypeDef {
 	if td := GetChildType(shortName); td != nil {
 		return td
 	}
@@ -229,13 +230,14 @@ func GetChildType(shortName string) *ResourceTypeDef {
 	return nil
 }
 
-// AllChildTypesForTest returns all registered child type definitions.
+// AllChildTypes returns all registered child type definitions.
 // The returned slice is in no guaranteed order.
 // Combines legacy registry entries with catalog child entries; legacy wins
-// on name collision so test overrides remain visible. Test-only: no
-// production caller — production code looks up individual child types via
-// GetChildType instead of walking the full set.
-func AllChildTypesForTest() []ResourceTypeDef {
+// on name collision so test overrides remain visible. This is the child half
+// of the union TypeDef resolves a single name against, and core/aws's AllWave2
+// walks it for the same reason: an enumeration over the parents alone answers
+// for half the catalog.
+func AllChildTypes() []ResourceTypeDef {
 	result := make([]ResourceTypeDef, 0, len(childTypes))
 	seen := make(map[string]struct{}, len(childTypes))
 	for name, def := range childTypes {
@@ -345,7 +347,7 @@ func sanitizeFetchResult(res FetchResult, err error) (FetchResult, error) {
 func GetPaginatedFetcher(shortName string) PaginatedFetcher {
 	fn, ok := paginatedRegistry[shortName]
 	if !ok {
-		if ct := typeDef(shortName); ct != nil && ct.Fetcher != nil {
+		if ct := TypeDef(shortName); ct != nil && ct.Fetcher != nil {
 			fn = ct.Fetcher
 		}
 	}
@@ -396,7 +398,7 @@ func SetAvailabilityFetcherForTest(shortName string, f AvailabilityFetcher) {
 func GetAvailabilityFetcher(shortName string) AvailabilityFetcher {
 	fn, ok := availabilityRegistry[shortName]
 	if !ok {
-		if ct := typeDef(shortName); ct != nil && ct.AvailabilityFetcher != nil {
+		if ct := TypeDef(shortName); ct != nil && ct.AvailabilityFetcher != nil {
 			fn = ct.AvailabilityFetcher
 		}
 	}
@@ -466,7 +468,7 @@ func SetFilteredPaginatedForTest(shortName string, f FilteredPaginatedFetcher) {
 func GetFilteredPaginatedFetcher(shortName string) FilteredPaginatedFetcher {
 	fn, ok := filteredPaginatedRegistry[shortName]
 	if !ok {
-		if ct := typeDef(shortName); ct != nil && ct.FilteredFetcher != nil {
+		if ct := TypeDef(shortName); ct != nil && ct.FilteredFetcher != nil {
 			fn = ct.FilteredFetcher
 		}
 	}
@@ -504,7 +506,7 @@ func GetRevealFetcher(shortName string) RevealFetcher {
 	if fn, ok := revealRegistry[shortName]; ok {
 		return fn
 	}
-	if ct := typeDef(shortName); ct != nil && ct.Reveal != nil {
+	if ct := TypeDef(shortName); ct != nil && ct.Reveal != nil {
 		return ct.Reveal
 	}
 	return nil
@@ -522,7 +524,7 @@ func HasRevealFetcher(shortName string) bool {
 	if _, ok := revealRegistry[shortName]; ok {
 		return true
 	}
-	if ct := typeDef(shortName); ct != nil && ct.Reveal != nil {
+	if ct := TypeDef(shortName); ct != nil && ct.Reveal != nil {
 		return true
 	}
 	return false

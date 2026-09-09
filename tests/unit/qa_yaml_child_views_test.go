@@ -1358,7 +1358,7 @@ func TestQA_YAML_AllChildTypes(t *testing.T) {
 	clients := demo.NewServiceClients()
 	ctx := context.Background()
 
-	for _, ct := range resource.AllChildTypesForTest() {
+	for _, ct := range resource.AllChildTypes() {
 		t.Run(ct.ShortName, func(t *testing.T) {
 			fetcher := resource.GetPaginatedChildFetcher(ct.ShortName)
 			if fetcher == nil {

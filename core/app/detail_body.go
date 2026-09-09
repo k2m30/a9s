@@ -489,7 +489,16 @@ func buildAttentionEntries(findings []domain.Finding, attentionDetails map[domai
 		var rows []domain.DetailRow
 		if attentionDetails != nil {
 			if det, ok := attentionDetails[f.Code]; ok {
-				rows = det.Rows
+				// An attention row's value is row text, so it reads the way the
+				// field rows one section below it read — those go through
+				// CanonicalValue in buildDetailItems and these did not, which
+				// is how an SDK timestamp reached the block verbatim while the
+				// same instant one section down showed as the day.
+				rows = make([]domain.DetailRow, len(det.Rows))
+				for i, row := range det.Rows {
+					row.Value = config.CanonicalValue(row.Value)
+					rows[i] = row
+				}
 			}
 		}
 		entries = append(entries, attentionEntry{tier: tier, code: string(f.Code), primary: f.Phrase, detailLines: wrapSentence(f.Detail, width), rows: rows, splitKeyValue: true})

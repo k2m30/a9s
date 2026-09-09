@@ -139,7 +139,7 @@ func TestW45_NoColumnButTheIdentityColumnShowsTheRowName(t *testing.T) {
 		}
 	}
 
-	for _, td := range resource.AllChildTypesForTest() {
+	for _, td := range resource.AllChildTypes() {
 		check(td, resource.Resource{
 			ID:   td.ShortName + "-1",
 			Name: "acme-" + td.ShortName + "-1",
@@ -171,7 +171,7 @@ func TestW45_IdentityColumnElectionIgnoresPathSubstrings(t *testing.T) {
 		return out
 	}
 
-	tds := append(resource.AllResourceTypes(), resource.AllChildTypesForTest()...)
+	tds := append(resource.AllResourceTypes(), resource.AllChildTypes()...)
 	for _, td := range tds {
 		cols := w45Columns(nil, td)
 		if len(cols) == 0 {
@@ -423,7 +423,7 @@ func TestW45_IdentityColumnSurvivesALoadedViewFile(t *testing.T) {
 // the row's name, and a type whose identity column has no title at all would
 // hand the name to every title-less column beside it.
 func TestW45_IdentityTitleIsUniqueWithinAType(t *testing.T) {
-	tds := append(resource.AllResourceTypes(), resource.AllChildTypesForTest()...)
+	tds := append(resource.AllResourceTypes(), resource.AllChildTypes()...)
 	for _, td := range tds {
 		cols := w45Columns(nil, td)
 		if len(cols) == 0 {

@@ -2,7 +2,7 @@
 // catalog.ResourceTypeDef.ConsoleURL across all 29 child types (the closure
 // wave: parent-context Fields enriched in child fetchers, ConsoleURL wired
 // per child type, mirroring the top-level table in console_url_types_test.go
-// but for resource.GetChildType/AllChildTypesForTest instead of
+// but for resource.GetChildType/AllChildTypes instead of
 // catalog.Find/resource.AllResourceTypes).
 //
 // Synthetic resource.Resource literals only, per this wave's dispatch
@@ -34,9 +34,9 @@ func childConsoleURLTypeDef(t *testing.T, shortName string) resource.ResourceTyp
 // ─── Completeness: every child type has a non-nil ConsoleURL builder ───────
 
 func TestConsoleURL_RegisteredForEveryChildType(t *testing.T) {
-	types := resource.AllChildTypesForTest()
+	types := resource.AllChildTypes()
 	if len(types) == 0 {
-		t.Fatal("resource.AllChildTypesForTest() returned no child types — registry not populated")
+		t.Fatal("resource.AllChildTypes() returned no child types — registry not populated")
 	}
 	for _, td := range types {
 		if td.ConsoleURL == nil {

@@ -23,3 +23,10 @@
   and `shard <shard id>` replace the two spellings that shouted, and the two
   CloudTrail delivery signals no longer name an SDK field where the value goes.
   What you see on a row is unchanged; this is the wording in the signal tables.
+
+- A CloudTrail delivery failure reads as what went wrong rather than as the
+  API's name for it. The status cell led with the error code (`AccessDenied:`)
+  and pushed the sentence that names the cause off the end of the line.
+
+- A timestamp shown in a status cell reads as the day, the way every other
+  date on the screen does. One trail row showed the raw value the SDK returned.

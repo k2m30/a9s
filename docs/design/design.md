@@ -273,7 +273,7 @@ Normal state (no filter, no command):
 │ [GREEN]  worker-01             running     t3.large       us-east-1a      ami-0abcdef012345   2024-01-10 14:30[/]           │
 │ [YELLOW]  worker-02             pending     t3.large       us-east-1b      ami-0abcdef012345   2024-03-17 08:00[/]          │
 │ [GREEN]  bastion               running     t2.micro       us-east-1a      ami-0zzz111222333   2023-11-01 10:00[/]          │
-│ [RED]  old-worker            stopped     t3.medium      us-east-1c      ami-0abcdef012345   2023-06-20 16:45[/]           │
+│ [YELLOW]  old-worker            stopped     t3.medium      us-east-1c      ami-0abcdef012345   2023-06-20 16:45[/]        │
 │ [DIM]  legacy-app            terminated  t2.small       us-east-1a      ami-0000111222333   2022-12-01 12:00[/]           │
 │   · · · (35 more)                                                                                                         │
 └───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
@@ -550,13 +550,24 @@ push(MainMenu) → push(ResourceList:ec2) → push(Detail:i-abc) → push(YAML)
 
 ### Row Color by Status (entire row)
 
-| Status value                    | Row color  | Hex       |
-|---------------------------------|------------|-----------|
-| running, available, active      | GREEN      | `#9ece6a` |
-| stopped, failed                 | RED        | `#f7768e` |
-| terminated                      | DIM        | `#565f89` |
-| pending, starting, creating     | YELLOW     | `#e0af68` |
-| anything else                   | PLAIN      | `#c0caf5` |
+<!-- BEGIN GENERATED: colors -->
+
+A row takes the colour of the finding it carries, and the catalog
+decides that. An instance an operator stopped and one AWS stopped
+itself are two findings at two severities, so they are two colours.
+
+| Finding | Phrase on the row | Severity | Row colour | Hex |
+| --- | --- | --- | --- | --- |
+| `ec2.state.pending` | pending | warn | YELLOW | `#e0af68` |
+| `ec2.state.stopping` | stopping | warn | YELLOW | `#e0af68` |
+| `ec2.state.stopped` | stopped | warn | YELLOW | `#e0af68` |
+| `ec2.state.stopped.server` | stopped by AWS | broken | RED | `#f7768e` |
+| `ec2.state.terminated` | terminated | dim | DIM | `#565f89` |
+
+Every other row is GREEN `#9ece6a` when its type reports it healthy and
+PLAIN `#c0caf5` when the type has nothing to say about it.
+
+<!-- END GENERATED: colors -->
 
 Selected row always overrides row color with full blue background.
 

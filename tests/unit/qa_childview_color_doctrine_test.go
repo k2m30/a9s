@@ -1,7 +1,7 @@
 // qa_childview_color_doctrine_test.go — extends the OWNER RULE gate in
 // qa_color_findings_conformance_test.go ("color derives from findings") to
 // CHILD views, which that gate never covers (it only walks
-// resource.AllResourceTypes(), the top-level catalog — resource.AllChildTypesForTest()
+// resource.AllResourceTypes(), the top-level catalog — resource.AllChildTypes()
 // is a separate registry entirely, see core/resource/accessors.go's
 // GetChildType/AllChildTypes).
 //
@@ -366,7 +366,7 @@ var knownColorlessChildTypes = map[string]bool{
 //   - An allowlisted violation still Color==nil is skipped (logged),
 //     pre-existing debt — this list IS the coder's worklist.
 func TestChildViewColorDoctrine_GenericCensus_FindingsChildTypesHaveColorFunc(t *testing.T) {
-	childTypes := resource.AllChildTypesForTest()
+	childTypes := resource.AllChildTypes()
 
 	var stillGapped []string
 	var newlyRegressed []string
@@ -457,7 +457,7 @@ func TestChildViewColorDoctrine_GenericCensus_ColorlessChildTypesNeverEmitFindin
 	}
 
 	got := map[string]bool{}
-	for _, ct := range resource.AllChildTypesForTest() {
+	for _, ct := range resource.AllChildTypes() {
 		if ct.Color == nil && len(ct.Findings) == 0 {
 			got[ct.ShortName] = true
 		}

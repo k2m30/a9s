@@ -201,7 +201,7 @@ Copied verbatim from `docs/attention-signals.md § Not yet implemented`:
 Every signal from §3 lands on the surfaces S1–S5 that `docs/attention-signals.md § Visualization Surfaces` defines; that section is where the wave→surface mapping lives.
 
 <!-- BEGIN GENERATED: badge -->
-Badge aggregation for `eks`: Wave 1 issue-colored rows plus Wave 2 `!`-severity findings — this type registers a Wave 2 enricher.
+Badge aggregation for `eks`: Wave 1 issue-colored rows only — this type registers no Wave 2 enricher, so nothing else bumps the count.
 <!-- END GENERATED: badge -->
 
 One row per signal from §3. The fetcher's own `DescribeCluster` sets the row color, so every signal is Wave 1:

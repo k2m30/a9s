@@ -63,7 +63,7 @@ func views7CatalogTypes(t *testing.T) map[string]resource.ResourceTypeDef {
 	for _, td := range resource.AllResourceTypes() {
 		out[td.ShortName] = td
 	}
-	for _, td := range resource.AllChildTypesForTest() {
+	for _, td := range resource.AllChildTypes() {
 		out[td.ShortName] = td
 	}
 	if len(out) == 0 {

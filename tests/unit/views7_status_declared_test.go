@@ -23,7 +23,7 @@ import (
 // titled "Status" or "State" — must declare that column, and a type must not
 // declare two.
 func TestEveryTypeDeclaresOneStatusColumn(t *testing.T) {
-	types := append(resource.AllResourceTypes(), resource.AllChildTypesForTest()...)
+	types := append(resource.AllResourceTypes(), resource.AllChildTypes()...)
 	for _, td := range types {
 		lifecycleKey := td.LifecycleKey
 		if lifecycleKey == "" {

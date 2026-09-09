@@ -13,6 +13,7 @@ import (
 	"sync"
 
 	"github.com/k2m30/a9s/v3/core/catalog"
+	"github.com/k2m30/a9s/v3/core/resource"
 )
 
 // Wave2Entry pairs a resource type ShortName with its registered Wave 2
@@ -35,7 +36,9 @@ var testWave2Overrides = map[string]IssueEnricher{} //nolint:gochecknoglobals //
 //
 // Lookup order:
 //  1. testWave2Overrides (only populated by SetWave2EnricherForTest)
-//  2. catalog.FindAny(shortName).Wave2 cast to IssueEnricher
+//  2. resource.TypeDef(shortName).Wave2 cast to IssueEnricher — the union of
+//     the child registry and the catalog, so a child type's enricher is
+//     dispatched rather than silently absent
 //
 // ok is false when neither source has a non-nil Fn for the name.
 func Wave2EnricherFor(shortName string) (IssueEnricher, bool) {
@@ -48,7 +51,7 @@ func Wave2EnricherFor(shortName string) (IssueEnricher, bool) {
 		}
 		return override, true
 	}
-	ct := catalog.FindAny(shortName)
+	ct := resource.TypeDef(shortName)
 	if ct == nil || ct.Wave2 == nil {
 		return IssueEnricher{}, false
 	}
@@ -59,15 +62,17 @@ func Wave2EnricherFor(shortName string) (IssueEnricher, bool) {
 	return e, true
 }
 
-// AllWave2 returns every Wave 2 enricher (from catalog + test overrides) in
-// dispatch order: ascending Priority, then alphabetical ShortName within a
-// priority tier.
+// AllWave2 returns every Wave 2 enricher (from the catalog's parents and
+// children, plus test overrides) in dispatch order: ascending Priority, then
+// alphabetical ShortName within a priority tier. Parents and children alike,
+// because the queue, the declared-reads gate and the detail bench all read
+// this one enumeration.
 //
 // Test overrides win on name collision; a test override with a nil Fn deletes
 // the catalog entry from the returned slice for the duration of the test.
 func AllWave2() []Wave2Entry {
 	seen := make(map[string]Wave2Entry)
-	for _, ct := range catalog.All() {
+	for _, ct := range append(catalog.All(), resource.AllChildTypes()...) {
 		if ct.Wave2 == nil {
 			continue
 		}

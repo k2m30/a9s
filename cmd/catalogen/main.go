@@ -79,6 +79,10 @@ func run() error {
 		return fmt.Errorf("related-resources.md: %w", err)
 	}
 
+	if err := generateDesignColors(repoRoot); err != nil {
+		return fmt.Errorf("design colour rules: %w", err)
+	}
+
 	for _, rt := range types {
 		if err := generateResourceDoc(repoRoot, rt); err != nil {
 			return fmt.Errorf("docs/resources/%s.md: %w", rt.ShortName, err)
@@ -133,6 +137,70 @@ func generateRelatedResources(repoRoot string, types []catalog.ResourceTypeDef) 
 	}
 
 	return updateGeneratedSection(path, "related-table", rows.String())
+}
+
+// designColorDocs are the design pages that state which colour a row takes.
+// They are prose pages a person writes, and the colour rules inside them were
+// the catalog's severities typed a second time — which is why they went stale:
+// ec2 gained a second stopped code at a second severity and three lines in
+// these two files went on calling every stopped row red.
+var designColorDocs = []string{
+	filepath.Join("docs", "design", "design.md"),
+	filepath.Join("docs", "design", "ec2-status-checks.md"),
+}
+
+// designColorCodes are the lifecycle findings whose colour these pages
+// illustrate. The list names which rows the block explains; the severity of
+// each — the fact that went stale — is read from the catalog.
+var designColorCodes = []domain.FindingCode{
+	"ec2.state.pending",
+	"ec2.state.stopping",
+	"ec2.state.stopped",
+	"ec2.state.stopped.server",
+	"ec2.state.terminated",
+}
+
+// severityColor is the row colour a severity paints, which is what these pages
+// are describing when they say a row is red.
+func severityColor(s domain.Severity) (name, hex string) {
+	switch s {
+	case domain.SevBroken:
+		return "RED", "#f7768e"
+	case domain.SevWarn:
+		return "YELLOW", "#e0af68"
+	case domain.SevDim:
+		return "DIM", "#565f89"
+	case domain.SevOK:
+		return "GREEN", "#9ece6a"
+	default:
+		return "PLAIN", "#c0caf5"
+	}
+}
+
+// generateDesignColors writes the colour-rule block into each design page that
+// carries the markers. The pages opt in, so a design page that says nothing
+// about colour is left alone.
+func generateDesignColors(repoRoot string) error {
+	var b strings.Builder
+	b.WriteString("\nA row takes the colour of the finding it carries, and the catalog\n")
+	b.WriteString("decides that. An instance an operator stopped and one AWS stopped\n")
+	b.WriteString("itself are two findings at two severities, so they are two colours.\n\n")
+	b.WriteString("| Finding | Phrase on the row | Severity | Row colour | Hex |\n")
+	b.WriteString("| --- | --- | --- | --- | --- |\n")
+	for _, code := range designColorCodes {
+		sev := catalog.Severity(code)
+		name, hex := severityColor(sev)
+		fmt.Fprintf(&b, "| `%s` | %s | %s | %s | `%s` |\n",
+			code, phraseCell(catalog.Phrase(code)), severityLabel(sev), name, hex)
+	}
+	b.WriteString("\nEvery other row is GREEN `#9ece6a` when its type reports it healthy and\nPLAIN `#c0caf5` when the type has nothing to say about it.\n\n")
+
+	for _, rel := range designColorDocs {
+		if err := updateOptionalSection(filepath.Join(repoRoot, rel), "colors", b.String()); err != nil {
+			return fmt.Errorf("%s: %w", rel, err)
+		}
+	}
+	return nil
 }
 
 // generateResourceDoc updates the per-resource docs/resources/<short>.md using

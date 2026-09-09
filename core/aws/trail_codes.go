@@ -100,7 +100,7 @@ func trailWave1Wave2Findings(isLogging, latestDeliveryError, latestDeliveryTime,
 		findings = append(findings, wave2Finding(CodeTrailNotLogging))
 	}
 	if latestDeliveryError != "" && latestDeliveryError != "-" {
-		findings = append(findings, wave2Finding(CodeTrailDeliveryError, latestDeliveryError))
+		findings = append(findings, wave2Finding(CodeTrailDeliveryError, StripAWSErrorCode(latestDeliveryError)))
 	}
 	if trailDeliveryIsStale(isLogging, latestDeliveryTime) {
 		findings = append(findings, wave2Finding(CodeTrailDeliveryStale, latestDeliveryTime))

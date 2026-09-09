@@ -40,22 +40,20 @@ type IssueEnricher struct {
 	Reads []string
 }
 
-// InFetcherWave2Sentinel is the explicit "Wave 2 done in the fetcher" sentinel.
-// Used by catalog entries (currently eks, ng, trail) whose Wave 2 signal in
-// docs/attention-signals.md is non-None but is populated synchronously by the
-// fetcher (e.g. EKS DescribeCluster, EKS Node Group DescribeNodegroup,
-// CloudTrail GetTrailStatus per-resource). Setting `Wave2: IssueEnricher{Fn:
-// InFetcherWave2Sentinel, Priority: 100}` marks the type as Wave-2-covered in
-// the catalog without doing real background work — the sentinel returns zero
-// findings. No gate enforces the sentinel's presence: the doc-sync guards
-// (`make check-catalogen` and tests/unit/docs_attention_signals_sync_test.go)
-// track FindingDef declarations, not the Wave2 field, so this wiring holds by
-// convention only.
+// InFetcherWave2Sentinel returns zero findings, zero issues, not truncated,
+// and never fails.
 //
-// Resource types whose Wave 2 column is "None" in docs/attention-signals.md
-// must omit the Wave2 field entirely; this sentinel is reserved for the
-// in-fetcher case. Returns zero findings, zero issues, not truncated, never
-// fails. Tests use it as a benign Fn fixture too.
+// No catalog entry registers it. It once marked a type whose extra per-item
+// describe happens inside the fetcher — eks and ng — as "Wave-2-covered", but
+// a type is Wave-2-covered when it declares a finding with Source "wave2",
+// which is what the signals table prints and what
+// TestTheWave2RegistrationMatchesTheDocsWave2Column now holds in both
+// directions. Every eks and ng finding is emitted by wave1Finding off data the
+// fetcher already holds, so the claim had nothing behind it and the generated
+// eks doc contradicted itself about whether the type had Wave 2 signals.
+//
+// It remains as the benign Fn the enrichment-queue and refresh tests register
+// when they need an enricher that is present and does nothing.
 func InFetcherWave2Sentinel(_ context.Context, _ *ServiceClients, _ []resource.Resource, _ resource.ResourceCache) (IssueEnricherResult, error) {
 	return IssueEnricherResult{
 		Findings:         map[string][]domain.Finding{},

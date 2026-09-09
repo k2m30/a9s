@@ -22,6 +22,7 @@ import (
 	"maps"
 	"net"
 	"net/url"
+	"regexp"
 	"slices"
 	"strings"
 
@@ -659,6 +660,40 @@ func CauseOf(err error) string {
 	}
 	return apiErr.ErrorCode() + ": " + message
 }
+
+// StripAWSErrorCode drops the machine code an AWS error message leads with and
+// keeps the sentence after it. AWS reports several errors as an already
+// formatted string rather than as an error value — a trail's
+// LatestDeliveryError is "AccessDenied: The S3 bucket policy denies
+// CloudTrail writes" — and the code is the least useful half on a one-line
+// surface: it names the API's classification, while the clause after it names
+// what actually went wrong.
+//
+// This is CauseForError's rule (code and message, message wins the line) for
+// the shape where the two arrive already joined in a string. The prefix has to
+// look like a code: two or more run-together words, each Capitalised or an
+// acronym, and nothing else on that side of the colon. A message whose first
+// clause merely contains a colon keeps it.
+func StripAWSErrorCode(s string) string {
+	code, rest, found := strings.Cut(s, ": ")
+	if !found || !awsErrorCodeShape.MatchString(code) {
+		return s
+	}
+	if rest = strings.TrimSpace(rest); rest == "" {
+		return s
+	}
+	return rest
+}
+
+// awsErrorCodeShape matches an AWS error code standing alone: two or more
+// words run together, each either Capitalised or an acronym. The acronym case
+// is not decoration — "KMSKeyNotFound" and "SNSInvalidParameter" are the shape
+// half of these codes take, and a Capitalised-words-only rule reads
+// "AccessDenied" and walks past them.
+//
+// Two words minimum is what keeps a sentence's own colon: "Note: …" and
+// "Error: …" are one word and stay whole.
+var awsErrorCodeShape = regexp.MustCompile(`^(?:[A-Z]+[a-z0-9]*){2,}$`)
 
 // firstClause is how a9s renders the words of a service response the SDK could
 // not model: whatever the service chose to write, which may be a host, a

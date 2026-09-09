@@ -35,7 +35,7 @@ func SetDetailEnricherForTest(shortName string, f DetailEnricher) {
 // falls through to the legacy map so test overrides via SetDetailEnricherForTest
 // continue to work for synthetic short names.
 func GetDetailEnricher(shortName string) DetailEnricher {
-	if ct := typeDef(shortName); ct != nil && ct.DetailEnrich != nil {
+	if ct := TypeDef(shortName); ct != nil && ct.DetailEnrich != nil {
 		return ct.DetailEnrich
 	}
 	return detailEnricherRegistry[shortName]
@@ -45,7 +45,7 @@ func GetDetailEnricher(shortName string) DetailEnricher {
 // Catalog-backed: checks the catalog (both top-level and child) first; falls
 // through to the legacy map.
 func HasDetailEnricher(shortName string) bool {
-	if ct := typeDef(shortName); ct != nil && ct.DetailEnrich != nil {
+	if ct := TypeDef(shortName); ct != nil && ct.DetailEnrich != nil {
 		return true
 	}
 	_, ok := detailEnricherRegistry[shortName]

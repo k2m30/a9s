@@ -195,7 +195,7 @@ type parentSourcedChain struct {
 func parentSourcedChains(t *testing.T) []parentSourcedChain {
 	t.Helper()
 	var out []parentSourcedChain
-	for _, ptd := range resource.AllChildTypesForTest() {
+	for _, ptd := range resource.AllChildTypes() {
 		for _, ch := range ptd.Children {
 			usesParent := false
 			for _, src := range ch.ContextKeys {
