@@ -652,25 +652,3 @@ func (c *Controller) SelectedRelatedRow() (DetailRelatedRow, bool) {
 	}
 	return *row, true
 }
-
-// DetailFrameTitle returns the frame-border title for the top detail screen.
-// Returns an empty string when the top screen is not a detail screen.
-func (c *Controller) DetailFrameTitle() string {
-	c.mu.RLock()
-	defer c.mu.RUnlock()
-	return c.detailFrameTitleLocked()
-}
-
-// detailFrameTitleLocked computes the detail frame title. The caller MUST hold
-// c.mu — snapshot() calls this while Apply already holds the write lock, so
-// taking the lock here would deadlock (RWMutex is not reentrant).
-func (c *Controller) detailFrameTitleLocked() string {
-	ds := c.topDetailState()
-	if ds == nil {
-		return ""
-	}
-	if ds.Resource.Name != "" {
-		return ds.Resource.Name
-	}
-	return resource.DisplayID(ds.Resource.ID)
-}

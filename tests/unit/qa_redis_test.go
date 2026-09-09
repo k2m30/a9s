@@ -119,11 +119,11 @@ func TestQA_Redis_DetailFrameTitle(t *testing.T) {
 	c := newDetailControllerUnit(t, res, "redis")
 	title := c.Snapshot().FrameTitle
 
-	// FrameTitle should be the resource Name (or ID if Name is empty)
-	expected := res.Name
-	if expected == "" {
-		expected = res.ID
-	}
+	// tui6 row 24 folded the controller's own Name-else-ID title into the one
+	// builder both lanes now paint from, so the expected string is that
+	// builder's — restoring the bare name here would restore the second
+	// builder with it.
+	expected := resource.DetailFrameTitle(res.ID, res.Name, resource.DetailTitleOmitsID("redis"))
 	if title != expected {
 		t.Errorf("Redis detail FrameTitle = %q, want %q", title, expected)
 	}

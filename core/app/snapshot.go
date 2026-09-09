@@ -108,7 +108,7 @@ func (c *Controller) snapshot() ViewState {
 		detail, layout := c.buildDetailBody(top.State.Detail)
 		vs.Body.Detail = detail
 		top.State.Detail.cursorLayout = layout
-		vs.FrameTitle = c.detailFrameTitleLocked()
+		vs.FrameTitle = detail.FrameTitle
 		vs.Footer = c.buildDetailFooterHints(top.State.Detail)
 	}
 	if top.ID == runtime.ScreenHelp {

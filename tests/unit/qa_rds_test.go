@@ -361,8 +361,13 @@ func TestQA_RDS_Detail_FrameTitle(t *testing.T) {
 	c := newDetailControllerUnit(t, res, "dbi")
 
 	title := c.Snapshot().FrameTitle
-	if title != "test-docdb-1" {
-		t.Errorf("Detail FrameTitle: expected %q, got %q", "test-docdb-1", title)
+	// tui6 row 24 folded the controller's own Name-else-ID title into the one
+	// builder both lanes now paint from, so the expected string is that
+	// builder's — restoring the bare name here would restore the second
+	// builder with it.
+	expected := resource.DetailFrameTitle(res.ID, res.Name, resource.DetailTitleOmitsID("dbi"))
+	if title != expected {
+		t.Errorf("Detail FrameTitle: expected %q, got %q", expected, title)
 	}
 }
 

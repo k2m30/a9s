@@ -108,6 +108,8 @@ func (c *Controller) buildDetailBody(ds *DetailState) (*DetailBody, detailLayout
 		ScrollY:             ds.ScrollY,
 		FieldCursor:         fc,
 		KeyWidth:            DetailKeyWidth(fields, ds.ViewportWidth),
+		FrameTitle: resource.DetailFrameTitle(
+			ds.Resource.ID, ds.Resource.Name, resource.DetailTitleOmitsID(ds.ResourceType)),
 	}, layout
 }
 

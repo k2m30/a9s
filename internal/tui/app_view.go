@@ -17,7 +17,6 @@ import (
 	"github.com/charmbracelet/x/ansi"
 
 	"github.com/k2m30/a9s/v3/core/app"
-	"github.com/k2m30/a9s/v3/core/resource"
 	"github.com/k2m30/a9s/v3/core/runtime"
 	"github.com/k2m30/a9s/v3/internal/tui/layout"
 	"github.com/k2m30/a9s/v3/internal/tui/styles"
@@ -157,11 +156,13 @@ func (m Model) frameTitle(rs *rendererState, snap app.ViewState) string {
 		}
 		return rs.resourceType
 	case rsKindDetail:
-		src := m.ctrl.GetDetailResource()
-		if src.ID == "" {
-			return "detail"
+		// The body decides its own title, like every other layout fact on it:
+		// two builders for one string is two answers, and the operator sees
+		// whichever lane painted last.
+		if snap.Body.Detail != nil {
+			return snap.Body.Detail.FrameTitle
 		}
-		return resource.DetailFrameTitle(src.ID, src.Name, m.detailTitleOmitsID())
+		return "detail"
 	case rsKindReveal:
 		if rs.revealName != "" {
 			return "reveal -- " + rs.revealName
@@ -203,25 +204,6 @@ func (m Model) frameTitle(rs *rendererState, snap app.ViewState) string {
 		return snap.FrameTitle
 	}
 	return ""
-}
-
-// detailTitleOmitsID reports whether the currently detailed resource type opts
-// out of showing its ID in the detail frame title (ResourceTypeDef.TitleOmitsID
-// — e.g. log_events, lambda_invocation_logs, whose IDs are opaque synthetic
-// keys). Checks the child-type registry first since these types are always
-// child views, falling back to the top-level type registry.
-func (m Model) detailTitleOmitsID() bool {
-	rtype := m.ctrl.GetDetailResourceType()
-	if rtype == "" {
-		return false
-	}
-	if ct := resource.GetChildType(rtype); ct != nil {
-		return ct.TitleOmitsID
-	}
-	if rt := resource.FindResourceType(rtype); rt != nil {
-		return rt.TitleOmitsID
-	}
-	return false
 }
 
 // headerRight returns the pre-rendered right-side string for the header.

@@ -3,6 +3,7 @@
 package webintegration
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/k2m30/a9s/v3/core/app"
@@ -133,8 +134,13 @@ func TestWebRelatedNavigate_SingleTarget_SeedsDetailFromCache(t *testing.T) {
 			"(FrameTitle=%q, fields=%d) — want the cached target group detail \"acme-web-tg\"",
 			name, len(vs.Body.Detail.Fields))
 	}
-	if name != "acme-web-tg" {
-		t.Fatalf("related-navigate to single-target: FrameTitle=%q, want \"acme-web-tg\" — "+
+	// tui6 row 24 folded the controller's own Name-else-ID title into the one
+	// builder both lanes paint from, so the title now reads
+	// "detail -- <id> (<name>)". What this case is about is that the cached
+	// resource was seeded at all — restoring the bare-name comparison would
+	// restore the second builder with it.
+	if !strings.Contains(name, "acme-web-tg") {
+		t.Fatalf("related-navigate to single-target: FrameTitle=%q, want it to name \"acme-web-tg\" — "+
 			"the cached target group detail was not seeded correctly",
 			name)
 	}

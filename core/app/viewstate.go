@@ -339,6 +339,11 @@ type DetailBody struct {
 	// FieldCursor is the index of the highlighted field row (for cursor-selection
 	// rendering in RenderDetail).
 	FieldCursor int `json:"field_cursor,omitempty"`
+	// FrameTitle is the title the frame border shows for this screen, decided
+	// where the body is built so both lanes paint the same one. It is composed
+	// through resource.DisplayID: an identifier is raw everywhere else, and a
+	// title is painted.
+	FrameTitle string `json:"frame_title,omitempty"`
 	// KeyWidth is the column width reserved for the key column of every kv row,
 	// decided at build time from the viewport the body was built for so both the
 	// terminal and the web lane lay the rows out identically.

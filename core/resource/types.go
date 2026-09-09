@@ -114,17 +114,35 @@ func DisplayID(id string) string {
 }
 
 func DetailFrameTitle(id, name string, omitID bool) string {
+	id, name = DisplayID(id), DisplayID(name)
 	if omitID {
 		if name != "" {
 			return "detail -- " + name
 		}
-		return "detail -- " + DisplayID(id)
+		return "detail -- " + id
 	}
 	if id == "" {
 		return "detail"
 	}
 	if name != "" {
-		return "detail -- " + DisplayID(id) + " (" + name + ")"
+		return "detail -- " + id + " (" + name + ")"
 	}
-	return "detail -- " + DisplayID(id)
+	return "detail -- " + id
+}
+
+// DetailTitleOmitsID reports whether a resource type opts out of showing its
+// identifier in the detail frame title (an opaque synthetic key, e.g. a
+// 56-digit CloudWatch event id). Child types are asked first, matching how a
+// child detail resolves everything else about itself.
+func DetailTitleOmitsID(resourceType string) bool {
+	if resourceType == "" {
+		return false
+	}
+	if ct := GetChildType(resourceType); ct != nil {
+		return ct.TitleOmitsID
+	}
+	if rt := FindResourceType(resourceType); rt != nil {
+		return rt.TitleOmitsID
+	}
+	return false
 }
