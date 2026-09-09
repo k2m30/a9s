@@ -21,6 +21,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -28,6 +29,7 @@ import (
 
 	"github.com/k2m30/a9s/v3/core/app"
 	"github.com/k2m30/a9s/v3/core/domain"
+	"github.com/k2m30/a9s/v3/core/resource"
 	"github.com/k2m30/a9s/v3/core/runtime/messages"
 )
 
@@ -39,6 +41,23 @@ import (
 // spends 0.05 to 0.07 in either build. A loaded machine stretches the hold and
 // the absorption together, so the reading stays on its own side of the bound.
 const views7LockedFraction = 0.2
+
+// wipfixEC2Rows returns n rows in the shape the ec2 fetcher writes.
+func wipfixEC2Rows(n int) []resource.Resource {
+	rows := make([]resource.Resource, n)
+	for i := range rows {
+		id := "i-" + strconv.Itoa(1000000000000000+i)
+		rows[i] = resource.Resource{
+			ID:   id,
+			Name: "example-instance-" + strconv.Itoa(i),
+			Fields: map[string]string{
+				"instance_id": id, "state": "running", "instance_type": "t3.micro",
+				"az": "us-east-1a", "private_ip": "10.0.1.10", "vpc_id": "vpc-0123456789abcdef0",
+			},
+		}
+	}
+	return rows
+}
 
 // views7AbsorbSpans absorbs n rows on a fresh controller and returns the
 // longest a concurrent lock-taking reader was blocked, and how long the whole

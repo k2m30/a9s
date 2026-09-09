@@ -27,11 +27,9 @@ func TestFetchS3Buckets_NoGetBucketLocation(t *testing.T) {
 	}
 	listClient := &fakeS3ListBuckets{Output: &s3.ListBucketsOutput{Buckets: buckets}}
 
-	start := time.Now()
 	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
 		return awsclient.FetchS3BucketsPageWithNotifications(context.Background(), listClient, nil, token)
 	})
-	elapsed := time.Since(start)
 
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -39,9 +37,11 @@ func TestFetchS3Buckets_NoGetBucketLocation(t *testing.T) {
 	if len(resources) != 100 {
 		t.Fatalf("expected 100 resources, got %d", len(resources))
 	}
-	// Should be near-instant since no GetBucketLocation calls
-	if elapsed > 1*time.Second {
-		t.Errorf("FetchS3Buckets took %v for 100 buckets — should be instant without GetBucketLocation", elapsed)
+	// The cost of a per-bucket call is a count, not a duration: one listing
+	// answers for every bucket, and a location lookup per bucket would be a
+	// hundred round trips whether the bench that ran them was fast or slow.
+	if calls := len(listClient.Inputs); calls != 1 {
+		t.Errorf("listing 100 buckets took %d ListBuckets calls, want 1 — the fetcher is calling per "+
+			"bucket, which is what a GetBucketLocation sweep costs on a real account", calls)
 	}
-	t.Logf("FetchS3Buckets: 100 buckets in %v", elapsed)
 }

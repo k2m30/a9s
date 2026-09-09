@@ -134,41 +134,57 @@ func TestColdSnapshot_ConcurrentFirstReadsAreWellFormed(t *testing.T) {
 	}
 }
 
-// wipfixAbsorbReturnBudget is how long a 6000-row absorption may keep its
-// caller. Measured on this bench: the same absorption on a screen whose
-// result is not persisted returns in 19-20 ms ordinary and 112-121 ms under
-// -race; on one that is, it takes 63-79 ms and 679-682 ms, and the whole
-// difference is the YAML marshal of the row set running on the caller's
-// goroutine. Each budget is the midpoint between its build's two numbers, so
-// the pin is red while the marshal is in the caller's path and green once the
-// save lane owns its own goroutine.
-func wipfixAbsorbReturnBudget() time.Duration {
-	if wipfixRaceDetector {
-		return 280 * time.Millisecond
+// wipfixEC2TypeFiles returns the ec2 type files under this test's config
+// folder. Nothing else in the test writes one, so its presence is the save
+// having run and nothing else.
+func wipfixEC2TypeFiles(t *testing.T) []string {
+	t.Helper()
+	pattern := filepath.Join(os.Getenv("A9S_CONFIG_FOLDER"), "cache", "*", "ec2.yaml")
+	matches, err := filepath.Glob(pattern)
+	if err != nil {
+		t.Fatalf("globbing %s: %v", pattern, err)
 	}
-	return 35 * time.Millisecond
+	return matches
 }
 
 // TestLargeFetchAbsorb_CallerDoesNotWaitForTheMarshal pins row 35's latency
-// half.
+// half by asking what has happened when the caller comes back, rather than
+// how long it took to come back. The marshal of a 12000-row set is work the
+// save lane owns: the caller returns with it still outstanding, and it lands
+// when the queue drains. A build that marshals on the caller's goroutine has
+// written the file by the time Handle returns, which is what this reads.
+//
+// No clock, so nothing here is faster or slower on a loaded machine.
 func TestLargeFetchAbsorb_CallerDoesNotWaitForTheMarshal(t *testing.T) {
 	c := newTestController(t)
 	_, _ = c.Apply(app.Action{Kind: app.ActionCommand, Arg: "ec2"})
-	rows := wipfixEC2Rows(6000)
 
-	start := time.Now()
 	_, _ = c.Handle(messages.ResourcesLoaded{
 		ResourceType: "ec2",
-		Resources:    rows,
+		Resources:    wipfixEC2Rows(12000),
 		Pagination:   &domain.PaginationMeta{IsTruncated: false},
 		Provenance:   messages.FetchProvenanceCanonicalList,
 	})
-	took := time.Since(start)
 
-	if budget := wipfixAbsorbReturnBudget(); took > budget {
-		t.Errorf("absorbing 6000 rows kept its caller for %v, budget %v (race=%v) — "+
-			"the row set's YAML marshal is running in the latency of the fetch that "+
-			"triggered it, and every key press waits behind it", took, budget, wipfixRaceDetector)
+	if written := wipfixEC2TypeFiles(t); len(written) != 0 {
+		t.Errorf("the ec2 type file %v was already on disk when the absorption returned — the row "+
+			"set's YAML marshal ran in the latency of the fetch that triggered it, and every key "+
+			"press waits behind it", written)
+	}
+
+	c.WaitForCacheWrites()
+
+	if written := wipfixEC2TypeFiles(t); len(written) != 1 {
+		t.Errorf("the queue drained and %d ec2 type files exist, want 1 — a save the caller does not "+
+			"wait for still has to land", len(written))
+	}
+	if body := c.Snapshot().Body.List; body == nil || len(body.Rows) != 12000 {
+		got := 0
+		if body != nil {
+			got = len(body.Rows)
+		}
+		t.Errorf("the list holds %d rows after absorbing 12000 — a caller that waits for less must "+
+			"not come back with less", got)
 	}
 }
 
