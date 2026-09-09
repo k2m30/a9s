@@ -814,6 +814,10 @@ func (c *Controller) autoOpenSingleDetail() []runtime.TaskRequest {
 // recomputed. A superseded message is still routed — it owes the request that
 // raised it the retirement of its activity flag.
 func (c *Controller) HandleResourcesLoadedEvent(msg messages.ResourcesLoaded) {
+	// Before the lock, exactly as Handle does it: this is the door the TUI
+	// uses, so a page that arrives through it crosses the text boundary here
+	// or nowhere.
+	msg.Resources = SanitizedRows(msg.Resources)
 	// The per-type save this result queues runs after the lock is released
 	// (C4), exactly as Handle runs it — deferred first so it fires last.
 	defer c.wakeCacheWriter()

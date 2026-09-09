@@ -22,7 +22,7 @@
 │ payments-worker-02        running         ok            on-demand     c5.xlarge       10.0.10.41                          i-0ccc999999…  │
 │ batch-etl-host-01         running         ok            on-demand     m5.large        10.0.10.50                          e1f2a3b4c5d6…  │
 │ dev-sandbox-01            stopped                       on-demand     t3.medium       10.1.0.20                           i-0a1b2c3d4e…  │
-│ dev-sandbox-02            stopped                       on-demand     t3.small        10.1.0.21                           i-0a1b2c3d4e…  │
+│ dev-sandbox -02           stopped                       on-demand     t3.small        10.1.0.21                           i-0a1b2c3d4e…  │
 │ ml-inference-01           running         ok            on-demand     g5.xlarge       10.0.6.10                           i-0a1b2c3d4e…  │
 │ ml-inference-02           running         ok            on-demand     g5.xlarge       10.0.6.11                           i-0a1b2c3d4e…  │
 │ ml-inference-03           running         ok            on-demand     g5.xlarge       10.0.6.12                           i-0a1b2c3d4e…  │

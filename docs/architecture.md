@@ -143,14 +143,25 @@ These are **current-state invariants**. The 020-architecture-refactor that produ
    values, finding wording and attention rows; all three are copy-on-write,
    returning their input untouched when nothing changes, because a page of
    rows is shared with the cache writer's goroutine. The writers that call
-   them are the whole boundary: the fetch lane in `Controller.Handle`
-   (`SanitizedRows`, before the controller lock, because it walks every row
-   of the page), the `ApplyResourcesLoaded` seam, the cache-replay seed in
-   `applyNavResult`, `ensureDetailState` for a resource opened straight into
-   a detail screen, `applyFindingToState` and `applyEnrichmentState` for
-   enricher wording, the `FlashIntent` case for an error banner, and
-   `ListState.setFetchError` for the marker a failed refresh leaves over a
-   list. Nothing downstream re-checks, and nothing in a renderer strips: the
+   them are the boundary, and they are doors rather than one constructor
+   because the row lane must sanitise BEFORE the controller lock (a page is
+   twelve thousand rows on a large account, and per-row work under the lock
+   is what the absorb-latency pin forbids), while the writer it protects runs
+   under it. Every door into controller state that accepts a
+   `resource.Resource`, a `[]resource.Resource`, findings or AWS error text
+   calls one of them: `Controller.Handle` and
+   `Controller.HandleResourcesLoadedEvent` — the TUI's own door — for a
+   loaded page (`SanitizedRows`), the `ApplyResourcesLoaded` test seam, the
+   cache-replay seed in `applyNavResult`, `ensureDetailState` for a resource
+   opened straight into a detail screen,
+   `applyDetailEnrichmentForResourceLocked` for one the detail enricher
+   re-read, `SetTextResource` for the one a text screen titles itself with,
+   `applyFindingToState` and `applyEnrichmentState` for enricher wording, the
+   `FlashIntent` case for an error banner, and `ListState.setFetchError` for
+   the marker a failed refresh leaves over a list. That list is enforced by
+   test, not by prose: a door added without the call is a hole nothing else
+   reports, which is how the TUI's own door went uncovered while the demo
+   still rendered a raw escape sequence. Nothing downstream re-checks, and nothing in a renderer strips: the
    painter's own C0-to-space mapping in `text.PadOrTrunc` stays, because a
    control character occupying no column is a fact about painting, and a9s's
    own SGR sequences must survive the painter or colour never reaches the
@@ -553,7 +564,7 @@ Cross-view behaviors that older revisions expressed as per-view capability inter
 |----------|-----------------|
 | Filter / search state | `ViewState` body fields (`ListBody.Filter`, `DetailBody.Search`, `TextBody.Search`, …) populated by the controller |
 | Search match set | `app.TextSearchMatches` (`core/app/text.go`) — computed once per body build over the painted line with its styling stripped, and published on `TextBody.SearchMatches` in display columns, which is what `ColStart`/`ColEnd` are named for. The walk is case-insensitive by regexp over the painted bytes rather than over a lowercased copy: a rune whose lowercase form differs in length ("İ") would otherwise move every later offset by the difference. The terminal converts to the rune offsets its painter walks in (`SearchModel.setMatches`) and computes no match set of its own. |
-| Layout widths | The body build. `DetailBody.KeyWidth` (`app.DetailKeyWidth`) is the detail key column, floored at 22 and capped at two fifths of the viewport the body was built for; `ListBody.Columns[StatusCol].Width` is widened to the widest status cell by `widenStatusColumn` (`core/app/list_body.go`), because the status phrase is written per row by an enricher after the type declared its column. Both are measured in terminal columns with `lipgloss.Width`, the measure `text.PadOrTrunc` pads to. Renderers read them; a renderer that decided a width of its own would lay the same body out differently from the web lane, which has no renderer to ask. |
+| Layout widths | The body build. `DetailBody.KeyWidth` (`app.DetailKeyWidth`) is the detail key column: the widest key plus its colon, raised to a floor of 22 and then capped at two fifths of the viewport the body was built for — the cap is applied last and wins, so a viewport under 55 columns yields less than the floor; `ListBody.Columns[StatusCol].Width` is widened to the widest status cell by `widenStatusColumn` (`core/app/list_body.go`), because the status phrase is written per row by an enricher after the type declared its column. Both are measured in terminal columns with `lipgloss.Width`, the measure `text.PadOrTrunc` pads to. Renderers read them; a renderer that decided a width of its own would lay the same body out differently from the web lane, which has no renderer to ask. |
 | Footer key hints | `core/app` footer builders (`buildListFooterHints`, `MenuFooterHintsFor`, `CostsFooterHintsFor`) via `ViewState.Footer` |
 | Copy content (`c`) | `Controller.CopyContent()` (`core/app/copy.go`) — one resolution for list/detail/text/identity, exposed as `ViewState.CopyText`/`CopyLabel`; the TUI's `handleCopy` delegates to it, the web client reads the rendered `data-copy-*` attributes. Only the reveal screen's copy stays adapter-local (the controller has no reveal screen). |
 | Console link (`o`/`O`) | `Controller.ConsoleTarget()` (`core/app/snapshot.go`) — one target resolution for list (incl. child lists), detail, and a focused single-target related row (full cached row via `Core.AnyLaneResourceByID`, then `StubCreator`, then bare ID); URL built by `consolelink.Resolve` + `Valid` guard, exposed as `ViewState.ConsoleURL`/`IsDemo`. The TUI's `handleOpenConsole` delegates to it and execs the opener ($BROWSER argv-split, then per-GOOS, never a shell); the web client reads `data-console-url`/`data-is-demo` and calls `window.open`/clipboard in its keydown handler — the server never execs. |

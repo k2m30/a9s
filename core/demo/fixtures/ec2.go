@@ -98,15 +98,21 @@ const (
 	// sg-0public0all000003); every other public instance is behind a group
 	// that names its ports.
 	EC2InstanceInternetExposedAll = "i-0a1b2c3d4e5f60050"
-	// EC2InstanceHostileTag is the only demo instance carrying a tag written
-	// by someone who wanted the terminal, not the operator, to read it: the
-	// value of its "Owner" tag opens an SGR sequence that recolours the rest
-	// of the screen and rings the bell. AWS accepts such a value and hands it
-	// straight back, so the demo carries one too and every surface that shows
-	// it must show it inert.
+	// EC2InstanceHostileTag is the only demo instance whose Name tag was
+	// written by someone who wanted the terminal, not the operator, to read
+	// it: the value opens an SGR sequence that recolours the rest of the
+	// screen and rings the bell. AWS accepts such a value and hands it
+	// straight back.
+	//
+	// It is the Name tag, not a tag beside it, because that is the value that
+	// reaches every surface an operator uses: the name field, the identity
+	// column, the filter typed against it, the frame title of its detail
+	// screen and the clipboard. A witness on any other tag would be visible
+	// only in the detail's Tags block, where YAML marshalling escapes a
+	// control byte anyway and the boundary is never the thing under test.
 	EC2InstanceHostileTag = "i-0a1b2c3d4e5f60031"
-	// EC2HostileTagValue is that value.
-	EC2HostileTagValue = "platform\x1b[31m-team\x07"
+	// EC2HostileTagValue is that Name.
+	EC2HostileTagValue = "dev-sandbox\x1b[31m-02\x07"
 	// EBSSnapPublic is the only demo snapshot restorable by every AWS
 	// account; every other snapshot is private to this account.
 	EBSSnapPublic = "snap-0a1b2c3d4e5f60002"
@@ -564,12 +570,6 @@ func makeInstance(
 		},
 		PrivateDnsName: aws.String(privateDNS(privateIP)),
 	}
-	if instanceID == EC2InstanceHostileTag {
-		inst.Tags = append(inst.Tags, ec2types.Tag{
-			Key:   aws.String("Owner"),
-			Value: aws.String(EC2HostileTagValue),
-		})
-	}
 	if instanceID == "i-0a1b2c3d4e5f60001" {
 		inst.Platform = ec2types.PlatformValuesWindows
 		inst.Tags = append(inst.Tags, ec2types.Tag{
@@ -726,7 +726,7 @@ func buildReservations() []ec2types.Reservation {
 		// graph-connection rationale.
 		{"e1f2a3b4c5d6e1f2a3b4c5d6", "batch-etl-host-01", "running", ec2types.InstanceTypeM5Large, "10.0.10.50", "", fixtProdVPCID, fixtProdPrivateSubnetA, time.Date(2026, 3, 15, 6, 0, 0, 0, time.UTC), ""},
 		{"i-0a1b2c3d4e5f60030", "dev-sandbox-01", "stopped", ec2types.InstanceTypeT3Medium, "10.1.0.20", "", fixtStagingVPCID, fixtStagingSubnetA, time.Date(2025, 10, 12, 7, 0, 0, 0, time.UTC), ""},
-		{"i-0a1b2c3d4e5f60031", "dev-sandbox-02", "stopped", ec2types.InstanceTypeT3Small, "10.1.0.21", "", fixtStagingVPCID, fixtStagingSubnetB, time.Date(2025, 10, 12, 7, 5, 0, 0, time.UTC), ""},
+		{EC2InstanceHostileTag, EC2HostileTagValue, "stopped", ec2types.InstanceTypeT3Small, "10.1.0.21", "", fixtStagingVPCID, fixtStagingSubnetB, time.Date(2025, 10, 12, 7, 5, 0, 0, time.UTC), ""},
 		// GPU inference fleet — the Cost Explorer growth story's resource-drill
 		// target (costs.go's CostsGrowthService/CostsGrowthUsageType,
 		// CostsResourceRowsByService): a g5.xlarge fleet scaled up around

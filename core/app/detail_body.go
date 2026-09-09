@@ -675,19 +675,21 @@ func buildDetailRelatedBlocks(ds *DetailState) []RelatedBlock {
 	return blocks
 }
 
-// detailKeyFloor is the narrowest the detail key column gets. A resource whose
-// longest field name is two characters would otherwise crowd its values
-// against the left edge, and they would sit in a different place on every
-// screen.
+// detailKeyFloor is the narrowest the detail key column gets on a viewport
+// wide enough to allow it. A resource whose longest field name is two
+// characters would otherwise crowd its values against the left edge, and they
+// would sit in a different place on every screen.
 const detailKeyFloor = 22
 
 // DetailKeyWidth returns the width the key column of a detail body reserves:
-// the widest top-level key plus its colon, never under detailKeyFloor and
-// never over two fifths of the viewport. The bound is what keeps a field name
-// wider than the terminal from reserving the whole line and leaving the value
-// — the thing the reader opened the detail view for — off the right edge. A
-// viewport of zero is a body built before anything was sized and bounds
-// nothing.
+// the widest top-level key plus its colon, raised to detailKeyFloor, and then
+// capped at two fifths of the viewport. The cap is applied last and wins, so
+// below a 55-column viewport the result is under the floor — 20 columns give
+// 8, 40 give 16. That order is deliberate: a field name wider than the
+// terminal must not reserve the whole line and leave the value — the thing the
+// reader opened the detail view for — off the right edge, and on a narrow
+// terminal neither must the floor. A viewport of zero is a body built before
+// anything was sized and bounds nothing, so the floor stands.
 //
 // It is measured in terminal columns, because that is what the padding under
 // it fills: a key counted in bytes reserves three times the room a CJK field

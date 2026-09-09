@@ -8,8 +8,10 @@
   counted. Such text is now made inert where it enters a9s — on a loaded page,
   on an enrichment result, on a detail screen opened directly, and in the text
   of an AWS error — so the list cell, the detail row, the filter, the frame
-  title and the clipboard all show the readable value and nothing else. The
-  demo carries one such tag so the behaviour is visible without an account.
+  title and the clipboard all show the readable value and nothing else. In the
+  demo, one EC2 instance is named through such a tag, so the behaviour is
+  visible in its list row, its filter, its detail title and its copy without
+  an account.
 
 - The highlight positions a text screen publishes for a search are now the
   display columns they are named for, rather than byte offsets. On a line with

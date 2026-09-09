@@ -27,6 +27,7 @@ import (
 	_ "github.com/k2m30/a9s/v3/core/aws"
 	"github.com/k2m30/a9s/v3/core/config"
 	"github.com/k2m30/a9s/v3/core/demo"
+	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 	"github.com/k2m30/a9s/v3/tests/unit"
 )
@@ -533,7 +534,14 @@ func TestW45_RenderedListPutsTheNameInTheNameColumn(t *testing.T) {
 				byTitle[col.Title] = i
 			}
 			for i, row := range lb.Rows {
-				name := stripped[i].Name
+				// The name the cell shows is the name after the text boundary,
+				// not the bytes the fetcher read off AWS: tui6 row 1 makes
+				// AWS-supplied text inert where it enters the controller, and
+				// the demo's one hostile Name tag (fixtures.EC2HostileTagValue)
+				// is exactly the row that tells the two apart. Comparing
+				// against the raw name again would be asking for the escape
+				// sequence back on the screen.
+				name := domain.Sanitize(stripped[i].Name)
 				if got := row.Cells[lb.IdentityCol]; got != name {
 					t.Errorf("%s row %d: the column that names the row shows %q, want %q", tc.shortName, i, got, name)
 				}

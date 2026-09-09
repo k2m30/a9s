@@ -98,7 +98,7 @@ func (c *Controller) SetTextResource(res resource.Resource) {
 	if ts == nil {
 		return
 	}
-	ts.Resource = res
+	ts.Resource = res.Sanitized()
 }
 
 // GetTextScreenContext returns the ScreenID and ScreenContext of the top text

@@ -197,6 +197,9 @@ func (c *Controller) ApplyDetailEnrichmentForResource(resourceType, resourceID s
 // ApplyDetailEnrichmentForResource, shared with foldEnrichDetailResultLocked
 // (both already run under c.mu). Callers must hold c.mu (write).
 func (c *Controller) applyDetailEnrichmentForResourceLocked(resourceType, resourceID string, enriched resource.Resource, f *domain.Finding, ad *domain.AttentionDetail) {
+	// The detail enricher's own read of AWS: one resource, so the boundary is
+	// affordable here under the lock, unlike a page of rows.
+	enriched = enriched.Sanitized()
 	// Universal rule 7 / S5: every issue-severity finding the enricher found
 	// must reach ds.Findings, not just the caller-folded (f, ad) pair —
 	// primaryWave2Finding only recognizes "wave2:"-sourced findings and folds
