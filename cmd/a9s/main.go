@@ -53,9 +53,8 @@ func main() {
 	// below and before any tui.New construction — both transitively call
 	// catalog accessors that panic when SetTypes has not yet been invoked.
 	aws.Install()
-	// Wire resource-registry callbacks into the projection layer. Replaces
-	// the legacy core/resource init() (core/resource has zero
-	// init()). Must run after aws.Install so callbacks
+	// Wire resource-registry callbacks into the projection layer
+	// (core/resource has zero init()). Must run after aws.Install so callbacks
 	// resolve catalog-backed defaults.
 	resource.WireProjection()
 
@@ -382,10 +381,10 @@ func runWebServer(profile, region, command, addr string, allowReveal, demoMode, 
 	}
 
 	// One behaviour, both lanes: the operator's file is kept and the report is
-	// shown, in the same words the terminal uses (internal/tui/app.go). It
-	// used to replace the whole config with the defaults and write to stderr,
-	// which threw away every column they had written and told nobody who had
-	// started the server in the background.
+	// shown, in the same words the terminal uses (internal/tui/app.go).
+	// Replacing the whole config with the defaults would throw away every
+	// column they had written, and stderr tells nobody who started the server
+	// in the background.
 	viewCfg, cfgErr := config.Load()
 	configReport := config.ReportText(viewCfg, cfgErr)
 	if viewCfg == nil {

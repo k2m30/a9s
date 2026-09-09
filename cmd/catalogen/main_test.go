@@ -28,7 +28,7 @@ func generateAndReadDoc(t *testing.T, rt catalog.ResourceTypeDef) string {
 	return string(raw)
 }
 
-// TestDetailCell_DeclaredSentenceOrEmDash pins task w27 row 2 directly
+// TestDetailCell_DeclaredSentenceOrEmDash pins the detail cell directly
 // through the generator's own function, not by writing and re-reading a
 // page: a finding with a declared Detail renders its escaped sentence, and
 // one with none renders the em dash.
@@ -101,9 +101,9 @@ func TestDetailCell_ThroughGenerateResourceDoc(t *testing.T) {
 	}
 }
 
-// w197 row 14: the header sentence says what the key IS now — the key the
-// status cell reads, and the mark of which column is the status column — so
-// every expectation below carries the new wording. The "no fetcher writes it"
+// The header sentence says what the key IS — the key the status cell reads,
+// and the mark of which column is the status column — so every expectation
+// below carries that wording. The "no fetcher writes it"
 // half replaces "none (the list API returns no lifecycle field)": the key is
 // named either way, because the column still reads it and the cell is the
 // type's finding phrase rather than nothing at all.

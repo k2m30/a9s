@@ -1,16 +1,12 @@
 // SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
 
-// rowstore.go — session-scoped, per-type row store (task #17, the row-store
-// unification effort). See docs/design/cache-requirements.md and the
-// row-store unification plan for the target design this file implements.
+// rowstore.go — session-scoped, per-type row store. See
+// docs/design/cache-requirements.md for the contract this file implements.
 //
-// As of Stage 3, RowStore is the SOLE per-type row store: the former
-// type-keyed maps (session.ProbeResources, session.ResourceCache,
-// session.LazyResourceCache) are gone. A type's rows live in exactly one
+// RowStore is the sole per-type row store: a type's rows live in exactly one
 // TypeRows entry regardless of which lane wrote them (Wave-1 probe, disk
 // seed, top-level fetch, or a sparse FetchByIDs drill) — see Origin/Partial
-// below for how that entry distinguishes the roles those three maps used to
-// play independently.
+// below for how that entry distinguishes those roles.
 //
 // Semantics mirror the two in-memory reconciliation rules that already exist
 // independently for the per-screen ListState (core/app/list_body.go:
@@ -43,12 +39,10 @@ const (
 	// has already landed must not regress the session's live knowledge.
 	OriginDisk Origin = iota
 	// OriginProbe marks rows retained by the Wave-1 availability probe
-	// (first-page-only — the role the removed session.ProbeResources map
-	// used to play).
+	// (first-page-only).
 	OriginProbe
 	// OriginFetch marks rows landed from a top-level list fetch — the
-	// richest, most page-complete source (the role the removed
-	// session.ResourceCache map used to play).
+	// richest, most page-complete source.
 	OriginFetch
 )
 
@@ -526,8 +520,7 @@ func (s *RowStore) Clear() {
 // ClearProbeOrigin drops every retained type entry whose Origin is
 // OriginProbe or OriginDisk, leaving OriginFetch entries (a top-level list's
 // own fetched rows) untouched. Used by the main-menu Ctrl+R refresh path
-// (formerly a reset of the now-removed session.ProbeResources/ProbeTruncated
-// maps) so the next Wave-1 probe round populates fresh without blanking an
+// so the next Wave-1 probe round populates fresh without blanking an
 // already-open resource list's live fetch result.
 func (s *RowStore) ClearProbeOrigin() {
 	s.mu.Lock()
@@ -542,10 +535,8 @@ func (s *RowStore) ClearProbeOrigin() {
 
 // ProbeOriginTypeNames returns the canonical short names of every type this
 // session has observed via OriginProbe or OriginDisk at least once (Gen!=0),
-// the Wave-1-probe/disk-seed role the removed session.ProbeResources map
-// used to play. Used by callers that need the same "has this type been
-// retained by a Wave-1 probe/disk seed this session" membership test the old
-// map provided, without exposing the rows themselves.
+// for callers that need the "has this type been retained by a Wave-1
+// probe/disk seed this session" membership test without the rows themselves.
 //
 // Deliberately NOT gated on len(tr.Rows) > 0: an observed-empty type (a live
 // Wave-1 probe or disk seed confirmed zero rows this session, Gen!=0 with an

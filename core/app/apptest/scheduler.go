@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
 
 // Package apptest is the deterministic interleaving harness for core/app's
-// detail-operation orchestration (GitHub issue #488, item 1). It exists to
+// detail-operation orchestration. It exists to
 // make "action B lands while action A is still in flight" reachable by a
 // test: core/app's Drain* variants (drainsync.go) always execute the front
 // of a FIFO queue, so a task dispatched earlier can never be observed

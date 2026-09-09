@@ -2,8 +2,7 @@
 
 package runtime
 
-// handlers_availability_test.go — locks the two NEEDS-CHANGES invariants from
-// PR #344 Stage 5 review:
+// handlers_availability_test.go — two invariants of the availability handlers:
 //
 //  1. Truncation precedence in handleEnrichmentChecked: Wave-1's RowStore
 //     Pagination.IsTruncated signal is authoritative — it must override the

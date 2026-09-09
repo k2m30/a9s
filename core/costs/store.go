@@ -544,9 +544,8 @@ func (s *Store) MergeAttrs(attrs map[string]string) {
 // derive the footer's "data through" date from, so a warm disk cache (no
 // live fetch on this open) still shows a correct value. "" when q has no
 // cached records at all. A still-open bucket's own End is capped at now's
-// own UTC date — the same "never overclaim spend through days that haven't
-// happened yet" rule ApplyCostsLoaded's per-delivery tracking used to apply
-// per-record; this derives the identical result from the store instead.
+// own UTC date — the "never overclaim spend through days that haven't
+// happened yet" rule, derived from the store.
 func (s *Store) DataThrough(q Query, now time.Time) string {
 	s.mu.RLock()
 	defer s.mu.RUnlock()

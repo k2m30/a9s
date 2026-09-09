@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
 
 // rowstore_observe.go — RowStore dual-write for the two events HandleEvent
-// must never apply intents for (task #17 wave 1 — row-store unification).
+// must never apply intents for.
 //
 // messages.ResourcesLoaded and messages.RelatedCheckResult are each already
 // owned by a dedicated, intent-returning Core method

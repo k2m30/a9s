@@ -128,7 +128,7 @@ func (c *Core) handleAvailabilityCacheLoaded(msg messages.AvailabilityCacheLoade
 			if cr, ok := rowsByType[shortName]; ok {
 				realRows = rowsFromCacheRows(shortName, cr)
 			}
-			// Dual-write (task #17 wave 1): only real per-type disk row data
+			// Only real per-type disk row data
 			// feeds RowStore's rows-carrying Observe (OriginDisk — a later live
 			// probe/fetch result is never regressed by a race-losing disk seed).
 			// A type with no real disk rows (placeholder-only fallback) is a
@@ -159,7 +159,7 @@ func (c *Core) handleAvailabilityCacheLoaded(msg messages.AvailabilityCacheLoade
 		}
 	}
 
-	// Apply cached issue counts (T033).
+	// Apply cached issue counts.
 	if len(issueKnown) > 0 {
 		intents = append(intents, PatchMenuIssueBatch{
 			Counts:    issueCounts,
@@ -223,7 +223,7 @@ func (c *Core) handleAvailabilityCacheLoaded(msg messages.AvailabilityCacheLoade
 
 	// Deferred -c navigation (D11): consume the one-shot -c navigation armed by
 	// handleClientsReadySuccess on the live path, now that the
-	// session.ProbeResources seed above has landed — dispatching it any
+	// RowStore seed above has landed — dispatching it any
 	// earlier (e.g. alongside TaskKindLoadAvailCache) would race the seed,
 	// since the adapter runs task cmds concurrently via tea.Batch.
 	if c.session.CommandArmed {
@@ -269,7 +269,7 @@ func (c *Core) handleAvailabilityPrefetched(msg messages.AvailabilityPrefetched)
 			Origin: OriginVerified,
 		})
 	}
-	// T034: wire issue counts from prefetch.
+	// Issue counts from the prefetch.
 	for shortName, count := range msg.IssueCounts {
 		intents = append(intents, PatchMenu{
 			ResourceType: shortName,
@@ -279,12 +279,10 @@ func (c *Core) handleAvailabilityPrefetched(msg messages.AvailabilityPrefetched)
 	}
 	intents = append(intents, PatchMenuCheckProgress{Checked: 0, Total: 0}) // signal "done"
 
-	// T034: retain prefetch resources for Wave-2 enrichment. Fetcher-emitted
-	// rows already carry Findings; no re-derive needed (W1.4b.3 dropped the
-	// legacy Status/Issues bridge). task #17 wave 1 stage 3: store-only —
-	// the former ResourceCache map write is gone, ObserveRows below is this
-	// write's only destination. A synchronous prefetch is a live, full
-	// result — OriginFetch, wholesale replace.
+	// Retain prefetch resources for Wave-2 enrichment. Fetcher-emitted rows
+	// already carry Findings, and ObserveRows below is this write's only
+	// destination. A synchronous prefetch is a live, full result —
+	// OriginFetch, wholesale replace.
 	if msg.Resources != nil {
 		for rt, resources := range msg.Resources {
 			pageMeta := msg.Pagination[rt]
@@ -362,16 +360,15 @@ func (c *Core) handleAvailabilityChecked(msg messages.AvailabilityChecked) ([]UI
 			// prior Count/Truncated.
 			Origin: OriginVerified,
 		})
-		// T032: wire issue counts from probe.
+		// Issue counts from the probe.
 		intents = append(intents, PatchMenu{
 			ResourceType: canon,
 			Issues:       msg.Issues,
 			Truncated:    msg.Truncated,
 		})
 
-		// T032: retain probe resources for Wave-2 enrichment. Fetcher-emitted
-		// rows already carry Findings; no re-derive needed (W1.4b.3 dropped
-		// the legacy Status/Issues bridge).
+		// Retain probe resources for Wave-2 enrichment. Fetcher-emitted rows
+		// already carry Findings.
 		// C6b/D17: this bare Wave-1 probe result carries no Wave-2 data of its
 		// own — if a prior Wave-2 enrichment pass this session already wrote
 		// Findings/Fields onto the type's previous in-memory rows, a plain
@@ -379,9 +376,8 @@ func (c *Core) handleAvailabilityChecked(msg messages.AvailabilityChecked) ([]UI
 		// completes (the visible mid-session blink D17 describes). Carry
 		// forward the previous rows' Wave-2-sourced Findings and this type's
 		// registered enricher Fields keys per matching resource ID first.
-		// task #17 wave 1 stage 2: the "previous rows" read is now RowStore's
-		// own current snapshot for canonType (replaces the removed
-		// session.ProbeResources[canonType] read) — the Wave-2-carried result
+		// The "previous rows" read is RowStore's own current snapshot for
+		// canonType — the Wave-2-carried result
 		// IS this probe's final row state, and ObserveRows below is its only
 		// write destination now.
 		previous, _ := c.ProbeResources(canon)
@@ -596,17 +592,13 @@ func (c *Core) removeEnrichQueuedType(name string) bool {
 
 func (c *Core) finishEnrichmentSweepIfDone(intents []UIIntent, tasks []TaskRequest, refillTasks []TaskRequest) ([]UIIntent, []TaskRequest) {
 	// All enrichment done — clear progress, save cache. RowStore retains its
-	// rows for the session (task #17 wave 1 stage 2 — no enrichment-completion
-	// free; see RowStore.Amend's doc comment), so unlike the removed
-	// session.ProbeResources/ProbeTruncated free this branch used to perform,
-	// there is nothing to nil out here.
+	// rows for the session (see RowStore.Amend's doc comment), so there is
+	// nothing to free here.
 	//
 	// Gated on len(refillTasks)==0 rather than re-reading EnrichQueue: the
 	// slot-freeing step above (refillEnrichSweep) already drained the queue as
-	// far as this completion's refill can take it — mirrors the pre-fix "if
-	// queue still has entries, fire next and return early; else check all-done"
-	// structure, just computed up front so a stale-payload completion can still
-	// return its refill task (see the TypeGen guard in handleEnrichmentChecked).
+	// far as this completion's refill can take it, computed up front so a
+	// stale-payload completion can still return its refill task (see the TypeGen guard in handleEnrichmentChecked).
 	if len(refillTasks) == 0 && c.session.EnrichChecked >= c.session.EnrichTotal {
 		intents = append(intents, PatchMenuEnrichProgress{Checked: 0, Total: 0})
 		// Dispatch-time payload freeze (restated on RowStore): SnapshotAll captures a defensive,
@@ -760,10 +752,9 @@ func (c *Core) handleEnrichmentChecked(msg messages.EnrichmentChecked) ([]UIInte
 		// screen keep exactly what the stored rows keep.
 		c.applyEnrichment(msg.ResourceType, allFindings, msg.AttentionDetails, msg.TruncatedIDs)
 
-		// Merge FieldUpdates into RowStore (task #17 wave 1 stage 3 — the
-		// former ResourceCache map leg is gone; a type's rows live in exactly
-		// one RowStore entry, so AmendRows' copy-on-write fold below is now
-		// this merge's only per-type-row destination).
+		// Merge FieldUpdates into RowStore: a type's rows live in exactly one
+		// RowStore entry, so AmendRows' copy-on-write fold below is this
+		// merge's only per-type-row destination.
 		if len(msg.FieldUpdates) > 0 {
 			c.AmendRows(msg.ResourceType, func(rows []resource.Resource) []resource.Resource {
 				out := make([]resource.Resource, len(rows))
@@ -795,9 +786,8 @@ func (c *Core) handleEnrichmentChecked(msg messages.EnrichmentChecked) ([]UIInte
 		td := resource.FindResourceType(msg.ResourceType)
 		var unified int
 		if td != nil {
-			// task #17 wave 1 stage 2: unifiedIssueCount's input is now
-			// RowStore's own current rows for this type (replaces the removed
-			// session.ProbeResources[msg.ResourceType] read) — this is the
+			// unifiedIssueCount's input is RowStore's own current rows for
+			// this type — this is the
 			// SAME rows applyEnrichment/AmendRows above just folded findings
 			// and FieldUpdates onto, so this aggregation is over the freshest
 			// per-type row state this call produced.
@@ -816,8 +806,7 @@ func (c *Core) handleEnrichmentChecked(msg messages.EnrichmentChecked) ([]UIInte
 		if unified == 0 && len(allFindings) == 0 {
 			issueTruncated = false
 		}
-		// task #17 wave 1 stage 2: the removed session.ProbeTruncated map's
-		// per-type truncation signal is now RowStore's own Pagination for this
+		// The per-type truncation signal is RowStore's own Pagination for this
 		// type, set by this same probe cycle's ObserveRows/AmendRows write.
 		if tr := c.session.RowStore.Snapshot(msg.ResourceType); tr.Pagination != nil && tr.Pagination.IsTruncated {
 			issueTruncated = true
@@ -870,18 +859,13 @@ func (c *Core) handleEnrichmentChecked(msg messages.EnrichmentChecked) ([]UIInte
 }
 
 // snapshotRowStoreForSave builds a TaskKindSaveCache payload from RowStore's
-// current retained rows (task #17 wave 1 stage 2 — replaces the deleted
-// snapshotProbeResourcesForSave, whose source was session.ProbeResources/
-// ProbeTruncated). SnapshotAll(false) excludes Partial-only entries (C6
-// scope: a sparse LazyResourceCache-role read must never poison a type's
-// canonical persisted list) — mirrors snapshotProbeResourcesForSave's own
-// scope, since the legacy session.ProbeResources map never carried Partial
-// rows either.
+// current retained rows. SnapshotAll(false) excludes Partial-only entries (C6
+// scope: a sparse by-ID read must never poison a type's canonical persisted
+// list).
 //
 // SnapshotAll's own defensive-copy guarantee (fresh slice + fresh Fields map
 // per row, see RowStore.Snapshot's doc comment) is what gives this payload
-// the dispatch-time-freeze property the deleted function's
-// element-by-element copy used to provide by hand.
+// its dispatch-time freeze.
 //
 // wave2Answered is stamped onto the returned payload as-is (C6b) — see
 // SaveCachePayload's doc comment for what it drives at execute time.
@@ -905,8 +889,8 @@ func (c *Core) snapshotRowStoreForSave(wave2Answered map[string]bool) *SaveCache
 	return &SaveCachePayload{Resources: resources, Truncated: truncated, Gens: c.rowStoreGens(), Wave2Answered: wave2Answered}
 }
 
-// rowStoreResourcesAndTruncated converts RowStore.SnapshotAll(false) (task
-// #17 wave 1 stage 2) into the (resources, truncated) map pair
+// rowStoreResourcesAndTruncated converts RowStore.SnapshotAll(false) into
+// the (resources, truncated) map pair
 // snapshotRowStoreForSave and the TaskKindSaveCache nil-Payload executor
 // fallback both need — the shape TaskKindSaveCache's payload/live-read
 // carried since before the row-store unification (SaveCachePayload.Resources/
@@ -925,12 +909,10 @@ func (c *Core) snapshotRowStoreForSave(wave2Answered map[string]bool) *SaveCache
 //
 // A nil tr.Pagination reports truncated=true (C5: nil pagination is never
 // exact — mirrors availabilityFromResourceCache's identical guard), never
-// truncated=false. A bare Pagination-present check here previously let a
-// nil-Pagination entry (the exact shape HandleResourcesLoaded's
+// truncated=false: a nil-Pagination entry is the shape HandleResourcesLoaded's
 // PatchResourceCache/SetResourceCache carries before any real page-boundary
-// observation) read as exact, so a downstream Exact-count derivation could
-// silently downgrade an already-deeper stored-exact total (the false-exact
-// shape D14 describes).
+// observation, and reading it as exact would let a downstream Exact-count
+// derivation downgrade an already-deeper stored-exact total.
 func (c *Core) rowStoreResourcesAndTruncated() (map[string][]resource.Resource, map[string]bool) {
 	all := c.session.RowStore.SnapshotAll(false)
 	resources := make(map[string][]resource.Resource, len(all))

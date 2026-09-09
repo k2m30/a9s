@@ -221,7 +221,7 @@ func checkS3KMS(ctx context.Context, clients any, res resource.Resource, _ resou
 // per-bucket API call. S3 server-access logs are delivered to ANOTHER S3
 // BUCKET (not CloudWatch Log Groups), so the pivot targets `s3` — the
 // destination resource kind — and the navigation ID is the destination
-// bucket name. Spec §2 `logs` subsection + a9s-devops (2026-04-20).
+// bucket name. Spec §2 `logs` subsection.
 func checkS3Logs(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	bucket := res.ID
 	if bucket == "" {

@@ -19,7 +19,7 @@ import (
 // the given resource type. For each cached row it:
 //
 //  1. Strips any existing Wave-2 entries from r.Findings (fetchers write
-//     Wave-1 Findings directly post-W1.1; nothing else needs re-derivation).
+//     Wave-1 Findings directly; nothing else needs re-derivation).
 //  2. Appends every Wave-2 Finding from findings[r.ID] (when present) —
 //     an enricher may emit more than one independently-evaluated condition
 //     per resource.
@@ -28,9 +28,8 @@ import (
 //     FindingCode).
 //
 // Folds Wave-2 findings into RowStore's retained rows for canon via
-// AmendRows' copy-on-write mutation (task #17 wave 1 stage 3 — the former
-// ResourceCache/LazyResourceCache in-place-mutation legs are gone; a type's
-// rows live in exactly one RowStore entry, so this is the only per-type-row
+// AmendRows' copy-on-write mutation (a type's rows live in exactly one
+// RowStore entry, so this is the only per-type-row
 // destination left). The mutate-in-place bug class the dispatch-time payload
 // freeze guards against is exactly what Amend exists to remove — see
 // RowStore.Amend's doc comment.
@@ -111,8 +110,8 @@ func ApplyWave2ToRow(
 	if r == nil {
 		return
 	}
-	// Strip any existing wave2 entries; fetchers write wave1 Findings directly
-	// (W1.1+). Builds a NEW backing array rather than compacting r.Findings in
+	// Strip any existing wave2 entries; fetchers write wave1 Findings directly.
+	// Builds a NEW backing array rather than compacting r.Findings in
 	// place (r.Findings[n] = f) — applyEnrichment's row copy is shallow, so an
 	// in-place compaction here would mutate the backing array still shared
 	// with prior snapshots/retained rows.

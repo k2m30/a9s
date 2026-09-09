@@ -27,8 +27,8 @@ type Core struct {
 	isDemo  bool
 
 	// saveColumns resolves the list column set a resource short name persists
-	// under (task #17 wave 1 stage 4: single materializer for both the
-	// list-open and sweep save lanes). Set once via SetSaveColumns by the
+	// under (single materializer for both the list-open and sweep save
+	// lanes). Set once via SetSaveColumns by the
 	// renderer-neutral Controller constructor (app.New), which is
 	// view-config-aware; nil means no renderer has registered one yet (e.g. a
 	// bare Core built directly in a runtime-package test), in which case
@@ -114,8 +114,8 @@ func (c *Core) HandleEvent(ev Event) ([]UIIntent, []TaskRequest) {
 		return c.handleEnrichmentChecked(msg)
 	case messages.ResourcesLoaded:
 		// Row-store dual-write, PLUS the list-open Wave-2 probe task — but
-		// NEVER HandleResourcesLoaded's ClearFlash/PatchResourceCache intents
-		// (task #17 wave 1). The TUI adapter calls Core.HandleResourcesLoaded
+		// NEVER HandleResourcesLoaded's ClearFlash/PatchResourceCache intents.
+		// The TUI adapter calls Core.HandleResourcesLoaded
 		// directly (bypassing HandleEvent entirely, see
 		// runtime_adapter_resources.go) and Controller.Handle
 		// (core/app/handle.go) already runs its own, separate
@@ -149,8 +149,8 @@ func (c *Core) HandleEvent(ev Event) ([]UIIntent, []TaskRequest) {
 		// wants. Two observations of one delivery meant two deep clones of the
 		// row set under the controller lock, and the second one won anyway.
 		// core/app.Controller.handleResourcesLoadedEvent owns the write for
-		// every screen state, including the one this used to cover: a
-		// canonical result whose screen is gone.
+		// every screen state, including a canonical result whose screen is
+		// gone.
 		//
 		// Nor is the supersession check here any more. HandleResourcesLoaded
 		// asks it once and the answer leaves as a ListResultVerdict, which

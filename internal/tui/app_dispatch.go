@@ -94,8 +94,7 @@ func (m *Model) applyIntents(intents []runtime.UIIntent) []tea.Cmd {
 			// "ensure initial state" seeding remain local:
 			//
 			// ScreenChildList/ScreenResourceList: the forward's generic PushScreen
-			// case sets State.List = nil; EnsureListState seeds it (mirrors what
-			// PushChildListScreen used to do inline) so topListState() inside
+			// case sets State.List = nil; EnsureListState seeds it so topListState() inside
 			// NewChildResourceList resolves to a fresh, initialised ListState
 			// rather than nil.
 			// ScreenProfileSelector: the builder in screens.go already calls

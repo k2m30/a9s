@@ -27,8 +27,8 @@ import (
 // FlashTickPayload) — non-flash result branches (stale gen → nil/nil;
 // success-no-pending-refresh → FetchIdentity+LoadAvailCache only) must
 // leave flash.gen alone so that any ClearFlashMsg already in flight for
-// the current flash still matches and clears on schedule (CXR/Architect
-// Stage 5 R3 finding on the prior `len(intents)>0||len(tasks)>0` gate).
+// the current flash still matches and clears on schedule; a
+// `len(intents)>0||len(tasks)>0` gate would not.
 func (m Model) handleClientsReady(msg messages.ClientsReady) (tea.Model, tea.Cmd) {
 	hasRL := m.activeRS().kind == rsKindList
 	intents, tasks := m.core.HandleClientsReady(runtime.ClientsReadyEvent{

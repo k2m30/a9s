@@ -62,8 +62,8 @@ func TrailingWindow(g Granularity, anchor, now time.Time) []Period {
 
 // WindowWithin returns the finer-granularity g periods tiling sel — the
 // generic "drill into this cell" window constructor (year->month,
-// month->week, week->day), replacing the ambiguous BuildWindow(newGran,
-// selectedPeriod.Start) callers used to reach for: BuildWindow's anchor
+// month->week, week->day). BuildWindow(newGran, selectedPeriod.Start) is
+// the wrong call for this: BuildWindow's anchor
 // doubles as both the window's end AND its shape's own natural span, which
 // is correct only when g is TrailingAnchored (year/month) and sel IS the
 // canonical trailing window — never when sel is an arbitrary drilled-into

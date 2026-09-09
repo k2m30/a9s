@@ -187,7 +187,7 @@ const (
 )
 
 // NewEC2Fixtures builds and returns a fully-populated EC2Fixtures struct
-// with deterministic demo data that matches the data served by the old demo code paths.
+// with deterministic demo data.
 // This is the single source of truth for all EC2 fake responses.
 var sharedEC2Fixtures = sync.OnceValue(func() *EC2Fixtures {
 	f := &EC2Fixtures{}

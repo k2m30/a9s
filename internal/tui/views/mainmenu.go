@@ -134,8 +134,7 @@ type renderLine struct {
 	itemIndex int
 }
 
-// RenderBody renders the menu from a controller-supplied MenuBody, byte-identical
-// to the old View(). The controller owns the logical state (visible entries,
+// RenderBody renders the menu from a controller-supplied MenuBody. The controller owns the logical state (visible entries,
 // selection, availability/issue badges); the renderer owns scrollOffset and dimensions.
 func (m *MainMenuModel) RenderBody(body app.MenuBody) string {
 	if len(body.Entries) == 0 {
@@ -238,9 +237,7 @@ func buildRenderLinesFromEntries(entries []app.MenuEntry) []renderLine {
 // entry, only when the count is positive. A truncated count is a lower bound
 // (the list has unfetched pages, so more issue rows may exist) and gets a "+"
 // suffix — mirroring the availability "(N+)" marker and the web menu template.
-// (Owner decision 2026-07-08 supersedes the earlier "truncation is behavioral,
-// never rendered" rule; the list-view ⓘ banner stays forbidden — that is a
-// separate mechanism.)
+// The list-view ⓘ banner stays forbidden; that is a separate mechanism.
 func entryIssueBadge(e app.MenuEntry) string {
 	if e.IssueBadge.Count <= 0 {
 		return ""

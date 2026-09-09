@@ -6,14 +6,11 @@ package tui
 // (specs/022-codebase-cleanup/wave3-status.md §"OPEN INVESTIGATION — possible
 // live regression (StubCreator / auto-open-single)").
 //
-// tests/unit/resourcelist_ami_stub_test.go's T016/T017 drive
-// ResourceListModel.Update(messages.ResourcesLoaded) directly. That is dead
-// code in production: app.go's root Update() switch routes every
-// messages.ResourcesLoaded to m.handleResourcesLoaded
-// (runtime_adapter_resources.go), never to the active view's own Update() —
-// the same class of false-confidence gap already found in
-// text_ctrl_interaction_test.go (YAMLModel.Update(), also never called by
-// production). This file drives the real chain instead: root Model.Update()
+// app.go's root Update() switch routes every messages.ResourcesLoaded to
+// m.handleResourcesLoaded (runtime_adapter_resources.go), never to the
+// active view's own Update(), so a test driving a view's Update() directly
+// proves nothing about production. This file drives the real chain: root
+// Model.Update()
 // -> handleRelatedNavigate -> NavigationKindFilteredList (TargetID branch,
 // Clients()==nil, matching the "no by-ID fetcher or clients not yet ready"
 // fallback) -> newRelatedList(autoOpenSingleDetail:true) ->
@@ -99,8 +96,7 @@ func amiSourceEC2() resource.Resource {
 }
 
 // TestHandleResourcesLoaded_AMIStub_AutoOpensDetail_NoClients pins the
-// StubCreator auto-open-single behavior resourcelist_ami_stub_test.go's T016
-// pins for the legacy dead path, driven instead through the real production
+// StubCreator auto-open-single behavior through the real production
 // dispatch (root Model.Update -> handleRelatedNavigate ->
 // handleResourcesLoaded). An empty by-ID AMI lookup must still land on the
 // StubCreator's synthetic detail — this is the whole point of a StubCreator:

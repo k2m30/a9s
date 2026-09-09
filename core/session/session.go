@@ -191,7 +191,7 @@ type Session struct {
 	// TUI tea.Cmd goroutines and concurrent web drains both reach
 	// EnsureCacheStore/CacheStore, and Rotate clears CacheStore from the
 	// event-handling goroutine on a profile/region switch — all must
-	// serialize on this lock (Codex P1 / CodeRabbit race).
+	// serialize on this lock.
 	pairMu sync.Mutex
 
 	// typeSaveGenMu guards typeSaveGen.
@@ -258,11 +258,9 @@ type Session struct {
 
 	// Wave 2 issue-enrichment dispatch.
 	//
-	// ProbeResources/ProbeTruncated DIED in task #17 wave 1 stage 2 (row-store
-	// unification): every read/write site in core/session, core/runtime,
-	// and internal/tui now goes through RowStore (Origin=OriginProbe/OriginDisk/
-	// OriginFetch as appropriate) instead of these two maps. See RowStore's doc
-	// comment for the semantics this replaces.
+	// Every read/write site in core/session, core/runtime and internal/tui
+	// goes through RowStore (Origin=OriginProbe/OriginDisk/OriginFetch as
+	// appropriate); see RowStore's doc comment.
 	EnrichQueue   []string   // resource types pending Wave 2 enrichment
 	EnrichmentGen domain.Gen // session-wide gen counter for Wave 2
 	EnrichChecked int        // number of enrichment probes completed in current gen
@@ -344,11 +342,10 @@ type Session struct {
 	listFetchSeq   map[domain.Gen]domain.Gen
 	listFetchSeqMu sync.Mutex
 
-	// RowStore is the session-scoped, per-type row store (task #17 wave 1/3 —
-	// row-store unification). The single source of truth for every cached
-	// resource-list row this session has observed, replacing the former
-	// ResourceCache/LazyResourceCache maps entirely (Stage 3): a type's rows
-	// live in exactly one TypeRows entry regardless of which lane last wrote
+	// RowStore is the session-scoped, per-type row store: the single source of
+	// truth for every cached resource-list row this session has observed. A
+	// type's rows live in exactly one TypeRows entry regardless of which lane
+	// last wrote
 	// them (Wave-1 probe, disk seed, top-level fetch, or a sparse FetchByIDs
 	// drill — see Origin/Partial). Never nil after New()/Rotate.
 	RowStore *RowStore
@@ -387,9 +384,9 @@ type Session struct {
 	// entirely by Rotate().
 	PendingDetailRefresh map[string]domain.Gen
 
-	// Feature-specific session caches. These used to hang off *ServiceClients
-	// but that blurred the AWS-transport/session-state boundary; they live
-	// here instead and are passed to detail enrichers via DetailEnrichmentCtx.
+	// Feature-specific session caches, kept out of *ServiceClients so the
+	// AWS-transport/session-state boundary stays clean; passed to detail
+	// enrichers via DetailEnrichmentCtx.
 	PolicyDocCache *awsclient.PolicyDocumentCache
 
 	// DetailDocCache is the session-scoped cache for on-demand detail
@@ -398,15 +395,12 @@ type Session struct {
 	DetailDocCache *awsclient.DetailDocCache
 
 	// IAMPolicies is the per-session cache for IAM policy resources, keyed by
-	// both PolicyName and ARN. Replaces the package-level globals previously in
-	// core/aws/iam_policies.go. Wired into *ServiceClients.IAMPolicies on
+	// both PolicyName and ARN. Wired into *ServiceClients.IAMPolicies on
 	// every ClientsReadyMsg so FetchIAMPoliciesByIDsFull uses the session store.
 	IAMPolicies *policyStore
 
 	// IdentityStore is the per-session cache for the AWS caller's account ID
-	// used by Pattern-C related checkers. Replaces the package-level globals
-	// previously in core/aws/identity_cache.go (identityCacheMu /
-	// cachedAccountID / cachedAccountErr). Wired into *ServiceClients.
+	// used by Pattern-C related checkers. Wired into *ServiceClients.
 	// IdentityStore on every ClientsReadyMsg so Pattern-C related checkers
 	// (Glue tags, EBS Backup) see a per-profile/region scoped cache rather
 	// than a process-global one. Distinct from Session.Identity (the resolved
@@ -415,9 +409,7 @@ type Session struct {
 	IdentityStore *identityStore
 
 	// RuleSets is the per-session, single-slot cache for the SES v1
-	// DescribeActiveReceiptRuleSet response. Replaces the package-level
-	// globals previously in core/aws/ses_related.go (sesRuleSetCacheMu
-	// + sesRuleSetCaches map keyed by *ServiceClients pointer). Wired into
+	// DescribeActiveReceiptRuleSet response. Wired into
 	// *ServiceClients.RuleSets on every ClientsReadyMsg so checkSESLambda /
 	// checkSESS3 see a session-scoped cache rather than a process-global map.
 	RuleSets *ruleSetStore
@@ -752,8 +744,7 @@ func (s *Session) WithCacheStoreSave(pair Pair, fn func(store *cache.Store) ([]c
 // *cache.Store while holding pairMu, for callers that only read
 // (store.Type/store.Types) and never Put/PrepareSave/SaveType. Pairs with
 // WithCacheStoreSave (the store-lock serialization, D13): a
-// reader that bypassed the lock (the shape every read call site once had)
-// could observe cache.Store's internal map mid-write from a concurrent
+// reader that bypassed the lock could observe cache.Store's internal map mid-write from a concurrent
 // WithCacheStoreSave call's fn (the in-memory store.Put half, which always
 // runs under pairMu) — a data race
 // on the map itself, independent of the logical Count/Rows consistency

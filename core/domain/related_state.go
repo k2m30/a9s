@@ -4,7 +4,7 @@ package domain
 
 // RelatedRowState classifies the resolution state of a related-resource
 // result or row (RelatedCheckResult / DetailRelatedRow / RelatedBlock /
-// rightColumnRow), replacing the former Count == -1 sentinel. RelatedResolved
+// rightColumnRow). RelatedResolved
 // is the zero value so a resolved result (Count 0..N is authoritative) needs
 // no explicit State assignment.
 type RelatedRowState uint8

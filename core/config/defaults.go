@@ -59,8 +59,7 @@ func buildDefaultViews() map[string]ViewDef {
 // ListColumnsFromCatalog is the one translation of a catalog column into the
 // view column every reader works with. The built-in views are built from it,
 // and so is the arm of resource.ResolveListColumnCascade that resolves a type
-// no view declares — a type registered by a test among them, which is how the
-// two used to differ.
+// no view declares, a type registered by a test among them.
 func ListColumnsFromCatalog(td catalog.ResourceTypeDef) []ListColumn {
 	if len(td.Columns) == 0 {
 		return nil

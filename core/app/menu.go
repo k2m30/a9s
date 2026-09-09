@@ -365,16 +365,14 @@ func applyAvailabilityObservation(ms *MenuState, key string, count int, truncate
 // half: the badge must survive a restart). No-op when profile or region is
 // unset (no cache file identity to write to). Shared by both callers of
 // syncMenuIssueCount — syncExactTotalToMenu (handle.go) and
-// applyEnrichmentState (list_filter.go) — which used to each carry their own
-// verbatim copy of the save block. Caller must hold c.mu (at least read).
+// applyEnrichmentState (list_filter.go). Caller must hold c.mu (at least read).
 //
 // What the badge shows is not what gets written: the counts on disk are
 // derived from RowStore by the one producer
 // (Core.SaveAvailabilityFromRows), the same derivation the sweep's own save
-// uses. This lane used to freeze a clone of the menu's five maps and write
-// EVERY type's count from that snapshot, which made the rendered menu a
-// second source of truth for the file — and a losing one, since a queued
-// snapshot could land its pre-observation counts on top of the sweep's.
+// uses. A snapshot of the rendered menu would be a second source of truth
+// for the file, and a losing one: queued, it could land its pre-observation
+// counts on top of the sweep's.
 //
 // The actual disk write never runs on this call stack. c.mu is the same lock
 // every key event needs (Apply/Handle take it for their whole duration), and
@@ -473,13 +471,6 @@ func (c *Controller) Close() {
 // populated from the on-disk availability cache before any live probe
 // completes) shows Refreshing=true until every retained type's
 // AvailabilityChecked result lands. Caller must hold c.mu (at least read).
-//
-// NOTE (task #17 wave 1 stage 2, row-store unification): this used to read
-// session.ProbeResources directly; that field is gone as of stage 2. This
-// one-line re-point to core.ProbeOriginTypeNames() is the minimal edit
-// needed to keep core/app compiling — core/app itself is out of
-// scope for stage 2 (its own ResourceCache lanes are Stage 3). Flagged for
-// Stage 3 to fold into whatever core/app's own RowStore migration does.
 func (c *Controller) menuRefreshing() bool {
 	for _, shortName := range c.core.ProbeOriginTypeNames() {
 		canon := resource.CanonicalShortName(shortName)

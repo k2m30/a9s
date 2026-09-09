@@ -122,12 +122,10 @@ func resourceIDSet(rows []app.ListRow) map[string]bool {
 // (lambda — see tests/unit/runtime_handlers_related_test.go's
 // TestHandleRelatedNavigate_NonByIDType_CacheMiss_EmitsFetchResources for why
 // lambda is the type used to pin this else-branch). HandleRelatedNavigate
-// emits a bare KindFetchResources task; pre-fix that task's
-// FetchResourcesPayload.Provenance defaulted to the zero value, which the
-// executor then stamped FetchProvenanceCanonicalList — permanently rejected
-// by handleResourcesLoadedEvent's gate against this non-canonical placeholder
-// screen, so the ResourcesLoaded result was silently dropped and the screen
-// never left "Loading…".
+// emits a bare KindFetchResources task; a zero Provenance on that task would
+// be stamped FetchProvenanceCanonicalList by the executor and rejected by
+// handleResourcesLoadedEvent's gate against this non-canonical placeholder
+// screen, leaving it on "Loading…" forever.
 func TestColdFetch_TargetIDCacheMiss_NoFetchByIDs_RowsLandOnScreen(t *testing.T) {
 	const targetARN = "arn:aws:lambda:us-east-1:123456789012:function:cold-fetch-target"
 
@@ -173,9 +171,9 @@ func TestColdFetch_TargetIDCacheMiss_NoFetchByIDs_RowsLandOnScreen(t *testing.T)
 // TestColdFetch_TruncatedReverseScan_RowsLandOnScreen covers branch 2: a
 // "(N+)" truncated reverse-scan row. HandleRelatedNavigate's Truncated branch
 // (checked before any TargetID/RelatedIDs cache-hit fast path) always emits a
-// bare KindFetchResources population fetch. Same pre-fix failure mode as
-// above: a defaulted-canonical Provenance stamp permanently rejected against
-// the non-canonical scoped-scan screen.
+// bare KindFetchResources population fetch; a defaulted-canonical Provenance
+// stamp would be rejected forever against the non-canonical scoped-scan
+// screen.
 func TestColdFetch_TruncatedReverseScan_RowsLandOnScreen(t *testing.T) {
 	const foundID = "i-truncated-0001"
 
@@ -317,13 +315,10 @@ func TestColdFetch_RelatedIDs_PartialCoverageTruncated_RowsLandOnScreen(t *testi
 
 // TestColdFetch_CtrlROnAlreadyOpenDrillList_RowsSurviveRefresh covers the
 // sibling defect the same fix caught: Ctrl+R (ActionRefresh) issued while
-// already sitting on an open related-navigation drill list.
-// activeListRefreshTasks (core/app/actions_list.go) used to stamp its
-// FetchResourcesPayload with the zero Provenance unconditionally — a
-// permanent mismatch against a non-canonical drill screen's
-// isTopLevelCanonicalList()==false, rejected forever by
-// handleResourcesLoadedEvent's gate. This was found by generalizing the root
-// cause, not by a failing smoke test, so nothing was watching it before this.
+// already sitting on an open related-navigation drill list: a zero Provenance
+// on the refresh task would mismatch a non-canonical drill screen's
+// isTopLevelCanonicalList()==false and be rejected forever by
+// handleResourcesLoadedEvent's gate.
 func TestColdFetch_CtrlROnAlreadyOpenDrillList_RowsSurviveRefresh(t *testing.T) {
 	ids := []string{"i-ctrlr-0001", "i-ctrlr-0002"}
 

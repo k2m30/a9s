@@ -656,7 +656,7 @@ func (c *Controller) applyCostPivot(cs *CostsState, n int) *runtime.TaskRequest 
 		// X12: only Row resets (a new pivot dimension's rows are unrelated
 		// to the old ones); Col is PRESERVED, merely clamped to the
 		// window's own bounds (unchanged by a pivot) — resetting it to 0
-		// used to yank the view to the oldest column and poison the next
+		// would yank the view to the oldest column and poison the next
 		// drill's anchor.
 		top := &cs.DrillStack[len(cs.DrillStack)-1]
 		top.RowDim = pivotDigitDims[n]

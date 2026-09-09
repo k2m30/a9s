@@ -4,8 +4,8 @@
 // HandleRelatedNavigate entry point, plus relatedCheckCmd, the TUI's own
 // per-def related-check fan-out.
 //
-// handleRelatedNavigate replaces the deleted entry point from
-// internal/tui/app_handlers_related_navigate.go. It constructs a transient
+// handleRelatedNavigate is the TUI's related-navigation entry point. It
+// constructs a transient
 // runtime.Core, calls core.HandleRelatedNavigate, then applies the navigation
 // decision to the view stack and translates TaskRequests into tea.Cmd values.
 // The existing app.go dispatch line (return m.handleRelatedNavigate(msg)) is
@@ -258,7 +258,7 @@ func (m Model) handleRelatedNavigate(msg messages.RelatedNavigate) (tea.Model, t
 		}
 
 	case runtime.NavigationKindResourceList:
-		// Owner decision #38 (2026-07-06): a related row with no TargetID,
+		// A related row with no TargetID,
 		// RelatedIDs, or FetchFilter to narrow by (e.g. the transient "(?)"
 		// no-filter unknown state) carries no filtering information at all —
 		// there is nothing "related" left to scope the list by. Dispatch the

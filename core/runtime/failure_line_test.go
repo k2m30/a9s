@@ -73,7 +73,7 @@ func TestFailureLine_OneSentence(t *testing.T) {
 
 // TestFailureLine_SubjectSaidOnce pins the status bar's stutter: the aggregate
 // a fetcher returns labels itself with the resource type, and the subject the
-// handler passes ends with that same type, so the line used to read
+// handler passes ends with that same type; said twice, the line would read
 // "availability ec2: ec2: DescribeInstances failed for ...".
 func TestFailureLine_SubjectSaidOnce(t *testing.T) {
 	agg := awsclient.AggregateFailures("ec2: DescribeInstances",

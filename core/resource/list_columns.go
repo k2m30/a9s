@@ -49,8 +49,8 @@ func ResolveListColumnCascade(vc *config.ViewsConfig, typeName string, td *Resou
 	// is nothing to merge onto it. It goes through the SAME translation the
 	// built-in views are derived from, so a type the catalog registers and one
 	// a test registers resolve their columns by one rule; building the columns
-	// here by hand is what used to drop the path and the sort key from the
-	// second, and let a test pass on a shape production never renders.
+	// here by hand would drop the path and the sort key from the second, and
+	// let a test pass on a shape production never renders.
 	if len(view.List) == 0 {
 		return config.ListColumnsFromCatalog(*td)
 	}

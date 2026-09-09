@@ -173,8 +173,7 @@ func TestCore_HandleValueRevealed_ErrorEmitsFlash(t *testing.T) {
 	}
 	// INVERTED by spec row 6 (task "errors"): a failed reveal is a failed AWS
 	// call, so it reads the cause through the one formatter instead of the raw
-	// error. Do not restore the old literal — the raw chain is what put a
-	// request id on the status bar here.
+	// error: the raw chain is what puts a request id on the status bar.
 	if got, want := fi.Text, "reveal: permission denied"; got != want {
 		t.Errorf("Text=%q want %q", got, want)
 	}

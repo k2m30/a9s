@@ -138,9 +138,9 @@ func EnrichECSServices(ctx context.Context, clients *ServiceClients, resources [
 
 				// Check deployments for rollout failures and circuit-breaker.
 				// Same shape as the event scan below: a9s's words on one row,
-				// AWS's reason on the row under it. The reason used to ride in
-				// the value behind a colon, which shaped one fact two ways
-				// inside one function and put AWS's FAILED on the screen.
+				// AWS's reason on the row under it, never behind a colon in the
+				// value, which would shape one fact two ways and put AWS's FAILED
+				// on the screen.
 				hasInProgress := false
 				var deploymentRows []domain.DetailRow
 				for _, dep := range svc.Deployments {

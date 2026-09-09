@@ -25,9 +25,9 @@ import (
 // a filtered/related-nav list — EscPops/ParentContext) — the same C6 scope
 // gate maybeSaveResourceListCache/syncExactTotalToMenu already use. Only a
 // topLevelCanonical call routes its accepted rows through
-// Core.ObserveRows (task #17 wave 1 stage 4: the RowStore is the single
-// per-type row source of truth; decision #1 explicitly rejects letting a
-// child/related-filtered list's narrower row set poison it). A
+// Core.ObserveRows (the RowStore is the single per-type row source of
+// truth, and a child/related-filtered list's narrower row set must never
+// poison it). A
 // non-topLevelCanonical call keeps writing ls.Rows locally only, exactly as
 // before RowStore existed — its content already came from a store read
 // (listScreenResources' fallback, or a related-navigate cache hit) and must
@@ -134,8 +134,8 @@ func (c *Controller) applyResourcesLoaded(ls *ListState, typeName string, resour
 	// topLevelCanonical routes the SAME decision (append/replace) through
 	// Core.ObserveRows first and adopts its accepted slice onto
 	// ls.Rows/ls.RowsGen — RowStore is the reconciler, this screen adopts
-	// what it accepted (task #17 wave 1 stage 4). A non-canonical screen
-	// (child/filtered/related) keeps the pre-RowStore local-only behavior:
+	// what it accepted. A non-canonical screen
+	// (child/filtered/related) keeps its local-only behavior:
 	// its own dedup-append/replace decision, written only to ls.Rows, never
 	// observed into the shared per-type store.
 	if ls != nil {
@@ -518,9 +518,8 @@ func (c *Controller) listVisibleLocked(ls *ListState, typeName string) []resourc
 
 // listBodyBuild is one list body's build inputs, frozen under the controller
 // lock so the O(n log n) filter+sort and the O(n·cols) cell extraction can run
-// WITHOUT it — the absorb half of the C4 latency guarantee (a 6000-row result
-// used to hold the lock for its whole row pass, and every key press waited
-// behind it).
+// WITHOUT it — the absorb half of the C4 latency guarantee: a 6000-row row
+// pass under the lock would stall every key press behind it.
 //
 // ls is a detached copy of the screen's ListState, and its Rows a shallow copy
 // of the resolved row set: the build reads them while other writers keep

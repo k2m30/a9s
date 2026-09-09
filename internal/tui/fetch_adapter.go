@@ -111,9 +111,9 @@ func (m *Model) fetchResourcesFiltered(resourceType string, filter map[string]st
 }
 
 // fetchByIDDetail fetches a single resource of targetType by exact ID via its
-// registered FetchByIDs helper and navigates straight to its detail view. It
-// generalises the former ami-only adapter shortcut: the runtime now emits
-// KindFetchByIDDetail for any by-ID-capable type on a cache-miss exact-ID drill.
+// registered FetchByIDs helper and navigates straight to its detail view. The
+// runtime emits KindFetchByIDDetail for any by-ID-capable type on a
+// cache-miss exact-ID drill.
 func (m *Model) fetchByIDDetail(targetType, id string) tea.Cmd {
 	ctx, clients := m.appCtx, m.core.Clients()
 	if clients == nil {

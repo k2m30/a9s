@@ -1380,10 +1380,9 @@ func TestBug3_SortUsesViewConfig_CustomSortKeyApplied(t *testing.T) {
 // Gen always passes the session-staleness guard in core.HandleEvent. Test and
 // demo callers that do not set Gen always proceed through to handleResourcesLoadedEvent.
 //
-// Regression scenario (pre-fix behaviour):
-//   - handleResourcesLoadedEvent fanned out to every same-type list on the stack.
-//   - Step 3's 1-row result would overwrite both screen 2 (correct) AND screen 1
-//     (wrong), so after pop screen 1 showed 1 row instead of 3.
+// If handleResourcesLoadedEvent fanned out to every same-type list on the
+// stack, step 3's 1-row result would overwrite both screen 2 (correct) AND
+// screen 1 (wrong), and after the pop screen 1 would show 1 row instead of 3.
 func TestHandleResourcesLoaded_StackedSameType_DoesNotCorruptUnderlyingList(t *testing.T) {
 	// Step 1: build controller on an ec2 list screen (screen 1) and give it
 	// 3 rows via the real Handle path.

@@ -185,9 +185,8 @@ func (c *Core) HandleNavigate(ev NavigateEvent) (NavigateResult, []TaskRequest) 
 		// One-shot command disarm (D15): disarm the deferred one-shot -c navigation the instant any
 		// resource-list navigation actually happens. CommandArmed/PendingCommand
 		// (session.go) latch a REPLAY of this exact navigation, deferred until
-		// handleAvailabilityCacheLoaded's seed lands (deferred -c navigation, D11) — but nothing
-		// previously re-checked "has the user already navigated since arming"
-		// at consumption time. A manually-typed navigation to the SAME or a
+		// handleAvailabilityCacheLoaded's seed lands (deferred -c navigation, D11).
+		// A manually-typed navigation to the SAME or a
 		// DIFFERENT resource type in the race window between arming (connect
 		// time) and consumption (availability-cache-loaded time) left the flag
 		// armed, so the later deferred emit fired a second, redundant
@@ -228,8 +227,7 @@ func (c *Core) HandleNavigate(ev NavigateEvent) (NavigateResult, []TaskRequest) 
 		}
 		canon := rt.ShortName
 		if entry, ok := c.ResourceCache(canon); ok {
-			// Cached resources already carry fetcher-emitted Findings; no
-			// re-derive needed (W1.4b.3 dropped the legacy Status/Issues bridge).
+			// Cached resources already carry fetcher-emitted Findings.
 			//
 			// C1: the retained rows are what the session last saw, not what AWS
 			// holds now — the re-entry seeds them and verifies them, exactly as
@@ -262,11 +260,8 @@ func (c *Core) HandleNavigate(ev NavigateEvent) (NavigateResult, []TaskRequest) 
 		// confirm/replace what the probe retained; Kind and the
 		// KindFetchResources task below are unchanged.
 		//
-		// task #17 wave 1 stage 3: a type's rows live in exactly one RowStore
-		// entry regardless of which lane wrote them, so the free-then-disk-
-		// fallback race this comment used to describe against a separate
-		// session.ProbeResources map no longer exists; the store is read
-		// directly instead.
+		// A type's rows live in exactly one RowStore entry regardless of which
+		// lane wrote them, so the store is read directly.
 		//
 		// Observed-empty guard on the disk-store fallback: it fires only when this session never
 		// observed canon at all. Gen (domain.Gen, zero value 0) is the

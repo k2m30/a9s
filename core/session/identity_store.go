@@ -2,9 +2,6 @@
 
 // identity_store.go — session-scoped caller identity store interface and
 // thread-safe implementation.
-//
-// Replaces the package-globals that previously lived in
-// core/aws/identity_cache.go.
 package session
 
 import "sync"

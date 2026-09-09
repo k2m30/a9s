@@ -234,7 +234,7 @@ type controllerErrorEntry struct {
 // immediately.
 //
 // Registers c's view-config-aware column resolver on core via
-// SetSaveColumns (task #17 wave 1 stage 4) so Core.SaveTypeRows persists a
+// SetSaveColumns so Core.SaveTypeRows persists a
 // user's per-session column overrides — not just the built-in defaults —
 // from both the TUI and web renderer, which both construct their Controller
 // through this single entry point.

@@ -41,7 +41,7 @@ func (c *Controller) topScreenID() runtime.ScreenID {
 // canonical top-level, unfiltered resource list for its type — the C6 scope
 // gate maybeSaveResourceListCache/syncExactTotalToMenu use to decide
 // disk-cache eligibility, and applyResourcesLoaded's callers use to decide
-// RowStore eligibility (task #17 wave 1 stage 4): a ScreenChildList, or a
+// RowStore eligibility: a ScreenChildList, or a
 // ScreenResourceList opened via EscPops/carrying a ParentContext (a
 // related-navigation or filtered view), is never the type's global
 // population and must not read/write the shared per-type RowStore entry.
@@ -223,10 +223,7 @@ func (c *Controller) cachedResources(typeName string) []resource.Resource {
 
 // findCachedResourceByID looks up a single resource by ID within typeName's
 // RowStore-backed cache (any origin), for callers that only need one row
-// (text/detail screen resolution) rather than the full slice. Mirrors the
-// linear-scan-by-ID pattern previously duplicated across
-// selectedResourceForAction, buildTextFooterHints, and GetTextResource
-// against the deleted Controller.resourceCache map.
+// (text/detail screen resolution) rather than the full slice.
 func (c *Controller) findCachedResourceByID(typeName, id string) (resource.Resource, bool) {
 	for _, r := range c.cachedResources(typeName) {
 		if r.ID == id {

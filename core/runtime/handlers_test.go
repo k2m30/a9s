@@ -163,11 +163,10 @@ func TestHandleFlash_NotError(t *testing.T) {
 
 // TestHandleFlash_IsError: IsError=true → FlashIntent + FlashTick with 2 s.
 //
-// INVERTED by spec row 1 (task "boundary"): the handler used to emit a second,
-// history-carrying intent beside the flash, which is what let the two hosts
-// disagree about whether a failure was logged. The error flash is now the
-// record, and the entry is made where the flash is applied. Do not restore an
-// assertion that a separate history intent is emitted here.
+// The error flash is the record, and the history entry is made where the
+// flash is applied: a second, history-carrying intent beside the flash would
+// let the two hosts disagree about whether a failure was logged. Do not add
+// an assertion that a separate history intent is emitted here.
 func TestHandleFlash_IsError(t *testing.T) {
 	c := newCore()
 	intents, tasks := c.HandleFlash(FlashEvent{Text: "bad thing", IsError: true, NewGen: 7})
@@ -286,9 +285,8 @@ func TestHandleAPIError_UnknownError(t *testing.T) {
 // TestHandleAPIError_AlwaysEmitsThreeIntents: regardless of error type, the
 // mandatory intents must always be present.
 //
-// INVERTED by spec row 1 (task "boundary"): the history intent this used to
-// count is gone — an error flash IS the history entry, made where it is
-// applied. Do not restore it.
+// An error flash IS the history entry, made where it is applied; no
+// separate history intent exists to count.
 func TestHandleAPIError_AlwaysEmitsThreeIntents(t *testing.T) {
 	c := newCore()
 	intents, _ := c.HandleAPIError(APIErrorEvent{Err: errors.New("any"), NewGen: 1})
@@ -502,7 +500,7 @@ func TestHandleClientsReady_Success_InstallsClients(t *testing.T) {
 // PendingRefresh=false, the success path emits NO FlashIntent in intents
 // and NO FlashTickPayload in tasks, so the adapter must not advance
 // m.flash.gen and must not invalidate any in-flight ClearFlashMsg for
-// the current flash. (CXR/Architect Stage 5 R3 regression.)
+// the current flash.
 func TestHandleClientsReady_Success_NoPendingRefresh_NoFlashWork(t *testing.T) {
 	c := newCore()
 	s := c.session
@@ -1039,8 +1037,8 @@ func TestHandleClientsReady_Failure_NilClients_NoBootstrapTasks(t *testing.T) {
 	}
 }
 
-// TestHandleClientsReady_Failure_RewiresPostRotateStores guards the Stage 5
-// P3 regression caught on PR #360: after Session.Rotate() installs fresh
+// TestHandleClientsReady_Failure_RewiresPostRotateStores: after
+// Session.Rotate() installs fresh
 // per-session stores (PolicyStore / IdentityStore / RuleSetStore), the
 // failure path on the resulting ClientsReadyMsg must rewire the retained
 // transport with those post-rotate stores. Otherwise Pattern-C related
@@ -1088,8 +1086,8 @@ func TestHandleClientsReady_Failure_RewiresPostRotateStores(t *testing.T) {
 	}
 }
 
-// TestHandleClientsReady_StaleGen_ReturnsEmpty guards the Stage 5 invariant
-// caught on PR #360: when the Core sees a stale ConnectGen on a
+// TestHandleClientsReady_StaleGen_ReturnsEmpty: when the Core sees a stale
+// ConnectGen on a
 // ClientsReadyMsg, it returns (nil, nil). The TUI adapter relies on this
 // to gate its flash.gen bump (it must not bump on stale dispatches —
 // doing so would invalidate ClearFlashMsg already in flight for the

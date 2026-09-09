@@ -128,7 +128,7 @@ func redirectsToHTTPS(listener elbtypes.Listener) bool {
 // elbCodeMisconfigured FindingDef declared at SevWarn in
 // catalog_networking.go. Both flags missing at once is the AWS
 // create-load-balancer default and must not escalate to SevBroken; doing so
-// previously painted every freshly-created, unhardened LB red.
+// would paint every freshly-created, unhardened LB red.
 //
 // Per-LB API failures aggregate into a composite error returned alongside
 // the partial findings (E1–E6 contract). LoadBalancerArn is read from

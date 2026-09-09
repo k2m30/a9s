@@ -44,13 +44,12 @@ import (
 // Strategy: use newControllerAtDetail to arrive at a known detail screen, seed
 // the related panel with a row via ApplyDetailRelated, then send a
 // RelatedCheckBatch that updates the same DisplayName with ResourceIDs=[Y].
-// ActionSelect on the focused row must emit at least one task.  If ResourceIDs
-// were dropped (pre-fix), the update path set ResourceIDs to nil, so targetID
-// would be "" and navigation would fall through without emitting a fetch task.
+// ActionSelect on the focused row must emit at least one task.  If the update
+// path dropped ResourceIDs, targetID would be "" and navigation would fall
+// through without emitting a fetch task.
 //
-// Pre-fix failure: mergeDetailRelatedRow's existing-row branch assigned
-// Count/Loading/Err/Truncated/FetchFilter but omitted
-// `ds.RelatedRows[i].ResourceIDs = resourceIDs`.
+// mergeDetailRelatedRow's existing-row branch must assign ResourceIDs along
+// with Count/Loading/Err/Truncated/FetchFilter.
 func TestHandleRelatedCheckBatch_ResourceIDs_EnableSingleResourceNav(t *testing.T) {
 	res := fakeEC2Resources()[0]
 	c := newControllerAtDetail(t, res, "ec2")
@@ -102,7 +101,7 @@ func TestHandleRelatedCheckBatch_ResourceIDs_EnableSingleResourceNav(t *testing.
 	// ActionSelect on the focused related row.  If ResourceIDs survived the
 	// batch update, navigation resolves to a single resource (targetID ==
 	// updatedID) and emits at least one task.  If ResourceIDs were dropped,
-	// targetID=="" and no task is emitted (pre-fix behavior).
+	// targetID=="" and no task is emitted.
 	_, navTasks := c.Apply(app.Action{Kind: app.ActionSelect})
 
 	if len(navTasks) == 0 {
@@ -443,9 +442,9 @@ func TestRelatedNav_MultiID_SeedsRelatedIDSet(t *testing.T) {
 	// so this exercises the shared applyRelatedNavResult seeding that both use.
 	vs, _ := c.Apply(app.Action{Kind: app.ActionRelatedSelect, Arg: "0"})
 
-	// [Codex P2] Apply must return the POST-navigation snapshot. c.snapshot() now
-	// runs AFTER dispatchRelatedNavigate pushes the filtered list; pre-fix the
-	// snapshot was taken first (Go evaluates return operands left-to-right), so a
+	// Apply must return the POST-navigation snapshot: c.snapshot() runs AFTER
+	// dispatchRelatedNavigate pushes the filtered list (Go evaluates return
+	// operands left-to-right), otherwise a
 	// caller trusting Apply's ViewState got the stale source detail.
 	if vs.Body.Kind != app.BodyKindList {
 		t.Errorf("Apply returned Body.Kind=%q after the related click, want %q "+

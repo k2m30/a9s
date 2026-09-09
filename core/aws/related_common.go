@@ -126,11 +126,11 @@ func findEmbeddedStruct[T any](rv reflect.Value) (T, bool) {
 // (arn:aws:kms:region:account:key/UUID), bare key UUID, alias ARN
 // (arn:aws:kms:region:account:alias/NAME, where NAME frequently contains its
 // own "/" as in the AWS-managed "aws/s3", "aws/rds", etc.), or bare alias
-// name ("alias/NAME"). Every *_related.go KMS checker used to split on the
-// LAST "/" — correct for the key/UUID shape but wrong for any alias, since it
-// discards the "alias/aws/" prefix and returns just the trailing
-// service-name segment (e.g. "s3"), which DescribeKey/FetchByIDs then
-// rejects as an invalid key ID. This is the single extraction seam: it
+// name ("alias/NAME"). Splitting on the LAST "/" is correct for the
+// key/UUID shape but wrong for any alias, since it discards the "alias/aws/"
+// prefix and returns just the trailing service-name segment (e.g. "s3"),
+// which DescribeKey/FetchByIDs then rejects as an invalid key ID. This is
+// the single extraction seam: it
 // strips only a recognized "key/" or "alias/" ARN prefix, preserving the
 // full alias name (including embedded slashes) instead of trimming to the
 // last path segment.
@@ -251,8 +251,7 @@ type typedRow[T any] struct {
 // fetches. Tri-state contract (the ng_related.go original): cache absent →
 // (nil, false, false) = unknown; entry present but zero rows assert to T
 // (disk-seeded, no RawStruct) → (nil, false, false) = unknown; entry present
-// and typed → the asserting rows only (non-asserting rows are dropped, as
-// every caller previously did itself).
+// and typed → the asserting rows only (non-asserting rows are dropped).
 func cachedTypedRows[T any](cache resource.ResourceCache, shortName string) (rows []typedRow[T], truncated bool, ok bool) {
 	entry, present := cache[shortName]
 	if !present {

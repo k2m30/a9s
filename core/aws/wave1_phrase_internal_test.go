@@ -81,8 +81,8 @@ func TestSlotPluralsComeFromTheDeclaration(t *testing.T) {
 
 // TestSlotWithAnAgreeingNounNeverEatsItsValue pins what a probe found: a slot
 // that marks a noun for agreement but names no token for the value has no
-// place to put it, and the value used to vanish into the inflected noun
-// ("<port(s)>" with "80" rendered "ports"). The value is what the reader is
+// place to put it, and the value would vanish into the inflected noun
+// ("<port(s)>" with "80" rendering "ports"). The value is what the reader is
 // being shown; it survives whatever the declaration got wrong.
 func TestSlotWithAnAgreeingNounNeverEatsItsValue(t *testing.T) {
 	if got := fillPhrase("<port(s)>", "80"); !strings.Contains(got, "80") {

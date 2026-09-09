@@ -116,13 +116,13 @@ func (c *Core) LoadAvailabilityCache() *cache.Store {
 }
 
 // reconcileTypeFile is the SINGLE chokepoint every type-file write goes
-// through (task #17 wave 1 — the row-store unification save chokepoint).
+// through.
 // SaveAvailabilityCache (counts-only) and SaveResourceListCache/
 // saveProbeResourcesToTypeFiles (rows-carrying) both stage their observation
 // through this function before store.Put — no other code path may construct
-// a cache.TypeFile to persist. Replaces the previously scattered no-shrink/
-// exact-stick/mismatch-drop guards that lived independently in each caller
-// and could disagree about which write lane's Rows should survive.
+// a cache.TypeFile to persist, so the no-shrink, exact-stick and
+// mismatch-drop guards exist once and cannot disagree about which write
+// lane's Rows should survive.
 //
 // Persisted-pair invariant, per rule:
 //   - Rule 0 (contradiction self-heal): a stored Exact that the current raw
@@ -156,8 +156,7 @@ func (c *Core) LoadAvailabilityCache() *cache.Store {
 // it came off the wire, BEFORE any caller-side "exactness sticks" adjustment
 // — reconcileTypeFile needs the untouched values to detect rule 0 below; a
 // caller that pre-collapses a truncated observation into a sticky-exact one
-// (as both SaveAvailabilityCache and SaveResourceListCache used to do
-// unconditionally) destroys the very information this chokepoint needs to
+// destroys the very information this chokepoint needs to
 // tell a genuine still-exact re-observation apart from a poisoned one.
 //
 // Rules, applied in order:
@@ -373,11 +372,6 @@ func rowIDsAreSubset(candidate, superset []cache.Row) bool {
 // (app.Controller.runAvailabilitySaveLoop, which owns the exact-total
 // sync-back and the in-list Wave-2 badge).
 //
-// The menu lane used to freeze a clone of MenuState's five maps instead. That
-// snapshot was a second source of truth and a stale one — it described the
-// menu as it was when the save was queued, so a queued snapshot landing after
-// the sweep's wrote the pre-observation counts back over it.
-//
 // pair is carried through to the save chokepoint, which refuses it when the
 // operator has since switched (C9). Best-effort like every other cache write.
 func (c *Core) SaveAvailabilityFromRows(pair session.Pair) error {
@@ -393,9 +387,9 @@ func (c *Core) SaveAvailabilityFromRows(pair session.Pair) error {
 // with a concurrent SaveResourceListCache/SaveAvailabilityCache call for the
 // same type file dispatched from another tea.Cmd goroutine (e.g. a
 // background availability sweep's save racing a list screen's own
-// fetch-completion save) — that race previously let one call's Count and
-// another's Rows land in the same on-disk TypeFile as a mismatched pair,
-// even though each call's own write was individually consistent. The actual
+// fetch-completion save) — without it one call's Count and another's Rows
+// can land in the same on-disk TypeFile as a mismatched pair, even though
+// each call's own write is individually consistent. The actual
 // disk write happens after WithCacheStoreSave releases pairMu — see its doc
 // comment for what changed and the trade-off that split accepts.
 // WithCacheStoreSave also covers the initial load (C7 hard invariant: a save
@@ -505,12 +499,9 @@ func (c *Core) saveAvailabilityCache(
 // materializeListFieldsForSave resolves shortName's list column set (via
 // Core.saveColumns when the renderer registered one, else the built-in-
 // defaults-only cascade in resolveSaveColumns) and writes each Path-backed
-// column's RawStruct scalar into Fields per saveFieldKey. Owner decision:
-// "для всех ресурсов должны быть закешированы все колонки, которые могут
-// меняться" — every renderable list column must be cached, driven by the
-// column CONFIG, no hardcode. Shared by both save lanes via SaveTypeRows
-// (task #17 wave 1 stage 4: one materializer for the list-open lane and the
-// sweep lane).
+// column's RawStruct scalar into Fields per saveFieldKey: every renderable
+// list column is cached, driven by the column CONFIG, no hardcode. Shared by both save lanes via SaveTypeRows
+// (one materializer for the list-open lane and the sweep lane).
 //
 // This is the SAVE seam, so it goes further than the render-time
 // app.MaterializeListFields: cache.Row never carries RawStruct, so a column
@@ -591,10 +582,8 @@ func materializeResourceFields(r resource.Resource, columns []config.ListColumn)
 // One rule decides both: persist the value the LIVE cascade chose, under the
 // key the replay cascade reads. app.ExtractCellValue is that cascade, and it
 // reads a column's own key — the status column included, which is why this
-// carries no branch for it any more. The status column used to need one
-// because the live cascade read three spellings in a fixed order and this had
-// to name the same first one; the two rules were one rule written twice, and
-// a change to either was a change the other did not make.
+// carries no branch for it: the cascade and this save read the same key, so
+// one rule exists rather than the same rule written twice.
 //
 //   - Keyed column, status or not: the live cell is Fields[Key] whenever that
 //     is populated, so a value already there is what the screen showed and
@@ -649,8 +638,7 @@ func (c *Core) SaveResourceListCache(pair session.Pair, shortName string, rows [
 	)
 }
 
-// SaveTypeRows is the single per-type save chokepoint (task #17 wave 1 stage
-// 4): materializes resources' Path-backed columns (via
+// SaveTypeRows is the single per-type save chokepoint: materializes resources' Path-backed columns (via
 // materializeListFieldsForSave, honoring a registered SetSaveColumns
 // resolver), builds the persisted cache.Row projection (ID/Name/Fields/
 // Findings — colors/glyphs/status are derived at render time and never
@@ -769,7 +757,7 @@ func (c *Core) saveResourceListCache(target SaveTarget, rows []cache.Row, conten
 	})
 }
 
-// CachedListDepth returns the number of rows previously persisted for
+// CachedListDepth returns the number of rows persisted for
 // shortName's canonical top-level list — its known population, not merely
 // the rows it stored: a file that knows 55 and stored 50 must be verified to
 // 55, or the verify walk stops one page short and the list regresses to
@@ -961,13 +949,11 @@ func (c *Core) DemoPrefetchCounts(ctx context.Context, clients *awsclient.Servic
 // buildEnrichQueue returns resource types that have a registered Wave-2 issue
 // enricher AND retained probe resources, in dispatch order. Dispatch order
 // (priority ascending, then alphabetical) is owned by awsclient.AllWave2 so
-// this function only filters by RowStore membership (task #17 wave 1 stage
-// 2 — replaces the removed session.ProbeResources membership check).
+// this function only filters by RowStore membership.
 //
 // Deliberately uses tr.Gen != 0 (observed-at-all), NOT ProbeOriginTypeNames'
-// len(Rows)>0 gate: the legacy session.ProbeResources map-key-presence check
-// this replaces (`_, ok := c.session.ProbeResources[e.ShortName]`) was true
-// even for an explicitly-retained, observed-EMPTY slice (a live Wave-1 probe
+// len(Rows)>0 gate: an explicitly-retained, observed-EMPTY slice counts as
+// observed (a live Wave-1 probe
 // confirming zero resources still ran that type's Wave-2 enricher). Reusing
 // ProbeOriginTypeNames here would silently skip Wave-2 enrichment for every
 // observed-empty type, a real behavior regression this membership test must
@@ -997,8 +983,8 @@ func (c *Core) BuildEnrichQueue() []string {
 // the caller embeds it in the adapter message for stale-result rejection.
 //
 // Builds a ResourceCache snapshot via BuildResourceCacheSnapshot, backed
-// entirely by RowStore (task #17 wave 1 stage 3 — a type's rows live in
-// exactly one RowStore entry regardless of which lane wrote them: Wave-1
+// entirely by RowStore (a type's rows live in exactly one RowStore entry
+// regardless of which lane wrote them: Wave-1
 // probe, top-level fetch, or a sparse FetchByIDs drill). On the normal
 // startup path no list has been opened yet, so building from full-only
 // entries would leave the first enrichment pass blind to siblings the
@@ -1041,10 +1027,9 @@ func (c *Core) ProbeEnrichment(ctx context.Context, clients *awsclient.ServiceCl
 // BuildResourceCacheSnapshot returns a read-only snapshot of currently-loaded
 // resource lists, keyed by resource short name, so enrichers see the full
 // set (including out-of-scope entries pulled via FetchByIDs). Backed
-// entirely by RowStore (task #17 wave 1 stage 3 — the former
-// ResourceCache/LazyResourceCache maps are gone; a type's rows live in
-// exactly one RowStore entry regardless of which lane wrote them, so there
-// is no merge-precedence left to apply).
+// entirely by RowStore (a type's rows live in exactly one RowStore entry
+// regardless of which lane wrote them, so there is no merge precedence to
+// apply).
 //
 // A Partial (lazy-add) entry is marked IsTruncated=true because it is
 // sparse (FetchByIDs, not a full first page); a full entry's own
@@ -1055,7 +1040,7 @@ func (c *Core) ProbeEnrichment(ctx context.Context, clients *awsclient.ServiceCl
 //
 // A type observed with a zero-length Rows slice (Gen != 0, e.g. a live
 // checker's CachedPages write-back reporting a genuinely empty-but-truncated
-// or empty-complete first page — issue #233) still gets a snapshot entry:
+// or empty-complete first page) still gets a snapshot entry:
 // only a never-observed type (Gen == 0) is skipped. Dropping an
 // observed-empty entry here would make FetchRelatedTarget's `cache[target]`
 // lookup miss and fall through to its own live re-fetch, discarding the

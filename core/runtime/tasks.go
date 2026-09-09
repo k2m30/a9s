@@ -298,11 +298,9 @@ func (SaveThemeConfigPayload) isTaskPayload() {}
 // c.session.ProbeResources live at EXECUTE time would race that later
 // mutation. Capturing the snapshot at dispatch time — mirroring the
 // DispatchSnapshot/CaptureDispatch pattern already used for
-// generations/clients — avoids that race entirely. (Historical note:
-// startEnrichment's rerun-start step used to eagerly strip Wave-2 findings
-// here too via clearEnrichmentFor; that eager strip was removed — C1/C6b:
-// stale-until-replaced, not blank-until-replaced — but the dispatch-time
-// snapshot requirement stands on its own regardless.)
+// generations/clients — avoids that race entirely. Wave-2 findings are never
+// stripped at rerun start (C1/C6b: stale-until-replaced, not
+// blank-until-replaced); the dispatch-time snapshot stands on its own.
 //
 // Resources and Truncated are shallow copies of the maps (values are the
 // existing []resource.Resource slices/headers at capture time); the executor

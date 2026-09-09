@@ -84,7 +84,7 @@ var sharedKMSFixtures = sync.OnceValue(func() *KMSFixtures {
 			CreationDate: aws.Time(time.Date(2024, 8, 1, 9, 0, 0, 0, time.UTC)),
 			Enabled:      false,
 		},
-		// CT-event cross-reference key required by ctdetail nav tests (T029).
+		// CT-event cross-reference key required by ctdetail nav tests.
 		{
 			KeyId:        aws.String("2f7e9a5b-8c1d-4e3f-9a0b-1c2d3e4f5a6b"),
 			Arn:          aws.String("arn:aws:kms:us-east-1:123456789012:key/2f7e9a5b-8c1d-4e3f-9a0b-1c2d3e4f5a6b"),
@@ -303,10 +303,9 @@ var sharedKMSFixtures = sync.OnceValue(func() *KMSFixtures {
 		},
 		// AWS-managed default S3 key (checkS3KMS pivot, ManagedKeyBucketName
 		// in s3.go). GetBucketEncryption reports the full alias ARN
-		// "arn:aws:kms:...:alias/aws/s3" — the exact shape that caused the
-		// pre-fix truncation bug (the naive last-"/" split used to chop it
-		// down to "s3", the bucket's own resource type, instead of passing
-		// the alias through whole). checkS3KMS returns the alias-style ID
+		// "arn:aws:kms:...:alias/aws/s3" — the shape a naive last-"/" split
+		// would chop down to "s3", the bucket's own resource type, instead of
+		// passing the alias through whole. checkS3KMS returns the alias-style ID
 		// "alias/aws/s3" (AWSManagedS3KeyID) as the navigation ID; real
 		// DescribeKey accepts that as KeyId directly and the KeyMetadata it
 		// returns always carries the true KeyId, so this fixture entry uses

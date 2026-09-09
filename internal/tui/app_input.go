@@ -269,7 +269,7 @@ func (m *Model) resetTabCycle() {
 // advanceTabCycle handles a Tab keypress in command mode. On the first Tab
 // for a given input it computes all matching candidates and shows the first
 // one; on subsequent Tabs it rotates through the candidates. With a single
-// candidate it behaves like the old single-shot completion.
+// candidate it completes once.
 func (m *Model) advanceTabCycle() {
 	if m.tabPrefix == "" {
 		prefix := strings.TrimSpace(m.cmdInput.Value())

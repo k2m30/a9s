@@ -25,7 +25,7 @@ func (c *Controller) handleActionBack(_ Action) (ViewState, []runtime.TaskReques
 	// Update methods in the TUI adapter.
 	c.applyIntents([]runtime.UIIntent{runtime.PopScreen{}})
 
-	// Owner decision #38 (2026-07-06): when the pop reveals a detail screen
+	// When the pop reveals a detail screen
 	// with registered related defs, re-dispatch its related-resource checks —
 	// a pivot left at the transient blank-navigable state (domain.RelatedUnknown,
 	// no FetchFilter) must resolve to its real count once the user drills into the target
@@ -424,9 +424,9 @@ func costsTaskSlice(t *runtime.TaskRequest) []runtime.TaskRequest {
 // current screen (resource/child list, main menu, or selector) to the
 // visible index carried in a.N, clamped to the visible range, then performs
 // the same logic as ActionSelect. This is the atomic replacement for the web
-// UI's row/entry click path, which previously replayed move-top + N×move-down
-// + select as separate round-trips — a chain that landed on the wrong row
-// whenever cursor movement skips entries (e.g. the main menu's
+// UI's row/entry click path: replaying move-top + N×move-down + select as
+// separate round-trips is a chain that lands on the wrong row whenever
+// cursor movement skips entries (e.g. the main menu's
 // skip-unavailable stepping over confirmed-empty resource types).
 //
 // a.N is the same visible index the renderer's template used to iterate the

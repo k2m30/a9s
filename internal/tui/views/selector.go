@@ -75,8 +75,8 @@ func (m *SelectorModel) SetSize(w, h int) {
 	m.height = h
 }
 
-// RenderSelector renders the selector list from a controller-supplied SelectorBody,
-// byte-identical to the old View(). The controller owns the logical state (visible
+// RenderSelector renders the selector list from a controller-supplied
+// SelectorBody. The controller owns the logical state (visible
 // items, cursor, active-item); the renderer owns dimensions.
 func (m *SelectorModel) RenderSelector(body app.SelectorBody) string {
 	if len(body.Items) == 0 {

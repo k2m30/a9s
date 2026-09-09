@@ -105,8 +105,7 @@ func (m Model) handleResourcesLoaded(msg messages.ResourcesLoaded) (tea.Model, t
 	// Auto-open-single-detail: when the active list was created with
 	// autoOpenSingleDetail (e.g. related navigation from a detail field), and
 	// exactly one row is visible after loading, navigate directly to detail —
-	// replacing the list. This mirrors the logic previously in
-	// ResourceListModel.Update(ResourcesLoadedMsg).
+	// replacing the list.
 	if rs.kind == rsKindList && m.ctrl.GetListAutoOpenSingle() {
 		snap := m.ctrl.Snapshot()
 		ls := snap.Body.List
@@ -190,9 +189,9 @@ func (m Model) handleResourcesLoaded(msg messages.ResourcesLoaded) (tea.Model, t
 // a text viewer for this resource: a TUI-only rendering concern with no
 // Controller equivalent. Calling the SAME Core.HandleEnrichDetailResult the
 // web/headless lane calls also means this lane's successful Ctrl+R clears
-// the resource's pending sticky-refresh demand — that used to be a
-// web/headless-only fold step, which left a successful TUI refresh's latch
-// armed forever and forced every later cfn/IAM open to re-fetch live.
+// the resource's pending sticky-refresh demand; otherwise a successful TUI
+// refresh would leave the latch armed and force every later cfn/IAM open to
+// re-fetch live.
 //
 // The Err branch returns early so the detail-state merge and the
 // syntax-color regeneration never fire on a half-populated EnrichedRes.

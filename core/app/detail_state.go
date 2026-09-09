@@ -288,8 +288,8 @@ func primaryWave2Finding(r resource.Resource) (*domain.Finding, *domain.Attentio
 // — see beginDetailWorkloadLocked's "sticky refresh" doc comment): that call
 // is shared with the TUI's direct-Core handleEnrichDetailResult shim, so
 // clearing lives once, in the one place both lanes route through, rather
-// than duplicated in each lane's fold (a duplicate here previously left the
-// TUI lane's own successful Ctrl+R never clearing the latch).
+// than duplicated in each lane's fold, where one copy can drift from the
+// other and leave a lane's successful Ctrl+R never clearing the latch.
 //
 // Also regenerates an open YAML/JSON text screen for this resource
 // (regenerateTextScreenLocked) using the same neutral (uncolored)

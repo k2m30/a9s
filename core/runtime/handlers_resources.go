@@ -177,12 +177,9 @@ func (c *Core) HandleResourcesLoaded(ev ResourcesLoadedEvent) ([]UIIntent, []Tas
 
 	var tasks []TaskRequest
 	if ev.TypeGen != 0 && ev.TypeGen == c.session.EnrichmentTypeGenGet(resType) {
-		// task #17 wave 1 stage 2: the removed session.ProbeResources/
-		// ProbeTruncated reseed is now store-only — ObserveRows below is this
-		// reseed's only destination. The enrichment-rerun reseed is a genuine
-		// fetch result — OriginFetch, wholesale replace (mirrors the
-		// unconditional whole-slice assignment the legacy map write used to
-		// perform, not an append).
+		// ObserveRows below is this reseed's only destination. The
+		// enrichment-rerun reseed is a genuine fetch result — OriginFetch,
+		// wholesale replace, not an append.
 		c.ObserveRows(resType, ev.Resources, ev.Pagination, session.OriginFetch, false)
 		tasks = append(tasks, TaskRequest{
 			Key: TaskKey{Kind: TaskKindProbeEnrich, Scope: resType},
@@ -306,8 +303,8 @@ func (c *Core) RefreshListEnrichment(rt string) domain.Gen {
 // rehydrates stale wave2 attention state on the next list-open, mirroring the
 // TUI's own main-menu Ctrl+R path.
 //
-// Every retained type's rows live in exactly one RowStore entry (task #17
-// wave 1 stage 3), so the type-name set gathered here is the union of the
+// Every retained type's rows live in exactly one RowStore entry, so the
+// type-name set gathered here is the union of the
 // full (ResourceCacheKeys) and Partial (lazy, via ForEachLazyResourceCache)
 // entries plus ProbeOriginTypeNames' Origin=Probe/Disk entries.
 func (c *Core) ClearAllWave2Findings() {
@@ -457,10 +454,9 @@ func (c *Core) HandleRelatedCheckResult(ev RelatedCheckResultEvent) ([]UIIntent,
 		if _, dup := addedInBatch[shortName]; dup {
 			continue
 		}
-		// A type's rows now live in exactly one RowStore entry regardless of
-		// which lane wrote them (task #17 wave 1 stage 3) — Gen!=0 alone
-		// (full OR Partial) is the "already has an entry" test that used to
-		// require checking two separate maps.
+		// A type's rows live in exactly one RowStore entry regardless of
+		// which lane wrote them — Gen!=0 alone (full OR Partial) is the
+		// "already has an entry" test.
 		if c.session.RowStore.Snapshot(shortName).Gen != 0 {
 			continue
 		}

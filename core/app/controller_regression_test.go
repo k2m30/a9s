@@ -1,18 +1,13 @@
 // SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
 
-// controller_regression_test.go — regression tests for five controller-path bugs
-// fixed in the headless/PR-C work.
+// controller_regression_test.go — five controller-path invariants:
 //
-// Each test is annotated with the pre-fix failure so it is clear why the test
-// would have failed before the corresponding fix.
-//
-//	Fix1 (P1-2): Handle silently dropped stale ResourcesLoaded (IsStale guard).
-//	Fix2 (P2-3): ApplyListFieldUpdates now applies to every matching stack list.
-//	Fix3 (P2-5): MenuSelected clamps cursor when the visible list shrinks.
-//	Fix4 (P2-1): ApplyDetailEnrichmentForResource sets ds.Resource on the match.
-//	Fix5 (P2-4): ensureDetailState seeds ds.Findings with the resource's wave-1
-//	             findings so the Attention section shows them — guarded by
-//	             TestApplyDetailFinding_PreservesWave1Findings.
+//	Handle drops a stale ResourcesLoaded (IsStale guard).
+//	ApplyListFieldUpdates applies to every matching stack list.
+//	MenuSelected clamps the cursor when the visible list shrinks.
+//	ApplyDetailEnrichmentForResource sets ds.Resource on the match.
+//	ensureDetailState seeds ds.Findings with the resource's wave-1 findings
+//	so the Attention section shows them (TestApplyDetailFinding_PreservesWave1Findings).
 //
 // The TestApplyDetailFindingForResource_* tests below are general regression
 // tests for applyFindingToState's wave-2 strip/append behaviour and the
@@ -93,8 +88,8 @@ func TestHandle_StaleResourcesLoaded_Dropped(t *testing.T) {
 // TestApplyListFieldUpdates_UpdatesBothStackedLists verifies that field updates
 // are applied to all same-type list screens on the stack, not only the top one.
 //
-// Pre-fix failure: only the top list's Rows were mutated. After popping back to
-// the underlying list, the old field value was still shown.
+// Both stacked lists' Rows take the update: after popping back to the
+// underlying list the new field value shows there too.
 func TestApplyListFieldUpdates_UpdatesBothStackedLists(t *testing.T) {
 	targetID := fakeEC2Resources()[0].ID // "i-0aaa111111111111a"
 

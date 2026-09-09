@@ -446,7 +446,7 @@ func alwaysMemoizeSuccess[T any](_ T, err error) bool {
 // coalesceCall instantiation — carrying both halves lets a definitive,
 // memoizable error (S3's benign NoSuchBucketPolicy) be stored exactly like a
 // successful value, without each decorator inventing its own error-carrying
-// wrapper type (coalescingS3 used to keep s3BucketPolicyResult for this).
+// wrapper type.
 type coalescedResult[T any] struct {
 	out T
 	err error
@@ -454,8 +454,7 @@ type coalescedResult[T any] struct {
 
 // recordCoalesceCall records one call outcome to the ledger (nil-receiver
 // safe, a no-op when the caller opted out) and, when enabled, to the
-// process-wide trace stream — the two-observer emission every decorator's
-// method used to repeat at three separate call sites.
+// process-wide trace stream.
 func recordCoalesceCall(ledger *CallLedger, opID domain.Gen, api, argKey string, executed bool) {
 	outcome, outcomeStr := CallServed, "served"
 	if executed {
@@ -473,9 +472,9 @@ func recordCoalesceCall(ledger *CallLedger, opID domain.Gen, api, argKey string,
 // shouldMemoize decides whether a (value, err) pair is a safe permanent
 // answer for the rest of the operation to reuse.
 //
-// The race this closes: completedResultMemo.get and singleflight.Group.Do
-// used to be two independent steps with a gap between them. A caller could
-// miss the memo, and then — before it reached Do — observe an entirely
+// The race this closes: with completedResultMemo.get and singleflight.Group.Do
+// as two independent steps, a caller could miss the memo and then, before it
+// reached Do, observe an entirely
 // different goroutine's flight for the SAME key run to completion (execute
 // the real call, record it, populate the memo, return from its closure, and
 // have singleflight delete its now-finished in-flight entry) inside that

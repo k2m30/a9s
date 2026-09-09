@@ -21,10 +21,9 @@ import (
 )
 
 // opAwareDocStore is the shared op-aware document-cache implementation
-// embedded by both DetailDocCache and PolicyDocumentCache — the state and
-// Get/Set/SetIfNewer bodies used to be duplicated verbatim between the two
-// (this repo's no-duplicate-truth rule); both exported types keep their own
-// distinct key namespaces and public method signatures unchanged.
+// embedded by both DetailDocCache and PolicyDocumentCache, so the state and
+// the Get/Set/SetIfNewer bodies exist once; both exported types keep their
+// own distinct key namespaces and public method signatures.
 type opAwareDocStore struct {
 	mu       sync.RWMutex
 	m        map[string]any

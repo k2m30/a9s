@@ -37,8 +37,8 @@ var exemptNames = map[string]bool{
 	"CreateServiceClients": true,
 	"ExecuteTaskAt":        true,
 	// Session-state mutators (in-memory maps on session.Session), moved into
-	// scanned core/runtime when RefreshListEnrichment centralized the
-	// list-refresh mutation list previously living in unscanned internal/tui.
+	// scanned core/runtime, where RefreshListEnrichment owns the list-refresh
+	// mutation list.
 	"DeleteEnrichmentRan":          true,
 	"DeleteEnrichmentTruncatedIDs": true,
 }

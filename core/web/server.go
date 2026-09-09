@@ -282,10 +282,10 @@ func (s *Server) getOrCreateSession(sessionID string) *sessionEntry {
 // Uses the per-task-budget drain (DrainSyncPerTaskTimeout), not a single
 // umbrella deadline over the whole sweep: a live bootstrap fans out identity
 // + cache load + one Wave-1 probe per resource type + one Wave-2 enrichment
-// per enrichable type — on the order of 100+ tasks. A single
-// context.WithTimeout(60s) shared across that entire batch used to expire
-// mid-sweep and silently drop every remaining task (DEF: stale disk counts,
-// no issue badges, forever). Per-task budgets let the queue always finish;
+// per enrichable type — on the order of 100+ tasks. A single timeout shared
+// across that entire batch would expire mid-sweep and drop every remaining
+// task (stale disk counts, no issue badges). Per-task budgets let the queue
+// always finish;
 // see backgroundTaskTimeout's doc comment for why 30s is the right per-task
 // bound. The parent context here is context.Background() (cancellation-only,
 // never expires): this goroutine is not tied to any http.Request context, and
@@ -316,10 +316,9 @@ func (s *Server) bootstrapLiveSession(entry *sessionEntry) {
 // RetryOnThrottle's up-to-3-attempt backoff), so 30s gives that inner
 // deadline comfortable headroom to fire first in the normal case while still
 // acting as a real backstop against a task that ignores ctx internally or
-// blocks on something other than the AWS call (e.g. a lock wait). This
-// constant replaces the old backgroundDrainTimeout, which bounded an entire
-// multi-task batch instead of one task and silently dropped everything after
-// it queued past the batch's single deadline.
+// blocks on something other than the AWS call (e.g. a lock wait). It bounds
+// one task, never a batch: a batch-wide deadline drops everything queued
+// past it.
 const backgroundTaskTimeout = 30 * time.Second
 
 // drainBackgroundTasks runs pending (already partitioned as background by

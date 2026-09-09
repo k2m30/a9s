@@ -40,7 +40,7 @@ type flashState struct {
 // Model is the root Bubble Tea model. It owns the renderer-state stack, header
 // state, AWS clients, and routes all messages to the headless controller.
 //
-// The stack []*rendererState replaces the former []views.View: no concrete view
+// The stack is []*rendererState: no concrete view
 // model instances are stored between frames. All logical screen state lives in
 // the headless app.Controller; the renderer reads m.ctrl.Snapshot().Body.Kind
 // and dispatches to free render functions (renderer.go) that create transient

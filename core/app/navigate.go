@@ -446,13 +446,11 @@ func (c *Controller) BeginDetailWorkload(rt string, res resource.Resource, refre
 
 // beginDetailWorkloadLocked begins a new DetailOperation for (rt, res) and
 // returns its COMPLETE workload — the single builder every site that begins
-// a detail operation must route through, replacing the former two-call
-// Core.BeginDetailOperation + Core.DetailOperationTasks pattern that let a
-// caller mint a fresh op ID (invalidating any earlier operation's in-flight
-// enrich/related results) while dispatching only one of the two replacement
-// tasks, silently stranding the other half forever. Callers append the
-// ENTIRE returned slice — there is no "half" left to selectively discard;
-// Core.BeginDetailOperation itself now returns that slice directly (no
+// a detail operation must route through, so no caller can mint a fresh op
+// ID (invalidating any earlier operation's in-flight enrich/related results)
+// while dispatching only one of the two replacement tasks and stranding the
+// other. Callers append the ENTIRE returned slice — there is no "half" to
+// selectively discard; Core.BeginDetailOperation returns that slice directly (no
 // *TaskRequest out-params to fold together), and the per-entry-point tests
 // in tests/unit/detail_workload_test.go pin that no caller drops an element.
 //
@@ -540,9 +538,8 @@ func (c *Controller) beginDetailWorkloadLocked(rt string, res resource.Resource,
 
 // openRelatedDetail pushes a detail screen for the already-fetched resource
 // cached and begins its detail workload (enrich + related, cache-replay
-// suppressed via beginDetailWorkloadLocked — same builder as ActionOpenDetail;
-// this method used to carry its own hand-rolled duplicate of that
-// cache-replay logic). Shared by the cache-hit related-navigate path
+// suppressed via beginDetailWorkloadLocked — same builder as
+// ActionOpenDetail). Shared by the cache-hit related-navigate path
 // (NavigationKindDetail) and the web by-ID auto-open path. Caller must hold
 // c.mu (write).
 func (c *Controller) openRelatedDetail(cached resource.Resource, targetType string) []runtime.TaskRequest {

@@ -176,8 +176,8 @@ func (c *Controller) buildDetailFooterHints(ds *DetailState) []KeyHint {
 // targetDisplayName is the human name the enter hint shows for a navigable
 // row's target type. The target is a type the screen is not showing, so it is
 // resolved through the same owner every other typeDef on this screen comes
-// from — the fallback, catalog and child rungs in one place — rather than the
-// catalog-then-child cascade this file used to spell out at both hint sites.
+// from — the fallback, catalog and child rungs in one place, not spelled out
+// at each hint site.
 // A type nothing answers for keeps its short name: an unnamed hint is worse
 // than a terse one.
 func (c *Controller) targetDisplayName(targetType string) string {

@@ -1,10 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
 
 // rule_set_store.go — session-scoped SES receipt rule set cache.
-//
-// Replaces the package-level globals that previously lived in
-// core/aws/ses_related.go (sesRuleSetCacheMu, sesRuleSetCaches map keyed
-// by *ServiceClients pointer).
 package session
 
 import (
@@ -17,9 +13,8 @@ import (
 )
 
 // ruleSetStore is a session-scoped, single-slot cache for the SES v1
-// DescribeActiveReceiptRuleSet response. Each Session owns one store; the
-// keying-by-pointer that the legacy globals required for per-clients
-// isolation is no longer necessary because Sessions ARE the isolation unit.
+// DescribeActiveReceiptRuleSet response. Each Session owns one store;
+// Sessions ARE the isolation unit, so no per-clients keying is needed.
 //
 // The store records ONLY successful responses — errors are not cached so
 // transient ListReceiptRules failures retry on the next call rather than

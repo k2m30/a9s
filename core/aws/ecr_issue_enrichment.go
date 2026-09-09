@@ -37,8 +37,7 @@ const (
 // ECRImagesPerRepo caps how many recent images are inspected per repository.
 // DescribeImages returns ImageScanFindingsSummary inline, so the enricher pays
 // exactly one AWS call per repo regardless of how many images it samples —
-// restoring the wave-2 N+1 budget (previously 11N: ListImages + ≤10
-// DescribeImageScanFindings per repo). This value caps how many images are
+// keeping the wave-2 N+1 budget. This value caps how many images are
 // included in the single DescribeImages response; AWS returns the most
 // recent images by default.
 const ECRImagesPerRepo = 10

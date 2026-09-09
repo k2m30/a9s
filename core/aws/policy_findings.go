@@ -40,7 +40,7 @@ var adminManagedPolicyResources = []string{ //nolint:gochecknoglobals // static 
 // far more than any one job needs without amounting to administrator. They
 // are worth showing where the operator is reading a principal's policy list,
 // but they are NOT administrator-equivalent and never feed the admin-attached
-// finding — that is the distinction PowerUserAccess used to blur.
+// finding.
 var broadPowerManagedPolicyResources = []string{ //nolint:gochecknoglobals // static AWS-managed policy set
 	"policy/PowerUserAccess",
 }

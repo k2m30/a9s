@@ -146,13 +146,11 @@ func (c *Controller) ExecuteOne(ctx context.Context, req runtime.TaskRequest) (f
 //
 // This is the fix for the "whole sweep dies at 60s" defect: a live web
 // availability sweep (identity + cache load + Wave-1 probes + Wave-2
-// enrichments, on the order of 100+ tasks) previously shared ONE
-// context.WithTimeout(60s) umbrella across the entire DrainSyncContextProgress
-// call (with a deadline-bearing ctx). Once that single
-// deadline expired, every remaining queued task failed with
-// context.DeadlineExceeded and was dropped — silently, because a task error
-// was (and still is, for callers of the other Drain* variants) just
-// `continue`d. Under the per-task model the queue always drains to
+// enrichments, on the order of 100+ tasks) gets one budget per task, never
+// one deadline across the whole DrainSyncContextProgress call: once a shared
+// deadline expires, every remaining queued task fails with
+// context.DeadlineExceeded and is dropped silently, because a task error is
+// just `continue`d. Under the per-task model the queue always drains to
 // completion (bounded by maxDrainIterations, the pre-existing runaway
 // backstop) unless the PARENT itself is cancelled.
 //

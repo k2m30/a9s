@@ -108,7 +108,7 @@ type ViewsConfig struct {
 // ever adds and re-sources, so a removed column stays on the operator's disk,
 // and a rename arrives as a title the file has never heard of — the operator
 // keeps the old column beside the new one. Shipping either needs a migration
-// this file does not have yet.
+// this file does not have.
 const GeneratedViewsVersion = 7
 
 // ViewDef defines the list and detail view configuration for a single resource type.
@@ -173,12 +173,10 @@ func TitleFieldKeys(title string) [2]string {
 // stored value. The type DECLARES it: its status column is the one naming the
 // type's lifecycle key, and nothing else is one.
 //
-// It used to answer on the title as well — a column titled "Status" or
-// "State" was the status column whatever it declared — and on the literal key
-// "status". Both were inference, and the cascade that went with them read
-// three spellings of the fact in a fixed order, so a type whose status column
-// declared its own key (tg's health_summary, cb's last_build) showed whatever
-// else happened to be in Fields and its declaration was consulted third.
+// Neither a column's title nor the literal key "status" makes it the
+// status column: both are inference, and a type whose status column declares
+// its own key (tg's health_summary, cb's last_build) would show whatever else
+// happened to be in Fields.
 //
 // The render cascade, its decorator lookup and the status-column resolver all
 // ask here, so none of the three can disagree about which column this is.
@@ -387,7 +385,7 @@ func loadReport(cfg *ViewsConfig, unresolved, collisions []string) error {
 // columns name, or its status key, which the findings fill and the save lane
 // stores.
 //
-// A Path is a producer, which is the half the report used to miss: the cascade
+// A Path is a producer: the cascade
 // reads the struct live, and MaterializeListFields writes that same value
 // under the column's key for the row a restart replays. So a column naming
 // both was reported as filled by nothing while rendering correctly on both
@@ -448,9 +446,7 @@ func unfillableColumnKeys(cfg *ViewsConfig) []string {
 // Whether the operator's file is in use is what changes the sentence, and the
 // caller holds that fact at load time: a nil config means nothing loaded and
 // the built-in defaults are in use, while a config with a report beside it is
-// the operator's file, minus the one column that named nothing. "(using
-// defaults)" used to be said in both cases, which was false in the second and
-// the more alarming of the two to read.
+// the operator's file, minus the one column that named nothing.
 //
 // Returns "" when err is nil, so a caller can hand the result on unconditionally.
 func ReportText(cfg *ViewsConfig, err error) string {

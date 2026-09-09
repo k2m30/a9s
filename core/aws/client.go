@@ -321,8 +321,7 @@ func (c *ServiceClients) SetRuleSets(s ruleSetStore) {
 
 // svcClients asserts clients holds an initialized *ServiceClients, the
 // prelude every catalog fetcher/reveal closure needs before it can dereference
-// a specific service client. Centralizes the assertion and its error text
-// (previously duplicated at every registration site).
+// a specific service client. Centralizes the assertion and its error text.
 func svcClients(clients any) (*ServiceClients, error) {
 	c, ok := clients.(*ServiceClients)
 	if !ok || c == nil {

@@ -162,9 +162,8 @@ func initStyles() {
 	SearchCurrentStyle = lipgloss.Style{}
 	SearchOtherStyle = lipgloss.Style{}
 
-	// These 13 styles were previously package-level vars in view files,
-	// initialized once at load time and unaffected by NO_COLOR / ReinitForTest().
-	// They are always initialized regardless of NO_COLOR to preserve that behavior.
+	// These 13 styles are always initialized regardless of NO_COLOR /
+	// ReinitForTest().
 	HelpCatStyle = lipgloss.NewStyle().Foreground(ColHelpCat).Bold(true)
 	HelpKeyStyle = lipgloss.NewStyle().Foreground(ColHelpKey).Bold(true)
 	HelpDescStyle = lipgloss.NewStyle().Foreground(ColDetailVal)

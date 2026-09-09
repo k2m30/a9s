@@ -208,8 +208,7 @@ func TestHandleEnrichDetailResult_Err_EmitsFlash(t *testing.T) {
 	}
 	// INVERTED by spec row 6 (task "errors"): the site went through the one
 	// formatter, so it names what failed the way every other failed call does
-	// and drops the redundant "failed" — the cause already says it failed. Do
-	// not restore the old literal; a subject nobody can act on was the point.
+	// and drops the redundant "failed" — the cause already says it failed.
 	if got, want := flashes[0].Text, "enrich ec2: AccessDenied: iam:GetPolicyVersion"; got != want {
 		t.Errorf("FlashIntent.Text = %q, want %q", got, want)
 	}

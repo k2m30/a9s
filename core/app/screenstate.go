@@ -37,7 +37,7 @@ type ListState struct {
 	// list screens of the same resource type from corrupting each other's data.
 	Rows []resource.Resource `json:"rows,omitempty"`
 	// RowsGen pins the RowStore generation this screen's Rows were adopted
-	// from, for the canonical top-level list only (task #17 wave 1 stage 4).
+	// from, for the canonical top-level list only.
 	// Zero for a screen that has never routed through Core.ObserveRows (a
 	// freshly-pushed screen, or a non-canonical child/filtered list, whose
 	// Rows are written locally without ever touching RowStore). Carries no

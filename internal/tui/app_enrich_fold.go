@@ -42,9 +42,8 @@ import (
 // once the fresh EnrichmentChecked result lands.
 //
 // Folds into RowStore's retained rows for canon via m.core.AmendRows'
-// copy-on-write mutation (task #17 wave 1 stage 3 — the former
-// ResourceCache/LazyResourceCache in-place-mutation legs are gone; a type's
-// rows live in exactly one RowStore entry, so this is the only per-type-row
+// copy-on-write mutation (a type's rows live in exactly one RowStore entry,
+// so this is the only per-type-row
 // destination left). See RowStore.Amend's doc comment for why in-place
 // mutation is not valid here.
 func (m *Model) applyEnrichment(resourceType string) {

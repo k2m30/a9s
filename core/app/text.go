@@ -131,7 +131,7 @@ func (c *Controller) GetTextScreenContext() (runtime.ScreenID, runtime.ScreenCon
 //
 // The walk runs over that painted line and nothing else — no folded copy,
 // whose length differs from what it folds the moment a rune's lowercase form
-// is longer ("İ"), which used to move every offset after it.
+// is longer ("İ"), which would move every offset after it.
 func TextSearchMatches(lines []string, query string) []SearchMatch {
 	if query == "" {
 		return nil

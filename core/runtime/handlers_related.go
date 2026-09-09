@@ -87,7 +87,7 @@ const (
 
 	// KindFetchByIDDetail asks the adapter to fetch a single resource by exact
 	// ID via its registered FetchByIDs helper and navigate straight to its
-	// detail view. This replaces the former ami-only adapter shortcut and fires
+	// detail view. It fires
 	// on any cache-miss exact-ID drill for types that have a registered
 	// FetchByIDs (currently: ami, kms, policy, ebs-snap). When the target type
 	// is in the owned cache, navigation resolves to NavigationKindDetail upstream
@@ -255,9 +255,8 @@ func (c *Core) RelatedCachedResource(targetType, id string) (resource.Resource, 
 }
 
 // relatedFetchTasks decides what fetch task (if any) is needed for a
-// RelatedIDs-based filtered list. Reads RowStore directly (task #17 wave 1
-// stage 3 — the former ResourceCache/LazyResourceCache maps are gone; a
-// type's rows live in exactly one RowStore entry, full or Partial alike).
+// RelatedIDs-based filtered list. Reads RowStore directly (a type's rows
+// live in exactly one RowStore entry, full or Partial alike).
 func relatedFetchTasks(s *session.Session, targetType string, relatedIDs []string) []TaskRequest {
 	tr := s.RowStore.Snapshot(targetType)
 
@@ -283,7 +282,7 @@ func relatedFetchTasks(s *session.Session, targetType string, relatedIDs []strin
 	// so the adapter is a pure pass-through. A Partial (lazy-only) entry
 	// never carries a continuation token of its own (ObservePartial leaves
 	// Pagination untouched), so this branch only fires for a full entry's
-	// own pagination state, matching the former ResourceCache-only check.
+	// own pagination state.
 	if tr.Gen != 0 && !tr.Partial && tr.Pagination != nil && tr.Pagination.IsTruncated {
 		return []TaskRequest{{
 			Key:   TaskKey{Kind: KindFetchMore, Scope: targetType},
@@ -305,11 +304,8 @@ func relatedFetchTasks(s *session.Session, targetType string, relatedIDs []strin
 }
 
 // relatedCacheSnapshot returns a flat map[string][]resource.Resource snapshot
-// suitable for the navigation resolver, reading directly from RowStore (task
-// #17 wave 1 stage 3). A type's rows now live in exactly one RowStore entry
-// (full or Partial), so there is no merge-precedence to apply — the former
-// two-map "ResourceCache wins over LazyResourceCache on ID collision" rule
-// is now vacuous (the store itself is the single source for both roles).
+// suitable for the navigation resolver, reading directly from RowStore . A type's rows live in exactly one RowStore entry (full or Partial),
+// so there is no merge precedence to apply.
 func relatedCacheSnapshot(s *session.Session) map[string][]resource.Resource {
 	all := s.RowStore.SnapshotAll(true)
 	snap := make(map[string][]resource.Resource, len(all))

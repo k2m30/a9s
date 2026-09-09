@@ -8,7 +8,7 @@ import (
 )
 
 // OpenProfileSelector is the blessed headless entry point for opening the
-// profile selector (issue #464 part 2). runtime.NavigateKindFetchProfiles
+// profile selector. runtime.NavigateKindFetchProfiles
 // stays adapter-only — internal/tui's runtime adapter is the only consumer
 // of that intent, since it owns the demo-mode guard and the tea.Cmd that
 // reads the local AWS config file. A headless host (web, DrainSync, or any

@@ -88,9 +88,8 @@ func buildItems(r domain.Resource, cfg *config.ViewsConfig, navProvider func(str
 	// ── type-specific setup ───────────────────────────────────────────────
 	shortName := r.Type
 
-	// Only look up detail paths when a config is provided. cfg==nil preserves
-	// the legacy nil-viewConfig behaviour from detail_fields.go: flat alphabetical
-	// field rendering with raw (un-normalised) key names.
+	// Only look up detail paths when a config is provided. cfg==nil renders
+	// flat alphabetical fields with raw (un-normalised) key names.
 	var detailFields []config.DetailField
 	if shortName != "" && cfg != nil {
 		vd := config.GetViewDef(cfg, shortName)
@@ -244,10 +243,10 @@ func buildItems(r domain.Resource, cfg *config.ViewsConfig, navProvider func(str
 		composedPath := strings.Join(pathParts, ".")
 
 		// The item keeps the path this walk just worked out — where the
-		// subfield actually sits — instead of its parent's. It used to keep
-		// the parent's, so anything keyed by path (the type's readable-wording
-		// declaration, the nav map) matched the parent or nothing, and a
-		// reader that wanted the field had to re-split the rendered line.
+		// subfield actually sits — instead of its parent's: anything keyed by
+		// path (the type's readable-wording declaration, the nav map) would
+		// otherwise match the parent or nothing, and a reader that wanted the
+		// field would have to re-split the rendered line.
 		//
 		// Value stays the rendered line. Splitting it into key and value here
 		// would move every nested row onto the renderer's pre-split branch,

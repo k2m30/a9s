@@ -31,9 +31,7 @@ import (
 	"github.com/k2m30/a9s/v3/internal/tui/views"
 )
 
-// handleNavigate replaces the entry point previously in
-// internal/tui/app_handlers_navigate.go. The signature is identical so the
-// existing app.go dispatch line is unchanged.
+// handleNavigate is the TUI's navigation entry point.
 //
 // It calls runtime.Core.HandleNavigate to get the navigation decision, then
 // constructs the requested view (when applicable) and translates any
@@ -484,9 +482,8 @@ func navigateTasksToCmd(m Model, tasks []runtime.TaskRequest) tea.Cmd {
 		switch t.Key.Kind {
 		case runtime.KindFetchResources:
 			// The runtime stamps the canonical (alias-resolved) ShortName onto
-			// req.Key.Scope when it builds the task, so ExecuteTask uses the same
-			// value that the former fetchResources(fetchRT, ...) call used —
-			// no navigation-result fallback is needed.
+			// req.Key.Scope when it builds the task, so ExecuteTask needs no
+			// navigation-result fallback.
 			cmds = append(cmds, m.executeTaskCmd(t))
 
 		case runtime.KindFetchProfiles:
@@ -627,7 +624,7 @@ func (m Model) handleRefresh() (tea.Model, tea.Cmd) {
 	// fetch).
 	//
 	// Deliberately NOT clearing the controller's own rendered rows
-	// (ls.Rows / c.resourceCache via ClearRowFindings) here: that used to
+	// (ls.Rows / c.resourceCache via ClearRowFindings) here: that would
 	// blank every Wave-2 glyph on screen for the full AWS round-trip between
 	// this Update() and the rerun's EnrichmentChecked arrival — a real,
 	// user-visible flicker, not just a stale-state risk. Wave-2 state is
@@ -635,7 +632,7 @@ func (m Model) handleRefresh() (tea.Model, tea.Cmd) {
 	// already strips-then-conditionally-reappends per resource ID against the
 	// FULL fresh findings map when the rerun's result lands, so any row
 	// missing from that map is correctly cleared at that point — pre-clearing
-	// here only widened the visible gap without changing the eventual state.
+	// here would only widen the visible gap without changing the eventual state.
 	if parentCtx == nil && !escPops {
 		(&m).applyEnrichment(rt)
 	}

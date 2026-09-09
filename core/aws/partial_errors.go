@@ -472,8 +472,8 @@ func ErrClass(err error) string {
 		return "timeout"
 	}
 	// "No such host" for a service endpoint is the signature of a service the
-	// region does not offer (live witness 2026-07-14: CodeArtifact in
-	// eu-central-2). Any other resolver failure is the resolver's own problem
+	// region does not offer (CodeArtifact in a region without it, say). Any
+	// other resolver failure is the resolver's own problem
 	// and must stay loud under its own class.
 	var dnsErr *net.DNSError
 	if errors.As(err, &dnsErr) {

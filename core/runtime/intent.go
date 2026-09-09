@@ -349,7 +349,7 @@ func (RefreshActiveListIntent) isIntent() {}
 // symmetry).
 //
 // Entry is *domain.ListViewCacheEntry; adapters apply the intent via
-// Core.SetResourceCache (RowStore-backed — task #17 wave 1 stage 3).
+// Core.SetResourceCache (RowStore-backed).
 type PatchResourceCache struct {
 	ResourceType string
 	Entry        *domain.ListViewCacheEntry

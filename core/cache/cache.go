@@ -436,8 +436,8 @@ type WritePlan struct {
 	seq uint64
 }
 
-// commit performs the disk write staged by PrepareSave — the directory
-// create, temp-file write, and atomic rename SaveType previously did inline.
+// commit performs the disk write staged by PrepareSave: the directory
+// create, temp-file write, and atomic rename.
 // Unexported: callers reach it only through Store.CommitSave, which adds the
 // saveMu serialization a WritePlan needs against a sibling commit for the
 // same Store (a WritePlan by itself is not safe to Commit concurrently
@@ -532,9 +532,9 @@ func SetEncodeHookForTest(fn func()) func() {
 // both the encode and the write (CommitSave) until after that lock is
 // released. See Session.WithCacheStoreSave, the caller this split exists for.
 //
-// The encode used to happen here, under that lock, and a six-thousand-row type
-// file takes 60ms to encode: one reader per flush waited the whole of it for a
-// snapshot, which is a key press the operator watches the app not answer.
+// Encoding under that lock is not an option: a six-thousand-row type file
+// takes 60ms to encode, and one reader per flush would wait the whole of it
+// for a snapshot, which is a key press the operator watches the app not answer.
 //
 // The deep copy the encode needs travels with it, into CommitSave (see
 // WritePlan.commit): callers stage a TypeFile via Put with Rows built from

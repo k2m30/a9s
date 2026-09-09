@@ -16,7 +16,7 @@ import (
 
 // FetchLambdaFunctionsPage calls the Lambda ListFunctions API and returns
 // a single page of functions. Pass an empty continuationToken for the first
-// page. event_source_arn is always emitted empty (issue #221: a per-function
+// page. event_source_arn is always emitted empty (a per-function
 // ListEventSourceMappings call here would turn a single-page list into an
 // N+1 fetch — the checker-owned mechanism in related_common.go's
 // lambdaEventSourceMappingLambdaCheck is the sole ListEventSourceMappings

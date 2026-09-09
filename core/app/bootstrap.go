@@ -66,10 +66,10 @@ func (c *Controller) BootstrapLive(profile, region string) []runtime.TaskRequest
 // (mutating: installs clients, bumps the availability gen; on failure rolls
 // back + flashes) and returns the resulting tasks for the caller to drain.
 // StackDepth/HasActiveRL/HasActiveCosts are computed under the same lock so
-// HandleClientsReady sees the real screen stack instead of a hardcoded
-// StackDepth: 1 that used to make maybeRefreshIntents think no active list
-// existed (C10: this is what caused a pre-connect navigation's replay to be
-// dropped on the web/headless lane). Shared by both the success and failure
+// HandleClientsReady sees the real screen stack, not a hardcoded
+// StackDepth: 1 that would make maybeRefreshIntents think no active list
+// existed and drop a pre-connect navigation's replay on the web/headless
+// lane (C10). Shared by both the success and failure
 // paths of BootstrapLive so a failed connect gets identical treatment to a
 // successful one instead of being silently dropped.
 func (c *Controller) routeClientsReady(ev runtime.ClientsReadyEvent) []runtime.TaskRequest {

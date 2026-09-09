@@ -8,9 +8,8 @@
 // the row is KEPT — name visible, cause phrase in the Status cell, the
 // failure still aggregated into the composite fetch error. Dropping the row
 // fakes an empty or shorter list: "you can't see it" must never render as
-// "it isn't there" (live witness 2026-07-14: a readonly role allowed
-// mwaa:ListEnvironments while denying airflow:GetEnvironment, and the
-// environment vanished).
+// "it isn't there": a readonly role can be allowed mwaa:ListEnvironments
+// while denied airflow:GetEnvironment, and the environment would vanish.
 //
 // The two phrases are not interchangeable: an authorization denial
 // (degradedAuthDenial — AccessDenied/AccessDeniedException, or EC2's

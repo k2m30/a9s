@@ -38,9 +38,8 @@ const (
 	S3CFNStackName = "a9s-demo-stack"
 	// ManagedKeyBucketName is encrypted with the AWS-managed `aws/s3` default
 	// key, reported by GetBucketEncryption as the full alias ARN
-	// "arn:aws:kms:...:alias/aws/s3" — the exact shape that caused the
-	// pre-fix truncation bug (kmsKeyIDFromField naively took the last "/"
-	// segment, "s3", the resource's own type name). kmsKeyIDFromField now
+	// "arn:aws:kms:...:alias/aws/s3" — the shape a naive last-"/" split
+	// would reduce to "s3", the resource's own type name. kmsKeyIDFromField
 	// strips only the region/account ARN prefix up to ":alias/" itself
 	// (keeping the literal ":" separator), so checkS3KMS returns the alias
 	// name whole — AWSManagedS3KeyID below, "alias/aws/s3" — matching real
@@ -201,8 +200,8 @@ func buildS3Buckets() []s3types.Bucket {
 		// DescribeLoggingStatus for acme-reporting returns BucketName=RedshiftAuditBucket.
 		{RedshiftAuditBucket, "arn:aws:s3:::" + RedshiftAuditBucket, "us-east-1", "2025-07-22T14:00:00+00:00"},
 		// Healthy: encrypted with the AWS-managed `aws/s3` key reported as a
-		// full alias ARN — the exact shape that caused the pre-fix KMS
-		// truncation bug (checkS3KMS / kmsKeyIDFromField).
+		// full alias ARN — the shape a naive last-"/" split gets wrong
+		// (checkS3KMS / kmsKeyIDFromField).
 		{ManagedKeyBucketName, "arn:aws:s3:::" + ManagedKeyBucketName, "us-east-1", "2025-08-01T09:00:00+00:00"},
 		// One witness per EnrichS3Posture condition.
 		{S3BucketPublic, "arn:aws:s3:::" + S3BucketPublic, "us-east-1", "2025-02-14T08:00:00+00:00"},
@@ -344,10 +343,9 @@ func buildS3EncryptionConfigs() map[string]*s3.GetBucketEncryptionOutput {
 	}
 
 	// AWS-managed `aws/s3` default key, reported as a full alias ARN —
-	// the shape that caused the pre-fix truncation bug (checkS3KMS /
-	// kmsKeyIDFromField naively split on the last "/", yielding "s3" —
-	// the resource's own type name — instead of the alias-style key ID
-	// "alias/aws/s3").
+	// the shape a naive last-"/" split in checkS3KMS / kmsKeyIDFromField
+	// would reduce to "s3", the resource's own type name, instead of the
+	// alias-style key ID "alias/aws/s3".
 	managedKeyARN := "arn:aws:kms:us-east-1:123456789012:" + AWSManagedS3KeyID
 	managedKeyRule := s3types.ServerSideEncryptionRule{
 		ApplyServerSideEncryptionByDefault: &s3types.ServerSideEncryptionByDefault{

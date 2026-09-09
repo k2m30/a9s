@@ -35,9 +35,8 @@ func (m *Model) pushRS(rs *rendererState) {
 
 // popRS removes the top rendererState. Returns false when only one entry remains.
 //
-// The list-count → menu-availability-badge sync-back (previously performed
-// here at depth 2, menu → list) now runs at the controller level in
-// core/app/handle.go's handleResourcesLoadedEvent/syncExactTotalToMenu,
+// The list-count → menu-availability-badge sync-back runs at the controller
+// level in core/app/handle.go's handleResourcesLoadedEvent/syncExactTotalToMenu,
 // on every ResourcesLoaded for a top-level list — so both the TUI and the
 // web renderer get it, and it fires as soon as a fetch or load-more result
 // lands rather than only when the user pops back to the menu.
@@ -74,10 +73,8 @@ func (m *Model) popRSOnly() bool {
 // handleActionBack in core/app/actions_nav.go) translated into the TUI's
 // native trigger via relatedCheckStartedCmdFromTasks. The controller is the
 // single source of truth for "does revealing this screen need a
-// related-check recompute" — the TUI no longer independently re-derives that
-// decision (the former TUI-only recomputeRelatedOnReveal is deleted; its
-// logic is now owned by handleActionBack so web/headless callers get the
-// same recompute).
+// related-check recompute" — the TUI never re-derives that decision;
+// handleActionBack owns it so web/headless callers get the same recompute.
 func (m *Model) popRSWithCtrlPop(ctrlPop bool) (bool, tea.Cmd) {
 	if len(m.stack) <= 1 {
 		return false, nil

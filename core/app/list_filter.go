@@ -160,9 +160,9 @@ func listSortResources(columns []ColumnDef, td *resource.ResourceTypeDef, ls *Li
 		// a replayed one does not, so a comparator that read the struct where
 		// it was there answered from a representation the cached frame cannot
 		// reach — and the list re-ordered under the operator the moment the
-		// fetch landed. sortStrings reads a number as a number, so the orders
-		// a struct comparison used to add are the ones the cache cannot
-		// express anyway.
+		// fetch landed. sortStrings reads a number as a number; the orders only
+		// a struct comparison could add are the ones the cache cannot express
+		// anyway.
 		return sortStrings(ExtractCellValue(col, td, a), ExtractCellValue(col, td, b), sortAsc)
 	})
 	return out

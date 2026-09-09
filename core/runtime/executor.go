@@ -233,9 +233,7 @@ func (c *Core) ExecuteTaskAt(ctx context.Context, req TaskRequest, snap Dispatch
 		// but is driven from the dispatch-time snapshot the caller captured via
 		// SaveCachePayload (see its doc comment for why dispatch-time capture,
 		// not a live session read, is required), falling back to a live
-		// RowStore read (task #17 wave 1 stage 2 — replaces the removed
-		// session.ProbeResources/ProbeTruncated live-read fallback) for any
-		// nil-Payload dispatch. C6 scope: RowStore's retained rows ARE this
+		// RowStore read for any nil-Payload dispatch. C6 scope: RowStore's retained rows ARE this
 		// session's canonical top-level population for each type — the same
 		// rows a fresh list-open would seed from.
 		//
@@ -389,7 +387,7 @@ func (c *Core) ExecuteTaskAt(ctx context.Context, req TaskRequest, snap Dispatch
 			return out.Msg(res, err), nil
 		}
 		// C1: a verify-refetch must verify the content actually being shown,
-		// not just page 1 — so page up to the previously-cached depth. C5: a
+		// not just page 1 — so page up to the cached depth. C5: a
 		// truncated first page must never downgrade a stored exact total;
 		// without this loop a 55-row cached/exact list would silently swap
 		// down to a 50-row truncated one. Bounded by CachedListDepth so this
@@ -654,8 +652,8 @@ func (c *Core) availabilityFromResourceCache() (
 		// observation. Unknown truncation is conservatively truncated so a
 		// downstream Exact-count derivation (SaveAvailabilityCache) never
 		// promotes an unobserved page-1-shaped count to Exact (the
-		// false-exact half of D14: a false Exact=true silently downgraded a
-		// real exact 55 to a false exact 50 and then dropped the stored Rows).
+		// false-exact half of D14: a false Exact=true would downgrade a real
+		// exact 55 to a false exact 50 and drop the stored Rows).
 		isTrunc := tr.Pagination == nil || tr.Pagination.IsTruncated
 		if isTrunc {
 			truncated[rt] = true
@@ -781,9 +779,8 @@ func cacheStoreToEvent(store *cache.Store) messages.AvailabilityCacheLoaded {
 	for name, tf := range types {
 		// A completely zero-value TypeFile (never Put with any real
 		// probe/fetch data — HasResources false, Count 0, no issues known, no
-		// rows) carries no observation to report. Excluding it here mirrors
-		// the pre-round-2 cache.Entry.Error-string exclusion and C1's "never
-		// 0" placeholder rule: a genuinely-observed empty type still reports
+		// rows) carries no observation to report. Excluding it here follows
+		// C1's "never 0" placeholder rule: a genuinely-observed empty type still reports
 		// Count=0 through this same path, but only once something has
 		// actually Put it (HasResources/Count/Exact/IssuesKnown/Rows all zero
 		// at once is the "nothing was ever recorded" signature). An Exact

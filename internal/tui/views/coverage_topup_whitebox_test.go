@@ -5,7 +5,7 @@
 // codecov gate (coverpkg=./internal/...): RightColumnModel's
 // Init/View/Update/updateKeyMsg/HasActionableRows (reached in production via
 // rs.rightCol in app_stack.go / NewRightColumn in runtime_adapter_related.go,
-// but never previously exercised directly), the config-driven detail render
+// but not exercised directly elsewhere), the config-driven detail render
 // path, and the DetailModel-specific SetSize in
 // detail_helpers.go. All are unexported (or exercise unexported branches), so
 // they are tested directly from package views.

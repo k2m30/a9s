@@ -275,9 +275,9 @@ func movedStatusKey(view string, col ListColumn, stamp int) (string, bool) {
 
 // viewFileRenames records a type this build has RENAMED, old name to new.
 // The generator wrote a file under the old name, the rename landed, and the
-// file stayed behind naming nothing: docdb-snap became dbc-snap (e7e87883)
-// and rds-snap became dbi-snap (490ffa84), so an installation that ran an
-// April build still has both on disk.
+// file stayed behind naming nothing: docdb-snap became dbc-snap and
+// rds-snap became dbi-snap, so an installation that ran an older build
+// still has both on disk.
 //
 // Same shape and same bargain as viewColumnAdditions: the migration owns what
 // the generator wrote, and a file it wrote is not the operator's mistake to be

@@ -2,8 +2,7 @@
 
 // Package screen is the Cost Explorer screen's pure state machine
 // (specs/021-cost-explorer/architecture.md): the "what should happen"
-// decisions core/app used to make inline, mixed in with session
-// bookkeeping. Every function here is pure — inputs are values, outputs are
+// decisions, kept apart from session bookkeeping. Every function here is pure — inputs are values, outputs are
 // typed outcomes; no session, no controller, no clocks except an injected
 // now. Imports core/costs only; core/app imports this package, so
 // this package must never import core/app, core/runtime, or
@@ -149,9 +148,7 @@ type PushDrill struct {
 	// Granularity is the pushed frame's own time-axis granularity — the
 	// SAME finerGranularity(state.Granularity) step Select already
 	// computed internally to build Window via WindowWithin, surfaced so
-	// the caller never re-derives it (the "two homes" duplication this
-	// field closes: core/app used to keep its own finerGranularity
-	// copy purely to set the pushed DrillLevel's Granularity field).
+	// the caller never re-derives it.
 	Granularity costs.Granularity
 	// ParentGranularity/SelectedPeriod/ParentCellNonZero carry the
 	// granularity-fallback gate's inputs straight into the pushed frame's
@@ -288,8 +285,8 @@ func pinFilterValue(f costs.Filter, dim costs.Dimension, value string) costs.Fil
 // (absolute column, unrelated to any viewport); as its OUTPUT (ViewModel.
 // Cursor) it is always a valid index — Row into Rows, Col into VisibleCols
 // (and into each Rows[i].Cells, which BuildViewModel slices to the same
-// visible window) — unifying the old adapter's separate absolute cursorCol
-// + viewport-relative relCursorCol into one post-clamp value.
+// visible window): one post-clamp value for both the absolute column and
+// the viewport-relative one.
 type CursorPos struct {
 	Row, Col int
 }

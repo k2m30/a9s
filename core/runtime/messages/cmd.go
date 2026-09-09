@@ -129,7 +129,7 @@ type RelatedNavigate struct {
 	// role_policies). This is deliberately narrower than the related-PANEL
 	// Count=1 pivot (rightcolumn.go, DirectDetail left false), which must
 	// keep mirroring "press Enter in the target's list view" — including
-	// drilling into that child view — per the pinned 2026-04-24 invariant
+	// drilling into that child view
 	// (tests/unit/related_navigate_cache_enter_child_test.go).
 	DirectDetail bool
 }

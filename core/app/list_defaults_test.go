@@ -14,9 +14,9 @@ import (
 // controller (applyListDefaults via ensureListState), not by the per-keystroke
 // view constructor. Guards the stack-lift move of the default-sort logic.
 //
-// The seeded value used to be "event_time", which is the Fields key that
-// column sorts by and not a name any column answers to: the sort could
-// therefore never be saved or restored, and the header arrow never appeared.
+// A seeded value of "event_time", the Fields key that column sorts by, is
+// not a name any column answers to: the sort could never be saved or
+// restored, and the header arrow would never appear.
 // The sort task made a column's name its own — "time" here — with the Fields
 // key it compares carried on the column as its sort_key. Do not restore
 // "event_time" as the seeded column.

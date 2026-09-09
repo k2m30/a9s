@@ -152,8 +152,7 @@ func ngIdentity(res resource.Resource) (nodegroupName, clusterName string) {
 // matchingNGInstances filters ec2List for instances tagged with
 // nodegroupName via "eks:nodegroup-name" and, when clusterName is
 // non-empty, also matching "eks:cluster-name". Shared by checkNGEC2 and
-// checkNGEBS, which previously each carried their own verbatim copy of this
-// tag-matching loop.
+// checkNGEBS.
 func matchingNGInstances(ec2List []typedRow[ec2types.Instance], nodegroupName, clusterName string) []typedRow[ec2types.Instance] {
 	var matches []typedRow[ec2types.Instance]
 	for _, row := range ec2List {

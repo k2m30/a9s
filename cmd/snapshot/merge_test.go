@@ -113,7 +113,7 @@ func TestMergeSnapshotFile_SelectedSectionsNotCarried(t *testing.T) {
 // TestMergeSnapshotFile_MissingFile pins that a missing/absent snapshot.json
 // (e.g. first-ever partial run, or a typo'd --out) is not an error — the
 // caller gets empty maps and proceeds with a full effective capture for the
-// selected types, same as the pre-fix os.ReadFile err != nil branch.
+// selected types.
 func TestMergeSnapshotFile_MissingFile(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "does-not-exist.json")

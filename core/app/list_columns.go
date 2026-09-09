@@ -190,11 +190,10 @@ func extractCellText(col ColumnDef, td *resource.ResourceTypeDef, r resource.Res
 
 	// Status/lifecycle column — OWNER CONTRACT: the type DECLARES its status
 	// column by giving it the type's lifecycle key (config.IsStatusColumn),
-	// and this reads that key and no other. It used to read the lifecycle
-	// key, then "status", then the column's own key, so a type declaring its
+	// and this reads that key and no other: a cascade over the lifecycle key,
+	// "status" and the column's own key would show a type that declares its
 	// status under its own name — tg's health_summary, cb's last_build —
-	// showed whichever other spelling was in Fields and its own declaration
-	// came third.
+	// whichever other spelling is in Fields.
 	//
 	// A finding still outranks every stored value: the phrase is what the
 	// operator is being told about this row. Below it, one key, then the

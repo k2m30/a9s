@@ -96,10 +96,9 @@ func (c *Core) CacheStore() *cache.Store { return c.EnsureCacheStore() }
 // Profile or Region (pair not yet resolved) returns nil WITHOUT memoizing, so
 // a pre-connect call never pins the store to the wrong "<profile>--"
 // directory. Session.EnsureCacheStore reads the pair itself under
-// session.pairMu — this method no longer reads session.Profile/Region at all,
-// closing the cross-goroutine race a profile/region switch (which writes
-// those fields via SetProfileRegion, also under pairMu) used to have against
-// a concurrent caller here (CI run 28839454135).
+// session.pairMu — this method never reads session.Profile/Region, so a
+// profile/region switch (which writes those fields via SetProfileRegion,
+// also under pairMu) cannot race a concurrent caller here.
 func (c *Core) EnsureCacheStore() *cache.Store {
 	if c.session.NoCache {
 		return nil
@@ -219,9 +218,8 @@ func (c *Core) ResetEnrichmentMaps() {
 
 // ResetProbeMaps clears the Wave-1 retained-probe row-store entries so the
 // next probe round populates fresh (used by the global refresh / Ctrl+R
-// path). Prior to task #17 wave 1 stage 2 this reset session.ProbeResources/
-// ProbeTruncated directly; those fields are gone, so this now clears every
-// RowStore entry whose Origin is OriginProbe or OriginDisk (the two origins
+// path). It clears every RowStore entry whose Origin is OriginProbe or
+// OriginDisk (the two origins
 // a Wave-1 probe/disk-seed populate) while leaving OriginFetch (top-level
 // list fetch) rows untouched — a menu-only refresh must not blank an
 // already-open resource list's own fetched rows.
@@ -249,9 +247,8 @@ func (c *Core) Identity() *domain.CallerIdentity {
 // ResourceCache returns the cached top-level resource-list entry for the
 // given resource short name, or (nil, false) when no FULL (non-Partial),
 // OriginFetch entry is cached. Renderer adapters use this in place of
-// indexing a session map directly. Backed by RowStore (task #17 wave 1
-// stage 3 — the former session.ResourceCache map is gone; a type's rows
-// live in exactly one RowStore entry). The returned entry is freshly built
+// indexing a session map directly. Backed by RowStore (a type's rows live
+// in exactly one RowStore entry). The returned entry is freshly built
 // from the store's defensive-copy Snapshot on every call — mutating it does
 // not write back into RowStore (callers wishing to mutate content use
 // SetResourceCache, AmendRows, or the Observe* family).
@@ -348,12 +345,10 @@ func listViewCacheEntryFromTypeRows(tr session.TypeRows) *domain.ListViewCacheEn
 
 // SetResourceCache stores the cached top-level resource-list entry for the
 // given resource short name as a full (non-Partial), OriginFetch RowStore
-// observation — replacing the rows wholesale (mirrors the former map's bare
-// assignment semantics; Observe's own stale-replace guard still applies for
-// a smaller/truncated/subset replace). A nil entry drops the cached entry
-// entirely so the next ResourceCache/HasResourceCache call reports a miss,
-// matching the former map's `m[rt] = nil` behavior (which HasResourceCache
-// already treated as absent).
+// observation — replacing the rows wholesale (Observe's own stale-replace
+// guard still applies for a smaller/truncated/subset replace). A nil entry
+// drops the cached entry entirely so the next ResourceCache/HasResourceCache
+// call reports a miss.
 //
 // e's interactive-state fields (FilterText/AttentionOnly/SortColIdx/
 // SortAsc/CursorPos/HScrollOffset) are written to the entry's ListViewState
@@ -442,8 +437,7 @@ func (c *Core) FetchOriginCacheKeys() []string {
 // entry.Resources[i] fields is safe (it mutates the copy, not RowStore's
 // backing array) but does NOT propagate back into the store — callers
 // needing the mutation to stick call SetResourceCache/AmendRows explicitly
-// afterward (mirrors the former map's shared-backing-array semantics for
-// the read side only; the write-back is now explicit, not implicit).
+// afterward: the read shares the backing array, the write-back is explicit.
 func (c *Core) ForEachResourceCache(fn func(rt string, entry *domain.ListViewCacheEntry)) {
 	for rt, tr := range c.session.RowStore.SnapshotAll(false) {
 		fn(rt, listSeedEntry(tr.Rows, tr.Pagination, tr.Population()))
@@ -453,8 +447,7 @@ func (c *Core) ForEachResourceCache(fn func(rt string, entry *domain.ListViewCac
 // LazyResourceCache returns the lazy-cache slice for the given resource
 // short name (resources pulled via FetchByIDs for filtered-target drills).
 // The bool reports whether a Partial RowStore entry exists for the type —
-// distinct from a non-nil empty slice. Backed by RowStore (task #17 wave 1
-// stage 3 — the former session.LazyResourceCache map is gone).
+// distinct from a non-nil empty slice. Backed by RowStore.
 func (c *Core) LazyResourceCache(rt string) ([]domain.Resource, bool) {
 	tr := c.session.RowStore.Snapshot(rt)
 	if tr.Gen == 0 || !tr.Partial {
@@ -477,9 +470,7 @@ func (c *Core) ForEachLazyResourceCache(fn func(rt string, rows []resource.Resou
 
 // ExtendLazyResourceCache merges the given per-type rows into the lazy
 // cache. Used by the PatchLazyResourceCache intent dispatcher. Backed
-// entirely by RowStore.ObservePartial (task #17 wave 1 stage 3 — the former
-// session.LazyResourceCache map dual-write is gone; ObservePartial is now
-// the sole write path). Each adds[rt] is already the full merged slice
+// entirely by RowStore.ObservePartial, the sole write path. Each adds[rt] is already the full merged slice
 // HandleRelatedCheckResult computed (dedup-appended against the prior
 // lazy-cache entry) — ObservePartial's own dedup-append makes re-merging it
 // against the store idempotent.
@@ -491,15 +482,13 @@ func (c *Core) ExtendLazyResourceCache(adds map[string][]resource.Resource) {
 
 // ProbeOriginTypeNames returns the canonical short names of every type
 // currently retaining an OriginProbe/OriginDisk row-carrying entry in
-// RowStore (task #17 wave 1 stage 2 — the membership test the removed
-// session.ProbeResources map used to provide via range-over-map).
+// RowStore.
 func (c *Core) ProbeOriginTypeNames() []string {
 	return c.session.RowStore.ProbeOriginTypeNames()
 }
 
 // ProbeResources returns the canonical retained rows for the given resource
-// short name, read from RowStore (task #17 wave 1 stage 2 — replaces the
-// removed session.ProbeResources map). Any full-population origin qualifies —
+// short name, read from RowStore. Any full-population origin qualifies —
 // Disk, Probe, or Fetch: a top-level list fetch REPLACES the probe/disk entry
 // for its type (one RowStore entry per type), so an origin gate here would
 // blind every probe-lane reader (ProbeEnrichment's enricher input,
@@ -523,8 +512,7 @@ func (c *Core) ProbeResources(rt string) ([]resource.Resource, bool) {
 }
 
 // ForEachProbeResources invokes fn for every retained OriginProbe/OriginDisk
-// row set (task #17 wave 1 stage 2 — replaces the removed
-// session.ProbeResources map). Each rows slice is a defensive copy
+// row set. Each rows slice is a defensive copy
 // (RowStore.SnapshotAll); the callback MUST NOT rely on in-place mutation
 // propagating back into the store — use AmendRows for that.
 func (c *Core) ForEachProbeResources(fn func(rt string, rows []resource.Resource)) {
@@ -611,8 +599,8 @@ func (c *Core) ObserveRows(canon string, rows []resource.Resource, pagination *r
 
 // ObserveCountRows is the dual-write chokepoint for a counts-only observation
 // (C6a: never touches Rows — e.g. the disk-cache-loaded seed when no
-// per-type disk row data is available and the legacy map falls back to
-// placeholder rows, which must never be fed into RowStore).
+// per-type disk row data is available and placeholder rows stand in, which
+// must never be fed into RowStore).
 func (c *Core) ObserveCountRows(canon string, totalCount int) domain.Gen {
 	return c.session.RowStore.ObserveCount(canon, totalCount)
 }

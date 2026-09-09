@@ -496,12 +496,10 @@ func (c *Controller) syncExactTotalToMenu(screen *Screen, canon string) {
 // badge is not known yet writes no issue count at all (issuesKnown=false),
 // so the file keeps what it already had.
 //
-// task #17 wave 1 stage 4: the per-type materialize/build-rows/write body
-// this method used to own directly now lives once in
+// The per-type materialize/build-rows/write body lives once in
 // runtime.Core.SaveTypeRows, shared with the sweep lane
-// (saveProbeResourcesToTypeFiles). The
-// redundant ObserveRows re-write this method used to perform after the disk
-// save is gone too: applyResourcesLoaded (this method's only two callers'
+// (saveProbeResourcesToTypeFiles). No ObserveRows write follows the disk
+// save: applyResourcesLoaded (this method's only two callers'
 // common ancestor) already routed ls.Rows through Core.ObserveRows before
 // either caller reached here, so ls.Rows already IS what the store holds.
 func (c *Controller) maybeSaveResourceListCache(ls *ListState, canon string) {
@@ -767,8 +765,7 @@ func (c *Controller) autoOpenSingleDetail() []runtime.TaskRequest {
 
 // HandleResourcesLoadedEvent is the public adapter seam used by the TUI's
 // runtime_adapter_resources.go. It routes a ResourcesLoaded message into the
-// matching controller list screen's state, replacing the old updateActiveView
-// path that routed the message through a stored ResourceListModel.Update().
+// matching controller list screen's state.
 //
 // The caller must perform the IsStale check, and must hand in a message the
 // runtime seam has already stamped (runtime.StampListResult): the canonical

@@ -490,8 +490,7 @@ func (m *ResourceListModel) RenderList(body app.ListBody) string {
 
 	// Cache-first seeding: the list opened with rows already
 	// visible while a fresh fetch confirms/replaces them. Additive-only — this
-	// line never renders when Refreshing is false (the default), so it does
-	// not affect the byte-parity gate against the legacy View() path.
+	// line never renders when Refreshing is false (the default).
 	if body.Refreshing {
 		sb.WriteString("\n")
 		sb.WriteString(styles.DimText.Render("── refreshing... ──"))
