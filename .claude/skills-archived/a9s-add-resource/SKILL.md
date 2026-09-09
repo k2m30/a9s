@@ -296,7 +296,7 @@ The type definitions are split by category. Append to the correct file:
     Aliases:   []string{"{alias1}", "{alias2}"},
     Category:  "{CATEGORY}",
     Columns: []Column{
-        {Key: "key1", Title: "Title1", Width: 28, Sortable: true},
+        {Key: "key1", Title: "Title1", Width: 28},
         // ... from architect spec
     },
 },
