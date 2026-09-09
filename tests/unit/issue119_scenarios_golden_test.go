@@ -364,8 +364,7 @@ func issue119RootModel(t testing.TB, w, h int, demoMode bool) tui.Model {
 }
 
 func issue119ApplyMsg(m tui.Model, msg tea.Msg) tui.Model {
-	m2, _ := m.Update(msg)
-	return m2.(tui.Model)
+	return tuitest.StepModel(m, msg)
 }
 
 func issue119LoadEC2List(t *testing.T, m tui.Model) tui.Model {

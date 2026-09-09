@@ -30,7 +30,7 @@ func wipfixWarmController(t *testing.T, n int) *app.Controller {
 	t.Helper()
 	c := newTestController(t)
 	_, _ = c.Apply(app.Action{Kind: app.ActionCommand, Arg: "ec2"})
-	_, _ = c.Handle(messages.ResourcesLoaded{
+	_, _ = handlePage(c, messages.ResourcesLoaded{
 		ResourceType: "ec2",
 		Resources:    wipfixEC2Rows(n),
 		Pagination:   &domain.PaginationMeta{IsTruncated: false},
@@ -102,7 +102,7 @@ func TestWarmSnapshot_TwoReadersOverlap(t *testing.T) {
 func TestColdSnapshot_ConcurrentFirstReadsAreWellFormed(t *testing.T) {
 	c := newTestController(t)
 	_, _ = c.Apply(app.Action{Kind: app.ActionCommand, Arg: "ec2"})
-	_, _ = c.Handle(messages.ResourcesLoaded{
+	_, _ = handlePage(c, messages.ResourcesLoaded{
 		ResourceType: "ec2",
 		Resources:    wipfixEC2Rows(6000),
 		Pagination:   &domain.PaginationMeta{IsTruncated: false},
@@ -159,7 +159,7 @@ func TestLargeFetchAbsorb_CallerDoesNotWaitForTheMarshal(t *testing.T) {
 	c := newTestController(t)
 	_, _ = c.Apply(app.Action{Kind: app.ActionCommand, Arg: "ec2"})
 
-	_, _ = c.Handle(messages.ResourcesLoaded{
+	_, _ = handlePage(c, messages.ResourcesLoaded{
 		ResourceType: "ec2",
 		Resources:    wipfixEC2Rows(12000),
 		Pagination:   &domain.PaginationMeta{IsTruncated: false},
@@ -196,7 +196,7 @@ func TestLargeFetchAbsorb_StillWritesTheSameFile(t *testing.T) {
 	c := newTestController(t)
 	cfg := os.Getenv("A9S_CONFIG_FOLDER")
 	_, _ = c.Apply(app.Action{Kind: app.ActionCommand, Arg: "ec2"})
-	_, _ = c.Handle(messages.ResourcesLoaded{
+	_, _ = handlePage(c, messages.ResourcesLoaded{
 		ResourceType: "ec2",
 		Resources:    wipfixEC2Rows(50),
 		Pagination:   &domain.PaginationMeta{IsTruncated: false},

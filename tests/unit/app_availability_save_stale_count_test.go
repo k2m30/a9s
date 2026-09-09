@@ -31,7 +31,7 @@ func TestPendingAvailabilitySave_NeverResurrectsASupersededCount(t *testing.T) {
 	ctrl, core, profile, region := newProvenancePinController(t)
 	seedCanonical200(t, ctrl, core, profile, region)
 
-	ctrl.Handle(messages.ResourcesLoaded{
+	handlePage(ctrl, messages.ResourcesLoaded{
 		ResourceType: provenancePinType,
 		Resources:    provenancePinEC2Rows(5, "i-refresh"),
 		Pagination:   &resource.PaginationMeta{IsTruncated: false},
@@ -77,7 +77,7 @@ func TestExactCanonicalShrink_LowersTheMenuCount(t *testing.T) {
 	_, _ = profile, region
 	seedCanonical200(t, ctrl, core, profile, region)
 
-	ctrl.Handle(messages.ResourcesLoaded{
+	handlePage(ctrl, messages.ResourcesLoaded{
 		ResourceType: provenancePinType,
 		Resources:    provenancePinEC2Rows(5, "i-refresh"),
 		Pagination:   &resource.PaginationMeta{IsTruncated: false},
@@ -105,7 +105,7 @@ func TestExactCanonicalShrink_ClearsTheLowerBoundMarker(t *testing.T) {
 	ctrl, _, _, _ := newProvenancePinController(t)
 	ctrl.Apply(app.Action{Kind: app.ActionCommand, Arg: provenancePinType})
 
-	ctrl.Handle(messages.ResourcesLoaded{
+	handlePage(ctrl, messages.ResourcesLoaded{
 		ResourceType: provenancePinType,
 		Resources:    provenancePinEC2Rows(200, "i-canon"),
 		Pagination:   &resource.PaginationMeta{IsTruncated: true, NextToken: "tok-more"},
@@ -118,7 +118,7 @@ func TestExactCanonicalShrink_ClearsTheLowerBoundMarker(t *testing.T) {
 		t.Fatal("precondition: the seeded count must be a truncated lower bound")
 	}
 
-	ctrl.Handle(messages.ResourcesLoaded{
+	handlePage(ctrl, messages.ResourcesLoaded{
 		ResourceType: provenancePinType,
 		Resources:    provenancePinEC2Rows(5, "i-refresh"),
 		Pagination:   &resource.PaginationMeta{IsTruncated: false},

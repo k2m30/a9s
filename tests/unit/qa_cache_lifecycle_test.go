@@ -194,7 +194,7 @@ func openS3List(ctrl *app.Controller) (app.ViewState, []runtime.TaskRequest) {
 // the helper waits for it: from a lifecycle test's point of view "the fetch
 // landed" and "the file it produced exists" are one step.
 func deliverVerifyFetch(ctrl *app.Controller, resources []resource.Resource, truncated bool) app.ViewState {
-	vs, _ := ctrl.Handle(messages.ResourcesLoaded{
+	vs, _ := handlePage(ctrl, messages.ResourcesLoaded{
 		ResourceType: lifecycleShortName,
 		Resources:    resources,
 		Pagination:   &resource.PaginationMeta{IsTruncated: truncated},

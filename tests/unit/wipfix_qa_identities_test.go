@@ -216,7 +216,7 @@ func TestPoppedScreensBody_DoesNotRenderOnItsSuccessor(t *testing.T) {
 
 		b.c.PushChildListScreen(td.ShortName)
 		b.c.SeedRelatedExactRows(td.ShortName, bIDs)
-		if _, err := b.c.Handle(messages.ResourcesLoaded{
+		if _, err := handlePage(b.c, messages.ResourcesLoaded{
 			ResourceType: td.ShortName,
 			Resources:    all,
 			Pagination:   &domain.PaginationMeta{IsTruncated: false},
@@ -233,7 +233,7 @@ func TestPoppedScreensBody_DoesNotRenderOnItsSuccessor(t *testing.T) {
 			time.Sleep(time.Duration(attempt) * 40 * time.Microsecond)
 			_, _ = b.c.Apply(app.Action{Kind: app.ActionBack})
 		}()
-		if _, err := b.c.Handle(messages.ResourcesLoaded{
+		if _, err := handlePage(b.c, messages.ResourcesLoaded{
 			ResourceType: td.ShortName,
 			Resources:    all,
 			Pagination:   &domain.PaginationMeta{IsTruncated: false},

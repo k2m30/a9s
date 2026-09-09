@@ -186,7 +186,7 @@ func TestControllerReapply_AttentionDetails_SurviveFreshFetchReplace(t *testing.
 // menu-syncing seam (Controller.Handle), mirroring deliverVerifyFetch in
 // qa_cache_lifecycle_test.go. Gen:0 always passes the staleness guard.
 func deliverAttnResourcesLoaded(ctrl *app.Controller, resources []resource.Resource, truncated bool) (app.ViewState, []runtime.TaskRequest, error) {
-	vs, tasks := ctrl.Handle(messages.ResourcesLoaded{
+	vs, tasks := handlePage(ctrl, messages.ResourcesLoaded{
 		ResourceType: attnSurvivalType,
 		Resources:    resources,
 		Pagination:   &resource.PaginationMeta{IsTruncated: truncated},

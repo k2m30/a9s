@@ -787,7 +787,7 @@ func TestRowStoreControllerPin_ListOpen_ThenLoadMore_AppendsIntoRowStore(t *test
 		{ID: "bucket-1", Name: "bucket-1", Type: "s3"},
 		{ID: "bucket-2", Name: "bucket-2", Type: "s3"},
 	}
-	_, _ = c.Handle(messages.ResourcesLoaded{
+	_, _ = handlePage(c, messages.ResourcesLoaded{
 		ResourceType: "s3",
 		Resources:    page1,
 		Pagination:   &resource.PaginationMeta{IsTruncated: true, NextToken: "tok-1"},
@@ -799,7 +799,7 @@ func TestRowStoreControllerPin_ListOpen_ThenLoadMore_AppendsIntoRowStore(t *test
 	page2 := []resource.Resource{
 		{ID: "bucket-3", Name: "bucket-3", Type: "s3"},
 	}
-	_, _ = c.Handle(messages.ResourcesLoaded{
+	_, _ = handlePage(c, messages.ResourcesLoaded{
 		ResourceType: "s3",
 		Resources:    page2,
 		Pagination:   &resource.PaginationMeta{IsTruncated: false},

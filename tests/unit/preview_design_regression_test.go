@@ -14,11 +14,11 @@ import (
 	"github.com/k2m30/a9s/v3/core/runtime/messages"
 	"github.com/k2m30/a9s/v3/internal/tui"
 	"github.com/k2m30/a9s/v3/internal/tui/views"
+	"github.com/k2m30/a9s/v3/tests/unit/tuitest"
 )
 
 func previewApplyMsg(m tui.Model, msg tea.Msg) (tui.Model, tea.Cmd) {
-	newM, cmd := m.Update(msg)
-	return newM.(tui.Model), cmd
+	return tuitest.Step(m, msg)
 }
 
 func previewView(m tui.Model) string {

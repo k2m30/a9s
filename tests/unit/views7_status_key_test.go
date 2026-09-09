@@ -171,7 +171,7 @@ func TestStatusCellIsTheSameAfterARestart(t *testing.T) {
 			const profile, region = "example-readonly", "us-east-1"
 			ctrl := newTestControllerForProfile(t, profile, region)
 			_, _ = ctrl.Apply(app.Action{Kind: app.ActionCommand, Arg: c.shortName})
-			_, _ = ctrl.Handle(messages.ResourcesLoaded{
+			_, _ = handlePage(ctrl, messages.ResourcesLoaded{
 				ResourceType: c.shortName,
 				Resources:    []resource.Resource{live},
 				Pagination:   &domain.PaginationMeta{IsTruncated: false},

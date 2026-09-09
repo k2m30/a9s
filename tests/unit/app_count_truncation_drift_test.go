@@ -108,7 +108,7 @@ func TestSyncExactTotalToMenu_DoesNotClearEnrichmentTruncation_OnEqualExactRows(
 			rows[i].Findings = []domain.Finding{broken[i]}
 		}
 	}
-	c.Handle(messages.ResourcesLoaded{Provenance: messages.FetchProvenanceCanonicalList,
+	handlePage(c, messages.ResourcesLoaded{Provenance: messages.FetchProvenanceCanonicalList,
 		ResourceType: "s3",
 		Resources:    rows,
 		Pagination:   &resource.PaginationMeta{IsTruncated: false},
@@ -152,7 +152,7 @@ func TestSyncExactTotalToMenu_ClearsPriorRowsDerivedTruncation_OnEqualExactRows(
 	// is authoritative and an equal-count rows-derived resync may not clear
 	// it. Seeding it through the lane the case names keeps the distinction the
 	// test isolates.)
-	c.Handle(messages.ResourcesLoaded{
+	handlePage(c, messages.ResourcesLoaded{
 		ResourceType: "s3",
 		Resources:    rows,
 		Pagination:   &resource.PaginationMeta{IsTruncated: true, NextToken: "next"},
@@ -162,7 +162,7 @@ func TestSyncExactTotalToMenu_ClearsPriorRowsDerivedTruncation_OnEqualExactRows(
 		t.Fatalf("precondition failed: GetMenuIssueTruncated()[s3] = %v, want true", got)
 	}
 
-	c.Handle(messages.ResourcesLoaded{
+	handlePage(c, messages.ResourcesLoaded{
 		ResourceType: "s3",
 		Resources:    rows,
 		Pagination:   &resource.PaginationMeta{IsTruncated: false},

@@ -101,14 +101,14 @@ func TestPartialPageOneThenExhaustingPageTwo_IsNotSavedAsExact(t *testing.T) {
 	cfg := os.Getenv("A9S_CONFIG_FOLDER")
 	_, _ = c.Apply(app.Action{Kind: app.ActionCommand, Arg: "ec2"})
 
-	_, _ = c.Handle(messages.ResourcesLoaded{
+	_, _ = handlePage(c, messages.ResourcesLoaded{
 		ResourceType: "ec2",
 		Resources:    wipfixSaveLaneRows(20),
 		Pagination:   &domain.PaginationMeta{IsTruncated: true, NextToken: "page-2"},
 		Err:          errors.New("operation error EC2: DescribeTags, api error AccessDenied"),
 		Provenance:   messages.FetchProvenanceCanonicalList,
 	})
-	_, _ = c.Handle(messages.ResourcesLoaded{
+	_, _ = handlePage(c, messages.ResourcesLoaded{
 		ResourceType: "ec2",
 		Resources:    wipfixSaveLaneRows(10),
 		Pagination:   &domain.PaginationMeta{IsTruncated: false},
@@ -141,13 +141,13 @@ func TestCleanPageOneThenExhaustingPageTwo_IsSavedAsExact(t *testing.T) {
 	cfg := os.Getenv("A9S_CONFIG_FOLDER")
 	_, _ = c.Apply(app.Action{Kind: app.ActionCommand, Arg: "ec2"})
 
-	_, _ = c.Handle(messages.ResourcesLoaded{
+	_, _ = handlePage(c, messages.ResourcesLoaded{
 		ResourceType: "ec2",
 		Resources:    wipfixSaveLaneRows(20),
 		Pagination:   &domain.PaginationMeta{IsTruncated: true, NextToken: "page-2"},
 		Provenance:   messages.FetchProvenanceCanonicalList,
 	})
-	_, _ = c.Handle(messages.ResourcesLoaded{
+	_, _ = handlePage(c, messages.ResourcesLoaded{
 		ResourceType: "ec2",
 		Resources:    wipfixSaveLaneRows(10),
 		Pagination:   &domain.PaginationMeta{IsTruncated: false},
@@ -222,7 +222,7 @@ func TestSupersededSuccess_LeavesTheNewerRefreshLoading(t *testing.T) {
 		t.Fatalf("precondition: both refreshes drew sequence %d", first)
 	}
 
-	_, _ = b.c.Handle(messages.ResourcesLoaded{
+	_, _ = handlePage(b.c, messages.ResourcesLoaded{
 		ResourceType: "s3",
 		Resources:    wipfixSaveLaneRows(1),
 		Pagination:   &domain.PaginationMeta{IsTruncated: false},

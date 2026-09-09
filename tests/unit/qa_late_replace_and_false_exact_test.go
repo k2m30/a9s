@@ -248,7 +248,7 @@ func TestLateReplace_DoesNotStompDeeperList(t *testing.T) {
 	page1Seq := core.NextListFetchSeq(ctrl.GetListInstance())
 
 	page1 := page1Resources(50)
-	ctrl.Handle(messages.ResourcesLoaded{
+	handlePage(ctrl, messages.ResourcesLoaded{
 		ResourceType: "s3",
 		Resources:    page1,
 		Pagination: &resource.PaginationMeta{
@@ -270,7 +270,7 @@ func TestLateReplace_DoesNotStompDeeperList(t *testing.T) {
 	page2Seq := core.NextListFetchSeq(ctrl.GetListInstance())
 
 	page2 := page2Resources(50, 5)
-	ctrl.Handle(messages.ResourcesLoaded{
+	handlePage(ctrl, messages.ResourcesLoaded{
 		ResourceType: "s3",
 		Resources:    page2,
 		Pagination: &resource.PaginationMeta{
@@ -303,7 +303,7 @@ func TestLateReplace_DoesNotStompDeeperList(t *testing.T) {
 	// page-1 IDs again, still truncated — exactly what a verify-refetch
 	// dispatched before the load-more (but resolved after it) would
 	// produce.
-	ctrl.Handle(messages.ResourcesLoaded{
+	handlePage(ctrl, messages.ResourcesLoaded{
 		ResourceType: "s3",
 		Resources:    page1Resources(50),
 		Pagination: &resource.PaginationMeta{

@@ -63,7 +63,7 @@ func TestOffLockBuild_DoesNotShareTheRelatedIDSet(t *testing.T) {
 		// row is about.
 		for i := range 200 {
 			id := "page-" + string(rune('a'+i%26)) + string(rune('a'+i/26))
-			_, _ = c.Handle(messages.ResourcesLoaded{
+			_, _ = handlePage(c, messages.ResourcesLoaded{
 				ResourceType: td.ShortName,
 				Resources:    []resource.Resource{{ID: id, Name: id, Fields: map[string]string{}}},
 				Pagination:   &domain.PaginationMeta{IsTruncated: false},

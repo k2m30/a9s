@@ -48,7 +48,7 @@ func TestApply_AutoOpenSingleDetail_ZeroRowsWithPagination_QueuesFetchMore(t *te
 	// keys on to exempt it from the canonical-only Provenance gate (handle.go).
 	c.PatchListEscPops(true)
 
-	_, tasks := c.Handle(messages.ResourcesLoaded{
+	_, tasks := handlePage(c, messages.ResourcesLoaded{
 		ResourceType: "ec2",
 		Resources:    nil,
 		Pagination:   &resource.PaginationMeta{IsTruncated: true, NextToken: "chase-tok-1"}, Provenance: messages.FetchProvenanceFilteredList,
@@ -93,7 +93,7 @@ func TestApply_AutoOpenSingleDetail_ZeroRowsNoPaginationWithStubCreator_OpensSyn
 	c.PatchListRelatedIDSet([]string{targetID})
 	c.PatchListEscPops(true)
 
-	c.Handle(messages.ResourcesLoaded{
+	handlePage(c, messages.ResourcesLoaded{
 		ResourceType: "ami",
 		Resources:    nil,
 		Pagination:   nil, Provenance: messages.FetchProvenanceByID,
@@ -126,7 +126,7 @@ func TestApply_AutoOpenSingleDetail_ZeroRowsNoPaginationNoStubCreator_Placeholde
 				t.Fatalf("Handle panicked on zero-row/no-pagination/no-StubCreator auto-open: %v", r)
 			}
 		}()
-		c.Handle(messages.ResourcesLoaded{Provenance: messages.FetchProvenanceByID,
+		handlePage(c, messages.ResourcesLoaded{Provenance: messages.FetchProvenanceByID,
 			ResourceType: "ec2",
 			Resources:    nil,
 			Pagination:   nil,
@@ -157,7 +157,7 @@ func TestApply_AutoOpenSingleDetail_NonEmptyPageMissingTarget_StillChasesViaFetc
 	c.PatchListRelatedIDSet([]string{targetID})
 	c.PatchListEscPops(true)
 
-	_, tasks := c.Handle(messages.ResourcesLoaded{
+	_, tasks := handlePage(c, messages.ResourcesLoaded{
 		ResourceType: "ec2",
 		// Non-empty page, but none of these rows is the target — the target
 		// is somewhere on a LATER page.
@@ -217,6 +217,9 @@ func TestApply_AutoOpenSingleDetail_LoadingMoreAlreadyTrue_NoPrematureStubCreati
 				t.Fatalf("Handle panicked while a chase was already in flight: %v", r)
 			}
 		}()
+		// Deliberately not handlePage: this page names a type the open screen is not,
+		// so it belongs to no screen and is delivered exactly as it is — stamping it
+		// for the screen on top is the guess the identity exists to remove.
 		c.Handle(messages.ResourcesLoaded{Provenance: messages.FetchProvenanceCanonicalList,
 			ResourceType: "ec2",
 			Resources:    nil,
@@ -251,6 +254,9 @@ func TestApply_AutoOpenSingleDetail_UnrelatedResourcesLoaded_NoStubNoDetailOpen(
 	c.SetListAutoOpenSingle(true)
 	c.PatchListRelatedIDSet([]string{targetID})
 
+	// Deliberately not handlePage: this page names a type the open screen is not,
+	// so it belongs to no screen and is delivered exactly as it is — stamping it
+	// for the screen on top is the guess the identity exists to remove.
 	c.Handle(messages.ResourcesLoaded{Provenance: messages.FetchProvenanceCanonicalList,
 		ResourceType: "ec2",
 		Resources:    []resource.Resource{{ID: "i-unrelated0001", Type: "ec2"}},
@@ -275,8 +281,11 @@ func TestApply_AutoOpenSingleDetail_UnrelatedThenOwnTypeEmptyNoPagination_StubFi
 	c.PatchListRelatedIDSet([]string{targetID})
 	c.PatchListEscPops(true)
 
+	// Deliberately not handlePage: this page names a type the open screen is not,
+	// so it belongs to no screen and is delivered exactly as it is — stamping it
+	// for the screen on top is the guess the identity exists to remove.
 	c.Handle(messages.ResourcesLoaded{ResourceType: "ec2", Resources: nil, Pagination: nil, Provenance: messages.FetchProvenanceCanonicalList})
-	c.Handle(messages.ResourcesLoaded{ResourceType: "ami", Resources: nil, Pagination: nil, Provenance: messages.FetchProvenanceByID})
+	handlePage(c, messages.ResourcesLoaded{ResourceType: "ami", Resources: nil, Pagination: nil, Provenance: messages.FetchProvenanceByID})
 
 	snap := c.Snapshot()
 	if snap.Body.Kind != app.BodyKindDetail {
@@ -300,8 +309,11 @@ func TestApply_AutoOpenSingleDetail_UnrelatedThenOwnTypePagination_ChaseFallback
 	c.PatchListRelatedIDSet([]string{targetID})
 	c.PatchListEscPops(true)
 
+	// Deliberately not handlePage: this page names a type the open screen is not,
+	// so it belongs to no screen and is delivered exactly as it is — stamping it
+	// for the screen on top is the guess the identity exists to remove.
 	c.Handle(messages.ResourcesLoaded{ResourceType: "ec2", Resources: nil, Pagination: nil, Provenance: messages.FetchProvenanceCanonicalList})
-	_, tasks := c.Handle(messages.ResourcesLoaded{
+	_, tasks := handlePage(c, messages.ResourcesLoaded{
 		ResourceType: "ami",
 		Resources:    nil,
 		Pagination:   &resource.PaginationMeta{IsTruncated: true, NextToken: "chase-tok-guard"}, Provenance: messages.FetchProvenanceFilteredList,
@@ -341,8 +353,11 @@ func TestApply_AutoOpenSingleDetail_UnrelatedThenOwnTypeRealResult_OpensRealReso
 	c.PatchListRelatedIDSet([]string{targetID})
 	c.PatchListEscPops(true)
 
+	// Deliberately not handlePage: this page names a type the open screen is not,
+	// so it belongs to no screen and is delivered exactly as it is — stamping it
+	// for the screen on top is the guess the identity exists to remove.
 	c.Handle(messages.ResourcesLoaded{ResourceType: "ec2", Resources: nil, Pagination: nil, Provenance: messages.FetchProvenanceCanonicalList})
-	c.Handle(messages.ResourcesLoaded{
+	handlePage(c, messages.ResourcesLoaded{
 		ResourceType: "ami",
 		Resources:    []resource.Resource{{ID: targetID, Name: realName, Type: "ami"}},
 		Pagination:   nil, Provenance: messages.FetchProvenanceByID,

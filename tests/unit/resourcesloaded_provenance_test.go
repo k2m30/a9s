@@ -14,6 +14,13 @@
 // this is the regression that reached disk and survived restart, so a
 // unit-level stub on the gate function would have passed happily while the
 // bug was live.
+// NOTE: every delivery in this file goes through ctrl.Handle rather than the
+// handlePage helper the rest of the suite uses. The helper stamps a hand-built
+// page for the screen on top, and this file's whole subject is which screen a
+// page reaches when it is NOT the one on top — a canonical result arriving
+// under a drill, a filtered result arriving under a fresh canonical list.
+// Stamping them would make every case here trivially true. These are the pins
+// that describe the by-type scan itself, so they stand or fall with it.
 package unit
 
 import (

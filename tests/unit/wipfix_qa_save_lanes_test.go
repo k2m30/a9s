@@ -81,7 +81,7 @@ func TestTruncatedRefetchThenCountsSave_AgreeOnExactness(t *testing.T) {
 	_, _ = c.Apply(app.Action{Kind: app.ActionCommand, Arg: "ec2"})
 
 	// A complete fetch first: the file records a confirmed population.
-	_, _ = c.Handle(messages.ResourcesLoaded{
+	_, _ = handlePage(c, messages.ResourcesLoaded{
 		ResourceType: "ec2",
 		Resources:    wipfixSaveLaneRows(55),
 		Pagination:   &domain.PaginationMeta{IsTruncated: false},
@@ -94,7 +94,7 @@ func TestTruncatedRefetchThenCountsSave_AgreeOnExactness(t *testing.T) {
 
 	// The refetch comes back truncated: both lanes now have something to say
 	// about the same file, and the counts-only one has no rows to say it with.
-	_, _ = c.Handle(messages.ResourcesLoaded{
+	_, _ = handlePage(c, messages.ResourcesLoaded{
 		ResourceType: "ec2",
 		Resources:    wipfixSaveLaneRows(50),
 		Pagination:   &domain.PaginationMeta{IsTruncated: true, NextToken: "page-2"},

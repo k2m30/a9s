@@ -45,7 +45,7 @@ func TestFieldUpdateDuringAbsorb_DoesNotRaceTheOffLockBuild(t *testing.T) {
 		}
 	}()
 	for range 40 {
-		_, _ = c.Handle(messages.ResourcesLoaded{
+		_, _ = handlePage(c, messages.ResourcesLoaded{
 			ResourceType: "ec2", Resources: absorbProbeRows(400),
 			Pagination: &domain.PaginationMeta{IsTruncated: false},
 			Provenance: messages.FetchProvenanceCanonicalList,

@@ -73,7 +73,7 @@ func TestListFetch_SupersededResultNeverReachesRowStore(t *testing.T) {
 	_, refreshTasks := ctrl.Apply(app.Action{Kind: app.ActionRefresh})
 	refreshSeq, refreshScreen := listGenFetchSeq(t, refreshTasks, "ctrl+R refresh")
 
-	ctrl.Handle(messages.ResourcesLoaded{
+	handlePage(ctrl, messages.ResourcesLoaded{
 		ResourceType: listGenType,
 		Resources:    listGenRows(3, "i-refresh"),
 		Pagination:   &resource.PaginationMeta{IsTruncated: false},
@@ -81,7 +81,7 @@ func TestListFetch_SupersededResultNeverReachesRowStore(t *testing.T) {
 		ListSeq:      refreshSeq,
 		ScreenID:     refreshScreen,
 	})
-	ctrl.Handle(messages.ResourcesLoaded{
+	handlePage(ctrl, messages.ResourcesLoaded{
 		ResourceType: listGenType,
 		Resources:    listGenRows(3, "i-entry"),
 		Pagination:   &resource.PaginationMeta{IsTruncated: false},
@@ -111,7 +111,7 @@ func TestListFetch_CtrlRResetWinsOverAnExactScreen(t *testing.T) {
 
 	_, entryTasks := ctrl.Apply(app.Action{Kind: app.ActionCommand, Arg: listGenType})
 	entrySeq, entryScreen := listGenFetchSeq(t, entryTasks, "on-entry verification")
-	ctrl.Handle(messages.ResourcesLoaded{
+	handlePage(ctrl, messages.ResourcesLoaded{
 		ResourceType: listGenType,
 		Resources:    listGenRows(6, "i-page"),
 		Pagination:   &resource.PaginationMeta{IsTruncated: false},
@@ -122,7 +122,7 @@ func TestListFetch_CtrlRResetWinsOverAnExactScreen(t *testing.T) {
 
 	_, refreshTasks := ctrl.Apply(app.Action{Kind: app.ActionRefresh})
 	refreshSeq, refreshScreen := listGenFetchSeq(t, refreshTasks, "ctrl+R refresh")
-	ctrl.Handle(messages.ResourcesLoaded{
+	handlePage(ctrl, messages.ResourcesLoaded{
 		ResourceType: listGenType,
 		Resources:    listGenRows(3, "i-page"),
 		Pagination:   &resource.PaginationMeta{IsTruncated: true, NextToken: "next"},

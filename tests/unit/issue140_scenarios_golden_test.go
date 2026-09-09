@@ -297,8 +297,7 @@ func issue140NavigateToEC2Detail(t *testing.T, m tui.Model) tui.Model {
 }
 
 func issue140ApplyMsg(m tui.Model, msg tea.Msg) tui.Model {
-	m2, _ := m.Update(msg)
-	return m2.(tui.Model)
+	return tuitest.StepModel(m, msg)
 }
 
 func sortedScenarioNames(m map[string]string) []string {

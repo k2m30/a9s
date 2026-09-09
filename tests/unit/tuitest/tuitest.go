@@ -15,24 +15,70 @@ import (
 	tea "charm.land/bubbletea/v2"
 	lipgloss "charm.land/lipgloss/v2"
 
+	"github.com/k2m30/a9s/v3/core/domain"
+	"github.com/k2m30/a9s/v3/core/runtime/messages"
 	"github.com/k2m30/a9s/v3/internal/tui"
 	"github.com/k2m30/a9s/v3/internal/tui/styles"
 )
 
+// listInstanceReporter is what a root model has to answer to for a
+// hand-built page message to be stamped for the screen the test is driving.
+// tui.Model does not implement it yet: the accessor is one line over
+// app.Controller.GetListInstance, and until it lands StampPage below leaves
+// model-driven messages alone. Replace this assertion with a direct call the
+// day it does.
+type listInstanceReporter interface {
+	ListInstanceForTest() domain.Gen
+}
+
 var ansiRe = regexp.MustCompile(`\x1b\[[0-9;]*[a-zA-Z]`)
 
+// StampPage fills in the screen identity a page message would have carried
+// had a real dispatch produced it. A test that hand-builds
+// messages.ResourcesLoaded is standing in for the fetch command, and the
+// command stamps the instance of the screen that issued it; without it the
+// message names no screen and can only be routed by resource type, which is
+// a guess as soon as two lists of one type are stacked.
+//
+// The sequence is deliberately left at zero. It orders one screen's requests
+// against each other, and a hand-built page has no sibling request to be
+// ordered against — a zero sequence is never superseded, which is what a
+// single delivery means. A test that IS about ordering sets its own.
+//
+// Messages that are not pages, and pages that already name a screen, pass
+// through untouched: a test that means to deliver a page naming nobody
+// (or one naming a screen it has since popped) still can.
+func StampPage(screen domain.Gen, msg tea.Msg) tea.Msg {
+	page, ok := msg.(messages.ResourcesLoaded)
+	if !ok || page.ScreenID != 0 || screen == 0 {
+		return msg
+	}
+	page.ScreenID = screen
+	return page
+}
+
 // Step sends msg through m.Update and returns the updated model and command.
-// It is the canonical implementation of the rootApplyMsg / applyMsg pattern.
+// It is the canonical implementation of the rootApplyMsg / applyMsg pattern,
+// and the one place a model-driven test's hand-built page is stamped.
 func Step(m tui.Model, msg tea.Msg) (tui.Model, tea.Cmd) {
-	newM, cmd := m.Update(msg)
+	newM, cmd := m.Update(stampFor(m, msg))
 	return newM.(tui.Model), cmd
 }
 
 // StepModel sends msg through m.Update and returns the updated model,
 // discarding the command. Use when the caller only needs the next state.
 func StepModel(m tui.Model, msg tea.Msg) tui.Model {
-	newM, _ := m.Update(msg)
+	newM, _ := m.Update(stampFor(m, msg))
 	return newM.(tui.Model)
+}
+
+// stampFor is StampPage for the screen m is currently showing.
+func stampFor(m tui.Model, msg tea.Msg) tea.Msg {
+	r, ok := any(m).(listInstanceReporter)
+	if !ok {
+		return msg
+	}
+	return StampPage(r.ListInstanceForTest(), msg)
 }
 
 // Render returns the rendered content string from a root model's View().

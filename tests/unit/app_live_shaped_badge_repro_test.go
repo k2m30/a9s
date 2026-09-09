@@ -183,7 +183,7 @@ func TestLiveShapedBadgeRepro_S3_SurvivesEscapeToMenu(t *testing.T) {
 	}
 
 	buckets := liveShapedBadgeReproS3Resources(5)
-	ctrl.Handle(messages.ResourcesLoaded{
+	handlePage(ctrl, messages.ResourcesLoaded{
 		ResourceType: "s3",
 		Resources:    buckets,
 		Gen:          0, Provenance: messages.FetchProvenanceCanonicalList,
@@ -281,7 +281,7 @@ func TestLiveShapedBadgeRepro_S3_LateDiskCacheReplayDoesNotClobberFreshBadge(t *
 	_, _ = ctrl.Apply(app.Action{Kind: app.ActionCommand, Arg: "s3"})
 
 	buckets := liveShapedBadgeReproS3Resources(5)
-	ctrl.Handle(messages.ResourcesLoaded{
+	handlePage(ctrl, messages.ResourcesLoaded{
 		ResourceType: "s3",
 		Resources:    buckets,
 		Gen:          0, Provenance: messages.FetchProvenanceCanonicalList,

@@ -27,6 +27,7 @@ import (
 	"github.com/k2m30/a9s/v3/internal/tui"
 	"github.com/k2m30/a9s/v3/internal/tui/keys"
 	"github.com/k2m30/a9s/v3/internal/tui/views"
+	"github.com/k2m30/a9s/v3/tests/unit/tuitest"
 )
 
 // ---------------------------------------------------------------------------
@@ -36,8 +37,7 @@ import (
 // livegapStep sends msg through tui.Model.Update and type-asserts the result
 // back to tui.Model.
 func livegapStep(m tui.Model, msg tea.Msg) (tui.Model, tea.Cmd) {
-	newM, cmd := m.Update(msg)
-	return newM.(tui.Model), cmd
+	return tuitest.Step(m, msg)
 }
 
 // livegapKey builds a printable-character key press.

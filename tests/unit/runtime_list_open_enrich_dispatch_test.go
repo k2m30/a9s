@@ -184,7 +184,7 @@ func TestControllerHandle_ListOpen_ResourcesLoaded_DispatchesProbeEnrich(t *test
 	ctrl := newBlessedController(t, core)
 	ctrl.SetUIMode("web")
 
-	_, tasks := ctrl.Handle(messages.ResourcesLoaded{Provenance: messages.FetchProvenanceCanonicalList,
+	_, tasks := handlePage(ctrl, messages.ResourcesLoaded{Provenance: messages.FetchProvenanceCanonicalList,
 		ResourceType: shortName,
 		Resources:    []resource.Resource{{ID: "r-1"}, {ID: "r-2"}},
 		Gen:          0,

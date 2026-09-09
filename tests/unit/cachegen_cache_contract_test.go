@@ -317,7 +317,7 @@ func TestListSave_DoesNotBlockControllerReadersOnDiskIO(t *testing.T) {
 	handled := make(chan struct{})
 	go func() {
 		defer close(handled)
-		ctrl.Handle(messages.ResourcesLoaded{
+		handlePage(ctrl, messages.ResourcesLoaded{
 			ResourceType: "s3",
 			Resources:    cachegenRows(2, "bucket-lock"),
 			Pagination:   &resource.PaginationMeta{IsTruncated: false},
@@ -693,7 +693,7 @@ func cachegenListBody(t *testing.T, ctrl *app.Controller) *app.ListBody {
 // reads the type file on the next line has to wait for it — the delivery and
 // the file it produces are one step from these tests' point of view.
 func cachegenLoadList(ctrl *app.Controller, rows []resource.Resource) {
-	ctrl.Handle(messages.ResourcesLoaded{
+	handlePage(ctrl, messages.ResourcesLoaded{
 		ResourceType: "s3",
 		Resources:    rows,
 		Pagination:   &resource.PaginationMeta{IsTruncated: false},

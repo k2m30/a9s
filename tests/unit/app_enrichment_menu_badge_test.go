@@ -251,7 +251,7 @@ func TestSyncExactTotalToMenu_RowsWithoutFindings_DoesNotSetIssueKnown(t *testin
 	for i := range rows {
 		rows[i] = resource.Resource{ID: "bucket-" + itoaTest(i), Type: "s3"}
 	}
-	c.Handle(messages.ResourcesLoaded{Provenance: messages.FetchProvenanceCanonicalList,
+	handlePage(c, messages.ResourcesLoaded{Provenance: messages.FetchProvenanceCanonicalList,
 		ResourceType: "s3",
 		Resources:    rows,
 		Pagination:   &resource.PaginationMeta{IsTruncated: false},

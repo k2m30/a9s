@@ -91,7 +91,7 @@ func TestLoadMoreExhausted_UpdatesMenuAvailability_ExactNoTUI(t *testing.T) {
 	for i := range moreRows {
 		moreRows[i] = resource.Resource{ID: "i-page2-" + itoaTest(i), Type: "ec2"}
 	}
-	vs, _ := c.Handle(messages.ResourcesLoaded{
+	vs, _ := handlePage(c, messages.ResourcesLoaded{
 		ResourceType: "ec2",
 		Resources:    moreRows,
 		Pagination:   &resource.PaginationMeta{IsTruncated: false},
@@ -131,7 +131,7 @@ func TestLoadMoreExhausted_SurvivesReturnToMenu(t *testing.T) {
 		{ID: "bucket-1", Type: "s3"}, {ID: "bucket-2", Type: "s3"},
 	}, &resource.PaginationMeta{IsTruncated: true, NextToken: "tok-a"}, false)
 
-	c.Handle(messages.ResourcesLoaded{
+	handlePage(c, messages.ResourcesLoaded{
 		ResourceType: "s3",
 		Resources:    []resource.Resource{{ID: "bucket-3", Type: "s3"}},
 		Pagination:   &resource.PaginationMeta{IsTruncated: false},
@@ -193,7 +193,7 @@ func TestLoadMoreExhausted_OnlyIncreaseGuard(t *testing.T) {
 		c.Apply(app.Action{Kind: app.ActionCommand, Arg: "ec2"})
 		c.ApplyResourcesLoaded("ec2", []resource.Resource{{ID: "i-only1", Type: "ec2"}}, &resource.PaginationMeta{IsTruncated: true, NextToken: "tok-z"}, false)
 
-		c.Handle(messages.ResourcesLoaded{
+		handlePage(c, messages.ResourcesLoaded{
 			ResourceType: "ec2",
 			Resources:    []resource.Resource{{ID: "i-only2", Type: "ec2"}},
 			Pagination:   &resource.PaginationMeta{IsTruncated: true, NextToken: "tok-y"},
@@ -215,7 +215,7 @@ func TestLoadMoreExhausted_OnlyIncreaseGuard(t *testing.T) {
 		c.Apply(app.Action{Kind: app.ActionCommand, Arg: "ec2"})
 		c.ApplyResourcesLoaded("ec2", []resource.Resource{{ID: "i-only1", Type: "ec2"}}, &resource.PaginationMeta{IsTruncated: true, NextToken: "tok-z"}, false)
 
-		c.Handle(messages.ResourcesLoaded{
+		handlePage(c, messages.ResourcesLoaded{
 			ResourceType: "ec2",
 			Resources:    []resource.Resource{{ID: "i-only2", Type: "ec2"}},
 			Pagination:   &resource.PaginationMeta{IsTruncated: false},
@@ -242,7 +242,7 @@ func TestLoadMoreExhausted_OnlyIncreaseGuard(t *testing.T) {
 		c.Apply(app.Action{Kind: app.ActionCommand, Arg: "ec2"})
 		c.ApplyResourcesLoaded("ec2", []resource.Resource{{ID: "i-a"}, {ID: "i-b"}}, &resource.PaginationMeta{IsTruncated: true, NextToken: "tok-y"}, false)
 
-		c.Handle(messages.ResourcesLoaded{
+		handlePage(c, messages.ResourcesLoaded{
 			ResourceType: "ec2",
 			Resources:    []resource.Resource{{ID: "i-c"}, {ID: "i-d"}, {ID: "i-e"}},
 			Pagination:   &resource.PaginationMeta{IsTruncated: false},
@@ -290,7 +290,7 @@ func TestLoadMoreExhausted_PersistsToDiskCache(t *testing.T) {
 	c.Apply(app.Action{Kind: app.ActionCommand, Arg: "ec2"})
 	c.ApplyResourcesLoaded("ec2", make([]resource.Resource, 100), &resource.PaginationMeta{IsTruncated: true, NextToken: "tok-1"}, false)
 
-	c.Handle(messages.ResourcesLoaded{
+	handlePage(c, messages.ResourcesLoaded{
 		ResourceType: "ec2",
 		Resources:    []resource.Resource{{ID: "i-extra-1"}, {ID: "i-extra-2"}},
 		Pagination:   &resource.PaginationMeta{IsTruncated: false},

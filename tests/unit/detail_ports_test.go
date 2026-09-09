@@ -349,7 +349,7 @@ func Test_FooterHints_YAML_CloudTrailHint(t *testing.T) {
 	// screen is pushed below, exactly as if an earlier top-level ec2 list
 	// had loaded it. This is the only way findCachedResourceByID (footer.go)
 	// can resolve it; no related/filtered/by-ID/child path is exercised here.
-	c.Handle(messages.ResourcesLoaded{ResourceType: "ec2", Resources: []resource.Resource{res}, Provenance: messages.FetchProvenanceCanonicalList})
+	handlePage(c, messages.ResourcesLoaded{ResourceType: "ec2", Resources: []resource.Resource{res}, Provenance: messages.FetchProvenanceCanonicalList})
 
 	c.ApplyIntents([]runtime.UIIntent{runtime.PushScreen{
 		ID:      runtime.ScreenYAML,

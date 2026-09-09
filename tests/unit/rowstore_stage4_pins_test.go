@@ -344,7 +344,7 @@ func TestStage4Pin_D16_ListLaneAndSweepLaneSaveByteIdenticalRows_UserReorderedCo
 	rows := []resource.Resource{stage4PinS3Resource("bucket-d16-1")}
 
 	// --- List-lane save: ResourcesLoaded through the real menu-sync seam. ---
-	_, _ = ctrl.Handle(messages.ResourcesLoaded{
+	_, _ = handlePage(ctrl, messages.ResourcesLoaded{
 		ResourceType: stage4PinType,
 		Resources:    rows,
 		Pagination:   &resource.PaginationMeta{IsTruncated: false},

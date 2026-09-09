@@ -77,7 +77,7 @@ func TestLoadMore_OnClientSideRelatedList_AppendsToThatList(t *testing.T) {
 	wipfixRelatedDrillList(t, ctrl, []string{"i-drill-0", "i-drill-1"})
 
 	// The drill's first page: two rows and more to come.
-	ctrl.Handle(messages.ResourcesLoaded{
+	handlePage(ctrl, messages.ResourcesLoaded{
 		ResourceType: provenancePinType,
 		Resources:    provenancePinEC2Rows(1, "i-drill"),
 		Pagination:   &resource.PaginationMeta{IsTruncated: true, NextToken: "page-2"},
@@ -107,7 +107,7 @@ func TestLoadMore_OnClientSideRelatedList_AppendsToThatList(t *testing.T) {
 	}
 
 	// The continuation's own result, carrying the lane the task recorded.
-	ctrl.Handle(messages.ResourcesLoaded{
+	handlePage(ctrl, messages.ResourcesLoaded{
 		ResourceType: provenancePinType,
 		Resources:    provenancePinEC2Rows(2, "i-drill")[1:],
 		Append:       true,
@@ -141,7 +141,7 @@ func TestRefreshDuringLoadMore_LeavesLoadMoreUsable(t *testing.T) {
 	_ = region
 	_ = core
 	ctrl.Apply(app.Action{Kind: app.ActionCommand, Arg: provenancePinType})
-	ctrl.Handle(messages.ResourcesLoaded{
+	handlePage(ctrl, messages.ResourcesLoaded{
 		ResourceType: provenancePinType,
 		Resources:    provenancePinEC2Rows(3, "i-page1"),
 		Pagination:   &resource.PaginationMeta{IsTruncated: true, NextToken: "page-2"},
@@ -159,7 +159,7 @@ func TestRefreshDuringLoadMore_LeavesLoadMoreUsable(t *testing.T) {
 	ctrl.Apply(app.Action{Kind: app.ActionRefresh})
 
 	// The superseded continuation lands and is discarded.
-	ctrl.Handle(messages.ResourcesLoaded{
+	handlePage(ctrl, messages.ResourcesLoaded{
 		ResourceType: provenancePinType,
 		Resources:    provenancePinEC2Rows(3, "i-page2"),
 		Append:       true,
@@ -194,7 +194,7 @@ func TestExactRelatedDrill_StartingWithFetchMore_RendersItsRows(t *testing.T) {
 	// A canonical page that is truncated: the RowStore entry has more pages,
 	// which is what makes the drill below start with a continuation.
 	ctrl.Apply(app.Action{Kind: app.ActionCommand, Arg: provenancePinType})
-	ctrl.Handle(messages.ResourcesLoaded{
+	handlePage(ctrl, messages.ResourcesLoaded{
 		ResourceType: provenancePinType,
 		Resources:    provenancePinEC2Rows(3, "i-cached"),
 		Pagination:   &resource.PaginationMeta{IsTruncated: true, NextToken: "page-2"},
@@ -216,7 +216,7 @@ func TestExactRelatedDrill_StartingWithFetchMore_RendersItsRows(t *testing.T) {
 	}
 
 	// The continuation lands: Append=true, because that is how the rows merge.
-	ctrl.Handle(messages.ResourcesLoaded{
+	handlePage(ctrl, messages.ResourcesLoaded{
 		ResourceType: provenancePinType,
 		Resources:    []resource.Resource{{ID: target, Name: target, Type: provenancePinType}},
 		Append:       true,

@@ -283,7 +283,7 @@ func TestListOpen_ResourcesLoaded_ClearsRefreshingAndSwapsRows(t *testing.T) {
 		{ID: "i-0fresh00001", Name: "fresh-row", Type: "ec2", Fields: map[string]string{"state": "running"}},
 		{ID: "i-0fresh00002", Name: "fresh-row-2", Type: "ec2", Fields: map[string]string{"state": "running"}},
 	}
-	vs, _ := c.Handle(messages.ResourcesLoaded{
+	vs, _ := handlePage(c, messages.ResourcesLoaded{
 		ResourceType: "ec2",
 		Resources:    fresh,
 		Pagination:   &resource.PaginationMeta{IsTruncated: false},

@@ -116,7 +116,7 @@ func TestListFetch_StaleEntryVerificationLosesToLaterRefresh(t *testing.T) {
 	}
 
 	// The refresh wins the race and lands first.
-	ctrl.Handle(messages.ResourcesLoaded{
+	handlePage(ctrl, messages.ResourcesLoaded{
 		ResourceType: listGenType,
 		Resources:    listGenRows(3, "i-refresh"),
 		Pagination:   &resource.PaginationMeta{IsTruncated: false},
@@ -126,7 +126,7 @@ func TestListFetch_StaleEntryVerificationLosesToLaterRefresh(t *testing.T) {
 	})
 
 	// The superseded on-entry verification arrives afterwards.
-	ctrl.Handle(messages.ResourcesLoaded{
+	handlePage(ctrl, messages.ResourcesLoaded{
 		ResourceType: listGenType,
 		Resources:    listGenRows(3, "i-entry"),
 		Pagination:   &resource.PaginationMeta{IsTruncated: false},
@@ -155,7 +155,7 @@ func TestListFetch_LatestResultStillApplies(t *testing.T) {
 	_, entryTasks := ctrl.Apply(app.Action{Kind: app.ActionCommand, Arg: listGenType})
 	entrySeq, entryScreen := listGenFetchSeq(t, entryTasks, "on-entry verification")
 
-	ctrl.Handle(messages.ResourcesLoaded{
+	handlePage(ctrl, messages.ResourcesLoaded{
 		ResourceType: listGenType,
 		Resources:    listGenRows(2, "i-entry"),
 		Pagination:   &resource.PaginationMeta{IsTruncated: false},
@@ -180,7 +180,7 @@ func TestListReEntry_RuntimeReturnsVerificationTask(t *testing.T) {
 	ctrl, core := newDetailParityHeadlessController(t)
 
 	ctrl.Apply(app.Action{Kind: app.ActionCommand, Arg: listGenType})
-	ctrl.Handle(messages.ResourcesLoaded{
+	handlePage(ctrl, messages.ResourcesLoaded{
 		ResourceType: listGenType,
 		Resources:    listGenRows(4, "i-first"),
 		Pagination:   &resource.PaginationMeta{IsTruncated: false},
@@ -211,7 +211,7 @@ func TestListReEntry_HeadlessMarksRefreshing(t *testing.T) {
 	ctrl, _ := newDetailParityHeadlessController(t)
 
 	ctrl.Apply(app.Action{Kind: app.ActionCommand, Arg: listGenType})
-	ctrl.Handle(messages.ResourcesLoaded{
+	handlePage(ctrl, messages.ResourcesLoaded{
 		ResourceType: listGenType,
 		Resources:    listGenRows(4, "i-first"),
 		Pagination:   &resource.PaginationMeta{IsTruncated: false},
@@ -253,7 +253,7 @@ func TestListTotal_ShallowVerifyKeepsKnownPopulation(t *testing.T) {
 		t.Fatalf("seeded list title %q does not show the known population 55", got)
 	}
 
-	ctrl.Handle(messages.ResourcesLoaded{
+	handlePage(ctrl, messages.ResourcesLoaded{
 		ResourceType: listGenType,
 		Resources:    listGenRows(50, "i-disk"),
 		Pagination:   &resource.PaginationMeta{IsTruncated: true, NextToken: "next"},
@@ -276,7 +276,7 @@ func TestListTotal_ExactVerifyRetiresKnownPopulation(t *testing.T) {
 	seedListGenDiskFile(t, 55, 50)
 
 	ctrl.Apply(app.Action{Kind: app.ActionCommand, Arg: listGenType})
-	ctrl.Handle(messages.ResourcesLoaded{
+	handlePage(ctrl, messages.ResourcesLoaded{
 		ResourceType: listGenType,
 		Resources:    listGenRows(50, "i-disk"),
 		Pagination:   &resource.PaginationMeta{IsTruncated: false},
@@ -296,7 +296,7 @@ func TestListTotal_VerifyReachingPopulationRetiresIt(t *testing.T) {
 	seedListGenDiskFile(t, 55, 50)
 
 	ctrl.Apply(app.Action{Kind: app.ActionCommand, Arg: listGenType})
-	ctrl.Handle(messages.ResourcesLoaded{
+	handlePage(ctrl, messages.ResourcesLoaded{
 		ResourceType: listGenType,
 		Resources:    listGenRows(55, "i-disk"),
 		Pagination:   &resource.PaginationMeta{IsTruncated: true, NextToken: "next"},

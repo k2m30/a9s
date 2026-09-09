@@ -329,7 +329,7 @@ func TestStage2Pin_SweepSaveMatchesListLaneDepth_NoSyncCallerLeft(t *testing.T) 
 		{ID: "bucket-stage2-1", Name: "bucket-stage2-1", Type: "s3"},
 		{ID: "bucket-stage2-2", Name: "bucket-stage2-2", Type: "s3"},
 	}
-	_, _ = c.Handle(messages.ResourcesLoaded{
+	_, _ = handlePage(c, messages.ResourcesLoaded{
 		ResourceType: "s3",
 		Resources:    page1,
 		Pagination:   &resource.PaginationMeta{IsTruncated: true, NextToken: "tok-1"},
@@ -339,7 +339,7 @@ func TestStage2Pin_SweepSaveMatchesListLaneDepth_NoSyncCallerLeft(t *testing.T) 
 	page2 := []resource.Resource{
 		{ID: "bucket-stage2-3", Name: "bucket-stage2-3", Type: "s3"},
 	}
-	_, _ = c.Handle(messages.ResourcesLoaded{
+	_, _ = handlePage(c, messages.ResourcesLoaded{
 		ResourceType: "s3",
 		Resources:    page2,
 		Pagination:   &resource.PaginationMeta{IsTruncated: false},

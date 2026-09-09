@@ -294,7 +294,7 @@ func TestCostsRound7_Item4B_GenericRefreshAction_DoesNotReachForceRefreshCosts(t
 func TestCostsRound7_Item4B_GenericRefreshAction_NonCostsScreen_KeepsOldBehavior(t *testing.T) {
 	c := newTestController(t)
 	c.Apply(app.Action{Kind: app.ActionCommand, Arg: "ec2"})
-	c.Handle(messages.ResourcesLoaded{Provenance: messages.FetchProvenanceCanonicalList,
+	handlePage(c, messages.ResourcesLoaded{Provenance: messages.FetchProvenanceCanonicalList,
 		ResourceType: "ec2",
 		Resources:    []resource.Resource{{ID: "i-0abc", Name: "web-01"}},
 	})

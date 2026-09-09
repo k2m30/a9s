@@ -28,6 +28,7 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 	"github.com/k2m30/a9s/v3/core/runtime/messages"
 	"github.com/k2m30/a9s/v3/internal/tui"
+	"github.com/k2m30/a9s/v3/tests/unit/tuitest"
 )
 
 // ---------------------------------------------------------------------------
@@ -37,8 +38,7 @@ import (
 // chainApplyMsg forwards a message through tui.Model.Update and type-asserts
 // the result back to tui.Model.
 func chainApplyMsg(m tui.Model, msg tea.Msg) (tui.Model, tea.Cmd) {
-	newM, cmd := m.Update(msg)
-	return newM.(tui.Model), cmd
+	return tuitest.Step(m, msg)
 }
 
 // chainViewContent returns the raw Content string from tui.Model.View().

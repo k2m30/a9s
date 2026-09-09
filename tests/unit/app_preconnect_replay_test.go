@@ -291,7 +291,7 @@ func TestPreConnectNavigate_ReplayDrain_ClearsLastFetchError(t *testing.T) {
 		{ID: "preconnect-bucket-1", Name: "preconnect-bucket-1", Type: "s3", Fields: map[string]string{"region": region}},
 		{ID: "preconnect-bucket-2", Name: "preconnect-bucket-2", Type: "s3", Fields: map[string]string{"region": region}},
 	}
-	ctrl.Handle(messages.ResourcesLoaded{
+	handlePage(ctrl, messages.ResourcesLoaded{
 		ResourceType: "s3",
 		Resources:    freshRows,
 		Gen:          core.AvailabilityGen(), Provenance: messages.FetchProvenanceCanonicalList,

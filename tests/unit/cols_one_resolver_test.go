@@ -236,7 +236,7 @@ func TestCols_IdentityColumnIsTheColumnThatShowsTheRowName(t *testing.T) {
 			ctrl.Apply(app.Action{Kind: app.ActionCommand, Arg: td.ShortName})
 
 			rows := colsDegradedRows(td.ShortName)
-			ctrl.Handle(messages.ResourcesLoaded{
+			handlePage(ctrl, messages.ResourcesLoaded{
 				ResourceType: td.ShortName,
 				Resources:    rows,
 				Provenance:   messages.FetchProvenanceCanonicalList,
@@ -300,7 +300,7 @@ func TestCols_SortingByTheIdentityColumnOrdersDegradedRowsByName(t *testing.T) {
 
 	rows := colsDegradedRows(shortName)
 	reversed := []resource.Resource{rows[1], rows[0]}
-	ctrl.Handle(messages.ResourcesLoaded{
+	handlePage(ctrl, messages.ResourcesLoaded{
 		ResourceType: shortName,
 		Resources:    reversed,
 		Provenance:   messages.FetchProvenanceCanonicalList,
@@ -435,7 +435,7 @@ func TestCols_SortingCloudTrailByTimeIsChronological(t *testing.T) {
 	ctrl := newTestController(t)
 	ctrl.SetViewConfig(colsLoadedViewConfig(t))
 	ctrl.Apply(app.Action{Kind: app.ActionCommand, Arg: shortName})
-	ctrl.Handle(messages.ResourcesLoaded{
+	handlePage(ctrl, messages.ResourcesLoaded{
 		ResourceType: shortName,
 		Resources:    rows,
 		Provenance:   messages.FetchProvenanceCanonicalList,

@@ -88,7 +88,7 @@ func views7AbsorbSpans(t *testing.T, n int) (held, total time.Duration) {
 	time.Sleep(5 * time.Millisecond)
 
 	start := time.Now()
-	_, _ = c.Handle(messages.ResourcesLoaded{
+	_, _ = handlePage(c, messages.ResourcesLoaded{
 		ResourceType: "ec2",
 		Resources:    rows,
 		Pagination:   &domain.PaginationMeta{IsTruncated: false},

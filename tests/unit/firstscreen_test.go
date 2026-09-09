@@ -306,7 +306,7 @@ func TestMenuOrigin_FailedListFetch_DoesNotVerify(t *testing.T) {
 		runtime.PatchMenuAvailability{ResourceType: "ec2", Count: 5, Origin: runtime.OriginCache},
 	})
 	c.Apply(app.Action{Kind: app.ActionCommand, Arg: "ec2"})
-	c.Handle(messages.ResourcesLoaded{
+	handlePage(c, messages.ResourcesLoaded{
 		ResourceType: "ec2",
 		Resources:    nil,
 		Err: &smithy.GenericAPIError{
@@ -359,7 +359,7 @@ func TestMenuOrigin_ListFetch_MarksTypeVerified(t *testing.T) {
 	}
 
 	c.Apply(app.Action{Kind: app.ActionCommand, Arg: "ec2"})
-	c.Handle(messages.ResourcesLoaded{
+	handlePage(c, messages.ResourcesLoaded{
 		ResourceType: "ec2",
 		Resources: []resource.Resource{
 			{ID: "i-0firstscreen001", Type: "ec2"},

@@ -79,7 +79,7 @@ func buildAvailSaveRaceController(t testing.TB, profile, region string) *app.Con
 			Findings:  []domain.Finding{{Code: "canary", Phrase: "canary", Severity: domain.SevBroken, Source: "wave1"}},
 		},
 	}
-	c.Handle(messages.ResourcesLoaded{Provenance: messages.FetchProvenanceCanonicalList,
+	handlePage(c, messages.ResourcesLoaded{Provenance: messages.FetchProvenanceCanonicalList,
 		ResourceType: availSaveRaceShortName,
 		Resources:    res,
 		Pagination:   &resource.PaginationMeta{IsTruncated: false},
@@ -207,7 +207,7 @@ func TestAvailSaveTempDirRace_HelperOrdering_MirrorsTTempDirLIFO(t *testing.T) {
 	t.Cleanup(c.Close)
 
 	c.Apply(app.Action{Kind: app.ActionCommand, Arg: availSaveRaceShortName})
-	c.Handle(messages.ResourcesLoaded{
+	handlePage(c, messages.ResourcesLoaded{
 		ResourceType: availSaveRaceShortName,
 		Resources: []resource.Resource{
 			{

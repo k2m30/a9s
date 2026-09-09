@@ -46,7 +46,7 @@ func TestPartialSuccessFetch_FullyLoadedList_TitlesWithoutPlus(t *testing.T) {
 	c := newTestController(t)
 	_, _ = c.Apply(app.Action{Kind: app.ActionCommand, Arg: "s3"})
 
-	_, _ = c.Handle(messages.ResourcesLoaded{
+	_, _ = handlePage(c, messages.ResourcesLoaded{
 		ResourceType: "s3",
 		Resources:    wipfixS3Rows(3),
 		Pagination:   &domain.PaginationMeta{IsTruncated: false, NextToken: ""},
@@ -86,7 +86,7 @@ func TestPartialSuccessFetch_TruncatedList_StillTitlesWithPlus(t *testing.T) {
 	c := newTestController(t)
 	_, _ = c.Apply(app.Action{Kind: app.ActionCommand, Arg: "s3"})
 
-	_, _ = c.Handle(messages.ResourcesLoaded{
+	_, _ = handlePage(c, messages.ResourcesLoaded{
 		ResourceType: "s3",
 		Resources:    wipfixS3Rows(3),
 		Pagination:   &domain.PaginationMeta{IsTruncated: true, NextToken: "page-2"},
@@ -118,7 +118,7 @@ func TestPartialSuccessFetch_NoPagination_TitlesWithoutPlus(t *testing.T) {
 	c := newTestController(t)
 	_, _ = c.Apply(app.Action{Kind: app.ActionCommand, Arg: "s3"})
 
-	_, _ = c.Handle(messages.ResourcesLoaded{
+	_, _ = handlePage(c, messages.ResourcesLoaded{
 		ResourceType: "s3",
 		Resources:    wipfixS3Rows(2),
 		Pagination:   nil,

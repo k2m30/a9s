@@ -217,7 +217,7 @@ func TestAllTypes_SilentSwap(t *testing.T) {
 				{ID: "alltypes-" + td.ShortName + "-fresh-2", Name: "alltypes-" + td.ShortName + "-fresh-2", Type: td.ShortName, Fields: map[string]string{"region": region}},
 				{ID: "alltypes-" + td.ShortName + "-fresh-3", Name: "alltypes-" + td.ShortName + "-fresh-3", Type: td.ShortName, Fields: map[string]string{"region": region}},
 			}
-			postSwap, _ := ctrl.Handle(messages.ResourcesLoaded{
+			postSwap, _ := handlePage(ctrl, messages.ResourcesLoaded{
 				ResourceType: td.ShortName,
 				Resources:    newRows, Provenance: messages.FetchProvenanceCanonicalList,
 			})

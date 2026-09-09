@@ -437,7 +437,7 @@ func TestApplyResourcesLoaded_PartialSuccessErr_InstallsCurrentFetchError(t *tes
 
 	partialErr := errors.New("partial: 1 of 3 IDs failed: throttled")
 	newRows := wave3LoadMoreResources(3, 100)
-	vs, _ := c.Handle(messages.ResourcesLoaded{
+	vs, _ := handlePage(c, messages.ResourcesLoaded{
 		ResourceType: "ec2",
 		Resources:    newRows,
 		Provenance:   messages.FetchProvenanceCanonicalList,

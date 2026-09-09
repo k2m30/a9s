@@ -122,7 +122,7 @@ func TestCostsSelfReview_C2_WebResourceJump_HeadlessReachesEC2Detail(t *testing.
 	// Deliver what the executor's KindFetchByIDDetail fetch produces on
 	// success (ExecuteTask returns messages.ResourcesLoaded for this task
 	// kind — runtime_adapter_related.go's own doc comment confirms this).
-	c.Handle(messages.ResourcesLoaded{
+	handlePage(c, messages.ResourcesLoaded{
 		ResourceType: "ec2",
 		Resources:    []resource.Resource{{ID: demoEC2InstanceID, Name: "web-prod-01", Fields: map[string]string{"instance_id": demoEC2InstanceID}}}, Provenance: messages.FetchProvenanceByID,
 	})

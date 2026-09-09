@@ -220,7 +220,7 @@ func TestRelatedCheckerCarry_ZeroInitialGrowsOnLoadMore(t *testing.T) {
 
 	// Page 1: two SGs, neither in vpc-target. Zero-initial carry must hide
 	// both immediately (nil filter != empty filter).
-	c.Handle(messages.ResourcesLoaded{ResourceType: "sg", Resources: []resource.Resource{
+	handlePage(c, messages.ResourcesLoaded{ResourceType: "sg", Resources: []resource.Resource{
 		wave3SG("sg-1", "vpc-other-1"),
 		wave3SG("sg-2", "vpc-other-2"),
 	}, Provenance: messages.FetchProvenanceCanonicalList})
@@ -230,7 +230,7 @@ func TestRelatedCheckerCarry_ZeroInitialGrowsOnLoadMore(t *testing.T) {
 	}
 
 	// Page 2 (load-more): one new match.
-	c.Handle(messages.ResourcesLoaded{ResourceType: "sg", Append: true, Resources: []resource.Resource{
+	handlePage(c, messages.ResourcesLoaded{ResourceType: "sg", Append: true, Resources: []resource.Resource{
 		wave3SG("sg-3", "vpc-target"),
 		wave3SG("sg-4", "vpc-other-3"),
 	}, Provenance: messages.FetchProvenanceCanonicalList})
@@ -243,7 +243,7 @@ func TestRelatedCheckerCarry_ZeroInitialGrowsOnLoadMore(t *testing.T) {
 	}
 
 	// Page 3 (load-more): two more matches — the set must grow, not reset.
-	c.Handle(messages.ResourcesLoaded{ResourceType: "sg", Append: true, Resources: []resource.Resource{
+	handlePage(c, messages.ResourcesLoaded{ResourceType: "sg", Append: true, Resources: []resource.Resource{
 		wave3SG("sg-5", "vpc-target"),
 		wave3SG("sg-6", "vpc-target"),
 	}, Provenance: messages.FetchProvenanceCanonicalList})
@@ -266,7 +266,7 @@ func TestRelatedCheckerCarry_NonTruncatedStillExtends(t *testing.T) {
 		t.Fatalf("precondition: RelatedIDSet size = %d, want 2", got)
 	}
 
-	c.Handle(messages.ResourcesLoaded{Provenance: messages.FetchProvenanceCanonicalList, ResourceType: "sg", Append: true, Resources: []resource.Resource{
+	handlePage(c, messages.ResourcesLoaded{Provenance: messages.FetchProvenanceCanonicalList, ResourceType: "sg", Append: true, Resources: []resource.Resource{
 		wave3SG("sg-c", "vpc-target"),
 	}})
 
@@ -298,7 +298,7 @@ func TestRelatedCheckerCarry_PreservesSortAfterMerge(t *testing.T) {
 
 	// Rows arrive in reverse-alpha order; if sort is re-applied after the
 	// merge, visible order must be alphabetical ascending regardless.
-	c.Handle(messages.ResourcesLoaded{ResourceType: "sg", Resources: []resource.Resource{
+	handlePage(c, messages.ResourcesLoaded{ResourceType: "sg", Resources: []resource.Resource{
 		wave3SG("sg-zeta", "vpc-target"),
 		wave3SG("sg-mu", "vpc-target"),
 		wave3SG("sg-alpha", "vpc-target"),
@@ -325,7 +325,7 @@ func TestRelatedCheckerCarry_NoChecker_Inert(t *testing.T) {
 	c.PatchListRelatedIDSet([]string{"i-1", "i-2"})
 	// No PatchListReapplyChecker call.
 
-	c.Handle(messages.ResourcesLoaded{Provenance: messages.FetchProvenanceCanonicalList, ResourceType: "ec2", Resources: []resource.Resource{
+	handlePage(c, messages.ResourcesLoaded{Provenance: messages.FetchProvenanceCanonicalList, ResourceType: "ec2", Resources: []resource.Resource{
 		{ID: "i-3", Name: "i-3", Type: "ec2", Fields: map[string]string{"instance_id": "i-3"}},
 	}})
 
@@ -483,6 +483,9 @@ func TestResourcesLoaded_DropsMismatchedType(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			c := openListController(t, tc.listShortName)
 
+			// Deliberately not handlePage: this page names a type the open screen is not,
+			// so it belongs to no screen and is delivered exactly as it is — stamping it
+			// for the screen on top is the guess the identity exists to remove.
 			c.Handle(messages.ResourcesLoaded{Provenance: messages.FetchProvenanceCanonicalList,
 				ResourceType: tc.staleType,
 				Resources: []resource.Resource{
@@ -515,7 +518,7 @@ func TestResourcesLoaded_AppliesMatchingType(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			c := openListController(t, tc.listShortName)
 
-			c.Handle(messages.ResourcesLoaded{
+			handlePage(c, messages.ResourcesLoaded{
 				ResourceType: tc.msgType,
 				Resources: []resource.Resource{
 					{ID: "res-a", Name: "res-a", Fields: map[string]string{"id": "res-a"}},
