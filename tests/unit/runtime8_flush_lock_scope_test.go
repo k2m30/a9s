@@ -1,7 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
 
-//go:build cacheencodehook
-
 // runtime8_flush_lock_scope_test.go — no reader waits on a lock the flush
 // holds across the encode.
 //
@@ -10,10 +8,6 @@
 // held at all, from one garbage-collection assist charged to whichever
 // goroutine allocates next. A latency bound cannot separate that from a lock,
 // so this states the property directly and has no clock in it.
-//
-// BUILD TAG: this file needs cache.SetEncodeHookForTest, a test-only seam
-// core/cache does not have yet. Landing that seam and deleting the tag line
-// above are one job — the file is inert until both happen.
 //
 // Failure mode: if a lock IS held across the encode, the two calls below never
 // return and the test binary's own timeout prints the goroutine dump naming

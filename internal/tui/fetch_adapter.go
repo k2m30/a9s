@@ -31,6 +31,70 @@ type profilesLoadedMsg struct {
 	profiles []string
 }
 
+// fetchOutcome is the one place a fetch's two possible answers are built. A
+// failure is the other outcome of the same request, so it is routed and
+// ordered by the same facts its paired success would have carried: the screen
+// that asked, the sequence that says which request this is, and the lane the
+// delivery gate matches on. Two hand-built literals per call site let those
+// drift, and they did — a failed page named no screen, so it was applied to
+// whichever list of its type was topmost, and carried no sequence, so a
+// failure a later refresh had already superseded could never be recognised as
+// stale.
+type fetchOutcome struct {
+	resourceType string
+	gen          domain.Gen
+	seq          domain.Gen
+	screen       domain.Gen
+	lane         messages.FetchProvenance
+	appendPage   bool
+	loadingMore  bool
+}
+
+// msg turns a fetcher's return into the message the request answers with.
+//
+// Partial-success contract: fetchers may return BOTH a non-empty
+// result.Resources AND a composite error. When that happens the error is
+// surfaced AND the partial Resources kept; a hard failure (no resources at
+// all) routes through APIError.
+func (o fetchOutcome) msg(res resource.FetchResult, err error) tea.Msg {
+	if err != nil && len(res.Resources) == 0 {
+		return messages.APIError{
+			ResourceType: o.resourceType,
+			Err:          err,
+			Gen:          o.gen,
+			ListSeq:      o.seq,
+			ScreenID:     o.screen,
+			Append:       o.appendPage,
+			LoadingMore:  o.loadingMore,
+			Provenance:   o.lane,
+		}
+	}
+	return messages.ResourcesLoaded{
+		ResourceType: o.resourceType,
+		Resources:    res.Resources,
+		Pagination:   res.Pagination,
+		Append:       o.appendPage,
+		LoadingMore:  o.loadingMore,
+		Err:          err,
+		Gen:          o.gen,
+		ListSeq:      o.seq,
+		ScreenID:     o.screen,
+		Provenance:   o.lane,
+	}
+}
+
+// listFetchIdentity resolves the screen a list fetch is issued by and the
+// sequence that orders it against that screen's other requests. A fetch with
+// no list screen on top draws none — there is nothing for it to be ordered
+// against.
+func (m *Model) listFetchIdentity() (screen, seq domain.Gen) {
+	screen = m.ctrl.GetListInstance()
+	if screen == 0 {
+		return 0, 0
+	}
+	return screen, m.core.NextListFetchSeq(screen)
+}
+
 // fetchResources returns a tea.Cmd that calls Core.FetchResources and
 // converts the result to ResourcesLoaded or APIError.
 // gen is the AvailabilityGen captured at dispatch time; it is stamped onto the
@@ -41,37 +105,14 @@ type profilesLoadedMsg struct {
 // list open. It decides which screen the delivery gate will accept this result
 // on.
 //
-// The sequence is drawn for the screen that issued the fetch, and every lane
-// draws one: the guard is keyed by the screen instance, so a drill's refresh
-// orders the drill's own requests and reaches no other screen. A fetch with no
-// list screen on top draws none — there is nothing for it to be ordered
-// against.
+// Every lane draws a sequence: the guard is keyed by the screen instance, so a
+// drill's refresh orders the drill's own requests and reaches no other screen.
 func (m *Model) fetchResources(resourceType string, gen domain.Gen, lane messages.FetchProvenance) tea.Cmd {
 	ctx, clients := m.appCtx, m.core.Clients()
-	screen := m.ctrl.GetListInstance()
-	var seq domain.Gen
-	if screen != 0 {
-		seq = m.core.NextListFetchSeq(screen)
-	}
+	screen, seq := m.listFetchIdentity()
+	out := fetchOutcome{resourceType: resourceType, gen: gen, seq: seq, screen: screen, lane: lane}
 	return func() tea.Msg {
-		res, err := m.core.FetchResources(ctx, clients, resourceType)
-		// Partial-success contract: fetchers may return BOTH a non-empty
-		// result.Resources AND a composite error. When that happens we
-		// surface the error AND keep the partial Resources; hard failures
-		// (no resources at all) route through APIError.
-		if err != nil && len(res.Resources) == 0 {
-			return messages.APIError{ResourceType: resourceType, Err: err, Gen: gen, Provenance: lane}
-		}
-		return messages.ResourcesLoaded{
-			ResourceType: resourceType,
-			Resources:    res.Resources,
-			Pagination:   res.Pagination,
-			Err:          err,
-			Gen:          gen,
-			ListSeq:      seq,
-			ScreenID:     screen,
-			Provenance:   lane,
-		}
+		return out.msg(m.core.FetchResources(ctx, clients, resourceType))
 	}
 }
 
@@ -79,19 +120,9 @@ func (m *Model) fetchResources(resourceType string, gen domain.Gen, lane message
 // gen is the AvailabilityGen captured at dispatch time.
 func (m *Model) fetchResourcesFiltered(resourceType string, filter map[string]string, gen domain.Gen) tea.Cmd {
 	ctx, clients := m.appCtx, m.core.Clients()
+	out := fetchOutcome{resourceType: resourceType, gen: gen, lane: messages.FetchProvenanceFilteredList}
 	return func() tea.Msg {
-		res, err := m.core.FetchResourcesFiltered(ctx, clients, resourceType, filter)
-		if err != nil && len(res.Resources) == 0 {
-			return messages.APIError{ResourceType: resourceType, Err: err, Gen: gen, Provenance: messages.FetchProvenanceFilteredList}
-		}
-		return messages.ResourcesLoaded{
-			ResourceType: resourceType,
-			Resources:    res.Resources,
-			Pagination:   res.Pagination,
-			Err:          err,
-			Gen:          gen,
-			Provenance:   messages.FetchProvenanceFilteredList,
-		}
+		return out.msg(m.core.FetchResourcesFiltered(ctx, clients, resourceType, filter))
 	}
 }
 
@@ -137,19 +168,9 @@ func (m *Model) fetchByIDDetail(targetType, id string) tea.Cmd {
 func (m *Model) fetchChildResources(childType string, parentCtx map[string]string) tea.Cmd {
 	ctx, clients := m.appCtx, m.core.Clients()
 	gen := m.core.AvailabilityGen()
+	out := fetchOutcome{resourceType: childType, gen: gen, lane: messages.FetchProvenanceChild}
 	return func() tea.Msg {
-		res, err := m.core.FetchChildResources(ctx, clients, childType, parentCtx)
-		if err != nil && len(res.Resources) == 0 {
-			return messages.APIError{ResourceType: childType, Err: err, Gen: gen, Provenance: messages.FetchProvenanceChild}
-		}
-		return messages.ResourcesLoaded{
-			ResourceType: childType,
-			Resources:    res.Resources,
-			Pagination:   res.Pagination,
-			Err:          err,
-			Gen:          gen,
-			Provenance:   messages.FetchProvenanceChild,
-		}
+		return out.msg(m.core.FetchChildResources(ctx, clients, childType, parentCtx))
 	}
 }
 
@@ -171,28 +192,13 @@ func (m *Model) fetchMoreResources(msg messages.LoadMore) tea.Cmd {
 	if provenance == messages.FetchProvenanceUnknown {
 		provenance = messages.ProvenanceForContinuation(msg.ParentContext, msg.FetchFilter)
 	}
-	screen := m.ctrl.GetListInstance()
-	var seq domain.Gen
-	if screen != 0 {
-		seq = m.core.NextListFetchSeq(screen)
+	screen, seq := m.listFetchIdentity()
+	out := fetchOutcome{
+		resourceType: msg.ResourceType, gen: gen, seq: seq, screen: screen,
+		lane: provenance, appendPage: true, loadingMore: true,
 	}
 	return func() tea.Msg {
-		res, err := m.core.FetchMoreResources(ctx, clients, p)
-		if err != nil && len(res.Resources) == 0 {
-			return messages.APIError{ResourceType: msg.ResourceType, Err: err, Gen: gen, Append: true, LoadingMore: true, Provenance: provenance}
-		}
-		return messages.ResourcesLoaded{
-			ResourceType: msg.ResourceType,
-			Resources:    res.Resources,
-			Pagination:   res.Pagination,
-			Append:       true,
-			LoadingMore:  true,
-			Err:          err,
-			Gen:          gen,
-			ListSeq:      seq,
-			ScreenID:     screen,
-			Provenance:   provenance,
-		}
+		return out.msg(m.core.FetchMoreResources(ctx, clients, p))
 	}
 }
 

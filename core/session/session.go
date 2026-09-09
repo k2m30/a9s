@@ -837,6 +837,17 @@ func (s *Session) ListFetchSeqNext(screen domain.Gen) domain.Gen {
 	return s.listFetchSeq[screen]
 }
 
+// ListFetchSeqForget drops screen's counter. A screen instance is never
+// reused, so once the screen is gone its entry answers nothing: no request of
+// its can still land, because the screen the answer would go to is not there.
+// Without this the map grows by one entry for every list screen the operator
+// ever opens.
+func (s *Session) ListFetchSeqForget(screen domain.Gen) {
+	s.listFetchSeqMu.Lock()
+	defer s.listFetchSeqMu.Unlock()
+	delete(s.listFetchSeq, screen)
+}
+
 // ListFetchSeqLatest returns the value ListFetchSeqNext last handed out to
 // screen, or zero when that screen has dispatched no list fetch.
 func (s *Session) ListFetchSeqLatest(screen domain.Gen) domain.Gen {

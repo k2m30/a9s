@@ -112,6 +112,12 @@ func (c *Core) NextListFetchSeq(screen domain.Gen) domain.Gen {
 	return c.session.ListFetchSeqNext(screen)
 }
 
+// ForgetListFetchSeq drops screen's list fetch counter, for a list screen
+// leaving the stack.
+func (c *Core) ForgetListFetchSeq(screen domain.Gen) {
+	c.session.ListFetchSeqForget(screen)
+}
+
 // LatestListFetchSeq returns the newest list fetch sequence handed out to
 // screen — the only value the apply point accepts from it.
 func (c *Core) LatestListFetchSeq(screen domain.Gen) domain.Gen {

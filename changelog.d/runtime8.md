@@ -4,6 +4,8 @@
 - A drill and the list it was opened from now order their own refreshes separately. They shared one counter, so each superseded the other's requests and a refreshed drill could revert to the rows the refresh replaced.
 - A child list is drawn from the same resource definition as the rest of its screen: it shows its own title instead of an internal short name, and a finding on a child row now colours it.
 - The main menu no longer stalls behind a cache write. A large type file was encoded while holding a lock the screen needs, so one key press per write waited out the whole encode.
+- A failed page now reaches the list that asked for it. It carried neither the screen nor the request number its successful twin carried, so it was applied to whichever list of that type was on top and a failure a later refresh had already replaced could not be recognised as stale.
+- An ECS task whose definition came back without its definition now says which call answered short, instead of reporting "no reason given" about a call a9s can name.
 - `--demo` no longer forces the disk cache off. The demo now runs the same cache-load-then-background-sweep path an installation runs, which is how the menu's issue badges are written.
 
 ## Removed

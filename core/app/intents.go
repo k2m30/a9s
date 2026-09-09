@@ -59,6 +59,7 @@ func (c *Controller) applyIntentsLocked(intents []runtime.UIIntent) {
 			// (app_stack.go), which refuses to pop the last screen. Popping to an
 			// empty stack would blank the app to BodyKindUnknown.
 			if len(c.stack) > 1 {
+				c.forgetListFetchSeqOf(c.stack[len(c.stack)-1])
 				c.stack = c.stack[:len(c.stack)-1]
 			}
 
@@ -66,6 +67,7 @@ func (c *Controller) applyIntentsLocked(intents []runtime.UIIntent) {
 			if len(c.stack) == 0 {
 				c.stack = append(c.stack, Screen{ID: v.ID, Ctx: v.Context})
 			} else {
+				c.forgetListFetchSeqOf(c.stack[len(c.stack)-1])
 				c.stack[len(c.stack)-1] = Screen{ID: v.ID, Ctx: v.Context}
 			}
 
@@ -386,4 +388,15 @@ func (c *Controller) refreshTasksForIntents(intents []runtime.UIIntent) []runtim
 		}
 	}
 	return nil
+}
+
+// forgetListFetchSeqOf drops the ordering counter of a list screen leaving the
+// stack. The counter is keyed by the screen instance and instances are never
+// reused, so an entry outlives the only thing that could ever read it; every
+// drill an operator opens and closes would otherwise leave one behind for the
+// session. A screen with no list state has none to drop.
+func (c *Controller) forgetListFetchSeqOf(s Screen) {
+	if s.State.List != nil && s.State.List.instance != 0 {
+		c.core.ForgetListFetchSeq(s.State.List.instance)
+	}
 }

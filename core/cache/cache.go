@@ -21,6 +21,7 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"gopkg.in/yaml.v3"
@@ -467,6 +468,9 @@ func (wp WritePlan) commit() error {
 		return fmt.Errorf("creating cache temp file in %s: %w", wp.dir, err)
 	}
 	tmpPath := tmpFile.Name()
+	if h := encodeHookForTest.Load(); h != nil {
+		(*h)()
+	}
 	// The copy guards the encode against a concurrent mutation of the live
 	// Fields maps a Row commonly aliases, which is a hazard for exactly as long
 	// as the encode reads them — so it belongs immediately before the encode
@@ -503,6 +507,21 @@ func (wp WritePlan) commit() error {
 		return fmt.Errorf("renaming cache %s: %w", wp.path, err)
 	}
 	return nil
+}
+
+// encodeHookForTest runs at the start of every WritePlan encode when set.
+// atomic.Pointer rather than a plain func var because the writer is a test
+// goroutine and the reader is the flush goroutine.
+var encodeHookForTest atomic.Pointer[func()]
+
+// SetEncodeHookForTest installs fn to run at the start of every WritePlan
+// encode and returns a func that puts back whatever was there before. It is
+// the seam the flush's lock scope is pinned through: a test parks the encode
+// here and drives a reader, which cannot return if a lock is held across it.
+func SetEncodeHookForTest(fn func()) func() {
+	prev := encodeHookForTest.Load()
+	encodeHookForTest.Store(&fn)
+	return func() { encodeHookForTest.Store(prev) }
 }
 
 // PrepareSave is SaveType's non-I/O half: it validates shortName, takes

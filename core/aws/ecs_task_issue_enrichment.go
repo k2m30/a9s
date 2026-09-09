@@ -202,9 +202,19 @@ func ecsTaskDefinitionPosture(ctx context.Context, clients *ServiceClients, resu
 		})
 		mu.Lock()
 		defer mu.Unlock()
-		if err != nil || out == nil || out.TaskDefinition == nil {
+		if err != nil {
 			for _, taskID := range tasksByDef[defARN] {
 				MarkSkipped(result, taskID, &failures, err)
+			}
+			return
+		}
+		// The service answered and the answer carries no definition. There is
+		// no error to read a cause off, so a9s states one: handing this arm a
+		// nil error left every task on the definition marked with no reason
+		// and the aggregate saying "no reason given" about a call a9s can name.
+		if out == nil || out.TaskDefinition == nil {
+			for _, taskID := range tasksByDef[defARN] {
+				MarkUnusable(result, taskID, &failures, "DescribeTaskDefinition returned no task definition")
 			}
 			return
 		}
