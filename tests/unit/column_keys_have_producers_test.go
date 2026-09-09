@@ -1,11 +1,16 @@
 package unit
 
-// column_keys_have_producers_test.go — systemic contract: every column key in
-// every ResourceTypeDef must have a registered producer (fetcher or enricher).
+// column_keys_have_producers_test.go — the one gate over one property: every
+// column names where its cell comes from, and a named Fields key has something
+// that writes it.
 //
-// TestColumnKeysHaveProducers walks all registered ResourceTypeDef entries and
-// checks that each column's Key is present in GetAllFieldKeys (the union of the
-// fetcher field-key registry and the enricher field-key registry).
+// It was two gates. column_key_mismatch_test.go walked the catalog's columns
+// and this file walked the built-in views' columns, checking the same keys
+// against the same registry, reading the same allowlist, and reporting a
+// failure in two different sentences. The two lists are one list now
+// (TestDefaultConfigColumnsAreTheCatalogs), so the second walk could only ever
+// repeat the first: the columns a type declares ARE the columns its view
+// renders, for every parent type and every child type (w197 row 12).
 //
 // TestEnricherFieldKeys_RegisterCallsAreInInitBlock is a stringy smoke test that
 // globs core/aws/*_issue_enrichment.go to verify the coder actually wired up
@@ -98,6 +103,10 @@ func TestColumnKeysHaveProducers(t *testing.T) {
 			producerSet := make(map[string]bool, len(allKeys))
 			for _, k := range allKeys {
 				producerSet[k] = true
+			}
+			if len(view.List) > 0 && allKeys == nil && resource.FindResourceType(shortName) != nil {
+				t.Errorf("no field keys registered for type %q — add SetFieldKeysForTest in the "+
+					"fetcher's init, or the columns below have nothing that could fill them", shortName)
 			}
 
 			columnSet := make(map[string]bool, len(view.List))
@@ -202,5 +211,29 @@ func TestEnricherFieldKeys_RegisterCallsAreInInitBlock(t *testing.T) {
 				"owning catalog.ResourceTypeDef literal's IssueEnricherFieldKeys field",
 			total, needle, minExpected,
 		)
+	}
+}
+
+// TestProducerAllowlistCarriesNoLifecycleKeyEntry pins the other half of row
+// 11. Fifteen entries in one allowlist sharing one justification is one rule
+// written fifteen times: the next type with a findings-filled status column
+// adds a sixteenth, and the day one of the fifteen gains a real producer
+// nobody removes its line.
+//
+// A status column whose key is the type's lifecycle key needs no per-type
+// exemption at all — the rule is the shape, and the gate can say it once.
+func TestProducerAllowlistCarriesNoLifecycleKeyEntry(t *testing.T) {
+	for _, td := range resource.AllResourceTypes() {
+		lifecycleKey := td.LifecycleKey
+		if lifecycleKey == "" {
+			lifecycleKey = "state"
+		}
+		for key := range columnKeyProducerAllowlist[td.ShortName] {
+			if key == lifecycleKey || key == "status" {
+				t.Errorf("the producers allowlist exempts %s/%q by name, which is the type's lifecycle "+
+					"key — a status column filled from findings is one rule about a shape, not fifteen "+
+					"entries about fifteen types", td.ShortName, key)
+			}
+		}
 	}
 }
