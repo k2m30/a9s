@@ -356,13 +356,14 @@ const (
 	// CFNoRootObject is the distribution with no default root object.
 	CFNoRootObject = "E4D5E6F7G8H9I0"
 
-	// CFS3OriginNoOAC is the distribution whose S3 origin has neither an
-	// origin access control nor a legacy origin access identity.
-	CFS3OriginNoOAC = "E7G8H9I0J1K2L3"
+	// CFS3OriginNoOAC is the distribution whose REST-endpoint S3 origin has
+	// neither an origin access control nor a legacy origin access identity;
+	// it is the no-root-object row as well.
+	CFS3OriginNoOAC = CFNoRootObject
 
 	// CFDefaultCert is the distribution serving custom aliases with the
 	// default CloudFront certificate.
-	CFDefaultCert = CFS3OriginNoOAC
+	CFDefaultCert = CFS3WebsiteOrigin
 
 	// CFNoGeoRestriction is the distribution with no geographic restriction.
 	CFNoGeoRestriction = "E6F7G8H9I0J1K2"
@@ -371,9 +372,9 @@ const (
 	// endpoint over http-only. It must carry NO insecure-protocol finding:
 	// that endpoint serves HTTP alone, so http-only is the only policy it
 	// accepts and there is nothing for an operator to change. It is the
-	// no-origin-access-control row as well, because a website endpoint is
-	// exactly the origin that cannot have one.
-	CFS3WebsiteOrigin = CFS3OriginNoOAC
+	// row with no origin access control that carries no finding for it,
+	// because a website endpoint is exactly the origin that cannot have one.
+	CFS3WebsiteOrigin = "E7G8H9I0J1K2L3"
 
 	// CFS3WebsiteOriginDomain is that origin's domain: the regional website
 	// endpoint of the same bucket, which is a different hostname from the
@@ -438,7 +439,7 @@ func cfDistributionConfigs() map[string]*cftypes.DistributionConfig {
 		CFNoRootObject:        cfHealthyConfig("s3-media", "ml-training-data.s3.amazonaws.com", "media.acme-corp.com"),
 		CFLoggingOff:          cfHealthyConfig("alb-old-api", "old-api.acme-corp.com", "old.acme-corp.com"),
 		CFNoGeoRestriction:    cfHealthyConfig("s3-demo-healthy", HealthyBucketName+".s3.us-east-1.amazonaws.com", "demo.acme-corp.com"),
-		CFS3OriginNoOAC:       cfHealthyConfig("s3-nopab", "a9s-demo-nopab.s3.amazonaws.com", "pab.acme-corp.com"),
+		CFS3WebsiteOrigin:     cfHealthyConfig("s3-nopab", "a9s-demo-nopab.s3.amazonaws.com", "pab.acme-corp.com"),
 		CFOriginBucketMissing: cfHealthyConfig("s3-new-launch", CFOriginBucketMissingDomain, "new-launch.acme-corp.com"),
 		CFCrossAccountOrigin:  cfHealthyConfig("s3-partner-shared", CFCrossAccountOriginDomain, "partner.acme-corp.com"),
 	}
@@ -461,21 +462,25 @@ func cfDistributionConfigs() map[string]*cftypes.DistributionConfig {
 	// The distribution keeps its insecure viewer policy from the summary.
 	cfgs[CFLoggingOff].DefaultCacheBehavior.ViewerProtocolPolicy = cftypes.ViewerProtocolPolicyAllowAll
 	cfgs[CFNoGeoRestriction].Restrictions.GeoRestriction.RestrictionType = cftypes.GeoRestrictionTypeNone
-	// CFS3OriginNoOAC also carries the default-certificate witness: the two
-	// conditions are independent and this row demonstrates both.
 	cfgs[CFS3OriginNoOAC].Origins.Items[0].OriginAccessControlId = aws.String("")
 	cfgs[CFS3OriginNoOAC].Origins.Items[0].S3OriginConfig = &cftypes.S3OriginConfig{OriginAccessIdentity: aws.String("")}
+	// The website-endpoint row has no access control either, which is the
+	// only shape that endpoint can take, so it must carry no finding for it.
+	// It also carries the default-certificate witness; the two conditions
+	// are independent.
+	cfgs[CFS3WebsiteOrigin].Origins.Items[0].OriginAccessControlId = aws.String("")
+	cfgs[CFS3WebsiteOrigin].Origins.Items[0].S3OriginConfig = &cftypes.S3OriginConfig{OriginAccessIdentity: aws.String("")}
 	// It reaches that bucket through the S3 website endpoint, which serves
 	// HTTP alone, so http-only is the only origin protocol policy CloudFront
 	// accepts for it and the insecure-protocol finding must not fire. The
 	// ordinary custom origin on CFLoggingOff is the row that trips it.
-	cfgs[CFS3OriginNoOAC].Origins.Items[0].DomainName = aws.String(CFS3WebsiteOriginDomain)
-	cfgs[CFS3OriginNoOAC].Origins.Items[0].CustomOriginConfig = &cftypes.CustomOriginConfig{
+	cfgs[CFS3WebsiteOrigin].Origins.Items[0].DomainName = aws.String(CFS3WebsiteOriginDomain)
+	cfgs[CFS3WebsiteOrigin].Origins.Items[0].CustomOriginConfig = &cftypes.CustomOriginConfig{
 		HTTPPort:             aws.Int32(80),
 		HTTPSPort:            aws.Int32(443),
 		OriginProtocolPolicy: cftypes.OriginProtocolPolicyHttpOnly,
 	}
-	cfgs[CFS3OriginNoOAC].ViewerCertificate = &cftypes.ViewerCertificate{CloudFrontDefaultCertificate: aws.Bool(true)}
+	cfgs[CFS3WebsiteOrigin].ViewerCertificate = &cftypes.ViewerCertificate{CloudFrontDefaultCertificate: aws.Bool(true)}
 
 	// Lambda@Edge association on the healthy distribution, for checkCfLambda.
 	cfgs["E1A2B3C4D5E6F7"].DefaultCacheBehavior.LambdaFunctionAssociations = &cftypes.LambdaFunctionAssociations{

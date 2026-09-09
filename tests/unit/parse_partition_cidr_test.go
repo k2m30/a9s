@@ -349,7 +349,10 @@ func TestCloudFrontS3Origin_DottedAndChinaOriginsReachBothChecks(t *testing.T) {
 		{name: "dotted bucket that exists, no origin access control", host: "my.bucket.s3.us-east-1.amazonaws.com", wantNoOAC: true},
 		{name: "China bucket that exists, no origin access control", host: "acme-cn.s3.cn-north-1.amazonaws.com.cn", wantNoOAC: true},
 		{name: "dualstack bucket that exists, no origin access control", host: "acme-dual.s3.dualstack.us-east-1.amazonaws.com", wantNoOAC: true},
-		{name: "website bucket that exists, no origin access control", host: "acme-site.s3-website-us-east-1.amazonaws.com", wantNoOAC: true},
+		// Inverted on 2026-09-09: a website endpoint takes neither an origin
+		// access control nor an identity, so their absence is not a finding
+		// there. The pre-inversion expectation was the defect.
+		{name: "website bucket that exists, no origin access control", host: "acme-site.s3-website-us-east-1.amazonaws.com", wantNoOAC: false},
 		{name: "dotted bucket that does not exist", host: "gone.away.s3.us-east-1.amazonaws.com", oac: true, wantMissing: true},
 		{name: "China bucket that does not exist", host: "gone-cn.s3.cn-north-1.amazonaws.com.cn", oac: true, wantMissing: true},
 		{name: "bucket that exists behind an origin access control", host: "acme-ok.s3.us-east-1.amazonaws.com", oac: true},

@@ -118,9 +118,12 @@ func cfConfigFindings(ctx context.Context, result *IssueEnricherResult, distID s
 		}
 		// An origin access identity is deprecated, not absent: a distribution
 		// already restricting its bucket through one is not exposed.
+		// A website endpoint takes neither: it is public by construction and
+		// has no private form for an access control to protect, so its
+		// absence there is not a gap the operator can close.
 		hasOAC := aws.ToString(origin.OriginAccessControlId) != ""
 		hasOAI := origin.S3OriginConfig != nil && aws.ToString(origin.S3OriginConfig.OriginAccessIdentity) != ""
-		if !hasOAC && !hasOAI {
+		if !hasOAC && !hasOAI && !isS3WebsiteEndpoint(domainName) {
 			emit(CodeCFS3OriginNoOAC,
 				domain.DetailRow{Label: "Origin", Value: domainName, Tier: "~"})
 		}
