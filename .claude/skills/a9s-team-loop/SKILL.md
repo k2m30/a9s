@@ -132,7 +132,7 @@ The orchestrator dispatches, integrates, and writes nothing else — with one fa
 3. Cherry-pick the branch onto a landing branch cut from `main` in a clean worktree; resolve conflicts there; if the branch was cut with WIP present, reverse-apply every WIP hunk and diff the result against the WIP file list.
 4. On the landing tree: `go vet ./...`, `make test`, `make lint` (retry once on the cross-worktree lock), `make check-catalogen`, `make mdlint`, `make security`.
 5. Fast-forward `main`; if the primary checkout has uncommitted work on a file the branch touches, set that file aside (`git diff` to a file, `git checkout --`), fast-forward, restore with `git apply --3way`, unstage, and confirm the primary tree still builds.
-6. Delete the batch branch and worktree.
+6. Delete the batch branch and worktree, and stop the task's QA, dev and facilitator agents (`TaskStop` by name); only the shared acceptance agent outlives a task.
 7. `graphify update .` on the fast-forwarded main tip, so the graph every dispatch is told to query describes the tree the next task starts from.
 
 ## Ending a round
