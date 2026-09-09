@@ -750,6 +750,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   itself, a VPC covered by a flow log on its subnet, a distribution in front of
   an S3 website endpoint, and a task Spot reclaimed, none of which is flagged,
   beside the rows that still are.
+- An EC2 instance whose status checks report nothing now reads "status unknown: checks not reporting" instead of ending in the raw API token.
+- A CloudFront distribution reaching an S3 website endpoint no longer carries a finding for a missing origin access control, which that endpoint cannot have.
+- When a task definition cannot be read, the ECS task row says DescribeTaskDefinition failed, not DescribeTasks; the same holds for an inline group-policy listing behind a policy lookup.
 
 ### Added
 
