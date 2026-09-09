@@ -162,7 +162,10 @@ func TestViewStatePurity_List_StatusCellFollowsCellsNotFindingsPhrase(t *testing
 	// this case is about WHICH string reaches the cell, and the decoy
 	// assertion below is what pins that.
 	columns := purityColumns()
-	columns[1].Width = len(bakedPhrase) + 1
+	// Wide enough for the DECOY, not just the baked phrase: a column that
+	// truncates the decoy would take the string this case is looking for off
+	// the screen and pass however the renderer behaved.
+	columns[1].Width = max(len(bakedPhrase), len(findingsPhrase)) + 1
 
 	body := app.ListBody{
 		Columns:     columns,

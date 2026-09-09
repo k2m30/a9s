@@ -139,34 +139,50 @@ func TestSearchHighlight_LandsOnTheMatchAfterADoubleWidthRune(t *testing.T) {
 }
 
 // TestSearchHighlight_PaintsTheBodysMatchSetAndComputesNone pins the shape of
-// row 2: the match set is computed once, by the controller, and the terminal
-// paints the set it is handed. A renderer that computes its own would find the
-// second occurrence on this line, which the body deliberately does not carry.
+// row 2 on both text lanes: the match set is computed once, by the controller,
+// and the terminal paints the set it is handed. A renderer that computes its
+// own would find the second occurrence on this line, which the body
+// deliberately does not carry.
 func TestSearchHighlight_PaintsTheBodysMatchSetAndComputesNone(t *testing.T) {
 	const line = "Tags: env=production, role=production"
-	c := newTextScreenController(runtime.ScreenYAML, []string{line})
-	c.Apply(app.Action{Kind: app.ActionSearch, Arg: tui6WideQuery})
-	body := c.Snapshot().Body.Text
-	if body == nil {
-		t.Fatal("no text body on the snapshot")
-	}
-	if len(body.SearchMatches) != 2 {
-		t.Fatalf("the fixture line must hold 2 occurrences, the body published %d", len(body.SearchMatches))
-	}
+	for _, lane := range []struct {
+		name   string
+		screen runtime.ScreenID
+		render func(vp viewport.Model, body app.TextBody) string
+	}{
+		{"yaml", runtime.ScreenYAML, func(vp viewport.Model, body app.TextBody) string {
+			m := views.NewTransientYAML(80, 6, vp)
+			return m.RenderText(body)
+		}},
+		{"json", runtime.ScreenJSON, func(vp viewport.Model, body app.TextBody) string {
+			m := views.NewTransientJSON(80, 6, vp)
+			return m.RenderText(body)
+		}},
+	} {
+		t.Run(lane.name, func(t *testing.T) {
+			c := newTextScreenController(lane.screen, []string{line})
+			c.Apply(app.Action{Kind: app.ActionSearch, Arg: tui6WideQuery})
+			body := c.Snapshot().Body.Text
+			if body == nil {
+				t.Fatal("no text body on the snapshot")
+			}
+			if len(body.SearchMatches) != 2 {
+				t.Fatalf("the fixture line must hold 2 occurrences, the body published %d", len(body.SearchMatches))
+			}
 
-	// Hand the renderer a body that names only the first occurrence.
-	body.SearchMatches = body.SearchMatches[:1]
+			// Hand the renderer a body that names only the first occurrence.
+			body.SearchMatches = body.SearchMatches[:1]
 
-	vp := viewport.New(viewport.WithWidth(80), viewport.WithHeight(6))
-	m := views.NewTransientYAML(80, 6, vp)
-	out := m.RenderText(*body)
+			out := lane.render(viewport.New(viewport.WithWidth(80), viewport.WithHeight(6)), *body)
 
-	current := styles.SearchCurrentStyle.Render(tui6WideQuery)
-	if n := strings.Count(out, current); n != 1 {
-		t.Errorf("the body named 1 match; the screen paints %d highlighted runs of %q", n, tui6WideQuery)
-	}
-	if other := styles.SearchOtherStyle.Render(tui6WideQuery); strings.Contains(out, other) {
-		t.Errorf("the screen highlights an occurrence the body did not name, so the renderer computed a match set of its own:\n%q", out)
+			current := styles.SearchCurrentStyle.Render(tui6WideQuery)
+			if n := strings.Count(out, current); n != 1 {
+				t.Errorf("the body named 1 match; the screen paints %d highlighted runs of %q", n, tui6WideQuery)
+			}
+			if other := styles.SearchOtherStyle.Render(tui6WideQuery); strings.Contains(out, other) {
+				t.Errorf("the screen highlights an occurrence the body did not name, so the renderer computed a match set of its own:\n%q", out)
+			}
+		})
 	}
 }
 

@@ -404,3 +404,56 @@ func TestHostileAWSString_ErrorHistoryIsInert(t *testing.T) {
 		t.Fatalf("the failure is not in the error history: %q", lines)
 	}
 }
+
+// TestHostileAWSString_C1SequenceIsStrippedWhole pins row 6 beside the ESC
+// pins: a sequence opened by a C1 control loses the control and its payload
+// together. U+009B is the single-character CSI, so "31m" after it is a
+// payload, not text; removing only the introducer would leave "31m" on the
+// screen as a word the operator never wrote.
+//
+// Both spellings are pinned. A terminal in 8-bit mode obeys the raw byte, and
+// a value carrying it is not valid UTF-8, so it decodes as a replacement rune
+// rather than as the control — a boundary that only looks at decoded runes
+// passes it through untouched.
+func TestHostileAWSString_C1SequenceIsStrippedWhole(t *testing.T) {
+	for _, tc := range []struct {
+		spelling string
+		value    string
+	}{
+		{"utf-8 U+009B", "web\u009b31m-prod"},
+		{"raw 8-bit 0x9b", "web\x9b31m-prod"},
+	} {
+		t.Run(tc.spelling, func(t *testing.T) {
+			c := newTestController(t)
+			c.Apply(app.Action{Kind: app.ActionCommand, Arg: "ec2"})
+			c.ApplyResourcesLoaded("ec2", []resource.Resource{{
+				ID: "i-0123456789abcdef0", Name: tc.value, Type: "ec2",
+				Fields: map[string]string{
+					"instance_id": "i-0123456789abcdef0",
+					"name":        tc.value,
+					"state":       "running",
+				},
+			}}, nil, false)
+			body := c.Snapshot().Body.List
+			if body == nil || len(body.Rows) != 1 {
+				t.Fatalf("want the one loaded row, got %+v", body)
+			}
+			cell := body.Rows[0].Cells[body.IdentityCol]
+			if ctrls := tui6Controls(cell); len(ctrls) > 0 {
+				t.Errorf("the identity cell carries control runes %q: %q", ctrls, cell)
+			}
+			// The rune scan above cannot see the raw spelling: an invalid UTF-8
+			// byte decodes as U+FFFD, which is not a control. The fixtures hold
+			// no multi-byte rune, so this byte can only be the introducer.
+			if strings.IndexByte(cell, 0x9b) >= 0 {
+				t.Errorf("the C1 introducer survived as a byte: %q", cell)
+			}
+			if strings.Contains(cell, "31m") {
+				t.Errorf("the C1 sequence's payload survived as visible text: %q", cell)
+			}
+			if !strings.Contains(cell, tui6PrintableHead) || !strings.Contains(cell, tui6PrintableTail) {
+				t.Errorf("the identity cell lost the readable part of the value: %q", cell)
+			}
+		})
+	}
+}

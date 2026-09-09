@@ -88,6 +88,11 @@ func tui6RenderList(t *testing.T, body app.ListBody) string {
 // the width that fits the widest status cell is on the body, like every other
 // column's width, not discovered again by whichever lane happens to paint.
 func TestStatusColumnWidth_IsAFactOfTheBuiltBody(t *testing.T) {
+	// The guard reads the width the TYPE declares, not the width this body
+	// published. Reading the published width would be the assertion's own
+	// answer, and the pin would report "proves nothing" exactly when the
+	// widening it exists for is working.
+	declared := tui6DeclaredStatusWidth(t)
 	body, _ := tui6StatusListBody(t, tui6LongStatus)
 
 	var widest int
@@ -96,8 +101,8 @@ func TestStatusColumnWidth_IsAFactOfTheBuiltBody(t *testing.T) {
 			widest = max(widest, text.Width(row.Cells[body.StatusCol]))
 		}
 	}
-	if widest <= body.Columns[body.StatusCol].Width {
-		t.Fatalf("no status cell (%d columns) exceeds the declared width (%d), so this pin proves nothing", widest, body.Columns[body.StatusCol].Width)
+	if widest <= declared {
+		t.Fatalf("no status cell (%d columns) exceeds the type's declared width (%d), so this pin proves nothing", widest, declared)
 	}
 	if got := body.Columns[body.StatusCol].Width; got != widest {
 		t.Errorf("the body publishes a status column of %d columns while its own widest status cell needs %d; the screen shows %d, so the body's number describes nothing", got, widest, widest)
