@@ -1,33 +1,43 @@
-generated: 5
+generated: 6
 list:
   Name:
+    key: name
     width: 24
   Volume ID:
     path: VolumeId
+    key: volume_id
     width: 22
   Status:
     path: State
+    key: state
     width: 12
   Size (GiB):
     path: Size
+    key: size
     width: 10
   Type:
     path: VolumeType
+    key: type
     width: 8
   IOPS:
     path: Iops
+    key: iops
     width: 8
   Encrypted:
     path: Encrypted
+    key: encrypted
     width: 10
   Attached To:
     path: Attachments
+    key: attached_to
     width: 20
   AZ:
     path: AvailabilityZone
+    key: az
     width: 16
   Created:
     path: CreateTime
+    key: created
     width: 18
 
 detail:

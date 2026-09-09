@@ -1,10 +1,12 @@
-generated: 5
+generated: 6
 list:
   Name:
     path: Name
+    key: name
     width: 36
   Type:
     path: Type
+    key: type
     width: 10
   Status:
     width: 12
@@ -13,9 +15,11 @@ list:
     width: 18
   ARN:
     path: StateMachineArn
+    key: arn
     width: 60
   Created:
     path: CreationDate
+    key: creation_date
     width: 22
 
 detail:

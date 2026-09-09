@@ -1,7 +1,8 @@
-generated: 5
+generated: 6
 list:
   User Name:
     path: UserName
+    key: user_name
     width: 32
   MFA:
     key: mfa
@@ -11,15 +12,19 @@ list:
     width: 14
   User ID:
     path: UserId
+    key: user_id
     width: 22
   Path:
     path: Path
+    key: path
     width: 20
   Created:
     path: CreateDate
+    key: create_date
     width: 22
   Password Last Used:
     path: PasswordLastUsed
+    key: password_last_used
     width: 22
 
 detail:

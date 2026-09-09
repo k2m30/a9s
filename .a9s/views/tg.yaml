@@ -1,25 +1,31 @@
-generated: 5
+generated: 6
 list:
   Target Group:
     path: TargetGroupName
+    key: target_group_name
     width: 32
   Port:
     path: Port
+    key: port
     width: 8
   Protocol:
     path: Protocol
+    key: protocol
     width: 10
   Status:
     key: health_summary
     width: 14
   VPC ID:
     path: VpcId
+    key: vpc_id
     width: 24
   Target Type:
     path: TargetType
+    key: target_type
     width: 12
   Health Check:
     path: HealthCheckPath
+    key: health_check_path
     width: 24
 
 detail:

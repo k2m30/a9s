@@ -1,13 +1,16 @@
-generated: 5
+generated: 6
 list:
   Domain Name:
     path: DomainName
+    key: domain_name
     width: 40
   Distribution ID:
     path: Id
+    key: distribution_id
     width: 16
   Status:
     path: Status
+    key: status
     width: 12
   WAF:
     path: WebACLId
@@ -17,12 +20,15 @@ list:
     width: 14
   Enabled:
     path: Enabled
+    key: enabled
     width: 9
   Aliases:
     path: Aliases.Items
+    key: aliases
     width: 30
   Price Class:
     path: PriceClass
+    key: price_class
     width: 16
 
 detail:

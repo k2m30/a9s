@@ -171,23 +171,23 @@ var verbatimDetailPaths = map[string]string{
 	"cf/distribution_id":                "identifier: the CloudFront distribution id",
 	"ct-events/ACTION.Insight type":     "identifier: the CloudTrail insight type name",
 	"ct-events/ACTOR.Access key":        "identifier: the access key id",
-	"ct-events/ENVELOPE.EventName":      "identifier: the AWS API operation name",
-	"ct-events/ENVELOPE.Username":       "identifier: the calling principal's name",
+	"ct-events/ENVELOPE.EventName":      "identifier: EventName, the AWS API operation this event records",
+	"ct-events/ENVELOPE.Username":       "identifier: the username CloudTrail recorded for the calling principal",
 	"ct-events/ERROR.errorCode":         "identifier: AWS's own error code, quoted verbatim so it can be searched",
-	"ct-events/REQUEST.rotationType":    "verbatim: the raw request block reproduces what the event carried",
-	"ct-events/RAW EVENT.errorCode":     "verbatim: the raw event view reproduces the event as AWS sent it",
-	"ct-events/RAW EVENT.eventCategory": "verbatim: the raw event view reproduces the event as AWS sent it",
-	"ct-events/RAW EVENT.eventName":     "verbatim: the raw event view reproduces the event as AWS sent it",
-	"ct-events/RAW EVENT.eventType":     "verbatim: the raw event view reproduces the event as AWS sent it",
-	"ecs-task/Attention":                "identifier by design: the stop code IS the thing to search for (core/aws/ecs_task_issue_enrichment.go)",
+	"ct-events/REQUEST.rotationType":    "verbatim: the raw request block reproduces the rotation type the caller asked for, as the caller wrote it",
+	"ct-events/RAW EVENT.errorCode":     "verbatim: the raw event view reproduces AWS's own error code, which is what an operator searches for",
+	"ct-events/RAW EVENT.eventCategory": "verbatim: the raw event view reproduces the event category as AWS sent it",
+	"ct-events/RAW EVENT.eventName":     "verbatim: the raw event view reproduces the event name, the API operation it records",
+	"ct-events/RAW EVENT.eventType":     "verbatim: the raw event view reproduces the event type as AWS sent it",
+	"ecs-task/Attention":                "identifier by design: the task's stop_code IS the thing an operator searches for",
 	"ecs-task/stop_code":                "identifier by design: the stop code IS the thing to search for",
-	"iam-group/Attention":               "identifier: the attached policy's own name",
+	"iam-group/Attention":               "identifier: the attached policy's PolicyName",
 	"iam-group/group_id":                "identifier: the IAM group id",
-	"iam-user/Attention":                "identifier: the attached policy's own name",
+	"iam-user/Attention":                "identifier: the attached policy's PolicyName",
 	"iam-user/user_id":                  "identifier: the IAM user id",
-	"msk/version":                       "identifier: the MSK configuration revision",
+	"msk/version":                       "identifier: the MSK cluster's current version string, which a change call has to quote back",
 	"policy/policy_name":                "identifier: the policy's own name",
-	"role/Attention":                    "identifier: the attached policy's own name",
+	"role/Attention":                    "identifier: the attached policy's PolicyName",
 	"role/role_id":                      "identifier: the IAM role id",
 	"role/role_name":                    "identifier: the role's own name",
 
@@ -195,11 +195,11 @@ var verbatimDetailPaths = map[string]string{
 	// off RawStruct, which the flat Fields pass never saw.
 	"alarm/MetricName":        "identifier: the CloudWatch metric's own name",
 	"alarm/Namespace":         "identifier: the CloudWatch namespace",
-	"ami/UsageOperation":      "identifier: the EC2 API operation the AMI bills under",
+	"ami/UsageOperation":      "identifier: UsageOperation, the billing code the AMI's usage is charged under",
 	"cf/Id":                   "identifier: the CloudFront distribution id",
 	"iam-group/GroupId":       "identifier: the IAM group id",
 	"iam-user/UserId":         "identifier: the IAM user id",
-	"msk/CurrentVersion":      "identifier: the MSK configuration revision",
+	"msk/CurrentVersion":      "identifier: CurrentVersion, the cluster revision string a change call has to quote back",
 	"policy/PolicyId":         "identifier: the IAM policy id",
 	"policy/PolicyName":       "identifier: the policy's own name",
 	"role/RoleId":             "identifier: the IAM role id",
@@ -216,42 +216,23 @@ var verbatimDetailPaths = map[string]string{
 // map left both other checks green — the sweep skips whatever the map names,
 // and the stale check only asks whether listed fields still render raw — so the
 // list could grow silently, which is exactly how an allowlist starts.
-const rawEnumDetailDebtCeiling = 16
+const rawEnumDetailDebtCeiling = 0
 
-// rawEnumDetailDebt is backlog w198: fields that render an SDK constant on a
-// demo detail row and are not this task's to fix.
+// rawEnumDetailDebt held backlog w198's worklist: fields that rendered an SDK
+// constant on a demo detail row. It is empty, and the ceiling above is zero:
+// every one of the sixteen is declared in its type's HumanizeFields and reads
+// as words.
 //
-// Three checks hold it to a ratchet, and between them the list can only shrink:
+// It stays because it is what makes the emptiness a gate rather than a claim.
+// Three checks hold it there:
 //
 //   - a raw constant on neither this list nor verbatimDetailPaths fails
 //     TestNoDemoDetailRowIsARawConstant, so a new one cannot be shipped;
-//   - adding an entry here fails the ceiling above, so it cannot be silenced
-//     by recording it instead;
+//   - adding an entry here fails the ceiling above, so a raw constant cannot be
+//     silenced by recording it instead;
 //   - an entry that no longer renders raw fails
-//     TestRawEnumDebtNeitherGrowsNorGoesStale, so a fixed field cannot keep its
-//     line — and the fix lowers the ceiling with it.
-//
-// Every entry is a fact an operator reads, so every entry is a defect. It is
-// recorded rather than fixed here because fixing it is w198's scope, and
-// recorded as one line per field so w198 has its worklist rather than a count.
-var rawEnumDetailDebt = map[string]string{
-	"acm/RenewalEligibility":     "w198",
-	"alarm/ComparisonOperator":   "w198",
-	"asg/HealthCheckType":        "w198",
-	"ddb/TableStatus":            "w198",
-	"ecs-svc/SchedulingStrategy": "w198",
-	"ecs-task/Connectivity":      "w198",
-	"kms/KeyManager":             "w198",
-	"kms/KeySpec":                "w198",
-	"kms/KeyState":               "w198",
-	"kms/KeyUsage":               "w198",
-	"kms/Origin":                 "w198",
-	"logs/DataProtectionStatus":  "w198",
-	"logs/LogGroupClass":         "w198",
-	"mwaa/Status":                "w198",
-	"pipeline/ExecutionMode":     "w198",
-	"tg/ProtocolVersion":         "w198",
-}
+//     TestRawEnumDebtNeitherGrowsNorGoesStale.
+var rawEnumDetailDebt = map[string]string{}
 
 // TestNoDemoDetailRowIsARawConstant sweeps every demo detail screen for a row
 // whose whole value is an SDK constant. It is the standing half of rows 4 to 6:

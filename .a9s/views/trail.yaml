@@ -1,18 +1,22 @@
-generated: 5
+generated: 6
 list:
   Trail Name:
     path: Name
+    key: trail_name
     width: 28
   Status:
     width: 12
   S3 Bucket:
     path: S3BucketName
+    key: s3_bucket
     width: 28
   Home Region:
     path: HomeRegion
+    key: home_region
     width: 16
   Multi-Region:
     path: IsMultiRegionTrail
+    key: multi_region
     width: 14
 
 detail:

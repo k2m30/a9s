@@ -1,10 +1,12 @@
-generated: 5
+generated: 6
 list:
   Name:
     path: Name
+    key: name
     width: 32
   Image ID:
     path: ImageId
+    key: image_id
     width: 22
   Status:
     path: State
@@ -14,18 +16,23 @@ list:
     width: 22
   Arch:
     path: Architecture
+    key: architecture
     width: 10
   Platform:
     path: PlatformDetails
+    key: platform
     width: 16
   Root Device:
     path: RootDeviceType
+    key: root_device_type
     width: 14
   Created:
     path: CreationDate
+    key: creation_date
     width: 22
   Public:
     path: Public
+    key: public
     width: 8
 
 detail:

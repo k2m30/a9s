@@ -1,16 +1,20 @@
-generated: 5
+generated: 6
 list:
   Function Name:
     path: FunctionName
+    key: function_name
     width: 36
   Runtime:
     path: Runtime
+    key: runtime
     width: 16
   Memory:
     path: MemorySize
+    key: memory
     width: 8
   Timeout:
     path: Timeout
+    key: timeout
     width: 8
   Status:
     path: State
@@ -18,9 +22,11 @@ list:
     width: 10
   Handler:
     path: Handler
+    key: handler
     width: 30
   Last Modified:
     path: LastModified
+    key: last_modified
     width: 22
 
 detail:

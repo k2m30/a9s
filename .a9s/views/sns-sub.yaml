@@ -1,15 +1,18 @@
-generated: 5
+generated: 6
 list:
   Topic ARN:
     path: TopicArn
+    key: topic_arn
     width: 48
   Status:
     width: 12
   Protocol:
     path: Protocol
+    key: protocol
     width: 10
   Endpoint:
     path: Endpoint
+    key: endpoint
     width: 48
   Confirmed:
     key: confirmed

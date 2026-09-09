@@ -1,13 +1,15 @@
-generated: 5
+generated: 6
 list:
   Bucket Name:
     path: Name
+    key: name
     width: 36
   Region:
     path: BucketRegion
     width: 14
   Creation Date:
     path: CreationDate
+    key: creation_date
     width: 22
   Status:
     key: status

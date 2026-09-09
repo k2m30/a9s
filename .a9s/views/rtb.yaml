@@ -1,12 +1,15 @@
-generated: 5
+generated: 6
 list:
   Name:
+    key: name
     width: 28
   Route Table ID:
     path: RouteTableId
+    key: route_table_id
     width: 26
   VPC ID:
     path: VpcId
+    key: vpc_id
     width: 24
   Status:
     width: 8

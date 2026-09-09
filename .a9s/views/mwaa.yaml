@@ -1,28 +1,35 @@
-generated: 5
+generated: 6
 list:
   Name:
     path: Name
+    key: name
     width: 32
   Status:
     key: status
     width: 32
   Airflow:
     path: AirflowVersion
+    key: airflow_version
     width: 10
   Class:
     path: EnvironmentClass
+    key: environment_class
     width: 14
   Workers:
     path: MaxWorkers
+    key: max_workers
     width: 9
   Schedulers:
     path: Schedulers
+    key: schedulers
     width: 10
   Access:
     path: WebserverAccessMode
+    key: webserver_access_mode
     width: 16
   Created:
     path: CreatedAt
+    key: created_at
     width: 22
 
 detail:

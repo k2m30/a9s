@@ -1,22 +1,27 @@
-generated: 5
+generated: 6
 list:
   Domain Name:
     path: DomainName
+    key: domain_name
     width: 40
   Status:
     path: Status
+    key: status
     width: 14
   Days Left:
     key: days_left
     width: 10
   Type:
     path: Type
+    key: type
     width: 14
   Expires:
     path: NotAfter
+    key: not_after
     width: 22
   In Use:
     path: InUse
+    key: in_use
     width: 8
 
 detail:

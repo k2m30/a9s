@@ -47,11 +47,13 @@ var dataTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static c
 			return consolelink.Regional(region, "gluestudio/home?region="+region+"#/editor/job/"+url.PathEscape(r.ID))
 		},
 		Columns: []domain.Column{
-			{Key: "job_name", Title: "Job Name", Width: 32, Sortable: true},
-			{Key: "glue_version", Title: "Version", Width: 10, Sortable: true},
-			{Key: "worker_type", Title: "Worker Type", Width: 14, Sortable: true},
-			{Key: "num_workers", Title: "Workers", Width: 9, Sortable: true},
-			{Key: "last_modified", Title: "Last Modified", Width: 22, Sortable: true},
+			{Key: "job_name", Title: "Job Name", Path: "Name", Width: 32, Sortable: true},
+			{Title: "Status", Width: 12},
+			{Key: "last_run", Title: "Last Run", Width: 14},
+			{Key: "glue_version", Title: "Version", Path: "GlueVersion", Width: 10, Sortable: true},
+			{Key: "worker_type", Title: "Worker Type", Path: "WorkerType", Width: 14, Sortable: true},
+			{Key: "num_workers", Title: "Workers", Path: "NumberOfWorkers", Width: 9, Sortable: true},
+			{Key: "last_modified", Title: "Last Modified", Path: "LastModifiedOn", Width: 22, Sortable: true},
 		},
 		Children: []domain.ChildViewDef{{
 			ChildType:      "glue_runs",
@@ -98,10 +100,11 @@ var dataTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static c
 			return consolelink.Regional(region, "athena/home?region="+region+"#/workgroups/details/"+url.PathEscape(r.ID))
 		},
 		Columns: []domain.Column{
-			{Key: "workgroup_name", Title: "Workgroup", Width: 28, Sortable: true},
-			{Key: "state", Title: "State", Width: 12, Sortable: true},
-			{Key: "description", Title: "Description", Width: 30, Sortable: false},
-			{Key: "engine_version", Title: "Engine", Width: 28, Sortable: true},
+			{Key: "workgroup_name", Title: "Workgroup", Path: "Name", Width: 28, Sortable: true},
+			{Title: "Status", Path: "State", Width: 12},
+			{Title: "Cost Cap", Path: "Configuration.BytesScannedCutoffPerQuery", Width: 12},
+			{Key: "description", Title: "Description", Path: "Description", Width: 30},
+			{Key: "engine_version", Title: "Engine", Path: "EngineVersion.EffectiveEngineVersion", Width: 28, Sortable: true},
 		},
 		Color: colorAthena,
 		Fetcher: fetcherWithClients(func(ctx context.Context, c *ServiceClients, continuationToken string) (resource.FetchResult, error) {
@@ -125,7 +128,7 @@ var dataTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static c
 	{
 		Name:           "Managed Airflow",
 		ShortName:      "mwaa",
-		HumanizeFields: []string{"webserver_access_mode", "endpoint_management", "last_update_status"},
+		HumanizeFields: []string{"webserver_access_mode", "endpoint_management", "last_update_status", "Status"},
 		Aliases:        []string{"mwaa", "airflow"},
 		Category:       "DATA & ANALYTICS",
 		CloudTrailKey:  "ResourceName:ID",
@@ -134,14 +137,14 @@ var dataTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static c
 			return consolelink.Regional(region, "mwaa/home?region="+region+"#environments/"+url.PathEscape(r.ID))
 		},
 		Columns: []domain.Column{
-			{Key: "name", Title: "Name", Width: 32, Sortable: true},
+			{Key: "name", Title: "Name", Path: "Name", Width: 32, Sortable: true},
 			{Key: "status", Title: "Status", Width: 32, Sortable: true},
-			{Key: "airflow_version", Title: "Airflow", Width: 10, Sortable: true},
-			{Key: "environment_class", Title: "Class", Width: 14, Sortable: true},
-			{Key: "max_workers", Title: "Workers", Width: 9, Sortable: true},
-			{Key: "schedulers", Title: "Schedulers", Width: 10, Sortable: true},
-			{Key: "webserver_access_mode", Title: "Access", Width: 16, Sortable: true},
-			{Key: "created_at", Title: "Created", Width: 22, Sortable: true},
+			{Key: "airflow_version", Title: "Airflow", Path: "AirflowVersion", Width: 10, Sortable: true},
+			{Key: "environment_class", Title: "Class", Path: "EnvironmentClass", Width: 14, Sortable: true},
+			{Key: "max_workers", Title: "Workers", Path: "MaxWorkers", Width: 9, Sortable: true},
+			{Key: "schedulers", Title: "Schedulers", Path: "Schedulers", Width: 10, Sortable: true},
+			{Key: "webserver_access_mode", Title: "Access", Path: "WebserverAccessMode", Width: 16, Sortable: true},
+			{Key: "created_at", Title: "Created", Path: "CreatedAt", Width: 22, Sortable: true},
 		},
 		Color:   colorAnyFindingOrHealthy,
 		Fetcher: fetcherWithClients(FetchMWAAEnvironmentsPage),

@@ -1,16 +1,20 @@
-generated: 5
+generated: 6
 list:
   Name:
     path: Name
+    key: name
     width: 36
   Status:
     path: Status
+    key: status
     width: 12
   Start Date:
     path: StartDate
+    key: start_date
     width: 22
   Stop Date:
     path: StopDate
+    key: stop_date
     width: 22
   Duration:
     key: duration

@@ -1,18 +1,22 @@
-generated: 5
+generated: 6
 list:
   Name:
+    key: name
     width: 24
   VPC ID:
     path: VpcId
+    key: vpc_id
     width: 24
   CIDR Block:
     path: CidrBlock
+    key: cidr_block
     width: 18
   Status:
     path: State
     width: 12
   Default:
     path: IsDefault
+    key: is_default
     width: 9
   Flow Logs:
     key: flow_logs

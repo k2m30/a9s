@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Sixteen detail rows now read as words instead of an AWS constant: a
+  certificate's renewal eligibility, an alarm's comparison operator, an auto
+  scaling group's health check type, a DynamoDB table's status, an ECS
+  service's scheduling strategy, an ECS task's connectivity, five KMS key
+  fields (manager, spec, state, usage and origin), a log group's data
+  protection status and class, an Airflow environment's status, a pipeline's
+  execution mode, and a target group's protocol version. `PendingDeletion`
+  reads `pending deletion`.
+
+- A resource type's list columns are declared in one place. The columns each
+  type shows were written down twice — once beside the fetcher and once in the
+  built-in view defaults — and the two had drifted apart, so which one a change
+  reached depended on which file it was made in. The rendered lists are
+  unchanged: every column, its order and its width are what they were, and the
+  generated view files under `.a9s/views/` now carry the field each cell reads
+  as well. A view file written by an earlier build takes that field on the next
+  start without losing anything the operator set.
+
 ### Fixed
 
 - The menu count for a resource type now follows a full list downward. A list

@@ -117,6 +117,10 @@ func TestQA_IAMGroups_TypeDef(t *testing.T) {
 		title string
 	}{
 		{"group_name", "Group Name"},
+		// w197: Status and Members come from the built-in view's list, folded
+		// into the type's own.
+		{"", "Status"},
+		{"member_count", "Members"},
 		{"group_id", "Group ID"},
 		{"path", "Path"},
 		{"create_date", "Created"},

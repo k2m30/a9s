@@ -32,10 +32,11 @@ var backupTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static
 			return consolelink.Regional(region, "backup/home?region="+region+"#/backupplan/details/"+r.ID)
 		},
 		Columns: []domain.Column{
-			{Key: "plan_name", Title: "Plan Name", Width: 32, Sortable: true},
-			{Key: "plan_id", Title: "Plan ID", Width: 38, Sortable: true},
-			{Key: "creation_date", Title: "Created", Width: 22, Sortable: true},
-			{Key: "last_execution", Title: "Last Execution", Width: 22, Sortable: true},
+			{Key: "plan_name", Title: "Plan Name", Path: "BackupPlanName", Width: 32, Sortable: true},
+			{Key: "status", Title: "Status", Width: 40},
+			{Key: "plan_id", Title: "Plan ID", Path: "BackupPlanId", Width: 38, Sortable: true},
+			{Key: "creation_date", Title: "Created", Path: "CreationDate", Width: 22, Sortable: true},
+			{Key: "last_execution", Title: "Last Execution", Path: "LastExecutionDate", Width: 22, Sortable: true},
 		},
 		// Wave 2 enricher surfaces plans whose recent backup jobs have
 		// failed — Wave 1 list is declarative config.

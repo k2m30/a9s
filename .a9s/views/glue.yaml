@@ -1,7 +1,8 @@
-generated: 5
+generated: 6
 list:
   Job Name:
     path: Name
+    key: job_name
     width: 32
   Status:
     width: 12
@@ -10,15 +11,19 @@ list:
     width: 14
   Version:
     path: GlueVersion
+    key: glue_version
     width: 10
   Worker Type:
     path: WorkerType
+    key: worker_type
     width: 14
   Workers:
     path: NumberOfWorkers
+    key: num_workers
     width: 9
   Last Modified:
     path: LastModifiedOn
+    key: last_modified
     width: 22
 
 detail:

@@ -1,19 +1,23 @@
-generated: 5
+generated: 6
 list:
   Project Name:
     path: Name
+    key: name
     width: 32
   Source Type:
     path: Source.Type
+    key: source_type
     width: 14
   Status:
     key: last_build
     width: 18
   Description:
     path: Description
+    key: description
     width: 36
   Last Modified:
     path: LastModified
+    key: last_modified
     width: 22
 
 detail:

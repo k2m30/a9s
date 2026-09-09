@@ -508,21 +508,25 @@ func TestQA_S3_YAML_FromObjectList(t *testing.T) {
 
 // Test copy returns the selected resource ID (clipboard not tested, just the data)
 
-// Test that S3 bucket list has exactly 2 columns (Bucket Name, Creation Date)
-
-func TestQA_S3_BucketList_ExactlyTwoColumns(t *testing.T) {
+// Test that the S3 bucket list has the four columns the operator sees.
+//
+// w197: it used to assert two, which was the type's own list before the
+// per-type list in core/config was folded into it. The built-in view has
+// rendered Region and Status all along, so two was never what a bucket list
+// showed — do not restore it.
+func TestQA_S3_BucketList_ExpectedColumns(t *testing.T) {
 	rt := resource.FindResourceType("s3")
 	if rt == nil {
 		t.Fatal("resource type 's3' not found")
 	}
-	if len(rt.Columns) != 2 {
-		t.Errorf("S3 bucket list should have exactly 2 columns, got %d", len(rt.Columns))
+	want := []string{"Bucket Name", "Region", "Creation Date", "Status"}
+	if len(rt.Columns) != len(want) {
+		t.Fatalf("S3 bucket list should have %d columns, got %d", len(want), len(rt.Columns))
 	}
-	if rt.Columns[0].Title != "Bucket Name" {
-		t.Errorf("first column should be 'Bucket Name', got %q", rt.Columns[0].Title)
-	}
-	if rt.Columns[1].Title != "Creation Date" {
-		t.Errorf("second column should be 'Creation Date', got %q", rt.Columns[1].Title)
+	for i, title := range want {
+		if rt.Columns[i].Title != title {
+			t.Errorf("column %d should be %q, got %q", i, title, rt.Columns[i].Title)
+		}
 	}
 }
 
@@ -530,7 +534,8 @@ func TestQA_S3_BucketList_ExactlyTwoColumns(t *testing.T) {
 
 func TestQA_S3_ObjectList_ExpectedColumns(t *testing.T) {
 	cols := resource.S3ObjectColumns()
-	expectedTitles := []string{"Key", "Size", "Last Modified", "Storage Class"}
+	// w197: the order is the built-in view's, which is the order rendered.
+	expectedTitles := []string{"Key", "Size", "Storage Class", "Last Modified"}
 
 	if len(cols) != len(expectedTitles) {
 		t.Fatalf("S3 object columns count: expected %d, got %d", len(expectedTitles), len(cols))

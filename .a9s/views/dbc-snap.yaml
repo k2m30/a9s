@@ -1,25 +1,31 @@
-generated: 5
+generated: 6
 list:
   Snapshot ID:
     path: DBClusterSnapshotIdentifier
+    key: snapshot_id
     width: 36
   Cluster ID:
     path: DBClusterIdentifier
+    key: cluster_id
     width: 28
   Status:
     key: status
     width: 32
   Engine:
     path: Engine
+    key: engine
     width: 12
   Type:
     path: SnapshotType
+    key: snapshot_type
     width: 12
   Created:
     path: SnapshotCreateTime
+    key: snapshot_create_time
     width: 22
   Storage:
     path: StorageType
+    key: storage_type
     width: 10
 
 detail:

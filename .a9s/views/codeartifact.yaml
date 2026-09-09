@@ -1,21 +1,25 @@
-generated: 5
+generated: 6
 list:
   Repository:
     path: Name
+    key: repo_name
     width: 28
   Status:
     width: 12
   Domain:
     path: DomainName
+    key: domain_name
     width: 24
   Packages:
     key: package_count
     width: 8
   Description:
     path: Description
+    key: description
     width: 30
   Owner:
     path: DomainOwner
+    key: domain_owner
     width: 14
 
 detail:

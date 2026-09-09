@@ -241,6 +241,10 @@ func TestQA_ECSTasks_TypeDef(t *testing.T) {
 		{"task_id", "Task ID"},
 		{"cluster", "Cluster"},
 		{"status", "Status"},
+		// w197: Stop Code and Health come from the built-in view's list, folded
+		// into the type's own; both read their RawStruct path, not a key.
+		{"", "Stop Code"},
+		{"", "Health"},
 		{"task_definition", "Task Definition"},
 		{"launch_type", "Launch"},
 		{"cpu", "CPU"},

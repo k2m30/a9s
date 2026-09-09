@@ -1,19 +1,22 @@
-generated: 5
+generated: 6
 list:
   Run ID:
     key: run_id_short
     width: 12
   State:
     path: JobRunState
+    key: job_run_state
     width: 12
   Started:
     path: StartedOn
+    key: started_on
     width: 22
   Execution Time:
     key: execution_time_human
     width: 14
   Error Message:
     path: ErrorMessage
+    key: error_message
     width: 44
   DPU Hours:
     key: dpu_hours

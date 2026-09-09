@@ -12,8 +12,15 @@ type Column struct {
 	Key string
 	// Title is the column header display text.
 	Title string
+	// Path is the RawStruct field path the cell reads when the row carries no
+	// Fields entry for Key — the value source a view file spells as "path:".
+	Path string
 	// Width is the fixed column width; 0 means flexible.
 	Width int
+	// SortKey is the Fields key the comparator reads when the displayed value
+	// does not sort the way the value does (a size rendered "900 B", a status
+	// rendered as a finding phrase).
+	SortKey string
 	// Sortable indicates whether this column supports sorting.
 	Sortable bool
 }

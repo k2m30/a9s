@@ -1,13 +1,16 @@
-generated: 5
+generated: 6
 list:
   Service Name:
     path: ServiceName
+    key: service_name
     width: 40
   Endpoint ID:
     path: VpcEndpointId
+    key: vpce_id
     width: 26
   Type:
     path: VpcEndpointType
+    key: type
     width: 12
   Status:
     path: State
@@ -17,6 +20,7 @@ list:
     width: 32
   VPC ID:
     path: VpcId
+    key: vpc_id
     width: 24
 
 detail:

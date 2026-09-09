@@ -1,22 +1,28 @@
-generated: 5
+generated: 6
 list:
   ASG Name:
     path: AutoScalingGroupName
+    key: asg_name
     width: 36
   Min:
     path: MinSize
+    key: min_size
     width: 6
   Max:
     path: MaxSize
+    key: max_size
     width: 6
   Desired:
     path: DesiredCapacity
+    key: desired
     width: 8
   Instances:
     path: Instances
+    key: instances
     width: 10
   Status:
     path: Status
+    key: status
     width: 12
 
 detail:

@@ -1,16 +1,20 @@
-generated: 5
+generated: 6
 list:
   Stream Name:
     path: StreamName
+    key: stream_name
     width: 36
   Status:
     path: StreamStatus
+    key: status
     width: 12
   Mode:
     path: StreamModeDetails.StreamMode
+    key: stream_mode
     width: 14
   Created:
     path: StreamCreationTimestamp
+    key: creation_time
     width: 22
 
 detail:

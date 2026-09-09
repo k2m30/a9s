@@ -1,22 +1,27 @@
-generated: 5
+generated: 6
 list:
   Server Id:
     path: ServerId
+    key: server_id
     width: 32
   Status:
     key: status
     width: 32
   Domain:
     path: Domain
+    key: domain
     width: 10
   Endpoint:
     path: EndpointType
+    key: endpoint_type
     width: 14
   Identity Provider:
     path: IdentityProviderType
+    key: identity_provider_type
     width: 20
   Users:
     path: UserCount
+    key: user_count
     width: 8
 
 detail:

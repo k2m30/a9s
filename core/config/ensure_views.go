@@ -169,6 +169,47 @@ var viewColumnChanges = []viewColumnChange{
 	// is the one column here whose older spelling still differs from what this
 	// build generates, so it is what the carry has to deliver.
 	{Version: 5, View: "logs", Was: ListColumn{Title: "Retention", Path: "RetentionInDays", Width: 10}},
+	// Version 6 moves the column list itself onto the resource type, which
+	// keyMoveVersion below records as a class. The Retention entry is renewed
+	// at this stamp for the same reason it was renewed at 5: it is the one
+	// column whose older spelling still differs from what this build generates
+	// in more than the key, so the class rule cannot deliver it and only a row
+	// naming that whole spelling can.
+	{Version: 6, View: "logs", Was: ListColumn{Title: "Retention", Path: "RetentionInDays", Width: 10}},
+}
+
+// keyMoveVersion is the stamp at which every built-in column took the key its
+// resource type declares. Before it, a column in a view file carried whatever
+// key the second per-type column list in core/config gave it — for most
+// columns none at all, the cell resolving through the RawStruct path beside it
+// — while the renderer merged the type's key onto that same column anyway, on
+// every frame. A file written before the move therefore differs from this
+// build's column in Key and in no other field, and that difference is this
+// build's own doing rather than an edit.
+//
+// It is one rule and not the 325 viewColumnChanges rows the same migration
+// would need column by column, because every one of those rows would say this
+// same sentence about a different column.
+//
+// It matches whole columns rather than the key alone, so a column the operator
+// touched at all — a width they set — keeps no key at this migration. That
+// costs them nothing on screen: ResolveListColumnCascade merges the type's key
+// onto every title both declare on every frame, so the cell reads the same
+// field either way. The alternative, taking the key wherever the title
+// matches, would overwrite a key an operator wrote themselves, which the file
+// does not record as theirs.
+const keyMoveVersion = 6
+
+// keyMovedOnly reports whether onDisk is this build's column for that title as
+// the build before keyMoveVersion generated it: same title, same value path,
+// same width, same sort key, and only the key the type declares missing.
+func keyMovedOnly(on, now ListColumn, stamp int) bool {
+	return stamp < keyMoveVersion &&
+		on.Key != now.Key &&
+		on.Title == now.Title &&
+		on.Path == now.Path &&
+		on.Width == now.Width &&
+		on.SortKey == now.SortKey
 }
 
 // viewColumnAdditions names a column the built-in views GAINED, and the
@@ -256,8 +297,7 @@ func mergeGeneratedColumns(name string, onDisk []byte, def ViewDef) ([]byte, boo
 		if have[c.Title] || !belongs(c.Title) {
 			continue
 		}
-		at := min(i, len(vd.List))
-		vd.List = append(vd.List[:at], append([]ListColumn{c}, vd.List[at:]...)...)
+		vd.List = slices.Insert(vd.List, min(i, len(vd.List)), c)
 	}
 	// Carry this build's corrections, field by field. An entry names the whole
 	// column an older build generated, so every field of it can be compared:
@@ -271,6 +311,9 @@ func mergeGeneratedColumns(name string, onDisk []byte, def ViewDef) ([]byte, boo
 		now, ok := want[on.Title]
 		if !ok {
 			continue
+		}
+		if keyMovedOnly(on, now, vd.Generated) {
+			vd.List[i].Key = now.Key
 		}
 		for _, ch := range viewColumnChanges {
 			if ch.View != name || ch.Was.Title != on.Title || ch.Version <= vd.Generated {
@@ -293,7 +336,7 @@ func generatedAsIs(name string, onDisk []ListColumn, want map[string]ListColumn,
 		if !ok {
 			return false
 		}
-		if on != now && !generatedByStamp(name, on, stamp) {
+		if on != now && !generatedByStamp(name, on, stamp) && !keyMovedOnly(on, now, stamp) {
 			return false
 		}
 	}

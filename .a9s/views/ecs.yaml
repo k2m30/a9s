@@ -1,19 +1,24 @@
-generated: 5
+generated: 6
 list:
   Cluster Name:
     path: ClusterName
+    key: cluster_name
     width: 32
   Status:
     path: Status
+    key: status
     width: 12
   Running:
     path: RunningTasksCount
+    key: running_tasks
     width: 9
   Pending:
     path: PendingTasksCount
+    key: pending_tasks
     width: 9
   Services:
     path: ActiveServicesCount
+    key: services_count
     width: 10
 
 detail:

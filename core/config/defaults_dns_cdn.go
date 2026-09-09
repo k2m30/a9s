@@ -5,30 +5,12 @@ package config
 func dnsCdnDefaultViews() map[string]ViewDef {
 	return map[string]ViewDef{
 		"r53": {
-			List: []ListColumn{
-				{Title: "Name", Path: "Name", Width: 36},
-				{Title: "Status", Width: 12},
-				{Title: "Zone ID", Path: "Id", Width: 30},
-				{Title: "Records", Path: "ResourceRecordSetCount", Width: 9},
-				{Title: "Private", Path: "Config.PrivateZone", Width: 9},
-				{Title: "Comment", Path: "Config.Comment", Width: 30},
-			},
 			Detail: []DetailField{
 				{Path: "Id"}, {Path: "Name"}, {Path: "CallerReference"}, {Path: "ResourceRecordSetCount"},
 				{Path: "Config"}, {Path: "LinkedService"},
 			},
 		},
 		"cf": {
-			List: []ListColumn{
-				{Title: "Domain Name", Path: "DomainName", Width: 40},
-				{Title: "Distribution ID", Path: "Id", Width: 16},
-				{Title: "Status", Path: "Status", Width: 12},
-				{Title: "WAF", Path: "WebACLId", Width: 14},
-				{Title: "TLS", Path: "ViewerCertificate.MinimumProtocolVersion", Width: 14},
-				{Title: "Enabled", Path: "Enabled", Width: 9},
-				{Title: "Aliases", Path: "Aliases.Items", Width: 30},
-				{Title: "Price Class", Path: "PriceClass", Width: 16},
-			},
 			Detail: []DetailField{
 				{Path: "Id"}, {Path: "DomainName"}, {Path: "Status"}, {Path: "Enabled"}, {Path: "Comment"},
 				{Path: "ARN"}, {Path: "Aliases"}, {Path: "Origins"}, {Path: "PriceClass"}, {Path: "HttpVersion"},
@@ -36,14 +18,6 @@ func dnsCdnDefaultViews() map[string]ViewDef {
 			},
 		},
 		"acm": {
-			List: []ListColumn{
-				{Title: "Domain Name", Path: "DomainName", Width: 40},
-				{Title: "Status", Path: "Status", Width: 14},
-				{Title: "Days Left", Key: "days_left", Width: 10},
-				{Title: "Type", Path: "Type", Width: 14},
-				{Title: "Expires", Path: "NotAfter", Width: 22},
-				{Title: "In Use", Path: "InUse", Width: 8},
-			},
 			Detail: []DetailField{
 				{Path: "DomainName"}, {Path: "CertificateArn"}, {Path: "SubjectAlternativeNameSummaries"},
 				{Path: "Status"}, {Path: "Type"}, {Path: "NotBefore"}, {Path: "NotAfter"},
@@ -52,20 +26,6 @@ func dnsCdnDefaultViews() map[string]ViewDef {
 			},
 		},
 		"apigw": {
-			List: []ListColumn{
-				{Title: "Name", Path: "Name", Width: 28},
-				{Title: "Status", Width: 12},
-				// api_id/protocol/endpoint are read by key, not by path: the
-				// REST (v1) and HTTP/WebSocket (v2) lanes return different SDK
-				// structs and only the v2 one has ApiId/ProtocolType/
-				// ApiEndpoint. Both fetchers write these three keys, so the key
-				// is the one form that answers for every row in the list.
-				{Title: "API ID", Key: "api_id", Width: 14},
-				{Title: "Protocol", Key: "protocol", Width: 12},
-				{Title: "Stages", Key: "stages_count", Width: 7},
-				{Title: "Endpoint", Key: "endpoint", Width: 50},
-				{Title: "Description", Path: "Description", Width: 30},
-			},
 			Detail: []DetailField{
 				{Key: "api_id", Label: "ApiId"}, {Path: "Name"},
 				{Key: "protocol", Label: "Protocol"}, {Key: "endpoint", Label: "Endpoint"},
@@ -75,12 +35,6 @@ func dnsCdnDefaultViews() map[string]ViewDef {
 		},
 		// Child views for DNS/CDN resources
 		"r53_records": {
-			List: []ListColumn{
-				{Title: "Name", Path: "Name", Width: 40},
-				{Title: "Type", Path: "Type", Width: 8},
-				{Title: "TTL", Path: "TTL", Width: 8},
-				{Title: "Values", Path: "", Key: "values", Width: 50},
-			},
 			Detail: []DetailField{
 				{Path: "Name"}, {Path: "Type"}, {Path: "TTL"}, {Path: "ResourceRecords"}, {Path: "AliasTarget"},
 				{Path: "SetIdentifier"}, {Path: "Weight"}, {Path: "Region"}, {Path: "Failover"},

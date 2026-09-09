@@ -1,22 +1,27 @@
-generated: 5
+generated: 6
 list:
   Pcx Id:
     path: VpcPeeringConnectionId
+    key: pcx_id
     width: 24
   Status:
     key: status
     width: 34
   Requester VPC:
     path: RequesterVpcInfo.VpcId
+    key: requester_vpc
     width: 22
   Requester Owner:
     path: RequesterVpcInfo.OwnerId
+    key: requester_owner
     width: 14
   Accepter VPC:
     path: AccepterVpcInfo.VpcId
+    key: accepter_vpc
     width: 22
   Accepter Owner:
     path: AccepterVpcInfo.OwnerId
+    key: accepter_owner
     width: 14
   Expires:
     key: expires

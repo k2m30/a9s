@@ -31,6 +31,13 @@ func TestColumnKeys_MatchFetcherFieldKeys(t *testing.T) {
 		}
 
 		for _, col := range rt.Columns {
+			// w197: a column whose cell reads a RawStruct path, or resolves
+			// through its own title, carries no key — there is nothing for the
+			// registry to produce. TestColumnKeysHaveProducers skips the same
+			// case on the same columns.
+			if col.Key == "" {
+				continue
+			}
 			if !validSet[col.Key] {
 				t.Errorf("resource type %q: column Key %q does not match any fetcher Fields key. Valid keys: %v",
 					rt.ShortName, col.Key, validKeys)

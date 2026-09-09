@@ -1,9 +1,11 @@
-generated: 5
+generated: 6
 list:
   Name:
+    key: name
     width: 24
   Status:
     path: State.Name
+    key: state
     width: 12
   Health:
     key: instance_status
@@ -13,18 +15,23 @@ list:
     width: 12
   Type:
     path: InstanceType
+    key: type
     width: 14
   Private IP:
     path: PrivateIpAddress
+    key: private_ip
     width: 16
   Public IP:
     path: PublicIpAddress
+    key: public_ip
     width: 16
   Instance ID:
     path: InstanceId
+    key: instance_id
     width: 20
   Launch Time:
     path: LaunchTime
+    key: launch_time
     width: 22
 
 detail:

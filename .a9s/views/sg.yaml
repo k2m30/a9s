@@ -1,19 +1,23 @@
-generated: 5
+generated: 6
 list:
   Group Name:
     path: GroupName
+    key: group_name
     width: 28
   Group ID:
     path: GroupId
+    key: group_id
     width: 24
   Status:
     key: risk_summary
     width: 22
   VPC ID:
     path: VpcId
+    key: vpc_id
     width: 24
   Description:
     path: Description
+    key: description
     width: 36
 
 detail:

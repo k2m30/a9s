@@ -1,7 +1,8 @@
-generated: 5
+generated: 6
 list:
   Identity:
     path: IdentityName
+    key: identity_name
     width: 36
   Type:
     key: identity_type

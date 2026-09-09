@@ -1,18 +1,23 @@
-generated: 5
+generated: 6
 list:
   Name:
+    key: name
     width: 28
   Subnet ID:
     path: SubnetId
+    key: subnet_id
     width: 26
   VPC ID:
     path: VpcId
+    key: vpc_id
     width: 24
   CIDR Block:
     path: CidrBlock
+    key: cidr_block
     width: 18
   AZ:
     path: AvailabilityZone
+    key: availability_zone
     width: 14
   Status:
     path: State
@@ -22,6 +27,7 @@ list:
     width: 8
   Available IPs:
     path: AvailableIpAddressCount
+    key: available_ips
     width: 14
 
 detail:

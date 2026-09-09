@@ -71,11 +71,13 @@ var cicdTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static c
 			return consolelink.Regional(region, "cloudformation/home?region="+region+"#/stacks/stackinfo?stackId="+arn)
 		},
 		Columns: []domain.Column{
-			{Key: "stack_name", Title: "Stack Name", Width: 36, Sortable: true},
-			{Key: "status", Title: "Status", Width: 24, Sortable: true},
-			{Key: "creation_time", Title: "Created", Width: 22, Sortable: true},
-			{Key: "last_updated", Title: "Updated", Width: 22, Sortable: true},
-			{Key: "description", Title: "Description", Width: 30, Sortable: false},
+			{Key: "stack_name", Title: "Stack Name", Path: "StackName", Width: 36, Sortable: true},
+			{Key: "status", Title: "Status", Path: "StackStatus", Width: 24, Sortable: true},
+			{Key: "drift_status", Title: "Drift", Width: 14},
+			{Title: "Reason", Path: "StackStatusReason", Width: 32},
+			{Key: "creation_time", Title: "Created", Path: "CreationTime", Width: 22, Sortable: true},
+			{Key: "last_updated", Title: "Updated", Path: "LastUpdatedTime", Width: 22, Sortable: true},
+			{Key: "description", Title: "Description", Path: "Description", Width: 30},
 		},
 		Children: []domain.ChildViewDef{
 			{ChildType: "cfn_events", Key: "enter", ContextKeys: map[string]string{"stack_name": "ID"}, DisplayNameKey: "Name"},
@@ -115,7 +117,7 @@ var cicdTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static c
 	{
 		Name:           "CodePipelines",
 		ShortName:      "pipeline",
-		HumanizeFields: []string{"pipeline_type"},
+		HumanizeFields: []string{"pipeline_type", "ExecutionMode"},
 		Aliases:        []string{"pipeline", "codepipeline", "pipelines"},
 		Category:       "CI/CD",
 		CloudTrailKey:  "ResourceName:ID",
@@ -123,12 +125,12 @@ var cicdTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static c
 			return consolelink.Regional(region, "codesuite/codepipeline/pipelines/"+url.PathEscape(r.ID)+"/view?region="+region)
 		},
 		Columns: []domain.Column{
-			{Key: "name", Title: "Pipeline Name", Width: 30, Sortable: true},
-			{Key: "pipeline_type", Title: "Type", Width: 6, Sortable: true},
+			{Key: "name", Title: "Pipeline Name", Path: "Name", Width: 30, Sortable: true},
+			{Key: "pipeline_type", Title: "Type", Path: "PipelineType", Width: 6, Sortable: true},
 			{Key: "last_status", Title: "Status", Width: 18, Sortable: true},
-			{Key: "version", Title: "Version", Width: 9, Sortable: true},
-			{Key: "created", Title: "Created", Width: 22, Sortable: true},
-			{Key: "updated", Title: "Updated", Width: 22, Sortable: true},
+			{Key: "version", Title: "Version", Path: "Version", Width: 9, Sortable: true},
+			{Key: "created", Title: "Created", Path: "Created", Width: 22, Sortable: true},
+			{Key: "updated", Title: "Updated", Path: "Updated", Width: 22, Sortable: true},
 		},
 		Children: []domain.ChildViewDef{{
 			ChildType:      "pipeline_stages",
@@ -177,11 +179,11 @@ var cicdTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static c
 			return consolelink.Regional(region, "codesuite/codebuild/"+acct+"/projects/"+url.PathEscape(r.ID))
 		},
 		Columns: []domain.Column{
-			{Key: "name", Title: "Project Name", Width: 32, Sortable: true},
-			{Key: "source_type", Title: "Source Type", Width: 14, Sortable: true},
+			{Key: "name", Title: "Project Name", Path: "Name", Width: 32, Sortable: true},
+			{Key: "source_type", Title: "Source Type", Path: "Source.Type", Width: 14, Sortable: true},
 			{Key: "last_build", Title: "Status", Width: 18, Sortable: true},
-			{Key: "description", Title: "Description", Width: 36, Sortable: false},
-			{Key: "last_modified", Title: "Last Modified", Width: 22, Sortable: true},
+			{Key: "description", Title: "Description", Path: "Description", Width: 36},
+			{Key: "last_modified", Title: "Last Modified", Path: "LastModified", Width: 22, Sortable: true},
 		},
 		Children: []domain.ChildViewDef{{
 			ChildType:      "cb_builds",
@@ -237,11 +239,15 @@ var cicdTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static c
 			return consolelink.Regional(region, "ecr/repositories/"+url.PathEscape(r.ID)+"/?region="+region)
 		},
 		Columns: []domain.Column{
-			{Key: "repository_name", Title: "Repository", Width: 36, Sortable: true},
-			{Key: "uri", Title: "URI", Width: 60, Sortable: false},
-			{Key: "tag_mutability", Title: "Tag Mutability", Width: 16, Sortable: true},
-			{Key: "scan_on_push", Title: "Scan", Width: 6, Sortable: true},
-			{Key: "created_at", Title: "Created", Width: 22, Sortable: true},
+			{Key: "repository_name", Title: "Repository", Path: "RepositoryName", Width: 36, Sortable: true},
+			{Title: "Status", Width: 12},
+			{Key: "uri", Title: "URI", Path: "RepositoryUri", Width: 60},
+			{Key: "tag_mutability", Title: "Tag Mutability", Path: "ImageTagMutability", Width: 16, Sortable: true},
+			{Key: "scan_on_push", Title: "Scan", Path: "ImageScanningConfiguration.ScanOnPush", Width: 6, Sortable: true},
+			{Key: "critical_vulns", Title: "Critical", Width: 8},
+			{Key: "high_vulns", Title: "High", Width: 6},
+			{Key: "images_scanned", Title: "Scanned", Width: 8},
+			{Key: "created_at", Title: "Created", Path: "CreatedAt", Width: 22, Sortable: true},
 		},
 		Children: []domain.ChildViewDef{{
 			ChildType:      "ecr_images",
@@ -302,10 +308,12 @@ var cicdTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static c
 			return consolelink.Regional(region, "codesuite/codeartifact/d/"+acct+"/"+url.PathEscape(domainName)+"/r/"+url.PathEscape(r.ID))
 		},
 		Columns: []domain.Column{
-			{Key: "repo_name", Title: "Repository", Width: 28, Sortable: true},
-			{Key: "domain_name", Title: "Domain", Width: 24, Sortable: true},
-			{Key: "description", Title: "Description", Width: 30, Sortable: false},
-			{Key: "domain_owner", Title: "Owner", Width: 14, Sortable: true},
+			{Key: "repo_name", Title: "Repository", Path: "Name", Width: 28, Sortable: true},
+			{Title: "Status", Width: 12},
+			{Key: "domain_name", Title: "Domain", Path: "DomainName", Width: 24, Sortable: true},
+			{Key: "package_count", Title: "Packages", Width: 8},
+			{Key: "description", Title: "Description", Path: "Description", Width: 30},
+			{Key: "domain_owner", Title: "Owner", Path: "DomainOwner", Width: 14, Sortable: true},
 		},
 		Color: colorCodeArtifact,
 		Fetcher: fetcherWithClients(func(ctx context.Context, c *ServiceClients, continuationToken string) (resource.FetchResult, error) {

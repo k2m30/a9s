@@ -1,21 +1,26 @@
-generated: 5
+generated: 6
 list:
   Name:
     path: Name
+    key: name
     width: 36
   Status:
     width: 12
   Zone ID:
     path: Id
+    key: zone_id
     width: 30
   Records:
     path: ResourceRecordSetCount
+    key: record_count
     width: 9
   Private:
     path: Config.PrivateZone
+    key: private_zone
     width: 9
   Comment:
     path: Config.Comment
+    key: comment
     width: 30
 
 detail:

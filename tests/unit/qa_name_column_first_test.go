@@ -120,26 +120,6 @@ var expectedConfigColumnCounts = map[string]int{
 	"efs":    6,
 }
 
-// expectedTypeDefColumnCounts lists the number of columns in the Go type
-// definition (resource.FindResourceType). These may differ from config counts
-// when YAML views have been updated ahead of the type definitions.
-var expectedTypeDefColumnCounts = map[string]int{
-	"sg":     5, // +1 single Status column (risk_summary, added f68982f7)
-	"vpc":    5,
-	"subnet": 7,
-	"rtb":    5,
-	"nat":    6,
-	"igw":    4,
-	"eip":    6,
-	"vpce":   5,
-	"tgw":    5,
-	"eni":    6,
-	"r53":    5,
-	"cf":     6,
-	"apigw":  5,
-	"efs":    6,
-}
-
 func TestConfigDefaultViewDef_ColumnCountPreserved(t *testing.T) {
 	for shortName, wantCount := range expectedConfigColumnCounts {
 		t.Run(shortName, func(t *testing.T) {
@@ -152,8 +132,13 @@ func TestConfigDefaultViewDef_ColumnCountPreserved(t *testing.T) {
 	}
 }
 
+// TestResourceTypeDef_ColumnCountPreserved reads the same table as the config
+// test above. w197: there used to be a second table here, because the type's
+// column list and the built-in view's were two declarations that differed —
+// the type's had no Status column. They are one list now, so a second table
+// would only be a second place to update.
 func TestResourceTypeDef_ColumnCountPreserved(t *testing.T) {
-	for shortName, wantCount := range expectedTypeDefColumnCounts {
+	for shortName, wantCount := range expectedConfigColumnCounts {
 		t.Run(shortName, func(t *testing.T) {
 			rt := resource.FindResourceType(shortName)
 			if rt == nil {
@@ -194,13 +179,12 @@ var expectedSecondColumn = map[string]struct {
 	"efs":    {configTitle: "File System ID", typeDefTitle: "File System ID", typeDefKey: "file_system_id"},
 }
 
-// configIDColumnIndexOverride lists resource types whose config-driven default
-// view now inserts a single Status column ahead of the ID column (the
-// title-based Status cascade, a56dc887), pushing the ID column from index 1
-// to index 2. The Go ResourceTypeDef.Columns for these types is unaffected
-// (no Status column there), so TestResourceTypeDef_IDColumnSecond still uses
-// index 1 via expectedSecondColumn.
-var configIDColumnIndexOverride = map[string]int{
+// idColumnIndexOverride lists resource types whose default view inserts a
+// single Status column ahead of the ID column (the title-based Status cascade,
+// a56dc887), pushing the ID column from index 1 to index 2. w197: it applied
+// to the config's list alone while the type's list had no Status column;
+// both tests read it now, because both read one list.
+var idColumnIndexOverride = map[string]int{
 	"r53":   2,
 	"apigw": 2,
 }
@@ -210,7 +194,7 @@ func TestConfigDefaultViewDef_IDColumnSecond(t *testing.T) {
 		t.Run(shortName, func(t *testing.T) {
 			vd := config.DefaultViewDef(shortName)
 			idx := 1
-			if override, ok := configIDColumnIndexOverride[shortName]; ok {
+			if override, ok := idColumnIndexOverride[shortName]; ok {
 				idx = override
 			}
 			if len(vd.List) <= idx {
@@ -231,16 +215,20 @@ func TestResourceTypeDef_IDColumnSecond(t *testing.T) {
 			if rt == nil {
 				t.Fatalf("resource.FindResourceType(%q) returned nil", shortName)
 			}
-			if len(rt.Columns) < 2 {
-				t.Fatalf("resource type %q has fewer than 2 columns", shortName)
+			idx := 1
+			if override, ok := idColumnIndexOverride[shortName]; ok {
+				idx = override
 			}
-			if rt.Columns[1].Title != want.typeDefTitle {
-				t.Errorf("resource type %q Columns[1].Title = %q, want %q",
-					shortName, rt.Columns[1].Title, want.typeDefTitle)
+			if len(rt.Columns) <= idx {
+				t.Fatalf("resource type %q has fewer than %d columns", shortName, idx+1)
 			}
-			if rt.Columns[1].Key != want.typeDefKey {
-				t.Errorf("resource type %q Columns[1].Key = %q, want %q",
-					shortName, rt.Columns[1].Key, want.typeDefKey)
+			if rt.Columns[idx].Title != want.typeDefTitle {
+				t.Errorf("resource type %q Columns[%d].Title = %q, want %q",
+					shortName, idx, rt.Columns[idx].Title, want.typeDefTitle)
+			}
+			if rt.Columns[idx].Key != want.typeDefKey {
+				t.Errorf("resource type %q Columns[%d].Key = %q, want %q",
+					shortName, idx, rt.Columns[idx].Key, want.typeDefKey)
 			}
 		})
 	}

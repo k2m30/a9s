@@ -1,9 +1,11 @@
-generated: 5
+generated: 6
 list:
   Name:
+    key: name
     width: 28
   IGW ID:
     path: InternetGatewayId
+    key: igw_id
     width: 26
   VPC ID:
     key: vpc_id

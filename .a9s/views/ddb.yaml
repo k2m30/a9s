@@ -1,13 +1,15 @@
-generated: 5
+generated: 6
 list:
   Table Name:
     path: TableName
+    key: table_name
     width: 36
   Status:
     key: status
     width: 32
   Items:
     path: ItemCount
+    key: item_count
     width: 12
   Size:
     key: size_bytes

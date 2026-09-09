@@ -1,22 +1,27 @@
-generated: 5
+generated: 6
 list:
   Pipeline Name:
     path: Name
+    key: name
     width: 30
   Type:
     path: PipelineType
+    key: pipeline_type
     width: 6
   Status:
     key: last_status
     width: 18
   Version:
     path: Version
+    key: version
     width: 9
   Created:
     path: Created
+    key: created
     width: 22
   Updated:
     path: Updated
+    key: updated
     width: 22
 
 detail:

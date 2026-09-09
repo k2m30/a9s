@@ -1,9 +1,11 @@
-generated: 5
+generated: 6
 list:
   Name:
+    key: name
     width: 28
   TGW ID:
     path: TransitGatewayId
+    key: tgw_id
     width: 26
   Status:
     path: State
@@ -13,9 +15,11 @@ list:
     width: 10
   Owner:
     path: OwnerId
+    key: owner_id
     width: 14
   Description:
     path: Description
+    key: description
     width: 30
 
 detail:

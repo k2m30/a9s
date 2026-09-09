@@ -1,7 +1,8 @@
-generated: 5
+generated: 6
 list:
   Name:
     path: Name
+    key: name
     width: 28
   Status:
     width: 12
@@ -19,6 +20,7 @@ list:
     width: 50
   Description:
     path: Description
+    key: description
     width: 30
 
 detail:

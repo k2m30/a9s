@@ -54,11 +54,12 @@ var secretsTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stati
 			return consolelink.Regional(region, "secretsmanager/secret?region="+region+"&name="+url.QueryEscape(r.ID))
 		},
 		Columns: []domain.Column{
-			{Key: "secret_name", Title: "Secret Name", Width: 36, Sortable: true},
-			{Key: "description", Title: "Description", Width: 30, Sortable: false},
-			{Key: "last_accessed", Title: "Last Accessed", Width: 18, Sortable: true},
-			{Key: "last_changed", Title: "Last Changed", Width: 18, Sortable: true},
-			{Key: "rotation_enabled", Title: "Rotation", Width: 10, Sortable: true},
+			{Key: "secret_name", Title: "Secret Name", Path: "Name", Width: 36, Sortable: true},
+			{Key: "status", Title: "Status", Path: "Name", Width: 10},
+			{Key: "description", Title: "Description", Path: "Description", Width: 30},
+			{Key: "last_accessed", Title: "Last Accessed", Path: "LastAccessedDate", Width: 18, Sortable: true},
+			{Key: "last_changed", Title: "Last Changed", Path: "LastChangedDate", Width: 18, Sortable: true},
+			{Key: "rotation_enabled", Title: "Rotation", Path: "RotationEnabled", Width: 10, Sortable: true},
 		},
 		Color: colorSecrets,
 		Fetcher: fetcherWithClients(func(ctx context.Context, c *ServiceClients, continuationToken string) (resource.FetchResult, error) {
@@ -109,12 +110,12 @@ var secretsTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stati
 			return consolelink.Regional(region, "systems-manager/parameters/"+name+"/description?region="+region)
 		},
 		Columns: []domain.Column{
-			{Key: "name", Title: "Name", Width: 40, Sortable: true},
-			{Key: "type", Title: "Type", Width: 14, Sortable: true},
+			{Key: "name", Title: "Name", Path: "Name", Width: 40, Sortable: true},
+			{Key: "type", Title: "Type", Path: "Type", Width: 14, Sortable: true},
 			{Key: "risk", Title: "Status", Width: 10, Sortable: true},
-			{Key: "version", Title: "Version", Width: 8, Sortable: true},
-			{Key: "last_modified", Title: "Last Modified", Width: 22, Sortable: true},
-			{Key: "description", Title: "Description", Width: 30, Sortable: false},
+			{Key: "version", Title: "Version", Path: "Version", Width: 8, Sortable: true},
+			{Key: "last_modified", Title: "Last Modified", Path: "LastModifiedDate", Width: 22, Sortable: true},
+			{Key: "description", Title: "Description", Path: "Description", Width: 30},
 		},
 		Color: colorSSM,
 		Fetcher: fetcherWithClients(func(ctx context.Context, c *ServiceClients, continuationToken string) (resource.FetchResult, error) {
@@ -139,7 +140,7 @@ var secretsTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stati
 	{
 		Name:           "KMS Keys",
 		ShortName:      "kms",
-		HumanizeFields: []string{"status"},
+		HumanizeFields: []string{"status", "KeyManager", "KeySpec", "KeyState", "KeyUsage", "Origin"},
 		Aliases:        []string{"kms", "keys"},
 		Category:       "SECRETS & CONFIG",
 		CloudTrailKey:  "ResourceName:ID",
@@ -148,10 +149,11 @@ var secretsTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stati
 			return consolelink.Regional(region, "kms/home?region="+region+"#/kms/keys/"+r.ID)
 		},
 		Columns: []domain.Column{
-			{Key: "alias", Title: "Alias", Width: 32, Sortable: true},
-			{Key: "key_id", Title: "Key ID", Width: 38, Sortable: true},
-			{Key: "status", Title: "Status", Width: 12, Sortable: true},
-			{Key: "description", Title: "Description", Width: 36, Sortable: false},
+			{Key: "alias", Title: "Alias", Path: "AliasName", Width: 32, Sortable: true},
+			{Key: "key_id", Title: "Key ID", Path: "KeyId", Width: 38, Sortable: true},
+			{Key: "status", Title: "Status", Path: "KeyState", Width: 12, Sortable: true},
+			{Key: "rotation_enabled", Title: "Rotation", Width: 10},
+			{Key: "description", Title: "Description", Path: "Description", Width: 36},
 		},
 		Color:                  colorKMS,
 		Fetcher:                fetcherWithClients(FetchKMSKeysPage),

@@ -113,7 +113,11 @@ func TestQA_VPCEndpoints_TypeDef(t *testing.T) {
 		{"service_name", "Service Name"},
 		{"vpce_id", "Endpoint ID"},
 		{"type", "Type"},
-		{"state", "State"},
+		// w197: the built-in view's list, folded into the type's own: a Status
+		// column resolving through its title and the last error beside it.
+		// "State" was never rendered.
+		{"", "Status"},
+		{"", "Last Error"},
 		{"vpc_id", "VPC ID"},
 	}
 	if len(rt.Columns) != len(expected) {

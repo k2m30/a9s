@@ -65,10 +65,12 @@ func TestQA_RDS_ListColumns_ColumnWidths(t *testing.T) {
 		"db_identifier":  28,
 		"engine":         12,
 		"engine_version": 10,
-		"status":         14,
-		"class":          16,
-		"endpoint":       40,
-		"multi_az":       10,
+		// w197: the width the built-in view has always rendered this column at,
+		// now that the view's list and the type's are one.
+		"status":   28,
+		"class":    16,
+		"endpoint": 40,
+		"multi_az": 10,
 	}
 	for _, col := range td.Columns {
 		expected, ok := expectedWidths[col.Key]

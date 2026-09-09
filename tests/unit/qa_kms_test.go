@@ -230,6 +230,8 @@ func TestKMS_ResourceTypeDef(t *testing.T) {
 		{"Alias", "alias", 32},
 		{"Key ID", "key_id", 38},
 		{"Status", "status", 12},
+		// w197: Rotation comes from the view list folded into this one.
+		{"Rotation", "rotation_enabled", 10},
 		{"Description", "description", 36},
 	}
 

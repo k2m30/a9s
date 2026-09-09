@@ -1,22 +1,27 @@
-generated: 5
+generated: 6
 list:
   Domain Name:
     path: DomainName
+    key: domain_name
     width: 28
   Status:
     key: status
     width: 40
   Engine Version:
     path: EngineVersion
+    key: engine_version
     width: 16
   Instance Type:
     path: ClusterConfig.InstanceType
+    key: instance_type
     width: 22
   Instances:
     path: ClusterConfig.InstanceCount
+    key: instance_count
     width: 10
   Endpoint:
     path: Endpoint
+    key: endpoint
     width: 48
 
 detail:

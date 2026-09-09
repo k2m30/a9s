@@ -1,7 +1,8 @@
-generated: 5
+generated: 6
 list:
   Key:
     path: Key
+    key: key
     width: 36
   Size:
     key: size
@@ -9,9 +10,11 @@ list:
     sort_key: size_raw
   Storage Class:
     path: StorageClass
+    key: storage_class
     width: 16
   Last Modified:
     path: LastModified
+    key: last_modified
     width: 22
 
 detail:

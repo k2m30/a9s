@@ -204,10 +204,12 @@ var messagingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 		},
 		Columns: []domain.Column{
 			{Key: "queue_name", Title: "Queue Name", Width: 36, Sortable: true},
+			{Title: "Status", Width: 12},
 			{Key: "approx_messages", Title: "Messages", Width: 10, Sortable: true},
 			{Key: "approx_not_visible", Title: "In Flight", Width: 10, Sortable: true},
+			{Key: "dlq", Title: "DLQ", Width: 5},
 			{Key: "delay_seconds", Title: "Delay", Width: 8, Sortable: true},
-			{Key: "queue_url", Title: "Queue URL", Width: 50, Sortable: false},
+			{Key: "queue_url", Title: "Queue URL", Width: 50},
 		},
 		Color: colorSQS,
 		Fetcher: fetcherWithClients(func(ctx context.Context, c *ServiceClients, continuationToken string) (resource.FetchResult, error) {
@@ -247,7 +249,9 @@ var messagingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 		},
 		Columns: []domain.Column{
 			{Key: "display_name", Title: "Topic Name", Width: 40, Sortable: true},
-			{Key: "topic_arn", Title: "Topic ARN", Width: 60, Sortable: true},
+			{Title: "Status", Width: 12},
+			{Key: "subs_count", Title: "Subs", Width: 6},
+			{Key: "topic_arn", Title: "Topic ARN", Path: "TopicArn", Width: 60, Sortable: true},
 		},
 		Children: []domain.ChildViewDef{{
 			ChildType:      "sns_subscriptions",
@@ -291,10 +295,12 @@ var messagingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 			return consolelink.Regional(region, "sns/v3/home?region="+region+"#/subscription/"+r.ID)
 		},
 		Columns: []domain.Column{
-			{Key: "topic_arn", Title: "Topic ARN", Width: 48, Sortable: true},
-			{Key: "protocol", Title: "Protocol", Width: 10, Sortable: true},
-			{Key: "endpoint", Title: "Endpoint", Width: 48, Sortable: false},
-			{Key: "subscription_arn", Title: "Subscription ARN", Width: 60, Sortable: false},
+			{Key: "topic_arn", Title: "Topic ARN", Path: "TopicArn", Width: 48, Sortable: true},
+			{Title: "Status", Width: 12},
+			{Key: "protocol", Title: "Protocol", Path: "Protocol", Width: 10, Sortable: true},
+			{Key: "endpoint", Title: "Endpoint", Path: "Endpoint", Width: 48},
+			{Key: "confirmed", Title: "Confirmed", Width: 12},
+			{Key: "subscription_arn", Title: "Subscription ARN", Width: 60},
 		},
 		Color: colorSNSSub,
 		Fetcher: fetcherWithClients(func(ctx context.Context, c *ServiceClients, continuationToken string) (resource.FetchResult, error) {
@@ -345,11 +351,11 @@ var messagingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 				"&environmentName="+url.QueryEscape(appEnv[1]))
 		},
 		Columns: []domain.Column{
-			{Key: "environment_name", Title: "Environment", Width: 28, Sortable: true},
-			{Key: "application_name", Title: "Application", Width: 24, Sortable: true},
-			{Key: "status", Title: "Status", Width: 12, Sortable: true},
-			{Key: "health", Title: "Health", Width: 10, Sortable: true},
-			{Key: "version_label", Title: "Version", Width: 16, Sortable: true},
+			{Key: "environment_name", Title: "Environment", Path: "EnvironmentName", Width: 28, Sortable: true},
+			{Key: "application_name", Title: "Application", Path: "ApplicationName", Width: 24, Sortable: true},
+			{Key: "status", Title: "Status", Path: "Status", Width: 12, Sortable: true},
+			{Key: "health", Title: "Health", Path: "Health", Width: 10, Sortable: true},
+			{Key: "version_label", Title: "Version", Path: "VersionLabel", Width: 16, Sortable: true},
 		},
 		Color: colorEB,
 		Fetcher: fetcherWithClients(func(ctx context.Context, c *ServiceClients, continuationToken string) (resource.FetchResult, error) {
@@ -398,11 +404,12 @@ var messagingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 			return consolelink.Regional(region, "events/home?region="+region+"#/eventbus/"+url.PathEscape(bus)+"/rules/"+url.PathEscape(r.ID))
 		},
 		Columns: []domain.Column{
-			{Key: "name", Title: "Rule Name", Width: 28, Sortable: true},
-			{Key: "state", Title: "State", Width: 10, Sortable: true},
-			{Key: "event_bus", Title: "Event Bus", Width: 18, Sortable: true},
-			{Key: "schedule", Title: "Schedule", Width: 24, Sortable: false},
-			{Key: "description", Title: "Description", Width: 30, Sortable: false},
+			{Key: "name", Title: "Rule Name", Path: "Name", Width: 28, Sortable: true},
+			{Title: "Status", Path: "State", Width: 10},
+			{Key: "target_count", Title: "Targets", Width: 8},
+			{Key: "event_bus", Title: "Event Bus", Path: "EventBusName", Width: 18, Sortable: true},
+			{Key: "schedule", Title: "Schedule", Path: "ScheduleExpression", Width: 24},
+			{Key: "description", Title: "Description", Path: "Description", Width: 30},
 		},
 		Children: []domain.ChildViewDef{{
 			ChildType:      "eb_rule_targets",
@@ -448,10 +455,10 @@ var messagingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 			return consolelink.Regional(region, "kinesis/home?region="+region+"#/streams/details/"+url.PathEscape(r.ID)+"/monitoring")
 		},
 		Columns: []domain.Column{
-			{Key: "stream_name", Title: "Stream Name", Width: 36, Sortable: true},
-			{Key: "status", Title: "Status", Width: 12, Sortable: true},
-			{Key: "stream_mode", Title: "Mode", Width: 14, Sortable: true},
-			{Key: "creation_time", Title: "Created", Width: 22, Sortable: true},
+			{Key: "stream_name", Title: "Stream Name", Path: "StreamName", Width: 36, Sortable: true},
+			{Key: "status", Title: "Status", Path: "StreamStatus", Width: 12, Sortable: true},
+			{Key: "stream_mode", Title: "Mode", Path: "StreamModeDetails.StreamMode", Width: 14, Sortable: true},
+			{Key: "creation_time", Title: "Created", Path: "StreamCreationTimestamp", Width: 22, Sortable: true},
 		},
 		Color: colorKinesis,
 		Fetcher: fetcherWithClients(func(ctx context.Context, c *ServiceClients, continuationToken string) (resource.FetchResult, error) {
@@ -490,10 +497,10 @@ var messagingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 			return consolelink.Regional(region, "msk/home?region="+region+"#/cluster/"+url.QueryEscape(arn)+"/view?tabId=details")
 		},
 		Columns: []domain.Column{
-			{Key: "cluster_name", Title: "Cluster Name", Width: 28, Sortable: true},
-			{Key: "cluster_type", Title: "Type", Width: 14, Sortable: true},
-			{Key: "state", Title: "Status", Width: 14, Sortable: true},
-			{Key: "version", Title: "Version", Width: 14, Sortable: true},
+			{Key: "cluster_name", Title: "Cluster Name", Path: "ClusterName", Width: 28, Sortable: true},
+			{Key: "cluster_type", Title: "Type", Path: "ClusterType", Width: 14, Sortable: true},
+			{Key: "state", Title: "Status", Path: "State", Width: 14, Sortable: true},
+			{Key: "version", Title: "Version", Path: "CurrentVersion", Width: 14, Sortable: true},
 		},
 		Color: colorMSK,
 		Fetcher: fetcherWithClients(func(ctx context.Context, c *ServiceClients, continuationToken string) (resource.FetchResult, error) {
@@ -546,10 +553,12 @@ var messagingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 			return consolelink.Regional(region, "states/home?region="+region+"#/statemachines/view/"+arn)
 		},
 		Columns: []domain.Column{
-			{Key: "name", Title: "Name", Width: 36, Sortable: true},
-			{Key: "type", Title: "Type", Width: 10, Sortable: true},
-			{Key: "arn", Title: "ARN", Width: 60, Sortable: false},
-			{Key: "creation_date", Title: "Created", Width: 22, Sortable: true},
+			{Key: "name", Title: "Name", Path: "Name", Width: 36, Sortable: true},
+			{Key: "type", Title: "Type", Path: "Type", Width: 10, Sortable: true},
+			{Title: "Status", Width: 12},
+			{Key: "last_run", Title: "Last Run", Width: 18},
+			{Key: "arn", Title: "ARN", Path: "StateMachineArn", Width: 60},
+			{Key: "creation_date", Title: "Created", Path: "CreationDate", Width: 22, Sortable: true},
 		},
 		Children: []domain.ChildViewDef{{
 			ChildType:      "sfn_executions",
@@ -604,7 +613,7 @@ var messagingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 			return consolelink.Regional(region, "ses/home?region="+region+"#/identities/"+url.PathEscape(r.ID))
 		},
 		Columns: []domain.Column{
-			{Key: "identity_name", Title: "Identity", Width: 36, Sortable: true},
+			{Key: "identity_name", Title: "Identity", Path: "IdentityName", Width: 36, Sortable: true},
 			{Key: "identity_type", Title: "Type", Width: 16, Sortable: true},
 			{Key: "status", Title: "Status", Width: 36, Sortable: true},
 		},

@@ -1,7 +1,8 @@
-generated: 5
+generated: 6
 list:
   Rule Name:
     path: Name
+    key: name
     width: 28
   Status:
     path: State
@@ -11,12 +12,15 @@ list:
     width: 8
   Event Bus:
     path: EventBusName
+    key: event_bus
     width: 18
   Schedule:
     path: ScheduleExpression
+    key: schedule
     width: 24
   Description:
     path: Description
+    key: description
     width: 30
 
 detail:

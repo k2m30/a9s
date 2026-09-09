@@ -1,10 +1,12 @@
-generated: 5
+generated: 6
 list:
   Stack Name:
     path: StackName
+    key: stack_name
     width: 36
   Status:
     path: StackStatus
+    key: status
     width: 24
   Drift:
     key: drift_status
@@ -14,12 +16,15 @@ list:
     width: 32
   Created:
     path: CreationTime
+    key: creation_time
     width: 22
   Updated:
     path: LastUpdatedTime
+    key: last_updated
     width: 22
   Description:
     path: Description
+    key: description
     width: 30
 
 detail:

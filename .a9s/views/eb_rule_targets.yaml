@@ -1,10 +1,12 @@
-generated: 5
+generated: 6
 list:
   Target ID:
     path: Id
+    key: target_id
     width: 20
   Target ARN:
     path: Arn
+    key: target_arn
     width: 48
   Resource:
     key: resource_type_name

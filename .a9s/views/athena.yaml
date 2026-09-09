@@ -1,7 +1,8 @@
-generated: 5
+generated: 6
 list:
   Workgroup:
     path: Name
+    key: workgroup_name
     width: 28
   Status:
     path: State
@@ -11,9 +12,11 @@ list:
     width: 12
   Description:
     path: Description
+    key: description
     width: 30
   Engine:
     path: EngineVersion.EffectiveEngineVersion
+    key: engine_version
     width: 28
 
 detail:

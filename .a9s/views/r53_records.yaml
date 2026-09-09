@@ -1,13 +1,16 @@
-generated: 5
+generated: 6
 list:
   Name:
     path: Name
+    key: name
     width: 40
   Type:
     path: Type
+    key: type
     width: 8
   TTL:
     path: TTL
+    key: ttl
     width: 8
   Values:
     key: values

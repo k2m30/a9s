@@ -1,19 +1,23 @@
-generated: 5
+generated: 6
 list:
   Plan Name:
     path: BackupPlanName
+    key: plan_name
     width: 32
   Status:
     key: status
     width: 40
   Plan ID:
     path: BackupPlanId
+    key: plan_id
     width: 38
   Created:
     path: CreationDate
+    key: creation_date
     width: 22
   Last Execution:
     path: LastExecutionDate
+    key: last_execution
     width: 22
 
 detail:

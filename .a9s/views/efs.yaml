@@ -1,22 +1,27 @@
-generated: 5
+generated: 6
 list:
   Name:
     path: Name
+    key: name
     width: 28
   File System ID:
     path: FileSystemId
+    key: file_system_id
     width: 22
   Status:
     key: status
     width: 24
   Perf Mode:
     path: PerformanceMode
+    key: performance_mode
     width: 16
   Encrypted:
     path: Encrypted
+    key: encrypted
     width: 10
   Mounts:
     path: NumberOfMountTargets
+    key: mount_targets
     width: 8
 
 detail:

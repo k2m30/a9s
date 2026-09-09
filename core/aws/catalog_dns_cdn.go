@@ -44,11 +44,12 @@ var dnsCdnTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static
 			return consolelink.Global(region, "route53/v2/hostedzones#ListRecordSets/"+zone)
 		},
 		Columns: []domain.Column{
-			{Key: "name", Title: "Name", Width: 36, Sortable: true},
-			{Key: "zone_id", Title: "Zone ID", Width: 30, Sortable: true},
-			{Key: "record_count", Title: "Records", Width: 9, Sortable: true},
-			{Key: "private_zone", Title: "Private", Width: 9, Sortable: true},
-			{Key: "comment", Title: "Comment", Width: 30, Sortable: false},
+			{Key: "name", Title: "Name", Path: "Name", Width: 36, Sortable: true},
+			{Title: "Status", Width: 12},
+			{Key: "zone_id", Title: "Zone ID", Path: "Id", Width: 30, Sortable: true},
+			{Key: "record_count", Title: "Records", Path: "ResourceRecordSetCount", Width: 9, Sortable: true},
+			{Key: "private_zone", Title: "Private", Path: "Config.PrivateZone", Width: 9, Sortable: true},
+			{Key: "comment", Title: "Comment", Path: "Config.Comment", Width: 30},
 		},
 		Children: []domain.ChildViewDef{{
 			ChildType:      "r53_records",
@@ -91,12 +92,14 @@ var dnsCdnTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static
 			return consolelink.Global(region, "cloudfront/v4/home#/distributions/"+r.ID)
 		},
 		Columns: []domain.Column{
-			{Key: "domain_name", Title: "Domain Name", Width: 40, Sortable: true},
-			{Key: "distribution_id", Title: "Distribution ID", Width: 16, Sortable: true},
-			{Key: "status", Title: "Status", Width: 12, Sortable: true},
-			{Key: "enabled", Title: "Enabled", Width: 9, Sortable: true},
-			{Key: "aliases", Title: "Aliases", Width: 30, Sortable: false},
-			{Key: "price_class", Title: "Price Class", Width: 16, Sortable: true},
+			{Key: "domain_name", Title: "Domain Name", Path: "DomainName", Width: 40, Sortable: true},
+			{Key: "distribution_id", Title: "Distribution ID", Path: "Id", Width: 16, Sortable: true},
+			{Key: "status", Title: "Status", Path: "Status", Width: 12, Sortable: true},
+			{Title: "WAF", Path: "WebACLId", Width: 14},
+			{Title: "TLS", Path: "ViewerCertificate.MinimumProtocolVersion", Width: 14},
+			{Key: "enabled", Title: "Enabled", Path: "Enabled", Width: 9, Sortable: true},
+			{Key: "aliases", Title: "Aliases", Path: "Aliases.Items", Width: 30},
+			{Key: "price_class", Title: "Price Class", Path: "PriceClass", Width: 16, Sortable: true},
 		},
 		Color: colorCF,
 		Fetcher: fetcherWithClients(func(ctx context.Context, c *ServiceClients, continuationToken string) (resource.FetchResult, error) {
@@ -137,7 +140,7 @@ var dnsCdnTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static
 	{
 		Name:           "ACM Certificates",
 		ShortName:      "acm",
-		HumanizeFields: []string{"Type"},
+		HumanizeFields: []string{"Type", "RenewalEligibility"},
 		Aliases:        []string{"acm", "certificates", "certs"},
 		Category:       "DNS & CDN",
 		CloudTrailKey:  "ResourceName:ID",
@@ -150,11 +153,12 @@ var dnsCdnTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static
 			return consolelink.Regional(region, "acm/home?region="+region+"#/certificates/"+uuid)
 		},
 		Columns: []domain.Column{
-			{Key: "domain_name", Title: "Domain Name", Width: 40, Sortable: true},
-			{Key: "status", Title: "Status", Width: 14, Sortable: true},
-			{Key: "type", Title: "Type", Width: 14, Sortable: true},
-			{Key: "not_after", Title: "Expires", Width: 22, Sortable: true},
-			{Key: "in_use", Title: "In Use", Width: 8, Sortable: true},
+			{Key: "domain_name", Title: "Domain Name", Path: "DomainName", Width: 40, Sortable: true},
+			{Key: "status", Title: "Status", Path: "Status", Width: 14, Sortable: true},
+			{Key: "days_left", Title: "Days Left", Width: 10},
+			{Key: "type", Title: "Type", Path: "Type", Width: 14, Sortable: true},
+			{Key: "not_after", Title: "Expires", Path: "NotAfter", Width: 22, Sortable: true},
+			{Key: "in_use", Title: "In Use", Path: "InUse", Width: 8, Sortable: true},
 		},
 		Color: acmColor,
 		Fetcher: fetcherWithClients(func(ctx context.Context, c *ServiceClients, continuationToken string) (resource.FetchResult, error) {
@@ -194,11 +198,13 @@ var dnsCdnTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static
 			return consolelink.Regional(region, "apigateway/main/api-detail?api="+r.ID+"&region="+region)
 		},
 		Columns: []domain.Column{
-			{Key: "name", Title: "Name", Width: 28, Sortable: true},
+			{Key: "name", Title: "Name", Path: "Name", Width: 28, Sortable: true},
+			{Title: "Status", Width: 12},
 			{Key: "api_id", Title: "API ID", Width: 14, Sortable: true},
 			{Key: "protocol", Title: "Protocol", Width: 12, Sortable: true},
-			{Key: "endpoint", Title: "Endpoint", Width: 50, Sortable: false},
-			{Key: "description", Title: "Description", Width: 30, Sortable: false},
+			{Key: "stages_count", Title: "Stages", Width: 7},
+			{Key: "endpoint", Title: "Endpoint", Width: 50},
+			{Key: "description", Title: "Description", Path: "Description", Width: 30},
 		},
 		Color:                  colorAPIGW,
 		Fetcher:                fetcherWithClients(FetchAPIGatewaysPageMerged),

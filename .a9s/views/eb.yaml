@@ -1,19 +1,24 @@
-generated: 5
+generated: 6
 list:
   Environment:
     path: EnvironmentName
+    key: environment_name
     width: 28
   Application:
     path: ApplicationName
+    key: application_name
     width: 24
   Status:
     path: Status
+    key: status
     width: 12
   Health:
     path: Health
+    key: health
     width: 10
   Version:
     path: VersionLabel
+    key: version_label
     width: 16
 
 detail:

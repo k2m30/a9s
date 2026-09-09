@@ -1,13 +1,16 @@
-generated: 5
+generated: 6
 list:
   DB Identifier:
     path: DBInstanceIdentifier
+    key: db_identifier
     width: 28
   Engine:
     path: Engine
+    key: engine
     width: 12
   Version:
     path: EngineVersion
+    key: engine_version
     width: 10
   Status:
     key: status
@@ -15,12 +18,15 @@ list:
     sort_key: status_raw
   Class:
     path: DBInstanceClass
+    key: class
     width: 16
   Endpoint:
     path: Endpoint.Address
+    key: endpoint
     width: 40
   Multi-AZ:
     path: MultiAZ
+    key: multi_az
     width: 10
 
 detail:

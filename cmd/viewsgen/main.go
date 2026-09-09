@@ -8,10 +8,15 @@ import (
 	"path/filepath"
 	"sort"
 
+	"github.com/k2m30/a9s/v3/core/aws"
 	"github.com/k2m30/a9s/v3/core/config"
 )
 
 func main() {
+	// The list columns are declared on the catalog types, so the generator
+	// reads nothing until the catalog is installed.
+	aws.Install()
+
 	cfg := config.DefaultConfig()
 
 	outDir := filepath.Join(".a9s", "views")

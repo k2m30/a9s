@@ -1,19 +1,23 @@
-generated: 5
+generated: 6
 list:
   Alias:
     path: AliasName
+    key: alias
     width: 32
   Key ID:
     path: KeyId
+    key: key_id
     width: 38
   Status:
     path: KeyState
+    key: status
     width: 12
   Rotation:
     key: rotation_enabled
     width: 10
   Description:
     path: Description
+    key: description
     width: 36
 
 detail:

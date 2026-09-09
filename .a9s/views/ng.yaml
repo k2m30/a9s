@@ -1,4 +1,4 @@
-generated: 5
+generated: 6
 list:
   Node Group:
     path: NodegroupName
@@ -14,9 +14,11 @@ list:
     width: 14
   Instance Types:
     path: InstanceTypes
+    key: instance_types
     width: 20
   Desired:
     path: ScalingConfig.DesiredSize
+    key: desired_size
     width: 9
 
 detail:

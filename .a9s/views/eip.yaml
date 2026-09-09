@@ -1,24 +1,30 @@
-generated: 5
+generated: 6
 list:
   Name:
+    key: name
     width: 24
   Allocation ID:
     path: AllocationId
+    key: allocation_id
     width: 26
   Public IP:
     path: PublicIp
+    key: public_ip
     width: 16
   Status:
     key: status
     width: 12
   Association:
     path: AssociationId
+    key: association_id
     width: 26
   Instance:
     path: InstanceId
+    key: instance_id
     width: 20
   Domain:
     path: Domain
+    key: domain
     width: 8
 
 detail:

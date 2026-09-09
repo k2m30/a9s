@@ -1,10 +1,12 @@
-generated: 5
+generated: 6
 list:
   Cluster Name:
     path: Name
+    key: cluster_name
     width: 28
   Version:
     path: Version
+    key: version
     width: 10
   Status:
     path: Status
@@ -12,9 +14,11 @@ list:
     width: 14
   Endpoint:
     path: Endpoint
+    key: endpoint
     width: 48
   Platform Version:
     path: PlatformVersion
+    key: platform_version
     width: 18
 
 detail:

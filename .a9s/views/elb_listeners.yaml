@@ -1,10 +1,12 @@
-generated: 5
+generated: 6
 list:
   Port:
     path: Port
+    key: port
     width: 8
   Protocol:
     path: Protocol
+    key: protocol
     width: 10
   Action:
     key: default_action_type
@@ -14,6 +16,7 @@ list:
     width: 32
   SSL Policy:
     path: SslPolicy
+    key: ssl_policy
     width: 24
   Certificate:
     key: certificate_short

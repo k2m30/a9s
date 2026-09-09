@@ -1,7 +1,8 @@
-generated: 5
+generated: 6
 list:
   Cluster ID:
     path: ClusterIdentifier
+    key: cluster_id
     width: 36
   Status:
     key: status
@@ -12,15 +13,19 @@ list:
     width: 14
   Node Type:
     path: NodeType
+    key: node_type
     width: 16
   Nodes:
     path: NumberOfNodes
+    key: num_nodes
     width: 7
   Database:
     path: DBName
+    key: db_name
     width: 16
   Endpoint:
     path: Endpoint.Address
+    key: endpoint
     width: 44
 
 detail:

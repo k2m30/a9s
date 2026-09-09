@@ -1,7 +1,8 @@
-generated: 5
+generated: 6
 list:
   Stream Name:
     path: LogStreamName
+    key: stream_name
     width: 48
   Last Event:
     key: last_event

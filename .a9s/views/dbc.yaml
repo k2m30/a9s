@@ -1,10 +1,12 @@
-generated: 5
+generated: 6
 list:
   Cluster ID:
     path: DBClusterIdentifier
+    key: cluster_id
     width: 28
   Version:
     path: EngineVersion
+    key: engine_version
     width: 10
   Status:
     key: status
@@ -12,9 +14,11 @@ list:
     sort_key: status_raw
   Instances:
     path: DBClusterMembers
+    key: instances
     width: 10
   Endpoint:
     path: Endpoint
+    key: endpoint
     width: 48
 
 detail:

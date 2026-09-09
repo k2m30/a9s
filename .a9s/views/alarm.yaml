@@ -1,7 +1,8 @@
-generated: 5
+generated: 6
 list:
   Alarm Name:
     path: AlarmName
+    key: alarm_name
     width: 36
   Status:
     path: StateValue
@@ -11,9 +12,11 @@ list:
     width: 10
   Metric:
     path: MetricName
+    key: metric_name
     width: 24
   Namespace:
     path: Namespace
+    key: namespace
     width: 24
   Threshold:
     path: Threshold

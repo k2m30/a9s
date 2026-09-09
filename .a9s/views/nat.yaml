@@ -1,15 +1,19 @@
-generated: 5
+generated: 6
 list:
   Name:
+    key: name
     width: 24
   NAT Gateway ID:
     path: NatGatewayId
+    key: nat_gateway_id
     width: 26
   VPC ID:
     path: VpcId
+    key: vpc_id
     width: 24
   Subnet ID:
     path: SubnetId
+    key: subnet_id
     width: 26
   Status:
     path: State

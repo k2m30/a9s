@@ -1,16 +1,20 @@
-generated: 5
+generated: 6
 list:
   Cluster Name:
     path: ClusterName
+    key: cluster_name
     width: 28
   Type:
     path: ClusterType
+    key: cluster_type
     width: 14
   Status:
     path: State
+    key: state
     width: 14
   Version:
     path: CurrentVersion
+    key: version
     width: 14
 
 detail:

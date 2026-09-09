@@ -1,13 +1,15 @@
-generated: 5
+generated: 6
 list:
   Timestamp:
     key: timestamp
     width: 22
   Logical ID:
     path: LogicalResourceId
+    key: logical_resource_id
     width: 28
   Type:
     path: ResourceType
+    key: resource_type
     width: 28
   Status:
     key: resource_status

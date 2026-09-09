@@ -1,4 +1,4 @@
-generated: 5
+generated: 6
 list:
   Topic Name:
     key: display_name
@@ -10,6 +10,7 @@ list:
     width: 6
   Topic ARN:
     path: TopicArn
+    key: topic_arn
     width: 60
 
 detail:

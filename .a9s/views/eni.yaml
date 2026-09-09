@@ -1,21 +1,27 @@
-generated: 5
+generated: 6
 list:
   Name:
+    key: name
     width: 24
   ENI ID:
     path: NetworkInterfaceId
+    key: eni_id
     width: 26
   Status:
     path: Status
+    key: status
     width: 12
   Type:
     path: InterfaceType
+    key: type
     width: 14
   VPC ID:
     path: VpcId
+    key: vpc_id
     width: 24
   Private IP:
     path: PrivateIpAddress
+    key: private_ip
     width: 16
 
 detail:

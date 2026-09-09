@@ -115,8 +115,12 @@ func TestQA_SNSSubscriptions_TypeDef(t *testing.T) {
 		title string
 	}{
 		{"topic_arn", "Topic ARN"},
+		// w197: Status and Confirmed come from the built-in view's list, folded
+		// into the type's own, and the order is that list's.
+		{"", "Status"},
 		{"protocol", "Protocol"},
 		{"endpoint", "Endpoint"},
+		{"confirmed", "Confirmed"},
 		{"subscription_arn", "Subscription ARN"},
 	}
 	if len(rt.Columns) != len(expected) {

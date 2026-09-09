@@ -1,10 +1,12 @@
-generated: 5
+generated: 6
 list:
   Cluster ID:
     path: ReplicationGroupId
+    key: cluster_id
     width: 28
   Node Type:
     path: CacheNodeType
+    key: node_type
     width: 18
   Status:
     key: status
@@ -15,6 +17,7 @@ list:
     width: 8
   Endpoint:
     path: ConfigurationEndpoint.Address
+    key: endpoint
     width: 40
 
 detail:
