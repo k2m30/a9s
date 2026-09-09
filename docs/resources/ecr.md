@@ -207,8 +207,8 @@ ecr — CI/CD. Status key: `state` — the column naming it is the status column
 <!-- BEGIN GENERATED: findings -->
 | Code | Phrase | Severity | Source | Detail |
 | --- | --- | --- | --- | --- |
-| ecr.vulnerabilities | <N> critical, <M> high vulnerabilities | broken | wave2 | — |
-| ecr.vulnerabilities-high | <N> high vulnerabilities | warn | wave2 | — |
+| ecr.vulnerabilities | <N> critical, <M> high vulnerabilities | broken | wave2 | Images in this repository carry findings at critical severity, and anything deployed from them is running that code today. Rebuild on a patched base image, push it, and roll the deployments that reference the affected tags forward. |
+| ecr.vulnerabilities-high | <N> high vulnerabilities | warn | wave2 | Scanning found high-severity findings in this repository's images, so the workloads running them carry known, already-published weaknesses. Rebuild on an updated base image and move the tags forward as part of the next routine deployment. |
 | ecr.public-policy | repository policy open to anyone | broken | wave2 | The repository policy grants a wildcard principal, so any AWS account can pull the images this repository holds and read whatever is baked into their layers. Replace the wildcard principal with the accounts or roles that need the images, or add a condition that requires the caller's account or ARN to equal one you expect; a condition that only says whether a key is set scopes nothing. |
 | ecr.no-lifecycle-policy | no lifecycle policy | warn | wave2 | No lifecycle policy is set, so every image ever pushed is kept forever: storage cost grows without limit and long-superseded, vulnerable images stay pullable by tag or digest. Add a lifecycle policy that expires untagged images and caps how many versions of each tag are retained. |
 | ecr.scan-on-push-off | scan on push off | warn | wave1 | Images pushed to this repository are never scanned, so a known vulnerability in a base layer reaches production without anyone being told. Turn on scan on push for the repository so every new image is checked as it arrives. |

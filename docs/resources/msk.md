@@ -232,15 +232,15 @@ msk — MESSAGING. Status key: `state` — the key the status cell reads, and th
 <!-- BEGIN GENERATED: findings -->
 | Code | Phrase | Severity | Source | Detail |
 | --- | --- | --- | --- | --- |
-| msk.warn.creating | creating | warn | wave1 | — |
-| msk.warn.updating | updating | warn | wave1 | — |
-| msk.warn.maintenance | maintenance | warn | wave1 | — |
-| msk.warn.rebooting\_broker | rebooting broker | warn | wave1 | — |
-| msk.warn.healing | healing | warn | wave1 | — |
-| msk.warn.deleting | deleting | warn | wave1 | — |
-| msk.broken.failed | failed | broken | wave1 | — |
-| msk.broker-outdated | broker software outdated | warn | wave2 | — |
-| msk.encryption-not-tls | encryption in transit not enforced | warn | wave2 | — |
+| msk.warn.creating | creating | warn | wave1 | The cluster's brokers are still being provisioned, so there are no bootstrap endpoints to connect to yet. Wait for it to become active before pointing producers at it. |
+| msk.warn.updating | updating | warn | wave1 | A cluster change is in flight — configuration, broker count or version — and brokers restart one at a time while it runs. Confirm your topics have enough replicas that a single broker restarting does not stall production. |
+| msk.warn.maintenance | maintenance | warn | wave1 | AWS is performing maintenance on this cluster, rolling brokers as it goes. Clients that retry and topics with a replication factor above one ride this out; single-replica topics see errors. |
+| msk.warn.rebooting\_broker | rebooting broker | warn | wave1 | A broker is restarting, so the partitions it leads are moving and clients see brief errors on those partitions. Check that the affected topics have replicas on other brokers. |
+| msk.warn.healing | healing | warn | wave1 | AWS is replacing or repairing a broker after a failure, so the cluster runs with reduced capacity until it finishes. Watch under-replicated partitions during this window. |
+| msk.warn.deleting | deleting | warn | wave1 | The cluster is being torn down, and its brokers and their data go with it. Confirm the producers and consumers have moved before the endpoints stop answering. |
+| msk.broken.failed | failed | broken | wave1 | The cluster is in a failed state and serves no Kafka traffic, so every producer and consumer behind it is stalled. Check the cluster's operations history for the failing step; a cluster in this state usually has to be recreated from a configuration you still hold. |
+| msk.broker-outdated | broker software outdated | warn | wave2 | The brokers run a Kafka version AWS no longer treats as current, so fixes and features stay out of reach and support for it eventually ends. Plan a rolling version upgrade in a maintenance window — clients keep working across it if the topics are replicated. |
+| msk.encryption-not-tls | encryption in transit not enforced | warn | wave2 | The cluster accepts plaintext client connections, so records and any credentials in the handshake cross the network readable by anything on the path. Set client-broker encryption to TLS only and move the clients over. |
 | msk.public-access | brokers reachable from the internet | broken | wave2 | Kafka brokers are published to the internet with their own public addresses, so the cluster is reachable from anywhere its security groups allow rather than only from inside the VPC. Turn public access off and reach the brokers from within the VPC or over a peered network. |
 | msk.unauthenticated | unauthenticated access allowed | broken | wave2 | The cluster accepts Kafka clients that present no credentials at all, so anyone who can reach a broker can read and write every topic. Turn unauthenticated access off and require one of the cluster's authentication methods. |
 <!-- END GENERATED: findings -->

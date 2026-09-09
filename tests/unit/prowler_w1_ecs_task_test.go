@@ -623,7 +623,9 @@ func TestECSTask_TeardownStatesKeepTheirLifecycleFinding(t *testing.T) {
 		"STOPPING":       "stopping",
 		"DEPROVISIONING": "deprovisioning",
 		"DEACTIVATING":   "deactivating",
-		"STOPPED":        "stopped",
+		// Task phrase7 row 2 split this phrase: "stopped" was Dim here and Warn
+		// on ec2, so the same word carried two colours.
+		"STOPPED": "stopped (task exited)",
 	}
 	td := catalog.FindAny("ecs-task")
 	if td == nil || td.Fetcher == nil {

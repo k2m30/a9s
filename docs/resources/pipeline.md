@@ -196,7 +196,7 @@ pipeline — CI/CD. Status key: `last_status` — the key the status cell reads,
 <!-- BEGIN GENERATED: findings -->
 | Code | Phrase | Severity | Source | Detail |
 | --- | --- | --- | --- | --- |
-| pipeline.stage-failed | stage failed | broken | wave2 | — |
+| pipeline.stage-failed | stage failed | broken | wave2 | A stage in this pipeline failed, so nothing after it ran and the change it carries never reached the environments downstream. Open the failed action for its error output, fix the build or deployment it names, then release the change again. |
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->

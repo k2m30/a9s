@@ -102,9 +102,9 @@ var monitoringTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 			{TargetType: "ct-events", DisplayName: "CloudTrail Events", Checker: checkAlarmCTEvents, NeedsTargetCache: true},
 		},
 		Findings: []catalog.FindingDef{
-			{Code: CodeAlarmStateAlarm, Phrase: "alarm triggered", Severity: domain.SevBroken, Source: "wave1"},
-			{Code: CodeAlarmStateInsufficient, Phrase: "insufficient data", Severity: domain.SevWarn, Source: "wave1"},
-			{Code: CodeAlarmNoActions, Phrase: "no actions", Severity: domain.SevWarn, Source: "wave1"},
+			{Code: CodeAlarmStateAlarm, Phrase: "alarm triggered", Severity: domain.SevBroken, Source: "wave1", Detail: "The metric this alarm watches has crossed its threshold, which is the condition somebody set it up to be told about. Open the metric behind it for the last few hours and act on what it measures, rather than on the alarm itself."},
+			{Code: CodeAlarmStateInsufficient, Phrase: "insufficient data", Severity: domain.SevWarn, Source: "wave1", Detail: "The alarm has no data to judge, so it is neither confirming health nor able to fire — and a silent alarm looks exactly like a quiet system. Check that the metric is still being published; a deleted resource or a renamed dimension is the usual cause."},
+			{Code: CodeAlarmNoActions, Phrase: "no actions", Severity: domain.SevWarn, Source: "wave1", Detail: "This alarm changes colour on a dashboard and notifies nobody, so a condition it catches at three in the morning is discovered in the morning. Attach a notification topic or a scaling action, or delete the alarm if nothing was ever going to act on it."},
 			{Code: CodeAlarmActionsDisabled, Phrase: "actions disabled", Severity: domain.SevWarn, Source: "wave1", Detail: "The alarm still changes state but runs none of its actions, so nobody is notified when it triggers. Switch actions back on for this alarm."},
 		},
 	},
@@ -155,8 +155,8 @@ var monitoringTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 		},
 		Findings: []catalog.FindingDef{
 			{Code: logsCodeRetentionNeverExpire, Phrase: "retention: never expire", Severity: domain.SevWarn, Source: "wave1", Detail: "No retention policy set — events kept forever, billed indefinitely."},
-			{Code: logsCodeStaleEmpty, Phrase: "empty, created over 90 days ago", Severity: domain.SevWarn, Source: "wave1"},
-			{Code: logsCodeMissingMetricFilters, Phrase: "audit log group missing metric filters", Severity: domain.SevWarn, Source: "wave2"},
+			{Code: logsCodeStaleEmpty, Phrase: "empty, created over 90 days ago", Severity: domain.SevWarn, Source: "wave1", Detail: "The group has existed for months and holds no events, so whatever was meant to write here never did, and anything relying on those logs for debugging or audit has nothing. Find the producer that should be writing and fix its permissions or configuration, or delete the group."},
+			{Code: logsCodeMissingMetricFilters, Phrase: "audit log group missing metric filters", Severity: domain.SevWarn, Source: "wave2", Detail: "This group carries audit or security logs but has no metric filter over it, so the events it collects are only found when somebody goes to look. Add metric filters and alarms for the events worth waking up for."},
 			{Code: CodeLogsNoKMS, Phrase: "not encrypted with KMS", Severity: domain.SevWarn, Source: "wave1", Detail: "Log events are encrypted with the CloudWatch Logs service key, so anyone with read access to the log group can read them and you cannot revoke that access with a key policy. Associate a KMS key with this log group."},
 		},
 	},
@@ -219,10 +219,10 @@ var monitoringTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 			{FieldPath: "CloudWatchLogsRoleArn", TargetType: "role"},
 		},
 		Findings: []catalog.FindingDef{
-			{Code: CodeTrailLogFileValidationDisabled, Phrase: "log file validation disabled", Severity: domain.SevWarn, Source: "wave1"},
-			{Code: CodeTrailNotLogging, Phrase: "not logging", Severity: domain.SevBroken, Source: "wave2"},
-			{Code: CodeTrailDeliveryError, Phrase: "delivery error: <LatestDeliveryError>", Severity: domain.SevBroken, Source: "wave2"},
-			{Code: CodeTrailDeliveryStale, Phrase: "delivery stale since <LatestDeliveryTime>", Severity: domain.SevBroken, Source: "wave2"},
+			{Code: CodeTrailLogFileValidationDisabled, Phrase: "log file validation disabled", Severity: domain.SevWarn, Source: "wave1", Detail: "The trail's files carry no integrity digest, so there is no way to prove afterwards that one was not altered or removed. Turn on log file validation — during an incident, unverifiable logs are close to no logs."},
+			{Code: CodeTrailNotLogging, Phrase: "not logging", Severity: domain.SevBroken, Source: "wave2", Detail: "The trail exists but is switched off, so nothing is being recorded and the account has no audit history of its calls for this period. Start logging on it; the gap it leaves cannot be filled in later."},
+			{Code: CodeTrailDeliveryError, Phrase: "delivery error: <LatestDeliveryError>", Severity: domain.SevBroken, Source: "wave2", Detail: "CloudTrail cannot write this trail's files to their destination, so events are being recorded nowhere durable. The error names the cause, usually a bucket policy, a removed bucket, or a KMS key CloudTrail may no longer use."},
+			{Code: CodeTrailDeliveryStale, Phrase: "delivery stale since <LatestDeliveryTime>", Severity: domain.SevBroken, Source: "wave2", Detail: "No log file has been delivered for far longer than this trail's normal interval, so the audit record has a hole in it starting from that time. Check the destination bucket's policy and the trail's KMS key, then confirm delivery resumes."},
 			{Code: CodeTrailNoCloudWatchLogs, Phrase: "not delivering to CloudWatch Logs", Severity: domain.SevWarn, Source: "wave1", Detail: "Events are delivered to the bucket only, so no metric filter or alarm can watch them and nobody is paged on suspicious account activity. Attach a log group to this trail."},
 			{Code: CodeTrailNoKMS, Phrase: "log files not KMS-encrypted", Severity: domain.SevWarn, Source: "wave1", Detail: "Delivered log files use S3-managed encryption, so anyone who can read the bucket can read the audit trail. Set a KMS key on the trail so log files are encrypted with a key you control."},
 			{Code: CodeTrailLogBucketPublic, Phrase: "log bucket is publicly accessible", Severity: domain.SevBroken, Source: "wave2", Detail: "The bucket holding this trail's log files is publicly accessible, so the account's audit history can be read by anyone. Remove the public grant from that bucket's policy and access control list."},
@@ -323,8 +323,8 @@ var monitoringChildTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals 
 			return FetchLogEvents(ctx, c.CloudWatchLogs, parentCtx["log_group_name"], parentCtx["log_stream_name"], continuationToken)
 		}),
 		Findings: []catalog.FindingDef{
-			{Code: CodeCWLogError, Phrase: "error", Severity: domain.SevBroken, Source: "wave1"},
-			{Code: CodeCWLogWarn, Phrase: "warning", Severity: domain.SevWarn, Source: "wave1"},
+			{Code: CodeCWLogError, Phrase: "error", Severity: domain.SevBroken, Source: "wave1", Detail: "This line reports an error from the workload itself, so something it was asked to do did not happen. Read the surrounding lines for the request or job it belongs to: a single error with no repeats usually means a transient dependency, a steady stream means a real fault."},
+			{Code: CodeCWLogWarn, Phrase: "warning", Severity: domain.SevWarn, Source: "wave1", Detail: "The workload logged something it could work around but wanted recorded — a retry, a deprecated setting, or a near-limit condition. Worth reading if it repeats; a single one is usually noise."},
 		},
 	},
 	{
@@ -344,8 +344,8 @@ var monitoringChildTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals 
 			return FetchAlarmHistory(ctx, c.CloudWatch, parentCtx, continuationToken)
 		}),
 		Findings: []catalog.FindingDef{
-			{Code: CodeAlarmHistoryStateAlarm, Phrase: "alarm", Severity: domain.SevBroken, Source: "wave1"},
-			{Code: CodeAlarmHistoryStateInsufficientData, Phrase: "insufficient data", Severity: domain.SevWarn, Source: "wave1"},
+			{Code: CodeAlarmHistoryStateAlarm, Phrase: "alarm", Severity: domain.SevBroken, Source: "wave1", Detail: "At this point the alarm's metric was over its threshold, so the condition it watches was true then. Line the timestamp up with your deployments and incident timeline to see what it coincided with."},
+			{Code: CodeAlarmHistoryStateInsufficientData, Phrase: "insufficient data", Severity: domain.SevWarn, Source: "wave1", Detail: "The alarm had no data to evaluate at this point, so it could not have fired even if the underlying condition was true. A run of these marks a window in which this alarm was protecting nothing."},
 		},
 	},
 }

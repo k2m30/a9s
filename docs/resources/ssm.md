@@ -122,8 +122,8 @@ ssm — SECRETS & CONFIG. Status key: `risk` — the key the status cell reads, 
 <!-- BEGIN GENERATED: findings -->
 | Code | Phrase | Severity | Source | Detail |
 | --- | --- | --- | --- | --- |
-| ssm.value.plaintext-sensitive | plaintext value looks like a credential | broken | wave1 | — |
-| ssm.value.stale | not modified in over 365 days | warn | wave1 | — |
+| ssm.value.plaintext-sensitive | plaintext value looks like a credential | broken | wave1 | This parameter holds what looks like a credential in plain text, so it is unencrypted at rest and readable by anyone allowed to read parameters on that path. Store it as an encrypted parameter under a KMS key, update the readers, then rotate the exposed value. |
+| ssm.value.stale | not modified in over 365 days | warn | wave1 | The parameter has not been touched in over a year, and if it holds a credential that credential has been valid all that time. Confirm it is still current, and rotate it if it is a secret. |
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->

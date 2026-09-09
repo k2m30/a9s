@@ -228,13 +228,13 @@ eb — MESSAGING. Status key: `status` — the key the status cell reads, and th
 <!-- BEGIN GENERATED: findings -->
 | Code | Phrase | Severity | Source | Detail |
 | --- | --- | --- | --- | --- |
-| eb.health.red | health: red | broken | wave1 | — |
-| eb.health.yellow | health: yellow | warn | wave1 | — |
-| eb.health.grey | health: grey | warn | wave1 | — |
+| eb.health.red | health: red | broken | wave1 | Elastic Beanstalk reports this environment as failing: instances are not passing checks or requests are erroring, so the application it hosts is degraded or down. Open the environment's health causes and its recent events for the failing instance or deployment. |
+| eb.health.yellow | health: yellow | warn | wave1 | Some requests in this environment are failing, or some instances are unhealthy, so it is serving but not cleanly. Read the health causes to see which instances or which responses are dragging it down before it goes red. |
+| eb.health.grey | health: grey | warn | wave1 | Beanstalk cannot tell whether this environment is healthy, usually because it is mid-operation or its health agent is not reporting. Wait for an operation to finish; if it stays grey, check the health agent and the instance profile's permissions. |
 | eb.status.terminated | terminated | dim | wave1 | — |
-| eb.status.launching | launching | warn | wave1 | — |
+| eb.status.launching | launching | warn | wave1 | The environment is still creating its instances and load balancer, so it does not serve yet. Wait for it to reach a health state before deploying an application version onto it. |
 | eb.status.terminating | terminating | dim | wave1 | — |
-| eb.environment-causes | environment reports health causes | warn | wave2 | — |
+| eb.environment-causes | environment reports health causes | warn | wave2 | The environment is reporting specific health causes rather than a clean bill, so something is wrong even if requests are still being served. Read the causes list; each one names an instance or a deployment step to look at. |
 | eb.managed-updates-off | managed platform updates off | warn | wave2 | The environment never takes platform patches on its own, so it stays on whatever version it was launched with until someone updates it by hand. Turn managed platform updates on and pick a weekly maintenance window. |
 | eb.enhanced-health-off | enhanced health reporting off | warn | wave2 | Health is reported from basic checks only, so the environment cannot tell you which instance or which request is failing, or why. Switch health reporting to enhanced. |
 | eb.cloudwatch-logs-off | log streaming to CloudWatch off | warn | wave2 | Instance logs stay on the instances and disappear when those instances are replaced, so there is nothing left to read after a failure. Turn on log streaming to CloudWatch Logs. |

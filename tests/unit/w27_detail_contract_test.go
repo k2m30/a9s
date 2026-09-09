@@ -24,6 +24,7 @@ import (
 	awsclient "github.com/k2m30/a9s/v3/core/aws"
 	"github.com/k2m30/a9s/v3/core/catalog"
 	"github.com/k2m30/a9s/v3/core/demo"
+	"github.com/k2m30/a9s/v3/core/demo/fixtures"
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 	"github.com/k2m30/a9s/v3/core/runtime"
@@ -83,13 +84,14 @@ func runFullCatalogDetailBench(t *testing.T) detailBenchResult {
 
 	// sg.unused scans the "eni" cache, the vpc-peer route findings the "rtb"
 	// cache, the not-in-backup-plan / no-snapshot findings the "backup" and
-	// "ebs-snap" caches, cf.origin-bucket-missing the "s3" cache, and
-	// r53.dangling-record the "eip", "ec2" and "eni" caches (all zero-call
+	// "ebs-snap" caches, cf.origin-bucket-missing the "s3" cache,
+	// r53.dangling-record the "eip", "ec2" and "eni" caches, and the snapshot
+	// cross-ref enrichers the "dbi" and "dbc" caches (all zero-call
 	// enrichers); load them all so the bench sees what a demo user who has
 	// opened those lists sees.
 	for _, td := range resource.AllResourceTypes() {
 		switch td.ShortName {
-		case "eni", "rtb", "backup", "ebs-snap", "s3", "eip", "ec2":
+		case "eni", "rtb", "backup", "ebs-snap", "s3", "eip", "ec2", "dbi", "dbc":
 		default:
 			continue
 		}
@@ -185,10 +187,23 @@ func TestDetailContract_EveryDeclaredDetailHasABenchWitness(t *testing.T) {
 		}
 	}
 
+	// A code the fixture registry already declares as a coverage gap is not a
+	// forgotten definition: it is a state the demo provably cannot stage
+	// beside healthy rows — SES exposes one account-wide enforcement status,
+	// so its three mutually exclusive codes cannot all be witnessed at once,
+	// and OpenSearch's per-item describe is batched, so a denial degrades
+	// every row rather than one. The registry is the single place those gaps
+	// are declared and ratcheted down; reading it here keeps this gate from
+	// growing a second, competing list.
+	gaps := fixtures.CoverageGaps()
+
 	var missing []string
 	for _, td := range resource.AllResourceTypes() {
 		for _, def := range td.Findings {
 			if def.Detail == "" {
+				continue
+			}
+			if gaps[td.ShortName+":"+string(def.Code)] {
 				continue
 			}
 			if !result.witnessed[td.ShortName+"/"+string(def.Code)] {
@@ -259,8 +274,14 @@ func joinLines(lines []string) string {
 }
 
 // TestDetailContract_TenDevopsSentencesVerbatim pins TASKDIR/detail_sentences.md's
-// nine single-state sentences character-for-character (row 3/5 ruling: "the
+// single-state sentences character-for-character (row 3/5 ruling: "the
 // ten sentences ... are declared on the definitions under row 1 verbatim").
+//
+// tgw.state.deleted is no longer among them. Task phrase7 row 3 ruled that a
+// Detail exists exactly at the tiers a surface shows, and Dim reaches neither
+// the detail Attention block nor the enrichment line, so its sentence was
+// deleted rather than left unread. Do not restore the assertion without
+// changing that contract in docs/attention-signals.md first.
 // The tenth, tgw.attachment-transitional, is not one of the nine: devops
 // wrote three per-state bullets for it and the ruling has dev consolidate
 // them into one sentence naming pending acceptance as the state that needs a
@@ -274,7 +295,6 @@ func TestDetailContract_TenDevopsSentencesVerbatim(t *testing.T) {
 		"tgw.state.modifying":       "A configuration change is being applied. Routing across the gateway can be inconsistent until it settles.",
 		"tgw.state.deleting":        "The gateway is being torn down. Every attachment on it goes away and any traffic still routed through it will stop.",
 		"tgw.state.failed":          "The gateway could not be created and will not recover. It has to be recreated, and anything routed through it has no path.",
-		"tgw.state.deleted":         "This gateway is gone. AWS keeps returning it for a while after deletion, so route tables that still point at it are dead references worth cleaning up.",
 		"tgw.attachment-failed":     "The network behind this attachment has no path across the gateway. Failed attachments do not retry; delete and recreate the attachment.",
 	}
 	for code, want := range verbatim {

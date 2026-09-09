@@ -347,12 +347,12 @@ lambda — COMPUTE. Status key: `state` — the key the status cell reads, and t
 <!-- BEGIN GENERATED: findings -->
 | Code | Phrase | Severity | Source | Detail |
 | --- | --- | --- | --- | --- |
-| lambda.last-update.failed | last update failed to apply | broken | wave1 | — |
-| lambda.runtime.deprecated | runtime is end-of-life | broken | wave1 | — |
-| lambda.state.pending | pending | warn | wave1 | — |
-| lambda.state.failed | failed | broken | wave1 | — |
+| lambda.last-update.failed | last update failed to apply | broken | wave1 | The last configuration or code update did not take, so the function still runs the previous version while the console shows what you asked for. Read the update status reason — a bad VPC configuration, an invalid role or a missing layer are typical — fix it, and apply the update again. |
+| lambda.runtime.deprecated | runtime is end-of-life | broken | wave1 | This function runs on a runtime AWS no longer patches, so language and base-image security fixes will never reach it, and AWS eventually blocks updates and then invocations. Move the function to a supported runtime version and redeploy. |
+| lambda.state.pending | pending | warn | wave1 | The function is still being created or attached to its VPC, and invocations during this window are throttled or rejected. Wait for it to become active before wiring an event source to it. |
+| lambda.state.failed | failed | broken | wave1 | The function cannot be invoked at all: its creation or VPC setup failed and it has no working execution environment. Read its state reason, fix the role, subnets or security groups it names, then update the function to retry. |
 | lambda.state.inactive | inactive, evicted after extended idle time | dim | wave1 | — |
-| lambda.dlq.missing | no dead-letter queue configured | warn | wave1 | — |
+| lambda.dlq.missing | no dead-letter queue configured | warn | wave1 | Asynchronous invocations that exhaust their retries are dropped silently, so a bad deployment or a downstream outage loses events with no record of what was lost. Set a dead-letter queue or an on-failure destination so failed events can be inspected and replayed. |
 | lambda.env-secret | credential in environment variables | broken | wave1 | A credential is stored as a plaintext environment variable on this function, readable by anyone who can call lambda:GetFunctionConfiguration. Move the value to Secrets Manager or Systems Manager Parameter Store, read it at cold start, and rotate the exposed one. |
 | lambda.public-policy | invokable by anyone | broken | wave2 | The function's resource policy allows a wildcard principal, so any AWS caller can invoke it and whatever it does downstream runs on your account's bill and permissions. Replace the `*` principal with the specific account, service, or ARN that should be allowed to call it. |
 | lambda.function-url-public | function endpoint open without authentication | broken | wave2 | The function has a web endpoint that requires no authentication, so anyone on the internet who learns the address can invoke it without credentials. Set the endpoint to require signed requests, or put an authorizing layer in front of it. |

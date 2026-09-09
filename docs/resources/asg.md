@@ -219,11 +219,11 @@ asg — COMPUTE. Status key: `status` — the key the status cell reads, and the
 <!-- BEGIN GENERATED: findings -->
 | Code | Phrase | Severity | Source | Detail |
 | --- | --- | --- | --- | --- |
-| asg.state.deleting | delete in progress | warn | wave1 | — |
-| asg.instances.underprovisioned | <N> of <M> instances in service | broken | wave1 | — |
-| asg.instances.unhealthy | <N unhealthy instance(s)> | warn | wave1 | — |
-| asg.scaling.suspended | scaling suspended | warn | wave1 | — |
-| asg.scaling-activity-failed | latest scaling activity failed | broken | wave2 | — |
+| asg.state.deleting | delete in progress | warn | wave1 | The group is being removed and is terminating its instances, so the capacity it provided is going away. If anything still depends on it, stop the deletion now — once it completes, the group and its scaling history are gone. |
+| asg.instances.underprovisioned | <N> of <M> instances in service | broken | wave1 | The group is running fewer instances in service than it is meant to, so the workload behind it carries its traffic short-handed. Read the group's scaling activities for launch failures: insufficient capacity in the Availability Zone, a bad launch template, or a failing health check are the usual causes. |
+| asg.instances.unhealthy | <N unhealthy instance(s)> | warn | wave1 | Some instances in this group are failing their health checks and will be terminated and replaced, briefly reducing capacity. Look at those instances' system logs before they go, so the replacements do not simply repeat the failure. |
+| asg.scaling.suspended | scaling suspended | warn | wave1 | One or more scaling processes are suspended, so the group will not add capacity under load or replace instances that fail, however its policies are written. Resume the suspended processes unless a deployment tool is holding them deliberately. |
+| asg.scaling-activity-failed | latest scaling activity failed | broken | wave2 | The group's most recent attempt to launch or terminate an instance failed, so it is not at the size its policies asked for. The activity's status message names the cause — capacity, a launch template error, or an IAM permission — fix that and the group retries. |
 | asg.launch-config.legacy | uses a launch configuration | warn | wave1 | The group launches from a launch configuration, an immutable legacy resource AWS no longer develops — it cannot carry IMDSv2 defaults, newer instance types, or versioned edits. Copy it to a launch template and point the group at that. |
 | asg.single-az | single availability zone | warn | wave1 | Every instance in this group sits in one availability zone, so a single zone failure takes the whole group down. Add subnets from at least one more zone to the group. |
 | asg.no-elb-health-check | no load balancer health check | warn | wave1 | The group is behind a load balancer but only watches EC2 status checks, so an instance whose application has stopped answering stays in service. Set the group's health check type to the load balancer's. |

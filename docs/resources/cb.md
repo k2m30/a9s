@@ -218,7 +218,7 @@ cb — CI/CD. Status key: `last_build` — the key the status cell reads, and th
 <!-- BEGIN GENERATED: findings -->
 | Code | Phrase | Severity | Source | Detail |
 | --- | --- | --- | --- | --- |
-| cb.latest-build-failed | latest build <status> | broken | wave2 | — |
+| cb.latest-build-failed | latest build <status> | broken | wave2 | The most recent build of this project did not succeed, so whatever artifact the pipelines behind it consume is stale. Open the build's phase list and logs to find which phase broke, then fix the buildspec, the source, or the missing dependency it names. |
 | cb.public-builds | build results publicly visible | broken | wave1 | Build logs, environment variables and artifacts for this project are readable by anyone on the internet without an AWS account, so any credential or internal hostname a build prints is public. Set the project's visibility back to private and rotate anything the logs have already exposed. |
 | cb.buildspec-from-source | buildspec taken from the source repository | warn | wave1 | The build instructions come from a file in the source repository, so anyone who can open a pull request can change what runs inside the build role. Move the buildspec inline into the project definition, or restrict who can trigger builds from unmerged branches. |
 | cb.source-url-credential | credential in the source repository address | broken | wave1 | The source repository address embeds a username and password or token, which is stored in the project definition and printed in build logs in clear text. Move the credential into a CodeBuild source credential or Secrets Manager entry and rotate it, because it must be assumed leaked. |

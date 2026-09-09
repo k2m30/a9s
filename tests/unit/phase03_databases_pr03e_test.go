@@ -167,8 +167,9 @@ func TestPR03e_DBIFetcher_StoppedEmitsBrokenFinding(t *testing.T) {
 	if f.Severity != domain.SevBroken {
 		t.Errorf("Findings[0].Severity: got %v, want domain.SevBroken (AS-126 regression: stopped must keep Broken severity)", f.Severity)
 	}
-	if f.Phrase != "stopped" {
-		t.Errorf("Findings[0].Phrase: got %q, want %q", f.Phrase, "stopped")
+	// Task phrase7 row 2 renamed this phrase: the old wording was declared at more than one severity across the catalog, so the same words carried two colours.
+	if f.Phrase != "stopped (storage still billed)" {
+		t.Errorf("Findings[0].Phrase: got %q, want %q", f.Phrase, "stopped (storage still billed)")
 	}
 
 	// And the catalog colorDBI must classify the row as ColorBroken via the

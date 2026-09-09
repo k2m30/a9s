@@ -142,7 +142,7 @@ var networkingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 			{Code: CodeELBStateProvisioning, Phrase: "provisioning", Severity: domain.SevWarn, Source: "wave1", Detail: "The load balancer is still being built and is not yet accepting traffic. This normally clears in a few minutes; if it does not, its subnets are usually out of free IP addresses."},
 			{Code: CodeELBStateActiveImpaired, Phrase: "active impaired", Severity: domain.SevWarn, Source: "wave1", Detail: "The load balancer is serving traffic but could not set up or scale in at least one availability zone, so capacity there is degraded. Check that every attached subnet has spare IP addresses."},
 			{Code: CodeELBStateFailed, Phrase: "failed", Severity: domain.SevBroken, Source: "wave1", Detail: "The load balancer could not be created and will not recover on its own. It has to be deleted and recreated; nothing routes through it in the meantime."},
-			{Code: elbCodeMisconfigured, Phrase: "deletion protection or access logs disabled", Severity: domain.SevWarn, Source: "wave2"},
+			{Code: elbCodeMisconfigured, Phrase: "deletion protection or access logs disabled", Severity: domain.SevWarn, Source: "wave2", Detail: "This load balancer can be deleted with a single call, or is not writing access logs, so an outage is one call away, or leaves no record of the requests that hit it. Turn deletion protection on and point access logs at a bucket."},
 			{Code: elbCodeDesyncMitigationOff, Phrase: "HTTP desync mitigation off", Severity: domain.SevWarn, Source: "wave2", Detail: "The load balancer forwards requests it knows are ambiguous instead of rejecting them, so a crafted request can be interpreted one way by the balancer and another by the target. Set the desync mitigation mode to defensive or strictest."},
 			{Code: elbCodeInvalidHeadersKept, Phrase: "invalid HTTP headers not dropped", Severity: domain.SevWarn, Source: "wave2", Detail: "Headers that are not valid HTTP are passed through to the targets instead of being dropped, which is how request smuggling reaches an application. Turn on dropping of invalid header fields."},
 			{Code: elbCodePlainHTTPListener, Phrase: "<port(s) LIST> in the clear", Severity: domain.SevWarn, Source: "wave2", Detail: "A listener on this load balancer carries traffic in the clear, so credentials and session cookies cross the network readable by anyone on the path; the ports are listed below. Terminate TLS on the listener, or redirect it to an HTTPS listener."},
@@ -291,8 +291,8 @@ var networkingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 			{TargetType: "ct-events", DisplayName: "CloudTrail Events", Checker: ctEventsCheckerFor("vpc")},
 		},
 		Findings: []catalog.FindingDef{
-			{Code: CodeVPCStatePending, Phrase: "pending", Severity: domain.SevWarn, Source: "wave1"},
-			{Code: vpcCodeNoFlowLogs, Phrase: "no active VPC flow logs", Severity: domain.SevWarn, Source: "wave2"},
+			{Code: CodeVPCStatePending, Phrase: "pending", Severity: domain.SevWarn, Source: "wave1", Detail: "The VPC is still being created, so subnets, gateways and endpoints cannot be attached to it yet. Wait for it to become available before building into it."},
+			{Code: vpcCodeNoFlowLogs, Phrase: "no active VPC flow logs", Severity: domain.SevWarn, Source: "wave2", Detail: "No flow log is capturing traffic for this VPC, so there is no record of what connected to what — and during an incident that question cannot be answered afterwards. Enable flow logs to CloudWatch Logs or S3 for the VPC."},
 		},
 	},
 	{
@@ -337,10 +337,10 @@ var networkingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 			{FieldPath: "VpcId", TargetType: "vpc"},
 		},
 		Findings: []catalog.FindingDef{
-			{Code: CodeSubnetStatePending, Phrase: "pending", Severity: domain.SevWarn, Source: "wave1"},
-			{Code: CodeSubnetStateUnavailable, Phrase: "unavailable", Severity: domain.SevBroken, Source: "wave1"},
-			{Code: CodeSubnetStateFailed, Phrase: "failed", Severity: domain.SevBroken, Source: "wave1"},
-			{Code: CodeSubnetStateFailedInsufficientCapacity, Phrase: "failed-insufficient-capacity", Severity: domain.SevBroken, Source: "wave1"},
+			{Code: CodeSubnetStatePending, Phrase: "pending", Severity: domain.SevWarn, Source: "wave1", Detail: "The subnet is still being created and cannot host network interfaces yet. Wait for it to become available before launching into it."},
+			{Code: CodeSubnetStateUnavailable, Phrase: "unavailable", Severity: domain.SevBroken, Source: "wave1", Detail: "The subnet is not usable, so anything scheduled into it fails to get an address — which presents as launch failures rather than as a subnet problem. Check the Availability Zone's status and the subnet's configuration, and place workloads elsewhere meanwhile."},
+			{Code: CodeSubnetStateFailed, Phrase: "failed", Severity: domain.SevBroken, Source: "wave1", Detail: "The subnet could not be created, so any launch template, node group or service that names it will fail. Recreate it, or repoint the resources that reference it at a working subnet."},
+			{Code: CodeSubnetStateFailedInsufficientCapacity, Phrase: "failed-insufficient-capacity", Severity: domain.SevBroken, Source: "wave1", Detail: "AWS had no capacity in this Availability Zone to create the subnet, so nothing can be placed here. Use another zone, and spread the workload's subnets across zones so one zone's capacity cannot block it again."},
 			{Code: CodeSubnetAutoPublicIP, Phrase: SubnetAutoPublicIPPhrase, Severity: domain.SevWarn, Source: "wave1", Detail: "Every instance launched into this subnet is given a public address by default, so a workload reaches the internet whether or not its owner intended it to. Turn the subnet's auto-assign public address setting off and attach an elastic address to the instances that genuinely need one."},
 		},
 	},
@@ -388,8 +388,8 @@ var networkingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 			{FieldPath: "Routes.VpcPeeringConnectionId", TargetType: "vpc"},
 		},
 		Findings: []catalog.FindingDef{
-			{Code: rtbCodeBlackholeRoute, Phrase: "blackhole route (target deleted)", Severity: domain.SevBroken, Source: "wave1"},
-			{Code: rtbCodeOrphanUnassociated, Phrase: "no subnet associations", Severity: domain.SevWarn, Source: "wave1"},
+			{Code: rtbCodeBlackholeRoute, Phrase: "blackhole route (target deleted)", Severity: domain.SevBroken, Source: "wave1", Detail: "A route in this table points at a gateway or interface that no longer exists, so traffic matching it is dropped silently — from the instance's side it looks like a firewall problem. Repoint the route at a live target or remove it."},
+			{Code: rtbCodeOrphanUnassociated, Phrase: "no subnet associations", Severity: domain.SevWarn, Source: "wave1", Detail: "No subnet uses this route table, so the routes in it affect nothing; if it was meant to carry traffic somewhere, that traffic is following the main table instead. Associate the subnets it was written for, or delete it."},
 		},
 	},
 	{
@@ -431,9 +431,9 @@ var networkingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 			{FieldPath: "NatGatewayAddresses.AllocationId", TargetType: "eip"},
 		},
 		Findings: []catalog.FindingDef{
-			{Code: CodeNATStatePending, Phrase: "pending", Severity: domain.SevWarn, Source: "wave1"},
-			{Code: CodeNATStateDeleting, Phrase: "deleting", Severity: domain.SevWarn, Source: "wave1"},
-			{Code: CodeNATStateFailed, Phrase: "failed", Severity: domain.SevBroken, Source: "wave1"},
+			{Code: CodeNATStatePending, Phrase: "pending", Severity: domain.SevWarn, Source: "wave1", Detail: "The gateway is still being created, so private subnets routed at it have no outbound path yet. Wait for it to become available before expecting egress to work."},
+			{Code: CodeNATStateDeleting, Phrase: "deleting", Severity: domain.SevWarn, Source: "wave1", Detail: "The gateway is going away, and once it does every subnet routed through it loses outbound internet access. Confirm the replacement exists and the route tables point at it before this finishes."},
+			{Code: CodeNATStateFailed, Phrase: "failed", Severity: domain.SevBroken, Source: "wave1", Detail: "The gateway could not be created, so the private subnets routing through it have no path out and their workloads fail on any external call. Check the Elastic IP and the public subnet it was placed in, then create it again."},
 			{Code: CodeNATStateDeleted, Phrase: "deleted", Severity: domain.SevDim, Source: "wave1"},
 		},
 	},
@@ -466,9 +466,9 @@ var networkingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 			{FieldPath: "Attachments.VpcId", TargetType: "vpc"},
 		},
 		Findings: []catalog.FindingDef{
-			{Code: CodeIGWStateAttaching, Phrase: "attaching", Severity: domain.SevWarn, Source: "wave1"},
-			{Code: CodeIGWStateDetaching, Phrase: "detaching", Severity: domain.SevWarn, Source: "wave1"},
-			{Code: CodeIGWNoAttachments, Phrase: "no VPC attachments", Severity: domain.SevWarn, Source: "wave1"},
+			{Code: CodeIGWStateAttaching, Phrase: "attaching", Severity: domain.SevWarn, Source: "wave1", Detail: "The gateway is still being attached, so the VPC has no internet path through it yet. Wait for the attachment to complete before testing egress or public addressing."},
+			{Code: CodeIGWStateDetaching, Phrase: "detaching", Severity: domain.SevWarn, Source: "wave1", Detail: "The gateway is being detached, and when it goes the VPC loses its internet path: public instances stop being reachable and outbound calls fail. Stop the detachment if anything still depends on it."},
+			{Code: CodeIGWNoAttachments, Phrase: "no VPC attachments", Severity: domain.SevWarn, Source: "wave1", Detail: "This gateway belongs to no VPC, so it routes nothing. Attach it to the VPC it was created for, or delete it so it stops appearing as available infrastructure."},
 		},
 	},
 	{
@@ -520,7 +520,7 @@ var networkingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 			{FieldPath: "NetworkInterfaceId", TargetType: "eni"},
 		},
 		Findings: []catalog.FindingDef{
-			{Code: CodeEIPUnassociated, Phrase: "unassociated", Severity: domain.SevWarn, Source: "wave1"},
+			{Code: CodeEIPUnassociated, Phrase: "unassociated", Severity: domain.SevWarn, Source: "wave1", Detail: "The address is allocated but attached to nothing, so AWS bills for it by the hour while it does no work — and it stays reserved, which only helps if something is about to claim it. Release it, or attach it to the instance or gateway it was held for."},
 		},
 	},
 	{
@@ -565,13 +565,13 @@ var networkingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 			{FieldPath: "RouteTableIds", TargetType: "rtb"},
 		},
 		Findings: []catalog.FindingDef{
-			{Code: CodeVPCEStatePendingAcceptance, Phrase: "pending acceptance", Severity: domain.SevWarn, Source: "wave1"},
-			{Code: CodeVPCEStatePending, Phrase: "pending", Severity: domain.SevWarn, Source: "wave1"},
-			{Code: CodeVPCEStateDeleting, Phrase: "deleting", Severity: domain.SevWarn, Source: "wave1"},
-			{Code: CodeVPCEStateFailed, Phrase: "failed", Severity: domain.SevBroken, Source: "wave1"},
-			{Code: CodeVPCEStateRejected, Phrase: "rejected", Severity: domain.SevBroken, Source: "wave1"},
-			{Code: CodeVPCEStateExpired, Phrase: "expired", Severity: domain.SevBroken, Source: "wave1"},
-			{Code: CodeVPCEStatePartial, Phrase: "partial", Severity: domain.SevBroken, Source: "wave1"},
+			{Code: CodeVPCEStatePendingAcceptance, Phrase: "pending acceptance", Severity: domain.SevWarn, Source: "wave1", Detail: "The endpoint is waiting for the service owner to accept the connection, so it carries no traffic and callers see timeouts. Ask the service's owner to accept the request."},
+			{Code: CodeVPCEStatePending, Phrase: "pending", Severity: domain.SevWarn, Source: "wave1", Detail: "The endpoint is still being set up, so its interfaces or route entries are not in place and the service is not reachable through it yet. Wait for it to become available."},
+			{Code: CodeVPCEStateDeleting, Phrase: "deleting", Severity: domain.SevWarn, Source: "wave1", Detail: "The endpoint is being removed, and traffic that used it falls back to whatever other path exists — usually none, for a private-only service. Confirm nothing still depends on it."},
+			{Code: CodeVPCEStateFailed, Phrase: "failed", Severity: domain.SevBroken, Source: "wave1", Detail: "The endpoint could not be created, so the service it was meant to reach privately is unreachable from this VPC. Check the subnets, the security groups and the service name, then create it again."},
+			{Code: CodeVPCEStateRejected, Phrase: "rejected", Severity: domain.SevBroken, Source: "wave1", Detail: "The service owner refused this connection, so the endpoint exists and carries nothing. Sort out access with the owning account before recreating it."},
+			{Code: CodeVPCEStateExpired, Phrase: "expired", Severity: domain.SevBroken, Source: "wave1", Detail: "The connection request was never answered and has lapsed, so the endpoint is dead and its traffic has nowhere to go. Delete it, and raise a new request once the service owner is ready to accept."},
+			{Code: CodeVPCEStatePartial, Phrase: "partial", Severity: domain.SevBroken, Source: "wave1", Detail: "The endpoint works in only some of the Availability Zones it was created for, so traffic from the others fails while the endpoint itself looks present. Check which subnets are missing an interface, and whether the service is offered in those zones."},
 			{Code: CodeVPCEStateDeleted, Phrase: "deleted", Severity: domain.SevDim, Source: "wave1"},
 			{Code: CodeVPCEPolicyOpen, Phrase: VPCEPolicyOpenPhrase, Severity: domain.SevWarn, Source: "wave1", Detail: "The endpoint policy grants every action to every principal, so any identity that can reach this endpoint can use it to talk to resources in other accounts. Replace it with a policy naming the principals and resources this VPC is allowed to reach."},
 		},
@@ -612,7 +612,7 @@ var networkingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 			{Code: CodeTGWStateModifying, Phrase: "modifying", Severity: domain.SevWarn, Source: "wave1", Detail: "A configuration change is being applied. Routing across the gateway can be inconsistent until it settles."},
 			{Code: CodeTGWStateDeleting, Phrase: "deleting", Severity: domain.SevWarn, Source: "wave1", Detail: "The gateway is being torn down. Every attachment on it goes away and any traffic still routed through it will stop."},
 			{Code: CodeTGWStateFailed, Phrase: "failed", Severity: domain.SevBroken, Source: "wave1", Detail: "The gateway could not be created and will not recover. It has to be recreated, and anything routed through it has no path."},
-			{Code: CodeTGWStateDeleted, Phrase: "deleted", Severity: domain.SevDim, Source: "wave1", Detail: "This gateway is gone. AWS keeps returning it for a while after deletion, so route tables that still point at it are dead references worth cleaning up."},
+			{Code: CodeTGWStateDeleted, Phrase: "deleted", Severity: domain.SevDim, Source: "wave1"},
 			{Code: tgwCodeAttachmentFailed, Phrase: "attachment failed", Severity: domain.SevBroken, Source: "wave2", Detail: "The network behind this attachment has no path across the gateway. Failed attachments do not retry; delete and recreate the attachment."},
 			{Code: tgwCodeAttachmentTransitional, Phrase: "attachment between states", Severity: domain.SevWarn, Source: "wave2", Detail: "The attachment is between states — being modified, rolled back, or waiting for the gateway owner to accept it — and traffic across it is not reliable until it settles. Pending acceptance is the one state that needs a person: the owning account has to approve it."},
 			{Code: CodeTGWAutoAccept, Phrase: TGWAutoAcceptPhrase, Severity: domain.SevWarn, Source: "wave1", Detail: "Any account this gateway is shared with can attach a VPC to it without review, putting that VPC on your routed network the moment it asks. Turn auto-accept off and approve each attachment explicitly."},
@@ -661,9 +661,9 @@ var networkingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 			{FieldPath: "Association.AllocationId", TargetType: "eip"},
 		},
 		Findings: []catalog.FindingDef{
-			{Code: CodeENIStateAttaching, Phrase: "attaching", Severity: domain.SevWarn, Source: "wave1"},
-			{Code: CodeENIStateDetaching, Phrase: "detaching", Severity: domain.SevWarn, Source: "wave1"},
-			{Code: CodeENIStateAvailable, Phrase: "available", Severity: domain.SevWarn, Source: "wave1"},
+			{Code: CodeENIStateAttaching, Phrase: "attaching", Severity: domain.SevWarn, Source: "wave1", Detail: "The interface is still being attached, so the instance or service it belongs to does not have this network path yet. Wait; an attachment that sticks usually means the subnet is out of addresses."},
+			{Code: CodeENIStateDetaching, Phrase: "detaching", Severity: domain.SevWarn, Source: "wave1", Detail: "The interface is being removed from its instance, so the addresses on it stop working there. Confirm nothing is still bound to those addresses."},
+			{Code: CodeENIStateAvailable, Phrase: "available", Severity: domain.SevWarn, Source: "wave1", Detail: "The interface is attached to nothing, which normally means the resource that owned it was deleted and left it behind; it holds addresses in the subnet and can block the subnet's deletion. Delete it once you have confirmed nothing is about to claim it."},
 		},
 	},
 	{
@@ -762,13 +762,13 @@ var networkingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 		// No Navigable fields — see docs/resources/vpc-peer-impl-plan.md §0.
 		Findings: []catalog.FindingDef{
 			{Code: vpcPeerCodeProvisioning, Phrase: "provisioning", Severity: domain.SevWarn, Source: "wave1", Detail: "Peering connection is being provisioned."},
-			{Code: vpcPeerCodeInitiating, Phrase: "initiating", Severity: domain.SevWarn, Source: "wave1", Detail: "Peering request is being initiated."},
+			{Code: vpcPeerCodeInitiating, Phrase: "initiating", Severity: domain.SevWarn, Source: "wave1", Detail: "The request has been made and the other VPC's owner has not accepted it yet, so nothing crosses between the two. Have the accepter approve it, then add routes on both sides — an accepted peering with no routes still carries nothing."},
 			{Code: vpcPeerCodePendingAcceptance, Phrase: "pending acceptance: expires in <N>d", Severity: domain.SevWarn, Source: "wave1", Detail: "The peer has not accepted this request yet, and AWS expires it a week after creation; the countdown is in the status and the date is listed below. Ask the accepter to approve it."},
 			{Code: vpcPeerCodeExpired, Phrase: "expired: never accepted", Severity: domain.SevWarn, Source: "wave1", Detail: "The peering request expired unaccepted; recreate it if still needed."},
 			{Code: vpcPeerCodeRejected, Phrase: "rejected", Severity: domain.SevBroken, Source: "wave1", Detail: "The accepter rejected this peering request, so nothing will ever route across it; AWS keeps the record listed for a while. Delete it and request again once the other side agrees."},
 			{Code: vpcPeerCodeFailed, Phrase: "failed", Severity: domain.SevBroken, Source: "wave1", Detail: "The peering connection failed to establish and will not recover on its own; the status message is listed below. Delete it and request a new one."},
-			{Code: vpcPeerCodeDeleting, Phrase: "deleting", Severity: domain.SevWarn, Source: "wave1", Detail: "Peering connection is being deleted."},
-			{Code: vpcPeerCodeDeleted, Phrase: "deleted", Severity: domain.SevDim, Source: "wave1", Detail: "AWS keeps deleted connections listed for a window."},
+			{Code: vpcPeerCodeDeleting, Phrase: "deleting", Severity: domain.SevWarn, Source: "wave1", Detail: "The connection is being torn down, and when it goes, traffic between the two VPCs stops and every route pointing at it becomes a silent drop. Remove those routes, or recreate the peering if this was not intended."},
+			{Code: vpcPeerCodeDeleted, Phrase: "deleted", Severity: domain.SevDim, Source: "wave1"},
 			{Code: vpcPeerCodeCidrOverlap, Phrase: "CIDR overlap with peer", Severity: domain.SevWarn, Source: "wave1", Detail: "The requester and accepter VPCs have overlapping address ranges, so routes into the overlap are blackholed; the range is listed below. Re-address one side, or peer a VPC that does not overlap."},
 			{Code: vpcPeerCodeNoLocalRoute, Phrase: "no local route to peer", Severity: domain.SevWarn, Source: "wave2", Detail: "No loaded route table routes to this peering connection."},
 			{Code: vpcPeerCodeRouteBlackholed, Phrase: "route to peer blackholed", Severity: domain.SevWarn, Source: "wave2", Detail: "A route references this connection but its state is blackhole."},
@@ -802,7 +802,7 @@ var networkingChildTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals 
 			return FetchELBListeners(ctx, c.ELBv2, parentCtx, continuationToken)
 		}),
 		Findings: []catalog.FindingDef{
-			{Code: CodeELBListenerNoCertificate, Phrase: "no certificate configured", Severity: domain.SevBroken, Source: "wave1"},
+			{Code: CodeELBListenerNoCertificate, Phrase: "no certificate configured", Severity: domain.SevBroken, Source: "wave1", Detail: "The listener terminates TLS but has no certificate attached, so every handshake against it fails and the service behind it is unreachable on that port. Attach a certificate from Certificate Manager to the listener."},
 		},
 	},
 	{
@@ -838,10 +838,10 @@ var networkingChildTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals 
 		LifecycleKey: "health",
 		FieldKeys:    []string{"target_id", "port", "az", "health", "reason", "reason_human", "description", "target_group_arn"},
 		Findings: []catalog.FindingDef{
-			{Code: CodeTGHealthUnhealthy, Phrase: "<health check reason>", Severity: domain.SevBroken, Source: "wave1", Detail: "This target is failing the group's health check, so the load balancer has stopped sending it requests; the reason the check gave is the phrase. Fix the target or the check's path, port and matcher."},
-			{Code: CodeTGHealthUnavailable, Phrase: "<health check reason>", Severity: domain.SevWarn, Source: "wave1", Detail: "The load balancer cannot health-check this target at all, usually because a security group or network path blocks the check. Open the check's port from the load balancer to the target."},
-			{Code: CodeTGHealthDraining, Phrase: "<health check reason>", Severity: domain.SevWarn, Source: "wave1", Detail: "The target is deregistering and finishing the requests it already holds. It stops receiving new ones and leaves the group when the deregistration delay elapses."},
-			{Code: CodeTGHealthInitial, Phrase: "<health check reason>", Severity: domain.SevDim, Source: "wave1", Detail: "The target has just registered and has not passed enough health checks to receive traffic yet. It becomes healthy once the configured threshold of consecutive successes is met."},
+			{Code: CodeTGHealthUnhealthy, Phrase: "<unhealthy check reason>", Severity: domain.SevBroken, Source: "wave1", Detail: "This target is failing the group's health check, so the load balancer has stopped sending it requests; the reason the check gave is the phrase. Fix the target or the check's path, port and matcher."},
+			{Code: CodeTGHealthUnavailable, Phrase: "<unavailable check reason>", Severity: domain.SevWarn, Source: "wave1", Detail: "The load balancer cannot health-check this target at all, usually because a security group or network path blocks the check. Open the check's port from the load balancer to the target."},
+			{Code: CodeTGHealthDraining, Phrase: "<draining check reason>", Severity: domain.SevWarn, Source: "wave1", Detail: "The target is deregistering and finishing the requests it already holds. It stops receiving new ones and leaves the group when the deregistration delay elapses."},
+			{Code: CodeTGHealthInitial, Phrase: "<initial check reason>", Severity: domain.SevDim, Source: "wave1"},
 		},
 		ChildFetcher: childFetcherWithClients(func(ctx context.Context, c *ServiceClients, parentCtx resource.ParentContext, continuationToken string) (resource.FetchResult, error) {
 			return FetchTargetHealth(ctx, c.ELBv2, parentCtx["target_group_arn"], continuationToken)

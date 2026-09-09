@@ -181,10 +181,10 @@ trail — MONITORING. Status key: `state` — the column naming it is the status
 <!-- BEGIN GENERATED: findings -->
 | Code | Phrase | Severity | Source | Detail |
 | --- | --- | --- | --- | --- |
-| trail.log-file-validation.disabled | log file validation disabled | warn | wave1 | — |
-| trail.not-logging | not logging | broken | wave2 | — |
-| trail.delivery-error | delivery error: <LatestDeliveryError> | broken | wave2 | — |
-| trail.delivery-stale | delivery stale since <LatestDeliveryTime> | broken | wave2 | — |
+| trail.log-file-validation.disabled | log file validation disabled | warn | wave1 | The trail's files carry no integrity digest, so there is no way to prove afterwards that one was not altered or removed. Turn on log file validation — during an incident, unverifiable logs are close to no logs. |
+| trail.not-logging | not logging | broken | wave2 | The trail exists but is switched off, so nothing is being recorded and the account has no audit history of its calls for this period. Start logging on it; the gap it leaves cannot be filled in later. |
+| trail.delivery-error | delivery error: <LatestDeliveryError> | broken | wave2 | CloudTrail cannot write this trail's files to their destination, so events are being recorded nowhere durable. The error names the cause, usually a bucket policy, a removed bucket, or a KMS key CloudTrail may no longer use. |
+| trail.delivery-stale | delivery stale since <LatestDeliveryTime> | broken | wave2 | No log file has been delivered for far longer than this trail's normal interval, so the audit record has a hole in it starting from that time. Check the destination bucket's policy and the trail's KMS key, then confirm delivery resumes. |
 | trail.no-cloudwatch-logs | not delivering to CloudWatch Logs | warn | wave1 | Events are delivered to the bucket only, so no metric filter or alarm can watch them and nobody is paged on suspicious account activity. Attach a log group to this trail. |
 | trail.no-kms | log files not KMS-encrypted | warn | wave1 | Delivered log files use S3-managed encryption, so anyone who can read the bucket can read the audit trail. Set a KMS key on the trail so log files are encrypted with a key you control. |
 | trail.log-bucket-public | log bucket is publicly accessible | broken | wave2 | The bucket holding this trail's log files is publicly accessible, so the account's audit history can be read by anyone. Remove the public grant from that bucket's policy and access control list. |

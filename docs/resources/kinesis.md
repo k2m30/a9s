@@ -169,9 +169,9 @@ kinesis — MESSAGING. Status key: `status` — the key the status cell reads, a
 <!-- BEGIN GENERATED: findings -->
 | Code | Phrase | Severity | Source | Detail |
 | --- | --- | --- | --- | --- |
-| kinesis.warn.creating | creating | warn | wave1 | — |
-| kinesis.warn.updating | updating | warn | wave1 | — |
-| kinesis.warn.deleting | deleting | warn | wave1 | — |
+| kinesis.warn.creating | creating | warn | wave1 | The stream is still being created and cannot take records or be read from yet. Wait for it to become active before starting producers and consumers. |
+| kinesis.warn.updating | updating | warn | wave1 | The stream is being resharded or reconfigured, so the shard list is changing under any consumer that cached it. Consumers using the Kinesis Client Library pick this up; hand-written ones may need to refresh. |
+| kinesis.warn.deleting | deleting | warn | wave1 | The stream is being removed, so producers start getting errors and any records still in it are lost. If this was not intended, stop the producers before they exhaust their retries, and check whether a replacement stream exists. |
 | kinesis.unencrypted | not encrypted at rest | warn | wave2 | Records sit unencrypted at rest, so anyone who reaches the backing storage reads whatever the stream carries. Turn on server-side encryption and point the stream at a KMS key. |
 | kinesis.min-retention | 24h retention | warn | wave2 | The stream keeps only the default 24 hours of records, so a consumer that falls behind for a day, or an outage longer than one, loses data with no way to replay it. Raise the retention period to cover the longest replay you expect to need. |
 <!-- END GENERATED: findings -->

@@ -123,7 +123,7 @@ One row per signal from §3:
 
 | Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) |
 |---|---|---|---|---|---|
-| `State == DISABLED` | 1 | Dim | n/a | S2, S4 | `disabled` |
+| `State == DISABLED` | 1 | Dim | n/a | S2, S4 | `disabled (rule off)` |
 | `ENABLED` rule with `len(Targets)==0` | 2 | Broken | `!` | S1, S2, S3, S4, S5 | `enabled rule has no targets` |
 | `DISABLED` rule with `len(Targets)>0` | 2 | Warning | `~` | S2, S3, S4, S5 | `target drift or no dead-letter config` |
 | target without `DeadLetterConfig` | 2 | Warning | `~` | S2, S3, S4, S5 | `target drift or no dead-letter config` |
@@ -136,7 +136,7 @@ Notes on the table above:
 
 ## 4.1 UX review (two sentences)
 
-At 3am, glancing at the list, can the operator tell what's wrong with a problem row without opening detail? Yes — a red row reads `enabled rule has no targets`, a yellow one reads `target drift or no dead-letter config`, and a switched-off rule dims to `disabled`; all three are triageable in the list without navigating to detail, and the detail view separates the two causes behind the yellow row.
+At 3am, glancing at the list, can the operator tell what's wrong with a problem row without opening detail? Yes — a red row reads `enabled rule has no targets`, a yellow one reads `target drift or no dead-letter config`, and a switched-off rule dims to `disabled (rule off)`; all three are triageable in the list without navigating to detail, and the detail view separates the two causes behind the yellow row.
 
 ## 5. Out of Scope
 
@@ -170,7 +170,7 @@ eb-rule — MESSAGING. Status key: `state` — the key the status cell reads, an
 <!-- BEGIN GENERATED: findings -->
 | Code | Phrase | Severity | Source | Detail |
 | --- | --- | --- | --- | --- |
-| eb-rule.state.disabled | disabled | dim | wave1 | — |
+| eb-rule.state.disabled | disabled (rule off) | dim | wave1 | — |
 | eb-rule.no-targets | enabled rule has no targets | broken | wave2 | This rule is enabled and its pattern still matches events, but it has no target to deliver them to, so every match is silently discarded. Attach the target it was created for, or disable the rule. |
 | eb-rule.target-issue | target drift or no dead-letter config | warn | wave2 | This rule's targets are not configured the way the rule implies: a disabled rule still carries targets, or a target has no dead-letter queue, so a delivery that fails leaves no trace. Remove the stale targets, or attach a dead-letter queue to the ones that matter. |
 <!-- END GENERATED: findings -->

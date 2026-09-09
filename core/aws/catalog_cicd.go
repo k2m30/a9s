@@ -104,12 +104,12 @@ var cicdTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static c
 		},
 		IssueEnricherFieldKeys: []string{"drift_status"},
 		Findings: []catalog.FindingDef{
-			{Code: CodeCFNStackFailed, Phrase: "<status, in words>", Severity: domain.SevBroken, Source: "wave1"},
-			{Code: CodeCFNStackRollback, Phrase: "<status, in words>", Severity: domain.SevBroken, Source: "wave1"},
-			{Code: CodeCFNStackInProgress, Phrase: "<status, in words>", Severity: domain.SevWarn, Source: "wave1"},
+			{Code: CodeCFNStackFailed, Phrase: "<failure status, in words>", Severity: domain.SevBroken, Source: "wave1", Detail: "The stack's last operation failed and CloudFormation left it in a state that blocks further updates, so nothing in this stack can be changed until it is resolved. Open the stack events, find the first resource that failed, fix that cause, then continue the update or delete the stack if it never reached a usable state."},
+			{Code: CodeCFNStackRollback, Phrase: "<rollback status, in words>", Severity: domain.SevBroken, Source: "wave1", Detail: "CloudFormation undid the last change, so the stack is back on its previous template and whatever the update was meant to deliver is not deployed. Read the events for the resource that triggered the rollback and fix it before pushing the template again."},
+			{Code: CodeCFNStackInProgress, Phrase: "<in-progress status, in words>", Severity: domain.SevWarn, Source: "wave1", Detail: "An operation is running against this stack right now, so its resources are being created, replaced or removed and no other change will be accepted until it ends. Watch the stack events until a terminal status appears."},
 			{Code: CodeCFNStackDeleted, Phrase: "delete complete", Severity: domain.SevDim, Source: "wave1"},
-			{Code: cfnCodeRecentResourceFailure, Phrase: "recent resource failure", Severity: domain.SevBroken, Source: "wave2"},
-			{Code: cfnCodeStackDrifted, Phrase: "stack drifted from template", Severity: domain.SevWarn, Source: "wave2"},
+			{Code: cfnCodeRecentResourceFailure, Phrase: "recent resource failure", Severity: domain.SevBroken, Source: "wave2", Detail: "At least one resource in this stack reported a failure during its most recent operation, so what is deployed is not what the template describes. Open the failing resource in the events list and fix the cause before the next deployment repeats it."},
+			{Code: cfnCodeStackDrifted, Phrase: "stack drifted from template", Severity: domain.SevWarn, Source: "wave2", Detail: "The live resources no longer match the template CloudFormation last applied, so the next stack update may overwrite a change somebody made by hand, or fail outright. Run a drift detail report, then either fold the manual change into the template or revert it."},
 			{Code: CodeCFNTerminationProtectionOff, Phrase: "termination protection off", Severity: domain.SevWarn, Source: "wave1", Detail: "A single delete call removes this stack and every resource it owns, with no second step to stop an accidental or scripted deletion. Turn on termination protection so the stack must be unprotected deliberately before it can be deleted."},
 			{Code: CodeCFNOutputSecret, Phrase: "credential in stack outputs", Severity: domain.SevBroken, Source: "wave1", Detail: "A stack output holds what looks like a credential, and outputs are readable by anyone who can describe the stack and importable by any other stack in the account. Move the value into Secrets Manager, export only its name, and rotate the exposed credential."},
 		},
@@ -159,7 +159,7 @@ var cicdTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static c
 			{TargetType: "ct-events", DisplayName: "CloudTrail Events", Checker: ctEventsCheckerFor("pipeline"), NeedsTargetCache: false},
 		},
 		Findings: []catalog.FindingDef{
-			{Code: pipelineCodeStageFailed, Phrase: "stage failed", Severity: domain.SevBroken, Source: "wave2"},
+			{Code: pipelineCodeStageFailed, Phrase: "stage failed", Severity: domain.SevBroken, Source: "wave2", Detail: "A stage in this pipeline failed, so nothing after it ran and the change it carries never reached the environments downstream. Open the failed action for its error output, fix the build or deployment it names, then release the change again."},
 		},
 	},
 	{
@@ -223,7 +223,7 @@ var cicdTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static c
 			{FieldPath: "VpcConfig.SecurityGroupIds", TargetType: "sg"},
 		},
 		Findings: []catalog.FindingDef{
-			{Code: cbCodeLatestBuildFailed, Phrase: "latest build <status>", Severity: domain.SevBroken, Source: "wave2"},
+			{Code: cbCodeLatestBuildFailed, Phrase: "latest build <status>", Severity: domain.SevBroken, Source: "wave2", Detail: "The most recent build of this project did not succeed, so whatever artifact the pipelines behind it consume is stale. Open the build's phase list and logs to find which phase broke, then fix the buildspec, the source, or the missing dependency it names."},
 			{Code: CodeCBPublicBuilds, Phrase: "build results publicly visible", Severity: domain.SevBroken, Source: "wave1", Detail: "Build logs, environment variables and artifacts for this project are readable by anyone on the internet without an AWS account, so any credential or internal hostname a build prints is public. Set the project's visibility back to private and rotate anything the logs have already exposed."},
 			{Code: CodeCBBuildspecFromSource, Phrase: "buildspec taken from the source repository", Severity: domain.SevWarn, Source: "wave1", Detail: "The build instructions come from a file in the source repository, so anyone who can open a pull request can change what runs inside the build role. Move the buildspec inline into the project definition, or restrict who can trigger builds from unmerged branches."},
 			{Code: CodeCBSourceURLCredential, Phrase: "credential in the source repository address", Severity: domain.SevBroken, Source: "wave1", Detail: "The source repository address embeds a username and password or token, which is stored in the project definition and printed in build logs in clear text. Move the credential into a CodeBuild source credential or Secrets Manager entry and rotate it, because it must be assumed leaked."},
@@ -281,8 +281,8 @@ var cicdTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static c
 			{FieldPath: "EncryptionConfiguration.KmsKey", TargetType: "kms"},
 		},
 		Findings: []catalog.FindingDef{
-			{Code: ecrCodeVulnerabilities, Phrase: "<N> critical, <M> high vulnerabilities", Severity: domain.SevBroken, Source: "wave2"},
-			{Code: ecrCodeHighVulnerabilities, Phrase: "<N> high vulnerabilities", Severity: domain.SevWarn, Source: "wave2"},
+			{Code: ecrCodeVulnerabilities, Phrase: "<N> critical, <M> high vulnerabilities", Severity: domain.SevBroken, Source: "wave2", Detail: "Images in this repository carry findings at critical severity, and anything deployed from them is running that code today. Rebuild on a patched base image, push it, and roll the deployments that reference the affected tags forward."},
+			{Code: ecrCodeHighVulnerabilities, Phrase: "<N> high vulnerabilities", Severity: domain.SevWarn, Source: "wave2", Detail: "Scanning found high-severity findings in this repository's images, so the workloads running them carry known, already-published weaknesses. Rebuild on an updated base image and move the tags forward as part of the next routine deployment."},
 			{Code: ecrCodePublicPolicy, Phrase: "repository policy open to anyone", Severity: domain.SevBroken, Source: "wave2", Detail: "The repository policy grants a wildcard principal, so any AWS account can pull the images this repository holds and read whatever is baked into their layers. Replace the wildcard principal with the accounts or roles that need the images, or add a condition that requires the caller's account or ARN to equal one you expect; a condition that only says whether a key is set scopes nothing."},
 			{Code: ecrCodeNoLifecyclePolicy, Phrase: "no lifecycle policy", Severity: domain.SevWarn, Source: "wave2", Detail: "No lifecycle policy is set, so every image ever pushed is kept forever: storage cost grows without limit and long-superseded, vulnerable images stay pullable by tag or digest. Add a lifecycle policy that expires untagged images and caps how many versions of each tag are retained."},
 			{Code: CodeECRScanOnPushOff, Phrase: "scan on push off", Severity: domain.SevWarn, Source: "wave1", Detail: "Images pushed to this repository are never scanned, so a known vulnerability in a base layer reaches production without anyone being told. Turn on scan on push for the repository so every new image is checked as it arrives."},
@@ -329,7 +329,7 @@ var cicdTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static c
 			{TargetType: "ct-events", DisplayName: "CloudTrail Events", Checker: ctEventsCheckerFor("codeartifact"), NeedsTargetCache: false},
 		},
 		Findings: []catalog.FindingDef{
-			{Code: codeartifactCodeNoPermissionsPolicy, Phrase: "no permissions policy", Severity: domain.SevWarn, Source: "wave2"},
+			{Code: codeartifactCodeNoPermissionsPolicy, Phrase: "no permissions policy", Severity: domain.SevWarn, Source: "wave2", Detail: "The repository has no resource policy, so who may read and publish depends entirely on the IAM policies attached to each caller and there is no single place to see or restrict it. Attach a repository policy naming the accounts and roles allowed to pull, and the smaller set allowed to publish."},
 			{Code: codeartifactCodePublicAccessPolicy, Phrase: "public access policy", Severity: domain.SevBroken, Source: "wave2", Detail: "The repository's resource policy grants a wildcard principal, so any AWS account can read the packages it holds and, depending on the actions allowed, publish into it. Replace the \"*\" principal with the accounts or roles that need the repository, or add a condition that requires the caller's account or ARN to equal one you expect; a condition that only says whether a key is set scopes nothing."},
 		},
 	},
@@ -387,11 +387,11 @@ var cicdChildTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 			return FetchCBBuilds(ctx, c.CodeBuild, c.CodeBuild, parentCtx, continuationToken)
 		}),
 		Findings: []catalog.FindingDef{
-			{Code: CodeCBBuildFailed, Phrase: "failed", Severity: domain.SevBroken, Source: "wave1"},
-			{Code: CodeCBBuildFault, Phrase: "fault", Severity: domain.SevBroken, Source: "wave1"},
-			{Code: CodeCBBuildTimedOut, Phrase: "timed out", Severity: domain.SevBroken, Source: "wave1"},
-			{Code: CodeCBBuildInProgress, Phrase: "in progress", Severity: domain.SevWarn, Source: "wave1"},
-			{Code: CodeCBBuildStopped, Phrase: "stopped", Severity: domain.SevDim, Source: "wave1"},
+			{Code: CodeCBBuildFailed, Phrase: "failed", Severity: domain.SevBroken, Source: "wave1", Detail: "This build produced no artifact, so any pipeline or deployment waiting on it is still on the previous version. Open the build's phase details and logs for the command that exited non-zero, and fix it in the source or the buildspec."},
+			{Code: CodeCBBuildFault, Phrase: "fault", Severity: domain.SevBroken, Source: "wave1", Detail: "The build stopped because of an error inside the build service rather than in your commands, so the failure says nothing about the code. Retry it, and if it repeats check the compute type, the build image, and the VPC configuration the project uses."},
+			{Code: CodeCBBuildTimedOut, Phrase: "timed out", Severity: domain.SevBroken, Source: "wave1", Detail: "The build hit the project's timeout and was killed part-way, so its artifacts are incomplete or absent. Find the phase that was still running when it was cut off — a hung test or a slow dependency fetch is typical — or raise the project's timeout if the build genuinely needs longer."},
+			{Code: CodeCBBuildInProgress, Phrase: "in progress", Severity: domain.SevWarn, Source: "wave1", Detail: "This build is still running, so its outcome is not known and any artifact it will publish does not exist yet. Wait for it to finish before treating the tag or artifact it targets as available."},
+			{Code: CodeCBBuildStopped, Phrase: "stopped (cancelled)", Severity: domain.SevDim, Source: "wave1"},
 		},
 	},
 	{
@@ -429,7 +429,7 @@ var cicdChildTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 			return FetchPipelineStages(ctx, c.CodePipeline, parentCtx, continuationToken)
 		}),
 		Findings: []catalog.FindingDef{
-			{Code: CodePipelineActionFailed, Phrase: "failed", Severity: domain.SevBroken, Source: "wave1"},
+			{Code: CodePipelineActionFailed, Phrase: "failed", Severity: domain.SevBroken, Source: "wave1", Detail: "This action failed, so the pipeline stopped here and the change never reached the stages after it. Open the action's execution details for the provider error it returned, fix that, then retry the stage."},
 		},
 	},
 }

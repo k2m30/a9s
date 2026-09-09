@@ -221,13 +221,13 @@ ddb — DATABASES & STORAGE. Status key: `status` — the key the status cell re
 <!-- BEGIN GENERATED: findings -->
 | Code | Phrase | Severity | Source | Detail |
 | --- | --- | --- | --- | --- |
-| ddb.broken.kms\_key\_inaccessible | kms key inaccessible | broken | wave1 | — |
-| ddb.broken.archived\_kms\_lost | archived: kms key lost | broken | wave1 | — |
-| ddb.warn.creating | creating | warn | wave1 | — |
-| ddb.warn.updating | updating | warn | wave1 | — |
-| ddb.warn.deleting | deleting | warn | wave1 | — |
-| ddb.warn.archiving | archiving | warn | wave1 | — |
-| ddb.pitr-off | point-in-time recovery disabled | warn | wave2 | — |
+| ddb.broken.kms\_key\_inaccessible | kms key inaccessible | broken | wave1 | The KMS key encrypting this table cannot be used, so reads and writes fail until it is available again. Check whether the key was disabled or scheduled for deletion, and whether its policy still grants DynamoDB access. |
+| ddb.broken.archived\_kms\_lost | archived: kms key lost | broken | wave1 | The table was archived because its encryption key became unusable, and it stays archived until the key is restored — the data cannot be read in this state. Recover the key if it is only pending deletion; once the key is gone the table's data is unrecoverable. |
+| ddb.warn.creating | creating | warn | wave1 | The table is still being created and does not accept requests yet. Wait for it to become active before pointing an application at it or attaching a stream consumer. |
+| ddb.warn.updating | updating | warn | wave1 | A change is being applied — capacity mode, an index, a replica — and some operations are restricted while it runs. Wait for it to finish before starting another table change. |
+| ddb.warn.deleting | deleting | warn | wave1 | The table and its indexes are being removed, and the data is not recoverable unless a backup exists. If this was not intended, check right now whether point-in-time recovery covers the window you need. |
+| ddb.warn.archiving | archiving | warn | wave1 | The table is being moved to an archived state and is becoming unavailable for reads and writes. Nothing to do while it runs; restoring it later needs the encryption key it used. |
+| ddb.pitr-off | point-in-time recovery disabled | warn | wave2 | Point-in-time recovery is off, so there is no way to roll this table back to a moment before a bad write and only explicit backups exist. Turn it on — it keeps a rolling 35-day window with no change to the table. |
 | ddb.deletion-protection-off | deletion protection off | warn | wave1 | A single delete call (DeleteTable) destroys this table and its data. Turn on deletion protection so removing it takes a deliberate second step. |
 | ddb.cross-account-policy | resource policy grants another account | warn | wave2 | The table's resource policy grants access to an AWS account outside this one. Confirm each account belongs to a partner you meant to share with, and remove the rest. |
 | ddb.public-policy | resource policy open to anyone | broken | wave2 | The table's resource policy allows any AWS principal, so anyone with an AWS account can reach it. Replace the wildcard principal with the specific roles that need access. |

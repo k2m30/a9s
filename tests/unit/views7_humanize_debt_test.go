@@ -77,7 +77,12 @@ var views7HumanizeDebtWitnesses = []views7RawEnumWitness{
 // and a fact the resource does not carry stays the not-applicable dash rather
 // than becoming a word that looks like an answer.
 var views7UntouchedWitnesses = []views7RawEnumWitness{
-	{"mwaa", "dim-airflow-deleting", "Status", "", "deleting"},
+	// Task phrase7 row 2 split this phrase: "deleting" was declared at two
+	// severities across the catalog (Dim here, Warn on twelve other types),
+	// so the same word carried two colours. The pin still proves the
+	// humanizer leaves a declared value alone; it is the declaration that
+	// moved, not the rendering.
+	{"mwaa", "dim-airflow-deleting", "Status", "", "deleting — environment teardown"},
 	{"mwaa", "warn-airflow-maintenance", "Status", "", "maintenance in progress"},
 	{"pipeline", "acme-frontend-deploy", "ExecutionMode", "", "-"},
 	{"tg", "acme-web-tg", "ProtocolVersion", "", "-"},

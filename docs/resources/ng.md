@@ -214,11 +214,11 @@ ng — CONTAINERS. Status key: `status` — the key the status cell reads, and t
 <!-- BEGIN GENERATED: findings -->
 | Code | Phrase | Severity | Source | Detail |
 | --- | --- | --- | --- | --- |
-| ng.state.creating | creating | warn | wave1 | — |
-| ng.state.updating | updating | warn | wave1 | — |
-| ng.state.deleting | deleting | warn | wave1 | — |
-| ng.state.create-failed | create failed | broken | wave1 | — |
-| ng.state.delete-failed | delete failed | broken | wave1 | — |
+| ng.state.creating | creating | warn | wave1 | The node group is still bringing up its instances and registering them with the cluster, so its capacity is not schedulable yet. Wait for it to become active before draining the node group it replaces. |
+| ng.state.updating | updating | warn | wave1 | Nodes in this group are being replaced or reconfigured, so pods are being evicted and rescheduled while it runs. Confirm your workloads have pod disruption budgets and enough spare capacity to absorb the rolling replacement. |
+| ng.state.deleting | deleting | warn | wave1 | The group is draining and terminating its nodes, so the capacity it contributed to the cluster is going away. Make sure the pods it hosts have somewhere else to land before the last node goes. |
+| ng.state.create-failed | create failed | broken | wave1 | The node group never came up, so the capacity you planned for this cluster does not exist. Its health issues name the cause — a subnet with no route to the cluster endpoint, an instance type unavailable in the zone, or a node role missing its policies. |
+| ng.state.delete-failed | delete failed | broken | wave1 | The node group could not be removed and is stuck part-deleted, still billing for whatever instances remain. Check its health issues, clear whatever blocks the deletion — often a load balancer or a network interface left by a service — then delete it again. |
 | ng.state.degraded | degraded | broken | wave1 | The node group is degraded, so some nodes are failing or not joining; every health issue AWS reports is a row under this finding. Fix the cause, usually IAM, subnet capacity or the launch template, and let the group reconcile. |
 | ng.health-issue | health issue | warn | wave1 | The node group reports a health issue while its state says nothing is wrong; every reported code is a row under this finding. Nodes may be failing to join or to stay healthy until it clears. |
 | ng.warn.details\_denied | details denied | warn | wave1 | Access to resource details was denied; only the name is visible. |

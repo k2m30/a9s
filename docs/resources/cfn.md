@@ -124,10 +124,10 @@ One row per signal from §3:
 
 | Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) |
 |---|---|---|---|---|---|
-| `*_IN_PROGRESS` / `REVIEW_IN_PROGRESS` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `<status, in words>` |
-| `ROLLBACK_COMPLETE` | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `<status, in words>` |
-| `UPDATE_ROLLBACK_COMPLETE` / `IMPORT_ROLLBACK_COMPLETE` | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `<status, in words>` |
-| `*_FAILED` | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `<status, in words>` |
+| `*_IN_PROGRESS` / `REVIEW_IN_PROGRESS` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `<in-progress status, in words>` |
+| `ROLLBACK_COMPLETE` | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `<rollback status, in words>` |
+| `UPDATE_ROLLBACK_COMPLETE` / `IMPORT_ROLLBACK_COMPLETE` | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `<rollback status, in words>` |
+| `*_FAILED` | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `<failure status, in words>` |
 | `StackStatus == DELETE_COMPLETE` | 1 | Dim | n/a | S2, S4 | `delete complete` |
 | `EnableTerminationProtection == false` on a live, top-level stack | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `termination protection off` |
 | a stack output value scans as a credential | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `credential in stack outputs` |
@@ -142,7 +142,7 @@ Rules for filling list and detail text:
 
 ## 4.1 UX review (two sentences)
 
-At 3am, glancing at the list, can the operator tell what's wrong with a problem row without opening detail? Mostly yes — the Status column spells the stack's own state as `<status, in words>`, so a stack that reports `UPDATE_FAILED` reads as words rather than as an API constant, and `recent resource failure`, `stack drifted from template` and `termination protection off` name a posture miss outright. The one gap: a stack stuck in `*_IN_PROGRESS > 1h` reads exactly like a normal in-flight deploy, because the elapsed age is not part of the phrase.
+At 3am, glancing at the list, can the operator tell what's wrong with a problem row without opening detail? Mostly yes — the Status column spells the stack's own state as `<failure status, in words>`, so a stack that reports `UPDATE_FAILED` reads as words rather than as an API constant, and `recent resource failure`, `stack drifted from template` and `termination protection off` name a posture miss outright. The one gap: a stack stuck in `*_IN_PROGRESS > 1h` reads exactly like a normal in-flight deploy, because the elapsed age is not part of the phrase.
 
 ## 4.2 On-Demand Detail Enrichment
 
@@ -190,12 +190,12 @@ cfn — CI/CD. Status key: `status` — the key the status cell reads, and the c
 <!-- BEGIN GENERATED: findings -->
 | Code | Phrase | Severity | Source | Detail |
 | --- | --- | --- | --- | --- |
-| cfn.stack.failed | <status, in words> | broken | wave1 | — |
-| cfn.stack.rollback | <status, in words> | broken | wave1 | — |
-| cfn.stack.in\_progress | <status, in words> | warn | wave1 | — |
+| cfn.stack.failed | <failure status, in words> | broken | wave1 | The stack's last operation failed and CloudFormation left it in a state that blocks further updates, so nothing in this stack can be changed until it is resolved. Open the stack events, find the first resource that failed, fix that cause, then continue the update or delete the stack if it never reached a usable state. |
+| cfn.stack.rollback | <rollback status, in words> | broken | wave1 | CloudFormation undid the last change, so the stack is back on its previous template and whatever the update was meant to deliver is not deployed. Read the events for the resource that triggered the rollback and fix it before pushing the template again. |
+| cfn.stack.in\_progress | <in-progress status, in words> | warn | wave1 | An operation is running against this stack right now, so its resources are being created, replaced or removed and no other change will be accepted until it ends. Watch the stack events until a terminal status appears. |
 | cfn.stack.deleted | delete complete | dim | wave1 | — |
-| cfn.recent-resource-failure | recent resource failure | broken | wave2 | — |
-| cfn.stack-drifted | stack drifted from template | warn | wave2 | — |
+| cfn.recent-resource-failure | recent resource failure | broken | wave2 | At least one resource in this stack reported a failure during its most recent operation, so what is deployed is not what the template describes. Open the failing resource in the events list and fix the cause before the next deployment repeats it. |
+| cfn.stack-drifted | stack drifted from template | warn | wave2 | The live resources no longer match the template CloudFormation last applied, so the next stack update may overwrite a change somebody made by hand, or fail outright. Run a drift detail report, then either fold the manual change into the template or revert it. |
 | cfn.termination-protection-off | termination protection off | warn | wave1 | A single delete call removes this stack and every resource it owns, with no second step to stop an accidental or scripted deletion. Turn on termination protection so the stack must be unprotected deliberately before it can be deleted. |
 | cfn.output-secret | credential in stack outputs | broken | wave1 | A stack output holds what looks like a credential, and outputs are readable by anyone who can describe the stack and importable by any other stack in the account. Move the value into Secrets Manager, export only its name, and rotate the exposed credential. |
 <!-- END GENERATED: findings -->

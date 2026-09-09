@@ -183,10 +183,10 @@ kms — SECRETS & CONFIG. Status key: `status` — the key the status cell reads
 <!-- BEGIN GENERATED: findings -->
 | Code | Phrase | Severity | Source | Detail |
 | --- | --- | --- | --- | --- |
-| kms.state.pending\_deletion | pending deletion | broken | wave1 | — |
-| kms.state.disabled | disabled | warn | wave1 | — |
-| kms.state.unavailable | <key state> | broken | wave1 | — |
-| kms.access-denied | access denied (kms:DescribeKey) | broken | wave1 | — |
+| kms.state.pending\_deletion | pending deletion | broken | wave1 | The key is scheduled for destruction, and when the waiting period ends everything encrypted under it becomes permanently unreadable — snapshots, buckets, secrets and volumes alike. Cancel the deletion unless you have proven nothing still depends on it. |
+| kms.state.disabled | disabled | warn | wave1 | The key cannot be used while it is disabled, so any read or write needing it fails now even though nothing has been destroyed. Re-enable it if that was not deliberate; the failures show up as permission errors in the services that use it. |
+| kms.state.unavailable | <key state> | broken | wave1 | The key is not usable in its current state, so every operation depending on it fails; for an external or custom key store this usually means the backing store is disconnected. Reconnect the key store, or restore the key material. |
+| kms.access-denied | access denied (kms:DescribeKey) | broken | wave1 | This key's state could not be read because the key policy or your own IAM policy denies it, so nothing here can be judged — the key may be healthy or pending deletion and this view cannot tell you which. Grant the role you browse with permission to describe the key. |
 | kms.rotation-disabled | key rotation disabled | warn | wave2 | This customer-managed key never rotates its backing material, so every ciphertext ever written under it depends on one key that has been in use since creation. Enable automatic key rotation on the key. |
 | kms.public-policy | key policy open to anyone | broken | wave2 | The key policy allows a wildcard principal, so any AWS account can use this key to decrypt data encrypted with it. Replace the "*" principal with the specific accounts or roles that need the key, or add a condition that requires the caller's account or ARN to equal one you expect; a condition that only names the service the request comes through, or only says whether a key is set, scopes nothing. |
 <!-- END GENERATED: findings -->

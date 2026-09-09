@@ -216,9 +216,9 @@ cf — DNS & CDN. Status key: `status` — the key the status cell reads, and th
 <!-- BEGIN GENERATED: findings -->
 | Code | Phrase | Severity | Source | Detail |
 | --- | --- | --- | --- | --- |
-| cf.disabled | disabled (admin-off) | dim | wave1 | The distribution is switched off, so it serves nothing and the edge locations answer with an error. Nothing here needs fixing unless it was meant to be serving; enable it, or delete it once you are sure. |
+| cf.disabled | disabled (admin-off) | dim | wave1 | — |
 | cf.status.in-progress | deploying: config propagating | warn | wave1 | A configuration change is still reaching the edge locations, so viewers may get the old behaviour or the new one depending on where they are. Wait for it to finish before judging anything else about the distribution. |
-| cf.insecure-protocol | traffic allowed without TLS | warn | wave2 | — |
+| cf.insecure-protocol | traffic allowed without TLS | warn | wave2 | The distribution accepts plain HTTP, or talks to its origin without TLS, so requests and any cookies or tokens in them can be read in transit. Set the viewer protocol policy to redirect to HTTPS, and the origin protocol policy to HTTPS only. |
 | cf.origin-bucket-missing | S3 origin bucket does not exist | broken | wave2 | The distribution forwards requests to a bucket that no longer exists, so those paths fail and anyone who creates a bucket with that name starts serving your traffic. Repoint the origin at a bucket you own, or remove it. |
 | cf.deprecated-tls | minimum TLS below 1.2 | warn | wave2 | Viewers may negotiate a protocol version with known weaknesses, which modern browsers already refuse. Raise the distribution's minimum protocol version to TLS 1.2 or later. |
 | cf.logging-off | access logging off | warn | wave2 | The distribution records no request logs, so an attack or abuse pattern at the edge leaves nothing to investigate. Turn on standard logging and give it a destination. |

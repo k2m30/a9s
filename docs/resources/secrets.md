@@ -166,7 +166,7 @@ One row per signal from §3:
 |---|---|---|---|---|---|
 | `now > NextRotationDate` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `rotation overdue` |
 | `LastAccessedDate > 180d` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `dormant` |
-| `DeletedDate set` | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `deleted` |
+| `DeletedDate set` | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `scheduled for deletion` |
 | `RotationEnabled` not true — no automatic rotation configured | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `rotation not enabled` |
 | the secret's value has not changed in over 365 days | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `value unchanged in over 365 days` |
 | Resource policy allows a wildcard principal with no restrictive condition | 2 | Broken | `!` | S1, S2, S3, S4, S5 | `resource policy open to anyone` |
@@ -223,11 +223,11 @@ secrets — SECRETS & CONFIG. Status key: `status` — the key the status cell r
 <!-- BEGIN GENERATED: findings -->
 | Code | Phrase | Severity | Source | Detail |
 | --- | --- | --- | --- | --- |
-| secrets.state.deleted | deleted | broken | wave1 | — |
-| secrets.state.rotation\_overdue | rotation overdue | warn | wave1 | — |
-| secrets.state.dormant | dormant | warn | wave1 | — |
-| secrets.rotation.disabled | rotation not enabled | warn | wave1 | — |
-| secrets.value.stale | value unchanged in over 365 days | warn | wave1 | — |
+| secrets.state.deleted | scheduled for deletion | broken | wave1 | This secret is inside its recovery window and will be destroyed when the window ends, and applications reading it are failing already. Restore it now if anything still needs the value — once the window closes there is no way to get it back. |
+| secrets.state.rotation\_overdue | rotation overdue | warn | wave1 | Rotation is configured but the secret is past the interval it should have rotated in, so either the rotation function is failing or it was never invoked. Check the rotation function's logs, and run a rotation by hand to prove it works. |
+| secrets.state.dormant | dormant | warn | wave1 | Nothing has read this secret in a long time, so it is either unused or read by something you have lost track of. Confirm which through CloudTrail, then delete it or record its owner — a live credential nobody watches is the one that leaks unnoticed. |
+| secrets.rotation.disabled | rotation not enabled | warn | wave1 | The value never changes on a schedule, so a leaked copy stays valid until somebody notices and rotates it by hand. Turn on rotation with a function that can change the credential at its source. |
+| secrets.value.stale | value unchanged in over 365 days | warn | wave1 | The value has not changed in over a year, so anyone who has ever held a copy still holds a working credential. Rotate it, and set up scheduled rotation so the next year does not look the same. |
 | secrets.public-policy | resource policy open to anyone | broken | wave2 | The secret's resource policy allows a wildcard principal, so any AWS account can read the credential this secret holds. Remove the "*" principal from the resource policy, or add a condition that requires the caller's account or ARN to equal one you expect; a condition that only says whether a key is set scopes nothing. |
 | secrets.cross-account-policy | resource policy grants another account | warn | wave2 | The secret's resource policy names a principal in another AWS account, so that account can read the credential. Confirm the grant is intended and still needed, and remove the account from the resource policy otherwise. |
 <!-- END GENERATED: findings -->

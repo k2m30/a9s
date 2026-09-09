@@ -227,8 +227,9 @@ func TestRedshift_Fetch_Availability_Maintenance(t *testing.T) {
 // TestRedshift_Fetch_Availability_Modifying asserts ClusterAvailabilityStatus=Modifying.
 func TestRedshift_Fetch_Availability_Modifying(t *testing.T) {
 	r := fetchSingleCluster(t, redshiftFixtureByID(t, fixtures.RedshiftAvailModifyingID))
-	assertStatus(t, r, "modifying")
-	assertFindings(t, r, []string{"modifying"})
+	// Task phrase7 row 2 renamed this phrase: the old wording was declared at more than one severity across the catalog, so the same words carried two colours.
+	assertStatus(t, r, "modifying — availability affected")
+	assertFindings(t, r, []string{"modifying — availability affected"})
 	assertClusterStatusField(t, r, "available")
 }
 
@@ -268,8 +269,8 @@ func TestRedshift_Fetch_MaintenanceDeferred_Expired(t *testing.T) {
 // TestRedshift_Fetch_PubliclyAccessible asserts PubliclyAccessible=true → warning phrase.
 func TestRedshift_Fetch_PubliclyAccessible(t *testing.T) {
 	r := fetchSingleCluster(t, redshiftFixtureByID(t, fixtures.RedshiftPubliclyAccessibleID))
-	assertStatus(t, r, "publicly accessible")
-	assertFindings(t, r, []string{"publicly accessible"})
+	assertStatus(t, r, "public endpoint")
+	assertFindings(t, r, []string{"public endpoint"})
 	assertClusterStatusField(t, r, "available")
 }
 
@@ -293,7 +294,7 @@ func TestRedshift_Fetch_MultiW1_PendingPlusPublicPlusUnencrypted(t *testing.T) {
 	assertStatus(t, r, "pending change queued (+2)")
 	assertFindings(t, r, []string{
 		"pending change queued",
-		"publicly accessible",
+		"public endpoint",
 		"unencrypted at rest",
 	})
 }
@@ -302,9 +303,9 @@ func TestRedshift_Fetch_MultiW1_PendingPlusPublicPlusUnencrypted(t *testing.T) {
 // for 2 coexisting warnings.
 func TestRedshift_Fetch_MultiW1_Two_Warnings_Suffix_Plus_1(t *testing.T) {
 	r := fetchSingleCluster(t, redshiftFixtureByID(t, fixtures.WarnRedshiftTwoID))
-	assertStatus(t, r, "publicly accessible (+1)")
+	assertStatus(t, r, "public endpoint (+1)")
 	assertFindings(t, r, []string{
-		"publicly accessible",
+		"public endpoint",
 		"unencrypted at rest",
 	})
 }

@@ -178,7 +178,7 @@ sfn — MESSAGING. Status key: `state` — the column naming it is the status co
 <!-- BEGIN GENERATED: findings -->
 | Code | Phrase | Severity | Source | Detail |
 | --- | --- | --- | --- | --- |
-| sfn.latest-execution-failed | latest execution <STATUS> | broken | wave2 | — |
+| sfn.latest-execution-failed | latest execution <STATUS> | broken | wave2 | The most recent run of this state machine did not succeed, so whatever it automates has not happened since. Open that execution's history for the state that failed and its error, then rerun once the cause is fixed. |
 | sfn.logging-off | execution logging off | warn | wave2 | The state machine records nothing about its executions, so a failed run leaves no trace of which state failed or what it was handed. Turn on execution logging to a CloudWatch log group. |
 | sfn.no-cmk | not encrypted with a customer key | warn | wave2 | Execution history and state data are encrypted with an AWS-owned key you cannot audit, rotate, or revoke. Point the state machine at a customer managed KMS key. |
 | sfn.definition-secret | credential in state machine definition | broken | wave2 | A credential is written into the state machine's definition, so it is readable by anyone who can call states:DescribeStateMachine and it travels with every export of the workflow. Move the value to Secrets Manager and reference it at run time, then rotate it. |

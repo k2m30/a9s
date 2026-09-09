@@ -165,11 +165,11 @@ ebs-snap — COMPUTE. Status key: `state` — the key the status cell reads, and
 <!-- BEGIN GENERATED: findings -->
 | Code | Phrase | Severity | Source | Detail |
 | --- | --- | --- | --- | --- |
-| ebs-snap.state.pending | pending | warn | wave1 | — |
-| ebs-snap.state.error | error | broken | wave1 | — |
+| ebs-snap.state.pending | pending | warn | wave1 | The snapshot is still being written and cannot be used to restore a volume or copied to another region yet. Wait for it to complete before relying on it as the recovery point for anything. |
+| ebs-snap.state.error | error | broken | wave1 | This snapshot failed and holds no usable copy of the volume, so any recovery plan naming it has a hole in it. Take a fresh snapshot of the source volume and delete this one. |
 | ebs-snap.encryption.disabled | unencrypted | warn | wave1 | Snapshot is not encrypted at rest — re-create from an encrypted volume. |
 | ebs-snap.aged-automated | automated, <N>d old | warn | wave1 | This automated snapshot is old and no retention policy prunes it, so it is billed indefinitely; the age is in the status. Add a lifecycle policy, or delete it. |
-| ebs-snap.orphan | orphan: source volume deleted | warn | wave2 | — |
+| ebs-snap.orphan | orphan: source volume deleted | warn | wave2 | The volume this snapshot came from no longer exists, so nothing is refreshing it and it will never get any newer. Keep it deliberately as an archive with an owner, or delete it — either way its stored data is billed every month. |
 | ebs-snap.public | shared with all AWS accounts | broken | wave2 | This snapshot is shared with every AWS account, so anyone can restore a volume from it and read whatever the source disk held. Stop sharing the snapshot with the `all` group. |
 <!-- END GENERATED: findings -->
 

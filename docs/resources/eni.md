@@ -173,9 +173,9 @@ eni — NETWORKING. Status key: `status` — the key the status cell reads, and 
 <!-- BEGIN GENERATED: findings -->
 | Code | Phrase | Severity | Source | Detail |
 | --- | --- | --- | --- | --- |
-| eni.state.attaching | attaching | warn | wave1 | — |
-| eni.state.detaching | detaching | warn | wave1 | — |
-| eni.state.available | available | warn | wave1 | — |
+| eni.state.attaching | attaching | warn | wave1 | The interface is still being attached, so the instance or service it belongs to does not have this network path yet. Wait; an attachment that sticks usually means the subnet is out of addresses. |
+| eni.state.detaching | detaching | warn | wave1 | The interface is being removed from its instance, so the addresses on it stop working there. Confirm nothing is still bound to those addresses. |
+| eni.state.available | available | warn | wave1 | The interface is attached to nothing, which normally means the resource that owned it was deleted and left it behind; it holds addresses in the subnet and can block the subnet's deletion. Delete it once you have confirmed nothing is about to claim it. |
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->

@@ -233,7 +233,7 @@ One row per signal from §3:
 | `restore-error` | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `restore-error` |
 | `inaccessible-encryption-credentials` | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `encryption key unavailable` |
 | `BackupRetentionPeriod == 0` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `no automated backups` |
-| `PubliclyAccessible == true` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `publicly accessible` |
+| `PubliclyAccessible == true` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `public endpoint` |
 | `StorageEncrypted == false` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `unencrypted storage` |
 | `DeletionProtection == false` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `deletion protection off` |
 | `MultiAZ == false` on a non-Aurora primary | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `single-AZ` |
@@ -241,8 +241,8 @@ One row per signal from §3:
 | `IAMDatabaseAuthenticationEnabled == false` (supported engines) | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `IAM database authentication off` |
 | `MasterUsername` is a vendor default | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `default master username` |
 | `CertificateDetails.ValidTill` within 90d (but more than 30d out) | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `server certificate expires in <N day(s)>` |
-| `CertificateDetails.ValidTill` within 30d | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `server certificate expires in <N day(s)>` |
-| `DBInstanceStatus == stopped` | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `stopped` |
+| `CertificateDetails.ValidTill` within 30d | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `server certificate expires in <N day(s)> — rotate now` |
+| `DBInstanceStatus == stopped` | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `stopped (storage still billed)` |
 | Pending maintenance overdue | 2 | Warning | `~` | S2, S3, S4, S5 | `maintenance scheduled` |
 | Engine version no longer available | 2 | Broken | `!` | S1, S2, S3, S4, S5 | `engine version deprecated` |
 | no backup plan selection matches this instance | 2 | Warning | `~` | S2, S3, S4, S5 | `not covered by a backup plan` |
@@ -263,7 +263,7 @@ Rules for filling list and detail text:
 
 ## 4.1 UX review (two sentences)
 
-At 3am, glancing at the list, can the operator tell what's wrong with a problem row without opening detail? Mostly yes — the failure statuses (`storage-full`, `encryption key unavailable`) are already self-describing in S4 and the configuration warnings (`no automated backups`, `publicly accessible`, `unencrypted storage`, `deletion protection off`) name the exact policy miss without jargon. The one gap is the transitional bucket: `<transitional status>` tells the operator the instance is busy but not what is being modified, because the first non-empty key of `PendingModifiedValues` is not part of the phrase.
+At 3am, glancing at the list, can the operator tell what's wrong with a problem row without opening detail? Mostly yes — the failure statuses (`storage-full`, `encryption key unavailable`) are already self-describing in S4 and the configuration warnings (`no automated backups`, `public endpoint`, `unencrypted storage`, `deletion protection off`) name the exact policy miss without jargon. The one gap is the transitional bucket: `<transitional status>` tells the operator the instance is busy but not what is being modified, because the first non-empty key of `PendingModifiedValues` is not part of the phrase.
 
 ## 5. Out of Scope
 
@@ -305,20 +305,20 @@ dbi — DATABASES & STORAGE. Status key: `status` — the key the status cell re
 <!-- BEGIN GENERATED: findings -->
 | Code | Phrase | Severity | Source | Detail |
 | --- | --- | --- | --- | --- |
-| dbi.broken.failed | failed | broken | wave1 | — |
-| dbi.broken.storage\_full | storage-full | broken | wave1 | — |
-| dbi.broken.incompatible\_network | incompatible-network | broken | wave1 | — |
-| dbi.broken.incompatible\_option\_group | incompatible-option-group | broken | wave1 | — |
-| dbi.broken.incompatible\_parameters | incompatible-parameters | broken | wave1 | — |
-| dbi.broken.incompatible\_restore | incompatible-restore | broken | wave1 | — |
-| dbi.broken.restore\_error | restore-error | broken | wave1 | — |
-| dbi.broken.encryption\_key\_unavailable | encryption key unavailable | broken | wave1 | — |
-| dbi.broken.stopped | stopped | broken | wave1 | — |
-| dbi.warn.transitional | <transitional status> | warn | wave1 | — |
-| dbi.warn.no\_automated\_backups | no automated backups | warn | wave1 | — |
-| dbi.warn.publicly\_accessible | publicly accessible | warn | wave1 | — |
-| dbi.warn.unencrypted\_storage | unencrypted storage | warn | wave1 | — |
-| dbi.warn.deletion\_protection\_off | deletion protection off | warn | wave1 | — |
+| dbi.broken.failed | failed | broken | wave1 | The instance is not serving connections and AWS could not bring it back on its own. Check its recent events, and plan a restore from the latest automated backup or snapshot — an instance in this state rarely recovers in place. |
+| dbi.broken.storage\_full | storage-full | broken | wave1 | The instance has run out of disk, so writes are rejected and the database is effectively read-only until space is freed. Raise the allocated storage now, then turn on storage autoscaling so the next growth spurt does not repeat this. |
+| dbi.broken.incompatible\_network | incompatible-network | broken | wave1 | The instance cannot start because its subnet group no longer gives it what it needs, usually free addresses or the Availability Zones it was created in. Fix the subnet group's subnets and free capacity, then reboot the instance. |
+| dbi.broken.incompatible\_option\_group | incompatible-option-group | broken | wave1 | The option group attached to this instance does not work with its engine version, so it cannot come up. Move the instance to an option group built for the version it runs, or roll the version back. |
+| dbi.broken.incompatible\_parameters | incompatible-parameters | broken | wave1 | A parameter in this instance's parameter group is rejected by the engine, most often a memory setting larger than the instance class allows, so it will not start. Correct the offending parameter and reboot the instance to apply it. |
+| dbi.broken.incompatible\_restore | incompatible-restore | broken | wave1 | The restore into this instance could not complete, so it holds no usable database. Check that the snapshot's engine version and options match the target, then start the restore again into a fresh instance. |
+| dbi.broken.restore\_error | restore-error | broken | wave1 | The instance failed while restoring from backup, so the recovery you were counting on did not land. Read its events for the failing step and restore again, choosing a different snapshot or point in time if one snapshot is the problem. |
+| dbi.broken.encryption\_key\_unavailable | encryption key unavailable | broken | wave1 | The KMS key that encrypts this instance's storage cannot be used, so the database is inaccessible and stays that way until the key is usable again. Check whether the key was disabled, scheduled for deletion, or has a policy that no longer grants the database service access. |
+| dbi.broken.stopped | stopped (storage still billed) | broken | wave1 | The database accepts no connections, and a stopped instance is restarted automatically after seven days, so this is not a way to keep it switched off. Start it if applications need it, or take a final snapshot and delete it — its storage and any provisioned IOPS are billed while it sits here. |
+| dbi.warn.transitional | <transitional status> | warn | wave1 | The instance is mid-change, so it may fail over, drop connections, or run with reduced performance until it settles. Wait for it to return to available before starting another modification or judging its performance. |
+| dbi.warn.no\_automated\_backups | no automated backups | warn | wave1 | Backup retention is zero, so there are no automated backups and no point-in-time recovery: a bad deployment or a dropped table can only be undone from a manual snapshot. Set a retention period of at least one day, and longer for anything that matters. |
+| dbi.warn.publicly\_accessible | public endpoint | warn | wave1 | The instance resolves to a routable address from outside the VPC, so only its security groups stand between the database and the internet. Turn public accessibility off and reach it over a private link or a bastion host unless an external system genuinely requires it. |
+| dbi.warn.unencrypted\_storage | unencrypted storage | warn | wave1 | The instance's storage, its snapshots and its automated backups are all written unencrypted, and encryption cannot be turned on in place. Snapshot the instance, copy the snapshot with encryption enabled, and restore into a new encrypted instance when you can take the cutover. |
+| dbi.warn.deletion\_protection\_off | deletion protection off | warn | wave1 | One delete call or one console click can delete this database and its automated backups together. Turn deletion protection on so removing it takes a deliberate second step. |
 | dbi.pending-maintenance | maintenance scheduled | warn | wave2 | AWS has a maintenance action pending for this instance and will apply it in a maintenance window of its choosing once the target date passes; the action, apply method and earliest date are listed below. Apply it yourself in a window that suits you. |
 | dbi.single-az | single-AZ | warn | wave1 | The instance runs in one Availability Zone, so an AZ failure takes the database down until you restore it. Enable Multi-AZ to keep a synchronous standby in a second AZ. |
 | dbi.minor-upgrade-off | auto minor version upgrade off | warn | wave1 | Minor engine patches — including security fixes — are never applied automatically. Enable auto minor version upgrade, or schedule the patching yourself. |
@@ -326,7 +326,7 @@ dbi — DATABASES & STORAGE. Status key: `status` — the key the status cell re
 | dbi.iam-auth-off | IAM database authentication off | warn | wave1 | Connections authenticate with long-lived database passwords only. Enable IAM database authentication so credentials become short-lived tokens tied to IAM identities. |
 | dbi.default-master-user | default master username | warn | wave1 | The administrative account uses the vendor default name, so an attacker only has to guess the password. Create a differently-named administrative user and retire this one. |
 | dbi.ca-cert-expiring | server certificate expires in <N day(s)> | warn | wave1 | The server certificate expires soon; clients that verify the connection will refuse to talk to it once it does. Rotate the instance onto the current certificate authority during a maintenance window. |
-| dbi.ca-cert-expiring-urgent | server certificate expires in <N day(s)> | broken | wave1 | The server certificate expires within a month, and every client that verifies the connection will refuse to talk to the instance the moment it does. Book the maintenance window now and rotate the instance onto the current certificate authority. |
+| dbi.ca-cert-expiring-urgent | server certificate expires in <N day(s)> — rotate now | broken | wave1 | The server certificate expires within a month, and every client that verifies the connection will refuse to talk to the instance the moment it does. Book the maintenance window now and rotate the instance onto the current certificate authority. |
 | dbi.engine-deprecated | engine version deprecated | broken | wave2 | AWS no longer supports this engine version, so it stops receiving security patches and will be force-upgraded on AWS's schedule. Upgrade to a supported version during a maintenance window of your choosing. |
 <!-- END GENERATED: findings -->
 

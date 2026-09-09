@@ -212,13 +212,13 @@ vpce — NETWORKING. Status key: `state` — the key the status cell reads, and 
 <!-- BEGIN GENERATED: findings -->
 | Code | Phrase | Severity | Source | Detail |
 | --- | --- | --- | --- | --- |
-| vpce.state.pending\_acceptance | pending acceptance | warn | wave1 | — |
-| vpce.state.pending | pending | warn | wave1 | — |
-| vpce.state.deleting | deleting | warn | wave1 | — |
-| vpce.state.failed | failed | broken | wave1 | — |
-| vpce.state.rejected | rejected | broken | wave1 | — |
-| vpce.state.expired | expired | broken | wave1 | — |
-| vpce.state.partial | partial | broken | wave1 | — |
+| vpce.state.pending\_acceptance | pending acceptance | warn | wave1 | The endpoint is waiting for the service owner to accept the connection, so it carries no traffic and callers see timeouts. Ask the service's owner to accept the request. |
+| vpce.state.pending | pending | warn | wave1 | The endpoint is still being set up, so its interfaces or route entries are not in place and the service is not reachable through it yet. Wait for it to become available. |
+| vpce.state.deleting | deleting | warn | wave1 | The endpoint is being removed, and traffic that used it falls back to whatever other path exists — usually none, for a private-only service. Confirm nothing still depends on it. |
+| vpce.state.failed | failed | broken | wave1 | The endpoint could not be created, so the service it was meant to reach privately is unreachable from this VPC. Check the subnets, the security groups and the service name, then create it again. |
+| vpce.state.rejected | rejected | broken | wave1 | The service owner refused this connection, so the endpoint exists and carries nothing. Sort out access with the owning account before recreating it. |
+| vpce.state.expired | expired | broken | wave1 | The connection request was never answered and has lapsed, so the endpoint is dead and its traffic has nowhere to go. Delete it, and raise a new request once the service owner is ready to accept. |
+| vpce.state.partial | partial | broken | wave1 | The endpoint works in only some of the Availability Zones it was created for, so traffic from the others fails while the endpoint itself looks present. Check which subnets are missing an interface, and whether the service is offered in those zones. |
 | vpce.state.deleted | deleted | dim | wave1 | — |
 | vpce.policy-open | endpoint policy open to anyone | warn | wave1 | The endpoint policy grants every action to every principal, so any identity that can reach this endpoint can use it to talk to resources in other accounts. Replace it with a policy naming the principals and resources this VPC is allowed to reach. |
 <!-- END GENERATED: findings -->

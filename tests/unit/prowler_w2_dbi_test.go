@@ -240,7 +240,7 @@ func TestW2DBICACertExpiringBroken(t *testing.T) {
 	}
 
 	got := w2DBIFetch(t, w2DBINow, db)
-	w2AssertFinding(t, got["acme-orders-db"].Findings, w2DBICodeCACertUrgent, "server certificate expires in 15 days", domain.SevBroken, "wave1")
+	w2AssertFinding(t, got["acme-orders-db"].Findings, w2DBICodeCACertUrgent, "server certificate expires in 15 days — rotate now", domain.SevBroken, "wave1")
 }
 
 // Exactly 30 days out is still the escalated tier; exactly 90 is still inside
@@ -264,7 +264,7 @@ func TestW2DBICACertBoundaries(t *testing.T) {
 
 	got := w2DBIFetch(t, w2DBINow, at30, at90, at91)
 
-	w2AssertFinding(t, got["acme-db-30"].Findings, w2DBICodeCACertUrgent, "server certificate expires in 30 days", domain.SevBroken, "wave1")
+	w2AssertFinding(t, got["acme-db-30"].Findings, w2DBICodeCACertUrgent, "server certificate expires in 30 days — rotate now", domain.SevBroken, "wave1")
 	w2AssertFinding(t, got["acme-db-90"].Findings, w2DBICodeCACertExpiring, "server certificate expires in 90 days", domain.SevWarn, "wave1")
 	w2AssertNoCode(t, got["acme-db-91"].Findings, w2DBICodeCACertExpiring)
 	w2AssertNoCode(t, got["acme-db-91"].Findings, w2DBICodeCACertUrgent)
@@ -510,6 +510,6 @@ func TestW2DBICACertSingularDay(t *testing.T) {
 	}
 
 	got := w2DBIFetch(t, w2DBINow, one, two)
-	w2AssertFinding(t, got["acme-db-1"].Findings, w2DBICodeCACertUrgent, "server certificate expires in 1 day", domain.SevBroken, "wave1")
-	w2AssertFinding(t, got["acme-db-2"].Findings, w2DBICodeCACertUrgent, "server certificate expires in 2 days", domain.SevBroken, "wave1")
+	w2AssertFinding(t, got["acme-db-1"].Findings, w2DBICodeCACertUrgent, "server certificate expires in 1 day — rotate now", domain.SevBroken, "wave1")
+	w2AssertFinding(t, got["acme-db-2"].Findings, w2DBICodeCACertUrgent, "server certificate expires in 2 days — rotate now", domain.SevBroken, "wave1")
 }

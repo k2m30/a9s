@@ -200,7 +200,7 @@ One row per signal from §3:
 | Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) |
 |---|---|---|---|---|---|
 | `status == DRAINING` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `draining` |
-| `status == INACTIVE` | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `inactive` |
+| `status == INACTIVE` | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `inactive (service deleted)` |
 | `desiredCount > 0` AND `runningCount == 0` (Wave 1, no context) | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `no tasks running` |
 | `runningCount < desiredCount` (Wave 1, no context) | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `running below desired count` |
 | `deployments[].rolloutState == FAILED` | 2 | Broken | `!` | S1, S2, S3, S4, S5 | `not running its desired tasks` |
@@ -219,7 +219,7 @@ Rules for filling list and detail text:
 
 ## 4.1 UX review (two sentences)
 
-At 3am, glancing at the list, can the operator tell what's wrong with a problem row without opening detail? Yes — every red row carries a specific cause in the Status column (`no tasks running`, `not running its desired tasks`, `inactive`), and a yellow one reads `running below desired count` or `draining`, so the on-call engineer can triage (capacity vs. health-check vs. scheduler) directly from the list; the detail pane is only needed to read the full event message and pivot to `tg` / `ecs-task` / `logs`.
+At 3am, glancing at the list, can the operator tell what's wrong with a problem row without opening detail? Yes — every red row carries a specific cause in the Status column (`no tasks running`, `not running its desired tasks`, `inactive (service deleted)`), and a yellow one reads `running below desired count` or `draining`, so the on-call engineer can triage (capacity vs. health-check vs. scheduler) directly from the list; the detail pane is only needed to read the full event message and pivot to `tg` / `ecs-task` / `logs`.
 
 ## 5. Out of Scope
 
@@ -275,8 +275,8 @@ ecs-svc — COMPUTE. Status key: `status` — the key the status cell reads, and
 <!-- BEGIN GENERATED: findings -->
 | Code | Phrase | Severity | Source | Detail |
 | --- | --- | --- | --- | --- |
-| ecs-svc.state.inactive | inactive | broken | wave1 | — |
-| ecs-svc.state.draining | draining | warn | wave1 | — |
+| ecs-svc.state.inactive | inactive (service deleted) | broken | wave1 | The service has been deleted and only its record remains, so it runs nothing and will never place a task again. Recreate it if the workload is still needed; otherwise remove whatever still points at it. |
+| ecs-svc.state.draining | draining | warn | wave1 | The service is being wound down and its tasks are being deregistered from their load balancer, so it carries less traffic each minute. Confirm the replacement is already serving before the last task goes. |
 | ecs-svc.tasks.none-running | no tasks running | broken | wave1 | The service is asking for tasks and none of them are running, so it is serving nothing. Read the service's events and the stopped tasks' reasons — an image pull failure, a failing health check or no capacity in the cluster are the usual causes. |
 | ecs-svc.tasks.below-desired | running below desired count | warn | wave1 | Fewer tasks are running than the service asks for, so it is carrying its traffic on reduced capacity. Read the service's events for placement failures and check the cluster has room for the missing tasks. |
 | ecs-svc.deployment-failed | not running its desired tasks | broken | wave2 | This service is not running the tasks it was asked to run: a deployment failed, the tasks cannot be placed, or the load balancer is failing their health checks. Read the service's events and task-stopped reasons to find which, then fix the task definition, the capacity, or the health check that is rejecting them. |

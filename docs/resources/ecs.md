@@ -139,7 +139,7 @@ One row per signal from §3:
 | `status == PROVISIONING` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `provisioning` |
 | `status == DEPROVISIONING` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `deprovisioning` |
 | `status == FAILED` | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `failed` |
-| `status == INACTIVE` | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `inactive` |
+| `status == INACTIVE` | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `inactive (cluster deleted)` |
 | `pendingTasksCount > 0 sustained` (on ACTIVE cluster) | 2 | Warning | `~` | S2, S3, S4, S5 | `tasks pending or not running` |
 | `runningTasksCount == 0 && registeredContainerInstancesCount > 0` (on ACTIVE cluster) | 2 | Warning | `~` | S2, S3, S4, S5 | `tasks pending or not running` |
 
@@ -152,7 +152,7 @@ Rules for filling list and detail text:
 
 ## 4.1 UX review (two sentences)
 
-At 3am, glancing at the list, can the operator tell what's wrong with a problem row without opening detail? Yes for Wave 1 states — `failed`, `inactive`, `provisioning` and `deprovisioning` each name the state outright. A cluster whose tasks are not running goes yellow reading `tasks pending or not running`, which separates "known-bad shape" from "transient burst" once the operator knows the cluster; the deeper reason (agent disconnect vs ENI attach failure) needs detail, where the counts are. All problem rows are self-explanatory in the list — operator can triage without opening detail.
+At 3am, glancing at the list, can the operator tell what's wrong with a problem row without opening detail? Yes for Wave 1 states — `failed`, `inactive (cluster deleted)`, `provisioning` and `deprovisioning` each name the state outright. A cluster whose tasks are not running goes yellow reading `tasks pending or not running`, which separates "known-bad shape" from "transient burst" once the operator knows the cluster; the deeper reason (agent disconnect vs ENI attach failure) needs detail, where the counts are. All problem rows are self-explanatory in the list — operator can triage without opening detail.
 
 ## 5. Out of Scope
 
@@ -183,11 +183,11 @@ ecs — COMPUTE. Status key: `status` — the key the status cell reads, and the
 <!-- BEGIN GENERATED: findings -->
 | Code | Phrase | Severity | Source | Detail |
 | --- | --- | --- | --- | --- |
-| ecs.state.provisioning | provisioning | warn | wave1 | — |
-| ecs.state.deprovisioning | deprovisioning | warn | wave1 | — |
-| ecs.state.failed | failed | broken | wave1 | — |
-| ecs.state.inactive | inactive | broken | wave1 | — |
-| ecs.cluster-issue | tasks pending or not running | warn | wave2 | — |
+| ecs.state.provisioning | provisioning | warn | wave1 | The cluster is still being set up, so task placement can fail until its capacity providers are ready. Wait for it to become active before deploying services onto it. |
+| ecs.state.deprovisioning | deprovisioning | warn | wave1 | The cluster is being torn down, so it will stop accepting task placements and anything still running on it is on borrowed time. Move the remaining services to another cluster if this was not meant to happen. |
+| ecs.state.failed | failed | broken | wave1 | The cluster could not be brought up, so nothing can be scheduled on it at all. Check the capacity provider and the underlying Auto Scaling group or Fargate configuration for the error, then recreate the cluster. |
+| ecs.state.inactive | inactive (cluster deleted) | broken | wave1 | The cluster has been deleted; AWS keeps returning it while old task records exist, but it can host nothing. Point any service or scheduled task that still references it at a live cluster. |
+| ecs.cluster-issue | tasks pending or not running | warn | wave2 | The cluster has tasks stuck pending, or fewer running than the services on it asked for, which usually means it has run out of processor, memory or network-interface capacity. Check the capacity provider's scaling and the placement constraints of the services that are short. |
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->

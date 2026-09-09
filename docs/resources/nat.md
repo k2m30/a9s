@@ -163,9 +163,9 @@ nat — NETWORKING. Status key: `state` — the key the status cell reads, and t
 <!-- BEGIN GENERATED: findings -->
 | Code | Phrase | Severity | Source | Detail |
 | --- | --- | --- | --- | --- |
-| nat.state.pending | pending | warn | wave1 | — |
-| nat.state.deleting | deleting | warn | wave1 | — |
-| nat.state.failed | failed | broken | wave1 | — |
+| nat.state.pending | pending | warn | wave1 | The gateway is still being created, so private subnets routed at it have no outbound path yet. Wait for it to become available before expecting egress to work. |
+| nat.state.deleting | deleting | warn | wave1 | The gateway is going away, and once it does every subnet routed through it loses outbound internet access. Confirm the replacement exists and the route tables point at it before this finishes. |
+| nat.state.failed | failed | broken | wave1 | The gateway could not be created, so the private subnets routing through it have no path out and their workloads fail on any external call. Check the Elastic IP and the public subnet it was placed in, then create it again. |
 | nat.state.deleted | deleted | dim | wave1 | — |
 <!-- END GENERATED: findings -->
 

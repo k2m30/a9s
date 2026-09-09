@@ -335,7 +335,9 @@ func TestFetchVpcPeeringConnectionsPage_StatePhrase_Deleting(t *testing.T) {
 	if f.Severity != domain.SevWarn {
 		t.Errorf("Severity = %v, want SevWarn", f.Severity)
 	}
-	const wantDetail = "Peering connection is being deleted."
+	// Task phrase7 row 1: the sentence has to say what the condition means for
+	// the operator AND what to do about it, so the old fragment was replaced.
+	const wantDetail = "The connection is being torn down, and when it goes, traffic between the two VPCs stops and every route pointing at it becomes a silent drop. Remove those routes, or recreate the peering if this was not intended."
 	if f.Detail != wantDetail {
 		t.Errorf("Detail = %q, want %q", f.Detail, wantDetail)
 	}
@@ -358,9 +360,9 @@ func TestFetchVpcPeeringConnectionsPage_StatePhrase_Deleted(t *testing.T) {
 	if f.Severity != domain.SevDim {
 		t.Errorf("Severity = %v, want SevDim", f.Severity)
 	}
-	const wantDetail = "AWS keeps deleted connections listed for a window."
-	if f.Detail != wantDetail {
-		t.Errorf("Detail = %q, want %q", f.Detail, wantDetail)
+	// Task phrase7 row 3 deleted this sentence: Detail exists only at the tiers a surface shows, and Dim reaches neither the Attention block nor the enrichment line.
+	if f.Detail != "" {
+		t.Errorf("Detail = %q, want it empty at the Dim tier", f.Detail)
 	}
 }
 
@@ -416,7 +418,8 @@ func TestFetchVpcPeeringConnectionsPage_StatePhrase_InitiatingRequest(t *testing
 	if f.Severity != domain.SevWarn {
 		t.Errorf("Severity = %v, want SevWarn", f.Severity)
 	}
-	const wantDetail = "Peering request is being initiated."
+	// Task phrase7 row 1: same reason as the deleting case above.
+	const wantDetail = "The request has been made and the other VPC's owner has not accepted it yet, so nothing crosses between the two. Have the accepter approve it, then add routes on both sides — an accepted peering with no routes still carries nothing."
 	if f.Detail != wantDetail {
 		t.Errorf("Detail = %q, want %q", f.Detail, wantDetail)
 	}

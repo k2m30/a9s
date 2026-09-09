@@ -236,7 +236,7 @@ One row per signal from §3:
 | Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) |
 |---|---|---|---|---|---|
 | `State.Name == shutting-down` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `shutting down` |
-| `stopped` + `StateReason.Code` begins `Server.*` | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `stopped` |
+| `stopped` + `StateReason.Code` begins `Server.*` | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `stopped by AWS` |
 | `State.Name == stopped` with no `Server.*` state reason | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `stopped` |
 | `terminated` | 1 | Dim | n/a | S2, S4 | `terminated` |
 | instance metadata answers without a session token | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `IMDSv1 allowed` |
@@ -320,16 +320,16 @@ ec2 — COMPUTE. Status key: `state` — the key the status cell reads, and the 
 <!-- BEGIN GENERATED: findings -->
 | Code | Phrase | Severity | Source | Detail |
 | --- | --- | --- | --- | --- |
-| ec2.state.pending | pending | warn | wave1 | — |
-| ec2.state.shutting-down | shutting down | warn | wave1 | — |
-| ec2.state.stopping | stopping | warn | wave1 | — |
-| ec2.state.stopped | stopped | warn | wave1 | — |
-| ec2.state.stopped.server | stopped | broken | wave1 | — |
+| ec2.state.pending | pending | warn | wave1 | The instance is still booting, so it is not serving yet and its status checks have not run. Give it a minute; if it stays here, check the launch's status reason and whether the instance type has capacity in that Availability Zone. |
+| ec2.state.shutting-down | shutting down | warn | wave1 | The instance is being terminated and will disappear shortly, taking anything on its instance-store volumes with it. If this was not intended, stop whatever issued the terminate call now — a terminated instance cannot be recovered. |
+| ec2.state.stopping | stopping | warn | wave1 | The instance is on its way down and is no longer accepting traffic, so anything routed to it is failing now. Wait for it to reach a stopped state before starting it again or detaching its volumes. |
+| ec2.state.stopped | stopped | warn | wave1 | Nothing this instance hosts is answering, while its EBS volumes and any Elastic IP attached to it keep costing money. Start it if it should be serving, or terminate it and release its volumes if it is genuinely finished with. |
+| ec2.state.stopped.server | stopped by AWS | broken | wave1 | AWS stopped this instance itself rather than an operator doing it, which points at degraded underlying hardware or a billing or compliance action on the account. Start it again so it comes up on different hardware, and check the instance's status events and your account notifications for the reason. |
 | ec2.state.terminated | terminated | dim | wave1 | — |
 | ec2.instance-status-impaired | impaired: system checks failing | broken | wave2 | AWS reports this instance is impaired — system or instance status checks are failing. |
 | ec2.instance-status.initializing | initializing: checks in progress | warn | wave2 | Instance status checks have not yet passed since start. |
 | ec2.instance-status.insufficient-data | status unknown: AWS insufficient-data | warn | wave2 | AWS cannot determine status — insufficient data from the hypervisor. |
-| ec2.scheduled-event | scheduled event | warn | wave2 | — |
+| ec2.scheduled-event | scheduled event | warn | wave2 | AWS has scheduled maintenance, a retirement or a reboot for this instance, and it will happen whether or not anyone is ready. Read the event window, then stop and start the instance at a time you choose so it moves to healthy hardware on your schedule. |
 | ec2.imdsv1-allowed | IMDSv1 allowed | warn | wave1 | Instance metadata answers requests without a session token, so an SSRF bug on this host can read the attached IAM role's credentials. Require session tokens for instance metadata. |
 | ec2.public-ip | public address | warn | wave1 | The instance holds a routable public address, so every port its security groups leave open is reachable from the internet. Put it behind a NAT gateway or load balancer unless it must be addressed directly. |
 | ec2.internet-exposed | <port(s) LIST> reachable from the internet | broken | wave2 | Sensitive ports on this instance answer from any address on the internet, so the services behind them are exposed to untargeted scanning. Narrow the security group's ingress rules to known CIDRs or reach the host through a bastion. |

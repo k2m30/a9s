@@ -169,8 +169,8 @@ logs — MONITORING. Status key: `state` — the column naming it is the status 
 | Code | Phrase | Severity | Source | Detail |
 | --- | --- | --- | --- | --- |
 | logs.retention-never-expire | retention: never expire | warn | wave1 | No retention policy set — events kept forever, billed indefinitely. |
-| logs.stale-empty | empty, created over 90 days ago | warn | wave1 | — |
-| logs.missing-metric-filters | audit log group missing metric filters | warn | wave2 | — |
+| logs.stale-empty | empty, created over 90 days ago | warn | wave1 | The group has existed for months and holds no events, so whatever was meant to write here never did, and anything relying on those logs for debugging or audit has nothing. Find the producer that should be writing and fix its permissions or configuration, or delete the group. |
+| logs.missing-metric-filters | audit log group missing metric filters | warn | wave2 | This group carries audit or security logs but has no metric filter over it, so the events it collects are only found when somebody goes to look. Add metric filters and alarms for the events worth waking up for. |
 | logs.no-kms | not encrypted with KMS | warn | wave1 | Log events are encrypted with the CloudWatch Logs service key, so anyone with read access to the log group can read them and you cannot revoke that access with a key policy. Associate a KMS key with this log group. |
 <!-- END GENERATED: findings -->
 

@@ -160,8 +160,8 @@ rtb — NETWORKING. Status key: `state` — the column naming it is the status c
 <!-- BEGIN GENERATED: findings -->
 | Code | Phrase | Severity | Source | Detail |
 | --- | --- | --- | --- | --- |
-| rtb.route.blackhole | blackhole route (target deleted) | broken | wave1 | — |
-| rtb.orphan-unassociated | no subnet associations | warn | wave1 | — |
+| rtb.route.blackhole | blackhole route (target deleted) | broken | wave1 | A route in this table points at a gateway or interface that no longer exists, so traffic matching it is dropped silently — from the instance's side it looks like a firewall problem. Repoint the route at a live target or remove it. |
+| rtb.orphan-unassociated | no subnet associations | warn | wave1 | No subnet uses this route table, so the routes in it affect nothing; if it was meant to carry traffic somewhere, that traffic is following the main table instead. Associate the subnets it was written for, or delete it. |
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->

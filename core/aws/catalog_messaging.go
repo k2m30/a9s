@@ -43,7 +43,7 @@ var messagingChildTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals /
 			return FetchEventBridgeRuleTargets(ctx, c.EventBridge, parentCtx, continuationToken)
 		}),
 		Findings: []catalog.FindingDef{
-			{Code: CodeEBRuleTargetNoDLQ, Phrase: "no DLQ configured", Severity: domain.SevWarn, Source: "wave1"},
+			{Code: CodeEBRuleTargetNoDLQ, Phrase: "no DLQ configured", Severity: domain.SevWarn, Source: "wave1", Detail: "Events this target fails to accept are retried and then dropped with no record, so a downstream outage silently loses them. Attach a dead-letter queue to the target so failed events can be inspected and replayed."},
 		},
 	},
 	{
@@ -76,9 +76,9 @@ var messagingChildTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals /
 			return FetchSFNExecutions(ctx, c.SFN, parentCtx, continuationToken)
 		}),
 		Findings: []catalog.FindingDef{
-			{Code: CodeSFNExecutionFailed, Phrase: "failed", Severity: domain.SevBroken, Source: "wave1"},
-			{Code: CodeSFNExecutionTimedOut, Phrase: "timed out", Severity: domain.SevBroken, Source: "wave1"},
-			{Code: CodeSFNExecutionAborted, Phrase: "aborted", Severity: domain.SevBroken, Source: "wave1"},
+			{Code: CodeSFNExecutionFailed, Phrase: "failed", Severity: domain.SevBroken, Source: "wave1", Detail: "The execution ended in a failure, so the workflow it represents did not complete and any compensating steps after the failing state never ran. Open the execution history for the state that threw, and its error and cause fields."},
+			{Code: CodeSFNExecutionTimedOut, Phrase: "timed out", Severity: domain.SevBroken, Source: "wave1", Detail: "The execution exceeded its timeout and was ended part-way, leaving the workflow in whatever partial state it had reached. Find the state that hung — usually a task waiting on a service with no timeout of its own — and check whether the work it started needs undoing."},
+			{Code: CodeSFNExecutionAborted, Phrase: "aborted", Severity: domain.SevBroken, Source: "wave1", Detail: "The execution was stopped before it finished, so its later states never ran and anything its earlier states created is still there. Confirm whether that needs cleaning up, then start a new execution if the work still has to happen."},
 		},
 	},
 	{
@@ -103,7 +103,7 @@ var messagingChildTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals /
 			return FetchSFNExecutionHistory(ctx, c.SFN, parentCtx, continuationToken)
 		}),
 		Findings: []catalog.FindingDef{
-			{Code: CodeSFNHistoryEventFailed, Phrase: "task failed", Severity: domain.SevBroken, Source: "wave1"},
+			{Code: CodeSFNHistoryEventFailed, Phrase: "task failed", Severity: domain.SevBroken, Source: "wave1", Detail: "This step of the workflow failed, and unless a catcher handled it everything after it was skipped. The event's error and cause fields name the service call that failed and what it returned."},
 		},
 	},
 	{
@@ -130,7 +130,7 @@ var messagingChildTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals /
 		// subscription is pending/deleted regardless of whether it was
 		// listed via ListSubscriptions or ListSubscriptionsByTopic.
 		Findings: []catalog.FindingDef{
-			{Code: CodeSNSSubPendingConfirmation, Phrase: "endpoint has not confirmed the subscription", Severity: domain.SevWarn, Source: "wave1"},
+			{Code: CodeSNSSubPendingConfirmation, Phrase: "endpoint has not confirmed the subscription", Severity: domain.SevWarn, Source: "wave1", Detail: "The subscription exists but the endpoint never confirmed it, so it receives nothing while the topic looks correctly wired. Resend the confirmation and have the endpoint accept it, or delete the subscription if it was a mistake."},
 			{Code: CodeSNSSubDeleted, Phrase: "endpoint deleted", Severity: domain.SevDim, Source: "wave1"},
 			{Code: CodeSNSSubPlainHTTP, Phrase: "delivers over plain HTTP", Severity: domain.SevWarn, Source: "wave1", Detail: "The subscription delivers over plain HTTP, so every message crosses the network in the clear and anyone on the path can read or alter it before the endpoint sees it. Point the subscription at an HTTPS endpoint."},
 		},
@@ -324,7 +324,7 @@ var messagingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 			{FieldPath: "TopicArn", TargetType: "sns"},
 		},
 		Findings: []catalog.FindingDef{
-			{Code: CodeSNSSubPendingConfirmation, Phrase: "endpoint has not confirmed the subscription", Severity: domain.SevWarn, Source: "wave1"},
+			{Code: CodeSNSSubPendingConfirmation, Phrase: "endpoint has not confirmed the subscription", Severity: domain.SevWarn, Source: "wave1", Detail: "The subscription exists but the endpoint never confirmed it, so it receives nothing while the topic looks correctly wired. Resend the confirmation and have the endpoint accept it, or delete the subscription if it was a mistake."},
 			{Code: CodeSNSSubDeleted, Phrase: "endpoint deleted", Severity: domain.SevDim, Source: "wave1"},
 			{Code: CodeSNSSubPlainHTTP, Phrase: "delivers over plain HTTP", Severity: domain.SevWarn, Source: "wave1", Detail: "The subscription delivers over plain HTTP, so every message crosses the network in the clear and anyone on the path can read or alter it before the endpoint sees it. Point the subscription at an HTTPS endpoint."},
 		},
@@ -380,13 +380,13 @@ var messagingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 			{TargetType: "ct-events", DisplayName: "CloudTrail Events", Checker: ctEventsCheckerFor("eb")},
 		},
 		Findings: []catalog.FindingDef{
-			{Code: CodeEBHealthRed, Phrase: "health: red", Severity: domain.SevBroken, Source: "wave1"},
-			{Code: CodeEBHealthYellow, Phrase: "health: yellow", Severity: domain.SevWarn, Source: "wave1"},
-			{Code: CodeEBHealthGrey, Phrase: "health: grey", Severity: domain.SevWarn, Source: "wave1"},
+			{Code: CodeEBHealthRed, Phrase: "health: red", Severity: domain.SevBroken, Source: "wave1", Detail: "Elastic Beanstalk reports this environment as failing: instances are not passing checks or requests are erroring, so the application it hosts is degraded or down. Open the environment's health causes and its recent events for the failing instance or deployment."},
+			{Code: CodeEBHealthYellow, Phrase: "health: yellow", Severity: domain.SevWarn, Source: "wave1", Detail: "Some requests in this environment are failing, or some instances are unhealthy, so it is serving but not cleanly. Read the health causes to see which instances or which responses are dragging it down before it goes red."},
+			{Code: CodeEBHealthGrey, Phrase: "health: grey", Severity: domain.SevWarn, Source: "wave1", Detail: "Beanstalk cannot tell whether this environment is healthy, usually because it is mid-operation or its health agent is not reporting. Wait for an operation to finish; if it stays grey, check the health agent and the instance profile's permissions."},
 			{Code: CodeEBTerminated, Phrase: "terminated", Severity: domain.SevDim, Source: "wave1"},
-			{Code: CodeEBLaunching, Phrase: "launching", Severity: domain.SevWarn, Source: "wave1"},
+			{Code: CodeEBLaunching, Phrase: "launching", Severity: domain.SevWarn, Source: "wave1", Detail: "The environment is still creating its instances and load balancer, so it does not serve yet. Wait for it to reach a health state before deploying an application version onto it."},
 			{Code: CodeEBTerminating, Phrase: "terminating", Severity: domain.SevDim, Source: "wave1"},
-			{Code: ebCodeEnvironmentCauses, Phrase: "environment reports health causes", Severity: domain.SevWarn, Source: "wave2"},
+			{Code: ebCodeEnvironmentCauses, Phrase: "environment reports health causes", Severity: domain.SevWarn, Source: "wave2", Detail: "The environment is reporting specific health causes rather than a clean bill, so something is wrong even if requests are still being served. Read the causes list; each one names an instance or a deployment step to look at."},
 			{Code: ebCodeManagedUpdatesOff, Phrase: "managed platform updates off", Severity: domain.SevWarn, Source: "wave2", Detail: "The environment never takes platform patches on its own, so it stays on whatever version it was launched with until someone updates it by hand. Turn managed platform updates on and pick a weekly maintenance window."},
 			{Code: ebCodeEnhancedHealthOff, Phrase: "enhanced health reporting off", Severity: domain.SevWarn, Source: "wave2", Detail: "Health is reported from basic checks only, so the environment cannot tell you which instance or which request is failing, or why. Switch health reporting to enhanced."},
 			{Code: ebCodeCWLogsOff, Phrase: "log streaming to CloudWatch off", Severity: domain.SevWarn, Source: "wave2", Detail: "Instance logs stay on the instances and disappear when those instances are replaced, so there is nothing left to read after a failure. Turn on log streaming to CloudWatch Logs."},
@@ -441,7 +441,7 @@ var messagingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 			{FieldPath: "RoleArn", TargetType: "role"},
 		},
 		Findings: []catalog.FindingDef{
-			{Code: CodeEBRuleDisabled, Phrase: "disabled", Severity: domain.SevDim, Source: "wave1"},
+			{Code: CodeEBRuleDisabled, Phrase: "disabled (rule off)", Severity: domain.SevDim, Source: "wave1"},
 			{Code: ebRuleCodeNoTargets, Phrase: "enabled rule has no targets", Severity: domain.SevBroken, Source: "wave2", Detail: "This rule is enabled and its pattern still matches events, but it has no target to deliver them to, so every match is silently discarded. Attach the target it was created for, or disable the rule."},
 			{Code: ebRuleCodeTargetIssue, Phrase: "target drift or no dead-letter config", Severity: domain.SevWarn, Source: "wave2", Detail: "This rule's targets are not configured the way the rule implies: a disabled rule still carries targets, or a target has no dead-letter queue, so a delivery that fails leaves no trace. Remove the stale targets, or attach a dead-letter queue to the ones that matter."},
 		},
@@ -478,9 +478,9 @@ var messagingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 			{TargetType: "ct-events", DisplayName: "CloudTrail Events", Checker: ctEventsCheckerFor("kinesis")},
 		},
 		Findings: []catalog.FindingDef{
-			{Code: CodeKinesisCreating, Phrase: "creating", Severity: domain.SevWarn, Source: "wave1"},
-			{Code: CodeKinesisUpdating, Phrase: "updating", Severity: domain.SevWarn, Source: "wave1"},
-			{Code: CodeKinesisDeleting, Phrase: "deleting", Severity: domain.SevWarn, Source: "wave1"},
+			{Code: CodeKinesisCreating, Phrase: "creating", Severity: domain.SevWarn, Source: "wave1", Detail: "The stream is still being created and cannot take records or be read from yet. Wait for it to become active before starting producers and consumers."},
+			{Code: CodeKinesisUpdating, Phrase: "updating", Severity: domain.SevWarn, Source: "wave1", Detail: "The stream is being resharded or reconfigured, so the shard list is changing under any consumer that cached it. Consumers using the Kinesis Client Library pick this up; hand-written ones may need to refresh."},
+			{Code: CodeKinesisDeleting, Phrase: "deleting", Severity: domain.SevWarn, Source: "wave1", Detail: "The stream is being removed, so producers start getting errors and any records still in it are lost. If this was not intended, stop the producers before they exhaust their retries, and check whether a replacement stream exists."},
 			{Code: kinesisCodeUnencrypted, Phrase: "not encrypted at rest", Severity: domain.SevWarn, Source: "wave2", Detail: "Records sit unencrypted at rest, so anyone who reaches the backing storage reads whatever the stream carries. Turn on server-side encryption and point the stream at a KMS key."},
 			{Code: kinesisCodeMinRetention, Phrase: "24h retention", Severity: domain.SevWarn, Source: "wave2", Detail: "The stream keeps only the default 24 hours of records, so a consumer that falls behind for a day, or an outage longer than one, loses data with no way to replay it. Raise the retention period to cover the longest replay you expect to need."},
 		},
@@ -528,15 +528,15 @@ var messagingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 			{FieldPath: "Provisioned.EncryptionInfo.EncryptionAtRest.DataVolumeKMSKeyId", TargetType: "kms"},
 		},
 		Findings: []catalog.FindingDef{
-			{Code: CodeMSKCreating, Phrase: "creating", Severity: domain.SevWarn, Source: "wave1"},
-			{Code: CodeMSKUpdating, Phrase: "updating", Severity: domain.SevWarn, Source: "wave1"},
-			{Code: CodeMSKMaintenance, Phrase: "maintenance", Severity: domain.SevWarn, Source: "wave1"},
-			{Code: CodeMSKRebootingBroker, Phrase: "rebooting broker", Severity: domain.SevWarn, Source: "wave1"},
-			{Code: CodeMSKHealing, Phrase: "healing", Severity: domain.SevWarn, Source: "wave1"},
-			{Code: CodeMSKDeleting, Phrase: "deleting", Severity: domain.SevWarn, Source: "wave1"},
-			{Code: CodeMSKFailed, Phrase: "failed", Severity: domain.SevBroken, Source: "wave1"},
-			{Code: mskCodeBrokerOutdated, Phrase: "broker software outdated", Severity: domain.SevWarn, Source: "wave2"},
-			{Code: mskCodeEncryptionNotTLS, Phrase: "encryption in transit not enforced", Severity: domain.SevWarn, Source: "wave2"},
+			{Code: CodeMSKCreating, Phrase: "creating", Severity: domain.SevWarn, Source: "wave1", Detail: "The cluster's brokers are still being provisioned, so there are no bootstrap endpoints to connect to yet. Wait for it to become active before pointing producers at it."},
+			{Code: CodeMSKUpdating, Phrase: "updating", Severity: domain.SevWarn, Source: "wave1", Detail: "A cluster change is in flight — configuration, broker count or version — and brokers restart one at a time while it runs. Confirm your topics have enough replicas that a single broker restarting does not stall production."},
+			{Code: CodeMSKMaintenance, Phrase: "maintenance", Severity: domain.SevWarn, Source: "wave1", Detail: "AWS is performing maintenance on this cluster, rolling brokers as it goes. Clients that retry and topics with a replication factor above one ride this out; single-replica topics see errors."},
+			{Code: CodeMSKRebootingBroker, Phrase: "rebooting broker", Severity: domain.SevWarn, Source: "wave1", Detail: "A broker is restarting, so the partitions it leads are moving and clients see brief errors on those partitions. Check that the affected topics have replicas on other brokers."},
+			{Code: CodeMSKHealing, Phrase: "healing", Severity: domain.SevWarn, Source: "wave1", Detail: "AWS is replacing or repairing a broker after a failure, so the cluster runs with reduced capacity until it finishes. Watch under-replicated partitions during this window."},
+			{Code: CodeMSKDeleting, Phrase: "deleting", Severity: domain.SevWarn, Source: "wave1", Detail: "The cluster is being torn down, and its brokers and their data go with it. Confirm the producers and consumers have moved before the endpoints stop answering."},
+			{Code: CodeMSKFailed, Phrase: "failed", Severity: domain.SevBroken, Source: "wave1", Detail: "The cluster is in a failed state and serves no Kafka traffic, so every producer and consumer behind it is stalled. Check the cluster's operations history for the failing step; a cluster in this state usually has to be recreated from a configuration you still hold."},
+			{Code: mskCodeBrokerOutdated, Phrase: "broker software outdated", Severity: domain.SevWarn, Source: "wave2", Detail: "The brokers run a Kafka version AWS no longer treats as current, so fixes and features stay out of reach and support for it eventually ends. Plan a rolling version upgrade in a maintenance window — clients keep working across it if the topics are replicated."},
+			{Code: mskCodeEncryptionNotTLS, Phrase: "encryption in transit not enforced", Severity: domain.SevWarn, Source: "wave2", Detail: "The cluster accepts plaintext client connections, so records and any credentials in the handshake cross the network readable by anything on the path. Set client-broker encryption to TLS only and move the clients over."},
 			{Code: mskCodePublicAccess, Phrase: "brokers reachable from the internet", Severity: domain.SevBroken, Source: "wave2", Detail: "Kafka brokers are published to the internet with their own public addresses, so the cluster is reachable from anywhere its security groups allow rather than only from inside the VPC. Turn public access off and reach the brokers from within the VPC or over a peered network."},
 			{Code: mskCodeUnauthenticated, Phrase: "unauthenticated access allowed", Severity: domain.SevBroken, Source: "wave2", Detail: "The cluster accepts Kafka clients that present no credentials at all, so anyone who can reach a broker can read and write every topic. Turn unauthenticated access off and require one of the cluster's authentication methods."},
 		},
@@ -598,7 +598,7 @@ var messagingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 			{FieldPath: "RoleArn", TargetType: "role"},
 		},
 		Findings: []catalog.FindingDef{
-			{Code: sfnCodeLatestExecutionFailed, Phrase: "latest execution <STATUS>", Severity: domain.SevBroken, Source: "wave2"},
+			{Code: sfnCodeLatestExecutionFailed, Phrase: "latest execution <STATUS>", Severity: domain.SevBroken, Source: "wave2", Detail: "The most recent run of this state machine did not succeed, so whatever it automates has not happened since. Open that execution's history for the state that failed and its error, then rerun once the cause is fixed."},
 			{Code: sfnCodeLoggingOff, Phrase: "execution logging off", Severity: domain.SevWarn, Source: "wave2", Detail: "The state machine records nothing about its executions, so a failed run leaves no trace of which state failed or what it was handed. Turn on execution logging to a CloudWatch log group."},
 			{Code: sfnCodeNoCMK, Phrase: "not encrypted with a customer key", Severity: domain.SevWarn, Source: "wave2", Detail: "Execution history and state data are encrypted with an AWS-owned key you cannot audit, rotate, or revoke. Point the state machine at a customer managed KMS key."},
 			{Code: sfnCodeDefinitionSecret, Phrase: "credential in state machine definition", Severity: domain.SevBroken, Source: "wave2", Detail: "A credential is written into the state machine's definition, so it is readable by anyone who can call states:DescribeStateMachine and it travels with every export of the workflow. Move the value to Secrets Manager and reference it at run time, then rotate it."},
@@ -635,14 +635,14 @@ var messagingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 			{TargetType: "ct-events", DisplayName: "CloudTrail Events", Checker: ctEventsCheckerFor("ses")},
 		},
 		Findings: []catalog.FindingDef{
-			{Code: CodeSESVerificationFailed, Phrase: "verification failed", Severity: domain.SevBroken, Source: "wave1"},
-			{Code: CodeSESVerificationTempFail, Phrase: "verify: temp failure", Severity: domain.SevBroken, Source: "wave1"},
-			{Code: CodeSESVerificationNotStarted, Phrase: "verification not started", Severity: domain.SevBroken, Source: "wave1"},
-			{Code: CodeSESVerificationPending, Phrase: "pending verification", Severity: domain.SevWarn, Source: "wave1"},
-			{Code: CodeSESSendingDisabled, Phrase: "sending disabled", Severity: domain.SevWarn, Source: "wave1"},
-			{Code: sesCodeShutdown, Phrase: "sending paused by AWS (shutdown)", Severity: domain.SevBroken, Source: "wave2"},
-			{Code: sesCodeProbation, Phrase: "account under review (probation)", Severity: domain.SevBroken, Source: "wave2"},
-			{Code: sesCodeQuota, Phrase: "quota 80%+ used", Severity: domain.SevWarn, Source: "wave2"},
+			{Code: CodeSESVerificationFailed, Phrase: "verification failed", Severity: domain.SevBroken, Source: "wave1", Detail: "Verification of this identity did not succeed, so mail sent from it is rejected outright. Check the DNS records the console asked you to publish — a missing or mistyped record is the usual cause — then start verification again."},
+			{Code: CodeSESVerificationTempFail, Phrase: "verify: temp failure", Severity: domain.SevBroken, Source: "wave1", Detail: "Verification failed for a reason the service treats as temporary, and until it succeeds this identity cannot send. Confirm the records are published and resolvable from outside your own network, then retry."},
+			{Code: CodeSESVerificationNotStarted, Phrase: "verification not started", Severity: domain.SevBroken, Source: "wave1", Detail: "Nothing has been verified for this identity, so no mail is accepted from it at all. Publish the verification records the console issues for the domain or address and complete the process."},
+			{Code: CodeSESVerificationPending, Phrase: "pending verification", Severity: domain.SevWarn, Source: "wave1", Detail: "Verification is still waiting to see the published records, so this identity cannot send yet. Check the records resolve publicly — propagation is usually minutes, and hours means something is wrong in the zone."},
+			{Code: CodeSESSendingDisabled, Phrase: "sending disabled", Severity: domain.SevWarn, Source: "wave1", Detail: "Sending is switched off for this identity, so mail using it is rejected while everything else about it looks configured. Re-enable it if that was not deliberate, and check the account-level sending status too."},
+			{Code: sesCodeShutdown, Phrase: "sending paused by AWS (shutdown)", Severity: domain.SevBroken, Source: "wave2", Detail: "AWS has paused sending for this account, usually after sustained bounces or complaints, so no mail leaves until it is lifted. Read the account's reputation metrics, fix the list hygiene or content that caused it, and open a case to request reinstatement."},
+			{Code: sesCodeProbation, Phrase: "account under review (probation)", Severity: domain.SevBroken, Source: "wave2", Detail: "The account is under review because its bounce or complaint rate crossed a threshold, and sending will be paused if it does not improve. Find the campaigns or senders driving the rate, suppress the bad addresses, and fix the acquisition path that produced them."},
+			{Code: sesCodeQuota, Phrase: "quota 80%+ used", Severity: domain.SevWarn, Source: "wave2", Detail: "The account has used most of its 24-hour sending quota, and once it is exhausted further sends are rejected until the window rolls. Spread the load out, or request a quota increase before the next campaign."},
 			{Code: sesCodeDKIMOff, Phrase: "DKIM not enabled", Severity: domain.SevWarn, Source: "wave2", Detail: "Outbound mail from this domain is not signed, so receivers cannot tell genuine mail from a forgery and are more likely to reject it or file it as spam. Enable DKIM signing for the identity and publish the records AWS gives you."},
 		},
 	},

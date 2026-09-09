@@ -261,13 +261,13 @@ redis — DATABASES & STORAGE. Status key: `status` — the key the status cell 
 <!-- BEGIN GENERATED: findings -->
 | Code | Phrase | Severity | Source | Detail |
 | --- | --- | --- | --- | --- |
-| redis.broken.create\_failed | create failed — see events | broken | wave1 | — |
-| redis.warn.creating | creating — new group | warn | wave1 | — |
-| redis.warn.deleting | deleting — teardown | warn | wave1 | — |
-| redis.warn.modifying | modifying — config change | warn | wave1 | — |
-| redis.warn.snapshotting | snapshotting — backup running | warn | wave1 | — |
-| redis.warn.shard\_issue | shard <NodeGroupId>: <status> | warn | wave1 | — |
-| redis.warn.multiaz\_without\_auto\_failover | multi-AZ without auto-failover | warn | wave1 | — |
+| redis.broken.create\_failed | create failed — see events | broken | wave1 | The replication group never came up, so nothing can connect to it. Read the group's events for the failing step — subnet capacity, the parameter group, or the node type in that Availability Zone — then delete it and create it again once fixed. |
+| redis.warn.creating | creating — new group | warn | wave1 | Nodes are still being provisioned, so the endpoint is not ready to take connections. Wait for the group to become available before pointing an application at it. |
+| redis.warn.deleting | deleting — teardown | warn | wave1 | The group's nodes are being removed and its endpoint stops answering shortly. Confirm nothing still connects to it — a cache that disappears usually shows up as latency on the database behind it. |
+| redis.warn.modifying | modifying — config change | warn | wave1 | A configuration change is being applied, and depending on the change the group may fail over or restart nodes while it runs. Expect brief connection resets, and hold off on further changes until it settles. |
+| redis.warn.snapshotting | snapshotting — backup running | warn | wave1 | A backup is being taken, which uses memory and I/O on the node doing it and can slow responses on a busy group. Nothing to fix; move the backup window outside peak hours if this keeps appearing during traffic. |
+| redis.warn.shard\_issue | shard <NodeGroupId>: <status> | warn | wave1 | One shard of this group is not in a normal state, so the keys that hash to it may be unavailable or served without a replica. Check that shard's nodes and its failover history before treating the whole group as healthy. |
+| redis.warn.multiaz\_without\_auto\_failover | multi-AZ without auto-failover | warn | wave1 | The group has replicas in more than one Availability Zone but will not promote them by itself, so losing the primary means downtime until somebody fails it over by hand. Turn automatic failover on — the replicas are already being paid for. |
 | redis.encryption-at-rest-off | encryption at rest off | warn | wave1 | Cached data is written to disk and to backups unencrypted. Encryption at rest can only be turned on at creation time — recreate the replication group with it enabled and migrate. |
 | redis.encryption-in-transit-off | encryption in transit off | warn | wave1 | Client traffic to this group crosses the network in cleartext, so anyone with VPC access can read the cached data. Enable in-transit encryption on the replication group. |
 | redis.no-auth | no authentication token | broken | wave1 | The group accepts any client that can reach it — encryption in transit is on but no authentication token is required. Set one, so a network-level reachability mistake is not immediately a data breach. |

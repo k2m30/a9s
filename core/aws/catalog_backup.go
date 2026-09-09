@@ -57,8 +57,8 @@ var backupTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static
 		},
 		IssueEnricherFieldKeys: []string{"status"},
 		Findings: []catalog.FindingDef{
-			{Code: backupCodeJobFailed, Phrase: "<N job(s)> failed in last 24h", Severity: domain.SevBroken, Source: "wave2"},
-			{Code: backupCodeJobPartial, Phrase: "partial: <N> of <M resource(s)> skipped", Severity: domain.SevWarn, Source: "wave2"},
+			{Code: backupCodeJobFailed, Phrase: "<N job(s)> failed in last 24h", Severity: domain.SevBroken, Source: "wave2", Detail: "A backup job for this plan did not complete in the last day, so the recovery points you expect for that window do not exist. Open the job in AWS Backup for its status message — an IAM permission, a resource deleted mid-job, or a vault lock rule are the usual causes — then rerun the plan once it is fixed."},
+			{Code: backupCodeJobPartial, Phrase: "partial: <N> of <M resource(s)> skipped", Severity: domain.SevWarn, Source: "wave2", Detail: "The plan ran but skipped some of the resources it selects, so those resources have no recovery point for this window even though the job reports progress. Check the job's resource list against the plan's selection, and the backup role's permissions on the resources that were missed."},
 		},
 	},
 }
@@ -85,8 +85,8 @@ var backupChildTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // s
 			return FetchCfnEvents(ctx, c.CloudFormation, parentCtx["stack_name"], continuationToken)
 		}),
 		Findings: []catalog.FindingDef{
-			{Code: CodeCfnEventFailed, Phrase: "<status, lowercased>", Severity: domain.SevBroken, Source: "wave1"},
-			{Code: CodeCfnEventInProgress, Phrase: "<status, lowercased>", Severity: domain.SevWarn, Source: "wave1"},
+			{Code: CodeCfnEventFailed, Phrase: "<failure status, lowercased>", Severity: domain.SevBroken, Source: "wave1", Detail: "This step of the stack operation failed, and CloudFormation stops or rolls back the whole change at the first failure. Read the status reason on this event — it names the resource and the error it returned — and fix that before retrying the stack."},
+			{Code: CodeCfnEventInProgress, Phrase: "<in-progress status, lowercased>", Severity: domain.SevWarn, Source: "wave1", Detail: "The step is still running, so the stack is mid-change and its resources may be replaced or briefly unavailable until it finishes. Wait for the matching completion event rather than starting another operation on the stack."},
 			{Code: CodeCfnEventDeleted, Phrase: "deleted", Severity: domain.SevDim, Source: "wave1"},
 		},
 	},
@@ -121,8 +121,8 @@ var backupChildTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // s
 			return result, nil
 		}),
 		Findings: []catalog.FindingDef{
-			{Code: CodeCfnResourceFailed, Phrase: "<status, lowercased>", Severity: domain.SevBroken, Source: "wave1"},
-			{Code: CodeCfnResourceInProgress, Phrase: "<status, lowercased>", Severity: domain.SevWarn, Source: "wave1"},
+			{Code: CodeCfnResourceFailed, Phrase: "<failure status, lowercased>", Severity: domain.SevBroken, Source: "wave1", Detail: "CloudFormation could not create, update or delete this resource, so the stack no longer matches its template and a rollback may have left the resource behind. Read the status reason, fix the underlying cause, then retry the stack operation or import the resource back."},
+			{Code: CodeCfnResourceInProgress, Phrase: "<in-progress status, lowercased>", Severity: domain.SevWarn, Source: "wave1", Detail: "The resource is mid-operation, so its live configuration matches neither the old template nor the new one yet. Wait for it to settle before reading its attributes or starting another stack change."},
 			{Code: CodeCfnResourceDeleted, Phrase: "deleted", Severity: domain.SevDim, Source: "wave1"},
 		},
 	},

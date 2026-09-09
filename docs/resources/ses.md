@@ -176,14 +176,14 @@ ses — MESSAGING. Status key: `status` — the key the status cell reads, and t
 <!-- BEGIN GENERATED: findings -->
 | Code | Phrase | Severity | Source | Detail |
 | --- | --- | --- | --- | --- |
-| ses.verification.failed | verification failed | broken | wave1 | — |
-| ses.verification.temp\_failure | verify: temp failure | broken | wave1 | — |
-| ses.verification.not\_started | verification not started | broken | wave1 | — |
-| ses.verification.pending | pending verification | warn | wave1 | — |
-| ses.sending.disabled | sending disabled | warn | wave1 | — |
-| ses.account-shutdown | sending paused by AWS (shutdown) | broken | wave2 | — |
-| ses.account-probation | account under review (probation) | broken | wave2 | — |
-| ses.quota-high | quota 80%+ used | warn | wave2 | — |
+| ses.verification.failed | verification failed | broken | wave1 | Verification of this identity did not succeed, so mail sent from it is rejected outright. Check the DNS records the console asked you to publish — a missing or mistyped record is the usual cause — then start verification again. |
+| ses.verification.temp\_failure | verify: temp failure | broken | wave1 | Verification failed for a reason the service treats as temporary, and until it succeeds this identity cannot send. Confirm the records are published and resolvable from outside your own network, then retry. |
+| ses.verification.not\_started | verification not started | broken | wave1 | Nothing has been verified for this identity, so no mail is accepted from it at all. Publish the verification records the console issues for the domain or address and complete the process. |
+| ses.verification.pending | pending verification | warn | wave1 | Verification is still waiting to see the published records, so this identity cannot send yet. Check the records resolve publicly — propagation is usually minutes, and hours means something is wrong in the zone. |
+| ses.sending.disabled | sending disabled | warn | wave1 | Sending is switched off for this identity, so mail using it is rejected while everything else about it looks configured. Re-enable it if that was not deliberate, and check the account-level sending status too. |
+| ses.account-shutdown | sending paused by AWS (shutdown) | broken | wave2 | AWS has paused sending for this account, usually after sustained bounces or complaints, so no mail leaves until it is lifted. Read the account's reputation metrics, fix the list hygiene or content that caused it, and open a case to request reinstatement. |
+| ses.account-probation | account under review (probation) | broken | wave2 | The account is under review because its bounce or complaint rate crossed a threshold, and sending will be paused if it does not improve. Find the campaigns or senders driving the rate, suppress the bad addresses, and fix the acquisition path that produced them. |
+| ses.quota-high | quota 80%+ used | warn | wave2 | The account has used most of its 24-hour sending quota, and once it is exhausted further sends are rejected until the window rolls. Spread the load out, or request a quota increase before the next campaign. |
 | ses.dkim-off | DKIM not enabled | warn | wave2 | Outbound mail from this domain is not signed, so receivers cannot tell genuine mail from a forgery and are more likely to reject it or file it as spam. Enable DKIM signing for the identity and publish the records AWS gives you. |
 <!-- END GENERATED: findings -->
 

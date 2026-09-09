@@ -135,9 +135,9 @@ igw — NETWORKING. Status key: `state` — the key the status cell reads, and t
 <!-- BEGIN GENERATED: findings -->
 | Code | Phrase | Severity | Source | Detail |
 | --- | --- | --- | --- | --- |
-| igw.state.attaching | attaching | warn | wave1 | — |
-| igw.state.detaching | detaching | warn | wave1 | — |
-| igw.no-attachments | no VPC attachments | warn | wave1 | — |
+| igw.state.attaching | attaching | warn | wave1 | The gateway is still being attached, so the VPC has no internet path through it yet. Wait for the attachment to complete before testing egress or public addressing. |
+| igw.state.detaching | detaching | warn | wave1 | The gateway is being detached, and when it goes the VPC loses its internet path: public instances stop being reachable and outbound calls fail. Stop the detachment if anything still depends on it. |
+| igw.no-attachments | no VPC attachments | warn | wave1 | This gateway belongs to no VPC, so it routes nothing. Attach it to the VPC it was created for, or delete it so it stops appearing as available infrastructure. |
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->

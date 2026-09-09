@@ -215,12 +215,12 @@ efs — DATABASES & STORAGE. Status key: `status` — the key the status cell re
 <!-- BEGIN GENERATED: findings -->
 | Code | Phrase | Severity | Source | Detail |
 | --- | --- | --- | --- | --- |
-| efs.broken.error | error | broken | wave1 | — |
-| efs.broken.no\_mount\_targets | no mount targets | broken | wave1 | — |
-| efs.warn.creating | creating | warn | wave1 | — |
-| efs.warn.updating | updating | warn | wave1 | — |
-| efs.warn.deleting | deleting | warn | wave1 | — |
-| efs.mount-target-down | mount target down | broken | wave2 | — |
+| efs.broken.error | error | broken | wave1 | The filesystem is in an error state, so mounts fail and anything depending on it is stalled. Check its events and its KMS key, and restore from a backup if it does not recover. |
+| efs.broken.no\_mount\_targets | no mount targets | broken | wave1 | The filesystem has no mount target in any subnet, so nothing in the VPC can mount it however correct the client configuration is. Create a mount target in each Availability Zone that runs clients. |
+| efs.warn.creating | creating | warn | wave1 | The filesystem is still being created and cannot be mounted yet. Wait for it to become available, then add its mount targets. |
+| efs.warn.updating | updating | warn | wave1 | A change to the filesystem is being applied, such as its throughput mode or lifecycle policy. Existing mounts keep working; expect throughput to change once it lands. |
+| efs.warn.deleting | deleting | warn | wave1 | The filesystem is being removed and its data goes with it; mounts still open start failing. If this was not intended, check whether an AWS Backup recovery point exists before it completes. |
+| efs.mount-target-down | mount target down | broken | wave2 | A mount target for this filesystem is unavailable, so clients in that Availability Zone cannot mount it while clients elsewhere still can — which presents as a partial, confusing outage. Check the mount target's subnet and security groups, and whether the subnet still has free addresses. |
 | efs.unencrypted | not encrypted | warn | wave1 | File data is stored unencrypted at rest. Encryption can only be set when the file system is created — create an encrypted file system and copy the data across. |
 | efs.public-policy | file system policy open to anyone | broken | wave2 | The file system policy allows any AWS principal, so anyone who can reach a mount target can read and write the data. Replace the wildcard principal with the specific roles that need access. |
 | efs.no-backup-policy | automatic backups off | warn | wave2 | AWS Backup is not taking daily backups of this file system, so a deletion or corruption is unrecoverable. Turn the automatic backup policy on. |

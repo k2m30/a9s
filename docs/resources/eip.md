@@ -170,7 +170,7 @@ eip — NETWORKING. Status key: `status` — the key the status cell reads, and 
 <!-- BEGIN GENERATED: findings -->
 | Code | Phrase | Severity | Source | Detail |
 | --- | --- | --- | --- | --- |
-| eip.unassociated | unassociated | warn | wave1 | — |
+| eip.unassociated | unassociated | warn | wave1 | The address is allocated but attached to nothing, so AWS bills for it by the hour while it does no work — and it stays reserved, which only helps if something is about to claim it. Release it, or attach it to the instance or gateway it was held for. |
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->

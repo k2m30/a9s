@@ -216,7 +216,7 @@ One row per signal from §3:
 | `lastStatus==STOPPED`, `StopCode==SpotInterruption` | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `stopped: <reason>` |
 | `lastStatus==STOPPED`, `StopCode==ServiceSchedulerInitiated` | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `stopped: <reason>` |
 | `lastStatus==STOPPED`, `StopCode==TerminationNotice` | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `stopped: <reason>` |
-| `lastStatus==STOPPED`, `StopCode==UserInitiated` | 1 | Dim | n/a | S2, S4 | `stopped` |
+| `lastStatus==STOPPED`, `StopCode==UserInitiated` | 1 | Dim | n/a | S2, S4 | `stopped (task exited)` |
 | `healthStatus==UNHEALTHY` | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `unhealthy` |
 | `lastStatus == PROVISIONING` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `provisioning` |
 | `lastStatus == PENDING` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `pending` |
@@ -240,7 +240,7 @@ Rules for filling list and detail text:
 
 ## 4.1 UX review (two sentences)
 
-At 3am, glancing at the list, can the operator tell what's wrong with a problem row without opening detail? Yes for every non-healthy state: a red row carries the stop code translated into plain words as `stopped: <reason>`, or reads `task failed` or `unhealthy`, so the operator can triage from the list alone; detail is only needed when they want the specific container name and its `Reason` text. A task stopped for no fault greys out to `stopped`, and the transitional words (`provisioning`, `pending`, `activating`, `deactivating`, `stopping`, `deprovisioning`) stand on their own — the implementation never shows a bare state word without its cause where a cause exists.
+At 3am, glancing at the list, can the operator tell what's wrong with a problem row without opening detail? Yes for every non-healthy state: a red row carries the stop code translated into plain words as `stopped: <reason>`, or reads `task failed` or `unhealthy`, so the operator can triage from the list alone; detail is only needed when they want the specific container name and its `Reason` text. A task stopped for no fault greys out to `stopped (task exited)`, and the transitional words (`provisioning`, `pending`, `activating`, `deactivating`, `stopping`, `deprovisioning`) stand on their own — the implementation never shows a bare state word without its cause where a cause exists.
 
 ## 5. Out of Scope
 
@@ -279,16 +279,16 @@ ecs-task — COMPUTE. Status key: `status` — the key the status cell reads, an
 <!-- BEGIN GENERATED: findings -->
 | Code | Phrase | Severity | Source | Detail |
 | --- | --- | --- | --- | --- |
-| ecs-task.state.provisioning | provisioning | warn | wave1 | — |
-| ecs-task.state.pending | pending | warn | wave1 | — |
-| ecs-task.state.activating | activating | warn | wave1 | — |
-| ecs-task.state.deactivating | deactivating | warn | wave1 | — |
-| ecs-task.state.stopping | stopping | warn | wave1 | — |
-| ecs-task.state.deprovisioning | deprovisioning | warn | wave1 | — |
-| ecs-task.state.stopped | stopped | dim | wave1 | — |
-| ecs-task.stop-code.failed | stopped: <reason> | broken | wave1 | — |
-| ecs-task.health.unhealthy | unhealthy | broken | wave1 | — |
-| ecs-task.task-failed | task failed | broken | wave2 | — |
+| ecs-task.state.provisioning | provisioning | warn | wave1 | The task is waiting for its network interface and volumes before its containers start, so it is not serving yet. If it stays here, check the subnet's free addresses and the interface limit on the instance or account. |
+| ecs-task.state.pending | pending | warn | wave1 | The task has been placed but its containers are not up, usually while an image is pulled. A long stay here points at a slow or failing image pull — check the registry credentials and the network path to it. |
+| ecs-task.state.activating | activating | warn | wave1 | The containers are running but the task's supporting work — service discovery, sidecar startup, load balancer registration — has not finished, so it takes no traffic yet. Wait; if it stays here, read the container dependencies in the task definition. |
+| ecs-task.state.deactivating | deactivating | warn | wave1 | The task is being taken out of service and deregistered from its targets, so it is shedding traffic. Confirm a replacement task is already healthy if this service has to stay available. |
+| ecs-task.state.stopping | stopping | warn | wave1 | The task's containers are being shut down and will not come back, so anything in flight on them ends here. Check the stop reason once it settles to see whether a deployment, a scale-in or a failure caused it. |
+| ecs-task.state.deprovisioning | deprovisioning | warn | wave1 | The containers have exited and AWS is releasing the task's network interface and volumes. Nothing to act on; the task disappears from this list shortly. |
+| ecs-task.state.stopped | stopped (task exited) | dim | wave1 | — |
+| ecs-task.stop-code.failed | stopped: <reason> | broken | wave1 | The task did not exit on request — something stopped it, so whatever it was serving stopped with it. The stop reason names the cause: a failed container health check, an out-of-memory kill, or an image that could not be pulled are the common ones. |
+| ecs-task.health.unhealthy | unhealthy | broken | wave1 | The container health check inside this task is failing, so the load balancer will stop sending it traffic and the scheduler will replace it. Read the container logs from the moment the check started failing, and confirm the check command and its grace period suit the application's startup time. |
+| ecs-task.task-failed | task failed | broken | wave2 | This task ended in a failure rather than a clean stop, so the work it was doing did not complete. Read its containers' exit codes and stopped reasons to see which one went and why. |
 | ecs-task.privileged | privileged container | broken | wave2 | A container in this task runs privileged, so it holds the host's full device and kernel-capability set and a container escape becomes a host compromise. Drop the privileged flag and grant only the specific Linux capabilities the workload needs. |
 | ecs-task.host-namespace | shares the host network or process namespace | warn | wave2 | This task shares the host's network or process namespace, so its containers can see and reach every other process and loopback service on that instance. Switch the task definition to the awsvpc network mode and leave the process-namespace setting unset. |
 | ecs-task.writable-root | writable root filesystem | warn | wave2 | A container in this task can write to its own root filesystem, so anything that lands code on it persists for the life of the task. Make the container's root filesystem read-only and mount a volume for the paths it genuinely writes. |

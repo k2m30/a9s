@@ -96,8 +96,8 @@ var containersTypes = []catalog.ResourceTypeDef{
 			{FieldPath: "RoleArn", TargetType: "role"},
 		},
 		Findings: []catalog.FindingDef{
-			{Code: CodeEKSStateCreating, Phrase: "creating", Severity: domain.SevWarn, Source: "wave1"},
-			{Code: CodeEKSStateUpdating, Phrase: "updating", Severity: domain.SevWarn, Source: "wave1"},
+			{Code: CodeEKSStateCreating, Phrase: "creating", Severity: domain.SevWarn, Source: "wave1", Detail: "The control plane is still being built, so kubectl and the node groups that will join it cannot connect yet. Wait for the cluster to become active before creating node groups or add-ons against it."},
+			{Code: CodeEKSStateUpdating, Phrase: "updating", Severity: domain.SevWarn, Source: "wave1", Detail: "A control-plane change is in flight — a version upgrade, a logging or endpoint change — and other cluster updates are rejected while it runs. Wait for it to finish, then confirm your nodes and add-ons are on a compatible version."},
 			{Code: CodeEKSStateDeleting, Phrase: "deleting", Severity: domain.SevWarn, Source: "wave1", Detail: "The cluster is being torn down; its workloads are going with it and nothing else about it is worth reporting until it is gone."},
 			{Code: CodeEKSStatePending, Phrase: "pending", Severity: domain.SevWarn, Source: "wave1", Detail: "The cluster has been created but its control plane is not serving yet; nothing can be scheduled on it until it becomes active."},
 			{Code: CodeEKSStateFailed, Phrase: "failed", Severity: domain.SevBroken, Source: "wave1", Detail: "The cluster is in a failed state and will not recover on its own; every health issue AWS reports is a row under this finding. Open a support case or recreate the cluster."},
@@ -162,11 +162,11 @@ var containersTypes = []catalog.ResourceTypeDef{
 			{FieldPath: "Subnets", TargetType: "subnet"},
 		},
 		Findings: []catalog.FindingDef{
-			{Code: CodeNGStateCreating, Phrase: "creating", Severity: domain.SevWarn, Source: "wave1"},
-			{Code: CodeNGStateUpdating, Phrase: "updating", Severity: domain.SevWarn, Source: "wave1"},
-			{Code: CodeNGStateDeleting, Phrase: "deleting", Severity: domain.SevWarn, Source: "wave1"},
-			{Code: CodeNGStateCreateFailed, Phrase: "create failed", Severity: domain.SevBroken, Source: "wave1"},
-			{Code: CodeNGStateDeleteFailed, Phrase: "delete failed", Severity: domain.SevBroken, Source: "wave1"},
+			{Code: CodeNGStateCreating, Phrase: "creating", Severity: domain.SevWarn, Source: "wave1", Detail: "The node group is still bringing up its instances and registering them with the cluster, so its capacity is not schedulable yet. Wait for it to become active before draining the node group it replaces."},
+			{Code: CodeNGStateUpdating, Phrase: "updating", Severity: domain.SevWarn, Source: "wave1", Detail: "Nodes in this group are being replaced or reconfigured, so pods are being evicted and rescheduled while it runs. Confirm your workloads have pod disruption budgets and enough spare capacity to absorb the rolling replacement."},
+			{Code: CodeNGStateDeleting, Phrase: "deleting", Severity: domain.SevWarn, Source: "wave1", Detail: "The group is draining and terminating its nodes, so the capacity it contributed to the cluster is going away. Make sure the pods it hosts have somewhere else to land before the last node goes."},
+			{Code: CodeNGStateCreateFailed, Phrase: "create failed", Severity: domain.SevBroken, Source: "wave1", Detail: "The node group never came up, so the capacity you planned for this cluster does not exist. Its health issues name the cause — a subnet with no route to the cluster endpoint, an instance type unavailable in the zone, or a node role missing its policies."},
+			{Code: CodeNGStateDeleteFailed, Phrase: "delete failed", Severity: domain.SevBroken, Source: "wave1", Detail: "The node group could not be removed and is stuck part-deleted, still billing for whatever instances remain. Check its health issues, clear whatever blocks the deletion — often a load balancer or a network interface left by a service — then delete it again."},
 			{Code: CodeNGStateDegraded, Phrase: "degraded", Severity: domain.SevBroken, Source: "wave1", Detail: "The node group is degraded, so some nodes are failing or not joining; every health issue AWS reports is a row under this finding. Fix the cause, usually IAM, subnet capacity or the launch template, and let the group reconcile."},
 			{Code: CodeNGHealthIssue, Phrase: "health issue", Severity: domain.SevWarn, Source: "wave1", Detail: "The node group reports a health issue while its state says nothing is wrong; every reported code is a row under this finding. Nodes may be failing to join or to stay healthy until it clears."},
 			DetailsDeniedFindingDef("ng", ""),
@@ -443,9 +443,9 @@ var containersChildTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals 
 			return FetchECRImages(ctx, c.ECR, parentCtx, continuationToken)
 		}),
 		Findings: []catalog.FindingDef{
-			{Code: CodeECRImageScanFailed, Phrase: "scan failed", Severity: domain.SevBroken, Source: "wave1"},
-			{Code: CodeECRImageCritical, Phrase: "<N> critical vulnerabilities", Severity: domain.SevBroken, Source: "wave1"},
-			{Code: CodeECRImageHigh, Phrase: "<N> high vulnerabilities", Severity: domain.SevWarn, Source: "wave1"},
+			{Code: CodeECRImageScanFailed, Phrase: "scan failed", Severity: domain.SevBroken, Source: "wave1", Detail: "This image was never scanned, so nothing is known about the vulnerabilities it carries; an unscanned image is not a clean one. Check whether its base operating system is one the registry can scan, then push the image again to trigger a new scan."},
+			{Code: CodeECRImageCritical, Phrase: "<N> critical vulnerabilities", Severity: domain.SevBroken, Source: "wave1", Detail: "The scan found vulnerabilities at critical severity in this image, and any container running it is exposed to them right now. Rebuild on a patched base image and redeploy the workloads using this tag or digest."},
+			{Code: CodeECRImageHigh, Phrase: "<N> high vulnerabilities", Severity: domain.SevWarn, Source: "wave1", Detail: "The scan found high-severity vulnerabilities in this image's layers. Fold a rebuild on an updated base image into the next deployment rather than shipping this one forward again."},
 			{Code: CodeECRImageUntagged, Phrase: "untagged", Severity: domain.SevDim, Source: "wave1"},
 		},
 	},
@@ -476,15 +476,15 @@ var containersChildTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals 
 			return FetchEcsSvcTasks(ctx, c.ECS, c.ECS, parentCtx["cluster"], parentCtx["service_name"], continuationToken)
 		}),
 		Findings: []catalog.FindingDef{
-			{Code: CodeECSTaskHealthUnhealthy, Phrase: "unhealthy", Severity: domain.SevBroken, Source: "wave1"},
-			{Code: CodeECSTaskStopCodeFailed, Phrase: "stopped: <reason>", Severity: domain.SevBroken, Source: "wave1"},
-			{Code: CodeECSTaskStateStopped, Phrase: "stopped", Severity: domain.SevDim, Source: "wave1"},
-			{Code: CodeECSTaskStateProvisioning, Phrase: "provisioning", Severity: domain.SevWarn, Source: "wave1"},
-			{Code: CodeECSTaskStatePending, Phrase: "pending", Severity: domain.SevWarn, Source: "wave1"},
-			{Code: CodeECSTaskStateActivating, Phrase: "activating", Severity: domain.SevWarn, Source: "wave1"},
-			{Code: CodeECSTaskStateDeactivating, Phrase: "deactivating", Severity: domain.SevWarn, Source: "wave1"},
-			{Code: CodeECSTaskStateStopping, Phrase: "stopping", Severity: domain.SevWarn, Source: "wave1"},
-			{Code: CodeECSTaskStateDeprovisioning, Phrase: "deprovisioning", Severity: domain.SevWarn, Source: "wave1"},
+			{Code: CodeECSTaskHealthUnhealthy, Phrase: "unhealthy", Severity: domain.SevBroken, Source: "wave1", Detail: "The container health check inside this task is failing, so the load balancer will stop sending it traffic and the scheduler will replace it. Read the container logs from the moment the check started failing, and confirm the check command and its grace period suit the application's startup time."},
+			{Code: CodeECSTaskStopCodeFailed, Phrase: "stopped: <reason>", Severity: domain.SevBroken, Source: "wave1", Detail: "The task did not exit on request — something stopped it, so whatever it was serving stopped with it. The stop reason names the cause: a failed container health check, an out-of-memory kill, or an image that could not be pulled are the common ones."},
+			{Code: CodeECSTaskStateStopped, Phrase: "stopped (task exited)", Severity: domain.SevDim, Source: "wave1"},
+			{Code: CodeECSTaskStateProvisioning, Phrase: "provisioning", Severity: domain.SevWarn, Source: "wave1", Detail: "The task is waiting for its network interface and volumes before its containers start, so it is not serving yet. If it stays here, check the subnet's free addresses and the interface limit on the instance or account."},
+			{Code: CodeECSTaskStatePending, Phrase: "pending", Severity: domain.SevWarn, Source: "wave1", Detail: "The task has been placed but its containers are not up, usually while an image is pulled. A long stay here points at a slow or failing image pull — check the registry credentials and the network path to it."},
+			{Code: CodeECSTaskStateActivating, Phrase: "activating", Severity: domain.SevWarn, Source: "wave1", Detail: "The containers are running but the task's supporting work — service discovery, sidecar startup, load balancer registration — has not finished, so it takes no traffic yet. Wait; if it stays here, read the container dependencies in the task definition."},
+			{Code: CodeECSTaskStateDeactivating, Phrase: "deactivating", Severity: domain.SevWarn, Source: "wave1", Detail: "The task is being taken out of service and deregistered from its targets, so it is shedding traffic. Confirm a replacement task is already healthy if this service has to stay available."},
+			{Code: CodeECSTaskStateStopping, Phrase: "stopping", Severity: domain.SevWarn, Source: "wave1", Detail: "The task's containers are being shut down and will not come back, so anything in flight on them ends here. Check the stop reason once it settles to see whether a deployment, a scale-in or a failure caused it."},
+			{Code: CodeECSTaskStateDeprovisioning, Phrase: "deprovisioning", Severity: domain.SevWarn, Source: "wave1", Detail: "The containers have exited and AWS is releasing the task's network interface and volumes. Nothing to act on; the task disappears from this list shortly."},
 		},
 	},
 	{
@@ -516,8 +516,8 @@ var containersChildTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals 
 			return FetchEcsSvcLogs(ctx, c.ECS, c.CloudWatchLogs, parentCtx["cluster"], parentCtx["service_name"], parentCtx["task_definition"], continuationToken)
 		}),
 		Findings: []catalog.FindingDef{
-			{Code: CodeCWLogError, Phrase: "error", Severity: domain.SevBroken, Source: "wave1"},
-			{Code: CodeCWLogWarn, Phrase: "warning", Severity: domain.SevWarn, Source: "wave1"},
+			{Code: CodeCWLogError, Phrase: "error", Severity: domain.SevBroken, Source: "wave1", Detail: "This line reports an error from the workload itself, so something it was asked to do did not happen. Read the surrounding lines for the request or job it belongs to: a single error with no repeats usually means a transient dependency, a steady stream means a real fault."},
+			{Code: CodeCWLogWarn, Phrase: "warning", Severity: domain.SevWarn, Source: "wave1", Detail: "The workload logged something it could work around but wanted recorded — a retry, a deprecated setting, or a near-limit condition. Worth reading if it repeats; a single one is usually noise."},
 		},
 	},
 }

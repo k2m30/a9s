@@ -186,8 +186,8 @@ vpc — NETWORKING. Status key: `state` — the key the status cell reads, and t
 <!-- BEGIN GENERATED: findings -->
 | Code | Phrase | Severity | Source | Detail |
 | --- | --- | --- | --- | --- |
-| vpc.state.pending | pending | warn | wave1 | — |
-| vpc.no-flow-logs | no active VPC flow logs | warn | wave2 | — |
+| vpc.state.pending | pending | warn | wave1 | The VPC is still being created, so subnets, gateways and endpoints cannot be attached to it yet. Wait for it to become available before building into it. |
+| vpc.no-flow-logs | no active VPC flow logs | warn | wave2 | No flow log is capturing traffic for this VPC, so there is no record of what connected to what — and during an incident that question cannot be answered afterwards. Enable flow logs to CloudWatch Logs or S3 for the VPC. |
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->

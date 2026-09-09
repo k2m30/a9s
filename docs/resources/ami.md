@@ -164,8 +164,8 @@ ami — COMPUTE. Status key: `state` — the key the status cell reads, and the 
 <!-- BEGIN GENERATED: findings -->
 | Code | Phrase | Severity | Source | Detail |
 | --- | --- | --- | --- | --- |
-| ami.state.pending | pending | warn | wave1 | — |
-| ami.state.failed | failed | broken | wave1 | — |
+| ami.state.pending | pending | warn | wave1 | The image is still being registered and cannot be launched from until it finishes. Wait rather than pointing a launch template or Auto Scaling group at it. |
+| ami.state.failed | failed | broken | wave1 | Registration of this image failed, so anything that launches from its identifier will error. Rebuild the image and update the launch templates or pipelines that reference it. |
 | ami.state.dim | <image state> | dim | wave1 | — |
 | ami.deprecated | deprecated | warn | wave1 | The deprecation date has passed — AWS no longer recommends this AMI for new launches. |
 | ami.public | shared with all AWS accounts | broken | wave1 | This image is shared with every AWS account, so anyone can launch it and read whatever the snapshot behind it contains. Remove the `all` group from the image's launch permission. |

@@ -311,7 +311,9 @@ func TestFetchMWAAEnvironmentsPage_StatusMappingAllTwelveValues(t *testing.T) {
 		{mwaatypes.EnvironmentStatusCreateFailed, "create failed", domain.SevBroken},
 		{mwaatypes.EnvironmentStatusUpdateFailed, "update failed: rolled back", domain.SevBroken},
 		{mwaatypes.EnvironmentStatusUnavailable, "unavailable: not stable", domain.SevBroken},
-		{mwaatypes.EnvironmentStatusDeleting, "deleting", domain.SevDim},
+		// Task phrase7 row 2: "deleting" was Dim here and Warn on twelve other
+		// types, so one phrase carried two colours; this row took the split.
+		{mwaatypes.EnvironmentStatusDeleting, "deleting — environment teardown", domain.SevDim},
 		{mwaatypes.EnvironmentStatusDeleted, "deleted", domain.SevDim},
 	}
 

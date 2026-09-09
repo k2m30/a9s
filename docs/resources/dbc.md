@@ -254,15 +254,15 @@ dbc — DATABASES & STORAGE. Status key: `status` — the key the status cell re
 <!-- BEGIN GENERATED: findings -->
 | Code | Phrase | Severity | Source | Detail |
 | --- | --- | --- | --- | --- |
-| dbc.broken.failed | failed: cluster operation | broken | wave1 | — |
-| dbc.broken.encryption\_key\_unreachable | encryption key unreachable | broken | wave1 | — |
-| dbc.broken.incompatible\_parameters | parameter group incompatible | broken | wave1 | — |
-| dbc.broken.no\_writer | no writer: reads only | broken | wave1 | — |
-| dbc.warn.transitional | <status>: in progress | warn | wave1 | — |
-| dbc.warn.deletion\_protection\_off | delete-protection off | warn | wave1 | — |
-| dbc.warn.not\_encrypted\_at\_rest | not encrypted at rest | warn | wave1 | — |
-| dbc.warn.no\_automated\_backups | no automated backups | warn | wave1 | — |
-| dbc.maintenance-overdue | maintenance overdue | broken | wave2 | — |
+| dbc.broken.failed | failed: cluster operation | broken | wave1 | The cluster's last operation failed and it is not serving, so both its writer and its readers are unavailable. Read the cluster events for the failing step, and plan a snapshot restore — a cluster in this state rarely returns on its own. |
+| dbc.broken.encryption\_key\_unreachable | encryption key unreachable | broken | wave1 | The KMS key protecting this cluster's volume cannot be used, so no node can read the data and the cluster will not start. Check whether the key is disabled, pending deletion, or whether its policy still allows the database service to use it. |
+| dbc.broken.incompatible\_parameters | parameter group incompatible | broken | wave1 | The cluster parameter group holds a setting the engine rejects, so the cluster will not come up with it applied. Correct the parameter and reboot the cluster; the events list names the setting. |
+| dbc.broken.no\_writer | no writer: reads only | broken | wave1 | The cluster has no writer instance, so every write fails while reads may still succeed and hide the outage from a shallow health check. Check whether a failover is stuck or the writer was deleted, then promote a reader or add an instance. |
+| dbc.warn.transitional | <status>: in progress | warn | wave1 | The cluster is mid-operation, so it may fail over or drop connections before it settles. Wait for it to return to available rather than starting another change on top of this one. |
+| dbc.warn.deletion\_protection\_off | delete-protection off | warn | wave1 | One delete call removes this cluster and every instance in it. Turn deletion protection on so it has to be disabled deliberately first. |
+| dbc.warn.not\_encrypted\_at\_rest | not encrypted at rest | warn | wave1 | The cluster's volume, its snapshots and its backups are stored unencrypted, and that cannot be changed in place. Snapshot it, copy the snapshot with a KMS key, and restore into a new encrypted cluster at the next opportunity for a cutover. |
+| dbc.warn.no\_automated\_backups | no automated backups | warn | wave1 | Backup retention is zero, so there is no point-in-time recovery for this cluster and a bad migration can only be undone from a manual snapshot. Set a retention period that matches how much data loss you could actually accept. |
+| dbc.maintenance-overdue | maintenance overdue | broken | wave2 | A pending maintenance action on this cluster is past the date AWS will apply it by, so AWS takes the outage at a time of its choosing rather than yours. Apply it in your own maintenance window now. |
 | dbc.single-az | single-AZ | warn | wave1 | The cluster has no instance in a second Availability Zone, so an AZ failure takes it down until you restore it. Add a replica in another AZ. |
 | dbc.minor-upgrade-off | auto minor version upgrade off | warn | wave1 | Minor engine patches — including security fixes — are never applied automatically. Enable auto minor version upgrade, or schedule the patching yourself. |
 | dbc.iam-auth-off | IAM database authentication off | warn | wave1 | Connections authenticate with long-lived database passwords only. Enable IAM database authentication so credentials become short-lived tokens tied to IAM identities. |

@@ -136,7 +136,7 @@ codeartifact — CI/CD. Status key: `state` — the column naming it is the stat
 <!-- BEGIN GENERATED: findings -->
 | Code | Phrase | Severity | Source | Detail |
 | --- | --- | --- | --- | --- |
-| codeartifact.no-permissions-policy | no permissions policy | warn | wave2 | — |
+| codeartifact.no-permissions-policy | no permissions policy | warn | wave2 | The repository has no resource policy, so who may read and publish depends entirely on the IAM policies attached to each caller and there is no single place to see or restrict it. Attach a repository policy naming the accounts and roles allowed to pull, and the smaller set allowed to publish. |
 | codeartifact.public-access-policy | public access policy | broken | wave2 | The repository's resource policy grants a wildcard principal, so any AWS account can read the packages it holds and, depending on the actions allowed, publish into it. Replace the "*" principal with the accounts or roles that need the repository, or add a condition that requires the caller's account or ARN to equal one you expect; a condition that only says whether a key is set scopes nothing. |
 <!-- END GENERATED: findings -->
 

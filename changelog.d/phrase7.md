@@ -1,0 +1,20 @@
+## Changed
+
+- Every attention signal a9s can raise now carries a sentence saying what the
+  condition means for your workload and what to do about it. Two hundred and
+  sixty-eight signals previously showed a two- or three-word status and nothing
+  else, on the detail view and in the generated signal tables alike.
+
+- A status phrase now names one condition at one colour. Words that used to
+  appear in both yellow and red say which is which: an instance AWS stopped
+  itself reads `stopped by AWS`, a database you stopped reads
+  `stopped (storage still billed)`, a secret inside its recovery window reads
+  `scheduled for deletion`, and a database or warehouse with a routable address
+  reads `public endpoint` rather than borrowing the wording S3 uses for objects
+  anyone can download. Redshift's two different `modifying` states, and the
+  certificate expiry tiers on certificates and database instances, now read
+  differently from each other too.
+
+- A signal that only greys a row no longer declares an explanation nothing
+  shows. The seven grey signals that carried one now carry the phrase alone,
+  which is all the list and the status cell ever rendered.

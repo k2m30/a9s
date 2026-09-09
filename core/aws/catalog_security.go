@@ -209,7 +209,7 @@ var securityTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stat
 		},
 		DetailEnrich: enrichPolicy,
 		Findings: []catalog.FindingDef{
-			{Code: iamPolicyCodeOrphanUnattached, Phrase: "unattached, no roles/users/groups use it", Severity: domain.SevWarn, Source: "wave1"},
+			{Code: iamPolicyCodeOrphanUnattached, Phrase: "unattached, no roles/users/groups use it", Severity: domain.SevWarn, Source: "wave1", Detail: "The policy is attached to nothing, so it grants nobody anything today — but it stays available to attach, and a permissive orphan is an easy mistake to make later. Delete it, or record why it is kept."},
 			{Code: iamPolicyCodeAdminStar, Phrase: "admin star (allows * on *)", Severity: domain.SevBroken, Source: "wave2", Detail: "This policy allows every action on every resource, so anyone holding it is an account administrator. Replace the \"*\" action and resource with the specific ones its holders need."},
 			{Code: iamPolicyCodePrivEsc, Phrase: "allows privilege escalation", Severity: domain.SevBroken, Source: "wave2", Detail: "This policy grants a combination of actions that lets its holder grant itself full administrator, even though no single action looks privileged. Split the combination across separate policies or remove the escalation actions."},
 		},
@@ -393,7 +393,7 @@ var securityChildTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals //
 		}),
 		DetailEnrich: enrichRolePolicy,
 		Findings: []catalog.FindingDef{
-			{Code: CodeRolePolicyOverPrivileged, Phrase: "over-privileged", Severity: domain.SevBroken, Source: "wave1"},
+			{Code: CodeRolePolicyOverPrivileged, Phrase: "over-privileged", Severity: domain.SevBroken, Source: "wave1", Detail: "This policy grants far more than the role needs, typically through an action or resource wildcard, so anything assuming the role can do all of it and any compromise is that much larger. Replace the wildcards with the specific actions and ARNs the workload actually calls, starting from the role's access advisor data."},
 			{Code: CodeRolePolicyInline, Phrase: "inline", Severity: domain.SevDim, Source: "wave1"},
 		},
 	},

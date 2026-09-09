@@ -222,10 +222,10 @@ subnet — NETWORKING. Status key: `state` — the key the status cell reads, an
 <!-- BEGIN GENERATED: findings -->
 | Code | Phrase | Severity | Source | Detail |
 | --- | --- | --- | --- | --- |
-| subnet.state.pending | pending | warn | wave1 | — |
-| subnet.state.unavailable | unavailable | broken | wave1 | — |
-| subnet.state.failed | failed | broken | wave1 | — |
-| subnet.state.failed-insufficient-capacity | failed-insufficient-capacity | broken | wave1 | — |
+| subnet.state.pending | pending | warn | wave1 | The subnet is still being created and cannot host network interfaces yet. Wait for it to become available before launching into it. |
+| subnet.state.unavailable | unavailable | broken | wave1 | The subnet is not usable, so anything scheduled into it fails to get an address — which presents as launch failures rather than as a subnet problem. Check the Availability Zone's status and the subnet's configuration, and place workloads elsewhere meanwhile. |
+| subnet.state.failed | failed | broken | wave1 | The subnet could not be created, so any launch template, node group or service that names it will fail. Recreate it, or repoint the resources that reference it at a working subnet. |
+| subnet.state.failed-insufficient-capacity | failed-insufficient-capacity | broken | wave1 | AWS had no capacity in this Availability Zone to create the subnet, so nothing can be placed here. Use another zone, and spread the workload's subnets across zones so one zone's capacity cannot block it again. |
 | subnet.auto-public-ip | auto-assigns public IPs | warn | wave1 | Every instance launched into this subnet is given a public address by default, so a workload reaches the internet whether or not its owner intended it to. Turn the subnet's auto-assign public address setting off and attach an elastic address to the instances that genuinely need one. |
 <!-- END GENERATED: findings -->
 

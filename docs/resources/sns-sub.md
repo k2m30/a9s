@@ -136,7 +136,7 @@ sns-sub — MESSAGING. Status key: `state` — the column naming it is the statu
 <!-- BEGIN GENERATED: findings -->
 | Code | Phrase | Severity | Source | Detail |
 | --- | --- | --- | --- | --- |
-| sns-sub.state.pending-confirmation | endpoint has not confirmed the subscription | warn | wave1 | — |
+| sns-sub.state.pending-confirmation | endpoint has not confirmed the subscription | warn | wave1 | The subscription exists but the endpoint never confirmed it, so it receives nothing while the topic looks correctly wired. Resend the confirmation and have the endpoint accept it, or delete the subscription if it was a mistake. |
 | sns-sub.state.deleted | endpoint deleted | dim | wave1 | — |
 | sns-sub.plain-http | delivers over plain HTTP | warn | wave1 | The subscription delivers over plain HTTP, so every message crosses the network in the clear and anyone on the path can read or alter it before the endpoint sees it. Point the subscription at an HTTPS endpoint. |
 <!-- END GENERATED: findings -->

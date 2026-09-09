@@ -266,8 +266,8 @@ eks — CONTAINERS. Status key: `status` — the key the status cell reads, and 
 <!-- BEGIN GENERATED: findings -->
 | Code | Phrase | Severity | Source | Detail |
 | --- | --- | --- | --- | --- |
-| eks.state.creating | creating | warn | wave1 | — |
-| eks.state.updating | updating | warn | wave1 | — |
+| eks.state.creating | creating | warn | wave1 | The control plane is still being built, so kubectl and the node groups that will join it cannot connect yet. Wait for the cluster to become active before creating node groups or add-ons against it. |
+| eks.state.updating | updating | warn | wave1 | A control-plane change is in flight — a version upgrade, a logging or endpoint change — and other cluster updates are rejected while it runs. Wait for it to finish, then confirm your nodes and add-ons are on a compatible version. |
 | eks.state.deleting | deleting | warn | wave1 | The cluster is being torn down; its workloads are going with it and nothing else about it is worth reporting until it is gone. |
 | eks.state.pending | pending | warn | wave1 | The cluster has been created but its control plane is not serving yet; nothing can be scheduled on it until it becomes active. |
 | eks.state.failed | failed | broken | wave1 | The cluster is in a failed state and will not recover on its own; every health issue AWS reports is a row under this finding. Open a support case or recreate the cluster. |

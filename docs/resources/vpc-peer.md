@@ -168,13 +168,13 @@ vpc-peer — NETWORKING. Status key: `status` — the key the status cell reads,
 | Code | Phrase | Severity | Source | Detail |
 | --- | --- | --- | --- | --- |
 | vpc-peer.warn.provisioning | provisioning | warn | wave1 | Peering connection is being provisioned. |
-| vpc-peer.warn.initiating | initiating | warn | wave1 | Peering request is being initiated. |
+| vpc-peer.warn.initiating | initiating | warn | wave1 | The request has been made and the other VPC's owner has not accepted it yet, so nothing crosses between the two. Have the accepter approve it, then add routes on both sides — an accepted peering with no routes still carries nothing. |
 | vpc-peer.warn.pending\_acceptance | pending acceptance: expires in <N>d | warn | wave1 | The peer has not accepted this request yet, and AWS expires it a week after creation; the countdown is in the status and the date is listed below. Ask the accepter to approve it. |
 | vpc-peer.warn.expired | expired: never accepted | warn | wave1 | The peering request expired unaccepted; recreate it if still needed. |
 | vpc-peer.broken.rejected | rejected | broken | wave1 | The accepter rejected this peering request, so nothing will ever route across it; AWS keeps the record listed for a while. Delete it and request again once the other side agrees. |
 | vpc-peer.broken.failed | failed | broken | wave1 | The peering connection failed to establish and will not recover on its own; the status message is listed below. Delete it and request a new one. |
-| vpc-peer.warn.deleting | deleting | warn | wave1 | Peering connection is being deleted. |
-| vpc-peer.dim.deleted | deleted | dim | wave1 | AWS keeps deleted connections listed for a window. |
+| vpc-peer.warn.deleting | deleting | warn | wave1 | The connection is being torn down, and when it goes, traffic between the two VPCs stops and every route pointing at it becomes a silent drop. Remove those routes, or recreate the peering if this was not intended. |
+| vpc-peer.dim.deleted | deleted | dim | wave1 | — |
 | vpc-peer.warn.cidr\_overlap | CIDR overlap with peer | warn | wave1 | The requester and accepter VPCs have overlapping address ranges, so routes into the overlap are blackholed; the range is listed below. Re-address one side, or peer a VPC that does not overlap. |
 | vpc-peer.warn.no\_local\_route | no local route to peer | warn | wave2 | No loaded route table routes to this peering connection. |
 | vpc-peer.warn.route\_blackholed | route to peer blackholed | warn | wave2 | A route references this connection but its state is blackhole. |

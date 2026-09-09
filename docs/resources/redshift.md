@@ -216,11 +216,11 @@ One row per signal from §3:
 | `ClusterAvailabilityStatus==Unavailable` | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `unavailable` |
 | `ClusterAvailabilityStatus==Failed` | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `failed` |
 | `ClusterAvailabilityStatus==Maintenance` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `maintenance` |
-| `ClusterStatus == modifying` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `modifying` |
-| `ClusterAvailabilityStatus==Modifying` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `modifying` |
+| `ClusterStatus == modifying` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `modifying — cluster settings` |
+| `ClusterAvailabilityStatus==Modifying` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `modifying — availability affected` |
 | `PendingModifiedValues` non-empty | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `pending change queued` |
 | `DeferredMaintenanceWindows[]` active | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `maintenance deferred` |
-| `PubliclyAccessible==true` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `publicly accessible` |
+| `PubliclyAccessible==true` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `public endpoint` |
 | `Encrypted==false` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `unencrypted at rest` |
 | `ClusterStatus == incompatible-hsm` | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `broken: incompatible-hsm` |
 | `ClusterStatus == incompatible-network` | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `broken: incompatible-network` |
@@ -235,7 +235,7 @@ One row per signal from §3:
 
 ## 4.1 UX review (two sentences)
 
-At 3am, glancing at the list, can the operator tell what's wrong with a problem row without opening detail? Yes — every non-healthy row carries a short cause in the Status column (`broken: storage-full`, `unavailable`, `publicly accessible`, `pending change queued`, `maintenance deferred`) rather than a bare state keyword; operator can triage without opening detail, and the detail line adds one sentence of context rather than repeating the column.
+At 3am, glancing at the list, can the operator tell what's wrong with a problem row without opening detail? Yes — every non-healthy row carries a short cause in the Status column (`broken: storage-full`, `unavailable`, `public endpoint`, `pending change queued`, `maintenance deferred`) rather than a bare state keyword; operator can triage without opening detail, and the detail line adds one sentence of context rather than repeating the column.
 
 ## 5. Out of Scope
 
@@ -273,26 +273,26 @@ redshift — DATABASES & STORAGE. Status key: `status` — the key the status ce
 <!-- BEGIN GENERATED: findings -->
 | Code | Phrase | Severity | Source | Detail |
 | --- | --- | --- | --- | --- |
-| redshift.broken.incompatible\_hsm | broken: incompatible-hsm | broken | wave1 | — |
-| redshift.broken.incompatible\_network | broken: incompatible-network | broken | wave1 | — |
-| redshift.broken.incompatible\_parameters | broken: incompatible-parameters | broken | wave1 | — |
-| redshift.broken.incompatible\_restore | broken: incompatible-restore | broken | wave1 | — |
-| redshift.broken.hardware\_failure | broken: hardware-failure | broken | wave1 | — |
-| redshift.broken.storage\_full | broken: storage-full | broken | wave1 | — |
-| redshift.broken.unavailable | unavailable | broken | wave1 | — |
-| redshift.broken.failed | failed | broken | wave1 | — |
-| redshift.warn.creating | creating | warn | wave1 | — |
-| redshift.warn.modifying | modifying | warn | wave1 | — |
-| redshift.warn.resizing | resizing | warn | wave1 | — |
-| redshift.warn.rebooting | rebooting | warn | wave1 | — |
-| redshift.warn.renaming | renaming | warn | wave1 | — |
-| redshift.warn.deleting | deleting | warn | wave1 | — |
-| redshift.warn.maintenance | maintenance | warn | wave1 | — |
-| redshift.warn.availability\_modifying | modifying | warn | wave1 | — |
-| redshift.warn.pending\_change | pending change queued | warn | wave1 | — |
-| redshift.warn.maintenance\_deferred | maintenance deferred | warn | wave1 | — |
-| redshift.warn.publicly\_accessible | publicly accessible | warn | wave1 | — |
-| redshift.warn.unencrypted\_at\_rest | unencrypted at rest | warn | wave1 | — |
+| redshift.broken.incompatible\_hsm | broken: incompatible-hsm | broken | wave1 | The cluster cannot reach the hardware security module holding its encryption key, so it will not come up. Check the client certificate for that module and the network path to it, then restore the connection. |
+| redshift.broken.incompatible\_network | broken: incompatible-network | broken | wave1 | The cluster's subnet group no longer provides what it needs — free addresses, or the Availability Zone it was created in — so it cannot start. Fix the subnet group, then restore the cluster. |
+| redshift.broken.incompatible\_parameters | broken: incompatible-parameters | broken | wave1 | A value in this cluster's parameter group is rejected, so the cluster will not come up with it applied. Correct the parameter group and reboot the cluster. |
+| redshift.broken.incompatible\_restore | broken: incompatible-restore | broken | wave1 | The restore from snapshot failed, so this cluster holds no usable data. Check the snapshot's node type and encryption against the target, then restore again. |
+| redshift.broken.hardware\_failure | broken: hardware-failure | broken | wave1 | A node's underlying hardware failed. Redshift replaces the node itself, but the cluster is degraded or unavailable until it does; watch the events and restore from the latest snapshot if it does not recover. |
+| redshift.broken.storage\_full | broken: storage-full | broken | wave1 | The cluster has no disk left, so queries that need to spill fail and loads are rejected. Delete or unload cold tables, vacuum to reclaim space, then resize to more storage. |
+| redshift.broken.unavailable | unavailable | broken | wave1 | The cluster is not answering queries, so every dashboard and job behind it is failing. Check the cluster events for the cause, and its most recent snapshot, before deciding between waiting and restoring. |
+| redshift.broken.failed | failed | broken | wave1 | The cluster is in a failed state and will not serve queries again in place. Restore the most recent snapshot into a new cluster and repoint the applications at it. |
+| redshift.warn.creating | creating | warn | wave1 | The cluster is still being provisioned and cannot take connections yet. Wait for it to become available before loading data or pointing tools at the endpoint. |
+| redshift.warn.modifying | modifying — cluster settings | warn | wave1 | A configuration change is being applied to the cluster, and it may reboot or run with reduced capacity before it settles. Wait for it to finish before starting another change or judging query times. |
+| redshift.warn.resizing | resizing | warn | wave1 | The cluster is changing node count or node type; depending on the resize type it is read-only or unavailable for part of it. Hold off on loads until it is done, and expect query plans to change afterwards. |
+| redshift.warn.rebooting | rebooting | warn | wave1 | The cluster is restarting, so open connections are dropped and queries in flight are lost. Wait for it to come back; applications should reconnect on their own. |
+| redshift.warn.renaming | renaming | warn | wave1 | The cluster identifier is changing, which changes its endpoint address, so anything holding the old name stops connecting. Update the connection strings and any DNS record pointing at the old endpoint. |
+| redshift.warn.deleting | deleting | warn | wave1 | The cluster is being removed, and unless a final snapshot was requested its data goes with it. If this was not intended, check now whether a snapshot exists to restore from. |
+| redshift.warn.maintenance | maintenance | warn | wave1 | The cluster is in its maintenance window and AWS is applying updates, so it can be briefly unavailable. Nothing to do beyond expecting the interruption; move the window if it clashes with your load schedule. |
+| redshift.warn.availability\_modifying | modifying — availability affected | warn | wave1 | Redshift reports the cluster's availability as changing rather than steady, so queries may be refused or slow while the change lands. Wait for it to report available again before treating a query failure as an application fault. |
+| redshift.warn.pending\_change | pending change queued | warn | wave1 | A modification is queued for the next maintenance window, so the cluster's live configuration is not the one shown as desired. Check what is pending and, if it needs an outage, apply it at a time you choose. |
+| redshift.warn.maintenance\_deferred | maintenance deferred | warn | wave1 | Maintenance on this cluster has been postponed, so it runs without updates AWS has scheduled, and the deferral has an end date. Plan a window before that date, or AWS will pick one for you. |
+| redshift.warn.publicly\_accessible | public endpoint | warn | wave1 | The cluster answers on a routable address outside the VPC, so only its security groups separate the warehouse from the internet. Turn public access off and reach it over a private link unless an outside system genuinely needs it. |
+| redshift.warn.unencrypted\_at\_rest | unencrypted at rest | warn | wave1 | The cluster's blocks and its snapshots are stored unencrypted. Turning encryption on requires a cluster migration, so plan it into a maintenance window rather than leaving it indefinitely. |
 | redshift.audit-logging-off | audit logging off | warn | wave2 | Nothing records connections and queries against this cluster, so an incident leaves no trail to follow. Enable audit logging to an S3 bucket or a CloudWatch log group. |
 | redshift.require-ssl-off | SSL not required | warn | wave2 | The cluster accepts unencrypted client connections, so credentials and query results can be read off the wire. Set the parameter group's require-SSL parameter (require_ssl) to true and reboot. |
 <!-- END GENERATED: findings -->

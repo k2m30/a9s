@@ -223,7 +223,7 @@ func TestDBI_Fetch_BrokenPrecedenceOverConfigWarnings(t *testing.T) {
 		DBInstanceArn:         aws.String("arn:aws:rds:us-east-1:123456789012:db:inline-precedence-broken"),
 		DBInstanceStatus:      aws.String("storage-full"),
 		BackupRetentionPeriod: aws.Int32(0),    // would trigger "no automated backups"
-		PubliclyAccessible:    aws.Bool(true),  // would trigger "publicly accessible"
+		PubliclyAccessible:    aws.Bool(true),  // would trigger "public endpoint"
 		StorageEncrypted:      aws.Bool(false), // would trigger "unencrypted storage"
 		DeletionProtection:    aws.Bool(false), // would trigger "deletion protection off"
 	}
@@ -256,7 +256,7 @@ func TestDBI_Fetch_NoAutomatedBackups(t *testing.T) {
 }
 
 // TestDBI_Fetch_PubliclyAccessible verifies PubliclyAccessible=true on a
-// healthy available instance produces "publicly accessible".
+// healthy available instance produces "public endpoint".
 func TestDBI_Fetch_PubliclyAccessible(t *testing.T) {
 	inst := findDBI(t, fixtures.WarnDbiPublicID)
 	status, fields, _ := fetchSingle(t, inst)
@@ -264,8 +264,8 @@ func TestDBI_Fetch_PubliclyAccessible(t *testing.T) {
 	if status != "" {
 		t.Errorf("Status = %q, want %q", status, "")
 	}
-	if fields["status"] != "publicly accessible" {
-		t.Errorf("Fields[status] = %q, want %q", fields["status"], "publicly accessible")
+	if fields["status"] != "public endpoint" {
+		t.Errorf("Fields[status] = %q, want %q", fields["status"], "public endpoint")
 	}
 }
 
@@ -353,7 +353,7 @@ func TestDBI_Fetch_MultiW1Warnings_SuffixFour(t *testing.T) {
 		DBInstanceArn:         aws.String("arn:aws:rds:us-east-1:123456789012:db:inline-all-4-warnings"),
 		DBInstanceStatus:      aws.String("available"),
 		BackupRetentionPeriod: aws.Int32(0),    // warning 1: no automated backups
-		PubliclyAccessible:    aws.Bool(true),  // warning 2: publicly accessible
+		PubliclyAccessible:    aws.Bool(true),  // warning 2: public endpoint
 		StorageEncrypted:      aws.Bool(false), // warning 3: unencrypted storage
 		DeletionProtection:    aws.Bool(false), // warning 4: deletion protection off
 	}
@@ -370,7 +370,7 @@ func TestDBI_Fetch_MultiW1Warnings_SuffixFour(t *testing.T) {
 
 // TestDBI_Fetch_MultiW1Warnings_PrecedenceOrder verifies that when only
 // PubliclyAccessible and DeletionProtection warnings are present (backups+encryption OK),
-// "publicly accessible" wins as the top-precedence phrase with "(+1)" for the
+// "public endpoint" wins as the top-precedence phrase with "(+1)" for the
 // hidden deletion-protection warning.
 func TestDBI_Fetch_MultiW1Warnings_PrecedenceOrder(t *testing.T) {
 	inst := rdstypes.DBInstance{
@@ -378,13 +378,13 @@ func TestDBI_Fetch_MultiW1Warnings_PrecedenceOrder(t *testing.T) {
 		DBInstanceArn:         aws.String("arn:aws:rds:us-east-1:123456789012:db:inline-public-and-no-protect"),
 		DBInstanceStatus:      aws.String("available"),
 		BackupRetentionPeriod: aws.Int32(7),    // OK
-		PubliclyAccessible:    aws.Bool(true),  // warning 1: publicly accessible
+		PubliclyAccessible:    aws.Bool(true),  // warning 1: public endpoint
 		StorageEncrypted:      aws.Bool(true),  // OK
 		DeletionProtection:    aws.Bool(false), // warning 2: deletion protection off
 	}
 	status, fields, _ := fetchSingle(t, inst)
 
-	want := "publicly accessible (+1)"
+	want := "public endpoint (+1)"
 	if status != "" {
 		t.Errorf("Status = %q, want %q", status, "")
 	}
@@ -400,7 +400,7 @@ func TestDBI_Fetch_SingleW1Warning_NoSuffix_Regression(t *testing.T) {
 	inst := findDBI(t, fixtures.WarnDbiPublicID)
 	status, fields, _ := fetchSingle(t, inst)
 
-	want := "publicly accessible"
+	want := "public endpoint"
 	if status != "" {
 		t.Errorf("Status = %q, want %q", status, "")
 	}
@@ -480,7 +480,7 @@ func TestDBI_Fetch_FindingsPopulated_Healthy(t *testing.T) {
 func TestDBI_Fetch_FindingsPopulated_SingleWarning(t *testing.T) {
 	cases := []struct{ id, want string }{
 		{fixtures.WarnDbiNoBackupsID, "no automated backups"},
-		{fixtures.WarnDbiPublicID, "publicly accessible"},
+		{fixtures.WarnDbiPublicID, "public endpoint"},
 		{fixtures.WarnDbiUnencryptedID, "unencrypted storage"},
 		{fixtures.WarnDbiUnprotectedID, "deletion protection off"},
 	}
@@ -517,7 +517,7 @@ func TestDBI_Fetch_FindingsPopulated_MultiWarning(t *testing.T) {
 
 	wantPhrases := []string{
 		"no automated backups",
-		"publicly accessible",
+		"public endpoint",
 		"unencrypted storage",
 	}
 
@@ -543,7 +543,7 @@ func TestDBI_Fetch_FindingsPopulated_AllFourWarnings(t *testing.T) {
 		DBInstanceArn:         aws.String("arn:aws:rds:us-east-1:123456789012:db:inline-all-four-warnings"),
 		DBInstanceStatus:      aws.String("available"),
 		BackupRetentionPeriod: aws.Int32(0),    // warning 1: no automated backups
-		PubliclyAccessible:    aws.Bool(true),  // warning 2: publicly accessible
+		PubliclyAccessible:    aws.Bool(true),  // warning 2: public endpoint
 		StorageEncrypted:      aws.Bool(false), // warning 3: unencrypted storage
 		DeletionProtection:    aws.Bool(false), // warning 4: deletion protection off
 	}
@@ -551,7 +551,7 @@ func TestDBI_Fetch_FindingsPopulated_AllFourWarnings(t *testing.T) {
 
 	wantPhrases := []string{
 		"no automated backups",
-		"publicly accessible",
+		"public endpoint",
 		"unencrypted storage",
 		"deletion protection off",
 	}
@@ -723,13 +723,13 @@ func TestDBI_Fetch_FindingsPopulated_EveryFixture(t *testing.T) {
 		{fixtures.BrokenDbiEncryptionLockedID, []string{"encryption key unavailable"}},
 		// Single Config Warnings.
 		{fixtures.WarnDbiNoBackupsID, []string{"no automated backups"}},
-		{fixtures.WarnDbiPublicID, []string{"publicly accessible"}},
+		{fixtures.WarnDbiPublicID, []string{"public endpoint"}},
 		{fixtures.WarnDbiUnencryptedID, []string{"unencrypted storage"}},
 		{fixtures.WarnDbiUnprotectedID, []string{"deletion protection off"}},
 		// Multi Config Warnings.
-		{fixtures.WarnDbiMultiID, []string{"no automated backups", "publicly accessible", "unencrypted storage"}},
+		{fixtures.WarnDbiMultiID, []string{"no automated backups", "public endpoint", "unencrypted storage"}},
 		// Wave-1 warning + Wave-2 maintenance — Findings carries Wave-1 phrases only.
-		{fixtures.WarnDbiPublicMaintID, []string{"publicly accessible"}},
+		{fixtures.WarnDbiPublicMaintID, []string{"public endpoint"}},
 		// Wave-2 only on Healthy row — Findings must be nil/empty (Wave-2 is not in Findings).
 		{fixtures.MaintDbiScheduledID, nil},
 		// Legacy fixture from the full RDS pool. d4 row 1 took "deletion
@@ -738,7 +738,7 @@ func TestDBI_Fetch_FindingsPopulated_EveryFixture(t *testing.T) {
 		// one witness it is supposed to have (warn-dbi-unprotected, dbi.go).
 		// Do not restore the fourth phrase — TestD4_DeletionProtectionHasOneWitness
 		// fails on it.
-		{"db-public-no-encryption", []string{"no automated backups", "publicly accessible", "unencrypted storage"}},
+		{"db-public-no-encryption", []string{"no automated backups", "public endpoint", "unencrypted storage"}},
 	}
 
 	for _, tc := range cases {

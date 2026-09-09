@@ -185,7 +185,7 @@ One row per signal from §3. `ListEnvironments` is opaque, so `GetEnvironment` r
 | `Status == CREATE_FAILED` | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `create failed` |
 | `Status == UPDATE_FAILED` | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `update failed: rolled back` |
 | `Status == UNAVAILABLE` | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `unavailable: not stable` |
-| `Status == DELETING` | 1 | Dim | n/a | S2, S4 | `deleting` |
+| `Status == DELETING` | 1 | Dim | n/a | S2, S4 | `deleting — environment teardown` |
 | `Status == DELETED` | 1 | Dim | n/a | S2, S4 | `deleted` |
 | `LastUpdate.Status == FAILED` on `AVAILABLE` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `last update failed` |
 | `WebserverAccessMode` public | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `webserver public` |
@@ -245,8 +245,8 @@ mwaa — DATA & ANALYTICS. Status key: `status` — the key the status cell read
 | mwaa.broken.create\_failed | create failed | broken | wave1 | Environment creation failed and the environment was not created. |
 | mwaa.broken.update\_failed | update failed: rolled back | broken | wave1 | Update failed; environment was restored to its previous state and is usable. |
 | mwaa.broken.unavailable | unavailable: not stable | broken | wave1 | Environment failed and did not return to a stable state; contact AWS support. |
-| mwaa.dim.deleting | deleting | dim | wave1 | Environment is being deleted. |
-| mwaa.dim.deleted | deleted | dim | wave1 | Environment has been deleted. |
+| mwaa.dim.deleting | deleting — environment teardown | dim | wave1 | — |
+| mwaa.dim.deleted | deleted | dim | wave1 | — |
 | mwaa.warn.last\_update\_failed | last update failed | warn | wave1 | The last update to this environment failed, so it is still running its previous configuration; the error code and message are listed below. Fix the cause and update again. |
 | mwaa.warn.webserver\_public | webserver public | warn | wave1 | The Airflow web server answers from the public internet, so its login page is reachable by anyone; the access mode is listed below. Switch the environment to private-only access from your VPC. |
 | mwaa.warn.details\_denied | details denied | warn | wave1 | Access to environment details was denied; only the name is visible. |
