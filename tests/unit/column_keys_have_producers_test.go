@@ -89,10 +89,22 @@ func TestColumnKeysHaveProducers(t *testing.T) {
 			}
 
 			for _, col := range view.List {
-				// Columns that drive rendering from a Path (reflection into
-				// RawStruct) instead of a Fields Key are out of scope — nothing
-				// for the registry to produce.
+				// A column reads its cell from a Fields key or from a
+				// RawStruct path, and the registry answers for the first. A
+				// column that declares neither is not out of scope: its value
+				// is looked up by turning the title into a key, which no
+				// registry knows about and nothing here could check — the one
+				// shape this gate used to skip by construction (w197 row 8).
 				if col.Key == "" {
+					if col.Path == "" {
+						t.Errorf(
+							"column %q on type %q declares neither a key nor a path — its cell is "+
+								"filled by guessing a field key from the title, so no producer can be "+
+								"checked for it. Name the key the fetcher writes, or the path the "+
+								"value is read from",
+							col.Title, shortName,
+						)
+					}
 					continue
 				}
 

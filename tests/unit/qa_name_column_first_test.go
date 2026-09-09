@@ -5,240 +5,113 @@ import (
 
 	_ "github.com/k2m30/a9s/v3/core/aws"
 	"github.com/k2m30/a9s/v3/core/config"
-	"github.com/k2m30/a9s/v3/core/resource"
 )
 
 // ===========================================================================
-// Issue #23: Name column must be first in all default list views
+// Issue #23: the name column comes first in every default list view.
 //
-// These tests verify that for 14 resource types, the human-readable name
-// column comes first in BOTH:
-//   1. config.DefaultViewDef(shortName).List[0] — the config default
-//   2. resource.FindResourceType(shortName).Columns[0] — the type definition
+// One list is read here. The built-in view is derived from the type's own
+// columns (core/config/defaults.go), and that the two agree whole — set,
+// order, width, key, path — is TestDefaultConfigColumnsAreTheCatalogs. So
+// asserting the order twice, once per declaration, would be asserting the
+// derivation rather than the order.
 //
-// The tests are written to FAIL against the current code (TDD) and will
-// pass once the column order is swapped in defaults and type definitions.
+// w197: the per-type column COUNTS that used to sit below also went with the
+// derivation. They were written when a swap could drop a column between two
+// hand-maintained lists; a count beside a derived list is a number to update
+// whenever a type gains a column, and it says nothing the columns themselves
+// do not — the titles asserted here are the property, and the whole list is
+// pinned in the file named above.
 // ===========================================================================
 
-// resourceColumnSpec defines the expected first column for a resource type
-// after the fix is applied.
-type resourceColumnSpec struct {
-	shortName         string
-	configFirstTitle  string // expected config.DefaultViewDef(...).List[0].Title
-	typeDefFirstTitle string // expected resource.FindResourceType(...).Columns[0].Title
-	typeDefFirstKey   string // expected resource.FindResourceType(...).Columns[0].Key
+// nameFirstColumn is the name column each of these 14 types must open with,
+// and the key its cell reads.
+var nameFirstColumn = []struct {
+	shortName string
+	title     string
+	key       string
+}{
+	// Networking
+	{"sg", "Group Name", "group_name"},
+	{"vpc", "Name", "name"},
+	{"subnet", "Name", "name"},
+	{"rtb", "Name", "name"},
+	{"nat", "Name", "name"},
+	{"igw", "Name", "name"},
+	{"eip", "Name", "name"},
+	{"vpce", "Service Name", "service_name"},
+	{"tgw", "Name", "name"},
+	{"eni", "Name", "name"},
+	// DNS/CDN
+	{"r53", "Name", "name"},
+	{"cf", "Domain Name", "domain_name"},
+	{"apigw", "Name", "name"},
+	// Databases
+	{"efs", "Name", "name"},
 }
 
-// affectedResources lists all 14 resource types that need name-first columns.
-// sg and vpc already have name-first in config defaults but NOT in type defs.
-var affectedResources = []resourceColumnSpec{
-	// Networking (10 resources)
-	{shortName: "sg", configFirstTitle: "Group Name", typeDefFirstTitle: "Group Name", typeDefFirstKey: "group_name"},
-	{shortName: "vpc", configFirstTitle: "Name", typeDefFirstTitle: "Name", typeDefFirstKey: "name"},
-	{shortName: "subnet", configFirstTitle: "Name", typeDefFirstTitle: "Name", typeDefFirstKey: "name"},
-	{shortName: "rtb", configFirstTitle: "Name", typeDefFirstTitle: "Name", typeDefFirstKey: "name"},
-	{shortName: "nat", configFirstTitle: "Name", typeDefFirstTitle: "Name", typeDefFirstKey: "name"},
-	{shortName: "igw", configFirstTitle: "Name", typeDefFirstTitle: "Name", typeDefFirstKey: "name"},
-	{shortName: "eip", configFirstTitle: "Name", typeDefFirstTitle: "Name", typeDefFirstKey: "name"},
-	{shortName: "vpce", configFirstTitle: "Service Name", typeDefFirstTitle: "Service Name", typeDefFirstKey: "service_name"},
-	{shortName: "tgw", configFirstTitle: "Name", typeDefFirstTitle: "Name", typeDefFirstKey: "name"},
-	{shortName: "eni", configFirstTitle: "Name", typeDefFirstTitle: "Name", typeDefFirstKey: "name"},
-	// DNS/CDN (3 resources)
-	{shortName: "r53", configFirstTitle: "Name", typeDefFirstTitle: "Name", typeDefFirstKey: "name"},
-	{shortName: "cf", configFirstTitle: "Domain Name", typeDefFirstTitle: "Domain Name", typeDefFirstKey: "domain_name"},
-	{shortName: "apigw", configFirstTitle: "Name", typeDefFirstTitle: "Name", typeDefFirstKey: "name"},
-	// Databases (1 resource)
-	{shortName: "efs", configFirstTitle: "Name", typeDefFirstTitle: "Name", typeDefFirstKey: "name"},
-}
-
-// ---------------------------------------------------------------------------
-// Config Defaults Tests: DefaultViewDef(...).List[0].Title must be name column
-// ---------------------------------------------------------------------------
-
-func TestConfigDefaultViewDef_NameColumnFirst(t *testing.T) {
-	for _, spec := range affectedResources {
+func TestDefaultViewDef_NameColumnFirst(t *testing.T) {
+	for _, spec := range nameFirstColumn {
 		t.Run(spec.shortName, func(t *testing.T) {
 			vd := config.DefaultViewDef(spec.shortName)
 			if len(vd.List) == 0 {
 				t.Fatalf("config.DefaultViewDef(%q) returned empty List", spec.shortName)
 			}
-			if vd.List[0].Title != spec.configFirstTitle {
-				t.Errorf("config.DefaultViewDef(%q).List[0].Title = %q, want %q",
-					spec.shortName, vd.List[0].Title, spec.configFirstTitle)
+			if vd.List[0].Title != spec.title || vd.List[0].Key != spec.key {
+				t.Errorf("%s opens with {Title:%q Key:%q}, want {Title:%q Key:%q} — the column an "+
+					"operator scans for is the first one",
+					spec.shortName, vd.List[0].Title, vd.List[0].Key, spec.title, spec.key)
 			}
 		})
 	}
 }
 
-// ---------------------------------------------------------------------------
-// Resource Type Tests: FindResourceType(...).Columns[0] must be name column
-// ---------------------------------------------------------------------------
-
-func TestResourceTypeDef_NameColumnFirst(t *testing.T) {
-	for _, spec := range affectedResources {
-		t.Run(spec.shortName, func(t *testing.T) {
-			rt := resource.FindResourceType(spec.shortName)
-			if rt == nil {
-				t.Fatalf("resource.FindResourceType(%q) returned nil", spec.shortName)
-			}
-			if len(rt.Columns) == 0 {
-				t.Fatalf("resource type %q has no columns", spec.shortName)
-			}
-			if rt.Columns[0].Title != spec.typeDefFirstTitle {
-				t.Errorf("resource type %q Columns[0].Title = %q, want %q",
-					spec.shortName, rt.Columns[0].Title, spec.typeDefFirstTitle)
-			}
-			if rt.Columns[0].Key != spec.typeDefFirstKey {
-				t.Errorf("resource type %q Columns[0].Key = %q, want %q",
-					spec.shortName, rt.Columns[0].Key, spec.typeDefFirstKey)
-			}
-		})
-	}
-}
-
-// ---------------------------------------------------------------------------
-// Column count preservation: swapping columns must not add or remove columns
-// ---------------------------------------------------------------------------
-
-// expectedConfigColumnCounts lists the number of columns each resource type
-// should have in its YAML-driven config default view. These counts include
-// attention columns added in Round 1 (nat +1 Failure, sg +1 Open).
-var expectedConfigColumnCounts = map[string]int{
-	"sg":     5,
-	"vpc":    6, // +1 Flow Logs (attention signal column)
-	"subnet": 8,
-	"rtb":    7, // +1 Blackholes (attention signal column), +1 single Status column
-	"nat":    7,
-	"igw":    4,
-	"eip":    7, // +1 State/status (attention signal column)
-	"vpce":   6,
-	"tgw":    6, // +1 Att Issues (attention signal column)
-	"eni":    6,
-	"r53":    6, // +1 single Status column
-	"cf":     8,
-	"apigw":  7, // +1 Stages (attention signal column), +1 single Status column
-	"efs":    6,
-}
-
-func TestConfigDefaultViewDef_ColumnCountPreserved(t *testing.T) {
-	for shortName, wantCount := range expectedConfigColumnCounts {
-		t.Run(shortName, func(t *testing.T) {
-			vd := config.DefaultViewDef(shortName)
-			if len(vd.List) != wantCount {
-				t.Errorf("config.DefaultViewDef(%q) has %d columns, want %d",
-					shortName, len(vd.List), wantCount)
-			}
-		})
-	}
-}
-
-// TestResourceTypeDef_ColumnCountPreserved reads the same table as the config
-// test above. w197: there used to be a second table here, because the type's
-// column list and the built-in view's were two declarations that differed —
-// the type's had no Status column. They are one list now, so a second table
-// would only be a second place to update.
-func TestResourceTypeDef_ColumnCountPreserved(t *testing.T) {
-	for shortName, wantCount := range expectedConfigColumnCounts {
-		t.Run(shortName, func(t *testing.T) {
-			rt := resource.FindResourceType(shortName)
-			if rt == nil {
-				t.Fatalf("resource.FindResourceType(%q) returned nil", shortName)
-			}
-			if len(rt.Columns) != wantCount {
-				t.Errorf("resource type %q has %d columns, want %d",
-					shortName, len(rt.Columns), wantCount)
-			}
-		})
-	}
-}
-
-// ---------------------------------------------------------------------------
-// Second column tests: the old first column should now be second
-// ---------------------------------------------------------------------------
-
-// expectedSecondColumn lists what the second column should be after the swap.
-// This is the column that was previously first (the ID column).
-var expectedSecondColumn = map[string]struct {
-	configTitle  string
-	typeDefTitle string
-	typeDefKey   string
+// idColumn is the identifier column that follows the name, at the index the
+// type's Status column leaves it. r53 and apigw carry a Status column ahead of
+// their ID (the title-based Status cascade, a56dc887), so theirs is third.
+var idColumn = []struct {
+	shortName string
+	index     int
+	title     string
+	key       string
 }{
-	"sg":     {configTitle: "Group ID", typeDefTitle: "Group ID", typeDefKey: "group_id"},
-	"vpc":    {configTitle: "VPC ID", typeDefTitle: "VPC ID", typeDefKey: "vpc_id"},
-	"subnet": {configTitle: "Subnet ID", typeDefTitle: "Subnet ID", typeDefKey: "subnet_id"},
-	"rtb":    {configTitle: "Route Table ID", typeDefTitle: "Route Table ID", typeDefKey: "route_table_id"},
-	"nat":    {configTitle: "NAT Gateway ID", typeDefTitle: "NAT Gateway ID", typeDefKey: "nat_gateway_id"},
-	"igw":    {configTitle: "IGW ID", typeDefTitle: "IGW ID", typeDefKey: "igw_id"},
-	"eip":    {configTitle: "Allocation ID", typeDefTitle: "Allocation ID", typeDefKey: "allocation_id"},
-	"vpce":   {configTitle: "Endpoint ID", typeDefTitle: "Endpoint ID", typeDefKey: "vpce_id"},
-	"tgw":    {configTitle: "TGW ID", typeDefTitle: "TGW ID", typeDefKey: "tgw_id"},
-	"eni":    {configTitle: "ENI ID", typeDefTitle: "ENI ID", typeDefKey: "eni_id"},
-	"r53":    {configTitle: "Zone ID", typeDefTitle: "Zone ID", typeDefKey: "zone_id"},
-	"cf":     {configTitle: "Distribution ID", typeDefTitle: "Distribution ID", typeDefKey: "distribution_id"},
-	"apigw":  {configTitle: "API ID", typeDefTitle: "API ID", typeDefKey: "api_id"},
-	"efs":    {configTitle: "File System ID", typeDefTitle: "File System ID", typeDefKey: "file_system_id"},
+	{"sg", 1, "Group ID", "group_id"},
+	{"vpc", 1, "VPC ID", "vpc_id"},
+	{"subnet", 1, "Subnet ID", "subnet_id"},
+	{"rtb", 1, "Route Table ID", "route_table_id"},
+	{"nat", 1, "NAT Gateway ID", "nat_gateway_id"},
+	{"igw", 1, "IGW ID", "igw_id"},
+	{"eip", 1, "Allocation ID", "allocation_id"},
+	{"vpce", 1, "Endpoint ID", "vpce_id"},
+	{"tgw", 1, "TGW ID", "tgw_id"},
+	{"eni", 1, "ENI ID", "eni_id"},
+	{"r53", 2, "Zone ID", "zone_id"},
+	{"cf", 1, "Distribution ID", "distribution_id"},
+	{"apigw", 2, "API ID", "api_id"},
+	{"efs", 1, "File System ID", "file_system_id"},
 }
 
-// idColumnIndexOverride lists resource types whose default view inserts a
-// single Status column ahead of the ID column (the title-based Status cascade,
-// a56dc887), pushing the ID column from index 1 to index 2. w197: it applied
-// to the config's list alone while the type's list had no Status column;
-// both tests read it now, because both read one list.
-var idColumnIndexOverride = map[string]int{
-	"r53":   2,
-	"apigw": 2,
-}
-
-func TestConfigDefaultViewDef_IDColumnSecond(t *testing.T) {
-	for shortName, want := range expectedSecondColumn {
-		t.Run(shortName, func(t *testing.T) {
-			vd := config.DefaultViewDef(shortName)
-			idx := 1
-			if override, ok := idColumnIndexOverride[shortName]; ok {
-				idx = override
+func TestDefaultViewDef_IDColumnFollowsTheName(t *testing.T) {
+	for _, spec := range idColumn {
+		t.Run(spec.shortName, func(t *testing.T) {
+			vd := config.DefaultViewDef(spec.shortName)
+			if len(vd.List) <= spec.index {
+				t.Fatalf("config.DefaultViewDef(%q) has %d columns, want more than %d",
+					spec.shortName, len(vd.List), spec.index)
 			}
-			if len(vd.List) <= idx {
-				t.Fatalf("config.DefaultViewDef(%q) has fewer than %d columns", shortName, idx+1)
-			}
-			if vd.List[idx].Title != want.configTitle {
-				t.Errorf("config.DefaultViewDef(%q).List[%d].Title = %q, want %q",
-					shortName, idx, vd.List[idx].Title, want.configTitle)
+			got := vd.List[spec.index]
+			if got.Title != spec.title || got.Key != spec.key {
+				t.Errorf("%s column %d is {Title:%q Key:%q}, want {Title:%q Key:%q} — the id the name "+
+					"replaced at the front is still on the screen",
+					spec.shortName, spec.index, got.Title, got.Key, spec.title, spec.key)
 			}
 		})
 	}
 }
 
-func TestResourceTypeDef_IDColumnSecond(t *testing.T) {
-	for shortName, want := range expectedSecondColumn {
-		t.Run(shortName, func(t *testing.T) {
-			rt := resource.FindResourceType(shortName)
-			if rt == nil {
-				t.Fatalf("resource.FindResourceType(%q) returned nil", shortName)
-			}
-			idx := 1
-			if override, ok := idColumnIndexOverride[shortName]; ok {
-				idx = override
-			}
-			if len(rt.Columns) <= idx {
-				t.Fatalf("resource type %q has fewer than %d columns", shortName, idx+1)
-			}
-			if rt.Columns[idx].Title != want.typeDefTitle {
-				t.Errorf("resource type %q Columns[%d].Title = %q, want %q",
-					shortName, idx, rt.Columns[idx].Title, want.typeDefTitle)
-			}
-			if rt.Columns[idx].Key != want.typeDefKey {
-				t.Errorf("resource type %q Columns[%d].Key = %q, want %q",
-					shortName, idx, rt.Columns[idx].Key, want.typeDefKey)
-			}
-		})
-	}
-}
-
-// ---------------------------------------------------------------------------
-// Documented exceptions: these resources correctly have ID-first because the
-// ID IS the human-readable name. Verify they are NOT affected by the fix.
-// ---------------------------------------------------------------------------
-
+// idFirstExceptions are the types whose identifier IS the name an operator
+// reads, so the rule above does not apply to them and must not be "fixed" onto
+// them by a later sweep.
 var idFirstExceptions = []struct {
 	shortName  string
 	firstTitle string
@@ -254,13 +127,12 @@ var idFirstExceptions = []struct {
 func TestDocumentedExceptions_IDFirstIsCorrect(t *testing.T) {
 	for _, exc := range idFirstExceptions {
 		t.Run(exc.shortName, func(t *testing.T) {
-			// Verify config defaults still have ID first
 			vd := config.DefaultViewDef(exc.shortName)
 			if len(vd.List) == 0 {
 				t.Fatalf("config.DefaultViewDef(%q) returned empty List", exc.shortName)
 			}
 			if vd.List[0].Title != exc.firstTitle {
-				t.Errorf("exception %q: config.DefaultViewDef.List[0].Title = %q, want %q (ID-first is correct for this type)",
+				t.Errorf("exception %q opens with %q, want %q — the identifier is this type's name",
 					exc.shortName, vd.List[0].Title, exc.firstTitle)
 			}
 		})
