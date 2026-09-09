@@ -137,3 +137,87 @@ func TestSearchHighlight_LandsOnTheMatchAfterADoubleWidthRune(t *testing.T) {
 		}
 	}
 }
+
+// TestSearchHighlight_PaintsTheBodysMatchSetAndComputesNone pins the shape of
+// row 2: the match set is computed once, by the controller, and the terminal
+// paints the set it is handed. A renderer that computes its own would find the
+// second occurrence on this line, which the body deliberately does not carry.
+func TestSearchHighlight_PaintsTheBodysMatchSetAndComputesNone(t *testing.T) {
+	const line = "Tags: env=production, role=production"
+	c := newTextScreenController(runtime.ScreenYAML, []string{line})
+	c.Apply(app.Action{Kind: app.ActionSearch, Arg: tui6WideQuery})
+	body := c.Snapshot().Body.Text
+	if body == nil {
+		t.Fatal("no text body on the snapshot")
+	}
+	if len(body.SearchMatches) != 2 {
+		t.Fatalf("the fixture line must hold 2 occurrences, the body published %d", len(body.SearchMatches))
+	}
+
+	// Hand the renderer a body that names only the first occurrence.
+	body.SearchMatches = body.SearchMatches[:1]
+
+	vp := viewport.New(viewport.WithWidth(80), viewport.WithHeight(6))
+	m := views.NewTransientYAML(80, 6, vp)
+	out := m.RenderText(*body)
+
+	current := styles.SearchCurrentStyle.Render(tui6WideQuery)
+	if n := strings.Count(out, current); n != 1 {
+		t.Errorf("the body named 1 match; the screen paints %d highlighted runs of %q", n, tui6WideQuery)
+	}
+	if other := styles.SearchOtherStyle.Render(tui6WideQuery); strings.Contains(out, other) {
+		t.Errorf("the screen highlights an occurrence the body did not name, so the renderer computed a match set of its own:\n%q", out)
+	}
+}
+
+// tui6FoldLine holds a rune whose lowercase form is a different length in
+// bytes: "İ" is two bytes and lowercases to three. Matching that folds the
+// line before searching it, and then reads the offset back against the
+// unfolded line, shifts every later match by the difference.
+const tui6FoldLine = "Name: İstanbul-production"
+
+// TestSearchOffsets_UnshiftedByALengthChangingFold pins row 4 on the published
+// offsets: the match is where the operator sees it, not where it sits in a
+// folded copy of the line nobody paints.
+func TestSearchOffsets_UnshiftedByALengthChangingFold(t *testing.T) {
+	if len(strings.ToLower(tui6FoldLine)) == len(tui6FoldLine) {
+		t.Fatal("the fixture line's fold does not change its byte length, so this pin proves nothing")
+	}
+	prefix := tui6FoldLine[:strings.Index(tui6FoldLine, tui6WideQuery)]
+	wantStart := text.Width(prefix)
+
+	matches := tui6TextMatches(t, []string{tui6FoldLine}, tui6WideQuery)
+	if len(matches) != 1 {
+		t.Fatalf("want 1 match, got %d: %+v", len(matches), matches)
+	}
+	if matches[0].ColStart != wantStart {
+		t.Errorf("ColStart is %d; the match starts at display column %d — the fold made the line one byte longer and every offset after it moved", matches[0].ColStart, wantStart)
+	}
+	if want := wantStart + text.Width(tui6WideQuery); matches[0].ColEnd != want {
+		t.Errorf("ColEnd is %d, want display column %d", matches[0].ColEnd, want)
+	}
+}
+
+// TestSearchHighlight_LandsOnTheMatchAfterALengthChangingFold pins row 4 on
+// the painted surface: the highlight covers the word, not the word shifted by
+// the fold's byte difference.
+func TestSearchHighlight_LandsOnTheMatchAfterALengthChangingFold(t *testing.T) {
+	c := newTextScreenController(runtime.ScreenYAML, []string{tui6FoldLine})
+	c.Apply(app.Action{Kind: app.ActionSearch, Arg: tui6WideQuery})
+	body := c.Snapshot().Body.Text
+	if body == nil {
+		t.Fatal("no text body on the snapshot")
+	}
+	vp := viewport.New(viewport.WithWidth(80), viewport.WithHeight(6))
+	m := views.NewTransientYAML(80, 6, vp)
+	out := m.RenderText(*body)
+
+	if !strings.Contains(out, styles.SearchCurrentStyle.Render(tui6WideQuery)) {
+		t.Errorf("the highlight does not cover %q\nrendered: %q", tui6WideQuery, out)
+	}
+	for _, wrong := range []string{"-productio", "roduction", "n-producti"} {
+		if strings.Contains(out, styles.SearchCurrentStyle.Render(wrong)) {
+			t.Errorf("the highlight covers %q instead of the match", wrong)
+		}
+	}
+}

@@ -19,6 +19,8 @@
 package unit
 
 import (
+	"errors"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -29,6 +31,7 @@ import (
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 	"github.com/k2m30/a9s/v3/core/runtime"
+	"github.com/k2m30/a9s/v3/core/runtime/messages"
 	"github.com/k2m30/a9s/v3/internal/tui/text"
 	"github.com/k2m30/a9s/v3/internal/tui/views"
 )
@@ -113,11 +116,16 @@ func TestHostileAWSString_ListCellIsInert(t *testing.T) {
 	tui6AssertInert(t, "the identity cell", body.Rows[0].Cells[body.IdentityCol])
 }
 
-// TestHostileAWSString_RenderedRowKeepsItsWidth pins the consequence the
-// operator sees: the hostile row and its healthy twin paint the same number of
-// columns. An unpainted ESC sequence in the cell makes the row longer than the
-// header it sits under and slides every column right of it.
-func TestHostileAWSString_RenderedRowKeepsItsWidth(t *testing.T) {
+// TestHostileAWSString_RenderedRowCarriesNoForeignSequence pins the rendered
+// surface: the escape sequence in the tag value must not reach the painted
+// row. Left in the cell it is not a column the measure can see — every measure
+// on both sides skips an SGR sequence — so nothing about the row's width says
+// it is there. What the terminal does with it is turn the rest of the line
+// red, past the cell, past the row.
+//
+// a9s paints its own colour in truecolor form (38;2;R;G;B), so a literal
+// \x1b[31m on the screen can only have come from the value.
+func TestHostileAWSString_RenderedRowCarriesNoForeignSequence(t *testing.T) {
 	c := newTestController(t)
 	c.Apply(app.Action{Kind: app.ActionCommand, Arg: "ec2"})
 	c.ApplyResourcesLoaded("ec2", tui6HostileRows(), nil, false)
@@ -130,21 +138,19 @@ func TestHostileAWSString_RenderedRowKeepsItsWidth(t *testing.T) {
 		t.Fatal("ec2 is not a registered resource type")
 	}
 	m := views.NewTransientResourceList(*td, 160, 30)
-	lines := strings.Split(m.RenderList(*body), "\n")
-	var hostile, healthy string
-	for _, line := range lines {
-		switch {
-		case strings.Contains(ansi.Strip(line), "i-0123456789abcdef0"):
-			hostile = line
-		case strings.Contains(ansi.Strip(line), "i-0aaaaaaaaaaaaaaa1"):
-			healthy = line
+	screen := m.RenderList(*body)
+	if !strings.Contains(screen, "\x1b[") {
+		t.Fatal("the list painted no styling at all, so this pin proves nothing")
+	}
+	if strings.Contains(screen, "\x1b[31m") {
+		var offending string
+		for _, line := range strings.Split(screen, "\n") {
+			if strings.Contains(line, "\x1b[31m") {
+				offending = line
+				break
+			}
 		}
-	}
-	if hostile == "" || healthy == "" {
-		t.Fatalf("both rows must be on screen; hostile=%q healthy=%q", hostile, healthy)
-	}
-	if hw, cw := text.Width(hostile), text.Width(healthy); hw != cw {
-		t.Errorf("the hostile row paints %d columns, its healthy twin %d — the columns to its right no longer line up\nhostile: %q", hw, cw, hostile)
+		t.Errorf("the tag value's own escape sequence reached the painted row, where it colours everything after it:\n%q", offending)
 	}
 }
 
@@ -327,5 +333,74 @@ func TestPainterKeepsA9sOwnStyling(t *testing.T) {
 	}
 	if plain := ansi.Strip(got); strings.TrimRight(plain, " ") != "running" {
 		t.Errorf("the painter changed the styled text to %q", plain)
+	}
+}
+
+// tui6HostileAPIError is a fetch failure whose message quotes the input AWS
+// rejected. An AWS error routinely repeats the bucket name, tag value or
+// resource identifier it refused, so a failure is one more lane
+// attacker-influenced characters reach a surface by.
+func tui6HostileAPIError() error {
+	return errors.New("InvalidBucketName: the bucket " + tui6HostileTag + " was rejected")
+}
+
+// tui6ListAfterAPIError opens a list with one cached row, fails the fetch over
+// it, and returns the resulting ViewState and controller.
+func tui6ListAfterAPIError(t *testing.T) (app.ViewState, *app.Controller) {
+	t.Helper()
+	c := newTestController(t)
+	c.Apply(app.Action{Kind: app.ActionCommand, Arg: "s3"})
+	c.ApplyResourcesLoaded("s3", []resource.Resource{{
+		ID: "a9s-demo-healthy", Name: "a9s-demo-healthy", Type: "s3",
+		Fields: map[string]string{"name": "a9s-demo-healthy"},
+	}}, nil, false)
+	vs, _ := c.Handle(messages.APIError{ResourceType: "s3", Err: tui6HostileAPIError(), Gen: 0})
+	return vs, c
+}
+
+// TestHostileAWSString_FlashIsInert pins the flash lane: the banner a failure
+// raises is AWS text on a surface, so it passes the same boundary the rows do.
+func TestHostileAWSString_FlashIsInert(t *testing.T) {
+	vs, _ := tui6ListAfterAPIError(t)
+	if vs.Header.Flash.Text == "" {
+		t.Fatal("the failure raised no flash, so this pin proves nothing")
+	}
+	tui6AssertInert(t, "the flash text", vs.Header.Flash.Text)
+}
+
+// TestHostileAWSString_ListErrorMarkerIsInert pins the sibling surface the same
+// error text reaches: the marker the list paints over its cached rows when a
+// refresh fails. It is the same string from the same response as the flash,
+// so one boundary must cover both.
+func TestHostileAWSString_ListErrorMarkerIsInert(t *testing.T) {
+	vs, _ := tui6ListAfterAPIError(t)
+	if vs.Body.List == nil {
+		t.Fatal("no list body after the failure")
+	}
+	marker := vs.Body.List.LastFetchError
+	if marker == "" {
+		t.Fatal("the failure left no error marker on the list, so this pin proves nothing")
+	}
+	tui6AssertInert(t, "the list's error marker", marker)
+}
+
+// TestHostileAWSString_ErrorHistoryIsInert pins the session record: the
+// failure the operator reads back after the banner has gone is the same text.
+func TestHostileAWSString_ErrorHistoryIsInert(t *testing.T) {
+	_, c := tui6ListAfterAPIError(t)
+	lines := c.ErrorHistoryLines()
+	if len(lines) == 0 {
+		t.Fatal("the failure left no error-history entry, so this pin proves nothing")
+	}
+	var found bool
+	for i, line := range lines {
+		if !strings.Contains(line, "InvalidBucketName") {
+			continue
+		}
+		found = true
+		tui6AssertInert(t, "error-history line "+strconv.Itoa(i), line)
+	}
+	if !found {
+		t.Fatalf("the failure is not in the error history: %q", lines)
 	}
 }
