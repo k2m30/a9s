@@ -17,6 +17,7 @@ import (
 	"testing"
 
 	_ "github.com/k2m30/a9s/v3/core/aws"
+	"github.com/k2m30/a9s/v3/core/catalog"
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
@@ -103,6 +104,21 @@ func TestChildTypeDeclarationsAreReachable(t *testing.T) {
 
 	if got := resource.GetChildType(child); got == nil {
 		t.Fatalf("the child type %q did not register", child)
+	}
+
+	// The registered half of the same claim, on a child the catalog itself
+	// carries: the general resolver answers for it, and the parents-only
+	// lookup is what "resolving half the catalog" looks like. Without this,
+	// every lookup below is answered by the test registry's own arm and the
+	// catalog arm could be narrowed back with nothing to say so.
+	const catalogChild = "tg_health"
+	if catalog.FindAny(catalogChild) == nil {
+		t.Errorf("catalog.FindAny(%q) found nothing — it is the one resolver, and a child type is a "+
+			"type", catalogChild)
+	}
+	if catalog.TopLevelOnly(catalogChild) != nil {
+		t.Errorf("catalog.TopLevelOnly(%q) answered — the narrow lookup means the parents, which is "+
+			"why the callers that mean both ask FindAny", catalogChild)
 	}
 
 	if defs := resource.GetRelated(child); len(defs) != 1 || defs[0].TargetType != "ec2" {
