@@ -55,11 +55,11 @@ var containersTypes = []catalog.ResourceTypeDef{
 			return consolelink.Regional(region, "eks/home?region="+region+"#/clusters/"+url.PathEscape(r.ID))
 		},
 		Columns: []domain.Column{
-			{Key: "cluster_name", Title: "Cluster Name", Path: "Name", Width: 28, Sortable: true},
-			{Key: "version", Title: "Version", Path: "Version", Width: 10, Sortable: true},
-			{Key: "status", Title: "Status", Path: "Status", Width: 14, Sortable: true},
+			{Key: "cluster_name", Title: "Cluster Name", Path: "Name", Width: 28},
+			{Key: "version", Title: "Version", Path: "Version", Width: 10},
+			{Key: "status", Title: "Status", Path: "Status", Width: 14},
 			{Key: "endpoint", Title: "Endpoint", Path: "Endpoint", Width: 48},
-			{Key: "platform_version", Title: "Platform Version", Path: "PlatformVersion", Width: 18, Sortable: true},
+			{Key: "platform_version", Title: "Platform Version", Path: "PlatformVersion", Width: 18},
 		},
 		Color:   colorEKSCluster,
 		Fetcher: fetcherWithClients(FetchEKSClustersPage),
@@ -127,11 +127,11 @@ var containersTypes = []catalog.ResourceTypeDef{
 			return consolelink.Regional(region, "eks/home?region="+region+"#/clusters/"+url.PathEscape(cluster)+"/nodegroups/"+url.PathEscape(r.ID))
 		},
 		Columns: []domain.Column{
-			{Key: "nodegroup_name", Title: "Node Group", Path: "NodegroupName", Width: 28, Sortable: true},
-			{Key: "cluster_name", Title: "Cluster", Path: "ClusterName", Width: 24, Sortable: true},
-			{Key: "status", Title: "Status", Path: "Status", Width: 14, Sortable: true},
+			{Key: "nodegroup_name", Title: "Node Group", Path: "NodegroupName", Width: 28},
+			{Key: "cluster_name", Title: "Cluster", Path: "ClusterName", Width: 24},
+			{Key: "status", Title: "Status", Path: "Status", Width: 14},
 			{Key: "instance_types", Title: "Instance Types", Path: "InstanceTypes", Width: 20},
-			{Key: "desired_size", Title: "Desired", Path: "ScalingConfig.DesiredSize", Width: 9, Sortable: true},
+			{Key: "desired_size", Title: "Desired", Path: "ScalingConfig.DesiredSize", Width: 9},
 		},
 		Color:   colorEKSNodeGroup,
 		Fetcher: fetchNodeGroupsPage,

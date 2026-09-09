@@ -9,6 +9,7 @@ list:
     key: id
     width: 38
   Status:
+    key: state
     width: 12
   Rules:
     key: rules_summary

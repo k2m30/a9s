@@ -818,13 +818,10 @@ func TestSFNExecutionColumns(t *testing.T) {
 		}
 	})
 
-	t.Run("sortable_columns", func(t *testing.T) {
-		for i, col := range cols {
-			if !col.Sortable {
-				t.Errorf("column[%d] (%s) should be sortable", i, col.Key)
-			}
-		}
-	})
+	// w197 row 6: the subtest that asserted every column's Sortable flag is
+	// gone with the field. Nothing ever refused a sort — handleActionSort
+	// sorts on whatever key the action carries — so the flag was a literal
+	// asserted back to itself. Do not restore it without the refusal.
 }
 
 // TestSFNExecutions_ChildTypeRegistered verifies that the child type is

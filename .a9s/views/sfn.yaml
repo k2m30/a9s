@@ -9,6 +9,7 @@ list:
     key: type
     width: 10
   Status:
+    key: state
     width: 12
   Last Run:
     key: last_run

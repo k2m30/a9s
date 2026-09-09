@@ -860,25 +860,10 @@ func TestGlueRunColumns(t *testing.T) {
 		}
 	})
 
-	t.Run("error_message_not_sortable", func(t *testing.T) {
-		for _, col := range cols {
-			if col.Key == "error_message" {
-				if col.Sortable {
-					t.Error("error_message column should not be sortable")
-				}
-				return
-			}
-		}
-		t.Error("error_message column not found")
-	})
-
-	t.Run("other_columns_sortable", func(t *testing.T) {
-		for _, col := range cols {
-			if col.Key != "error_message" && !col.Sortable {
-				t.Errorf("column %q should be sortable", col.Key)
-			}
-		}
-	})
+	// w197 row 6: the subtest that asserted every column's Sortable flag is
+	// gone with the field. Nothing ever refused a sort — handleActionSort
+	// sorts on whatever key the action carries — so the flag was a literal
+	// asserted back to itself. Do not restore it without the refusal.
 }
 
 // ---------------------------------------------------------------------------

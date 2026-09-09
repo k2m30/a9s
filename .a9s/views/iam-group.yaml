@@ -5,6 +5,7 @@ list:
     key: group_name
     width: 32
   Status:
+    key: state
     width: 12
   Members:
     key: member_count

@@ -710,15 +710,10 @@ func TestSFNExecutionHistoryColumns(t *testing.T) {
 		}
 	})
 
-	t.Run("sortable_flags", func(t *testing.T) {
-		// timestamp, event_type_short, state_name are sortable; event_detail is not
-		wantSortable := []bool{true, true, true, false}
-		for i, want := range wantSortable {
-			if cols[i].Sortable != want {
-				t.Errorf("col[%d].Sortable: expected %v, got %v", i, want, cols[i].Sortable)
-			}
-		}
-	})
+	// w197 row 6: the subtest that asserted every column's Sortable flag is
+	// gone with the field. Nothing ever refused a sort — handleActionSort
+	// sorts on whatever key the action carries — so the flag was a literal
+	// asserted back to itself. Do not restore it without the refusal.
 }
 
 // TestSFNExecutionHistory_ChildTypeRegistered verifies that the child type

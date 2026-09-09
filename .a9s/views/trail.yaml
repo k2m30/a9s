@@ -5,6 +5,7 @@ list:
     key: trail_name
     width: 28
   Status:
+    key: state
     width: 12
   S3 Bucket:
     path: S3BucketName

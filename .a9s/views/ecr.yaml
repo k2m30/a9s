@@ -5,6 +5,7 @@ list:
     key: repository_name
     width: 36
   Status:
+    key: state
     width: 12
   URI:
     path: RepositoryUri

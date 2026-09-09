@@ -100,8 +100,8 @@ func TestChildTypeResolvesTheSameOnBothPaths(t *testing.T) {
 		Name:      "S3 Objects",
 		ShortName: "wipfix_child_objects",
 		Columns: []domain.Column{
-			{Key: "key", Title: "Key", Width: 40, Sortable: true},
-			{Key: "size", Title: "Size", Width: 10, Sortable: true},
+			{Key: "key", Title: "Key", Width: 40},
+			{Key: "size", Title: "Size", Width: 10},
 		},
 	}
 	resource.SetChildTypeForTest(child)

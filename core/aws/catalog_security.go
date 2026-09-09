@@ -60,12 +60,12 @@ var securityTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stat
 			return consolelink.Global(region, "iam/home#/roles/details/"+url.PathEscape(r.ID))
 		},
 		Columns: []domain.Column{
-			{Key: "role_name", Title: "Role Name", Path: "RoleName", Width: 36, Sortable: true},
-			{Title: "Status", Width: 12},
+			{Key: "role_name", Title: "Role Name", Path: "RoleName", Width: 36},
+			{Key: "state", Title: "Status", Width: 12},
 			{Title: "Last Used", Path: "RoleLastUsed.LastUsedDate", Width: 22},
 			{Key: "trust_summary", Title: "Trust", Width: 12},
-			{Key: "path", Title: "Path", Path: "Path", Width: 20, Sortable: true},
-			{Key: "create_date", Title: "Created", Path: "CreateDate", Width: 22, Sortable: true},
+			{Key: "path", Title: "Path", Path: "Path", Width: 20},
+			{Key: "create_date", Title: "Created", Path: "CreateDate", Width: 22},
 			{Key: "description", Title: "Description", Path: "Description", Width: 30},
 		},
 		Children: []domain.ChildViewDef{{
@@ -124,12 +124,12 @@ var securityTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stat
 			return consolelink.Global(region, "iam/home#/policies/details/"+url.QueryEscape(arn))
 		},
 		Columns: []domain.Column{
-			{Key: "policy_name", Title: "Policy Name", Width: 36, Sortable: true},
-			{Key: "policy_type", Title: "Type", Width: 10, Sortable: true},
-			{Key: "risk", Title: "Status", Width: 14, Sortable: true},
-			{Key: "attachment_count", Title: "Attached", Width: 10, Sortable: true},
-			{Key: "path", Title: "Path", Width: 20, Sortable: true},
-			{Key: "create_date", Title: "Created", Width: 22, Sortable: true},
+			{Key: "policy_name", Title: "Policy Name", Width: 36},
+			{Key: "policy_type", Title: "Type", Width: 10},
+			{Key: "risk", Title: "Status", Width: 14},
+			{Key: "attachment_count", Title: "Attached", Width: 10},
+			{Key: "path", Title: "Path", Width: 20},
+			{Key: "create_date", Title: "Created", Width: 22},
 		},
 		Color: colorPolicy,
 		Fetcher: fetcherWithClients(func(ctx context.Context, c *ServiceClients, continuationToken string) (resource.FetchResult, error) {
@@ -223,13 +223,13 @@ var securityTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stat
 			return consolelink.Global(region, "iam/home#/users/details/"+url.PathEscape(r.ID))
 		},
 		Columns: []domain.Column{
-			{Key: "user_name", Title: "User Name", Path: "UserName", Width: 32, Sortable: true},
-			{Key: "mfa", Title: "MFA", Width: 5, Sortable: true},
-			{Key: "risk", Title: "Status", Width: 14, Sortable: true},
-			{Key: "user_id", Title: "User ID", Path: "UserId", Width: 22, Sortable: true},
-			{Key: "path", Title: "Path", Path: "Path", Width: 20, Sortable: true},
-			{Key: "create_date", Title: "Created", Path: "CreateDate", Width: 22, Sortable: true},
-			{Key: "password_last_used", Title: "Password Last Used", Path: "PasswordLastUsed", Width: 22, Sortable: true},
+			{Key: "user_name", Title: "User Name", Path: "UserName", Width: 32},
+			{Key: "mfa", Title: "MFA", Width: 5},
+			{Key: "risk", Title: "Status", Width: 14},
+			{Key: "user_id", Title: "User ID", Path: "UserId", Width: 22},
+			{Key: "path", Title: "Path", Path: "Path", Width: 20},
+			{Key: "create_date", Title: "Created", Path: "CreateDate", Width: 22},
+			{Key: "password_last_used", Title: "Password Last Used", Path: "PasswordLastUsed", Width: 22},
 		},
 		Color: colorIAMUser,
 		Fetcher: fetcherWithClients(func(ctx context.Context, c *ServiceClients, continuationToken string) (resource.FetchResult, error) {
@@ -266,13 +266,13 @@ var securityTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stat
 			return consolelink.Global(region, "iam/home#/groups/details/"+url.PathEscape(r.ID))
 		},
 		Columns: []domain.Column{
-			{Key: "group_name", Title: "Group Name", Path: "GroupName", Width: 32, Sortable: true},
-			{Title: "Status", Width: 12},
+			{Key: "group_name", Title: "Group Name", Path: "GroupName", Width: 32},
+			{Key: "state", Title: "Status", Width: 12},
 			{Key: "member_count", Title: "Members", Width: 9},
-			{Key: "group_id", Title: "Group ID", Path: "GroupId", Width: 22, Sortable: true},
-			{Key: "path", Title: "Path", Path: "Path", Width: 20, Sortable: true},
-			{Key: "create_date", Title: "Created", Path: "CreateDate", Width: 22, Sortable: true},
-			{Key: "arn", Title: "ARN", Path: "Arn", Width: 60, Sortable: true},
+			{Key: "group_id", Title: "Group ID", Path: "GroupId", Width: 22},
+			{Key: "path", Title: "Path", Path: "Path", Width: 20},
+			{Key: "create_date", Title: "Created", Path: "CreateDate", Width: 22},
+			{Key: "arn", Title: "ARN", Path: "Arn", Width: 60},
 		},
 		Children: []domain.ChildViewDef{{
 			ChildType:      "iam_group_members",
@@ -316,9 +316,9 @@ var securityTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stat
 			return consolelink.Regional(region, tail+"&region="+region+"&scope=regional")
 		},
 		Columns: []domain.Column{
-			{Key: "name", Title: "Name", Path: "Name", Width: 28, Sortable: true},
-			{Key: "id", Title: "ID", Path: "Id", Width: 38, Sortable: true},
-			{Title: "Status", Width: 12},
+			{Key: "name", Title: "Name", Path: "Name", Width: 28},
+			{Key: "id", Title: "ID", Path: "Id", Width: 38},
+			{Key: "state", Title: "Status", Width: 12},
 			{Key: "rules_summary", Title: "Rules", Width: 18},
 			{Key: "description", Title: "Description", Path: "Description", Width: 36},
 		},

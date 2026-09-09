@@ -5,6 +5,7 @@ list:
     key: log_group_name
     width: 48
   Status:
+    key: state
     width: 12
   Size:
     key: stored_bytes

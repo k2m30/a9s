@@ -34,7 +34,37 @@ import (
 // type — a stale allowlist entry (column was removed) is itself a test failure.
 var columnKeyProducerAllowlist = map[string]map[string]string{
 	// "<shortName>": {"<colKey>": "justification"},
+	"apigw":        {"state": statusFromFindingsOnly},
+	"codeartifact": {"state": statusFromFindingsOnly},
+	"ecr":          {"state": statusFromFindingsOnly},
+	"glue":         {"state": statusFromFindingsOnly},
+	"iam-group":    {"state": statusFromFindingsOnly},
+	"logs":         {"state": statusFromFindingsOnly},
+	"r53":          {"state": statusFromFindingsOnly},
+	"role":         {"state": statusFromFindingsOnly},
+	"rtb":          {"state": statusFromFindingsOnly},
+	"sfn":          {"state": statusFromFindingsOnly},
+	"sns":          {"state": statusFromFindingsOnly},
+	"sns-sub":      {"state": statusFromFindingsOnly},
+	"sqs":          {"state": statusFromFindingsOnly},
+	"trail":        {"state": statusFromFindingsOnly},
+	"waf":          {"state": statusFromFindingsOnly},
 }
+
+// statusFromFindingsOnly is the justification the fifteen entries above share.
+//
+// Their Status column reads no stored value from the fetcher: the render
+// cascade fills a status column from domain.StatusPhrase(r.Findings) first,
+// and these types have nothing behind it — running each of the fifteen
+// fetchers over the demo bench shows not one writes "state" or "status"
+// (w197 row 8). The key is not a guess: it is the lifecycle key the save lane
+// writes the rendered phrase under (core/runtime/probes.go saveFieldKey), and
+// so the key the cell is read back from on a cache replay. Naming it is what
+// replaced the title-to-key guess these columns used to be resolved by.
+//
+// A fetcher that starts writing a real status for one of these types drops
+// its line here rather than keeping it.
+const statusFromFindingsOnly = "status is the type's finding phrase, stored by the save lane under the lifecycle key; no fetcher writes it"
 
 // TestColumnKeysHaveProducers verifies that every List-column Key defined in
 // the built-in default views (core/config/defaults_*.go, merged via

@@ -73,13 +73,13 @@ var databasesTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 			return consolelink.Regional(region, "rds/home?region="+region+"#database:id="+url.PathEscape(r.ID)+";is-cluster=false")
 		},
 		Columns: []domain.Column{
-			{Key: "db_identifier", Title: "DB Identifier", Path: "DBInstanceIdentifier", Width: 28, Sortable: true},
-			{Key: "engine", Title: "Engine", Path: "Engine", Width: 12, Sortable: true},
-			{Key: "engine_version", Title: "Version", Path: "EngineVersion", Width: 10, Sortable: true},
-			{Key: "status", Title: "Status", Width: 28, SortKey: "status_raw", Sortable: true},
-			{Key: "class", Title: "Class", Path: "DBInstanceClass", Width: 16, Sortable: true},
+			{Key: "db_identifier", Title: "DB Identifier", Path: "DBInstanceIdentifier", Width: 28},
+			{Key: "engine", Title: "Engine", Path: "Engine", Width: 12},
+			{Key: "engine_version", Title: "Version", Path: "EngineVersion", Width: 10},
+			{Key: "status", Title: "Status", Width: 28, SortKey: "status_raw"},
+			{Key: "class", Title: "Class", Path: "DBInstanceClass", Width: 16},
 			{Key: "endpoint", Title: "Endpoint", Path: "Endpoint.Address", Width: 40},
-			{Key: "multi_az", Title: "Multi-AZ", Path: "MultiAZ", Width: 10, Sortable: true},
+			{Key: "multi_az", Title: "Multi-AZ", Path: "MultiAZ", Width: 10},
 		},
 		Children: []domain.ChildViewDef{{
 			ChildType:      "dbi_events",
@@ -153,9 +153,9 @@ var databasesTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 			return consolelink.Global(region, "s3/buckets/"+url.PathEscape(r.ID))
 		},
 		Columns: []domain.Column{
-			{Key: "name", Title: "Bucket Name", Path: "Name", Width: 36, Sortable: true},
+			{Key: "name", Title: "Bucket Name", Path: "Name", Width: 36},
 			{Title: "Region", Path: "BucketRegion", Width: 14},
-			{Key: "creation_date", Title: "Creation Date", Path: "CreationDate", Width: 22, Sortable: true},
+			{Key: "creation_date", Title: "Creation Date", Path: "CreationDate", Width: 22},
 			{Key: "status", Title: "Status", Width: 32},
 		},
 		Children: []domain.ChildViewDef{{
@@ -223,10 +223,10 @@ var databasesTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 			return consolelink.Regional(region, "elasticache/home?region="+region+"#/redis/"+url.PathEscape(r.ID))
 		},
 		Columns: []domain.Column{
-			{Key: "cluster_id", Title: "Cluster ID", Path: "ReplicationGroupId", Width: 28, Sortable: true},
-			{Key: "node_type", Title: "Node Type", Path: "CacheNodeType", Width: 18, Sortable: true},
-			{Key: "status", Title: "Status", Width: 32, SortKey: "status_raw", Sortable: true},
-			{Key: "nodes", Title: "Nodes", Width: 8, Sortable: true},
+			{Key: "cluster_id", Title: "Cluster ID", Path: "ReplicationGroupId", Width: 28},
+			{Key: "node_type", Title: "Node Type", Path: "CacheNodeType", Width: 18},
+			{Key: "status", Title: "Status", Width: 32, SortKey: "status_raw"},
+			{Key: "nodes", Title: "Nodes", Width: 8},
 			{Key: "endpoint", Title: "Endpoint", Path: "ConfigurationEndpoint.Address", Width: 40},
 		},
 		Color: colorRedis,
@@ -285,10 +285,10 @@ var databasesTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 			}
 		},
 		Columns: []domain.Column{
-			{Key: "cluster_id", Title: "Cluster ID", Path: "DBClusterIdentifier", Width: 28, Sortable: true},
-			{Key: "engine_version", Title: "Version", Path: "EngineVersion", Width: 10, Sortable: true},
-			{Key: "status", Title: "Status", Width: 32, SortKey: "status_raw", Sortable: true},
-			{Key: "instances", Title: "Instances", Path: "DBClusterMembers", Width: 10, Sortable: true},
+			{Key: "cluster_id", Title: "Cluster ID", Path: "DBClusterIdentifier", Width: 28},
+			{Key: "engine_version", Title: "Version", Path: "EngineVersion", Width: 10},
+			{Key: "status", Title: "Status", Width: 32, SortKey: "status_raw"},
+			{Key: "instances", Title: "Instances", Path: "DBClusterMembers", Width: 10},
 			{Key: "endpoint", Title: "Endpoint", Path: "Endpoint", Width: 48},
 		},
 		Color: colorDBC,
@@ -401,11 +401,11 @@ var databasesTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 			return consolelink.Regional(region, "dynamodbv2/home?region="+region+"#table?name="+url.QueryEscape(r.ID))
 		},
 		Columns: []domain.Column{
-			{Key: "table_name", Title: "Table Name", Path: "TableName", Width: 36, Sortable: true},
-			{Key: "status", Title: "Status", Width: 32, Sortable: true},
-			{Key: "item_count", Title: "Items", Path: "ItemCount", Width: 12, Sortable: true},
-			{Key: "size_bytes", Title: "Size", Width: 14, SortKey: "size_bytes_raw", Sortable: true},
-			{Key: "billing_mode", Title: "Billing", Width: 16, Sortable: true},
+			{Key: "table_name", Title: "Table Name", Path: "TableName", Width: 36},
+			{Key: "status", Title: "Status", Width: 32},
+			{Key: "item_count", Title: "Items", Path: "ItemCount", Width: 12},
+			{Key: "size_bytes", Title: "Size", Width: 14, SortKey: "size_bytes_raw"},
+			{Key: "billing_mode", Title: "Billing", Width: 16},
 		},
 		Color: colorDDB,
 		Fetcher: fetcherWithClients(func(ctx context.Context, c *ServiceClients, continuationToken string) (resource.FetchResult, error) {
@@ -453,11 +453,11 @@ var databasesTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 			return consolelink.Regional(region, "aos/home?region="+region+"#opensearch/domains/"+url.PathEscape(r.ID))
 		},
 		Columns: []domain.Column{
-			{Key: "domain_name", Title: "Domain Name", Path: "DomainName", Width: 28, Sortable: true},
+			{Key: "domain_name", Title: "Domain Name", Path: "DomainName", Width: 28},
 			{Key: "status", Title: "Status", Width: 40},
-			{Key: "engine_version", Title: "Engine Version", Path: "EngineVersion", Width: 16, Sortable: true},
-			{Key: "instance_type", Title: "Instance Type", Path: "ClusterConfig.InstanceType", Width: 22, Sortable: true},
-			{Key: "instance_count", Title: "Instances", Path: "ClusterConfig.InstanceCount", Width: 10, Sortable: true},
+			{Key: "engine_version", Title: "Engine Version", Path: "EngineVersion", Width: 16},
+			{Key: "instance_type", Title: "Instance Type", Path: "ClusterConfig.InstanceType", Width: 22},
+			{Key: "instance_count", Title: "Instances", Path: "ClusterConfig.InstanceCount", Width: 10},
 			{Key: "endpoint", Title: "Endpoint", Path: "Endpoint", Width: 48},
 		},
 		Color: colorOpenSearch,
@@ -521,12 +521,12 @@ var databasesTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 			return consolelink.Regional(region, "redshiftv2/home?region="+region+"#cluster-details:cluster="+url.PathEscape(r.ID))
 		},
 		Columns: []domain.Column{
-			{Key: "cluster_id", Title: "Cluster ID", Path: "ClusterIdentifier", Width: 36, Sortable: true},
-			{Key: "status", Title: "Status", Width: 34, SortKey: "cluster_status", Sortable: true},
+			{Key: "cluster_id", Title: "Cluster ID", Path: "ClusterIdentifier", Width: 36},
+			{Key: "status", Title: "Status", Width: 34, SortKey: "cluster_status"},
 			{Title: "Pending", Path: "PendingModifiedValues.NodeType", Width: 14},
-			{Key: "node_type", Title: "Node Type", Path: "NodeType", Width: 16, Sortable: true},
-			{Key: "num_nodes", Title: "Nodes", Path: "NumberOfNodes", Width: 7, Sortable: true},
-			{Key: "db_name", Title: "Database", Path: "DBName", Width: 16, Sortable: true},
+			{Key: "node_type", Title: "Node Type", Path: "NodeType", Width: 16},
+			{Key: "num_nodes", Title: "Nodes", Path: "NumberOfNodes", Width: 7},
+			{Key: "db_name", Title: "Database", Path: "DBName", Width: 16},
 			{Key: "endpoint", Title: "Endpoint", Path: "Endpoint.Address", Width: 44},
 		},
 		Color: colorRedshift,
@@ -591,12 +591,12 @@ var databasesTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 			return consolelink.Regional(region, "efs/home?region="+region+"#/file-systems/"+r.ID)
 		},
 		Columns: []domain.Column{
-			{Key: "name", Title: "Name", Path: "Name", Width: 28, Sortable: true},
-			{Key: "file_system_id", Title: "File System ID", Path: "FileSystemId", Width: 22, Sortable: true},
-			{Key: "status", Title: "Status", Width: 24, Sortable: true},
-			{Key: "performance_mode", Title: "Perf Mode", Path: "PerformanceMode", Width: 16, Sortable: true},
-			{Key: "encrypted", Title: "Encrypted", Path: "Encrypted", Width: 10, Sortable: true},
-			{Key: "mount_targets", Title: "Mounts", Path: "NumberOfMountTargets", Width: 8, Sortable: true},
+			{Key: "name", Title: "Name", Path: "Name", Width: 28},
+			{Key: "file_system_id", Title: "File System ID", Path: "FileSystemId", Width: 22},
+			{Key: "status", Title: "Status", Width: 24},
+			{Key: "performance_mode", Title: "Perf Mode", Path: "PerformanceMode", Width: 16},
+			{Key: "encrypted", Title: "Encrypted", Path: "Encrypted", Width: 10},
+			{Key: "mount_targets", Title: "Mounts", Path: "NumberOfMountTargets", Width: 8},
 		},
 		Color: colorEFS,
 		Fetcher: fetcherWithClients(func(ctx context.Context, c *ServiceClients, continuationToken string) (resource.FetchResult, error) {
@@ -649,12 +649,12 @@ var databasesTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 			return consolelink.Regional(region, "rds/home?region="+region+"#db-snapshot:id="+url.PathEscape(r.ID))
 		},
 		Columns: []domain.Column{
-			{Key: "snapshot_id", Title: "Snapshot ID", Path: "DBSnapshotIdentifier", Width: 36, Sortable: true},
-			{Key: "db_instance", Title: "DB Instance", Path: "DBInstanceIdentifier", Width: 28, Sortable: true},
-			{Key: "status", Title: "Status", Width: 32, Sortable: true},
-			{Key: "engine", Title: "Engine", Path: "Engine", Width: 12, Sortable: true},
-			{Key: "snapshot_type", Title: "Type", Path: "SnapshotType", Width: 12, Sortable: true},
-			{Key: "created", Title: "Created", Path: "SnapshotCreateTime", Width: 22, Sortable: true},
+			{Key: "snapshot_id", Title: "Snapshot ID", Path: "DBSnapshotIdentifier", Width: 36},
+			{Key: "db_instance", Title: "DB Instance", Path: "DBInstanceIdentifier", Width: 28},
+			{Key: "status", Title: "Status", Width: 32},
+			{Key: "engine", Title: "Engine", Path: "Engine", Width: 12},
+			{Key: "snapshot_type", Title: "Type", Path: "SnapshotType", Width: 12},
+			{Key: "created", Title: "Created", Path: "SnapshotCreateTime", Width: 22},
 		},
 		Color: colorDBISnap,
 		Fetcher: fetcherWithClients(func(ctx context.Context, c *ServiceClients, continuationToken string) (resource.FetchResult, error) {
@@ -694,13 +694,13 @@ var databasesTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 			return consolelink.Regional(region, "rds/home?region="+region+"#db-snapshot:id="+url.PathEscape(r.ID))
 		},
 		Columns: []domain.Column{
-			{Key: "snapshot_id", Title: "Snapshot ID", Path: "DBClusterSnapshotIdentifier", Width: 36, Sortable: true},
-			{Key: "cluster_id", Title: "Cluster ID", Path: "DBClusterIdentifier", Width: 28, Sortable: true},
-			{Key: "status", Title: "Status", Width: 32, Sortable: true},
-			{Key: "engine", Title: "Engine", Path: "Engine", Width: 12, Sortable: true},
-			{Key: "snapshot_type", Title: "Type", Path: "SnapshotType", Width: 12, Sortable: true},
-			{Key: "snapshot_create_time", Title: "Created", Path: "SnapshotCreateTime", Width: 22, Sortable: true},
-			{Key: "storage_type", Title: "Storage", Path: "StorageType", Width: 10, Sortable: true},
+			{Key: "snapshot_id", Title: "Snapshot ID", Path: "DBClusterSnapshotIdentifier", Width: 36},
+			{Key: "cluster_id", Title: "Cluster ID", Path: "DBClusterIdentifier", Width: 28},
+			{Key: "status", Title: "Status", Width: 32},
+			{Key: "engine", Title: "Engine", Path: "Engine", Width: 12},
+			{Key: "snapshot_type", Title: "Type", Path: "SnapshotType", Width: 12},
+			{Key: "snapshot_create_time", Title: "Created", Path: "SnapshotCreateTime", Width: 22},
+			{Key: "storage_type", Title: "Storage", Path: "StorageType", Width: 10},
 		},
 		Color: colorDBCSnap,
 		Fetcher: fetcherWithClients(func(ctx context.Context, c *ServiceClients, continuationToken string) (resource.FetchResult, error) {

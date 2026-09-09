@@ -100,12 +100,12 @@ var networkingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 			return consolelink.Regional(region, "ec2/home?region="+region+"#LoadBalancer:loadBalancerArn="+arn)
 		},
 		Columns: []domain.Column{
-			{Key: "name", Title: "Name", Path: "LoadBalancerName", Width: 32, Sortable: true},
+			{Key: "name", Title: "Name", Path: "LoadBalancerName", Width: 32},
 			{Key: "dns_name", Title: "DNS Name", Path: "DNSName", Width: 48},
-			{Key: "type", Title: "Type", Path: "Type", Width: 12, Sortable: true},
-			{Key: "scheme", Title: "Scheme", Path: "Scheme", Width: 14, Sortable: true},
-			{Key: "state", Title: "Status", Path: "State.Code", Width: 12, Sortable: true},
-			{Key: "vpc_id", Title: "VPC ID", Path: "VpcId", Width: 24, Sortable: true},
+			{Key: "type", Title: "Type", Path: "Type", Width: 12},
+			{Key: "scheme", Title: "Scheme", Path: "Scheme", Width: 14},
+			{Key: "state", Title: "Status", Path: "State.Code", Width: 12},
+			{Key: "vpc_id", Title: "VPC ID", Path: "VpcId", Width: 24},
 		},
 		Children: []domain.ChildViewDef{{
 			ChildType:      "elb_listeners",
@@ -164,12 +164,12 @@ var networkingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 			return consolelink.Regional(region, "ec2/home?region="+region+"#TargetGroup:targetGroupArn="+arn)
 		},
 		Columns: []domain.Column{
-			{Key: "target_group_name", Title: "Target Group", Path: "TargetGroupName", Width: 32, Sortable: true},
-			{Key: "port", Title: "Port", Path: "Port", Width: 8, Sortable: true},
-			{Key: "protocol", Title: "Protocol", Path: "Protocol", Width: 10, Sortable: true},
-			{Key: "health_summary", Title: "Status", Width: 14, Sortable: true},
-			{Key: "vpc_id", Title: "VPC ID", Path: "VpcId", Width: 24, Sortable: true},
-			{Key: "target_type", Title: "Target Type", Path: "TargetType", Width: 12, Sortable: true},
+			{Key: "target_group_name", Title: "Target Group", Path: "TargetGroupName", Width: 32},
+			{Key: "port", Title: "Port", Path: "Port", Width: 8},
+			{Key: "protocol", Title: "Protocol", Path: "Protocol", Width: 10},
+			{Key: "health_summary", Title: "Status", Width: 14},
+			{Key: "vpc_id", Title: "VPC ID", Path: "VpcId", Width: 24},
+			{Key: "target_type", Title: "Target Type", Path: "TargetType", Width: 12},
 			{Key: "health_check_path", Title: "Health Check", Path: "HealthCheckPath", Width: 24},
 		},
 		Children: []domain.ChildViewDef{{
@@ -218,10 +218,10 @@ var networkingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 			return consolelink.Regional(region, "vpc/home?region="+region+"#SecurityGroup:groupId="+r.ID)
 		},
 		Columns: []domain.Column{
-			{Key: "group_name", Title: "Group Name", Path: "GroupName", Width: 28, Sortable: true},
-			{Key: "group_id", Title: "Group ID", Path: "GroupId", Width: 24, Sortable: true},
-			{Key: "risk_summary", Title: "Status", Width: 22, Sortable: true},
-			{Key: "vpc_id", Title: "VPC ID", Path: "VpcId", Width: 24, Sortable: true},
+			{Key: "group_name", Title: "Group Name", Path: "GroupName", Width: 28},
+			{Key: "group_id", Title: "Group ID", Path: "GroupId", Width: 24},
+			{Key: "risk_summary", Title: "Status", Width: 22},
+			{Key: "vpc_id", Title: "VPC ID", Path: "VpcId", Width: 24},
 			{Key: "description", Title: "Description", Path: "Description", Width: 36},
 		},
 		Color: colorAnyFindingOrHealthy,
@@ -260,11 +260,11 @@ var networkingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 			return consolelink.Regional(region, "vpc/home?region="+region+"#VpcDetails:VpcId="+r.ID)
 		},
 		Columns: []domain.Column{
-			{Key: "name", Title: "Name", Width: 24, Sortable: true},
-			{Key: "vpc_id", Title: "VPC ID", Path: "VpcId", Width: 24, Sortable: true},
-			{Key: "cidr_block", Title: "CIDR Block", Path: "CidrBlock", Width: 18, Sortable: true},
+			{Key: "name", Title: "Name", Width: 24},
+			{Key: "vpc_id", Title: "VPC ID", Path: "VpcId", Width: 24},
+			{Key: "cidr_block", Title: "CIDR Block", Path: "CidrBlock", Width: 18},
 			{Title: "Status", Path: "State", Width: 12},
-			{Key: "is_default", Title: "Default", Path: "IsDefault", Width: 9, Sortable: true},
+			{Key: "is_default", Title: "Default", Path: "IsDefault", Width: 9},
 			{Key: "flow_logs", Title: "Flow Logs", Width: 10},
 		},
 		Color: colorVPC,
@@ -303,14 +303,14 @@ var networkingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 			return consolelink.Regional(region, "vpc/home?region="+region+"#SubnetDetails:subnetId="+r.ID)
 		},
 		Columns: []domain.Column{
-			{Key: "name", Title: "Name", Width: 28, Sortable: true},
-			{Key: "subnet_id", Title: "Subnet ID", Path: "SubnetId", Width: 26, Sortable: true},
-			{Key: "vpc_id", Title: "VPC ID", Path: "VpcId", Width: 24, Sortable: true},
-			{Key: "cidr_block", Title: "CIDR Block", Path: "CidrBlock", Width: 18, Sortable: true},
-			{Key: "availability_zone", Title: "AZ", Path: "AvailabilityZone", Width: 14, Sortable: true},
+			{Key: "name", Title: "Name", Width: 28},
+			{Key: "subnet_id", Title: "Subnet ID", Path: "SubnetId", Width: 26},
+			{Key: "vpc_id", Title: "VPC ID", Path: "VpcId", Width: 24},
+			{Key: "cidr_block", Title: "CIDR Block", Path: "CidrBlock", Width: 18},
+			{Key: "availability_zone", Title: "AZ", Path: "AvailabilityZone", Width: 14},
 			{Title: "Status", Path: "State", Width: 12},
 			{Title: "Public", Path: "MapPublicIpOnLaunch", Width: 8},
-			{Key: "available_ips", Title: "Available IPs", Path: "AvailableIpAddressCount", Width: 14, Sortable: true},
+			{Key: "available_ips", Title: "Available IPs", Path: "AvailableIpAddressCount", Width: 14},
 		},
 		Color: colorSubnet,
 		Fetcher: fetcherWithClients(func(ctx context.Context, c *ServiceClients, continuationToken string) (resource.FetchResult, error) {
@@ -352,12 +352,12 @@ var networkingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 			return consolelink.Regional(region, "vpc/home?region="+region+"#RouteTableDetails:RouteTableId="+r.ID)
 		},
 		Columns: []domain.Column{
-			{Key: "name", Title: "Name", Width: 28, Sortable: true},
-			{Key: "route_table_id", Title: "Route Table ID", Path: "RouteTableId", Width: 26, Sortable: true},
-			{Key: "vpc_id", Title: "VPC ID", Path: "VpcId", Width: 24, Sortable: true},
-			{Title: "Status", Width: 8},
-			{Key: "routes_count", Title: "Routes", Width: 8, Sortable: true},
-			{Key: "associations_count", Title: "Assoc.", Width: 8, Sortable: true},
+			{Key: "name", Title: "Name", Width: 28},
+			{Key: "route_table_id", Title: "Route Table ID", Path: "RouteTableId", Width: 26},
+			{Key: "vpc_id", Title: "VPC ID", Path: "VpcId", Width: 24},
+			{Key: "state", Title: "Status", Width: 8},
+			{Key: "routes_count", Title: "Routes", Width: 8},
+			{Key: "associations_count", Title: "Assoc.", Width: 8},
 			{Key: "blackhole_routes_count", Title: "Blackholes", Width: 10},
 		},
 		Color: colorRTB,
@@ -401,10 +401,10 @@ var networkingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 			return consolelink.Regional(region, "vpc/home?region="+region+"#NatGatewayDetails:natGatewayId="+r.ID)
 		},
 		Columns: []domain.Column{
-			{Key: "name", Title: "Name", Width: 24, Sortable: true},
-			{Key: "nat_gateway_id", Title: "NAT Gateway ID", Path: "NatGatewayId", Width: 26, Sortable: true},
-			{Key: "vpc_id", Title: "VPC ID", Path: "VpcId", Width: 24, Sortable: true},
-			{Key: "subnet_id", Title: "Subnet ID", Path: "SubnetId", Width: 26, Sortable: true},
+			{Key: "name", Title: "Name", Width: 24},
+			{Key: "nat_gateway_id", Title: "NAT Gateway ID", Path: "NatGatewayId", Width: 26},
+			{Key: "vpc_id", Title: "VPC ID", Path: "VpcId", Width: 24},
+			{Key: "subnet_id", Title: "Subnet ID", Path: "SubnetId", Width: 26},
 			{Title: "Status", Path: "State", Width: 12},
 			{Title: "Failure", Path: "FailureCode", Width: 22},
 			{Key: "public_ip", Title: "Public IP", Width: 16},
@@ -445,10 +445,10 @@ var networkingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 			return consolelink.Regional(region, "vpc/home?region="+region+"#InternetGateway:internetGatewayId="+r.ID)
 		},
 		Columns: []domain.Column{
-			{Key: "name", Title: "Name", Width: 28, Sortable: true},
-			{Key: "igw_id", Title: "IGW ID", Path: "InternetGatewayId", Width: 26, Sortable: true},
-			{Key: "vpc_id", Title: "VPC ID", Width: 24, Sortable: true},
-			{Key: "state", Title: "Status", Width: 12, Sortable: true},
+			{Key: "name", Title: "Name", Width: 28},
+			{Key: "igw_id", Title: "IGW ID", Path: "InternetGatewayId", Width: 26},
+			{Key: "vpc_id", Title: "VPC ID", Width: 24},
+			{Key: "state", Title: "Status", Width: 12},
 		},
 		Color: colorIGW,
 		Fetcher: fetcherWithClients(func(ctx context.Context, c *ServiceClients, continuationToken string) (resource.FetchResult, error) {
@@ -480,13 +480,13 @@ var networkingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 			return consolelink.Regional(region, "vpc/home?region="+region+"#ElasticIpDetails:AllocationId="+r.ID)
 		},
 		Columns: []domain.Column{
-			{Key: "name", Title: "Name", Width: 24, Sortable: true},
-			{Key: "allocation_id", Title: "Allocation ID", Path: "AllocationId", Width: 26, Sortable: true},
-			{Key: "public_ip", Title: "Public IP", Path: "PublicIp", Width: 16, Sortable: true},
+			{Key: "name", Title: "Name", Width: 24},
+			{Key: "allocation_id", Title: "Allocation ID", Path: "AllocationId", Width: 26},
+			{Key: "public_ip", Title: "Public IP", Path: "PublicIp", Width: 16},
 			{Key: "status", Title: "Status", Width: 12},
-			{Key: "association_id", Title: "Association", Path: "AssociationId", Width: 26, Sortable: true},
-			{Key: "instance_id", Title: "Instance", Path: "InstanceId", Width: 20, Sortable: true},
-			{Key: "domain", Title: "Domain", Path: "Domain", Width: 8, Sortable: true},
+			{Key: "association_id", Title: "Association", Path: "AssociationId", Width: 26},
+			{Key: "instance_id", Title: "Instance", Path: "InstanceId", Width: 20},
+			{Key: "domain", Title: "Domain", Path: "Domain", Width: 8},
 		},
 		Color: colorAnyFindingOrHealthy,
 		Fetcher: fetcherWithClients(func(ctx context.Context, c *ServiceClients, _ string) (resource.FetchResult, error) {
@@ -531,12 +531,12 @@ var networkingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 			return consolelink.Regional(region, "vpc/home?region="+region+"#EndpointDetails:vpcEndpointId="+r.ID)
 		},
 		Columns: []domain.Column{
-			{Key: "service_name", Title: "Service Name", Path: "ServiceName", Width: 40, Sortable: true},
-			{Key: "vpce_id", Title: "Endpoint ID", Path: "VpcEndpointId", Width: 26, Sortable: true},
-			{Key: "type", Title: "Type", Path: "VpcEndpointType", Width: 12, Sortable: true},
+			{Key: "service_name", Title: "Service Name", Path: "ServiceName", Width: 40},
+			{Key: "vpce_id", Title: "Endpoint ID", Path: "VpcEndpointId", Width: 26},
+			{Key: "type", Title: "Type", Path: "VpcEndpointType", Width: 12},
 			{Title: "Status", Path: "State", Width: 12},
 			{Title: "Last Error", Path: "LastError.Message", Width: 32},
-			{Key: "vpc_id", Title: "VPC ID", Path: "VpcId", Width: 24, Sortable: true},
+			{Key: "vpc_id", Title: "VPC ID", Path: "VpcId", Width: 24},
 		},
 		Color: colorVPCE,
 		Fetcher: fetcherWithClients(func(ctx context.Context, c *ServiceClients, continuationToken string) (resource.FetchResult, error) {
@@ -583,11 +583,11 @@ var networkingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 			return consolelink.Regional(region, "vpc/home?region="+region+"#TransitGateways:filter="+r.ID)
 		},
 		Columns: []domain.Column{
-			{Key: "name", Title: "Name", Width: 28, Sortable: true},
-			{Key: "tgw_id", Title: "TGW ID", Path: "TransitGatewayId", Width: 26, Sortable: true},
+			{Key: "name", Title: "Name", Width: 28},
+			{Key: "tgw_id", Title: "TGW ID", Path: "TransitGatewayId", Width: 26},
 			{Title: "Status", Path: "State", Width: 12},
 			{Key: "att_status", Title: "Att Issues", Width: 10},
-			{Key: "owner_id", Title: "Owner", Path: "OwnerId", Width: 14, Sortable: true},
+			{Key: "owner_id", Title: "Owner", Path: "OwnerId", Width: 14},
 			{Key: "description", Title: "Description", Path: "Description", Width: 30},
 		},
 		Color: colorTGW,
@@ -626,11 +626,11 @@ var networkingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 			return consolelink.Regional(region, "ec2/home?region="+region+"#NetworkInterface:networkInterfaceId="+r.ID)
 		},
 		Columns: []domain.Column{
-			{Key: "name", Title: "Name", Width: 24, Sortable: true},
-			{Key: "eni_id", Title: "ENI ID", Path: "NetworkInterfaceId", Width: 26, Sortable: true},
-			{Key: "status", Title: "Status", Path: "Status", Width: 12, Sortable: true},
-			{Key: "type", Title: "Type", Path: "InterfaceType", Width: 14, Sortable: true},
-			{Key: "vpc_id", Title: "VPC ID", Path: "VpcId", Width: 24, Sortable: true},
+			{Key: "name", Title: "Name", Width: 24},
+			{Key: "eni_id", Title: "ENI ID", Path: "NetworkInterfaceId", Width: 26},
+			{Key: "status", Title: "Status", Path: "Status", Width: 12},
+			{Key: "type", Title: "Type", Path: "InterfaceType", Width: 14},
+			{Key: "vpc_id", Title: "VPC ID", Path: "VpcId", Width: 24},
 			{Key: "private_ip", Title: "Private IP", Path: "PrivateIpAddress", Width: 16},
 		},
 		Color: colorENI,
@@ -675,12 +675,12 @@ var networkingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 			return consolelink.Regional(region, "transfer/home#/servers/"+r.ID)
 		},
 		Columns: []domain.Column{
-			{Key: "server_id", Title: "Server Id", Path: "ServerId", Width: 32, Sortable: true},
-			{Key: "status", Title: "Status", Width: 32, Sortable: true},
-			{Key: "domain", Title: "Domain", Path: "Domain", Width: 10, Sortable: true},
-			{Key: "endpoint_type", Title: "Endpoint", Path: "EndpointType", Width: 14, Sortable: true},
-			{Key: "identity_provider_type", Title: "Identity Provider", Path: "IdentityProviderType", Width: 20, Sortable: true},
-			{Key: "user_count", Title: "Users", Path: "UserCount", Width: 8, Sortable: true},
+			{Key: "server_id", Title: "Server Id", Path: "ServerId", Width: 32},
+			{Key: "status", Title: "Status", Width: 32},
+			{Key: "domain", Title: "Domain", Path: "Domain", Width: 10},
+			{Key: "endpoint_type", Title: "Endpoint", Path: "EndpointType", Width: 14},
+			{Key: "identity_provider_type", Title: "Identity Provider", Path: "IdentityProviderType", Width: 20},
+			{Key: "user_count", Title: "Users", Path: "UserCount", Width: 8},
 		},
 		Children: []domain.ChildViewDef{{
 			ChildType:      "transfer_agreements",
@@ -737,13 +737,13 @@ var networkingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 			return consolelink.Regional(region, "vpc/home?region="+region+"#PeeringConnectionDetails:VpcPeeringConnectionId="+r.ID)
 		},
 		Columns: []domain.Column{
-			{Key: "pcx_id", Title: "Pcx Id", Path: "VpcPeeringConnectionId", Width: 24, Sortable: true},
-			{Key: "status", Title: "Status", Width: 34, Sortable: true},
-			{Key: "requester_vpc", Title: "Requester VPC", Path: "RequesterVpcInfo.VpcId", Width: 22, Sortable: true},
-			{Key: "requester_owner", Title: "Requester Owner", Path: "RequesterVpcInfo.OwnerId", Width: 14, Sortable: true},
-			{Key: "accepter_vpc", Title: "Accepter VPC", Path: "AccepterVpcInfo.VpcId", Width: 22, Sortable: true},
-			{Key: "accepter_owner", Title: "Accepter Owner", Path: "AccepterVpcInfo.OwnerId", Width: 14, Sortable: true},
-			{Key: "expires", Title: "Expires", Width: 17, Sortable: true},
+			{Key: "pcx_id", Title: "Pcx Id", Path: "VpcPeeringConnectionId", Width: 24},
+			{Key: "status", Title: "Status", Width: 34},
+			{Key: "requester_vpc", Title: "Requester VPC", Path: "RequesterVpcInfo.VpcId", Width: 22},
+			{Key: "requester_owner", Title: "Requester Owner", Path: "RequesterVpcInfo.OwnerId", Width: 14},
+			{Key: "accepter_vpc", Title: "Accepter VPC", Path: "AccepterVpcInfo.VpcId", Width: 22},
+			{Key: "accepter_owner", Title: "Accepter Owner", Path: "AccepterVpcInfo.OwnerId", Width: 14},
+			{Key: "expires", Title: "Expires", Width: 17},
 		},
 		Color: colorAnyFindingOrHealthy,
 		Fetcher: fetcherWithClients(func(ctx context.Context, c *ServiceClients, continuationToken string) (resource.FetchResult, error) {
@@ -855,11 +855,11 @@ var networkingChildTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals 
 			return consolelink.Regional(region, "transfer/home#/servers/"+sid)
 		},
 		Columns: []domain.Column{
-			{Key: "agreement_id", Title: "Agreement Id", Width: 24, Sortable: true},
+			{Key: "agreement_id", Title: "Agreement Id", Width: 24},
 			{Key: "description", Title: "Description", Width: 32},
-			{Key: "status", Title: "Status", Width: 24, Sortable: true},
-			{Key: "local_profile", Title: "Local Profile", Width: 16, Sortable: true},
-			{Key: "partner_profile", Title: "Partner Profile", Width: 16, Sortable: true},
+			{Key: "status", Title: "Status", Width: 24},
+			{Key: "local_profile", Title: "Local Profile", Width: 16},
+			{Key: "partner_profile", Title: "Partner Profile", Width: 16},
 			{Key: "base_directory", Title: "Base Directory", Width: 30},
 		},
 		Color: colorAnyFindingOrHealthy,

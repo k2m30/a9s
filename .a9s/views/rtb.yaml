@@ -12,6 +12,7 @@ list:
     key: vpc_id
     width: 24
   Status:
+    key: state
     width: 8
   Routes:
     key: routes_count

@@ -119,7 +119,10 @@ func TestQA_IAMGroups_TypeDef(t *testing.T) {
 		{"group_name", "Group Name"},
 		// w197: Status and Members come from the built-in view's list, folded
 		// into the type's own.
-		{"", "Status"},
+		// w197 row 8: the status cell is the finding phrase, stored under the
+		// lifecycle key; the column names that key rather than guessing it
+		// from the title.
+		{"state", "Status"},
 		{"member_count", "Members"},
 		{"group_id", "Group ID"},
 		{"path", "Path"},

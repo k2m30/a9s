@@ -21,8 +21,6 @@ type Column struct {
 	// does not sort the way the value does (a size rendered "900 B", a status
 	// rendered as a finding phrase).
 	SortKey string
-	// Sortable indicates whether this column supports sorting.
-	Sortable bool
 }
 
 // ChildViewDef describes a child view that can be drilled into from a parent

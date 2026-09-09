@@ -6,10 +6,10 @@ package resource
 // an S3 bucket (objects/prefixes), as opposed to the bucket list columns.
 func S3ObjectColumns() []Column {
 	return []Column{
-		{Key: "key", Title: "Key", Path: "Key", Width: 36, Sortable: true},
-		{Key: "size", Title: "Size", Width: 12, SortKey: "size_raw", Sortable: true},
-		{Key: "storage_class", Title: "Storage Class", Path: "StorageClass", Width: 16, Sortable: true},
-		{Key: "last_modified", Title: "Last Modified", Path: "LastModified", Width: 22, Sortable: true},
+		{Key: "key", Title: "Key", Path: "Key", Width: 36},
+		{Key: "size", Title: "Size", Width: 12, SortKey: "size_raw"},
+		{Key: "storage_class", Title: "Storage Class", Path: "StorageClass", Width: 16},
+		{Key: "last_modified", Title: "Last Modified", Path: "LastModified", Width: 22},
 	}
 }
 
@@ -17,10 +17,10 @@ func S3ObjectColumns() []Column {
 // inside a Route53 hosted zone.
 func R53RecordColumns() []Column {
 	return []Column{
-		{Key: "name", Title: "Name", Path: "Name", Width: 40, Sortable: true},
-		{Key: "type", Title: "Type", Path: "Type", Width: 8, Sortable: true},
-		{Key: "ttl", Title: "TTL", Path: "TTL", Width: 8, Sortable: true},
-		{Key: "values", Title: "Values", Width: 50, Sortable: true},
+		{Key: "name", Title: "Name", Path: "Name", Width: 40},
+		{Key: "type", Title: "Type", Path: "Type", Width: 8},
+		{Key: "ttl", Title: "TTL", Path: "TTL", Width: 8},
+		{Key: "values", Title: "Values", Width: 50},
 	}
 }
 
@@ -28,9 +28,9 @@ func R53RecordColumns() []Column {
 // CloudWatch Log Group.
 func LogStreamColumns() []Column {
 	return []Column{
-		{Key: "stream_name", Title: "Stream Name", Path: "LogStreamName", Width: 48, Sortable: true},
-		{Key: "last_event", Title: "Last Event", Width: 22, Sortable: true},
-		{Key: "first_event", Title: "First Event", Width: 22, Sortable: true},
+		{Key: "stream_name", Title: "Stream Name", Path: "LogStreamName", Width: 48},
+		{Key: "last_event", Title: "Last Event", Width: 22},
+		{Key: "first_event", Title: "First Event", Width: 22},
 	}
 }
 
@@ -38,8 +38,8 @@ func LogStreamColumns() []Column {
 // CloudWatch Log Stream.
 func LogEventColumns() []Column {
 	return []Column{
-		{Key: "timestamp", Title: "Timestamp", Width: 22, Sortable: true},
-		{Key: "message", Title: "Message", Width: 120, Sortable: true},
+		{Key: "timestamp", Title: "Timestamp", Width: 22},
+		{Key: "message", Title: "Message", Width: 120},
 	}
 }
 
@@ -47,12 +47,12 @@ func LogEventColumns() []Column {
 // within an ELBv2 Target Group.
 func TargetHealthColumns() []Column {
 	return []Column{
-		{Key: "target_id", Title: "Target ID", Width: 24, Sortable: true},
-		{Key: "port", Title: "Port", Width: 8, Sortable: true},
-		{Key: "az", Title: "AZ", Width: 14, Sortable: true},
-		{Key: "health", Title: "Health", Width: 14, Sortable: true},
-		{Key: "reason_human", Title: "Reason", Width: 28, Sortable: true},
-		{Key: "description", Title: "Description", Width: 36, Sortable: true},
+		{Key: "target_id", Title: "Target ID", Width: 24},
+		{Key: "port", Title: "Port", Width: 8},
+		{Key: "az", Title: "AZ", Width: 14},
+		{Key: "health", Title: "Health", Width: 14},
+		{Key: "reason_human", Title: "Reason", Width: 28},
+		{Key: "description", Title: "Description", Width: 36},
 	}
 }
 
@@ -60,12 +60,12 @@ func TargetHealthColumns() []Column {
 // within a Lambda function's log group.
 func LambdaInvocationColumns() []Column {
 	return []Column{
-		{Key: "timestamp", Title: "Timestamp", Width: 22, Sortable: true},
-		{Key: "request_id", Title: "Request ID", Width: 38, Sortable: true},
-		{Key: "status", Title: "Status", Width: 10, Sortable: true},
-		{Key: "duration_ms", Title: "Duration", Width: 14, SortKey: "duration_ms_raw", Sortable: true},
-		{Key: "memory_used", Title: "Memory", Width: 16, SortKey: "memory_used_mb", Sortable: true},
-		{Key: "cold_start", Title: "Cold Start", Width: 12, Sortable: true},
+		{Key: "timestamp", Title: "Timestamp", Width: 22},
+		{Key: "request_id", Title: "Request ID", Width: 38},
+		{Key: "status", Title: "Status", Width: 10},
+		{Key: "duration_ms", Title: "Duration", Width: 14, SortKey: "duration_ms_raw"},
+		{Key: "memory_used", Title: "Memory", Width: 16, SortKey: "memory_used_mb"},
+		{Key: "cold_start", Title: "Cold Start", Width: 12},
 	}
 }
 
@@ -73,47 +73,47 @@ func LambdaInvocationColumns() []Column {
 // lines within a Lambda invocation.
 func LambdaInvocationLogColumns() []Column {
 	return []Column{
-		{Key: "timestamp", Title: "Timestamp", Width: 22, Sortable: true},
-		{Key: "message", Title: "Message", Width: 120, Sortable: true},
+		{Key: "timestamp", Title: "Timestamp", Width: 22},
+		{Key: "message", Title: "Message", Width: 120},
 	}
 }
 
 // EcsSvcEventColumns returns the column definitions for ECS service events.
 func EcsSvcEventColumns() []Column {
 	return []Column{
-		{Key: "timestamp", Title: "Timestamp", Width: 22, Sortable: true},
-		{Key: "message", Title: "Message", Width: 120, Sortable: true},
+		{Key: "timestamp", Title: "Timestamp", Width: 22},
+		{Key: "message", Title: "Message", Width: 120},
 	}
 }
 
 // EcsSvcTaskColumns returns the column definitions for ECS service tasks.
 func EcsSvcTaskColumns() []Column {
 	return []Column{
-		{Key: "task_id", Title: "Task ID", Width: 14, Sortable: true},
-		{Key: "status", Title: "Status", Width: 12, Sortable: true},
-		{Key: "health", Title: "Health", Width: 10, Sortable: true},
-		{Key: "task_def_short", Title: "Task Definition", Width: 28, Sortable: true},
-		{Key: "started_at", Title: "Started At", Width: 22, Sortable: true},
-		{Key: "stopped_reason", Title: "Stopped Reason", Width: 40, Sortable: true},
+		{Key: "task_id", Title: "Task ID", Width: 14},
+		{Key: "status", Title: "Status", Width: 12},
+		{Key: "health", Title: "Health", Width: 10},
+		{Key: "task_def_short", Title: "Task Definition", Width: 28},
+		{Key: "started_at", Title: "Started At", Width: 22},
+		{Key: "stopped_reason", Title: "Stopped Reason", Width: 40},
 	}
 }
 
 // EcsSvcLogColumns returns the column definitions for ECS service container logs.
 func EcsSvcLogColumns() []Column {
 	return []Column{
-		{Key: "timestamp", Title: "Timestamp", Width: 22, Sortable: true},
-		{Key: "stream_short", Title: "Stream", Width: 20, Sortable: true},
-		{Key: "message", Title: "Message", Width: 120, Sortable: true},
+		{Key: "timestamp", Title: "Timestamp", Width: 22},
+		{Key: "stream_short", Title: "Stream", Width: 20},
+		{Key: "message", Title: "Message", Width: 120},
 	}
 }
 
 // CfnEventColumns returns the column definitions for CloudFormation stack events.
 func CfnEventColumns() []Column {
 	return []Column{
-		{Key: "timestamp", Title: "Timestamp", Width: 22, Sortable: true},
-		{Key: "logical_resource_id", Title: "Logical ID", Path: "LogicalResourceId", Width: 28, Sortable: true},
-		{Key: "resource_type", Title: "Type", Path: "ResourceType", Width: 28, Sortable: true},
-		{Key: "resource_status", Title: "Status", Width: 24, Sortable: true},
+		{Key: "timestamp", Title: "Timestamp", Width: 22},
+		{Key: "logical_resource_id", Title: "Logical ID", Path: "LogicalResourceId", Width: 28},
+		{Key: "resource_type", Title: "Type", Path: "ResourceType", Width: 28},
+		{Key: "resource_status", Title: "Status", Width: 24},
 		{Key: "resource_status_reason", Title: "Reason", Width: 40},
 	}
 }
@@ -121,12 +121,12 @@ func CfnEventColumns() []Column {
 // CfnResourceColumns returns the column definitions for CloudFormation stack resources.
 func CfnResourceColumns() []Column {
 	return []Column{
-		{Key: "logical_resource_id", Title: "Logical ID", Path: "LogicalResourceId", Width: 28, Sortable: true},
-		{Key: "physical_resource_id", Title: "Physical ID", Path: "PhysicalResourceId", Width: 28, Sortable: true},
-		{Key: "resource_type", Title: "Type", Path: "ResourceType", Width: 28, Sortable: true},
-		{Key: "resource_status", Title: "Status", Width: 24, Sortable: true},
-		{Key: "drift_status", Title: "Drift", Width: 12, Sortable: true},
-		{Key: "last_updated", Title: "Updated", Width: 22, Sortable: true},
+		{Key: "logical_resource_id", Title: "Logical ID", Path: "LogicalResourceId", Width: 28},
+		{Key: "physical_resource_id", Title: "Physical ID", Path: "PhysicalResourceId", Width: 28},
+		{Key: "resource_type", Title: "Type", Path: "ResourceType", Width: 28},
+		{Key: "resource_status", Title: "Status", Width: 24},
+		{Key: "drift_status", Title: "Drift", Width: 12},
+		{Key: "last_updated", Title: "Updated", Width: 22},
 	}
 }
 
@@ -134,8 +134,8 @@ func CfnResourceColumns() []Column {
 // scaling activities.
 func AsgActivityColumns() []Column {
 	return []Column{
-		{Key: "start_time", Title: "Start Time", Width: 22, Sortable: true},
-		{Key: "status_code", Title: "Status", Width: 14, Sortable: true},
+		{Key: "start_time", Title: "Start Time", Width: 22},
+		{Key: "status_code", Title: "Status", Width: 14},
 		{Key: "description", Title: "Description", Width: 50},
 		{Key: "cause", Title: "Cause", Width: 40},
 	}
@@ -145,8 +145,8 @@ func AsgActivityColumns() []Column {
 // history items.
 func AlarmHistoryColumns() []Column {
 	return []Column{
-		{Key: "timestamp", Title: "Timestamp", Width: 22, Sortable: true},
-		{Key: "history_item_type", Title: "Type", Width: 18, Sortable: true},
+		{Key: "timestamp", Title: "Timestamp", Width: 22},
+		{Key: "history_item_type", Title: "Type", Width: 18},
 		{Key: "history_summary", Title: "Summary", Width: 60},
 	}
 }
@@ -154,11 +154,11 @@ func AlarmHistoryColumns() []Column {
 // SFNExecutionColumns returns the column definitions for SFN execution list items.
 func SFNExecutionColumns() []Column {
 	return []Column{
-		{Key: "name", Title: "Name", Path: "Name", Width: 36, Sortable: true},
-		{Key: "status", Title: "Status", Path: "Status", Width: 12, Sortable: true},
-		{Key: "start_date", Title: "Start Date", Path: "StartDate", Width: 22, Sortable: true},
-		{Key: "stop_date", Title: "Stop Date", Path: "StopDate", Width: 22, Sortable: true},
-		{Key: "duration", Title: "Duration", Width: 12, Sortable: true},
+		{Key: "name", Title: "Name", Path: "Name", Width: 36},
+		{Key: "status", Title: "Status", Path: "Status", Width: 12},
+		{Key: "start_date", Title: "Start Date", Path: "StartDate", Width: 22},
+		{Key: "stop_date", Title: "Stop Date", Path: "StopDate", Width: 22},
+		{Key: "duration", Title: "Duration", Width: 12},
 	}
 }
 
@@ -166,9 +166,9 @@ func SFNExecutionColumns() []Column {
 // history events.
 func SFNExecutionHistoryColumns() []Column {
 	return []Column{
-		{Key: "timestamp", Title: "Timestamp", Path: "Timestamp", Width: 22, Sortable: true},
-		{Key: "event_type_short", Title: "Event Type", Width: 24, Sortable: true},
-		{Key: "state_name", Title: "State", Width: 24, Sortable: true},
+		{Key: "timestamp", Title: "Timestamp", Path: "Timestamp", Width: 22},
+		{Key: "event_type_short", Title: "Event Type", Width: 24},
+		{Key: "state_name", Title: "State", Width: 24},
 		{Key: "event_detail", Title: "Detail", Width: 40},
 	}
 }
@@ -176,9 +176,9 @@ func SFNExecutionHistoryColumns() []Column {
 // ELBListenerColumns returns the column definitions for ELB listeners.
 func ELBListenerColumns() []Column {
 	return []Column{
-		{Key: "port", Title: "Port", Path: "Port", Width: 8, Sortable: true},
-		{Key: "protocol", Title: "Protocol", Path: "Protocol", Width: 10, Sortable: true},
-		{Key: "default_action_type", Title: "Action", Width: 16, Sortable: true},
+		{Key: "port", Title: "Port", Path: "Port", Width: 8},
+		{Key: "protocol", Title: "Protocol", Path: "Protocol", Width: 10},
+		{Key: "default_action_type", Title: "Action", Width: 16},
 		{Key: "default_action_target", Title: "Target", Width: 32},
 		{Key: "ssl_policy", Title: "SSL Policy", Path: "SslPolicy", Width: 24},
 		{Key: "certificate_short", Title: "Certificate", Width: 32},
@@ -189,10 +189,10 @@ func ELBListenerColumns() []Column {
 // a CodeBuild project.
 func CBBuildColumns() []Column {
 	return []Column{
-		{Key: "build_number", Title: "Build #", Width: 10, Sortable: true},
-		{Key: "build_status", Title: "Status", Width: 14, Sortable: true},
-		{Key: "start_time", Title: "Start Time", Width: 22, Sortable: true},
-		{Key: "duration", Title: "Duration", Width: 12, Sortable: true},
+		{Key: "build_number", Title: "Build #", Width: 10},
+		{Key: "build_status", Title: "Status", Width: 14},
+		{Key: "start_time", Title: "Start Time", Width: 22},
+		{Key: "duration", Title: "Duration", Width: 12},
 		{Key: "source_version_short", Title: "Source Version", Width: 14},
 		{Key: "initiator", Title: "Initiator", Width: 24},
 	}
@@ -202,7 +202,7 @@ func CBBuildColumns() []Column {
 // events within a build.
 func CBBuildLogColumns() []Column {
 	return []Column{
-		{Key: "timestamp", Title: "Timestamp", Width: 22, Sortable: true},
+		{Key: "timestamp", Title: "Timestamp", Width: 22},
 		{Key: "message", Title: "Message", Width: 120},
 	}
 }
@@ -211,11 +211,11 @@ func CBBuildLogColumns() []Column {
 // pairs within a CodePipeline pipeline's current state.
 func PipelineStageColumns() []Column {
 	return []Column{
-		{Key: "stage_name", Title: "Stage", Width: 20, Sortable: true},
-		{Key: "stage_status", Title: "Stage Status", Width: 14, Sortable: true},
-		{Key: "action_name", Title: "Action", Width: 24, Sortable: true},
-		{Key: "action_status", Title: "Action Status", Width: 14, Sortable: true},
-		{Key: "last_change_time", Title: "Last Changed", Width: 22, Sortable: true},
+		{Key: "stage_name", Title: "Stage", Width: 20},
+		{Key: "stage_status", Title: "Stage Status", Width: 14},
+		{Key: "action_name", Title: "Action", Width: 24},
+		{Key: "action_status", Title: "Action Status", Width: 14},
+		{Key: "last_change_time", Title: "Last Changed", Width: 22},
 		{Key: "external_url", Title: "External URL", Width: 40},
 	}
 }
@@ -224,11 +224,11 @@ func PipelineStageColumns() []Column {
 // a repository.
 func ECRImageColumns() []Column {
 	return []Column{
-		{Key: "image_tags", Title: "Tag(s)", Width: 24, Sortable: true},
-		{Key: "digest_short", Title: "Digest", Width: 16, Sortable: true},
-		{Key: "pushed_at", Title: "Pushed At", Width: 22, Sortable: true},
-		{Key: "image_size", Title: "Size", Width: 12, SortKey: "image_size_raw", Sortable: true},
-		{Key: "scan_status", Title: "Scan Status", Width: 14, Sortable: true},
+		{Key: "image_tags", Title: "Tag(s)", Width: 24},
+		{Key: "digest_short", Title: "Digest", Width: 16},
+		{Key: "pushed_at", Title: "Pushed At", Width: 22},
+		{Key: "image_size", Title: "Size", Width: 12, SortKey: "image_size_raw"},
+		{Key: "scan_status", Title: "Scan Status", Width: 14},
 		{Key: "finding_counts", Title: "Findings", Width: 20},
 	}
 }
@@ -237,28 +237,28 @@ func ECRImageColumns() []Column {
 // (both managed and inline).
 func RolePolicyColumns() []Column {
 	return []Column{
-		{Key: "policy_name", Title: "Policy Name", Width: 40, Sortable: true},
-		{Key: "policy_arn", Title: "Policy ARN", Width: 56, Sortable: true},
-		{Key: "policy_type", Title: "Type", Width: 10, Sortable: true},
+		{Key: "policy_name", Title: "Policy Name", Width: 40},
+		{Key: "policy_arn", Title: "Policy ARN", Width: 56},
+		{Key: "policy_type", Title: "Type", Width: 10},
 	}
 }
 
 // IAMGroupMemberColumns returns the column definitions for IAM group members.
 func IAMGroupMemberColumns() []Column {
 	return []Column{
-		{Key: "user_name", Title: "User Name", Width: 28, Sortable: true},
-		{Key: "user_id", Title: "User ID", Width: 24, Sortable: true},
-		{Key: "create_date", Title: "Created", Width: 22, Sortable: true},
-		{Key: "password_last_used", Title: "Password Last Used", Width: 22, Sortable: true},
+		{Key: "user_name", Title: "User Name", Width: 28},
+		{Key: "user_id", Title: "User ID", Width: 24},
+		{Key: "create_date", Title: "Created", Width: 22},
+		{Key: "password_last_used", Title: "Password Last Used", Width: 22},
 	}
 }
 
 // DbiEventColumns returns the column definitions for RDS DB instance events.
 func DbiEventColumns() []Column {
 	return []Column{
-		{Key: "timestamp", Title: "Timestamp", Path: "Date", Width: 22, Sortable: true},
-		{Key: "event_categories", Title: "Category", Width: 18, Sortable: true},
-		{Key: "message", Title: "Message", Path: "Message", Width: 60, Sortable: true},
+		{Key: "timestamp", Title: "Timestamp", Path: "Date", Width: 22},
+		{Key: "event_categories", Title: "Category", Width: 18},
+		{Key: "message", Title: "Message", Path: "Message", Width: 60},
 	}
 }
 
@@ -266,19 +266,19 @@ func DbiEventColumns() []Column {
 // subscriptions (child of SNS Topics).
 func SnsSubscriptionColumns() []Column {
 	return []Column{
-		{Key: "protocol", Title: "Protocol", Width: 10, Sortable: true},
-		{Key: "endpoint", Title: "Endpoint", Width: 48, Sortable: true},
-		{Key: "confirmation_status", Title: "Status", Width: 18, Sortable: true},
-		{Key: "owner", Title: "Owner", Width: 14, Sortable: true},
+		{Key: "protocol", Title: "Protocol", Width: 10},
+		{Key: "endpoint", Title: "Endpoint", Width: 48},
+		{Key: "confirmation_status", Title: "Status", Width: 18},
+		{Key: "owner", Title: "Owner", Width: 14},
 	}
 }
 
 // EbRuleTargetColumns returns the column definitions for EventBridge rule targets.
 func EbRuleTargetColumns() []Column {
 	return []Column{
-		{Key: "target_id", Title: "Target ID", Path: "Id", Width: 20, Sortable: true},
-		{Key: "target_arn", Title: "Target ARN", Path: "Arn", Width: 48, Sortable: true},
-		{Key: "resource_type_name", Title: "Resource", Width: 28, Sortable: true},
+		{Key: "target_id", Title: "Target ID", Path: "Id", Width: 20},
+		{Key: "target_arn", Title: "Target ARN", Path: "Arn", Width: 48},
+		{Key: "resource_type_name", Title: "Resource", Width: 28},
 		{Key: "input_summary", Title: "Input", Width: 36},
 	}
 }
@@ -286,21 +286,21 @@ func EbRuleTargetColumns() []Column {
 // GlueRunColumns returns the column definitions for Glue Job Runs.
 func GlueRunColumns() []Column {
 	return []Column{
-		{Key: "run_id_short", Title: "Run ID", Width: 12, Sortable: true},
-		{Key: "job_run_state", Title: "State", Path: "JobRunState", Width: 12, Sortable: true},
-		{Key: "started_on", Title: "Started", Path: "StartedOn", Width: 22, Sortable: true},
-		{Key: "execution_time_human", Title: "Execution Time", Width: 14, Sortable: true},
+		{Key: "run_id_short", Title: "Run ID", Width: 12},
+		{Key: "job_run_state", Title: "State", Path: "JobRunState", Width: 12},
+		{Key: "started_on", Title: "Started", Path: "StartedOn", Width: 22},
+		{Key: "execution_time_human", Title: "Execution Time", Width: 14},
 		{Key: "error_message", Title: "Error Message", Path: "ErrorMessage", Width: 44},
-		{Key: "dpu_hours", Title: "DPU Hours", Width: 10, Sortable: true},
+		{Key: "dpu_hours", Title: "DPU Hours", Width: 10},
 	}
 }
 
 // ELBListenerRuleColumns returns the column definitions for ELB listener rules.
 func ELBListenerRuleColumns() []Column {
 	return []Column{
-		{Key: "priority", Title: "Priority", Width: 10, Sortable: true},
-		{Key: "conditions_summary", Title: "Conditions", Width: 36, Sortable: true},
-		{Key: "action_type", Title: "Action", Width: 16, Sortable: true},
+		{Key: "priority", Title: "Priority", Width: 10},
+		{Key: "conditions_summary", Title: "Conditions", Width: 36},
+		{Key: "action_type", Title: "Action", Width: 16},
 		{Key: "action_target", Title: "Target", Width: 32},
 	}
 }

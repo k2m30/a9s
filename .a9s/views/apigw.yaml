@@ -5,6 +5,7 @@ list:
     key: name
     width: 28
   Status:
+    key: state
     width: 12
   API ID:
     key: api_id

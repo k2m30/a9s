@@ -239,15 +239,15 @@ var computeTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stati
 			return consolelink.Regional(region, "ec2/home?region="+region+"#InstanceDetails:instanceId="+r.ID)
 		},
 		Columns: []domain.Column{
-			{Key: "name", Title: "Name", Width: 24, Sortable: true},
-			{Key: "state", Title: "Status", Path: "State.Name", Width: 12, Sortable: true},
+			{Key: "name", Title: "Name", Width: 24},
+			{Key: "state", Title: "Status", Path: "State.Name", Width: 12},
 			{Key: "instance_status", Title: "Health", Width: 12},
-			{Key: "lifecycle", Title: "Lifecycle", Width: 12, Sortable: true},
-			{Key: "type", Title: "Type", Path: "InstanceType", Width: 14, Sortable: true},
+			{Key: "lifecycle", Title: "Lifecycle", Width: 12},
+			{Key: "type", Title: "Type", Path: "InstanceType", Width: 14},
 			{Key: "private_ip", Title: "Private IP", Path: "PrivateIpAddress", Width: 16},
 			{Key: "public_ip", Title: "Public IP", Path: "PublicIpAddress", Width: 16},
-			{Key: "instance_id", Title: "Instance ID", Path: "InstanceId", Width: 20, Sortable: true},
-			{Key: "launch_time", Title: "Launch Time", Path: "LaunchTime", Width: 22, Sortable: true},
+			{Key: "instance_id", Title: "Instance ID", Path: "InstanceId", Width: 20},
+			{Key: "launch_time", Title: "Launch Time", Path: "LaunchTime", Width: 22},
 		},
 		CellDecorators: map[string]func(domain.Resource, string) string{
 			"state": func(r domain.Resource, v string) string {
@@ -360,12 +360,12 @@ var computeTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stati
 			return consolelink.Regional(region, "ecs/v2/redirect?arn="+url.QueryEscape(arn)+"&region="+region)
 		},
 		Columns: []domain.Column{
-			{Key: "service_name", Title: "Service Name", Path: "ServiceName", Width: 32, Sortable: true},
-			{Key: "cluster", Title: "Cluster", Width: 24, Sortable: true},
-			{Key: "status", Title: "Status", Path: "Status", Width: 12, Sortable: true},
-			{Key: "desired_count", Title: "Desired", Path: "DesiredCount", Width: 9, Sortable: true},
-			{Key: "running_count", Title: "Running", Path: "RunningCount", Width: 9, Sortable: true},
-			{Key: "launch_type", Title: "Launch Type", Path: "LaunchType", Width: 12, Sortable: true},
+			{Key: "service_name", Title: "Service Name", Path: "ServiceName", Width: 32},
+			{Key: "cluster", Title: "Cluster", Width: 24},
+			{Key: "status", Title: "Status", Path: "Status", Width: 12},
+			{Key: "desired_count", Title: "Desired", Path: "DesiredCount", Width: 9},
+			{Key: "running_count", Title: "Running", Path: "RunningCount", Width: 9},
+			{Key: "launch_type", Title: "Launch Type", Path: "LaunchType", Width: 12},
 		},
 		Children: []domain.ChildViewDef{
 			{
@@ -442,11 +442,11 @@ var computeTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stati
 			return consolelink.Regional(region, "ecs/v2/clusters/"+url.PathEscape(r.ID)+"?region="+region)
 		},
 		Columns: []domain.Column{
-			{Key: "cluster_name", Title: "Cluster Name", Path: "ClusterName", Width: 32, Sortable: true},
-			{Key: "status", Title: "Status", Path: "Status", Width: 12, Sortable: true},
-			{Key: "running_tasks", Title: "Running", Path: "RunningTasksCount", Width: 9, Sortable: true},
-			{Key: "pending_tasks", Title: "Pending", Path: "PendingTasksCount", Width: 9, Sortable: true},
-			{Key: "services_count", Title: "Services", Path: "ActiveServicesCount", Width: 10, Sortable: true},
+			{Key: "cluster_name", Title: "Cluster Name", Path: "ClusterName", Width: 32},
+			{Key: "status", Title: "Status", Path: "Status", Width: 12},
+			{Key: "running_tasks", Title: "Running", Path: "RunningTasksCount", Width: 9},
+			{Key: "pending_tasks", Title: "Pending", Path: "PendingTasksCount", Width: 9},
+			{Key: "services_count", Title: "Services", Path: "ActiveServicesCount", Width: 10},
 		},
 		Color: colorECSCluster,
 		Fetcher: fetcherWithClients(func(ctx context.Context, c *ServiceClients, continuationToken string) (resource.FetchResult, error) {
@@ -492,15 +492,15 @@ var computeTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stati
 			return consolelink.Regional(region, "ecs/v2/redirect?arn="+url.QueryEscape(arn)+"&region="+region)
 		},
 		Columns: []domain.Column{
-			{Key: "task_id", Title: "Task ID", Path: "TaskArn", Width: 38, Sortable: true},
-			{Key: "cluster", Title: "Cluster", Path: "ClusterArn", Width: 24, Sortable: true},
-			{Key: "status", Title: "Status", Path: "LastStatus", Width: 12, Sortable: true},
+			{Key: "task_id", Title: "Task ID", Path: "TaskArn", Width: 38},
+			{Key: "cluster", Title: "Cluster", Path: "ClusterArn", Width: 24},
+			{Key: "status", Title: "Status", Path: "LastStatus", Width: 12},
 			{Title: "Stop Code", Path: "StopCode", Width: 24},
 			{Title: "Health", Path: "HealthStatus", Width: 12},
-			{Key: "task_definition", Title: "Task Definition", Path: "TaskDefinitionArn", Width: 30, Sortable: true},
-			{Key: "launch_type", Title: "Launch", Path: "LaunchType", Width: 10, Sortable: true},
-			{Key: "cpu", Title: "CPU", Path: "Cpu", Width: 6, Sortable: true},
-			{Key: "memory", Title: "Memory", Path: "Memory", Width: 8, Sortable: true},
+			{Key: "task_definition", Title: "Task Definition", Path: "TaskDefinitionArn", Width: 30},
+			{Key: "launch_type", Title: "Launch", Path: "LaunchType", Width: 10},
+			{Key: "cpu", Title: "CPU", Path: "Cpu", Width: 6},
+			{Key: "memory", Title: "Memory", Path: "Memory", Width: 8},
 		},
 		Color: colorECSTask,
 		Fetcher: fetcherWithClients(func(ctx context.Context, c *ServiceClients, continuationToken string) (resource.FetchResult, error) {
@@ -559,13 +559,13 @@ var computeTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stati
 			return consolelink.Regional(region, "lambda/home?region="+region+"#/functions/"+url.PathEscape(r.ID))
 		},
 		Columns: []domain.Column{
-			{Key: "function_name", Title: "Function Name", Path: "FunctionName", Width: 36, Sortable: true},
-			{Key: "runtime", Title: "Runtime", Path: "Runtime", Width: 16, Sortable: true},
-			{Key: "memory", Title: "Memory", Path: "MemorySize", Width: 8, Sortable: true},
-			{Key: "timeout", Title: "Timeout", Path: "Timeout", Width: 8, Sortable: true},
-			{Key: "state", Title: "Status", Path: "State", Width: 10, Sortable: true},
+			{Key: "function_name", Title: "Function Name", Path: "FunctionName", Width: 36},
+			{Key: "runtime", Title: "Runtime", Path: "Runtime", Width: 16},
+			{Key: "memory", Title: "Memory", Path: "MemorySize", Width: 8},
+			{Key: "timeout", Title: "Timeout", Path: "Timeout", Width: 8},
+			{Key: "state", Title: "Status", Path: "State", Width: 10},
 			{Key: "handler", Title: "Handler", Path: "Handler", Width: 30},
-			{Key: "last_modified", Title: "Last Modified", Path: "LastModified", Width: 22, Sortable: true},
+			{Key: "last_modified", Title: "Last Modified", Path: "LastModified", Width: 22},
 		},
 		Children: []domain.ChildViewDef{
 			{
@@ -644,12 +644,12 @@ var computeTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stati
 			return consolelink.Regional(region, "ec2/home?region="+region+"#AutoScalingGroupDetails:id="+url.PathEscape(r.ID)+";view=details")
 		},
 		Columns: []domain.Column{
-			{Key: "asg_name", Title: "ASG Name", Path: "AutoScalingGroupName", Width: 36, Sortable: true},
-			{Key: "min_size", Title: "Min", Path: "MinSize", Width: 6, Sortable: true},
-			{Key: "max_size", Title: "Max", Path: "MaxSize", Width: 6, Sortable: true},
-			{Key: "desired", Title: "Desired", Path: "DesiredCapacity", Width: 8, Sortable: true},
-			{Key: "instances", Title: "Instances", Path: "Instances", Width: 10, Sortable: true},
-			{Key: "status", Title: "Status", Path: "Status", Width: 12, Sortable: true},
+			{Key: "asg_name", Title: "ASG Name", Path: "AutoScalingGroupName", Width: 36},
+			{Key: "min_size", Title: "Min", Path: "MinSize", Width: 6},
+			{Key: "max_size", Title: "Max", Path: "MaxSize", Width: 6},
+			{Key: "desired", Title: "Desired", Path: "DesiredCapacity", Width: 8},
+			{Key: "instances", Title: "Instances", Path: "Instances", Width: 10},
+			{Key: "status", Title: "Status", Path: "Status", Width: 12},
 		},
 		Children: []domain.ChildViewDef{
 			{ChildType: "asg_activities", Key: "enter", ContextKeys: map[string]string{"asg_name": "asg_name"}, DisplayNameKey: "asg_name"},
@@ -706,16 +706,16 @@ var computeTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stati
 			return consolelink.Regional(region, "ec2/home?region="+region+"#VolumeDetails:volumeId="+r.ID)
 		},
 		Columns: []domain.Column{
-			{Key: "name", Title: "Name", Width: 24, Sortable: true},
-			{Key: "volume_id", Title: "Volume ID", Path: "VolumeId", Width: 22, Sortable: true},
-			{Key: "state", Title: "Status", Path: "State", Width: 12, Sortable: true},
-			{Key: "size", Title: "Size (GiB)", Path: "Size", Width: 10, Sortable: true},
-			{Key: "type", Title: "Type", Path: "VolumeType", Width: 8, Sortable: true},
-			{Key: "iops", Title: "IOPS", Path: "Iops", Width: 8, Sortable: true},
-			{Key: "encrypted", Title: "Encrypted", Path: "Encrypted", Width: 10, Sortable: true},
-			{Key: "attached_to", Title: "Attached To", Path: "Attachments", Width: 20, Sortable: true},
-			{Key: "az", Title: "AZ", Path: "AvailabilityZone", Width: 16, Sortable: true},
-			{Key: "created", Title: "Created", Path: "CreateTime", Width: 18, Sortable: true},
+			{Key: "name", Title: "Name", Width: 24},
+			{Key: "volume_id", Title: "Volume ID", Path: "VolumeId", Width: 22},
+			{Key: "state", Title: "Status", Path: "State", Width: 12},
+			{Key: "size", Title: "Size (GiB)", Path: "Size", Width: 10},
+			{Key: "type", Title: "Type", Path: "VolumeType", Width: 8},
+			{Key: "iops", Title: "IOPS", Path: "Iops", Width: 8},
+			{Key: "encrypted", Title: "Encrypted", Path: "Encrypted", Width: 10},
+			{Key: "attached_to", Title: "Attached To", Path: "Attachments", Width: 20},
+			{Key: "az", Title: "AZ", Path: "AvailabilityZone", Width: 16},
+			{Key: "created", Title: "Created", Path: "CreateTime", Width: 18},
 		},
 		Color: colorEBS,
 		Fetcher: fetcherWithClients(func(ctx context.Context, c *ServiceClients, continuationToken string) (resource.FetchResult, error) {
@@ -757,14 +757,14 @@ var computeTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stati
 			return consolelink.Regional(region, "ec2/home?region="+region+"#Snapshots:snapshotId="+r.ID)
 		},
 		Columns: []domain.Column{
-			{Key: "name", Title: "Name", Width: 24, Sortable: true},
-			{Key: "snapshot_id", Title: "Snapshot ID", Path: "SnapshotId", Width: 24, Sortable: true},
-			{Key: "state", Title: "Status", Path: "State", Width: 12, Sortable: true},
-			{Key: "volume_id", Title: "Volume ID", Path: "VolumeId", Width: 22, Sortable: true},
-			{Key: "size", Title: "Size (GiB)", Path: "VolumeSize", Width: 10, Sortable: true},
-			{Key: "encrypted", Title: "Encrypted", Path: "Encrypted", Width: 10, Sortable: true},
-			{Key: "description", Title: "Description", Path: "Description", Width: 30, Sortable: true},
-			{Key: "started", Title: "Started", Path: "StartTime", Width: 18, Sortable: true},
+			{Key: "name", Title: "Name", Width: 24},
+			{Key: "snapshot_id", Title: "Snapshot ID", Path: "SnapshotId", Width: 24},
+			{Key: "state", Title: "Status", Path: "State", Width: 12},
+			{Key: "volume_id", Title: "Volume ID", Path: "VolumeId", Width: 22},
+			{Key: "size", Title: "Size (GiB)", Path: "VolumeSize", Width: 10},
+			{Key: "encrypted", Title: "Encrypted", Path: "Encrypted", Width: 10},
+			{Key: "description", Title: "Description", Path: "Description", Width: 30},
+			{Key: "started", Title: "Started", Path: "StartTime", Width: 18},
 			{Key: "progress", Title: "Progress", Path: "Progress", Width: 10},
 		},
 		Color: colorEBSSnap,
@@ -807,15 +807,15 @@ var computeTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stati
 			return consolelink.Regional(region, "ec2/home?region="+region+"#ImageDetails:imageId="+r.ID)
 		},
 		Columns: []domain.Column{
-			{Key: "name", Title: "Name", Path: "Name", Width: 32, Sortable: true},
-			{Key: "image_id", Title: "Image ID", Path: "ImageId", Width: 22, Sortable: true},
+			{Key: "name", Title: "Name", Path: "Name", Width: 32},
+			{Key: "image_id", Title: "Image ID", Path: "ImageId", Width: 22},
 			{Title: "Status", Path: "State", Width: 12},
 			{Key: "deprecated", Title: "Deprecated", Width: 22},
-			{Key: "architecture", Title: "Arch", Path: "Architecture", Width: 10, Sortable: true},
-			{Key: "platform", Title: "Platform", Path: "PlatformDetails", Width: 16, Sortable: true},
-			{Key: "root_device_type", Title: "Root Device", Path: "RootDeviceType", Width: 14, Sortable: true},
-			{Key: "creation_date", Title: "Created", Path: "CreationDate", Width: 22, Sortable: true},
-			{Key: "public", Title: "Public", Path: "Public", Width: 8, Sortable: true},
+			{Key: "architecture", Title: "Arch", Path: "Architecture", Width: 10},
+			{Key: "platform", Title: "Platform", Path: "PlatformDetails", Width: 16},
+			{Key: "root_device_type", Title: "Root Device", Path: "RootDeviceType", Width: 14},
+			{Key: "creation_date", Title: "Created", Path: "CreationDate", Width: 22},
+			{Key: "public", Title: "Public", Path: "Public", Width: 8},
 		},
 		StubCreator: func(id string) domain.Resource {
 			return domain.Resource{
@@ -869,12 +869,12 @@ var computeTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stati
 			return consolelink.Regional(region, "ec2/home?region="+region+"#LaunchTemplateDetails:launchTemplateId="+r.ID)
 		},
 		Columns: []domain.Column{
-			{Key: "name", Title: "Name", Width: 32, Sortable: true},
-			{Key: "status", Title: "Status", Width: 32, Sortable: true},
-			{Key: "default_version", Title: "Default", Width: 10, Sortable: true},
-			{Key: "latest_version", Title: "Latest", Width: 10, Sortable: true},
-			{Key: "created_by", Title: "Created By", Width: 24, Sortable: true},
-			{Key: "created", Title: "Created", Width: 18, Sortable: true},
+			{Key: "name", Title: "Name", Width: 32},
+			{Key: "status", Title: "Status", Width: 32},
+			{Key: "default_version", Title: "Default", Width: 10},
+			{Key: "latest_version", Title: "Latest", Width: 10},
+			{Key: "created_by", Title: "Created By", Width: 24},
+			{Key: "created", Title: "Created", Width: 18},
 		},
 		Color: colorAnyFindingOrHealthy,
 		Fetcher: fetcherWithClients(func(ctx context.Context, c *ServiceClients, continuationToken string) (resource.FetchResult, error) {

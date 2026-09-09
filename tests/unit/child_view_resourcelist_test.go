@@ -21,8 +21,8 @@ func TestHandleChildKey_EnterOnS3Bucket_ProducesEnterChildViewMsg(t *testing.T) 
 		Name:      "S3 Buckets",
 		ShortName: "s3",
 		Columns: []resource.Column{
-			{Key: "name", Title: "Bucket Name", Width: 40, Sortable: true},
-			{Key: "creation_date", Title: "Creation Date", Width: 22, Sortable: true},
+			{Key: "name", Title: "Bucket Name", Width: 40},
+			{Key: "creation_date", Title: "Creation Date", Width: 22},
 		},
 		Children: []resource.ChildViewDef{{
 			ChildType:      "s3_objects",
@@ -69,8 +69,8 @@ func TestHandleChildKey_EnterOnR53Zone_ProducesEnterChildViewMsg(t *testing.T) {
 		Name:      "Route 53 Hosted Zones",
 		ShortName: "r53",
 		Columns: []resource.Column{
-			{Key: "name", Title: "Name", Width: 36, Sortable: true},
-			{Key: "zone_id", Title: "Zone ID", Width: 30, Sortable: true},
+			{Key: "name", Title: "Name", Width: 36},
+			{Key: "zone_id", Title: "Zone ID", Width: 30},
 		},
 		Children: []resource.ChildViewDef{{
 			ChildType:      "r53_records",
@@ -206,7 +206,7 @@ func TestHandleChildKey_NoChildren_DefaultsToDetail(t *testing.T) {
 		Name:      "EC2 Instances",
 		ShortName: "ec2",
 		Columns: []resource.Column{
-			{Key: "instance_id", Title: "Instance ID", Width: 20, Sortable: true},
+			{Key: "instance_id", Title: "Instance ID", Width: 20},
 		},
 	}
 	k := keys.Default()
@@ -375,8 +375,8 @@ func TestHandleChildKey_NonEnterKey_EventsKey(t *testing.T) {
 		Name:      "Test Parent",
 		ShortName: "test_parent_events",
 		Columns: []resource.Column{
-			{Key: "id", Title: "ID", Width: 20, Sortable: true},
-			{Key: "name", Title: "Name", Width: 30, Sortable: true},
+			{Key: "id", Title: "ID", Width: 20},
+			{Key: "name", Title: "Name", Width: 30},
 		},
 		Children: []resource.ChildViewDef{{
 			ChildType:      "test_events",
@@ -424,7 +424,7 @@ func TestHandleChildKey_NonEnterKey_NoChildDefined(t *testing.T) {
 		Name:      "EC2 Instances",
 		ShortName: "ec2_no_events",
 		Columns: []resource.Column{
-			{Key: "instance_id", Title: "Instance ID", Width: 20, Sortable: true},
+			{Key: "instance_id", Title: "Instance ID", Width: 20},
 		},
 		// No Children defined — pressing "e" should be a no-op
 	}

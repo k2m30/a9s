@@ -44,7 +44,7 @@ func buildDefaultViews() map[string]ViewDef {
 	m := defaultDetails()
 	install := func(td catalog.ResourceTypeDef) {
 		v := m[td.ShortName]
-		v.List = catalogListColumns(td)
+		v.List = ListColumnsFromCatalog(td)
 		m[td.ShortName] = v
 	}
 	for _, td := range catalog.All() {
@@ -56,11 +56,12 @@ func buildDefaultViews() map[string]ViewDef {
 	return m
 }
 
-// catalogListColumns is the one translation of a catalog column into the view
-// column the config hands out. Every field of the catalog column that decides
-// what a cell shows is carried; Sortable is not, because it is not a view
-// file's to say — it stays the type's own fact and is read off the catalog.
-func catalogListColumns(td catalog.ResourceTypeDef) []ListColumn {
+// ListColumnsFromCatalog is the one translation of a catalog column into the
+// view column every reader works with. The built-in views are built from it,
+// and so is the arm of resource.ResolveListColumnCascade that resolves a type
+// no view declares — a type registered by a test among them, which is how the
+// two used to differ.
+func ListColumnsFromCatalog(td catalog.ResourceTypeDef) []ListColumn {
 	if len(td.Columns) == 0 {
 		return nil
 	}

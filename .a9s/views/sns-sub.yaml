@@ -5,6 +5,7 @@ list:
     key: topic_arn
     width: 48
   Status:
+    key: state
     width: 12
   Protocol:
     path: Protocol

@@ -66,12 +66,12 @@ var monitoringTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 			return consolelink.Regional(region, "cloudwatch/home?region="+region+"#alarmsV2:alarm/"+url.PathEscape(r.ID))
 		},
 		Columns: []domain.Column{
-			{Key: "alarm_name", Title: "Alarm Name", Path: "AlarmName", Width: 36, Sortable: true},
+			{Key: "alarm_name", Title: "Alarm Name", Path: "AlarmName", Width: 36},
 			{Title: "Status", Path: "StateValue", Width: 12},
 			{Title: "Actions On", Path: "ActionsEnabled", Width: 10},
-			{Key: "metric_name", Title: "Metric", Path: "MetricName", Width: 24, Sortable: true},
-			{Key: "namespace", Title: "Namespace", Path: "Namespace", Width: 24, Sortable: true},
-			{Key: "threshold", Title: "Threshold", Path: "Threshold", Width: 12, Sortable: true},
+			{Key: "metric_name", Title: "Metric", Path: "MetricName", Width: 24},
+			{Key: "namespace", Title: "Namespace", Path: "Namespace", Width: 24},
+			{Key: "threshold", Title: "Threshold", Path: "Threshold", Width: 12},
 		},
 		Children: []domain.ChildViewDef{{
 			ChildType:      "alarm_history",
@@ -119,13 +119,13 @@ var monitoringTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 			return consolelink.Regional(region, "cloudwatch/home?region="+region+"#logsV2:log-groups/log-group/"+url.PathEscape(r.ID))
 		},
 		Columns: []domain.Column{
-			{Key: "log_group_name", Title: "Log Group Name", Path: "LogGroupName", Width: 48, Sortable: true},
-			{Title: "Status", Width: 12},
-			{Key: "stored_bytes", Title: "Size", Width: 14, SortKey: "stored_bytes_raw", Sortable: true},
-			{Key: "retention", Title: "Retention", Width: 12, Sortable: true},
+			{Key: "log_group_name", Title: "Log Group Name", Path: "LogGroupName", Width: 48},
+			{Key: "state", Title: "Status", Width: 12},
+			{Key: "stored_bytes", Title: "Size", Width: 14, SortKey: "stored_bytes_raw"},
+			{Key: "retention", Title: "Retention", Width: 12},
 			{Title: "Metric Filters", Path: "MetricFilterCount", Width: 8},
 			{Key: "last_event_at", Title: "Last Event", Width: 22},
-			{Key: "creation_time", Title: "Created", Width: 16, Sortable: true},
+			{Key: "creation_time", Title: "Created", Width: 16},
 		},
 		Children: []domain.ChildViewDef{{
 			ChildType:      "log_streams",
@@ -174,11 +174,11 @@ var monitoringTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 			return consolelink.Regional(region, "cloudtrailv2/home?region="+region+"#/trails/"+arn)
 		},
 		Columns: []domain.Column{
-			{Key: "trail_name", Title: "Trail Name", Path: "Name", Width: 28, Sortable: true},
-			{Title: "Status", Width: 12},
-			{Key: "s3_bucket", Title: "S3 Bucket", Path: "S3BucketName", Width: 28, Sortable: true},
-			{Key: "home_region", Title: "Home Region", Path: "HomeRegion", Width: 16, Sortable: true},
-			{Key: "multi_region", Title: "Multi-Region", Path: "IsMultiRegionTrail", Width: 14, Sortable: true},
+			{Key: "trail_name", Title: "Trail Name", Path: "Name", Width: 28},
+			{Key: "state", Title: "Status", Width: 12},
+			{Key: "s3_bucket", Title: "S3 Bucket", Path: "S3BucketName", Width: 28},
+			{Key: "home_region", Title: "Home Region", Path: "HomeRegion", Width: 16},
+			{Key: "multi_region", Title: "Multi-Region", Path: "IsMultiRegionTrail", Width: 14},
 		},
 		Color: colorTrail,
 		Fetcher: fetcherWithClients(func(ctx context.Context, c *ServiceClients, continuationToken string) (resource.FetchResult, error) {
@@ -236,8 +236,8 @@ var monitoringTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 		Category:  "MONITORING",
 		Columns: []domain.Column{
 			{Key: "_ct.verb", Title: "V", Width: 1},
-			{Key: "time", Title: "TIME", Width: 15, SortKey: "event_time", Sortable: true},
-			{Key: "status", Title: "Status", Width: 12, Sortable: true},
+			{Key: "time", Title: "TIME", Width: 15, SortKey: "event_time"},
+			{Key: "status", Title: "Status", Width: 12},
 			{Key: "_ct.actor", Title: "ACTOR", Width: 36},
 			{Key: "_ct.origin", Title: "ORIGIN", Width: 7},
 			{Title: "EVENT", Path: "EventName", Width: 34},

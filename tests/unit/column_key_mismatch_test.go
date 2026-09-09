@@ -31,11 +31,18 @@ func TestColumnKeys_MatchFetcherFieldKeys(t *testing.T) {
 		}
 
 		for _, col := range rt.Columns {
-			// w197: a column whose cell reads a RawStruct path, or resolves
-			// through its own title, carries no key — there is nothing for the
-			// registry to produce. TestColumnKeysHaveProducers skips the same
-			// case on the same columns.
+			// w197: a column whose cell reads a RawStruct path carries no key
+			// — there is nothing for the registry to produce.
+			// TestColumnKeysHaveProducers, which reports the case of a column
+			// declaring neither, skips the same columns here.
 			if col.Key == "" {
+				continue
+			}
+			// w197 row 8: the one allowlist, read by both gates rather than
+			// copied into this one. A status column filled from the type's
+			// findings names the key the save lane stores the phrase under,
+			// which no fetcher writes by design.
+			if _, exempted := columnKeyProducerAllowlist[rt.ShortName][col.Key]; exempted {
 				continue
 			}
 			if !validSet[col.Key] {

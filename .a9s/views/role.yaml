@@ -5,6 +5,7 @@ list:
     key: role_name
     width: 36
   Status:
+    key: state
     width: 12
   Last Used:
     path: RoleLastUsed.LastUsedDate

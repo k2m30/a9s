@@ -5,6 +5,7 @@ list:
     key: name
     width: 36
   Status:
+    key: state
     width: 12
   Zone ID:
     path: Id

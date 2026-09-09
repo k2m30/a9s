@@ -44,48 +44,33 @@ func ResolveListColumnCascade(vc *config.ViewsConfig, typeName string, td *Resou
 	// "TIME") that an exact match silently drops what the other declaration
 	// says about that very column.
 
-	// No view declares this type at all — child types are not in the built-in
-	// views — so the catalog is the whole declaration and there is nothing to
-	// merge onto it.
+	// No view declares this type at all — a type registered by a test is the
+	// only such case left — so the catalog is the whole declaration and there
+	// is nothing to merge onto it. It goes through the SAME translation the
+	// built-in views are derived from, so a type the catalog registers and one
+	// a test registers resolve their columns by one rule; building the columns
+	// here by hand is what used to drop the path and the sort key from the
+	// second, and let a test pass on a shape production never renders.
 	if len(view.List) == 0 {
-		cols := make([]config.ListColumn, len(td.Columns))
-		for i, c := range td.Columns {
-			cols[i] = mergeListColumn(c.Title, c.Width, c.Key, config.ListColumn{})
-		}
-		return cols
+		return config.ListColumnsFromCatalog(*td)
 	}
 
 	catalogKeyByTitle := make(map[string]string, len(td.Columns))
 	for _, c := range td.Columns {
 		catalogKeyByTitle[strings.ToLower(c.Title)] = c.Key
 	}
+	// The catalog owns what the cell reads: its Key wins wherever it declares
+	// one. The view owns the title, the width and the order, because the view
+	// is the file an operator edits, and it keeps its own Path and SortKey — a
+	// built-in view carries the catalog's, an operator's file carries theirs.
 	cols := make([]config.ListColumn, len(view.List))
 	for i, lc := range view.List {
-		cols[i] = mergeListColumn(lc.Title, lc.Width, catalogKeyByTitle[strings.ToLower(lc.Title)], lc)
+		cols[i] = lc
+		if key := catalogKeyByTitle[strings.ToLower(lc.Title)]; key != "" {
+			cols[i].Key = key
+		}
 	}
 	return cols
-}
-
-// mergeListColumn is the one merge of the two declarations of a column, called
-// by both arms of the cascade so neither can read the pair its own way.
-//
-// The catalog owns what the cell reads: its Key wins wherever it declares one.
-// The defaults own the rendering hints the catalog literal has no field for —
-// Path, SortKey — and their own Key on a column the catalog does not
-// declare at all. Title and width come from whichever declaration the calling
-// arm is built around, which is the only thing the two arms still differ on.
-func mergeListColumn(title string, width int, catalogKey string, def config.ListColumn) config.ListColumn {
-	key := def.Key
-	if catalogKey != "" {
-		key = catalogKey
-	}
-	return config.ListColumn{
-		Title:   title,
-		Width:   width,
-		Key:     key,
-		Path:    def.Path,
-		SortKey: def.SortKey,
-	}
 }
 
 // copyListColumns copies a view definition's columns whole. Every field a

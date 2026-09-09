@@ -5,6 +5,7 @@ list:
     key: job_name
     width: 32
   Status:
+    key: state
     width: 12
   Last Run:
     key: last_run

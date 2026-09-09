@@ -5,6 +5,7 @@ list:
     key: repo_name
     width: 28
   Status:
+    key: state
     width: 12
   Domain:
     path: DomainName

@@ -4,6 +4,7 @@ list:
     key: display_name
     width: 40
   Status:
+    key: state
     width: 12
   Subs:
     key: subs_count

@@ -24,8 +24,8 @@ func s3BucketTypeDef() resource.ResourceTypeDef {
 		ShortName: "s3",
 		Aliases:   []string{"s3", "buckets"},
 		Columns: []resource.Column{
-			{Key: "name", Title: "Bucket Name", Width: 40, Sortable: true},
-			{Key: "creation_date", Title: "Creation Date", Width: 22, Sortable: true},
+			{Key: "name", Title: "Bucket Name", Width: 40},
+			{Key: "creation_date", Title: "Creation Date", Width: 22},
 		},
 		Children: []resource.ChildViewDef{{
 			ChildType:      "s3_objects",
