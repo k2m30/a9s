@@ -269,14 +269,64 @@ func TestTheDesignDocsColourRulesComeFromAGeneratedBlock(t *testing.T) {
 // ROW 10 — no status cell carries a raw SDK error code
 // ---------------------------------------------------------------------------
 
-// sdkErrorCodePrefix matches an AWS error code standing at the head of an
-// error string: two or more CamelCase words followed by a colon, which is the
-// shape every AWS SDK error message opens with ("AccessDenied: ...",
-// "KMSKeyNotFound: ...", "ThrottlingException: ..."). The style gate's own
-// checks cannot see this — its whole-cell rule exempts any value containing a
-// colon as an identifier, and its token rule only matches tokens with no
-// lowercase letters at all.
-var sdkErrorCodePrefix = regexp.MustCompile(`\b[A-Z][a-z0-9]+(?:[A-Z][a-z0-9]+)+(?:Exception|Error)?:`)
+// sdkErrorCodePrefix matches an AWS error code introducing the sentence after
+// it: two or more words run together, each Capitalised or an acronym, then a
+// colon and a space. It is the same shape core/aws's awsErrorCodeShape
+// accepts, deliberately, so the gate cannot go looking for a narrower set of
+// codes than the humaniser strips — a code the humaniser handles and the gate
+// misses is a rule with no check, and a code the gate flags and the humaniser
+// leaves is a failure nobody can fix.
+//
+// The acronym alternative carries the whole rule: "KMSKeyNotFound" and
+// "SNSInvalidParameter" are the shape half of these codes take, and a
+// Capitalised-words-only pattern reads "AccessDenied" and walks straight past
+// them.
+//
+// Two words minimum, and the colon must be followed by a space, so a
+// sentence's own punctuation survives: "Note: …" is one word, and "PORTS:22"
+// has no space.
+//
+// The style gate's own checks cannot see any of this — its whole-cell rule
+// exempts any value containing a colon as an identifier, and its token rule
+// only matches tokens with no lowercase letters at all.
+var sdkErrorCodePrefix = regexp.MustCompile(`\b(?:[A-Z]+[a-z0-9]*){2,}: `)
+
+// TestTheSDKErrorCodePatternCatchesTheShapesAWSReturns pins which codes the
+// sweep above is looking for. The sweep is only as good as this pattern, and
+// its demo bench holds one offending row: a pattern narrowed by accident would
+// leave the sweep green and say nothing, which is how the acronym-led half of
+// these codes went unseen in the first place.
+func TestTheSDKErrorCodePatternCatchesTheShapesAWSReturns(t *testing.T) {
+	cases := []struct {
+		cell string
+		want bool
+		why  string
+	}{
+		{"delivery error: AccessDenied: The S3 bucket policy denies CloudTrail writes", true,
+			"two Capitalised words, the shape the demo trail returns"},
+		{"delivery error: KMSKeyNotFound: The KMS key for this trail no longer exists", true,
+			"acronym-led, the half a Capitalised-words-only pattern walks past"},
+		{"delivery error: SNSInvalidParameter: The topic ARN is not valid", true,
+			"acronym-led with the acronym mid-code"},
+		{"delivery error: ThrottlingException: Rate exceeded", true,
+			"the Exception suffix is just another run-together word"},
+
+		{"delivery error: the S3 bucket policy denies CloudTrail writes", false,
+			"the humaniser has stripped the code; the sentence keeps its own capitals"},
+		{"unhealthy targets: 2 of 5", false,
+			"a prose label before a colon is one word, not a code"},
+		{"risk: PORTS:22 open to the internet", false,
+			"no space after the colon, so it is an identifier rather than a code"},
+		{"stopping: instance is shutting down", false,
+			"a lowercase label keeps its colon"},
+	}
+
+	for _, tc := range cases {
+		if got := sdkErrorCodePrefix.MatchString(tc.cell); got != tc.want {
+			t.Errorf("MatchString(%q) = %v, want %v — %s", tc.cell, got, tc.want, tc.why)
+		}
+	}
+}
 
 func TestNoStatusCellCarriesAnSDKErrorCode(t *testing.T) {
 	byType, cache := buildVisibilityTypeCache(t)
@@ -297,7 +347,7 @@ func TestNoStatusCellCarriesAnSDKErrorCode(t *testing.T) {
 			if code := sdkErrorCodePrefix.FindString(cell); code != "" {
 				offenders = append(offenders, fmt.Sprintf(
 					"%s %s: status cell %q carries the SDK error code %q",
-					td.ShortName, r.ID, cell, strings.TrimSuffix(code, ":")))
+					td.ShortName, r.ID, cell, strings.TrimSuffix(code, ": ")))
 			}
 		}
 	}
