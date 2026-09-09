@@ -93,8 +93,20 @@ var wholePlaceholderPhrase = regexp.MustCompile(`^<[^<>]*>$`)
 // situation where that shortcut gets taken.
 const minOperatorSentenceLen = 40
 
+// sentenceBreaks counts the full stops a Detail puts between sentences. The
+// terminal stop has no space after it and is not a break, so a Detail that
+// says what the condition means and then what to do about it returns 1 and a
+// Detail that only describes the condition returns 0.
+//
+// An abbreviation's stop ("e.g. ") would be miscounted as a break, which can
+// only let a one-sentence Detail through. The clause below errs that way on
+// purpose: a gate over prose should never invent a defect.
+func sentenceBreaks(detail string) int {
+	return strings.Count(detail, ". ") + strings.Count(detail, "? ")
+}
+
 func TestEveryIssueTierFindingCarriesAnOperatorSentence(t *testing.T) {
-	var missing, tooShort, restatesPhrase []string
+	var missing, tooShort, restatesPhrase, noAction []string
 
 	for _, e := range allCatalogFindingDefs(t) {
 		if !e.def.Severity.IsIssue() {
@@ -110,6 +122,8 @@ func TestEveryIssueTierFindingCarriesAnOperatorSentence(t *testing.T) {
 		case strings.EqualFold(detail, e.def.Phrase),
 			strings.EqualFold(strings.TrimSuffix(detail, "."), e.def.Phrase):
 			restatesPhrase = append(restatesPhrase, fmt.Sprintf("%s: Detail=%q", where, detail))
+		case sentenceBreaks(detail) == 0:
+			noAction = append(noAction, fmt.Sprintf("%s: Detail=%q", where, detail))
 		}
 	}
 
@@ -126,6 +140,13 @@ func TestEveryIssueTierFindingCarriesAnOperatorSentence(t *testing.T) {
 	if len(restatesPhrase) > 0 {
 		t.Errorf("%d Detail sentences restate their own phrase, so the Attention entry "+
 			"says the same words twice:\n  %s", len(restatesPhrase), strings.Join(restatesPhrase, "\n  "))
+	}
+	if len(noAction) > 0 {
+		t.Errorf("%d Detail sentences describe the condition and stop. A sentence that "+
+			"only says again, at length, what the phrase already said leaves the "+
+			"operator where they started; the second sentence is the one that says "+
+			"what to do, and for a state nobody can act on it says that:\n  %s",
+			len(noAction), strings.Join(noAction, "\n  "))
 	}
 }
 
