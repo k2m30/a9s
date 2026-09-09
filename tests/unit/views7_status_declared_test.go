@@ -32,7 +32,7 @@ func TestEveryTypeDeclaresOneStatusColumn(t *testing.T) {
 
 		declared, titled := 0, 0
 		for _, col := range td.Columns {
-			if config.IsStatusColumn(col.Key, col.Title, lifecycleKey) {
+			if config.IsStatusColumn(col.Key, lifecycleKey) {
 				declared++
 			}
 			if col.Title == "Status" || col.Title == "State" {

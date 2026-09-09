@@ -255,7 +255,7 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 - Shard-level status out of scope at list level — a9s-devops (2026-04-20): possible=yes, worth=no at list level. `NodeGroup.Status` exists but belongs in a per-replication-group shard panel, not on the list row.
 
 <!-- BEGIN GENERATED: header -->
-redis — DATABASES & STORAGE. Lifecycle key: `status`.
+redis — DATABASES & STORAGE. Status key: `status` — the key the status cell reads, and the column naming it is the status column.
 <!-- END GENERATED: header -->
 
 <!-- BEGIN GENERATED: findings -->

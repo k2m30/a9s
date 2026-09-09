@@ -162,7 +162,7 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 - `~` severity choice for `lastEventTimestamp` staleness — user decision deferred; defaulted to `~` (informational, not an active break) because a stale log stream is a lagging signal, not an active break. a9s-devops (2026-04-20): stale-log-group does not itself cause user-facing impact — it flags a silent emitter; worth surfacing but not worth bumping the menu `issues:N` count.
 
 <!-- BEGIN GENERATED: header -->
-logs — MONITORING. Lifecycle key: none (the list API returns no lifecycle field).
+logs — MONITORING. Status key: `state` — the column naming it is the status column, and no fetcher writes it, so the cell is the finding phrase.
 <!-- END GENERATED: header -->
 
 <!-- BEGIN GENERATED: findings -->

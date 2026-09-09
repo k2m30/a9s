@@ -254,6 +254,18 @@ func HumanizeFieldKey(s string) string {
 // HumanizeFieldKey, or nil when the type declares none. The list surface, the
 // detail surface and any later reader ask here, so none of them can disagree
 // about which fields the type wants in words.
+// StatusKey is the Fields key this type's status cell reads, and so the key
+// its status column names: LifecycleKey, or "state" when the type declares
+// none. The default was written out at every caller — the render cascade, the
+// decorator lookup, the status-column resolver, the docs generator — which is
+// four places to change the day it is not "state".
+func (d ResourceTypeDef) StatusKey() string {
+	if d.LifecycleKey != "" {
+		return d.LifecycleKey
+	}
+	return "state"
+}
+
 func (d ResourceTypeDef) HumanizedFields() map[string]bool {
 	if len(d.HumanizeFields) == 0 {
 		return nil

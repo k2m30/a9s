@@ -210,7 +210,7 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 - a9s-devops consultation — `logs` discovery left as TBD — a9s-devops (2026-04-20): possible=partial, worth=yes-in-principle. Standard logging goes to S3 not CW Logs; real-time log configs require `GetRealtimeLogConfig` per configuration, which exceeds the bounded Wave 2 budget.
 
 <!-- BEGIN GENERATED: header -->
-cf — DNS & CDN. Lifecycle key: `status`.
+cf — DNS & CDN. Status key: `status` — the key the status cell reads, and the column naming it is the status column.
 <!-- END GENERATED: header -->
 
 <!-- BEGIN GENERATED: findings -->

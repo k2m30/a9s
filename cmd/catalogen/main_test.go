@@ -101,7 +101,13 @@ func TestDetailCell_ThroughGenerateResourceDoc(t *testing.T) {
 	}
 }
 
-func TestGenerateResourceDocLifecycleHeader(t *testing.T) {
+// w197 row 14: the header sentence says what the key IS now — the key the
+// status cell reads, and the mark of which column is the status column — so
+// every expectation below carries the new wording. The "no fetcher writes it"
+// half replaces "none (the list API returns no lifecycle field)": the key is
+// named either way, because the column still reads it and the cell is the
+// type's finding phrase rather than nothing at all.
+func TestGenerateResourceDocStatusKeyHeader(t *testing.T) {
 	cases := []struct {
 		name       string
 		rt         catalog.ResourceTypeDef
@@ -115,7 +121,7 @@ func TestGenerateResourceDocLifecycleHeader(t *testing.T) {
 				Category:  "STORAGE",
 				FieldKeys: []string{"name", "creation_date", "notification_lambda", "notification_sqs", "notification_sns"},
 			},
-			wantHeader: "s3 — STORAGE. Lifecycle key: none (the list API returns no lifecycle field).",
+			wantHeader: "s3 — STORAGE. Status key: `state` — the column naming it is the status column, and no fetcher writes it, so the cell is the finding phrase.",
 		},
 		{
 			name: "default state key present in field keys",
@@ -125,7 +131,7 @@ func TestGenerateResourceDocLifecycleHeader(t *testing.T) {
 				Category:  "COMPUTE",
 				FieldKeys: []string{"name", "state", "instance_type"},
 			},
-			wantHeader: "ec2 — COMPUTE. Lifecycle key: `state`.",
+			wantHeader: "ec2 — COMPUTE. Status key: `state` — the key the status cell reads, and the column naming it is the status column.",
 		},
 		{
 			name: "explicit lifecycle key present in field keys",
@@ -136,7 +142,7 @@ func TestGenerateResourceDocLifecycleHeader(t *testing.T) {
 				LifecycleKey: "status",
 				FieldKeys:    []string{"name", "status", "engine"},
 			},
-			wantHeader: "dbi — DATABASE. Lifecycle key: `status`.",
+			wantHeader: "dbi — DATABASE. Status key: `status` — the key the status cell reads, and the column naming it is the status column.",
 		},
 		{
 			name: "explicit lifecycle key absent from non-empty field keys",
@@ -147,7 +153,7 @@ func TestGenerateResourceDocLifecycleHeader(t *testing.T) {
 				LifecycleKey: "status",
 				FieldKeys:    []string{"name", "size"},
 			},
-			wantHeader: "wdg — MISC. Lifecycle key: none (the list API returns no lifecycle field).",
+			wantHeader: "wdg — MISC. Status key: `status` — the column naming it is the status column, and no fetcher writes it, so the cell is the finding phrase.",
 		},
 		{
 			name: "empty field keys keep the state default",
@@ -156,7 +162,7 @@ func TestGenerateResourceDocLifecycleHeader(t *testing.T) {
 				ShortName: "gdt",
 				Category:  "MISC",
 			},
-			wantHeader: "gdt — MISC. Lifecycle key: `state`.",
+			wantHeader: "gdt — MISC. Status key: `state` — the key the status cell reads, and the column naming it is the status column.",
 		},
 	}
 
@@ -166,8 +172,8 @@ func TestGenerateResourceDocLifecycleHeader(t *testing.T) {
 			if !strings.Contains(doc, tc.wantHeader) {
 				t.Errorf("generated doc header mismatch\nwant fragment: %q\ngot doc:\n%s", tc.wantHeader, doc)
 			}
-			if strings.Contains(tc.wantHeader, "none") && strings.Contains(doc, "Lifecycle key: `") {
-				t.Errorf("doc names a lifecycle key despite none being expected:\n%s", doc)
+			if strings.Contains(tc.wantHeader, "no fetcher writes it") && strings.Contains(doc, "the key the status cell reads") {
+				t.Errorf("doc claims the key is written despite no producer for it:\n%s", doc)
 			}
 		})
 	}

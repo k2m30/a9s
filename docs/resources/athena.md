@@ -141,7 +141,7 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 - a9s-devops consultation — count shown = yes for kms/logs/role/s3 (singular fields when set); glue = yes (region count); ct-events = unknown (windowed CloudTrail queries) — `a9s-devops (2026-04-20): possible=yes, worth=yes. Per-target singular or account-wide; consistent with acm/s3/ec2 specs in docs/resources/.`
 
 <!-- BEGIN GENERATED: header -->
-athena — DATA & ANALYTICS. Lifecycle key: `state`.
+athena — DATA & ANALYTICS. Status key: `state` — the key the status cell reads, and the column naming it is the status column.
 <!-- END GENERATED: header -->
 
 <!-- BEGIN GENERATED: findings -->

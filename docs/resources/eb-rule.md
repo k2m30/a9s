@@ -164,7 +164,7 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 - a9s-devops consultation — rule-per-bus coverage map not worth adding — `a9s-devops (2026-04-20): possible=yes, worth=no. EventBusName is already on the list row and per-target pivots already cover the drill-down workflow.`
 
 <!-- BEGIN GENERATED: header -->
-eb-rule — MESSAGING. Lifecycle key: `state`.
+eb-rule — MESSAGING. Status key: `state` — the key the status cell reads, and the column naming it is the status column.
 <!-- END GENERATED: header -->
 
 <!-- BEGIN GENERATED: findings -->

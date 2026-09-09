@@ -217,7 +217,7 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 - `DeletedDate set` classified as Warning rather than Dim — `docs/attention-signals.md § Signals § SECRETS & CONFIG` row `secrets`. The golden doc explicitly writes `Warning`; this spec honors the classification.
 
 <!-- BEGIN GENERATED: header -->
-secrets — SECRETS & CONFIG. Lifecycle key: `status`.
+secrets — SECRETS & CONFIG. Status key: `status` — the key the status cell reads, and the column naming it is the status column.
 <!-- END GENERATED: header -->
 
 <!-- BEGIN GENERATED: findings -->

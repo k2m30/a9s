@@ -168,7 +168,7 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 - `~` severity choice for dormant-role finding — a9s-devops (2026-04-20): possible=yes, worth=no (for bumping S1). Dormancy is informational; deletion requires human review of trust and attached-policy blast radius, so chasing it via the menu issues count would be noise. `~` (no S1 bump) is the correct surface.
 
 <!-- BEGIN GENERATED: header -->
-role — SECURITY & IAM. Lifecycle key: none (the list API returns no lifecycle field).
+role — SECURITY & IAM. Status key: `state` — the column naming it is the status column, and no fetcher writes it, so the cell is the finding phrase.
 <!-- END GENERATED: header -->
 
 <!-- BEGIN GENERATED: findings -->

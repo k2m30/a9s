@@ -179,7 +179,7 @@ Every problem row names its cause in the Status column (`IMDSv1 allowed`, `EBS e
 - Read-only invariant — `docs/architecture.md` § "What is a9s?".
 
 <!-- BEGIN GENERATED: header -->
-lt — COMPUTE. Lifecycle key: `status`.
+lt — COMPUTE. Status key: `status` — the key the status cell reads, and the column naming it is the status column.
 <!-- END GENERATED: header -->
 
 <!-- BEGIN GENERATED: findings -->

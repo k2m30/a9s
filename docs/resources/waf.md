@@ -134,7 +134,7 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 - List text and detail text wording for both Wave 2 signals — generated per the output-template §4 rules (≤40 char S4, no jargon, state + cause).
 
 <!-- BEGIN GENERATED: header -->
-waf — SECURITY & IAM. Lifecycle key: none (the list API returns no lifecycle field).
+waf — SECURITY & IAM. Status key: `state` — the column naming it is the status column, and no fetcher writes it, so the cell is the finding phrase.
 <!-- END GENERATED: header -->
 
 <!-- BEGIN GENERATED: findings -->

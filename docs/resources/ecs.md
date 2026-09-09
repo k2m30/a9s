@@ -177,7 +177,7 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 - AWS API Reference (fallback) — CloudWatch Alarm `Dimensions` shape — `AWS API Reference: Dimension` (<https://docs.aws.amazon.com/AmazonCloudWatch/latest/APIReference/API_Dimension.html>).
 
 <!-- BEGIN GENERATED: header -->
-ecs — COMPUTE. Lifecycle key: `status`.
+ecs — COMPUTE. Status key: `status` — the key the status cell reads, and the column naming it is the status column.
 <!-- END GENERATED: header -->
 
 <!-- BEGIN GENERATED: findings -->

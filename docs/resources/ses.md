@@ -170,7 +170,7 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 - `user decision (2026-04-23)`: wire a dedicated SES v1 SDK client (`github.com/aws/aws-sdk-go-v2/service/ses`) to back the `lambda` and `s3` pivots via `ses:DescribeActiveReceiptRuleSet`. SES v1 receipt rules are a minority workflow (inbound email) but when present the pivot is genuinely load-bearing (3am debugging of `support@`/`invoices@`-style routers). Returning a silent 0 when the relationship does exist is worse than the one-call cost.
 
 <!-- BEGIN GENERATED: header -->
-ses — MESSAGING. Lifecycle key: `status`.
+ses — MESSAGING. Status key: `status` — the key the status cell reads, and the column naming it is the status column.
 <!-- END GENERATED: header -->
 
 <!-- BEGIN GENERATED: findings -->

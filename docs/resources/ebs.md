@@ -184,7 +184,7 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 - UX decision — `Events[] non-empty` uses `~` severity — informational scheduled/AWS-notification event; does not require immediate action, so does not bump S1 menu count.
 
 <!-- BEGIN GENERATED: header -->
-ebs — COMPUTE. Lifecycle key: `state`.
+ebs — COMPUTE. Status key: `state` — the key the status cell reads, and the column naming it is the status column.
 <!-- END GENERATED: header -->
 
 <!-- BEGIN GENERATED: findings -->

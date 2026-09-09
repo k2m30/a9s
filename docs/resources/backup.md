@@ -143,7 +143,7 @@ At 3am, glancing at the list, the operator sees a red plan row reading `<N job(s
 - Severity choice: `FAILED/EXPIRED/ABORTED` = `!` (Broken) and `PARTIAL` = `~` (Warning) — `docs/attention-signals.md § Signals § BACKUP` row `backup` ships the failed-job finding as Broken and the partial-job finding as Warning, which maps to the S1-bumping `!` glyph and the non-bumping `~` glyph per the skill's Wave-to-surface rules.
 
 <!-- BEGIN GENERATED: header -->
-backup — BACKUP. Lifecycle key: none (the list API returns no lifecycle field).
+backup — BACKUP. Status key: `status` — the key the status cell reads, and the column naming it is the status column.
 <!-- END GENERATED: header -->
 
 <!-- BEGIN GENERATED: findings -->

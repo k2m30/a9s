@@ -159,7 +159,7 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 - Read-only invariant (Out of Scope write operations) — `docs/architecture.md` § "What is a9s?".
 
 <!-- BEGIN GENERATED: header -->
-tgw — NETWORKING. Lifecycle key: `state`.
+tgw — NETWORKING. Status key: `state` — the key the status cell reads, and the column naming it is the status column.
 <!-- END GENERATED: header -->
 
 <!-- BEGIN GENERATED: findings -->

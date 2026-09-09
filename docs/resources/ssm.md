@@ -116,7 +116,7 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 - Policies scope-out — `a9s-devops (2026-04-20): possible=yes (ParameterMetadata.Policies[] is present on the list response), worth=no for the default list view. Rationale: parameter policies (expiration, notification, no-change) are a niche power-user feature; alerting on policy expiry is better served by EventBridge or a dedicated advanced-policies view than by occupying S3/S4 real estate that all SSM rows would otherwise lose to a rarely-used signal.`
 
 <!-- BEGIN GENERATED: header -->
-ssm — SECRETS & CONFIG. Lifecycle key: `risk`.
+ssm — SECRETS & CONFIG. Status key: `risk` — the key the status cell reads, and the column naming it is the status column.
 <!-- END GENERATED: header -->
 
 <!-- BEGIN GENERATED: findings -->

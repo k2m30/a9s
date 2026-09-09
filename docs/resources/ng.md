@@ -208,7 +208,7 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 - Health-issue codes as rows under the finding — `a9s-devops (2026-04-20): possible=yes, worth=yes. AWS surfaces the issue Code and Message verbatim; the humanized code is what the operator reads.` The list line stays the finding's own phrase; each reported code is a row in the detail view, so a group with three issues has three to read.
 
 <!-- BEGIN GENERATED: header -->
-ng — CONTAINERS. Lifecycle key: `status`.
+ng — CONTAINERS. Status key: `status` — the key the status cell reads, and the column naming it is the status column.
 <!-- END GENERATED: header -->
 
 <!-- BEGIN GENERATED: findings -->

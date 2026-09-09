@@ -204,7 +204,7 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 - a9s-devops consultation — Classic (ELBv1) default Healthy bucket when no State field — implicit from `docs/attention-signals.md § Signals § NETWORKING` row `elb`; no state signal available, so the row defaults to Healthy and target-health signalling moves to `tg`. No separate devops dispatch.
 
 <!-- BEGIN GENERATED: header -->
-elb — NETWORKING. Lifecycle key: `state`.
+elb — NETWORKING. Status key: `state` — the key the status cell reads, and the column naming it is the status column.
 <!-- END GENERATED: header -->
 
 <!-- BEGIN GENERATED: findings -->

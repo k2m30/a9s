@@ -177,7 +177,7 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 - S1–S5 surface rules and glyph constraints — `a9s-resource-spec` skill § "Allowed visualization surfaces (exactly five)".
 
 <!-- BEGIN GENERATED: header -->
-kms — SECRETS & CONFIG. Lifecycle key: `status`.
+kms — SECRETS & CONFIG. Status key: `status` — the key the status cell reads, and the column naming it is the status column.
 <!-- END GENERATED: header -->
 
 <!-- BEGIN GENERATED: findings -->

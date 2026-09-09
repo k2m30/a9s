@@ -20,6 +20,14 @@
 
 ## Fixed
 
+- A view file you edited keeps working when you rename its status column. The
+  key `status`, which older versions accepted on any type, is migrated to the
+  key that type actually uses, so the column still shows the finding phrase and
+  still colours the row. A key that names nothing at all is now reported when
+  a9s starts, once, naming the file and the key — and the rest of your file is
+  used as written. The web server used to discard the whole file over one such
+  line; it keeps it now, like the terminal app always did.
+
 - A resource whose status the list computes now shows that status, not another
   value stored beside it. A target group whose own column said `unhealthy
   targets: 2/5` displayed `available`, and a build project reading `last build

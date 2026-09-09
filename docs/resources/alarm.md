@@ -220,7 +220,7 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 - Superseded HOW ignored — row middle-dot `·` marker, `⚠ Background Check` detail header, and derived list-level banner in `docs/historical/analysis/enrichment-visibility.md` are not cited or reproduced per the skill's S1–S5 rules.
 
 <!-- BEGIN GENERATED: header -->
-alarm — MONITORING. Lifecycle key: `state`.
+alarm — MONITORING. Status key: `state` — the key the status cell reads, and the column naming it is the status column.
 <!-- END GENERATED: header -->
 
 <!-- BEGIN GENERATED: findings -->

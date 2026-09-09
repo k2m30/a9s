@@ -142,7 +142,7 @@ func generateResourceDoc(repoRoot string, rt catalog.ResourceTypeDef) error {
 
 	// Header section content.
 	header := fmt.Sprintf("%s — %s. %s\n",
-		rt.ShortName, rt.Category, lifecycleFragment(rt))
+		rt.ShortName, rt.Category, statusKeyFragment(rt))
 
 	// Findings section content.
 	var findingsContent strings.Builder
@@ -324,24 +324,22 @@ func severityLabel(s domain.Severity) string {
 	}
 }
 
-// lifecycleKey returns the effective lifecycle key for a resource type.
-func lifecycleKey(rt catalog.ResourceTypeDef) string {
-	if rt.LifecycleKey == "" {
-		return "state"
+// statusKeyFragment returns the "Status key: …" header sentence. The key does
+// two things and the sentence says both: it is the Fields key the status cell
+// reads, and the column naming it IS the type's status column.
+//
+// When the Wave 1 fetcher declares its field keys and this key is not among
+// them, no fetcher writes it — the cell is the type's finding phrase, and the
+// sentence says so rather than sending a reader hunting for the field.
+func statusKeyFragment(rt catalog.ResourceTypeDef) string {
+	key := rt.StatusKey()
+	written := slices.Contains(rt.FieldKeys, key) || slices.Contains(rt.IssueEnricherFieldKeys, key)
+	if len(rt.FieldKeys) > 0 && !written {
+		return fmt.Sprintf("Status key: `%s` — the column naming it is the status column, and no "+
+			"fetcher writes it, so the cell is the finding phrase.", key)
 	}
-	return rt.LifecycleKey
-}
-
-// lifecycleFragment returns the "Lifecycle key: …" header sentence. When the
-// Wave 1 fetcher declares its field keys and the effective lifecycle key is
-// not among them, the type has no row-color driver — naming a key would send
-// QA hunting for a field that never exists.
-func lifecycleFragment(rt catalog.ResourceTypeDef) string {
-	key := lifecycleKey(rt)
-	if len(rt.FieldKeys) > 0 && !slices.Contains(rt.FieldKeys, key) {
-		return "Lifecycle key: none (the list API returns no lifecycle field)."
-	}
-	return fmt.Sprintf("Lifecycle key: `%s`.", key)
+	return fmt.Sprintf("Status key: `%s` — the key the status cell reads, and the column naming it "+
+		"is the status column.", key)
 }
 
 // generateSignalTables writes the per-category signal tables of

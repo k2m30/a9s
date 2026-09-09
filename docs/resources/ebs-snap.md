@@ -159,7 +159,7 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 - UX rewrite — S4 `error: <StateMessage>` vs bare `error` — `user default (2026-04-20): pair the state keyword with StateMessage so a red row is triageable without opening detail; matches the skill's "state keywords are not explanations" rule.`
 
 <!-- BEGIN GENERATED: header -->
-ebs-snap — COMPUTE. Lifecycle key: `state`.
+ebs-snap — COMPUTE. Status key: `state` — the key the status cell reads, and the column naming it is the status column.
 <!-- END GENERATED: header -->
 
 <!-- BEGIN GENERATED: findings -->

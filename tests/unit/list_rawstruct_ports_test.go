@@ -371,9 +371,12 @@ func TestListRawStruct_AllTypes_OverridesFields(t *testing.T) {
 
 			td := resource.FindResourceType(tc.shortName)
 			cols := resource.ResolveListColumnCascade(nil, tc.shortName, td)
-			lifecycleKey := ""
+			// w197 row 15: IsStatusColumn takes the RESOLVED key — every
+			// caller had already defaulted it, and the callee defaulting
+			// again was a fourth copy of the same "" means "state".
+			lifecycleKey := "state"
 			if td != nil {
-				lifecycleKey = td.LifecycleKey
+				lifecycleKey = td.StatusKey()
 			}
 
 			for key, stored := range tc.storedFields {
@@ -389,7 +392,7 @@ func TestListRawStruct_AllTypes_OverridesFields(t *testing.T) {
 					// entries are here as noise the row carries, not as cells.
 					continue
 				}
-				if config.IsStatusColumn(key, column, lifecycleKey) {
+				if config.IsStatusColumn(key, lifecycleKey) {
 					// The documented exception this test always carried: a
 					// status column answers from findings and the lifecycle
 					// key through the humanizer, so the stored value reaches

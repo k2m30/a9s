@@ -180,7 +180,7 @@ At 3am, glancing at the list, a yellow row reading `pending` says the VPC is sti
 - No per-VPC CloudWatch namespace — `a9s-devops (2026-04-20): possible=no, worth=no. AWS publishes flow logs (presence covered in Wave 2) but no per-VPC metric namespace.`
 
 <!-- BEGIN GENERATED: header -->
-vpc — NETWORKING. Lifecycle key: `state`.
+vpc — NETWORKING. Status key: `state` — the key the status cell reads, and the column naming it is the status column.
 <!-- END GENERATED: header -->
 
 <!-- BEGIN GENERATED: findings -->

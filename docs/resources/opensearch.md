@@ -211,7 +211,7 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 - user decision — severity for `EncryptionAtRestOptions.Enabled==false` — `user (2026-04-20): decide →`~`. Rationale: posture/compliance finding, not an outage risk. Consistent with RDS`StorageEncrypted==false`and S3 encryption defaults treated as background annotations.`
 
 <!-- BEGIN GENERATED: header -->
-opensearch — DATABASES & STORAGE. Lifecycle key: `status`.
+opensearch — DATABASES & STORAGE. Status key: `status` — the key the status cell reads, and the column naming it is the status column.
 <!-- END GENERATED: header -->
 
 <!-- BEGIN GENERATED: findings -->

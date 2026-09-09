@@ -222,7 +222,7 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 - Read-only invariant — `docs/architecture.md` § "What is a9s?".
 
 <!-- BEGIN GENERATED: header -->
-eb — MESSAGING. Lifecycle key: `status`.
+eb — MESSAGING. Status key: `status` — the key the status cell reads, and the column naming it is the status column.
 <!-- END GENERATED: header -->
 
 <!-- BEGIN GENERATED: findings -->

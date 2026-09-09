@@ -184,7 +184,7 @@ Opening the detail, YAML, or JSON view triggers one extra read-only call whose r
 - Read-only invariant (no write ops) — `docs/architecture.md` § "What is a9s?" ("a9s never makes write calls to AWS").
 
 <!-- BEGIN GENERATED: header -->
-cfn — CI/CD. Lifecycle key: `status`.
+cfn — CI/CD. Status key: `status` — the key the status cell reads, and the column naming it is the status column.
 <!-- END GENERATED: header -->
 
 <!-- BEGIN GENERATED: findings -->

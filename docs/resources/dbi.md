@@ -299,7 +299,7 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 - user decision (2026-04-21): each Broken failure status renders its own S5 remedy sentence (per the table in §4), rather than a single generic "in a failed state" sentence.
 
 <!-- BEGIN GENERATED: header -->
-dbi — DATABASES & STORAGE. Lifecycle key: `status`.
+dbi — DATABASES & STORAGE. Status key: `status` — the key the status cell reads, and the column naming it is the status column.
 <!-- END GENERATED: header -->
 
 <!-- BEGIN GENERATED: findings -->

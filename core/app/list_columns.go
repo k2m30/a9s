@@ -113,7 +113,7 @@ func extractListCells(columns []ColumnDef, r resource.Resource, td *resource.Res
 	for i, col := range columns {
 		v := ExtractCellValue(col, td, r)
 		if td != nil && len(td.CellDecorators) > 0 {
-			if dec := lookupListDecorator(td.CellDecorators, col, td.LifecycleKey); dec != nil {
+			if dec := lookupListDecorator(td.CellDecorators, col, td.StatusKey()); dec != nil {
 				v = dec(r, v)
 			}
 		}
@@ -159,10 +159,7 @@ func lookupListDecorator(decs map[string]func(resource.Resource, string) string,
 			return d
 		}
 	}
-	if lifecycleKey == "" {
-		lifecycleKey = "state"
-	}
-	if config.IsStatusColumn(col.Key, col.Title, lifecycleKey) {
+	if config.IsStatusColumn(col.Key, lifecycleKey) {
 		if d, ok := decs[lifecycleKey]; ok {
 			return d
 		}
@@ -204,10 +201,10 @@ func extractCellText(col ColumnDef, td *resource.ResourceTypeDef, r resource.Res
 	// falls through to the raw fieldpath/Fields value further down and a raw
 	// AWS enum ("FAILED", "STALE") reaches the screen.
 	lifecycleKey := "state"
-	if td != nil && td.LifecycleKey != "" {
-		lifecycleKey = td.LifecycleKey
+	if td != nil {
+		lifecycleKey = td.StatusKey()
 	}
-	if config.IsStatusColumn(col.Key, col.Title, lifecycleKey) {
+	if config.IsStatusColumn(col.Key, lifecycleKey) {
 		if phrase := domain.StatusPhrase(r.Findings); phrase != "" {
 			return phrase
 		}
@@ -378,11 +375,11 @@ func IdentityColumnIndex(columns []ColumnDef, td *resource.ResourceTypeDef) int 
 // Findings, is the authoritative source).
 func resolveListStatusCol(columns []ColumnDef, td *resource.ResourceTypeDef) int {
 	lifecycleKey := "state"
-	if td != nil && td.LifecycleKey != "" {
-		lifecycleKey = td.LifecycleKey
+	if td != nil {
+		lifecycleKey = td.StatusKey()
 	}
 	for i, c := range columns {
-		if config.IsStatusColumn(c.Key, c.Title, lifecycleKey) {
+		if config.IsStatusColumn(c.Key, lifecycleKey) {
 			return i
 		}
 	}

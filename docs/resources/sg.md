@@ -172,7 +172,7 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 - Read-only invariant — `docs/architecture.md` § "What is a9s?".
 
 <!-- BEGIN GENERATED: header -->
-sg — NETWORKING. Lifecycle key: `risk_summary`.
+sg — NETWORKING. Status key: `risk_summary` — the key the status cell reads, and the column naming it is the status column.
 <!-- END GENERATED: header -->
 
 <!-- BEGIN GENERATED: findings -->

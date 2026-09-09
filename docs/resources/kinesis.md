@@ -163,7 +163,7 @@ One bullet per claim in §§2–4.1.
 - a9s-devops consultation — `ddb` reverse pivot omitted — `a9s-devops (2026-04-20): possible=yes, worth=no. DescribeKinesisStreamingDestination would be required per DDB table in the loaded list; operators pivot DDB→Kinesis in practice, not the reverse, so the N-table cost is unjustified for a rare workflow. Recorded in §5 Out of Scope.`
 
 <!-- BEGIN GENERATED: header -->
-kinesis — MESSAGING. Lifecycle key: `status`.
+kinesis — MESSAGING. Status key: `status` — the key the status cell reads, and the column naming it is the status column.
 <!-- END GENERATED: header -->
 
 <!-- BEGIN GENERATED: findings -->

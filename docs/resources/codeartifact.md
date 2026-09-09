@@ -130,7 +130,7 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 - S5 sentence wording (declared on the finding definition, rendered in the Findings table below) `No packages published since repository was created 47 days ago — consider removing if unused.` — a9s-devops (2026-04-20): possible=yes, worth=yes; plain-English operator sentence with a next-step hint. Avoids all banned jargon (no `Wave`, no `enrichment`, no `finding`, no `bucket`).
 
 <!-- BEGIN GENERATED: header -->
-codeartifact — CI/CD. Lifecycle key: none (the list API returns no lifecycle field).
+codeartifact — CI/CD. Status key: `state` — the column naming it is the status column, and no fetcher writes it, so the cell is the finding phrase.
 <!-- END GENERATED: header -->
 
 <!-- BEGIN GENERATED: findings -->

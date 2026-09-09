@@ -267,7 +267,7 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 - `ct-events` as universal pivot — `docs/related-resources.md` § Policy.
 
 <!-- BEGIN GENERATED: header -->
-redshift — DATABASES & STORAGE. Lifecycle key: `status`.
+redshift — DATABASES & STORAGE. Status key: `status` — the key the status cell reads, and the column naming it is the status column.
 <!-- END GENERATED: header -->
 
 <!-- BEGIN GENERATED: findings -->

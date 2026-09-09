@@ -117,7 +117,7 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 - Read-only invariant — `docs/architecture.md` § "What is a9s?" (read-only by design).
 
 <!-- BEGIN GENERATED: header -->
-iam-group — SECURITY & IAM. Lifecycle key: none (the list API returns no lifecycle field).
+iam-group — SECURITY & IAM. Status key: `state` — the column naming it is the status column, and no fetcher writes it, so the cell is the finding phrase.
 <!-- END GENERATED: header -->
 
 <!-- BEGIN GENERATED: findings -->

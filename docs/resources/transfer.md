@@ -197,7 +197,7 @@ Every problem row names its cause in the Status column (`offline: not accepting 
 - Read-only invariant — `docs/architecture.md` § "What is a9s?".
 
 <!-- BEGIN GENERATED: header -->
-transfer — NETWORKING. Lifecycle key: `status`.
+transfer — NETWORKING. Status key: `status` — the key the status cell reads, and the column naming it is the status column.
 <!-- END GENERATED: header -->
 
 <!-- BEGIN GENERATED: findings -->

@@ -188,7 +188,7 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 - a9s-devops consultation — sibling Glue object types (crawlers, triggers, workflows) deliberately excluded for now — `a9s-devops persona (2026-04-20): possible=yes, worth=no. Would warrant their own shortNames in a future iteration; current glue shortName scopes to Jobs per docs/related-resources.md § glue.`
 
 <!-- BEGIN GENERATED: header -->
-glue — DATA & ANALYTICS. Lifecycle key: none (the list API returns no lifecycle field).
+glue — DATA & ANALYTICS. Status key: `state` — the column naming it is the status column, and no fetcher writes it, so the cell is the finding phrase.
 <!-- END GENERATED: header -->
 
 <!-- BEGIN GENERATED: findings -->

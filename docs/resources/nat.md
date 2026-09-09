@@ -157,7 +157,7 @@ At 3am, glancing at the list, the operator sees a red row for a failed NAT readi
 - Read-only invariant — `docs/architecture.md` § "What is a9s?".
 
 <!-- BEGIN GENERATED: header -->
-nat — NETWORKING. Lifecycle key: `state`.
+nat — NETWORKING. Status key: `state` — the key the status cell reads, and the column naming it is the status column.
 <!-- END GENERATED: header -->
 
 <!-- BEGIN GENERATED: findings -->

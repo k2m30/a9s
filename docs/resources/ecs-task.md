@@ -273,7 +273,7 @@ One bullet per claim in §§2–4.1.
 - a9s-devops persona (2026-04-20) — severity on Wave 2 `essential+ExitCode!=0` is `!` (counted) because the finding identifies a concrete container-level failure an on-call must address. Rationale: matches the existing `enrichment-visibility.md` example for ECS Tasks (`"task stopped: EssentialContainerExited"` with `!`).
 
 <!-- BEGIN GENERATED: header -->
-ecs-task — COMPUTE. Lifecycle key: `status`.
+ecs-task — COMPUTE. Status key: `status` — the key the status cell reads, and the column naming it is the status column.
 <!-- END GENERATED: header -->
 
 <!-- BEGIN GENERATED: findings -->

@@ -269,7 +269,7 @@ One bullet per claim in §§2–4.1. Citation sources, in order of authority:
 - Wave classification and ECS signal set — `docs/attention-signals.md § Signals § COMPUTE` row `ecs-svc`.
 
 <!-- BEGIN GENERATED: header -->
-ecs-svc — COMPUTE. Lifecycle key: `status`.
+ecs-svc — COMPUTE. Status key: `status` — the key the status cell reads, and the column naming it is the status column.
 <!-- END GENERATED: header -->
 
 <!-- BEGIN GENERATED: findings -->

@@ -130,7 +130,7 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 - Count shown for `ct-events` — `a9s-devops (2026-04-20): possible=yes, worth=yes. Event volume is itself diagnostic (no recent events on a changed subscription is a clue), so the number matters here.`
 
 <!-- BEGIN GENERATED: header -->
-sns-sub — MESSAGING. Lifecycle key: none (the list API returns no lifecycle field).
+sns-sub — MESSAGING. Status key: `state` — the column naming it is the status column, and no fetcher writes it, so the cell is the finding phrase.
 <!-- END GENERATED: header -->
 
 <!-- BEGIN GENERATED: findings -->

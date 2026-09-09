@@ -209,7 +209,7 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 - a9s-devops consultation — `eni`/`subnet`/`vpc` discovery via `DescribeMountTargets` fields `NetworkInterfaceId`/`SubnetId`/`VpcId` — `a9s-devops (2026-04-20): possible=yes, worth=yes. All three are direct SDK fields on MountTargetDescription; one DescribeMountTargets call covers all three pivots.`
 
 <!-- BEGIN GENERATED: header -->
-efs — DATABASES & STORAGE. Lifecycle key: `status`.
+efs — DATABASES & STORAGE. Status key: `status` — the key the status cell reads, and the column naming it is the status column.
 <!-- END GENERATED: header -->
 
 <!-- BEGIN GENERATED: findings -->

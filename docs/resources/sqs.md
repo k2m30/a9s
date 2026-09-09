@@ -196,7 +196,7 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 - §5 read-only invariant — `docs/architecture.md` § "What is a9s?".
 
 <!-- BEGIN GENERATED: header -->
-sqs — MESSAGING. Lifecycle key: none (the list API returns no lifecycle field).
+sqs — MESSAGING. Status key: `state` — the column naming it is the status column, and no fetcher writes it, so the cell is the finding phrase.
 <!-- END GENERATED: header -->
 
 <!-- BEGIN GENERATED: findings -->

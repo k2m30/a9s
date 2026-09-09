@@ -248,7 +248,7 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 - amendment — `dbc` was corrected from RDS to DocumentDB: the display name and API reference follow DocumentDB, and the deferred replica-lag metric is `DBInstanceReplicaLag`, not `AuroraReplicaLag` — `docs/attention-signals.md § Not yet implemented`. Rationale: `docs/related-resources.md` § Per-type contract anchors `dbc` at `documentdb/latest/developerguide/API_DBCluster.html` and the user specification is `dbc (DocumentDB Cluster)`. The field names (`Status`, `DBClusterMembers`, `IsClusterWriter`, `DeletionProtection`, `StorageEncrypted`, `BackupRetentionPeriod`) match `service/docdb/types.DBCluster` verbatim, so no field edits were needed.
 
 <!-- BEGIN GENERATED: header -->
-dbc — DATABASES & STORAGE. Lifecycle key: `status`.
+dbc — DATABASES & STORAGE. Status key: `status` — the key the status cell reads, and the column naming it is the status column.
 <!-- END GENERATED: header -->
 
 <!-- BEGIN GENERATED: findings -->

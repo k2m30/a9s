@@ -223,7 +223,7 @@ At 3am, glancing at a ct-events list filtered by an anxious operator, can they t
 - a9s-devops consultation — `ct-events` self-pivot is exposed as four distinct menu items rather than one generic "filter" — `a9s-devops persona (2026-04-20): possible=yes, worth=yes. Four facets = four common forensics questions ("what else did this key do?", "every ConsoleLogin this week?", etc.) each worth a one-keystroke pivot; collapsing into a single generic filter would add a form prompt and cost time during an incident.`
 
 <!-- BEGIN GENERATED: header -->
-ct-events — MONITORING. Lifecycle key: `status`.
+ct-events — MONITORING. Status key: `status` — the key the status cell reads, and the column naming it is the status column.
 <!-- END GENERATED: header -->
 
 <!-- BEGIN GENERATED: findings -->

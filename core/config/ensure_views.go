@@ -10,6 +10,8 @@ import (
 	"slices"
 	"sort"
 	"strings"
+
+	"github.com/k2m30/a9s/v3/core/catalog"
 )
 
 //go:embed views_reference.yaml
@@ -176,6 +178,11 @@ var viewColumnChanges = []viewColumnChange{
 	// in more than the key, so the class rule cannot deliver it and only a row
 	// naming that whole spelling can.
 	{Version: 6, View: "logs", Was: ListColumn{Title: "Retention", Path: "RetentionInDays", Width: 10}},
+	// Renewed again at 7 for the reason it was renewed at 5 and 6: a file
+	// still carrying the pre-correction Retention column is a file this stamp
+	// must reach, and an entry only carries while its Version is above the
+	// stamp the file was written at.
+	{Version: 7, View: "logs", Was: ListColumn{Title: "Retention", Path: "RetentionInDays", Width: 10}},
 }
 
 // keyMoveVersion is the stamp at which every built-in column took the key its
@@ -210,6 +217,33 @@ func keyMovedOnly(on, now ListColumn, stamp int) bool {
 		on.Path == now.Path &&
 		on.Width == now.Width &&
 		on.SortKey == now.SortKey
+}
+
+// statusKeyMoveVersion is the stamp at which a column stopped answering to the
+// literal key "status". Until it, the status cell was the one a column's TITLE
+// said was the status column, or the one whose key was spelled "status"
+// whatever the type calls its own lifecycle key — so an operator editing a
+// view file typed "status" and it worked. The type declares the key now
+// (catalog.ResourceTypeDef.LifecycleKey), and a hand-typed "status" on a type
+// that calls it something else names nothing.
+//
+// That is a key this build moved, so this build moves it: the same bargain
+// keyMoveVersion makes. It is matched on the key alone and not on the title,
+// because renaming the column is the other half of what an operator does to
+// it, and a renamed column is exactly the one the title merge cannot reach.
+const statusKeyMoveVersion = 7
+
+// movedStatusKey returns the key a column carrying the old literal "status"
+// takes on this type, and whether it moved at all.
+func movedStatusKey(view, key string, stamp int) (string, bool) {
+	if stamp >= statusKeyMoveVersion || key != "status" {
+		return "", false
+	}
+	td := catalog.Find(view)
+	if td == nil || td.StatusKey() == "status" {
+		return "", false
+	}
+	return td.StatusKey(), true
 }
 
 // viewColumnAdditions names a column the built-in views GAINED, and the
@@ -308,6 +342,9 @@ func mergeGeneratedColumns(name string, onDisk []byte, def ViewDef) ([]byte, boo
 	// happens to change would leave the next kind of correction stranded —
 	// which is how the humanize flag reached new installations alone.
 	for i, on := range vd.List {
+		if moved, ok := movedStatusKey(name, on.Key, vd.Generated); ok {
+			vd.List[i].Key = moved
+		}
 		now, ok := want[on.Title]
 		if !ok {
 			continue

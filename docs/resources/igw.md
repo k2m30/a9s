@@ -129,7 +129,7 @@ At 3am, glancing at the list, the operator can distinguish the Warning modes by 
 - CloudWatch metrics per IGW not available — `a9s-devops (2026-04-20): possible=no, worth=no. AWS does not publish an AWS/EC2 or AWS/VPC namespace for internet gateways; flow logs on the VPC are the closest substitute and are VPC-scoped, not gateway-scoped.`
 
 <!-- BEGIN GENERATED: header -->
-igw — NETWORKING. Lifecycle key: `state`.
+igw — NETWORKING. Status key: `state` — the key the status cell reads, and the column naming it is the status column.
 <!-- END GENERATED: header -->
 
 <!-- BEGIN GENERATED: findings -->

@@ -158,7 +158,7 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 - Read-only invariant — `docs/architecture.md` § "What is a9s?".
 
 <!-- BEGIN GENERATED: header -->
-ami — COMPUTE. Lifecycle key: `state`.
+ami — COMPUTE. Status key: `state` — the key the status cell reads, and the column naming it is the status column.
 <!-- END GENERATED: header -->
 
 <!-- BEGIN GENERATED: findings -->

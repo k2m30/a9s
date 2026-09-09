@@ -206,7 +206,7 @@ At 3am, glancing at the list, a red vpce row reading `failed`, `rejected`, `expi
 - Wave 3 endpoint-policy analysis out-of-scope — `docs/attention-signals.md § Not yet implemented`.
 
 <!-- BEGIN GENERATED: header -->
-vpce — NETWORKING. Lifecycle key: `state`.
+vpce — NETWORKING. Status key: `state` — the key the status cell reads, and the column naming it is the status column.
 <!-- END GENERATED: header -->
 
 <!-- BEGIN GENERATED: findings -->

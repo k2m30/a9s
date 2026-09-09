@@ -215,7 +215,7 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 - a9s golden doc — a9s is read-only — `docs/architecture.md` § "a9s is a read-only terminal UI for AWS".
 
 <!-- BEGIN GENERATED: header -->
-ddb — DATABASES & STORAGE. Lifecycle key: `status`.
+ddb — DATABASES & STORAGE. Status key: `status` — the key the status cell reads, and the column naming it is the status column.
 <!-- END GENERATED: header -->
 
 <!-- BEGIN GENERATED: findings -->

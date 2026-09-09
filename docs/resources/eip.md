@@ -164,7 +164,7 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 - a9s-devops persona — `alarm` non-ENI/NAT dimensions, `logs` beyond best-effort, ECS without ENI recorded in §5 — persona (2026-04-20): possible=no / partial, worth=no. AWS surface does not expose a direct cross-reference and the operator benefit is below the Wave 1 cost budget.
 
 <!-- BEGIN GENERATED: header -->
-eip — NETWORKING. Lifecycle key: `status`.
+eip — NETWORKING. Status key: `status` — the key the status cell reads, and the column naming it is the status column.
 <!-- END GENERATED: header -->
 
 <!-- BEGIN GENERATED: findings -->

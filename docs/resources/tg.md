@@ -159,7 +159,7 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 - a9s-devops consultation — Wave 2 severity mapping ("any unhealthy" = Warning, "all unhealthy" = Broken) matches `docs/attention-signals.md § Signals § NETWORKING` row `tg` — `a9s-devops (2026-04-20): possible=yes, worth=yes. "All targets unhealthy" is the user-facing-outage case and justifies the Broken bucket.`
 
 <!-- BEGIN GENERATED: header -->
-tg — NETWORKING. Lifecycle key: none (the list API returns no lifecycle field).
+tg — NETWORKING. Status key: `health_summary` — the key the status cell reads, and the column naming it is the status column.
 <!-- END GENERATED: header -->
 
 <!-- BEGIN GENERATED: findings -->

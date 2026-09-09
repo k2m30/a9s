@@ -160,7 +160,7 @@ Opening the detail, YAML, or JSON view triggers one extra read-only call whose r
 - §5 read-only invariant — `docs/architecture.md` § "What is a9s?" (line 15).
 
 <!-- BEGIN GENERATED: header -->
-sns — MESSAGING. Lifecycle key: none (the list API returns no lifecycle field).
+sns — MESSAGING. Status key: `state` — the column naming it is the status column, and no fetcher writes it, so the cell is the finding phrase.
 <!-- END GENERATED: header -->
 
 <!-- BEGIN GENERATED: findings -->

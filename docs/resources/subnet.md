@@ -216,7 +216,7 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 - `efs` pivot worth surfacing despite indirect discovery — a9s-devops (2026-04-20): possible=yes, worth=yes. Subnet IP exhaustion or AZ failure directly breaks EFS mount-target reachability in that AZ; operator routinely asks "which FS mounts through this subnet?" during AZ incident triage. Surfaced via the zero-call mount-target ENI scan, so the count is present whenever the `eni` and `efs` lists are loaded.
 
 <!-- BEGIN GENERATED: header -->
-subnet — NETWORKING. Lifecycle key: `state`.
+subnet — NETWORKING. Status key: `state` — the key the status cell reads, and the column naming it is the status column.
 <!-- END GENERATED: header -->
 
 <!-- BEGIN GENERATED: findings -->

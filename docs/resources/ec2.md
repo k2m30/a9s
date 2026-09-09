@@ -314,7 +314,7 @@ Opening the detail, YAML, or JSON view triggers one extra read-only call whose r
 - a9s-devops consultation — long-stopped wording shows age (`stopped 42d ago`) rather than just `stopped` — a9s-devops (2026-04-20): possible=yes, worth=yes. Age is the whole reason the row is flagged; without it the row violates the "no bare state keyword" rule.
 
 <!-- BEGIN GENERATED: header -->
-ec2 — COMPUTE. Lifecycle key: `state`.
+ec2 — COMPUTE. Status key: `state` — the key the status cell reads, and the column naming it is the status column.
 <!-- END GENERATED: header -->
 
 <!-- BEGIN GENERATED: findings -->

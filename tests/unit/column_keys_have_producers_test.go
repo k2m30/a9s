@@ -110,7 +110,7 @@ func TestColumnKeysHaveProducers(t *testing.T) {
 				// key, so a fetcher that never writes it is not a gap: the
 				// cell is not empty for want of it. Fifteen types are in that
 				// position today and the sixteenth needs no line here.
-				if config.IsStatusColumn(col.Key, col.Title, lifecycleKey) {
+				if config.IsStatusColumn(col.Key, lifecycleKey) {
 					continue
 				}
 

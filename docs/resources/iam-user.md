@@ -148,7 +148,7 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 - `iam-user` NOT-related pairs (`kms`, `role`) — `docs/related-resources.md` § Explicitly excluded.
 
 <!-- BEGIN GENERATED: header -->
-iam-user — SECURITY & IAM. Lifecycle key: none (the list API returns no lifecycle field).
+iam-user — SECURITY & IAM. Status key: `risk` — the key the status cell reads, and the column naming it is the status column.
 <!-- END GENERATED: header -->
 
 <!-- BEGIN GENERATED: findings -->

@@ -128,7 +128,7 @@ func views7StatusColumn(t *testing.T, td *resource.ResourceTypeDef) app.ColumnDe
 		lifecycleKey = "state"
 	}
 	for _, lc := range resource.ResolveListColumnCascade(nil, td.ShortName, td) {
-		if config.IsStatusColumn(lc.Key, lc.Title, lifecycleKey) {
+		if config.IsStatusColumn(lc.Key, lifecycleKey) {
 			return app.ColumnDef{Key: lc.Key, Title: lc.Title, Width: lc.Width, Path: lc.Path, SortKey: lc.SortKey}
 		}
 	}

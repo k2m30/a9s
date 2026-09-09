@@ -167,7 +167,7 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 - a9s-devops consultation — zombie detection (`RequesterManaged` + cross-reference to already-loaded sibling lists) — `a9s-devops (2026-04-20): possible=yes, worth=yes. Requester-managed ENIs whose owner is gone are a real cleanup item (common after Lambda VPC churn and failed vpce teardown). Sibling-list cross-reference is zero-cost during normal browsing and matches the golden-doc's Wave 1 phrasing.`
 
 <!-- BEGIN GENERATED: header -->
-eni — NETWORKING. Lifecycle key: `status`.
+eni — NETWORKING. Status key: `status` — the key the status cell reads, and the column naming it is the status column.
 <!-- END GENERATED: header -->
 
 <!-- BEGIN GENERATED: findings -->

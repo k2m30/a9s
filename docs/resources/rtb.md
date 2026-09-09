@@ -154,7 +154,7 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 - Count-shown values left `unknown` — `docs/related-resources.md` § `rtb` and `docs/historical/analysis/enrichment-visibility.md` do not specify per-target count visibility for `rtb`; HOW decision deferred to a per-resource UX review rather than invented here.
 
 <!-- BEGIN GENERATED: header -->
-rtb — NETWORKING. Lifecycle key: none (the list API returns no lifecycle field).
+rtb — NETWORKING. Status key: `state` — the column naming it is the status column, and no fetcher writes it, so the cell is the finding phrase.
 <!-- END GENERATED: header -->
 
 <!-- BEGIN GENERATED: findings -->

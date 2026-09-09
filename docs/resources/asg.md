@@ -213,7 +213,7 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 - a9s-devops consultation — severity call for Wave 2 launch-failure on Healthy row — `a9s-devops (2026-04-20): possible=yes, worth=yes. Failed latest activity on an otherwise-green ASG is operator-actionable (new instances won't come up) — severity !, not ~.`.
 
 <!-- BEGIN GENERATED: header -->
-asg — COMPUTE. Lifecycle key: `status`.
+asg — COMPUTE. Status key: `status` — the key the status cell reads, and the column naming it is the status column.
 <!-- END GENERATED: header -->
 
 <!-- BEGIN GENERATED: findings -->

@@ -341,7 +341,7 @@ One bullet per claim in §§2–4.1. Citation sources, in order of authority:
 - S4 list-text wording (`creating`, `idle: not invoked recently`, `failed: <StateReasonCode>`, `update failed: <LastUpdateStatusReasonCode>`, `runtime deprecated: <Runtime>`, `no DLQ — async failures dropped`) — a9s-devops (2026-04-20): possible=yes, worth=yes. Paired state+cause wording per the skill's §4 rules; `StateReasonCode` / `LastUpdateStatusReasonCode` are AWS-provided short codes suitable for a 40-char status cell (AWS SDK Go v2 — lambda/types.StateReasonCode, lambda/types.LastUpdateStatusReasonCode).
 
 <!-- BEGIN GENERATED: header -->
-lambda — COMPUTE. Lifecycle key: `state`.
+lambda — COMPUTE. Status key: `state` — the key the status cell reads, and the column naming it is the status column.
 <!-- END GENERATED: header -->
 
 <!-- BEGIN GENERATED: findings -->

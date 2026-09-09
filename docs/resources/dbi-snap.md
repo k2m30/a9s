@@ -183,7 +183,7 @@ One bullet per claim in §§2–4.1. Citation sources, in order of authority:
 - Count-shown values for the related panel — a9s-devops persona (2026-04-20): possible=yes (for cached-sibling lookups), worth=yes. For `dbi`, `kms`, `dbc`, `backup` the counts come from already-loaded siblings and are exact and cheap; `ct-events` is windowed and a count would be misleading, hence `unknown`.
 
 <!-- BEGIN GENERATED: header -->
-dbi-snap — DATABASES & STORAGE. Lifecycle key: `status`.
+dbi-snap — DATABASES & STORAGE. Status key: `status` — the key the status cell reads, and the column naming it is the status column.
 <!-- END GENERATED: header -->
 
 <!-- BEGIN GENERATED: findings -->

@@ -4,12 +4,16 @@
 package config
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 
 	"gopkg.in/yaml.v3"
+
+	"github.com/k2m30/a9s/v3/core/catalog"
 )
 
 // DetailField references a single line in the detail view. Exactly one of
@@ -104,7 +108,7 @@ type ViewsConfig struct {
 // and a rename arrives as a title the file has never heard of — the operator
 // keeps the old column beside the new one. Shipping either needs a migration
 // this file does not have yet.
-const GeneratedViewsVersion = 6
+const GeneratedViewsVersion = 7
 
 // ViewDef defines the list and detail view configuration for a single resource type.
 type ViewDef struct {
@@ -175,15 +179,11 @@ func TitleFieldKeys(title string) [2]string {
 // declared its own key (tg's health_summary, cb's last_build) showed whatever
 // else happened to be in Fields and its declaration was consulted third.
 //
-// title is kept in the signature because the callers hold it and the next
-// reader will look for it here; it is deliberately not read.
-//
-// The render cascade, its decorator lookup and the cache save lane all ask
-// here, so none of the three can disagree about which column this is.
-func IsStatusColumn(key, _, lifecycleKey string) bool {
-	if lifecycleKey == "" {
-		lifecycleKey = "state"
-	}
+// The render cascade, its decorator lookup and the status-column resolver all
+// ask here, so none of the three can disagree about which column this is.
+// Each resolves the type's lifecycle key first — "state" when the type
+// declares none — so this takes the resolved key and does not default again.
+func IsStatusColumn(key, lifecycleKey string) bool {
 	return key != "" && key == lifecycleKey
 }
 
@@ -318,7 +318,61 @@ func LoadFromDirs(dirs []string) (*ViewsConfig, error) {
 		return nil, nil
 	}
 
-	return &ViewsConfig{Views: merged}, nil
+	cfg := &ViewsConfig{Views: merged}
+	return cfg, unfillableColumnKeys(cfg)
+}
+
+// unfillableColumnKeys reports every list column whose key names nothing on
+// its type — no fetcher field, no enricher field, and no column the type
+// declares. Such a cell is empty on every row, forever, and a view file is the
+// one thing in a9s a person is invited to edit, so the load says which file
+// and which key rather than leaving them to wonder.
+//
+// It is a report and not a rejection: the caller keeps the config it was
+// handed. One bad key costs the operator that one column, not the file.
+func unfillableColumnKeys(cfg *ViewsConfig) error {
+	names := make([]string, 0, len(cfg.Views))
+	for name := range cfg.Views {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+
+	var reports []string
+	for _, name := range names {
+		td := catalog.Find(name)
+		if td == nil {
+			if child := catalog.FindChild(name); child != nil {
+				td = child
+			} else {
+				// A file for a type this build does not have: nothing to
+				// check it against, and not the operator's mistake to report.
+				continue
+			}
+		}
+		fillable := map[string]bool{"@id": true, td.StatusKey(): true}
+		for _, k := range td.FieldKeys {
+			fillable[k] = true
+		}
+		for _, k := range td.IssueEnricherFieldKeys {
+			fillable[k] = true
+		}
+		for _, c := range td.Columns {
+			if c.Key != "" {
+				fillable[c.Key] = true
+			}
+		}
+		for _, col := range cfg.Views[name].List {
+			if col.Key == "" || fillable[col.Key] {
+				continue
+			}
+			reports = append(reports, fmt.Sprintf("%s.yaml: column %q reads key %q, which nothing on %s writes",
+				name, col.Title, col.Key, name))
+		}
+	}
+	if len(reports) == 0 {
+		return nil
+	}
+	return errors.New(strings.Join(reports, "; "))
 }
 
 // Load discovers and loads per-resource YAML files from the standard

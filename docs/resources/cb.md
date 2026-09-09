@@ -212,7 +212,7 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 - Buildspec-based ECR discovery exclusion — `a9s-devops (2026-04-20): possible=no, worth=n/a. AWS APIs do not return parsed buildspec content; the buildspec is either inline YAML or a file reference, and neither is exposed as structured references on Project.`
 
 <!-- BEGIN GENERATED: header -->
-cb — CI/CD. Lifecycle key: none (the list API returns no lifecycle field).
+cb — CI/CD. Status key: `last_build` — the key the status cell reads, and the column naming it is the status column.
 <!-- END GENERATED: header -->
 
 <!-- BEGIN GENERATED: findings -->
