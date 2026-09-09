@@ -721,6 +721,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - A refresh that a newer one has already superseded no longer clears the newer one's spinner. Pressing Ctrl+R twice reported that loading was over while the second fetch was still running; each list now records which request raised its own marker.
 - A snapshot whose share attributes came back without the attributes result no longer reads as "checked, not shared publicly". The same silence is closed for a node group whose launch template could not be read, a hosted zone whose record sets were refused, an AS2 agreement whose partner profile did not resolve, and the Auto Scaling and Secrets Manager panels that reported a confident count from a call that did not answer.
 - `--demo` no longer forces the disk cache off. The demo now runs the same cache-load-then-background-sweep path an installation runs, which is how the menu's issue badges are written.
+- Six signals no longer fire on a healthy resource:
+  - A queue using the encryption Amazon SQS manages for you is no longer
+    reported as unencrypted. Only a queue with neither that nor a key of your
+    own is.
+  - An SNS topic without a key of your own is described as what it is, a topic
+    whose message encryption uses a key you cannot audit, rather than as one
+    whose messages sit in the clear.
+  - An EKS cluster on Kubernetes 1.28 or newer is no longer told its secrets
+    are unencrypted. Those versions encrypt secrets with an AWS-owned key
+    without being asked; only an older cluster has none.
+  - A VPC whose subnets are covered by flow logs no longer reads as having no
+    record of its traffic. A flow log attached to a subnet or a network
+    interface writes the same records as one attached to the VPC, and all three
+    now count.
+  - A task the scheduler stopped during a deployment, or that Spot reclaimed,
+    is no longer red. Those are the platform doing its job, and they now grey
+    out like any other clean stop; a task that failed to start or whose
+    essential container exited is still red.
+  - A CloudFront distribution in front of an S3 static-website endpoint is no
+    longer told to talk to that origin over HTTPS. The endpoint only serves
+    HTTP, so there is nothing to change.
+- The detail row under a CloudFront distribution reaching its origin without
+  TLS is labelled in words. It read `OriginProtocolPolicy`, which is the name
+  of the API field rather than anything an operator says.
+- Demo mode now shows the corrected checks working. It carries a queue using
+  the encryption SQS manages, a cluster on a version that encrypts secrets by
+  itself, a VPC covered by a flow log on its subnet, a distribution in front of
+  an S3 website endpoint, and a task Spot reclaimed, none of which is flagged,
+  beside the rows that still are.
 
 ### Added
 
@@ -1258,36 +1287,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   does not restart the ones already running, a Kinesis stream that is updating
   is only resharding some of the time, and a Simple Email Service identity that
   cannot send is usually incomplete rather than switched off.
-### Fixed
-- Six signals no longer fire on a healthy resource:
-  - A queue using the encryption Amazon SQS manages for you is no longer
-    reported as unencrypted. Only a queue with neither that nor a key of your
-    own is.
-  - An SNS topic without a key of your own is described as what it is, a topic
-    whose message encryption uses a key you cannot audit, rather than as one
-    whose messages sit in the clear.
-  - An EKS cluster on Kubernetes 1.28 or newer is no longer told its secrets
-    are unencrypted. Those versions encrypt secrets with an AWS-owned key
-    without being asked; only an older cluster has none.
-  - A VPC whose subnets are covered by flow logs no longer reads as having no
-    record of its traffic. A flow log attached to a subnet or a network
-    interface writes the same records as one attached to the VPC, and all three
-    now count.
-  - A task the scheduler stopped during a deployment, or that Spot reclaimed,
-    is no longer red. Those are the platform doing its job, and they now grey
-    out like any other clean stop; a task that failed to start or whose
-    essential container exited is still red.
-  - A CloudFront distribution in front of an S3 static-website endpoint is no
-    longer told to talk to that origin over HTTPS. The endpoint only serves
-    HTTP, so there is nothing to change.
-- The detail row under a CloudFront distribution reaching its origin without
-  TLS is labelled in words. It read `OriginProtocolPolicy`, which is the name
-  of the API field rather than anything an operator says.
-- Demo mode now shows the corrected checks working. It carries a queue using
-  the encryption SQS manages, a cluster on a version that encrypts secrets by
-  itself, a VPC covered by a flow log on its subnet, a distribution in front of
-  an S3 website endpoint, and a task Spot reclaimed, none of which is flagged,
-  beside the rows that still are.
 
 ### Fixed (security)
 
