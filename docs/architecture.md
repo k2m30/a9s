@@ -130,6 +130,34 @@ These are **current-state invariants**. The 020-architecture-refactor that produ
    is the quit key in normal mode; it is not a navigation primitive.
    Input-mode and search-mode semantics take precedence over view-local
    bindings.
+9. **AWS-supplied text is made inert where it enters, never where it is
+   painted.** A tag value, a description, a name, a CloudTrail user agent
+   and an AWS error message are all written by whoever can tag the resource,
+   and AWS hands them back verbatim. `domain.Sanitize`
+   (`core/domain/sanitize.go`) replaces every C0, DEL and C1 control with a
+   single space, and every sequence an ESC or a C1 introducer opens — CSI,
+   OSC, DCS, SOS, PM, APC, in both the two-character ESC spelling and the
+   raw 8-bit one — with a single space for the whole sequence, payload
+   included. `Resource.Sanitized`, `SanitizedFindings` and
+   `SanitizedAttentionDetails` apply it to a resource's name, field keys and
+   values, finding wording and attention rows; all three are copy-on-write,
+   returning their input untouched when nothing changes, because a page of
+   rows is shared with the cache writer's goroutine. The writers that call
+   them are the whole boundary: the fetch lane in `Controller.Handle`
+   (`SanitizedRows`, before the controller lock, because it walks every row
+   of the page), the `ApplyResourcesLoaded` seam, the cache-replay seed in
+   `applyNavResult`, `ensureDetailState` for a resource opened straight into
+   a detail screen, `applyFindingToState` and `applyEnrichmentState` for
+   enricher wording, the `FlashIntent` case for an error banner, and
+   `ListState.setFetchError` for the marker a failed refresh leaves over a
+   list. Nothing downstream re-checks, and nothing in a renderer strips: the
+   painter's own C0-to-space mapping in `text.PadOrTrunc` stays, because a
+   control character occupying no column is a fact about painting, and a9s's
+   own SGR sequences must survive the painter or colour never reaches the
+   screen. That is also why the boundary cannot live there — by the time a
+   cell is styled, the value's escape and a9s's own are the same bytes.
+   a9s paints colour in truecolor form (`38;2;R;G;B`), so a literal
+   `ESC[31m` on a rendered surface can only have come from a value.
 
 ---
 
@@ -524,6 +552,8 @@ Cross-view behaviors that older revisions expressed as per-view capability inter
 | Behavior | Source of truth |
 |----------|-----------------|
 | Filter / search state | `ViewState` body fields (`ListBody.Filter`, `DetailBody.Search`, `TextBody.Search`, …) populated by the controller |
+| Search match set | `app.TextSearchMatches` (`core/app/text.go`) — computed once per body build over the painted line with its styling stripped, and published on `TextBody.SearchMatches` in display columns, which is what `ColStart`/`ColEnd` are named for. The walk is case-insensitive by regexp over the painted bytes rather than over a lowercased copy: a rune whose lowercase form differs in length ("İ") would otherwise move every later offset by the difference. The terminal converts to the rune offsets its painter walks in (`SearchModel.setMatches`) and computes no match set of its own. |
+| Layout widths | The body build. `DetailBody.KeyWidth` (`app.DetailKeyWidth`) is the detail key column, floored at 22 and capped at two fifths of the viewport the body was built for; `ListBody.Columns[StatusCol].Width` is widened to the widest status cell by `widenStatusColumn` (`core/app/list_body.go`), because the status phrase is written per row by an enricher after the type declared its column. Both are measured in terminal columns with `lipgloss.Width`, the measure `text.PadOrTrunc` pads to. Renderers read them; a renderer that decided a width of its own would lay the same body out differently from the web lane, which has no renderer to ask. |
 | Footer key hints | `core/app` footer builders (`buildListFooterHints`, `MenuFooterHintsFor`, `CostsFooterHintsFor`) via `ViewState.Footer` |
 | Copy content (`c`) | `Controller.CopyContent()` (`core/app/copy.go`) — one resolution for list/detail/text/identity, exposed as `ViewState.CopyText`/`CopyLabel`; the TUI's `handleCopy` delegates to it, the web client reads the rendered `data-copy-*` attributes. Only the reveal screen's copy stays adapter-local (the controller has no reveal screen). |
 | Console link (`o`/`O`) | `Controller.ConsoleTarget()` (`core/app/snapshot.go`) — one target resolution for list (incl. child lists), detail, and a focused single-target related row (full cached row via `Core.AnyLaneResourceByID`, then `StubCreator`, then bare ID); URL built by `consolelink.Resolve` + `Valid` guard, exposed as `ViewState.ConsoleURL`/`IsDemo`. The TUI's `handleOpenConsole` delegates to it and execs the opener ($BROWSER argv-split, then per-GOOS, never a shell); the web client reads `data-console-url`/`data-is-demo` and calls `window.open`/clipboard in its keydown handler — the server never execs. |
