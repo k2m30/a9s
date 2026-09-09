@@ -163,7 +163,10 @@ func TestScenario_TransferVisual(t *testing.T) {
 	scenario.OpenDetailResource("transfer", denied)
 	scenario.ExpectNoAPIError()
 	scenario.ExpectViewContains(transferDetailDetailsDenied)
-	scenario.ExpectViewContains("only the listed fields are visible")
+	// Task phrase7 row 17 rewrote the degraded sentence: it says the row is
+	// unjudged rather than healthy, and which permission to grant. The
+	// substring this reads is the half that says what the operator has lost.
+	scenario.ExpectViewContains("unjudged rather than clean")
 
 	scenario.Back()
 

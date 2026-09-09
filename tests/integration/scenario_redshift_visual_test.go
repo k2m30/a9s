@@ -203,9 +203,9 @@ func TestScenario_RedshiftVisual_DetailSurfacesAllIssues(t *testing.T) {
 		// Wave-1 single-phrase rows.
 		{demofixtures.RedshiftResizingID, []string{"Resizing"}},
 		{demofixtures.RedshiftRebootingID, []string{"Rebooting"}},
-		{demofixtures.RedshiftIncompatibleNetworkID, []string{"Broken: incompatible-network"}},
-		{demofixtures.RedshiftHardwareFailureID, []string{"Broken: hardware-failure"}},
-		{demofixtures.RedshiftStorageFullID, []string{"Broken: storage-full"}},
+		{demofixtures.RedshiftIncompatibleNetworkID, []string{"Subnet group cannot host the cluster"}},
+		{demofixtures.RedshiftHardwareFailureID, []string{"Node hardware failed"}},
+		{demofixtures.RedshiftStorageFullID, []string{"Out of storage"}},
 		{demofixtures.RedshiftAvailUnavailableID, []string{"Unavailable"}},
 		{demofixtures.RedshiftAvailFailedID, []string{"Failed"}},
 		{demofixtures.RedshiftAvailMaintenanceID, []string{"Maintenance"}},
@@ -218,7 +218,7 @@ func TestScenario_RedshiftVisual_DetailSurfacesAllIssues(t *testing.T) {
 		{demofixtures.WarnRedshiftMultiID, []string{"Pending change queued", "Public endpoint", "Unencrypted at rest"}},
 		{demofixtures.WarnRedshiftTwoID, []string{"Public endpoint", "Unencrypted at rest"}},
 		// U8 — Broken suppresses the Warnings, so only the Broken phrase appears.
-		{demofixtures.RedshiftBrokenWithWarningHiddenID, []string{"Broken: storage-full"}},
+		{demofixtures.RedshiftBrokenWithWarningHiddenID, []string{"Out of storage"}},
 		{demofixtures.RedshiftAvailUnavailableWithWarningHiddenID, []string{"Unavailable"}},
 	}
 
@@ -251,7 +251,9 @@ func TestScenario_RedshiftVisual_HealthyRowsHaveNoIssuesPhrases(t *testing.T) {
 
 	wave1Phrases := []string{
 		"resizing", "rebooting",
-		"broken: incompatible-", "node hardware failed", "out of storage",
+		"parameter group rejected", "restore did not complete",
+		"encryption key store unreachable", "subnet group cannot host the cluster",
+		"node hardware failed", "out of storage",
 		"unavailable", "failed", "maintenance", "modifying",
 		"pending change queued", "maintenance deferred",
 		"public endpoint", "unencrypted at rest",
