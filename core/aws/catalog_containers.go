@@ -446,8 +446,9 @@ var containersChildTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals 
 		},
 	},
 	{
-		Name:      "Service Tasks",
-		ShortName: "ecs_tasks",
+		Name:         "Service Tasks",
+		ShortName:    "ecs_tasks",
+		LifecycleKey: "status",
 		ConsoleURL: func(r domain.Resource, region, _ string) string {
 			arn := r.Fields["task_arn"]
 			if arn == "" {

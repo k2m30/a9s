@@ -9,6 +9,7 @@ list:
     width: 26
   Status:
     path: State
+    key: state
     width: 12
   Att Issues:
     key: att_status

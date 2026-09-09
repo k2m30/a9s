@@ -6,6 +6,7 @@ list:
     width: 28
   Status:
     path: State
+    key: state
     width: 12
   Cost Cap:
     path: Configuration.BytesScannedCutoffPerQuery

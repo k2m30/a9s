@@ -25,6 +25,7 @@ var backupTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static
 	{
 		Name:          "Backup Plans",
 		ShortName:     "backup",
+		LifecycleKey:  "status",
 		Aliases:       []string{"backup", "backup-plans"},
 		Category:      "BACKUP",
 		CloudTrailKey: "ResourceName:ID",
@@ -64,8 +65,9 @@ var backupTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static
 
 var backupChildTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static catalog: intentional package-level var
 	{
-		Name:      "Stack Events",
-		ShortName: "cfn_events",
+		Name:         "Stack Events",
+		ShortName:    "cfn_events",
+		LifecycleKey: "resource_status",
 		ConsoleURL: func(r domain.Resource, region, _ string) string {
 			arn := r.Fields["stack_arn"]
 			if arn == "" {
@@ -89,8 +91,9 @@ var backupChildTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // s
 		},
 	},
 	{
-		Name:      "Stack Resources",
-		ShortName: "cfn_resources",
+		Name:         "Stack Resources",
+		ShortName:    "cfn_resources",
+		LifecycleKey: "resource_status",
 		ConsoleURL: func(r domain.Resource, region, _ string) string {
 			arn := r.Fields["stack_arn"]
 			if arn == "" {

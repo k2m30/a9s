@@ -165,18 +165,26 @@ func TitleFieldKeys(title string) [2]string {
 
 // IsStatusColumn reports whether a list column is the status/lifecycle
 // column, whose cell is derived from Findings first and only then from a
-// stored value. A column whose Title is "Status" or "State" qualifies
-// whatever its Key, because that is how the operator reads it; the Key
-// checks cover the types whose status column is titled something else.
+// stored value. The type DECLARES it: its status column is the one naming the
+// type's lifecycle key, and nothing else is one.
+//
+// It used to answer on the title as well — a column titled "Status" or
+// "State" was the status column whatever it declared — and on the literal key
+// "status". Both were inference, and the cascade that went with them read
+// three spellings of the fact in a fixed order, so a type whose status column
+// declared its own key (tg's health_summary, cb's last_build) showed whatever
+// else happened to be in Fields and its declaration was consulted third.
+//
+// title is kept in the signature because the callers hold it and the next
+// reader will look for it here; it is deliberately not read.
 //
 // The render cascade, its decorator lookup and the cache save lane all ask
 // here, so none of the three can disagree about which column this is.
-func IsStatusColumn(key, title, lifecycleKey string) bool {
+func IsStatusColumn(key, _, lifecycleKey string) bool {
 	if lifecycleKey == "" {
 		lifecycleKey = "state"
 	}
-	return key == "status" || key == lifecycleKey ||
-		strings.EqualFold(title, "status") || strings.EqualFold(title, "state")
+	return key != "" && key == lifecycleKey
 }
 
 // UnmarshalYAML implements custom unmarshaling for ViewDef to preserve

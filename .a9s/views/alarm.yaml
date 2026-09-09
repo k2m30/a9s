@@ -6,6 +6,7 @@ list:
     width: 36
   Status:
     path: StateValue
+    key: state
     width: 12
   Actions On:
     path: ActionsEnabled

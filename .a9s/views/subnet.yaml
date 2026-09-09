@@ -21,6 +21,7 @@ list:
     width: 14
   Status:
     path: State
+    key: state
     width: 12
   Public:
     path: MapPublicIpOnLaunch

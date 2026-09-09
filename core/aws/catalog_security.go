@@ -113,6 +113,7 @@ var securityTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stat
 	{
 		Name:          "IAM Policies",
 		ShortName:     "policy",
+		LifecycleKey:  "risk",
 		Aliases:       []string{"policy", "policies", "iam-policies", "iam_policies"},
 		Category:      "SECURITY & IAM",
 		CloudTrailKey: "ResourceName:ID",
@@ -216,6 +217,7 @@ var securityTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stat
 	{
 		Name:          "IAM Users",
 		ShortName:     "iam-user",
+		LifecycleKey:  "risk",
 		Aliases:       []string{"iam-user", "iam-users", "users", "iam_users"},
 		Category:      "SECURITY & IAM",
 		CloudTrailKey: "Username:ID",

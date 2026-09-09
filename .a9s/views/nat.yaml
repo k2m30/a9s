@@ -17,6 +17,7 @@ list:
     width: 26
   Status:
     path: State
+    key: state
     width: 12
   Failure:
     path: FailureCode

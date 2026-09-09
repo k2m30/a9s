@@ -13,7 +13,15 @@
   written twice, and the two copies had drifted apart, so which one a change
   reached depended on which file it was made in. Every list looks exactly as
   it did: same columns, same order, same widths. The view files under
-  `.a9s/views/` now also record which field each cell reads, including the
-  fifteen status columns that used to be matched to a field by their heading
-  alone. A view file written by an earlier version picks all of that up on the
-  next start, and anything you changed in it stays yours.
+  `.a9s/views/` now also record which field each cell reads, including every
+  status column, which used to be matched to a field by its heading alone. A
+  view file written by an earlier version picks all of that up on the next
+  start, and anything you changed in it stays yours.
+
+## Fixed
+
+- A resource whose status the list computes now shows that status, not another
+  value stored beside it. A target group whose own column said `unhealthy
+  targets: 2/5` displayed `available`, and a build project reading `last build
+  failed` displayed `succeeded`. The cell now reads the field its column names
+  and nothing else, live and after a restart, so it says the same thing on both.

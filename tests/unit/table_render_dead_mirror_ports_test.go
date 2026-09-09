@@ -244,7 +244,9 @@ func TestRenderListWidenLifecycleColumn_StackedFindingsNotTruncated(t *testing.T
 			{Key: "@id", Title: "ID", Width: 20},
 			// Narrow on purpose: "stopped" (7 chars) fits, "stopped (+1)"
 			// (12 chars) does not — the AS-566 regression this pin guards.
-			{Key: "status", Title: "Status", Width: 8},
+			// w197 row 11: ec2's status column names ec2's lifecycle key. It
+			// used to read "status" and be a status column by its title.
+			{Key: "state", Title: "Status", Width: 8},
 		}},
 	}}
 	c := newTestController(t)

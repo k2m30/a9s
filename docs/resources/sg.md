@@ -172,7 +172,7 @@ At 3am, glancing at the list, can the operator tell what's wrong with a problem 
 - Read-only invariant — `docs/architecture.md` § "What is a9s?".
 
 <!-- BEGIN GENERATED: header -->
-sg — NETWORKING. Lifecycle key: none (the list API returns no lifecycle field).
+sg — NETWORKING. Lifecycle key: `risk_summary`.
 <!-- END GENERATED: header -->
 
 <!-- BEGIN GENERATED: findings -->

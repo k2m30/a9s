@@ -51,6 +51,11 @@ func minimalTypeDef(shortName string) resource.ResourceTypeDef {
 			{Key: "name", Title: "Name", Width: 24},
 			{Key: "status", Title: "Status", Width: 20},
 		},
+		// w197 row 11: a type DECLARES which column is its status column by
+		// giving it the type's lifecycle key. It used to be inferred — from
+		// the title, or from the literal key "status" — so this def needed to
+		// say nothing and got a status column anyway.
+		LifecycleKey: "status",
 		Color: func(r resource.Resource) resource.Color {
 			switch r.Fields["status"] {
 			case "stopped", "failed":
@@ -74,9 +79,14 @@ func minimalTypeDefWithLifecycleKey() resource.ResourceTypeDef {
 		ShortName: "ec2-lifecycle-test",
 		Columns: []resource.Column{
 			{Key: "name", Title: "Name", Width: 24},
-			{Key: "status", Title: "Status", Width: 20},
+			// w197 row 11: the status column names the type's lifecycle key,
+			// which is what the cell reads. It used to be keyed "status" while
+			// the type declared "state", and the cell read the declaration
+			// past the column — the shape that showed tg "available" where its
+			// own column said "unhealthy targets: 2/5".
+			{Key: "state", Title: "Status", Width: 20},
 		},
-		LifecycleKey: "state", // explicit: post-fix fallback reads Fields["state"]
+		LifecycleKey: "state", // explicit: the cell reads Fields["state"]
 		Color: func(r resource.Resource) resource.Color {
 			return resource.ColorHealthy
 		},
@@ -684,10 +694,14 @@ func TestViews_ListStatusColumn_LifecycleKeyDefaultIsState(t *testing.T) {
 		short := short
 		t.Run(short, func(t *testing.T) {
 			// Use a unique non-registered name to avoid registry overriding columns.
+			// w197 row 11: the status column names the key the cell reads,
+			// and a type that declares no LifecycleKey names "state" — which
+			// is the default this test is about, so the column says it.
 			td := minimalTypeDef(short + "-lkdefault-test")
-			// Explicitly confirm LifecycleKey is empty (minimalTypeDef default).
-			if td.LifecycleKey != "" {
-				t.Fatalf("test precondition failed: minimalTypeDef set LifecycleKey=%q, want empty", td.LifecycleKey)
+			td.LifecycleKey = ""
+			td.Columns = []resource.Column{
+				{Key: "name", Title: "Name", Width: 24},
+				{Key: "state", Title: "Status", Width: 20},
 			}
 
 			r := resource.Resource{

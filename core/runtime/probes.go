@@ -534,13 +534,9 @@ func (c *Core) materializeListFieldsForSave(shortName string, resources []resour
 	if len(columns) == 0 {
 		return resources
 	}
-	lifecycleKey := "state"
-	if td := resource.FindResourceType(shortName); td != nil && td.LifecycleKey != "" {
-		lifecycleKey = td.LifecycleKey
-	}
 	out := make([]resource.Resource, len(resources))
 	for i, r := range resources {
-		out[i] = materializeResourceFields(r, columns, lifecycleKey)
+		out[i] = materializeResourceFields(r, columns)
 	}
 	return out
 }
@@ -559,7 +555,7 @@ func resolveSaveColumns(shortName string) []config.ListColumn {
 // materializeListFieldsForSave: for every Path-backed column it writes the
 // RawStruct scalar into Fields under the key saveFieldKey names, when
 // saveFieldKey says the save owes that column a value at all.
-func materializeResourceFields(r resource.Resource, columns []config.ListColumn, lifecycleKey string) resource.Resource {
+func materializeResourceFields(r resource.Resource, columns []config.ListColumn) resource.Resource {
 	if r.RawStruct == nil {
 		return r
 	}
@@ -569,7 +565,7 @@ func materializeResourceFields(r resource.Resource, columns []config.ListColumn,
 		if col.Path == "" {
 			continue
 		}
-		key, owed := saveFieldKey(col, out.Fields, lifecycleKey)
+		key, owed := saveFieldKey(col, out.Fields)
 		if !owed || key == "" {
 			continue
 		}
@@ -593,32 +589,24 @@ func materializeResourceFields(r resource.Resource, columns []config.ListColumn,
 // column, and does the SDK struct owe it a value there.
 //
 // One rule decides both: persist the value the LIVE cascade chose, under the
-// key the replay cascade reads first. app.ExtractCellValue is that cascade,
-// and its precedence differs by column shape:
+// key the replay cascade reads. app.ExtractCellValue is that cascade, and it
+// reads a column's own key — the status column included, which is why this
+// carries no branch for it any more. The status column used to need one
+// because the live cascade read three spellings in a fixed order and this had
+// to name the same first one; the two rules were one rule written twice, and
+// a change to either was a change the other did not make.
 //
-//   - Status/lifecycle column: the live cell comes from Findings, then the
-//     lifecycle key, then "status", then the column's own key, and only then
-//     from the struct. So the struct value is owed only when every one of
-//     those Fields keys is empty, and it belongs under the lifecycle key —
-//     the first one read back. Findings still win at render, so persisting
-//     it cannot outrank a later disagreeing finding.
-//   - Keyed non-status column: the live cell is Fields[Key] whenever that is
-//     populated, so a value already there is what the screen showed and the
-//     struct must not replace it. A Wave-2 enrichment result is the everyday
-//     case, and no struct carries it.
+//   - Keyed column, status or not: the live cell is Fields[Key] whenever that
+//     is populated, so a value already there is what the screen showed and
+//     the struct must not replace it. A Wave-2 enrichment result is the
+//     everyday case, and no struct carries it. A finding still outranks the
+//     stored value at render, so persisting one cannot outrank a later
+//     disagreeing finding.
 //   - Key-less column: the live cell is the struct scalar, which outranks
 //     anything in Fields. So it overwrites whatever the fetcher left under
 //     the title's key — otherwise the restart renders the fetcher's spelling
 //     of a value the screen never showed.
-func saveFieldKey(col config.ListColumn, fields map[string]string, lifecycleKey string) (string, bool) {
-	if config.IsStatusColumn(col.Key, col.Title, lifecycleKey) {
-		for _, k := range [3]string{lifecycleKey, "status", col.Key} {
-			if k != "" && fields[k] != "" {
-				return "", false
-			}
-		}
-		return lifecycleKey, true
-	}
+func saveFieldKey(col config.ListColumn, fields map[string]string) (string, bool) {
 	if col.Key != "" {
 		return col.Key, fields[col.Key] == ""
 	}

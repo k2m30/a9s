@@ -14,6 +14,7 @@ list:
     width: 12
   Status:
     path: State
+    key: state
     width: 12
   Last Error:
     path: LastError.Message

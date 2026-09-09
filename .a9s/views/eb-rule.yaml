@@ -6,6 +6,7 @@ list:
     width: 28
   Status:
     path: State
+    key: state
     width: 10
   Targets:
     key: target_count

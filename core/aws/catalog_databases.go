@@ -146,6 +146,7 @@ var databasesTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 	{
 		Name:          "S3 Buckets",
 		ShortName:     "s3",
+		LifecycleKey:  "status",
 		Aliases:       []string{"s3", "buckets"},
 		Category:      "DATABASES & STORAGE",
 		CloudTrailKey: "ResourceName:ID",
@@ -445,6 +446,7 @@ var databasesTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 	{
 		Name:           "OpenSearch Domains",
 		ShortName:      "opensearch",
+		LifecycleKey:   "status",
 		HumanizeFields: []string{"domain_processing_status"},
 		Aliases:        []string{"opensearch", "os", "elasticsearch"},
 		Category:       "DATABASES & STORAGE",

@@ -152,6 +152,7 @@ var networkingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 	{
 		Name:           "Target Groups",
 		ShortName:      "tg",
+		LifecycleKey:   "health_summary",
 		HumanizeFields: []string{"protocol", "ProtocolVersion"},
 		Aliases:        []string{"tg", "targetgroups", "target-groups"},
 		Category:       "NETWORKING",
@@ -211,6 +212,7 @@ var networkingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 	{
 		Name:          "Security Groups",
 		ShortName:     "sg",
+		LifecycleKey:  "risk_summary",
 		Aliases:       []string{"sg", "securitygroups", "security-groups"},
 		Category:      "NETWORKING",
 		CloudTrailKey: "ResourceName:ID",
@@ -263,7 +265,7 @@ var networkingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 			{Key: "name", Title: "Name", Width: 24},
 			{Key: "vpc_id", Title: "VPC ID", Path: "VpcId", Width: 24},
 			{Key: "cidr_block", Title: "CIDR Block", Path: "CidrBlock", Width: 18},
-			{Title: "Status", Path: "State", Width: 12},
+			{Key: "state", Title: "Status", Path: "State", Width: 12},
 			{Key: "is_default", Title: "Default", Path: "IsDefault", Width: 9},
 			{Key: "flow_logs", Title: "Flow Logs", Width: 10},
 		},
@@ -308,7 +310,7 @@ var networkingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 			{Key: "vpc_id", Title: "VPC ID", Path: "VpcId", Width: 24},
 			{Key: "cidr_block", Title: "CIDR Block", Path: "CidrBlock", Width: 18},
 			{Key: "availability_zone", Title: "AZ", Path: "AvailabilityZone", Width: 14},
-			{Title: "Status", Path: "State", Width: 12},
+			{Key: "state", Title: "Status", Path: "State", Width: 12},
 			{Title: "Public", Path: "MapPublicIpOnLaunch", Width: 8},
 			{Key: "available_ips", Title: "Available IPs", Path: "AvailableIpAddressCount", Width: 14},
 		},
@@ -405,7 +407,7 @@ var networkingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 			{Key: "nat_gateway_id", Title: "NAT Gateway ID", Path: "NatGatewayId", Width: 26},
 			{Key: "vpc_id", Title: "VPC ID", Path: "VpcId", Width: 24},
 			{Key: "subnet_id", Title: "Subnet ID", Path: "SubnetId", Width: 26},
-			{Title: "Status", Path: "State", Width: 12},
+			{Key: "state", Title: "Status", Path: "State", Width: 12},
 			{Title: "Failure", Path: "FailureCode", Width: 22},
 			{Key: "public_ip", Title: "Public IP", Width: 16},
 		},
@@ -472,6 +474,7 @@ var networkingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 	{
 		Name:           "Elastic IPs",
 		ShortName:      "eip",
+		LifecycleKey:   "status",
 		HumanizeFields: []string{"status"},
 		Aliases:        []string{"eip", "elastic-ips", "elasticips"},
 		Category:       "NETWORKING",
@@ -534,7 +537,7 @@ var networkingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 			{Key: "service_name", Title: "Service Name", Path: "ServiceName", Width: 40},
 			{Key: "vpce_id", Title: "Endpoint ID", Path: "VpcEndpointId", Width: 26},
 			{Key: "type", Title: "Type", Path: "VpcEndpointType", Width: 12},
-			{Title: "Status", Path: "State", Width: 12},
+			{Key: "state", Title: "Status", Path: "State", Width: 12},
 			{Title: "Last Error", Path: "LastError.Message", Width: 32},
 			{Key: "vpc_id", Title: "VPC ID", Path: "VpcId", Width: 24},
 		},
@@ -585,7 +588,7 @@ var networkingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 		Columns: []domain.Column{
 			{Key: "name", Title: "Name", Width: 28},
 			{Key: "tgw_id", Title: "TGW ID", Path: "TransitGatewayId", Width: 26},
-			{Title: "Status", Path: "State", Width: 12},
+			{Key: "state", Title: "Status", Path: "State", Width: 12},
 			{Key: "att_status", Title: "Att Issues", Width: 10},
 			{Key: "owner_id", Title: "Owner", Path: "OwnerId", Width: 14},
 			{Key: "description", Title: "Description", Path: "Description", Width: 30},
@@ -845,8 +848,9 @@ var networkingChildTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals 
 		}),
 	},
 	{
-		Name:      "Agreements",
-		ShortName: "transfer_agreements",
+		Name:         "Agreements",
+		ShortName:    "transfer_agreements",
+		LifecycleKey: "status",
 		ConsoleURL: func(r domain.Resource, region, _ string) string {
 			sid := r.Fields["server_id"]
 			if sid == "" {

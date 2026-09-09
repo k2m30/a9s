@@ -67,7 +67,7 @@ var monitoringTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 		},
 		Columns: []domain.Column{
 			{Key: "alarm_name", Title: "Alarm Name", Path: "AlarmName", Width: 36},
-			{Title: "Status", Path: "StateValue", Width: 12},
+			{Key: "state", Title: "Status", Path: "StateValue", Width: 12},
 			{Title: "Actions On", Path: "ActionsEnabled", Width: 10},
 			{Key: "metric_name", Title: "Metric", Path: "MetricName", Width: 24},
 			{Key: "namespace", Title: "Namespace", Path: "Namespace", Width: 24},
@@ -230,10 +230,11 @@ var monitoringTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 		},
 	},
 	{
-		Name:      "CloudTrail Events",
-		ShortName: "ct-events",
-		Aliases:   []string{"event", "events", "ct-events", "cloudtrail-events"},
-		Category:  "MONITORING",
+		Name:         "CloudTrail Events",
+		ShortName:    "ct-events",
+		LifecycleKey: "status",
+		Aliases:      []string{"event", "events", "ct-events", "cloudtrail-events"},
+		Category:     "MONITORING",
 		Columns: []domain.Column{
 			{Key: "_ct.verb", Title: "V", Width: 1},
 			{Key: "time", Title: "TIME", Width: 15, SortKey: "event_time"},

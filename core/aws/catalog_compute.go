@@ -809,7 +809,7 @@ var computeTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stati
 		Columns: []domain.Column{
 			{Key: "name", Title: "Name", Path: "Name", Width: 32},
 			{Key: "image_id", Title: "Image ID", Path: "ImageId", Width: 22},
-			{Title: "Status", Path: "State", Width: 12},
+			{Key: "state", Title: "Status", Path: "State", Width: 12},
 			{Key: "deprecated", Title: "Deprecated", Width: 22},
 			{Key: "architecture", Title: "Arch", Path: "Architecture", Width: 10},
 			{Key: "platform", Title: "Platform", Path: "PlatformDetails", Width: 16},
@@ -910,8 +910,9 @@ var computeTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stati
 
 var computeChildTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static catalog: intentional package-level var
 	{
-		Name:      "Lambda Invocations",
-		ShortName: "lambda_invocations",
+		Name:         "Lambda Invocations",
+		ShortName:    "lambda_invocations",
+		LifecycleKey: "status",
 		ConsoleURL: func(r domain.Resource, region, _ string) string {
 			return cloudWatchLogStreamConsoleURL(region, r.Fields["log_group"], r.Fields["log_stream"])
 		},
@@ -951,8 +952,9 @@ var computeChildTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // 
 		}),
 	},
 	{
-		Name:      "Scaling Activities",
-		ShortName: "asg_activities",
+		Name:         "Scaling Activities",
+		ShortName:    "asg_activities",
+		LifecycleKey: "status_code",
 		ConsoleURL: func(r domain.Resource, region, _ string) string {
 			name := r.Fields["asg_name"]
 			if name == "" {

@@ -57,6 +57,14 @@ type ResourceTypeDef struct {
 	Columns []domain.Column
 	// LifecycleKey names the Resource.Fields key holding lifecycle state
 	// (e.g. "running", "stopped"). Defaults to "state" when empty.
+	//
+	// It is also this type's DECLARATION of which column is its status
+	// column: the one naming this key, and no other (config.IsStatusColumn).
+	// A type whose state is a computed verdict rather than an API field names
+	// that verdict's key — tg's health_summary, sg's risk_summary, cb's
+	// last_build — and the cell reads exactly it. Nothing infers a status
+	// column from a title any more, so a type that renames this key renames
+	// its column's Key in the same literal or loses the column.
 	LifecycleKey string
 	// IdentityKey optionally names the column key used to position the
 	// enrichment-finding row marker. When empty, the row-marker resolver

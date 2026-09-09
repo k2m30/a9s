@@ -47,8 +47,9 @@ var messagingChildTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals /
 		},
 	},
 	{
-		Name:      "SFN Executions",
-		ShortName: "sfn_executions",
+		Name:         "SFN Executions",
+		ShortName:    "sfn_executions",
+		LifecycleKey: "status",
 		ConsoleURL: func(r domain.Resource, region, _ string) string {
 			arn := r.Fields["execution_arn"]
 			if arn == "" {
@@ -81,8 +82,9 @@ var messagingChildTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals /
 		},
 	},
 	{
-		Name:      "SFN Execution History",
-		ShortName: "sfn_execution_history",
+		Name:         "SFN Execution History",
+		ShortName:    "sfn_execution_history",
+		LifecycleKey: "state_name",
 		ConsoleURL: func(r domain.Resource, region, _ string) string {
 			arn := r.Fields["execution_arn"]
 			if arn == "" {
@@ -105,8 +107,9 @@ var messagingChildTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals /
 		},
 	},
 	{
-		Name:      "SNS Subscriptions",
-		ShortName: "sns_subscriptions",
+		Name:         "SNS Subscriptions",
+		ShortName:    "sns_subscriptions",
+		LifecycleKey: "confirmation_status",
 		ConsoleURL: func(r domain.Resource, region, _ string) string {
 			arn := r.Fields["subscription_arn"]
 			if arn == "" {
@@ -405,7 +408,7 @@ var messagingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 		},
 		Columns: []domain.Column{
 			{Key: "name", Title: "Rule Name", Path: "Name", Width: 28},
-			{Title: "Status", Path: "State", Width: 10},
+			{Key: "state", Title: "Status", Path: "State", Width: 10},
 			{Key: "target_count", Title: "Targets", Width: 8},
 			{Key: "event_bus", Title: "Event Bus", Path: "EventBusName", Width: 18},
 			{Key: "schedule", Title: "Schedule", Path: "ScheduleExpression", Width: 24},

@@ -46,6 +46,7 @@ var secretsTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stati
 	{
 		Name:           "Secrets Manager",
 		ShortName:      "secrets",
+		LifecycleKey:   "status",
 		HumanizeFields: []string{"status"},
 		Aliases:        []string{"secrets", "secretsmanager", "sm"},
 		Category:       "SECRETS & CONFIG",
@@ -101,6 +102,7 @@ var secretsTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stati
 	{
 		Name:           "SSM Parameters",
 		ShortName:      "ssm",
+		LifecycleKey:   "risk",
 		HumanizeFields: []string{"type"},
 		Aliases:        []string{"ssm", "parameters", "parameter-store"},
 		Category:       "SECRETS & CONFIG",

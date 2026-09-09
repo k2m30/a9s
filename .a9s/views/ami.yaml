@@ -10,6 +10,7 @@ list:
     width: 22
   Status:
     path: State
+    key: state
     width: 12
   Deprecated:
     key: deprecated

@@ -189,21 +189,20 @@ func extractCellText(col ColumnDef, td *resource.ResourceTypeDef, r resource.Res
 		return r.ID
 	}
 
-	// Status/lifecycle column — OWNER CONTRACT: a column whose Title equals
-	// "Status" (case-insensitive, exact word) IS the status column,
-	// regardless of its Key. This covers keyed columns whose data lives
-	// under their own key (e.g. cb's {Key:"last_status", Title:"Status"},
-	// tg's {Key:"health_summary", Title:"Status"}, sg's
-	// {Key:"risk_summary", Title:"Status"}) as well as the pre-existing
-	// Key-less, Path-based case (e.g. lambda/ec2's per-session view
-	// {Title:"State", Path:"State"} with no Key, or acm/eks/ng's
-	// default-view {Path:"Status"} with no Key). Every qualifying column
-	// must route through the same domain.StatusPhrase + HumanizeStatusPhrase
-	// chokepoint — otherwise it falls through to the raw fieldpath/Fields
-	// value further down and a raw AWS enum (e.g. "FAILED", "STALE")
-	// reaches the screen. The predicate lives in config.IsStatusColumn, which
-	// the decorator lookup and the cache save lane also ask, so none of them
-	// can disagree about which column this is.
+	// Status/lifecycle column — OWNER CONTRACT: the type DECLARES its status
+	// column by giving it the type's lifecycle key (config.IsStatusColumn),
+	// and this reads that key and no other. It used to read the lifecycle
+	// key, then "status", then the column's own key, so a type declaring its
+	// status under its own name — tg's health_summary, cb's last_build —
+	// showed whichever other spelling was in Fields and its own declaration
+	// came third.
+	//
+	// A finding still outranks every stored value: the phrase is what the
+	// operator is being told about this row. Below it, one key, then the
+	// struct. Every qualifying column routes through the same
+	// domain.StatusPhrase + HumanizeStatusPhrase chokepoint — otherwise it
+	// falls through to the raw fieldpath/Fields value further down and a raw
+	// AWS enum ("FAILED", "STALE") reaches the screen.
 	lifecycleKey := "state"
 	if td != nil && td.LifecycleKey != "" {
 		lifecycleKey = td.LifecycleKey
@@ -212,16 +211,8 @@ func extractCellText(col ColumnDef, td *resource.ResourceTypeDef, r resource.Res
 		if phrase := domain.StatusPhrase(r.Findings); phrase != "" {
 			return phrase
 		}
-		if v, ok := r.Fields[lifecycleKey]; ok && v != "" {
+		if v, ok := r.Fields[col.Key]; ok && v != "" {
 			return domain.HumanizeStatusPhrase(v)
-		}
-		if v, ok := r.Fields["status"]; ok && v != "" {
-			return domain.HumanizeStatusPhrase(v)
-		}
-		if col.Key != "" {
-			if v, ok := r.Fields[col.Key]; ok && v != "" {
-				return domain.HumanizeStatusPhrase(v)
-			}
 		}
 		if col.Path != "" && r.RawStruct != nil {
 			return domain.HumanizeStatusPhrase(fieldpath.ExtractScalar(r.RawStruct, col.Path))
@@ -377,26 +368,21 @@ func IdentityColumnIndex(columns []ColumnDef, td *resource.ResourceTypeDef) int 
 	return 0
 }
 
-// resolveListStatusCol mirrors the statusColIdx resolution in resourcelist.go
-// View(): the column whose key is "status" or the type's LifecycleKey, else a
-// case-insensitive "State"/"Status" title match. Returns -1 when no status
-// column exists. buildListBody uses it to bake the issue-Finding Phrase (S4)
-// into the status cell so the ViewState is render-ready — the TUI does this
-// override at render time, but the web renders Cells verbatim, so it must live
-// in the ViewState for both renderers (and the enrichment findings map, not the
-// resource's embedded Wave-1 Findings, is the authoritative source).
+// resolveListStatusCol finds the type's declared status column — the one
+// naming its lifecycle key, which config.IsStatusColumn is the one answer to.
+// Returns -1 when no status column exists. buildListBody uses it to bake the
+// issue-Finding Phrase (S4) into the status cell so the ViewState is
+// render-ready — the TUI does this override at render time, but the web
+// renders Cells verbatim, so it must live in the ViewState for both renderers
+// (and the enrichment findings map, not the resource's embedded Wave-1
+// Findings, is the authoritative source).
 func resolveListStatusCol(columns []ColumnDef, td *resource.ResourceTypeDef) int {
 	lifecycleKey := "state"
 	if td != nil && td.LifecycleKey != "" {
 		lifecycleKey = td.LifecycleKey
 	}
 	for i, c := range columns {
-		if c.Key == "status" || c.Key == lifecycleKey {
-			return i
-		}
-	}
-	for i, c := range columns {
-		if strings.EqualFold(c.Title, "State") || strings.EqualFold(c.Title, "Status") {
+		if config.IsStatusColumn(c.Key, c.Title, lifecycleKey) {
 			return i
 		}
 	}

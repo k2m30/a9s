@@ -101,7 +101,7 @@ var dataTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static c
 		},
 		Columns: []domain.Column{
 			{Key: "workgroup_name", Title: "Workgroup", Path: "Name", Width: 28},
-			{Title: "Status", Path: "State", Width: 12},
+			{Key: "state", Title: "Status", Path: "State", Width: 12},
 			{Title: "Cost Cap", Path: "Configuration.BytesScannedCutoffPerQuery", Width: 12},
 			{Key: "description", Title: "Description", Path: "Description", Width: 30},
 			{Key: "engine_version", Title: "Engine", Path: "EngineVersion.EffectiveEngineVersion", Width: 28},
@@ -196,8 +196,9 @@ var dataTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static c
 
 var dataChildTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static catalog: intentional package-level var
 	{
-		Name:      "Job Runs",
-		ShortName: "glue_runs",
+		Name:         "Job Runs",
+		ShortName:    "glue_runs",
+		LifecycleKey: "job_run_state",
 		ConsoleURL: func(r domain.Resource, region, _ string) string {
 			job := r.Fields["job_name"]
 			if job == "" {

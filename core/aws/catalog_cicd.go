@@ -117,6 +117,7 @@ var cicdTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static c
 	{
 		Name:           "CodePipelines",
 		ShortName:      "pipeline",
+		LifecycleKey:   "last_status",
 		HumanizeFields: []string{"pipeline_type", "ExecutionMode"},
 		Aliases:        []string{"pipeline", "codepipeline", "pipelines"},
 		Category:       "CI/CD",
@@ -164,6 +165,7 @@ var cicdTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static c
 	{
 		Name:           "CodeBuild Projects",
 		ShortName:      "cb",
+		LifecycleKey:   "last_build",
 		HumanizeFields: []string{"source_type"},
 		Aliases:        []string{"cb", "codebuild"},
 		Category:       "CI/CD",
@@ -341,8 +343,9 @@ var cicdTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static c
 // ChildFetcher closure.
 var cicdChildTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static catalog: intentional package-level var
 	{
-		Name:      "CodeBuild Builds",
-		ShortName: "cb_builds",
+		Name:         "CodeBuild Builds",
+		ShortName:    "cb_builds",
+		LifecycleKey: "build_status",
 		ConsoleURL: func(r domain.Resource, region, accountID string) string {
 			buildID := r.Fields["build_id"]
 			if buildID == "" {

@@ -13,6 +13,7 @@ list:
     width: 18
   Status:
     path: State
+    key: state
     width: 12
   Default:
     path: IsDefault
