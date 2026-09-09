@@ -179,10 +179,13 @@ func wipfixRefreshSeq(t *testing.T, b *wipfixBench) domain.Gen {
 
 // TestAliasFailure_ReachesTheCanonicalScreen pins row 46's second half: a
 // failure for a list opened under an alias has to reach that list, or it
-// loads for ever with nothing to show for it. The alias half of the question
-// is answered by the identity now — the failure names the screen that asked,
-// and "rds" versus "dbi" never enters into it — so what is left to pin is
-// that a failure retires the loading flag and leaves a marker.
+// loads for ever with nothing to show for it.
+//
+// The alias half is trivially true now and cannot fail: routing reads the
+// screen identity the failure carries and never looks at the type name, so
+// "rds" versus "dbi" does not arise. THE PINNED FACT IS THAT A FAILURE CLEARS
+// LOADING AND MARKS THE ERROR ON THE SCREEN THAT OWNS IT. Nobody should read
+// the name above and restore a scan that matches screens by type.
 func TestAliasFailure_ReachesTheCanonicalScreen(t *testing.T) {
 	c := newTestController(t)
 	_, _ = c.Apply(app.Action{Kind: app.ActionCommand, Arg: "rds"})

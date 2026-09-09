@@ -472,7 +472,11 @@ func TestObserveResourcesLoadedRows_ByIDFetch_DoesNotReplaceCanonical(t *testing
 	seedCanonical200(t, ctrl, core, profile, region)
 	popTopScreenForProvenancePin(t, ctrl)
 
-	handlePage(ctrl, messages.ResourcesLoaded{
+	// Deliberately unstamped: popTopScreenForProvenancePin left no list screen
+	// open, so this page names none and reaches none. It is still observed
+	// into the row store — what the assertion below is about is the shared
+	// per-type entry, never that the message wrote nothing.
+	ctrl.Handle(messages.ResourcesLoaded{
 		ResourceType: provenancePinType,
 		Resources:    provenancePinEC2Rows(1, "i-byid"),
 		Provenance:   messages.FetchProvenanceByID,
@@ -486,7 +490,11 @@ func TestObserveResourcesLoadedRows_ChildFetch_DoesNotReplaceCanonical(t *testin
 	seedCanonical200(t, ctrl, core, profile, region)
 	popTopScreenForProvenancePin(t, ctrl)
 
-	handlePage(ctrl, messages.ResourcesLoaded{
+	// Deliberately unstamped: popTopScreenForProvenancePin left no list screen
+	// open, so this page names none and reaches none. It is still observed
+	// into the row store — what the assertion below is about is the shared
+	// per-type entry, never that the message wrote nothing.
+	ctrl.Handle(messages.ResourcesLoaded{
 		ResourceType: provenancePinType,
 		Resources:    provenancePinEC2Rows(4, "i-child"),
 		Provenance:   messages.FetchProvenanceChild,
@@ -533,7 +541,11 @@ func TestObserveResourcesLoadedRows_UnknownProvenance_FailSafe_DoesNotReplaceCan
 	popTopScreenForProvenancePin(t, ctrl)
 
 	// Provenance intentionally omitted — the zero value, FetchProvenanceUnknown.
-	handlePage(ctrl, messages.ResourcesLoaded{Provenance: messages.FetchProvenanceUnknown,
+	// Deliberately unstamped: popTopScreenForProvenancePin left no list screen
+	// open, so this page names none and reaches none. It is still observed
+	// into the row store — what the assertion below is about is the shared
+	// per-type entry, never that the message wrote nothing.
+	ctrl.Handle(messages.ResourcesLoaded{Provenance: messages.FetchProvenanceUnknown,
 		ResourceType: provenancePinType,
 		Resources:    provenancePinEC2Rows(7, "i-unknown"),
 	})

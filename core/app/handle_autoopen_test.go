@@ -40,7 +40,6 @@ func TestAutoOpenSingleDetail_ByIDPlaceholderOpensDetail(t *testing.T) {
 			{ID: "i-0target00000001", Name: "target", Type: "ec2",
 				Fields: map[string]string{"instance_id": "i-0target00000001"}},
 		}, Provenance: messages.FetchProvenanceByID,
-		ScreenID: c.GetListInstance(),
 	})
 
 	snap := c.Snapshot()
