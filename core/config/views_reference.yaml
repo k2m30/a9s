@@ -3539,6 +3539,7 @@ ebs:  # ec2types.Volume
   - Operator.Managed
   - Operator.Principal
   - OutpostArn
+  - OwnerId
   - Size
   - SnapshotId
   - SourceVolumeId
@@ -3547,6 +3548,7 @@ ebs:  # ec2types.Volume
   - Tags[].Key
   - Tags[].Value
   - Throughput
+  - VolumeArn
   - VolumeId
   - VolumeInitializationRate
   - VolumeType
