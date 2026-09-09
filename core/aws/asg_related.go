@@ -217,11 +217,21 @@ func checkASGRole(ctx context.Context, clients any, res resource.Resource, _ res
 		return resource.UnknownRelated("role")
 	}
 
-	// Resolve instance profile from launch config or launch template
-	profileNameOrARN := asgResolveInstanceProfile(ctx, c, asg)
-	if profileNameOrARN != "" {
-		roleARNs := asgInstanceProfileToRoles(ctx, c, profileNameOrARN)
+	// Resolve instance profile from launch config or launch template. A call
+	// that did not answer leaves the same gap the missing-clients branch
+	// above describes, and gets the same answer: what was found is a lower
+	// bound, and nothing found is unknown rather than none.
+	profileNameOrARN, checked := asgResolveInstanceProfile(ctx, c, asg)
+	if checked && profileNameOrARN != "" {
+		roleARNs, resolved := asgInstanceProfileToRoles(ctx, c, profileNameOrARN)
 		ids = append(ids, roleARNs...)
+		checked = resolved
+	}
+	if !checked {
+		if len(ids) > 0 {
+			return relatedResultTrunc("role", ids, true)
+		}
+		return resource.UnknownRelated("role")
 	}
 
 	return relatedResult("role", ids)
@@ -229,7 +239,10 @@ func checkASGRole(ctx context.Context, clients any, res resource.Resource, _ res
 
 // asgResolveInstanceProfile reads the IamInstanceProfile from the ASG's launch config or launch template.
 // Returns the profile name or ARN, or empty string if none is found.
-func asgResolveInstanceProfile(ctx context.Context, c *ServiceClients, asg asgtypes.AutoScalingGroup) string {
+// checked is false when a call did not answer, which is a different fact from
+// an ASG that names no instance profile: the first leaves the role pivot's
+// count a lower bound, the second makes it exact.
+func asgResolveInstanceProfile(ctx context.Context, c *ServiceClients, asg asgtypes.AutoScalingGroup) (profile string, checked bool) {
 	// Launch configuration path
 	if asg.LaunchConfigurationName != nil && *asg.LaunchConfigurationName != "" {
 		out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*autoscaling.DescribeLaunchConfigurationsOutput, error) {
@@ -237,10 +250,18 @@ func asgResolveInstanceProfile(ctx context.Context, c *ServiceClients, asg asgty
 				LaunchConfigurationNames: []string{*asg.LaunchConfigurationName},
 			})
 		})
-		if err == nil && len(out.LaunchConfigurations) > 0 && out.LaunchConfigurations[0].IamInstanceProfile != nil {
-			return *out.LaunchConfigurations[0].IamInstanceProfile
+		// The caller turns false into a lower-bound count or UnknownRelated,
+		// so the role pivot never claims an exact number it did not read.
+		// no finding: false is the record.
+		if err != nil || len(out.LaunchConfigurations) == 0 {
+			return "", false
 		}
-		return ""
+		if out.LaunchConfigurations[0].IamInstanceProfile != nil {
+			return *out.LaunchConfigurations[0].IamInstanceProfile, true
+		}
+		// no finding: the launch configuration was read and names no instance
+		// profile, which is an answer.
+		return "", true
 	}
 
 	// Launch template path
@@ -249,7 +270,9 @@ func asgResolveInstanceProfile(ctx context.Context, c *ServiceClients, asg asgty
 		ltSpec = asg.MixedInstancesPolicy.LaunchTemplate.LaunchTemplateSpecification
 	}
 	if ltSpec == nil || ltSpec.LaunchTemplateId == nil || *ltSpec.LaunchTemplateId == "" {
-		return ""
+		// no finding: the ASG names no launch template, so there is no
+		// instance profile to read and nothing went unanswered.
+		return "", true
 	}
 
 	version := aws.String("$Latest")
@@ -262,24 +285,33 @@ func asgResolveInstanceProfile(ctx context.Context, c *ServiceClients, asg asgty
 			Versions:         []string{*version},
 		})
 	})
+	// As in the launch-configuration arm above, the caller renders the pivot
+	// as a lower bound or as unknown.
+	// no finding: false is the record.
 	if err != nil || len(ltOut.LaunchTemplateVersions) == 0 {
-		return ""
+		return "", false
 	}
 	ltData := ltOut.LaunchTemplateVersions[0].LaunchTemplateData
 	if ltData == nil || ltData.IamInstanceProfile == nil {
-		return ""
+		// no finding: the template version was read and declares no instance
+		// profile, which is an answer.
+		return "", true
 	}
 	if ltData.IamInstanceProfile.Arn != nil && *ltData.IamInstanceProfile.Arn != "" {
-		return *ltData.IamInstanceProfile.Arn
+		return *ltData.IamInstanceProfile.Arn, true
 	}
 	if ltData.IamInstanceProfile.Name != nil && *ltData.IamInstanceProfile.Name != "" {
-		return *ltData.IamInstanceProfile.Name
+		return *ltData.IamInstanceProfile.Name, true
 	}
-	return ""
+	// no finding: the profile block is present and names neither an ARN nor a
+	// name, which the template read answered for.
+	return "", true
 }
 
-// asgInstanceProfileToRoles resolves a profile name or ARN to role ARNs via iam:GetInstanceProfile.
-func asgInstanceProfileToRoles(ctx context.Context, c *ServiceClients, profileNameOrARN string) []string {
+// asgInstanceProfileToRoles resolves a profile name or ARN to role ARNs via
+// iam:GetInstanceProfile. resolved is false when the call did not answer, so
+// the caller can say its role count is a lower bound rather than exact.
+func asgInstanceProfileToRoles(ctx context.Context, c *ServiceClients, profileNameOrARN string) (roles []string, resolved bool) {
 	// Extract name from ARN if needed (arn:aws:iam::<acct>:instance-profile/<name>)
 	profileName := profileNameOrARN
 	if strings.Contains(profileNameOrARN, ":instance-profile/") {
@@ -293,8 +325,11 @@ func asgInstanceProfileToRoles(ctx context.Context, c *ServiceClients, profileNa
 			InstanceProfileName: aws.String(profileName),
 		})
 	})
+	// The caller marks its role count a lower bound rather than reporting the
+	// roles it did read as all of them.
+	// no finding: false is the record.
 	if err != nil || out.InstanceProfile == nil {
-		return nil
+		return nil, false
 	}
 	var roleARNs []string
 	for _, r := range out.InstanceProfile.Roles {
@@ -302,5 +337,5 @@ func asgInstanceProfileToRoles(ctx context.Context, c *ServiceClients, profileNa
 			roleARNs = append(roleARNs, arnRoleName(*r.Arn))
 		}
 	}
-	return roleARNs
+	return roleARNs, true
 }

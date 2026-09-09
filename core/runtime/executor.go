@@ -377,9 +377,13 @@ func (c *Core) ExecuteTaskAt(ctx context.Context, req TaskRequest, snap Dispatch
 				provenance = p.Provenance
 			}
 		}
+		out := FetchOutcome{
+			ResourceType: resourceType, Gen: gen, TypeGen: typeGen,
+			ListSeq: req.ListSeq, ScreenID: req.ScreenID, Lane: provenance,
+		}
 		res, err := c.FetchResources(ctx, snap.Clients, resourceType)
 		if err != nil && len(res.Resources) == 0 {
-			return messages.APIError{ResourceType: resourceType, Err: err, Gen: gen, Provenance: provenance, ListSeq: req.ListSeq, ScreenID: req.ScreenID}, nil
+			return out.Msg(res, err), nil
 		}
 		// C1: a verify-refetch must verify the content actually being shown,
 		// not just page 1 — so page up to the previously-cached depth. C5: a
@@ -408,17 +412,7 @@ func (c *Core) ExecuteTaskAt(ctx context.Context, req TaskRequest, snap Dispatch
 			res.Resources = append(res.Resources, more.Resources...)
 			res.Pagination = more.Pagination
 		}
-		return messages.ResourcesLoaded{
-			ResourceType: resourceType,
-			Resources:    res.Resources,
-			Pagination:   res.Pagination,
-			Err:          err,
-			Gen:          gen,
-			TypeGen:      typeGen,
-			ListSeq:      req.ListSeq,
-			ScreenID:     req.ScreenID,
-			Provenance:   provenance,
-		}, nil
+		return out.Msg(res, err), nil
 
 	// --- fetch filtered resources ---
 	case KindFetchFiltered:
@@ -428,18 +422,12 @@ func (c *Core) ExecuteTaskAt(ctx context.Context, req TaskRequest, snap Dispatch
 		}
 		resourceType := req.Key.Scope
 		gen := snap.AvailabilityGen
-		res, err := c.FetchResourcesFiltered(ctx, snap.Clients, resourceType, p.Filter)
-		if err != nil && len(res.Resources) == 0 {
-			return messages.APIError{ResourceType: resourceType, Err: err, Gen: gen, Provenance: messages.FetchProvenanceFilteredList, ListSeq: req.ListSeq, ScreenID: req.ScreenID}, nil
+		out := FetchOutcome{
+			ResourceType: resourceType, Gen: gen,
+			ListSeq: req.ListSeq, ScreenID: req.ScreenID,
+			Lane: messages.FetchProvenanceFilteredList,
 		}
-		return messages.ResourcesLoaded{
-			ResourceType: resourceType,
-			Resources:    res.Resources,
-			Pagination:   res.Pagination,
-			Err:          err,
-			Gen:          gen,
-			Provenance:   messages.FetchProvenanceFilteredList,
-		}, nil
+		return out.Msg(c.FetchResourcesFiltered(ctx, snap.Clients, resourceType, p.Filter)), nil
 
 	// --- fetch more (pagination) ---
 	case KindFetchMore:
@@ -449,28 +437,17 @@ func (c *Core) ExecuteTaskAt(ctx context.Context, req TaskRequest, snap Dispatch
 		}
 		resourceType := req.Key.Scope
 		gen := snap.AvailabilityGen
-		res, err := c.FetchMoreResources(ctx, snap.Clients, FetchMoreParams{
+		out := FetchOutcome{
+			ResourceType: resourceType, Gen: gen,
+			ListSeq: req.ListSeq, ScreenID: req.ScreenID, Lane: p.Lane(),
+			Append: true, LoadingMore: !p.ContinuesInitialLoad,
+		}
+		return out.Msg(c.FetchMoreResources(ctx, snap.Clients, FetchMoreParams{
 			ResourceType: resourceType,
 			Token:        p.ContinuationToken,
 			ParentCtx:    p.ParentContext,
 			FetchFilter:  p.FetchFilter,
-		})
-		provenance := p.Lane()
-		if err != nil && len(res.Resources) == 0 {
-			return messages.APIError{ResourceType: resourceType, Err: err, Gen: gen, Append: true, LoadingMore: !p.ContinuesInitialLoad, Provenance: provenance, ListSeq: req.ListSeq, ScreenID: req.ScreenID}, nil
-		}
-		return messages.ResourcesLoaded{
-			ResourceType: resourceType,
-			Resources:    res.Resources,
-			Pagination:   res.Pagination,
-			Append:       true,
-			LoadingMore:  !p.ContinuesInitialLoad,
-			Err:          err,
-			Gen:          gen,
-			ListSeq:      req.ListSeq,
-			ScreenID:     req.ScreenID,
-			Provenance:   provenance,
-		}, nil
+		})), nil
 
 	// --- fetch child resources ---
 	case TaskKindFetchChildResources:
@@ -479,18 +456,12 @@ func (c *Core) ExecuteTaskAt(ctx context.Context, req TaskRequest, snap Dispatch
 			return nil, fmt.Errorf("ExecuteTask %s: missing FetchChildResourcesPayload", req.Key.Kind)
 		}
 		gen := snap.AvailabilityGen
-		res, err := c.FetchChildResources(ctx, snap.Clients, p.ChildType, p.ParentContext)
-		if err != nil && len(res.Resources) == 0 {
-			return messages.APIError{ResourceType: p.ChildType, Err: err, Gen: gen, Provenance: messages.FetchProvenanceChild, ListSeq: req.ListSeq, ScreenID: req.ScreenID}, nil
+		out := FetchOutcome{
+			ResourceType: p.ChildType, Gen: gen,
+			ListSeq: req.ListSeq, ScreenID: req.ScreenID,
+			Lane: messages.FetchProvenanceChild,
 		}
-		return messages.ResourcesLoaded{
-			ResourceType: p.ChildType,
-			Resources:    res.Resources,
-			Pagination:   res.Pagination,
-			Err:          err,
-			Gen:          gen,
-			Provenance:   messages.FetchProvenanceChild,
-		}, nil
+		return out.Msg(c.FetchChildResources(ctx, snap.Clients, p.ChildType, p.ParentContext)), nil
 
 	// --- fetch reveal value ---
 	case KindFetchReveal:
@@ -528,13 +499,12 @@ func (c *Core) ExecuteTaskAt(ctx context.Context, req TaskRequest, snap Dispatch
 		if len(res) == 0 {
 			return messages.ByIDFetchFailed{TargetType: p.TargetType, ID: p.ID, Reason: fmt.Sprintf("%s %s not found", p.TargetType, p.ID)}, nil
 		}
-		gen := snap.AvailabilityGen
-		return messages.ResourcesLoaded{
-			ResourceType: p.TargetType,
-			Resources:    res,
-			Gen:          gen,
-			Provenance:   messages.FetchProvenanceByID,
-		}, nil
+		out := FetchOutcome{
+			ResourceType: p.TargetType, Gen: snap.AvailabilityGen,
+			ListSeq: req.ListSeq, ScreenID: req.ScreenID,
+			Lane: messages.FetchProvenanceByID,
+		}
+		return out.Msg(resource.FetchResult{Resources: res}, nil), nil
 
 	// --- fetch costs (Cost Explorer) ---
 	case KindFetchCosts:

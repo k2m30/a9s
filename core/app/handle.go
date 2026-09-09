@@ -281,58 +281,41 @@ func (c *Controller) Handle(ev runtime.Event) (ViewState, []runtime.TaskRequest)
 	return vs, tasks
 }
 
-// findResourceListScreen scans the screen stack from the top for the list
-// screen a result carrying resourceType + provenance belongs to — resolving
-// resourceType (including aliases) against each screen's context, so a late
-// result for type X lands on X's screen regardless of which screen is
-// currently on top. A fetch result belongs to a single list — the active
-// (topmost) one of its type — so the first match wins; fanning it out to
-// every same-type list would overwrite a stacked filtered/child list's rows
-// onto the list beneath it (and vice-versa).
+// findResourceListScreen returns the list screen a result belongs to: the one
+// whose instance the request named, or the single screen its type and lane
+// could mean, or none.
 //
-// A screen-type match alone is not sufficient: the gate is symmetric — a
-// screen only accepts a result whose provenance matches what that screen IS.
-// isTopLevelCanonicalList reports whether the screen IS the type's canonical
-// top-level list; provenance.CanonicalList() reports whether the result IS a
-// canonical-list result. The two must agree:
-//   - A canonical screen never accepts a by-ID/filtered/child result sharing
-//     this ResourceType — that result's actual target is always a screen
-//     pushed AFTER (and therefore found before, in this top-down scan) the
-//     canonical list it happens to share a type with, since every
-//     by-ID/filtered/child navigation pushes its own screen on top of
-//     whatever it navigated from (applyRelatedNavResult).
-//   - Symmetrically, a by-ID/filtered/child screen never accepts a
-//     canonical-list result: a late canonical refresh sharing this
-//     ResourceType is never that drill's data either — its target is the
-//     canonical screen the drill was pushed on top of, found deeper in this
-//     same scan.
+// A result carries the identity of the screen that dispatched it
+// (runtime.TaskRequest.ScreenID, stamped at both dispatch boundaries and
+// echoed back on messages.ResourcesLoaded / messages.APIError). That identity
+// is the whole answer whenever it is there: the named screen or nowhere, and a
+// result naming a screen that has since been popped strands nothing, because
+// the screen's rows went with it.
 //
-// provenance == FetchProvenanceUnknown never satisfies either side:
-// CanonicalList() is false for it, which would let it slip through the
-// non-canonical branch of the agreement above by accident. An unstamped
-// result fails closed (ok=false) rather than matching whichever
-// non-canonical screen of its type happens to be topmost.
+// A result that names no screen was not dispatched by one — a synthetic
+// construction, a cache-seed replay, a host that builds the message itself.
+// For those the type and the lane are all there is, and they are enough only
+// while they name ONE screen. Two lists of one type share their type AND their
+// lane — a filtered drill on a filtered drill, a child list on a child list —
+// so a scan that returned the topmost was guessing between them, and the guess
+// landed the deeper one's page on the newer one. When more than one screen
+// answers to the type and lane the result belongs to none of them: a page
+// nobody applies is better than a page applied to the wrong list.
 //
-// On a mismatch the screen is skipped — never returned — and the scan
-// continues deeper in the stack rather than returning immediately: the true
-// target, if its screen is still open, is necessarily found further down,
-// and if it already popped there is nothing to strand — a screen that no
-// longer exists has no Rows left to apply to.
+// The lane must agree with what the screen IS, not merely with its type:
+// isTopLevelCanonicalList reports whether the screen is the type's canonical
+// top-level list, and provenance.CanonicalList() whether the result is a
+// canonical-list result. A canonical screen never accepts a by-ID, filtered or
+// child result sharing its type, and vice versa. provenance
+// FetchProvenanceUnknown satisfies neither side, so an unstamped lane fails
+// closed rather than matching whichever screen happens to be topmost.
 //
 // Shared by handleResourcesLoadedEvent (the fetch-success path) and
 // clearActiveListLoadingTarget (the paired fetch-FAILURE path, via
 // ClearActiveListLoadingIntent) so a failed request is always routed to the
 // exact same screen its paired success would have landed on — one scan, so
-// the two paths cannot drift apart and reintroduce the asymmetry where a
-// failure lands on whatever screen happens to be on top instead of the one
-// that actually issued the failed request.
+// the two paths cannot drift apart.
 func (c *Controller) findResourceListScreen(resourceType string, provenance messages.FetchProvenance, screenID domain.Gen) (screen *Screen, ok bool) {
-	// A result that names the screen instance that asked for it goes to that
-	// screen or nowhere. Two lists of one type share their type AND their
-	// lane, so the scan below cannot tell them apart: it returns whichever is
-	// topmost, and a continuation the deeper one is still waiting for lands on
-	// the newer one instead. When the named screen has been popped there is
-	// nothing to strand — its rows went with it.
 	if screenID != 0 {
 		for i := len(c.stack) - 1; i >= 0; i-- {
 			s := &c.stack[i]
@@ -345,6 +328,7 @@ func (c *Controller) findResourceListScreen(resourceType string, provenance mess
 	if resourceType == "" || provenance == messages.FetchProvenanceUnknown {
 		return nil, false
 	}
+	var match *Screen
 	for i := len(c.stack) - 1; i >= 0; i-- {
 		s := &c.stack[i]
 		if s.ID != runtime.ScreenResourceList && s.ID != runtime.ScreenChildList {
@@ -356,9 +340,12 @@ func (c *Controller) findResourceListScreen(resourceType string, provenance mess
 		if isTopLevelCanonicalList(s.ID, s.State.List) != provenance.CanonicalList() {
 			continue
 		}
-		return s, true
+		if match != nil {
+			return nil, false
+		}
+		match = s
 	}
-	return nil, false
+	return match, match != nil
 }
 
 // handleResourcesLoadedEvent applies a ResourcesLoaded event to the list

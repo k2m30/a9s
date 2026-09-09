@@ -49,6 +49,9 @@ func FetchHostedZonesPage(ctx context.Context, api Route53ListHostedZonesAPI, co
 	recordSetsAPI, _ := api.(Route53ListResourceRecordSetsAPI)
 
 	var resources []resource.Resource
+	// Every zone's alias enumeration is its own call, so one denial is one
+	// zone's coverage gap rather than the page's failure.
+	var failures []Failure
 
 	for _, zone := range output.HostedZones {
 		zoneID := ""
@@ -80,7 +83,11 @@ func FetchHostedZonesPage(ctx context.Context, api Route53ListHostedZonesAPI, co
 		aliasTargets := ""
 		s3WebsiteAliasNames := ""
 		if recordSetsAPI != nil && zoneID != "" {
-			aliasTargets, s3WebsiteAliasNames = enumerateR53AliasTargets(ctx, recordSetsAPI, zoneID)
+			var aliasErr error
+			aliasTargets, s3WebsiteAliasNames, aliasErr = enumerateR53AliasTargets(ctx, recordSetsAPI, zoneID)
+			if aliasErr != nil {
+				failures = append(failures, FailedCall(zoneID, aliasErr))
+			}
 		}
 
 		r := resource.Resource{
@@ -122,7 +129,7 @@ func FetchHostedZonesPage(ctx context.Context, api Route53ListHostedZonesAPI, co
 			PageSize:    len(resources),
 			TotalHint:   totalHint,
 		},
-	}, nil
+	}, AggregateFailures("ListResourceRecordSets", failures, len(output.HostedZones))
 }
 
 // enumerateR53AliasTargets lists the zone's record sets and returns two
@@ -138,12 +145,18 @@ func FetchHostedZonesPage(ctx context.Context, api Route53ListHostedZonesAPI, co
 //     name in real AWS).
 //
 // Cost: one ListResourceRecordSets call per zone.
-func enumerateR53AliasTargets(ctx context.Context, api Route53ListResourceRecordSetsAPI, zoneID string) (string, string) {
+// A call that did not answer returns the reason: both lists feed related
+// pivots that join on them, and an empty list read as "this zone aliases
+// nothing" is a confident zero drawn from a call nobody made.
+func enumerateR53AliasTargets(ctx context.Context, api Route53ListResourceRecordSetsAPI, zoneID string) (string, string, error) {
 	out, err := api.ListResourceRecordSets(ctx, &route53.ListResourceRecordSetsInput{
 		HostedZoneId: aws.String(zoneID),
 	})
-	if err != nil || out == nil {
-		return "", ""
+	if err != nil {
+		return "", "", err
+	}
+	if out == nil {
+		return "", "", UnusableAnswerErr{Call: "ListResourceRecordSets", Field: "record sets"}
 	}
 	var aliases, s3Website []string
 	for _, rr := range out.ResourceRecordSets {
@@ -156,7 +169,7 @@ func enumerateR53AliasTargets(ctx context.Context, api Route53ListResourceRecord
 			s3Website = append(s3Website, strings.TrimSuffix(*rr.Name, "."))
 		}
 	}
-	return strings.Join(aliases, ","), strings.Join(s3Website, ",")
+	return strings.Join(aliases, ","), strings.Join(s3Website, ","), nil
 }
 
 // isS3WebsiteEndpoint reports whether a Route 53 AliasTarget DNSName is

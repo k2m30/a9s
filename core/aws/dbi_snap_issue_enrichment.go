@@ -87,8 +87,11 @@ func dbiSnapShareAttributes(ctx context.Context, clients *ServiceClients, snap r
 			DBSnapshotIdentifier: aws.String(snap.ID),
 		})
 	})
-	if err != nil || out.DBSnapshotAttributesResult == nil {
+	if err != nil {
 		return nil, err
+	}
+	if out.DBSnapshotAttributesResult == nil {
+		return nil, UnusableAnswerErr{Call: "DescribeDBSnapshotAttributes", Field: "attributes result"}
 	}
 	attrs := make([]snapshotAttribute, 0, len(out.DBSnapshotAttributesResult.DBSnapshotAttributes))
 	for _, a := range out.DBSnapshotAttributesResult.DBSnapshotAttributes {

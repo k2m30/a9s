@@ -304,6 +304,10 @@ func scanS3BucketPosture(ctx context.Context, api s3PostureAPI, bucket string) s
 // for the NoSuchPublicAccessBlockConfiguration case, which reads the same as
 // a nil configuration body.
 func s3PABRows(out *s3.GetPublicAccessBlockOutput, err error) []domain.DetailRow {
+	// err here is only NoSuchPublicAccessBlockConfiguration, which the caller
+	// has already separated from a refusal; it reads the same as a nil
+	// configuration body, and both are the finding this returns rows for.
+	// no finding: this arm IS the finding.
 	if err != nil || out == nil || out.PublicAccessBlockConfiguration == nil {
 		return []domain.DetailRow{
 			{Label: "Status", Value: "no public access block configuration"},

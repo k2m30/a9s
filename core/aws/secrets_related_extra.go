@@ -296,6 +296,10 @@ func checkSecretsLogs(ctx context.Context, clients any, res resource.Resource, _
 	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*lambda.GetFunctionOutput, error) {
 		return lambdaAPI.GetFunction(ctx, &lambda.GetFunctionInput{FunctionName: &rotationARN})
 	})
+	// /aws/lambda/<name> is Lambda's own default and is derived from the ARN
+	// above; only a non-default LoggingConfig would have changed it, so the
+	// fallback states a fact this call would have refined, not guessed.
+	// no finding: the answer is already known without this call.
 	if err != nil || out == nil || out.Configuration == nil {
 		return relatedResult("logs", []string{defaultLogGroup})
 	}
@@ -446,8 +450,12 @@ func checkSecretsSNS(ctx context.Context, clients any, res resource.Resource, _ 
 	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*lambda.GetFunctionOutput, error) {
 		return lambdaAPI.GetFunction(ctx, &lambda.GetFunctionInput{FunctionName: &rotationARN})
 	})
+	// The rotation function's configuration is where the dead-letter topic is
+	// named, so a call that did not answer leaves the count unknown; reporting
+	// zero read as "checked, no topic".
+	// no finding: this arm now answers with the related panel's unknown.
 	if err != nil || out == nil || out.Configuration == nil {
-		return resource.KnownRelated("sns", nil, false)
+		return resource.UnknownRelated("sns")
 	}
 	dlc := out.Configuration.DeadLetterConfig
 	if dlc == nil || dlc.TargetArn == nil || *dlc.TargetArn == "" {

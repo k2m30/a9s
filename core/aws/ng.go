@@ -15,11 +15,17 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// resolveNGImageID calls DescribeLaunchTemplateVersions for the given LaunchTemplateSpecification
-// and returns the ImageId from the first version found. Returns "" on any error or missing data.
-func resolveNGImageID(ctx context.Context, api EC2DescribeLaunchTemplateVersionsAPI, lt *ekstypes.LaunchTemplateSpecification) string {
+// resolveNGImageID calls DescribeLaunchTemplateVersions for the given
+// LaunchTemplateSpecification and returns the ImageId from the first version
+// found.
+//
+// The error is the caller's to record: a node group that names a launch
+// template has an AMI, so an empty image_id cell after a failed read is a
+// blank the operator cannot tell from a template that declares none. A
+// template that genuinely declares no image returns ("", nil).
+func resolveNGImageID(ctx context.Context, api EC2DescribeLaunchTemplateVersionsAPI, lt *ekstypes.LaunchTemplateSpecification) (string, error) {
 	if api == nil || lt == nil || lt.Id == nil {
-		return ""
+		return "", nil
 	}
 	version := "$Default"
 	if lt.Version != nil && *lt.Version != "" {
@@ -29,14 +35,19 @@ func resolveNGImageID(ctx context.Context, api EC2DescribeLaunchTemplateVersions
 		LaunchTemplateId: lt.Id,
 		Versions:         []string{version},
 	})
-	if err != nil || out == nil || len(out.LaunchTemplateVersions) == 0 {
-		return ""
+	if err != nil {
+		return "", err
+	}
+	if out == nil || len(out.LaunchTemplateVersions) == 0 {
+		return "", UnusableAnswerErr{Call: "DescribeLaunchTemplateVersions", Field: "launch template version"}
 	}
 	data := out.LaunchTemplateVersions[0].LaunchTemplateData
+	// no finding: the version was read and declares no image, which is an
+	// answer — the node group inherits the EKS-optimised default.
 	if data == nil || data.ImageId == nil {
-		return ""
+		return "", nil
 	}
-	return *data.ImageId
+	return *data.ImageId, nil
 }
 
 // healthIssueFinding builds a Broken Finding for an unhealthy lifecycle

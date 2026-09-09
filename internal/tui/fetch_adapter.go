@@ -50,37 +50,20 @@ type fetchOutcome struct {
 	loadingMore  bool
 }
 
-// msg turns a fetcher's return into the message the request answers with.
-//
-// Partial-success contract: fetchers may return BOTH a non-empty
-// result.Resources AND a composite error. When that happens the error is
-// surfaced AND the partial Resources kept; a hard failure (no resources at
-// all) routes through APIError.
+// msg turns a fetcher's return into the message the request answers with,
+// through the one seam that builds it (messages.FetchOutcome.Msg) — the
+// terminal's fetch commands and the runtime's own answer the same way or they
+// are two answers.
 func (o fetchOutcome) msg(res resource.FetchResult, err error) tea.Msg {
-	if err != nil && len(res.Resources) == 0 {
-		return messages.APIError{
-			ResourceType: o.resourceType,
-			Err:          err,
-			Gen:          o.gen,
-			ListSeq:      o.seq,
-			ScreenID:     o.screen,
-			Append:       o.appendPage,
-			LoadingMore:  o.loadingMore,
-			Provenance:   o.lane,
-		}
-	}
-	return messages.ResourcesLoaded{
+	return runtime.FetchOutcome{
 		ResourceType: o.resourceType,
-		Resources:    res.Resources,
-		Pagination:   res.Pagination,
-		Append:       o.appendPage,
-		LoadingMore:  o.loadingMore,
-		Err:          err,
 		Gen:          o.gen,
 		ListSeq:      o.seq,
 		ScreenID:     o.screen,
-		Provenance:   o.lane,
-	}
+		Lane:         o.lane,
+		Append:       o.appendPage,
+		LoadingMore:  o.loadingMore,
+	}.Msg(res, err)
 }
 
 // listFetchIdentity resolves the screen a list fetch is issued by and the
@@ -120,7 +103,8 @@ func (m *Model) fetchResources(resourceType string, gen domain.Gen, lane message
 // gen is the AvailabilityGen captured at dispatch time.
 func (m *Model) fetchResourcesFiltered(resourceType string, filter map[string]string, gen domain.Gen) tea.Cmd {
 	ctx, clients := m.appCtx, m.core.Clients()
-	out := fetchOutcome{resourceType: resourceType, gen: gen, lane: messages.FetchProvenanceFilteredList}
+	screen, seq := m.listFetchIdentity()
+	out := fetchOutcome{resourceType: resourceType, gen: gen, seq: seq, screen: screen, lane: messages.FetchProvenanceFilteredList}
 	return func() tea.Msg {
 		return out.msg(m.core.FetchResourcesFiltered(ctx, clients, resourceType, filter))
 	}
@@ -168,7 +152,8 @@ func (m *Model) fetchByIDDetail(targetType, id string) tea.Cmd {
 func (m *Model) fetchChildResources(childType string, parentCtx map[string]string) tea.Cmd {
 	ctx, clients := m.appCtx, m.core.Clients()
 	gen := m.core.AvailabilityGen()
-	out := fetchOutcome{resourceType: childType, gen: gen, lane: messages.FetchProvenanceChild}
+	screen, seq := m.listFetchIdentity()
+	out := fetchOutcome{resourceType: childType, gen: gen, seq: seq, screen: screen, lane: messages.FetchProvenanceChild}
 	return func() tea.Msg {
 		return out.msg(m.core.FetchChildResources(ctx, clients, childType, parentCtx))
 	}

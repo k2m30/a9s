@@ -28,6 +28,9 @@ func snsGetTopicAttrs(ctx context.Context, clients any, topicARN string) map[str
 	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*sns.GetTopicAttributesOutput, error) {
 		return api.GetTopicAttributes(ctx, &sns.GetTopicAttributesInput{TopicArn: &topicARN})
 	})
+	// Both callers render this nil as UnknownRelated, so the pivot shows "?"
+	// rather than "no key" or "no subscriptions".
+	// no finding: nil is this helper's unknown.
 	if err != nil || out == nil {
 		return nil
 	}

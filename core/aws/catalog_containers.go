@@ -330,7 +330,11 @@ func fetchNodeGroupsPage(ctx context.Context, clients any, continuationToken str
 			}
 			res := buildNodeGroupResource(cluster, ngName, descOutput.Nodegroup)
 			if lt := descOutput.Nodegroup.LaunchTemplate; lt != nil && lt.Id != nil {
-				res.Fields["image_id"] = resolveNGImageID(ctx, c.EC2, lt)
+				imageID, imgErr := resolveNGImageID(ctx, c.EC2, lt)
+				if imgErr != nil {
+					failures = append(failures, FailedCall(cluster+"/"+ngName, imgErr))
+				}
+				res.Fields["image_id"] = imageID
 			}
 			resources = append(resources, res)
 		}

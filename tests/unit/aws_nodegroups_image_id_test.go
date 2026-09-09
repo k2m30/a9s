@@ -12,6 +12,7 @@ package unit
 import (
 	"context"
 	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -212,9 +213,20 @@ func TestFetchNodeGroups_ImageIDEmptyWhenLaunchTemplateResolveFails(t *testing.T
 
 	pf := resource.GetPaginatedFetcher("ng")
 	result, err := pf(context.Background(), &awsclient.ServiceClients{EKS: eksFull, EC2: ltFake}, "")
-	// The fetch should succeed (error from DescribeLaunchTemplateVersions is non-fatal)
-	if err != nil {
-		t.Fatalf("expected no error, got %v", err)
+	// INVERTED for runtime8 row 15. This required err == nil, which read the
+	// refused DescribeLaunchTemplateVersions as nothing at all: the row landed
+	// with a blank image_id an operator cannot tell from a template that
+	// declares no image. Non-fatal is still non-fatal — the node group is
+	// emitted, asserted below — but the refusal is now carried out in the
+	// fetcher's partial-failure aggregate, which is what every other per-item
+	// call in this fetcher already does. Do not "restore" the nil error.
+	if err == nil {
+		t.Fatal("the refused launch-template read is not carried out of the fetcher, so the blank " +
+			"image_id below reads as a node group whose template declares no image")
+	}
+	if !strings.Contains(err.Error(), "ng-lt-error") {
+		t.Errorf("the aggregate is %q, want it to name the node group whose launch template could not "+
+			"be read", err)
 	}
 	resources := result.Resources
 	if len(resources) != 1 {

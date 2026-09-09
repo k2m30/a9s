@@ -272,6 +272,9 @@ func checkEbRole(ctx context.Context, clients any, res resource.Resource, _ reso
 	}
 
 	var ids []string
+	// resolved stays true until a profile lookup does not answer; the same
+	// rule the ASG role pivot follows, because it is the same call.
+	resolved := true
 	for _, cfg := range cfgOut.ConfigurationSettings {
 		for _, opt := range cfg.OptionSettings {
 			ns := ""
@@ -292,13 +295,20 @@ func checkEbRole(ctx context.Context, clients any, res resource.Resource, _ reso
 			switch {
 			case ns == "aws:autoscaling:launchconfiguration" && name == "IamInstanceProfile":
 				// Resolve instance profile to role ARNs
-				roleARNs := asgInstanceProfileToRoles(ctx, c, val)
+				roleARNs, answered := asgInstanceProfileToRoles(ctx, c, val)
 				ids = append(ids, roleARNs...)
+				resolved = resolved && answered
 			case ns == "aws:elasticbeanstalk:environment" && name == "ServiceRole":
 				// ServiceRole may be a role ARN or a role name
 				ids = append(ids, val)
 			}
 		}
+	}
+	if !resolved {
+		if len(ids) > 0 {
+			return relatedResultTrunc("role", ids, true)
+		}
+		return resource.UnknownRelated("role")
 	}
 	return relatedResult("role", ids)
 }

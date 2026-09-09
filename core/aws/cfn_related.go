@@ -132,6 +132,9 @@ func cfnStackResourcesByType(ctx context.Context, clients any, stackName, resour
 	out, err := c.CloudFormation.ListStackResources(ctx, &cloudformation.ListStackResourcesInput{
 		StackName: aws.String(stackName),
 	})
+	// Both checkCfn* callers turn false into UnknownRelated, so the pivot
+	// renders "?" rather than claiming the stack holds no such resources.
+	// no finding: false is the answer this helper exists to give.
 	if err != nil || out == nil {
 		return nil, false
 	}

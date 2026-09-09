@@ -30,6 +30,7 @@ package aws
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"slices"
 	"strconv"
@@ -260,7 +261,12 @@ func enrichSnapshotPublicShare(
 		attrs, err := cfg.PublicAttr(ctx, clients, res)
 		mu.Lock()
 		defer mu.Unlock()
-		if err != nil {
+		var unusable UnusableAnswerErr
+		switch {
+		case errors.As(err, &unusable):
+			MarkUnusable(result, res.ID, &failures, unusable.Error())
+			return
+		case err != nil:
 			MarkSkipped(result, res.ID, &failures, err)
 			return
 		}

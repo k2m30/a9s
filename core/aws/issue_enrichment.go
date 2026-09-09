@@ -258,6 +258,21 @@ func markUninspected(result *IssueEnricherResult, id, check string) {
 	result.TruncatedIDs[id] = check
 }
 
+// UnusableAnswerErr is what a helper returns when the service answered and the
+// answer carries no field to read. Returning a nil error there says "read it,
+// there is nothing" — the one thing a call that answered nothing must not
+// claim — and returning a bare error says a call refused, which is a different
+// fact with a different cause. Callers recognise it with errors.As and record
+// through MarkUnusable, so the row names the call that came back short.
+type UnusableAnswerErr struct {
+	// Call is the API operation that answered without the field.
+	Call string
+	// Field names what was missing, in the words the operator reads.
+	Field string
+}
+
+func (e UnusableAnswerErr) Error() string { return e.Call + " returned no " + e.Field }
+
 // MarkUnusable records an item the service answered for without the field the
 // enricher needs — a summary the response omitted, a name the batch did not
 // come back with. There is no error to classify, so a9s states the cause

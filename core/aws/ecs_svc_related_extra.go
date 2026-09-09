@@ -256,6 +256,8 @@ func checkECSSvcECR(ctx context.Context, clients any, res resource.Resource, _ r
 			TaskDefinition: &taskDefARN,
 		})
 	})
+	// The related panel's error result carries the refusal to the pivot.
+	// no finding: this arm already answers with it.
 	if err != nil || out.TaskDefinition == nil {
 		return resource.ErrorRelated("ecr", err)
 	}
@@ -324,6 +326,9 @@ func checkECSSvcSecrets(ctx context.Context, clients any, res resource.Resource,
 			TaskDefinition: &taskDefARN,
 		})
 	})
+	// As in checkEcsSvcECR above, the pivot is told the call refused rather
+	// than shown a count.
+	// no finding: this arm already answers with the error result.
 	if err != nil || out.TaskDefinition == nil {
 		return resource.ErrorRelated("secrets", err)
 	}

@@ -301,7 +301,10 @@ func emitAPIErrorCmd(p runtime.EmitAPIErrorPayload) tea.Cmd {
 	err := p.Err
 	gen := p.Gen
 	return func() tea.Msg {
-		return messages.APIError{Err: err, Gen: gen}
+		// No fetch behind this one — a connect failure. The seam takes the
+		// two facts it has and leaves the rest zero, which is what the literal
+		// did; an exemption for it would be an allowlist of one.
+		return runtime.FetchOutcome{Gen: gen}.Msg(resource.FetchResult{}, err)
 	}
 }
 

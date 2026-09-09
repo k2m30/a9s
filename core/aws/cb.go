@@ -165,6 +165,9 @@ func cbSourceLocationCredential(src *cbtypes.ProjectSource) (string, bool) {
 	}
 	loc := aws.ToString(src.Location)
 	u, err := url.Parse(loc)
+	// This is url.Parse, not an AWS call, and a CodeCommit or S3 location is
+	// not a URL and never carries a credential.
+	// no finding: a parse failure is the healthy answer.
 	if err != nil || u.User == nil || u.Scheme == "" {
 		return "", false
 	}

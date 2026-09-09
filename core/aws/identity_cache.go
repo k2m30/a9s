@@ -70,6 +70,10 @@ func liveAccountID(ctx context.Context, c *ServiceClients) string {
 		return ""
 	}
 	out, err := c.STS.GetCallerIdentity(ctx, &sts.GetCallerIdentityInput{})
+	// The empty string is recorded one frame up as errAccountUnresolved on the
+	// IdentityStore, which every later caller in the session reads instead of
+	// retrying.
+	// no finding: that sticky failure is the record.
 	if err != nil || out == nil || out.Account == nil {
 		return ""
 	}

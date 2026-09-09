@@ -25,6 +25,10 @@ func athenaWorkGroupConfig(ctx context.Context, clients any, wgName string) *ath
 		return nil
 	}
 	out, err := c.Athena.GetWorkGroup(ctx, &athena.GetWorkGroupInput{WorkGroup: aws.String(wgName)})
+	// Every checkAthena* caller turns this nil into UnknownRelated, so the
+	// pivot renders "?" rather than a count nobody read, and the workgroup row
+	// itself was never in question.
+	// no finding: the related panel's own unknown is the mechanism.
 	if err != nil || out == nil || out.WorkGroup == nil {
 		return nil
 	}

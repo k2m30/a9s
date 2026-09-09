@@ -207,6 +207,9 @@ func backupPlanVaults(ctx context.Context, clients any, res resource.Resource) [
 			BackupPlanId: &planID,
 		})
 	})
+	// checkBackupKMS and checkBackupSNS both turn this nil into
+	// UnknownRelated.
+	// no finding: the pivot renders "?" instead of a count nobody read.
 	if err != nil || out == nil || out.BackupPlan == nil {
 		return nil
 	}

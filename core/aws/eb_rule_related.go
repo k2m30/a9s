@@ -52,6 +52,8 @@ func ebRuleTargetsByService(ctx context.Context, clients any, ruleName string, s
 	out, err := c.EventBridge.ListTargetsByRule(ctx, &eventbridge.ListTargetsByRuleInput{
 		Rule: aws.String(ruleName),
 	})
+	// Every checkEbRule* caller renders false as UnknownRelated.
+	// no finding: the pivot shows "?" rather than a target count nobody read.
 	if err != nil || out == nil {
 		return nil, false
 	}

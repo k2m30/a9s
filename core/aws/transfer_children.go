@@ -14,6 +14,7 @@ package aws
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"maps"
 	"slices"
@@ -167,8 +168,8 @@ func enrichTransferAgreement(ctx context.Context, clients any, res resource.Reso
 
 	localProfileID := aws.ToString(agreement.LocalProfileId)
 	partnerProfileID := aws.ToString(agreement.PartnerProfileId)
-	localAs2ID, localCertFindings := resolveTransferProfile(ctx, c.Transfer, localProfileID)
-	partnerAs2ID, partnerCertFindings := resolveTransferProfile(ctx, c.Transfer, partnerProfileID)
+	localAs2ID, localCertFindings, localErr := resolveTransferProfile(ctx, c.Transfer, localProfileID)
+	partnerAs2ID, partnerCertFindings, partnerErr := resolveTransferProfile(ctx, c.Transfer, partnerProfileID)
 
 	enriched := res
 	enriched.Fields = make(map[string]string, len(res.Fields))
@@ -184,49 +185,69 @@ func enrichTransferAgreement(ctx context.Context, clients any, res resource.Reso
 
 	enriched.Findings = slices.Concat(res.Findings, localCertFindings, partnerCertFindings)
 
-	return enriched, nil
+	// The enriched detail is returned either way — a profile that did not
+	// resolve must not blank the agreement. The error travels with it so the
+	// operator is told a certificate check did not run, rather than reading an
+	// agreement with no expiry warning as one with no expiring certificate.
+	return enriched, errors.Join(localErr, partnerErr)
 }
 
 // resolveTransferProfile resolves a profile id to its As2Id fact
 // (DescribeProfile) and evaluates each of its certificates for expiry
-// (DescribeCertificate). Returns ("", nil) for an empty profileID or a
-// failed/empty lookup — a resolution failure must not break the agreement
-// detail it is enriching.
-func resolveTransferProfile(ctx context.Context, api TransferAPI, profileID string) (string, []domain.Finding) {
+// (DescribeCertificate).
+//
+// A resolution failure must not break the agreement detail it is enriching, so
+// the As2Id and the findings come back empty and the caller renders what it
+// has. It is carried out as an error all the same: the certificate checks that
+// did not run are the difference between "no certificate is expiring" and "a9s
+// did not look", and only the second one is true here.
+func resolveTransferProfile(ctx context.Context, api TransferAPI, profileID string) (string, []domain.Finding, error) {
+	// no finding: an agreement that names no profile has none to resolve.
 	if profileID == "" {
-		return "", nil
+		return "", nil, nil
 	}
 	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*transfer.DescribeProfileOutput, error) {
 		return api.DescribeProfile(ctx, &transfer.DescribeProfileInput{ProfileId: aws.String(profileID)})
 	})
-	if err != nil || out.Profile == nil {
-		return "", nil
+	if err != nil {
+		return "", nil, err
+	}
+	if out.Profile == nil {
+		return "", nil, UnusableAnswerErr{Call: "DescribeProfile", Field: "profile"}
 	}
 	as2ID := aws.ToString(out.Profile.As2Id)
 
+	var certErrs []error
 	var findings []domain.Finding
 	for _, certID := range out.Profile.CertificateIds {
-		if f, ok := transferCertificateFinding(ctx, api, certID); ok {
+		f, ok, certErr := transferCertificateFinding(ctx, api, certID)
+		certErrs = append(certErrs, certErr)
+		if ok {
 			findings = append(findings, f)
 		}
 	}
-	return as2ID, findings
+	return as2ID, findings, errors.Join(certErrs...)
 }
 
 // transferCertificateFinding evaluates one certificate for expiry via
 // DescribeCertificate: InactiveDate past or Status INACTIVE is Broken
 // "expired"; within 30 days is Warning "expires in <N>d" — the child-row
 // signal (docs/resources/transfer.md §3.2), never bubbled to the server
-// row. Returns (zero, false) for an empty certID or a failed lookup.
-func transferCertificateFinding(ctx context.Context, api TransferAPI, certID string) (domain.Finding, bool) {
+// row. A lookup that did not answer returns (zero, false) AND the reason: an
+// absent expiry warning must not read as a certificate that is not expiring.
+func transferCertificateFinding(ctx context.Context, api TransferAPI, certID string) (domain.Finding, bool, error) {
+	// no finding: an empty certificate id names nothing to describe.
 	if certID == "" {
-		return domain.Finding{}, false
+		return domain.Finding{}, false, nil
 	}
 	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*transfer.DescribeCertificateOutput, error) {
 		return api.DescribeCertificate(ctx, &transfer.DescribeCertificateInput{CertificateId: aws.String(certID)})
 	})
-	if err != nil || out.Certificate == nil {
-		return domain.Finding{}, false
+	if err != nil {
+		return domain.Finding{}, false, err
+	}
+	if out.Certificate == nil {
+		return domain.Finding{}, false, UnusableAnswerErr{Call: "DescribeCertificate", Field: "certificate"}
 	}
 	cert := out.Certificate
 
@@ -235,15 +256,17 @@ func transferCertificateFinding(ctx context.Context, api TransferAPI, certID str
 		expired = true
 	}
 	if expired {
-		return wave1Finding(transferCodeCertExpired), true
+		return wave1Finding(transferCodeCertExpired), true, nil
 	}
 
 	if cert.InactiveDate != nil {
 		remaining := time.Until(*cert.InactiveDate)
 		if remaining > 0 && remaining <= transferCertExpiringWindow {
 			days := int(remaining.Hours() / 24)
-			return wave1Finding(transferCodeCertExpiring, strconv.Itoa(days)), true
+			return wave1Finding(transferCodeCertExpiring, strconv.Itoa(days)), true, nil
 		}
 	}
-	return domain.Finding{}, false
+	// no finding: the certificate was read and is neither expired nor inside
+	// the expiring window, which is an answer.
+	return domain.Finding{}, false, nil
 }

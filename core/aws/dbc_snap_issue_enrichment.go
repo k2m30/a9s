@@ -76,8 +76,11 @@ func dbcSnapShareAttributes(ctx context.Context, clients *ServiceClients, snap r
 				DBClusterSnapshotIdentifier: aws.String(snap.ID),
 			})
 		})
-		if err != nil || out.DBClusterSnapshotAttributesResult == nil {
+		if err != nil {
 			return nil, err
+		}
+		if out.DBClusterSnapshotAttributesResult == nil {
+			return nil, UnusableAnswerErr{Call: "DescribeDBClusterSnapshotAttributes", Field: "attributes result"}
 		}
 		attrs := make([]snapshotAttribute, 0, len(out.DBClusterSnapshotAttributesResult.DBClusterSnapshotAttributes))
 		for _, a := range out.DBClusterSnapshotAttributesResult.DBClusterSnapshotAttributes {
@@ -93,8 +96,11 @@ func dbcSnapShareAttributes(ctx context.Context, clients *ServiceClients, snap r
 			DBClusterSnapshotIdentifier: aws.String(snap.ID),
 		})
 	})
-	if err != nil || out.DBClusterSnapshotAttributesResult == nil {
+	if err != nil {
 		return nil, err
+	}
+	if out.DBClusterSnapshotAttributesResult == nil {
+		return nil, UnusableAnswerErr{Call: "DescribeDBClusterSnapshotAttributes", Field: "attributes result"}
 	}
 	attrs := make([]snapshotAttribute, 0, len(out.DBClusterSnapshotAttributesResult.DBClusterSnapshotAttributes))
 	for _, a := range out.DBClusterSnapshotAttributesResult.DBClusterSnapshotAttributes {

@@ -162,6 +162,10 @@ func enumerateBackupPlanResources(
 				NextToken:    nextToken,
 			})
 		})
+		// Breaking leaves complete=false, which the caller renders as
+		// selections_partial on the plan row, so the operator is told the
+		// selection list is short.
+		// no finding: the walk's completeness is the recorder here.
 		if err != nil || listOut == nil {
 			break
 		}
@@ -175,6 +179,9 @@ func enumerateBackupPlanResources(
 					SelectionId:  sel.SelectionId,
 				})
 			})
+			// The plan row carries selections_partial and never claims the
+			// selection set is whole, exactly as for the list walk's break.
+			// no finding: the false return is the recorder.
 			if selErr != nil || selOut == nil || selOut.BackupSelection == nil {
 				return strings.Join(resources, ","), strings.Join(notResources, ","), strings.Join(selectionTags, ","), false
 			}
