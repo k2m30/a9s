@@ -82,17 +82,20 @@ func runFullCatalogDetailBench(t *testing.T) detailBenchResult {
 	clients := demo.NewServiceClients()
 	cache := resource.ResourceCache{}
 
-	// sg.unused scans the "eni" cache, the vpc-peer route findings the "rtb"
-	// cache, the not-in-backup-plan / no-snapshot findings the "backup" and
-	// "ebs-snap" caches, cf.origin-bucket-missing the "s3" cache,
-	// r53.dangling-record the "eip", "ec2" and "eni" caches, and the snapshot
-	// cross-ref enrichers the "dbi" and "dbc" caches (all zero-call
-	// enrichers); load them all so the bench sees what a demo user who has
-	// opened those lists sees.
+	// The cross-ref enrichers scan other types' caches, and each one names the
+	// caches it scans on its own registration. Loading exactly that union is
+	// what a demo user who has opened those lists sees; typing the union out
+	// here instead would go stale the first time an enricher gained a scan,
+	// silently, because an unloaded cache produces no finding rather than an
+	// error.
+	needed := map[string]bool{}
+	for _, e := range awsclient.AllWave2() {
+		for _, name := range e.Enricher.Reads {
+			needed[name] = true
+		}
+	}
 	for _, td := range resource.AllResourceTypes() {
-		switch td.ShortName {
-		case "eni", "rtb", "backup", "ebs-snap", "s3", "eip", "ec2", "dbi", "dbc":
-		default:
+		if !needed[td.ShortName] {
 			continue
 		}
 		if rows, ok := DrainFixtures(t, td, clients); ok {

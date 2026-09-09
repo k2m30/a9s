@@ -18,3 +18,8 @@
 - A signal that only greys a row no longer declares an explanation nothing
   shows. The seven grey signals that carried one now carry the phrase alone,
   which is all the list and the status cell ever rendered.
+
+- A placeholder in a signal's list text is written one way. `latest run <status>`
+  and `shard <shard id>` replace the two spellings that shouted, and the two
+  CloudTrail delivery signals no longer name an SDK field where the value goes.
+  What you see on a row is unchanged; this is the wording in the signal tables.

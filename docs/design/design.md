@@ -174,7 +174,8 @@ Column headers:
 
 Row coloring strategy (entire row, not just status cell):
 - `running` / `available` / `active`: entire row in green `#9ece6a`
-- `stopped` / `failed`: entire row in red `#f7768e`
+- `failed`, and `stopped` where AWS stopped the instance itself: entire row in red `#f7768e`
+- `stopped` by request: entire row in yellow `#e0af68`
 - `terminated`: entire row dimmed `#565f89`
 - `pending` / `creating`: entire row in yellow `#e0af68`
 - Selected row: full-width `#7aa2f7` background, `#1a1b26` foreground, bold
@@ -282,7 +283,8 @@ Notes on row coloring:
 - Selected row: full-width blue background regardless of status
 - `running` rows: entire row text in GREEN `#9ece6a`
 - `pending` rows: entire row text in YELLOW `#e0af68`
-- `stopped` rows: entire row text in RED `#f7768e`
+- `stopped by AWS` rows: entire row text in RED `#f7768e`
+- `stopped` rows (stopped by request): entire row text in YELLOW `#e0af68`
 - `terminated` rows: entire row DIM `#565f89`
 - Column headers have NO underline/separator row below them
 

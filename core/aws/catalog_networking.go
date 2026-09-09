@@ -230,7 +230,7 @@ var networkingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 		Fetcher: fetcherWithClients(func(ctx context.Context, c *ServiceClients, continuationToken string) (resource.FetchResult, error) {
 			return FetchSecurityGroupsPage(ctx, c.EC2, continuationToken)
 		}),
-		Wave2:     IssueEnricher{Fn: EnrichSGUsage, Priority: 100},
+		Wave2:     IssueEnricher{Fn: EnrichSGUsage, Priority: 100, Reads: []string{"eni"}},
 		FieldKeys: []string{"group_id", "group_name", "vpc_id", "description", "dangerous_open_count", "wide_open", "open_ports", "risk_summary"},
 		Related: []domain.RelatedDef{
 			{TargetType: "vpc", DisplayName: "VPC", Checker: checkSGVPC, NeedsTargetCache: false},
@@ -752,7 +752,7 @@ var networkingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 		Fetcher: fetcherWithClients(func(ctx context.Context, c *ServiceClients, continuationToken string) (resource.FetchResult, error) {
 			return FetchVpcPeeringConnectionsPage(ctx, c.EC2, continuationToken)
 		}),
-		Wave2:     IssueEnricher{Fn: EnrichVpcPeerRoutes, Priority: 100},
+		Wave2:     IssueEnricher{Fn: EnrichVpcPeerRoutes, Priority: 100, Reads: []string{"rtb"}},
 		FieldKeys: []string{"pcx_id", "status", "requester_vpc", "requester_owner", "accepter_vpc", "accepter_owner", "expires"},
 		Related: []domain.RelatedDef{
 			{TargetType: "rtb", DisplayName: "Route Tables", Checker: checkVpcPeerRTB, NeedsTargetCache: true, Truncated: true},

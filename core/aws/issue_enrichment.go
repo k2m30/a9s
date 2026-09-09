@@ -33,6 +33,11 @@ import (
 type IssueEnricher struct {
 	Fn       IssueEnricherFunc
 	Priority int // lower runs first; default 100
+	// Reads names the resource types whose ResourceCache this enricher scans.
+	// An enricher that scans a cache nobody loaded emits nothing and says
+	// nothing about it, so whatever arranges the caches has to be told; this
+	// is the one place it is told, beside the Fn it describes.
+	Reads []string
 }
 
 // InFetcherWave2Sentinel is the explicit "Wave 2 done in the fetcher" sentinel.

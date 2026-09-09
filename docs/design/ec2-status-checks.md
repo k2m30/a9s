@@ -43,7 +43,8 @@ when status checks are not fully passing on a `running` instance.
 | running, initializing              | `~ running`           | YELLOW    |
 | running, insufficient-data         | `running`             | GREEN     |
 | pending (any checks)               | `pending`             | YELLOW    |
-| stopped (checks not applicable)    | `stopped`             | RED       |
+| stopped by request                 | `stopped`             | YELLOW    |
+| stopped by AWS (`Server.*` reason) | `stopped by AWS`      | RED       |
 | terminated                         | `terminated`          | DIM       |
 | status check API error (fallback)  | `running`             | GREEN     |
 
@@ -329,6 +330,7 @@ Demo fixtures set `system_status` and `instance_status` fields on EC2 instances:
 | worker-02     | running     | initializing   | initializing    | `~ running`     |
 | bastion       | running     | ok             | ok              | `running`       |
 | old-worker    | stopped     | (empty)        | (empty)         | `stopped`       |
+| host-retired  | stopped     | (empty)        | (empty)         | `stopped by AWS`|
 | legacy-app    | terminated  | (empty)        | (empty)         | `terminated`    |
 
 ---

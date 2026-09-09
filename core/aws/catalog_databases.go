@@ -91,7 +91,7 @@ var databasesTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 		Fetcher: fetcherWithClients(func(ctx context.Context, c *ServiceClients, continuationToken string) (resource.FetchResult, error) {
 			return FetchRDSInstancesPage(ctx, c.RDS, continuationToken)
 		}),
-		Wave2: IssueEnricher{Fn: EnrichDBIMaintenance, Priority: 10},
+		Wave2: IssueEnricher{Fn: EnrichDBIMaintenance, Priority: 10, Reads: []string{"backup"}},
 		FieldKeys: []string{
 			"db_identifier", "engine", "engine_version", "status", "status_raw", "class", "endpoint",
 			"multi_az", "arn", "publicly_accessible", "storage_encrypted",
@@ -256,7 +256,7 @@ var databasesTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 			{Code: CodeRedisDeleting, Phrase: "deleting — teardown", Severity: domain.SevWarn, Source: "wave1", Detail: "The group's nodes are being removed and its endpoint stops answering shortly. Confirm nothing still connects to it — a cache that disappears usually shows up as latency on the database behind it."},
 			{Code: CodeRedisModifying, Phrase: "modifying — config change", Severity: domain.SevWarn, Source: "wave1", Detail: "A configuration change is being applied, and depending on the change the group may fail over or restart nodes while it runs. Expect brief connection resets, and hold off on further changes until it settles."},
 			{Code: CodeRedisSnapshotting, Phrase: "snapshotting — backup running", Severity: domain.SevWarn, Source: "wave1", Detail: "A backup is being taken, which uses memory and I/O on the node doing it and can slow responses on a busy group. Nothing to fix; move the backup window outside peak hours if this keeps appearing during traffic."},
-			{Code: CodeRedisShardIssue, Phrase: "shard <NodeGroupId>: <status>", Severity: domain.SevWarn, Source: "wave1", Detail: "One shard of this group is not in a normal state, so the keys that hash to it may be unavailable or served without a replica. Check that shard's nodes and its failover history before treating the whole group as healthy."},
+			{Code: CodeRedisShardIssue, Phrase: "shard <shard id>: <status>", Severity: domain.SevWarn, Source: "wave1", Detail: "One shard of this group is not in a normal state, so the keys that hash to it may be unavailable or served without a replica. Check that shard's nodes and its failover history before treating the whole group as healthy."},
 			{Code: CodeRedisMultiAZWithoutAutoFailover, Phrase: "multi-AZ without auto-failover", Severity: domain.SevWarn, Source: "wave1", Detail: "The group has replicas in more than one Availability Zone but will not promote them by itself, so losing the primary means downtime until somebody fails it over by hand. Turn automatic failover on — the replicas are already being paid for."},
 			{Code: CodeRedisAtRestOff, Phrase: "encryption at rest off", Severity: domain.SevWarn, Source: "wave1", Detail: "Cached data is written to disk and to backups unencrypted. Encryption at rest can only be turned on at creation time — recreate the replication group with it enabled and migrate."},
 			{Code: CodeRedisTransitOff, Phrase: "encryption in transit off", Severity: domain.SevWarn, Source: "wave1", Detail: "Client traffic to this group crosses the network in cleartext, so anyone with VPC access can read the cached data. Enable in-transit encryption on the replication group."},
@@ -346,7 +346,7 @@ var databasesTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 				},
 			}, nil
 		}),
-		Wave2: IssueEnricher{Fn: EnrichDBCMaintenance, Priority: 100},
+		Wave2: IssueEnricher{Fn: EnrichDBCMaintenance, Priority: 100, Reads: []string{"backup"}},
 		FieldKeys: []string{
 			"cluster_id", "engine", "engine_version", "status", "status_raw", "instances", "endpoint", "arn",
 			"has_writer", "writer_count", "deletion_protection", "storage_encrypted",
@@ -412,7 +412,7 @@ var databasesTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 		Fetcher: fetcherWithClients(func(ctx context.Context, c *ServiceClients, continuationToken string) (resource.FetchResult, error) {
 			return FetchDynamoDBTablesPage(ctx, c.DynamoDB, c.DynamoDB, continuationToken)
 		}),
-		Wave2:     IssueEnricher{Fn: EnrichDynamoDBPITR, Priority: 100},
+		Wave2:     IssueEnricher{Fn: EnrichDynamoDBPITR, Priority: 100, Reads: []string{"backup"}},
 		FieldKeys: []string{"table_name", "status", "item_count", "size_bytes", "size_bytes_raw", "billing_mode"},
 		Related: []domain.RelatedDef{
 			{TargetType: "kms", DisplayName: "KMS Key", Checker: checkDdbKMS},
@@ -662,7 +662,7 @@ var databasesTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 		Fetcher: fetcherWithClients(func(ctx context.Context, c *ServiceClients, continuationToken string) (resource.FetchResult, error) {
 			return FetchDBISnapshotsPage(ctx, c.RDS, continuationToken)
 		}),
-		Wave2:     IssueEnricher{Fn: enrichDBISnapCrossRef, Priority: 100},
+		Wave2:     IssueEnricher{Fn: enrichDBISnapCrossRef, Priority: 100, Reads: []string{"dbi"}},
 		FieldKeys: []string{"snapshot_id", "db_instance", "status", "engine", "snapshot_type", "created", "arn"},
 		Related: []domain.RelatedDef{
 			{TargetType: "dbi", DisplayName: "DB Instances", Checker: checkDBISnapDBI, NeedsTargetCache: true, Truncated: true},
@@ -758,7 +758,7 @@ var databasesTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 				},
 			}, nil
 		}),
-		Wave2: IssueEnricher{Fn: enrichDBCSnapCrossRef, Priority: 100},
+		Wave2: IssueEnricher{Fn: enrichDBCSnapCrossRef, Priority: 100, Reads: []string{"dbc"}},
 		FieldKeys: []string{
 			"snapshot_id", "cluster_id", "status", "engine", "snapshot_type",
 			"snapshot_create_time", "storage_type", "storage_encrypted",

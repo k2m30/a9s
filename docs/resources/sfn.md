@@ -118,14 +118,14 @@ One row per signal from §3:
 
 | Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) |
 |---|---|---|---|---|---|
-| Recent failed execution (single) | 2 | Broken | `!` | S1, S2, S3, S4, S5 | `latest execution <STATUS>` |
+| Recent failed execution (single) | 2 | Broken | `!` | S1, S2, S3, S4, S5 | `latest execution <status>` |
 | `LoggingConfiguration` absent or level OFF | 2 | Warning | `~` | S2, S3, S4, S5 | `execution logging off` |
 | `EncryptionConfiguration` not a customer managed key | 2 | Warning | `~` | S2, S3, S4, S5 | `not encrypted with a customer key` |
 | a credential in the `Definition` | 2 | Broken | `!` | S1, S2, S3, S4, S5 | `credential in state machine definition` |
 
 ## 4.1 UX review (two sentences)
 
-At 3am, glancing at the list, can the operator tell what's wrong with a problem row without opening detail? Yes — a state machine whose newest execution ended badly goes red reading `latest execution <STATUS>`, and the other signals read as plainly (`execution logging off`, `not encrypted with a customer key`); the operator still needs the detail view to read the failing execution's ARN and error cause, which is the expected next step.
+At 3am, glancing at the list, can the operator tell what's wrong with a problem row without opening detail? Yes — a state machine whose newest execution ended badly goes red reading `latest execution <status>`, and the other signals read as plainly (`execution logging off`, `not encrypted with a customer key`); the operator still needs the detail view to read the failing execution's ARN and error cause, which is the expected next step.
 
 ## 4.2 On-Demand Detail Enrichment
 
@@ -178,7 +178,7 @@ sfn — MESSAGING. Status key: `state` — the column naming it is the status co
 <!-- BEGIN GENERATED: findings -->
 | Code | Phrase | Severity | Source | Detail |
 | --- | --- | --- | --- | --- |
-| sfn.latest-execution-failed | latest execution <STATUS> | broken | wave2 | The most recent run of this state machine did not succeed, so whatever it automates has not happened since. Open that execution's history for the state that failed and its error, then rerun once the cause is fixed. |
+| sfn.latest-execution-failed | latest execution <status> | broken | wave2 | The most recent run of this state machine did not succeed, so whatever it automates has not happened since. Open that execution's history for the state that failed and its error, then rerun once the cause is fixed. |
 | sfn.logging-off | execution logging off | warn | wave2 | The state machine records nothing about its executions, so a failed run leaves no trace of which state failed or what it was handed. Turn on execution logging to a CloudWatch log group. |
 | sfn.no-cmk | not encrypted with a customer key | warn | wave2 | Execution history and state data are encrypted with an AWS-owned key you cannot audit, rotate, or revoke. Point the state machine at a customer managed KMS key. |
 | sfn.definition-secret | credential in state machine definition | broken | wave2 | A credential is written into the state machine's definition, so it is readable by anyone who can call states:DescribeStateMachine and it travels with every export of the workflow. Move the value to Secrets Manager and reference it at run time, then rotate it. |

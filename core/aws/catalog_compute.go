@@ -273,7 +273,7 @@ var computeTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stati
 		FetchByIDs: fetchByIDsWithClients(func(ctx context.Context, c *ServiceClients, ids []string) ([]resource.Resource, error) {
 			return FetchEC2InstancesByIDs(ctx, c.EC2, ids)
 		}),
-		Wave2: IssueEnricher{Fn: EnrichEC2InstanceStatus, Priority: 100},
+		Wave2: IssueEnricher{Fn: EnrichEC2InstanceStatus, Priority: 100, Reads: []string{"sg"}},
 		FieldKeys: []string{
 			"instance_id", "name", "state", "type", "private_ip", "public_ip",
 			"launch_time", "lifecycle", "image_id", "vpc_id",
@@ -721,7 +721,7 @@ var computeTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stati
 		Fetcher: fetcherWithClients(func(ctx context.Context, c *ServiceClients, continuationToken string) (resource.FetchResult, error) {
 			return FetchEBSVolumesPage(ctx, c.EC2, continuationToken)
 		}),
-		Wave2:     IssueEnricher{Fn: EnrichEBSVolumeStatus, Priority: 10},
+		Wave2:     IssueEnricher{Fn: EnrichEBSVolumeStatus, Priority: 10, Reads: []string{"backup", "ebs-snap"}},
 		FieldKeys: []string{"volume_id", "name", "state", "size", "type", "iops", "encrypted", "attached_to", "az", "created"},
 		Related: []domain.RelatedDef{
 			{TargetType: "ec2", DisplayName: "EC2 Instance", Checker: checkEBSEC2, NeedsTargetCache: false},
@@ -771,7 +771,7 @@ var computeTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stati
 		Fetcher: fetcherWithClients(func(ctx context.Context, c *ServiceClients, continuationToken string) (resource.FetchResult, error) {
 			return FetchEBSSnapshotsPage(ctx, c.EC2, continuationToken)
 		}),
-		Wave2:     IssueEnricher{Fn: enrichEBSSnapCrossRef, Priority: 100},
+		Wave2:     IssueEnricher{Fn: enrichEBSSnapCrossRef, Priority: 100, Reads: []string{"ebs"}},
 		FieldKeys: []string{"snapshot_id", "name", "state", "volume_id", "size", "encrypted", "description", "started", "progress"},
 		FetchByIDs: fetchByIDsWithClients(func(ctx context.Context, c *ServiceClients, ids []string) ([]resource.Resource, error) {
 			return FetchEBSSnapshotsByIDs(ctx, c.EC2, ids)
@@ -880,7 +880,7 @@ var computeTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stati
 		Fetcher: fetcherWithClients(func(ctx context.Context, c *ServiceClients, continuationToken string) (resource.FetchResult, error) {
 			return FetchLaunchTemplatesPage(ctx, c.EC2, continuationToken)
 		}),
-		Wave2:     IssueEnricher{Fn: EnrichLTDeprecatedAMI, Priority: 100},
+		Wave2:     IssueEnricher{Fn: EnrichLTDeprecatedAMI, Priority: 100, Reads: []string{"ami"}},
 		FieldKeys: []string{"name", "status", "default_version", "latest_version", "created_by", "created"},
 		Related: []domain.RelatedDef{
 			{TargetType: "ami", DisplayName: "AMI", Checker: checkLTAMI},

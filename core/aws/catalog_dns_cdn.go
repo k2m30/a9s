@@ -61,7 +61,7 @@ var dnsCdnTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static
 		Fetcher: fetcherWithClients(func(ctx context.Context, c *ServiceClients, continuationToken string) (resource.FetchResult, error) {
 			return FetchHostedZonesPage(ctx, c.Route53, continuationToken)
 		}),
-		Wave2:     IssueEnricher{Fn: EnrichRoute53Zone, Priority: 100},
+		Wave2:     IssueEnricher{Fn: EnrichRoute53Zone, Priority: 100, Reads: []string{"ec2", "eip"}},
 		FieldKeys: []string{"zone_id", "name", "record_count", "private_zone", "comment", "alias_targets", "s3website_alias_names"},
 		Related: []domain.RelatedDef{
 			{TargetType: "elb", DisplayName: "Load Balancers", Checker: checkR53ELB, NeedsTargetCache: true, Truncated: true},
@@ -105,7 +105,7 @@ var dnsCdnTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static
 		Fetcher: fetcherWithClients(func(ctx context.Context, c *ServiceClients, continuationToken string) (resource.FetchResult, error) {
 			return FetchCloudFrontDistributionsPage(ctx, c.CloudFront, continuationToken)
 		}),
-		Wave2: IssueEnricher{Fn: EnrichCloudFrontDistribution, Priority: 100},
+		Wave2: IssueEnricher{Fn: EnrichCloudFrontDistribution, Priority: 100, Reads: []string{"s3"}},
 		// lambda_function_arns — required for the lambda:cf related-panel
 		// pivot (checkLambdaCF); cache-restored rows have no RawStruct, so
 		// this must survive the YAML cache round-trip via FieldKeys.

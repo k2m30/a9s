@@ -143,10 +143,10 @@ One row per signal from §3:
 | `Job.SecurityConfiguration` empty | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `no security configuration` |
 | the job's default arguments do not enable continuous CloudWatch logging | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `continuous logging off` |
 | a default argument value scans as a credential | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `credential in job arguments` |
-| latest run `FAILED` | 2 | Broken | `!` | S1, S2, S3, S4, S5 | `latest run <STATUS>` |
-| latest run `TIMEOUT` | 2 | Broken | `!` | S1, S2, S3, S4, S5 | `latest run <STATUS>` |
-| latest run `ERROR` | 2 | Broken | `!` | S1, S2, S3, S4, S5 | `latest run <STATUS>` |
-| latest run `EXPIRED` | 2 | Broken | `!` | S1, S2, S3, S4, S5 | `latest run <STATUS>` |
+| latest run `FAILED` | 2 | Broken | `!` | S1, S2, S3, S4, S5 | `latest run <status>` |
+| latest run `TIMEOUT` | 2 | Broken | `!` | S1, S2, S3, S4, S5 | `latest run <status>` |
+| latest run `ERROR` | 2 | Broken | `!` | S1, S2, S3, S4, S5 | `latest run <status>` |
+| latest run `EXPIRED` | 2 | Broken | `!` | S1, S2, S3, S4, S5 | `latest run <status>` |
 
 Notes on the S4 text:
 
@@ -194,7 +194,7 @@ glue — DATA & ANALYTICS. Status key: `state` — the column naming it is the s
 <!-- BEGIN GENERATED: findings -->
 | Code | Phrase | Severity | Source | Detail |
 | --- | --- | --- | --- | --- |
-| glue.latest-run-failed | latest run <STATUS> | broken | wave2 | The job's most recent run did not finish, so whatever it feeds has been stale since then. Check the run's error message and CloudWatch logs for the cause, then rerun the job. |
+| glue.latest-run-failed | latest run <status> | broken | wave2 | The job's most recent run did not finish, so whatever it feeds has been stale since then. Check the run's error message and CloudWatch logs for the cause, then rerun the job. |
 | glue.no-security-configuration | no security configuration | warn | wave1 | This job names no security configuration, so its S3 output, its CloudWatch log stream and its job bookmarks are all written without encryption at rest. Create a security configuration with a KMS key and attach it to the job. |
 | glue.continuous-logging-off | continuous logging off | warn | wave1 | Continuous logging is off, so driver and executor output only appears after the run ends and is lost entirely when a run is killed, leaving failures with no diagnostics. Add the continuous CloudWatch logging argument to the job's default arguments. |
 | glue.argument-secret | credential in job arguments | broken | wave1 | A default argument on this job holds what looks like a credential, and default arguments are readable by anyone who can describe the job and are echoed into run history. Move the value into Secrets Manager, pass its name instead, and rotate the exposed credential. |
