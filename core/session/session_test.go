@@ -112,7 +112,7 @@ func TestSession_Rotate_ClearsCaches(t *testing.T) {
 	s.RowStore.ObservePartial("rds", []resource.Resource{{ID: "db-001"}})
 	s.EnrichmentRan["ec2"] = true
 	s.EnrichmentTypeGen["ec2"] = 42
-	s.EnrichmentTruncatedIDs["ec2"] = map[string]bool{"i-x": true}
+	s.EnrichmentTruncatedIDs["ec2"] = map[string]string{"i-x": "DescribeInstanceStatus"}
 	s.RelatedCache.Set("ec2:i-001", []session.RelatedCacheResult{
 		{DefDisplayName: "VPCs"},
 	})

@@ -744,27 +744,13 @@ func (c *Core) saveResourceListCache(target SaveTarget, rows []cache.Row, conten
 			ShortName:          canon,
 			Wave2Authoritative: content.Wave2Authoritative,
 		})
-		// #463: FirstSeen diff runs unconditionally, after reconcileTypeFile
-		// (including any Wave-2 carry it performed), against the pre-save
-		// on-disk generation (existing.Rows) — the single chokepoint both
-		// SaveResourceListCache and saveResourceListCacheWave2Complete share.
-		// #463 defect 2: a Wave-2-completion save diffs against the
-		// just-written Wave-1 generation, so its own newPairs only ever
-		// covers Wave-2-sourced codes — REPLACING the type's delta here
-		// would wipe the Wave-1 new-pair counts that same sweep's earlier,
-		// non-authoritative save just recorded. Non-authoritative saves keep
-		// REPLACE semantics (each is a fresh one-step scan baseline);
-		// wave2Authoritative saves MERGE onto whatever the sweep's Wave-1
-		// save already recorded this cycle. Cannot double-count: a pair
-		// stamps fresh at most once per cycle (stampFindingFirstSeen's own
-		// old-vs-new diff), so the two saves' newPairs sets are disjoint.
-		var newPairs map[domain.FindingCode]int
-		tf.Rows, newPairs = stampFindingFirstSeen(existing.Rows, tf.Rows, time.Now())
-		if content.Wave2Authoritative {
-			c.session.MergeNewFindingPairs(canon, newPairs)
-		} else {
-			c.session.SetNewFindingPairs(canon, newPairs)
-		}
+		// #463: the FirstSeen diff runs unconditionally, after
+		// reconcileTypeFile (including any Wave-2 carry it performed), against
+		// the pre-save on-disk generation (existing.Rows) — the single
+		// chokepoint both save lanes share. A finding the earlier generation
+		// already carried keeps the stamp that observation earned rather than
+		// reading as newly seen because this save's fetch re-reported it.
+		tf.Rows = stampFindingFirstSeen(existing.Rows, tf.Rows, time.Now())
 		if content.IssuesKnown {
 			tf.Issues = content.Issues
 			tf.IssuesKnown = true

@@ -712,7 +712,7 @@ func TestSaveAvailabilityCache_ConcurrentWithPairMuReads_NoRaceNoDeadlock(t *tes
 	}()
 
 	// Concurrent readers hammer the same pairMu-guarded read surface the
-	// save's WithCacheStoreSave contends with (Core.FindingFirstSeenForType ->
+	// save's WithCacheStoreSave contends with (Core.CachedListDepth ->
 	// Session.ReadCacheStore -> pairMu), for as long as the save is in
 	// flight, then a little past it.
 	const readerGoroutines = 8
@@ -730,7 +730,7 @@ func TestSaveAvailabilityCache_ConcurrentWithPairMuReads_NoRaceNoDeadlock(t *tes
 					return
 				default:
 				}
-				_ = c.FindingFirstSeenForType(shortNames[(g+i)%numTypes])
+				_ = c.CachedListDepth(shortNames[(g+i)%numTypes])
 				i++
 			}
 		}()

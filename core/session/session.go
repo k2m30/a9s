@@ -444,18 +444,6 @@ type Session struct {
 	// reset) and by Rotate() — same per-sweep lifetime as EnrichmentRan.
 	// Single-goroutine: written only from the handler loop, no mutex.
 	ScanHealthLogged map[string]bool
-
-	// NewFindingPairs is the per-type count of (row, finding-code) pairs
-	// newly observed on the most recent on-disk cache save for that type
-	// (#463 — new-since-previous-scan deltas, read through
-	// Core.NewFindingPairsSincePrev), keyed by
-	// resource short name then domain.FindingCode. Replaced wholesale per
-	// type on each save (core/runtime.saveResourceListCache), never
-	// accumulated across saves — same access discipline as ProbeStatus:
-	// guarded by newFindingPairsMu, access only through
-	// SetNewFindingPairs/GetNewFindingPairs/AllNewFindingPairs.
-	NewFindingPairs   map[string]map[domain.FindingCode]int
-	newFindingPairsMu sync.Mutex
 }
 
 // New constructs a fresh Session with all maps initialized and generation
@@ -917,72 +905,6 @@ func (s *Session) EnrichmentRanReset() {
 	s.EnrichmentRan = make(map[string]bool)
 }
 
-// SetNewFindingPairs replaces shortName's new-finding-pair counts wholesale
-// with counts (#463) — used by a non-authoritative save (each one is a fresh
-// one-step scan baseline, so REPLACE is correct there). A wave2Authoritative
-// save must use MergeNewFindingPairs instead (#463 defect 2): it diffs
-// against the just-written Wave-1 generation, so a wholesale replace here
-// would wipe the Wave-1 new-pair counts that same sweep's earlier save just
-// recorded.
-func (s *Session) SetNewFindingPairs(shortName string, counts map[domain.FindingCode]int) {
-	s.newFindingPairsMu.Lock()
-	defer s.newFindingPairsMu.Unlock()
-	if s.NewFindingPairs == nil {
-		s.NewFindingPairs = make(map[string]map[domain.FindingCode]int)
-	}
-	s.NewFindingPairs[shortName] = counts
-}
-
-// MergeNewFindingPairs adds counts onto shortName's existing new-finding-pair
-// entry, summing per code, rather than replacing it (#463 defect 2) — the
-// Wave-2-completion save's counterpart to SetNewFindingPairs, used so its
-// own (Wave-2-sourced) new pairs accumulate onto whatever the sweep's
-// earlier Wave-1 save already recorded this cycle instead of wiping it.
-// No-op when counts is empty, so a clean rerun with nothing new never
-// touches the map. Cannot double-count a pair across the two saves in one
-// cycle: stampFindingFirstSeen only reports a pair as new relative to the
-// on-disk generation it diffed against, and the second save's diff already
-// sees the first save's just-written generation.
-func (s *Session) MergeNewFindingPairs(shortName string, counts map[domain.FindingCode]int) {
-	if len(counts) == 0 {
-		return
-	}
-	s.newFindingPairsMu.Lock()
-	defer s.newFindingPairsMu.Unlock()
-	if s.NewFindingPairs == nil {
-		s.NewFindingPairs = make(map[string]map[domain.FindingCode]int)
-	}
-	existing := s.NewFindingPairs[shortName]
-	merged := make(map[domain.FindingCode]int, len(existing)+len(counts))
-	maps.Copy(merged, existing)
-	for code, n := range counts {
-		merged[code] += n
-	}
-	s.NewFindingPairs[shortName] = merged
-}
-
-// GetNewFindingPairs returns shortName's most recently recorded new-finding-
-// pair counts, if any.
-func (s *Session) GetNewFindingPairs(shortName string) (map[domain.FindingCode]int, bool) {
-	s.newFindingPairsMu.Lock()
-	defer s.newFindingPairsMu.Unlock()
-	rec, ok := s.NewFindingPairs[shortName]
-	return rec, ok
-}
-
-// AllNewFindingPairs returns a defensive deep copy of every recorded
-// new-finding-pair entry, safe for the caller to range over (and mutate)
-// without holding newFindingPairsMu or aliasing the stored per-type maps.
-func (s *Session) AllNewFindingPairs() map[string]map[domain.FindingCode]int {
-	s.newFindingPairsMu.Lock()
-	defer s.newFindingPairsMu.Unlock()
-	out := make(map[string]map[domain.FindingCode]int, len(s.NewFindingPairs))
-	for shortName, counts := range s.NewFindingPairs {
-		out[shortName] = maps.Clone(counts)
-	}
-	return out
-}
-
 // Rotate rotates the session when the user switches profile or region. Every
 // generation counter is bumped so that in-flight async messages tagged with
 // the pre-switch gens are rejected by the handlers' gen guards; all cached
@@ -1055,12 +977,6 @@ func (s *Session) Rotate() {
 	s.probeStatusMu.Lock()
 	s.ProbeStatus = nil
 	s.probeStatusMu.Unlock()
-
-	// NewFindingPairs: same rationale — a prior profile/region's new-finding
-	// deltas must not leak into the next pair's scan (#463).
-	s.newFindingPairsMu.Lock()
-	s.NewFindingPairs = nil
-	s.newFindingPairsMu.Unlock()
 
 	// Feature caches: swap the PolicyDocumentCache for a fresh instance so
 	// documents fetched in the previous account cannot leak into the next.

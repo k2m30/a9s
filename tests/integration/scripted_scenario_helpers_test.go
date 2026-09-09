@@ -844,6 +844,14 @@ func (s *fullIntegrationScenario) shouldDrainFollowups(msg tea.Msg) bool {
 	// and the `~` glyph / `(+N)` suffix / "maintenance scheduled" invariants
 	// cannot be exercised end-to-end. Added 2026-04-22 after the dbi render
 	// gate surfaced the gap.
+	// With the cache on, ctrl+r on the menu answers with the cache load
+	// first and dispatches the sweep from ITS handler, so a harness that
+	// stops here never starts the probe lane at all — the menu sits at
+	// "verifying 0/70" and no badge is ever written. The tea runtime follows
+	// this chain; the bench has to follow it too or it is not running the app
+	// an installation runs.
+	case messages.AvailabilityCacheLoaded:
+		return true
 	case messages.AvailabilityPrefetched:
 		return true
 	case messages.AvailabilityChecked:

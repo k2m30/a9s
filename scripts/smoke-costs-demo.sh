@@ -27,6 +27,7 @@ make build || exit 1
 
 cleanup() {
 	tmux kill-session -t "$SESSION" 2>/dev/null
+	[ -n "${A9S_CONFIG_FOLDER:-}" ] && rm -rf "$A9S_CONFIG_FOLDER"
 }
 trap cleanup EXIT
 
@@ -80,6 +81,12 @@ keys() {
 # from an earlier run (older fixture anchor or names) would poison every
 # assertion below. Start cold.
 rm -f "$HOME/.a9s/cache/demo--costs.yaml"
+
+# A cache root of the run's own: the demo now keeps a cache like any other
+# session, and a smoke must neither read the operator's nor leave anything in
+# it. Fresh per run, so every run starts cold and asserts the same thing.
+A9S_CONFIG_FOLDER="$(mktemp -d "${TMPDIR:-/tmp}/a9s-smoke-home.XXXXXX")"
+export A9S_CONFIG_FOLDER
 
 tmux new-session -d -s "$SESSION" -x 220 -y 50 "$BIN --demo"
 

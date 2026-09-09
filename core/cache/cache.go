@@ -414,16 +414,18 @@ func (s *Store) Put(shortName string, tf TypeFile) {
 	s.types[shortName] = tf
 }
 
-// WritePlan is an immutable, already-marshaled write staged by PrepareSave:
-// the target directory/path plus the exact bytes to write. Produced while a
-// caller's own lock is still held (e.g. session.Session.pairMu) and safe to
-// Commit — or, via CommitSave, hand to the Store that produced it — after
-// that lock is released, since a WritePlan holds no reference back into the
-// Store's types map. See PrepareSave/CommitSave.
+// WritePlan is an immutable write staged by PrepareSave: the target
+// directory/path plus the state to write. Produced while a caller's own lock
+// is still held (e.g. session.Session.pairMu) and safe to Commit — or, via
+// CommitSave, hand to the Store that produced it — after that lock is
+// released, since a WritePlan holds no reference back into the Store's types
+// map. See PrepareSave/CommitSave.
 type WritePlan struct {
 	dir  string
 	path string
-	data []byte
+	// tf is the state to write. It is copied and encoded at commit time, not
+	// here — see WritePlan.commit and PrepareSave.
+	tf TypeFile
 	// seq is this plan's position in its target file's preparation order,
 	// assigned by PrepareSave. CommitSave skips a plan whose seq is older
 	// than the newest one already committed for that path, so a plan
@@ -465,7 +467,25 @@ func (wp WritePlan) commit() error {
 		return fmt.Errorf("creating cache temp file in %s: %w", wp.dir, err)
 	}
 	tmpPath := tmpFile.Name()
-	if _, err := tmpFile.Write(wp.data); err != nil {
+	// The copy guards the encode against a concurrent mutation of the live
+	// Fields maps a Row commonly aliases, which is a hazard for exactly as long
+	// as the encode reads them — so it belongs immediately before the encode
+	// and not under the session pair lock, which protects nothing about it.
+	tf := wp.tf
+	tf.Rows = deepCopyRows(tf.Rows)
+	// Encoded straight into the temp file rather than marshalled to a []byte
+	// first: a six-thousand-row type file is megabytes, and the buffer that
+	// holds all of it before a single byte is written is garbage the collector
+	// charges to whichever goroutine allocates next — which, during a flush, is
+	// the one building the frame for the operator's key press.
+	enc := yaml.NewEncoder(tmpFile)
+	if err := enc.Encode(tf); err != nil {
+		_ = enc.Close()
+		_ = tmpFile.Close()
+		_ = os.Remove(tmpPath)
+		return fmt.Errorf("writing cache %s: %w", tmpPath, err)
+	}
+	if err := enc.Close(); err != nil {
 		_ = tmpFile.Close()
 		_ = os.Remove(tmpPath)
 		return fmt.Errorf("writing cache %s: %w", tmpPath, err)
@@ -485,29 +505,30 @@ func (wp WritePlan) commit() error {
 	return nil
 }
 
-// PrepareSave is SaveType's non-I/O half: validates shortName, deep-copies
-// (deepCopyRows) and yaml.Marshals shortName's current staged state (as set
-// by Put) into an immutable WritePlan, and resolves + escape-checks its
-// target path. Touches no disk — safe to call while holding a caller's own
-// lock (e.g. session.Session.pairMu) for only as long as this in-memory work
-// takes, deferring the actual write (CommitSave) until after that lock is
+// PrepareSave is SaveType's non-I/O half: it validates shortName, takes
+// shortName's current staged state (as set by Put) into an immutable
+// WritePlan, and resolves + escape-checks its target path. Touches no disk and
+// encodes nothing — safe to call while holding a caller's own lock (e.g.
+// session.Session.pairMu) for only as long as this lookup takes, deferring
+// both the encode and the write (CommitSave) until after that lock is
 // released. See Session.WithCacheStoreSave, the caller this split exists for.
 //
-// tf.Rows is deep-copied before Marshal (deepCopyRows): callers stage a
-// TypeFile via Put with Rows built from live resource.Resource data (e.g.
-// runtime.SaveTypeRows aliases cache.Row.Fields directly onto
-// resource.Resource.Fields whenever materializeResourceFields finds nothing
-// left to add — no copy is made in that case). Marshal here can run on a
-// different goroutine than the one still holding that live resource (e.g.
-// Controller's async availability-cache writer racing a controller-lane
-// applyFieldUpdatesToSlice call that mutates the same Fields map in place);
-// yaml.Marshal's reflect-based map/slice walk and that mutation can race on
-// the identical map — this was a real, reproduced data race (go test -race),
-// not a theoretical one. Deep-copying here — the single chokepoint every
-// save lane's Marshal goes through — makes the marshaled snapshot fully
-// independent of whatever live structure Rows/Fields/Findings originally
-// aliased, without requiring any caller to take a lock it doesn't already
-// hold.
+// The encode used to happen here, under that lock, and a six-thousand-row type
+// file takes 60ms to encode: one reader per flush waited the whole of it for a
+// snapshot, which is a key press the operator watches the app not answer.
+//
+// The deep copy the encode needs travels with it, into CommitSave (see
+// WritePlan.commit): callers stage a TypeFile via Put with Rows built from
+// live resource.Resource data (e.g. runtime.SaveTypeRows aliases
+// cache.Row.Fields directly onto resource.Resource.Fields whenever
+// materializeResourceFields finds nothing left to add — no copy is made in
+// that case). The encode can run on a different goroutine than the one still
+// holding that live resource, and yaml's reflect-based map/slice walk racing a
+// mutation of the identical map was a real, reproduced data race (go test
+// -race), not a theoretical one. The copy is what makes the encoded snapshot
+// independent of whatever live structure Rows/Fields/Findings aliased, and it
+// belongs immediately before the encode it protects rather than under a lock
+// that protects nothing about it.
 func (s *Store) PrepareSave(shortName string) (WritePlan, error) {
 	// filepath.IsLocal is the guard shape static taint analysis recognizes as
 	// a path-injection barrier; ContainsAny alone is not. IsLocal alone would
@@ -520,8 +541,6 @@ func (s *Store) PrepareSave(shortName string) (WritePlan, error) {
 	if !ok {
 		return WritePlan{}, fmt.Errorf("cache: SaveType(%s): no staged state (call Put first)", shortName)
 	}
-	tf.Rows = deepCopyRows(tf.Rows)
-
 	// dir is s.dir — the root captured once at LoadDirIn construction time, NOT
 	// a fresh DirIn(root, s.profile, s.region) recompute (see Store's doc comment) —
 	// so a commit that runs on a goroutine outliving its owning Controller
@@ -538,11 +557,6 @@ func (s *Store) PrepareSave(shortName string) (WritePlan, error) {
 		return WritePlan{}, fmt.Errorf("cache: cannot determine cache directory")
 	}
 
-	data, err := yaml.Marshal(tf)
-	if err != nil {
-		return WritePlan{}, fmt.Errorf("marshaling cache type %s: %w", shortName, err)
-	}
-
 	fname := shortName + ".yaml"
 	path := filepath.Join(dir, fname)
 	cleanDir := filepath.Clean(dir)
@@ -550,7 +564,7 @@ func (s *Store) PrepareSave(shortName string) (WritePlan, error) {
 		return WritePlan{}, fmt.Errorf("cache: SaveType(%s): resolved path %s escapes cache directory %s", shortName, cleaned, cleanDir)
 	}
 
-	return WritePlan{dir: dir, path: path, data: data, seq: s.nextSeqFor(path)}, nil
+	return WritePlan{dir: dir, path: path, tf: tf, seq: s.nextSeqFor(path)}, nil
 }
 
 // nextSeqFor assigns path's next preparation sequence number.

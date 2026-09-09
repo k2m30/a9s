@@ -257,7 +257,12 @@ func main() {
 		if region == "" {
 			region = demo.DemoRegion
 		}
-		extraOpts = append(extraOpts, tui.WithClients(demo.NewServiceClients()), tui.WithNoCache(true), tui.WithIsDemo(true))
+		// Demo mode supplies the clients; whether the app keeps a cache is
+		// --no-cache's answer here as everywhere else. Forcing it off meant
+		// the demo ran a lane the installed app does not: no cache load on
+		// start, and therefore no cache-load-then-sweep chain — the path the
+		// main menu's issue badges are written on for a real operator.
+		extraOpts = append(extraOpts, tui.WithClients(demo.NewServiceClients()), tui.WithNoCache(noCache), tui.WithIsDemo(true))
 	} else if noCache {
 		extraOpts = append(extraOpts, tui.WithNoCache(true))
 	}

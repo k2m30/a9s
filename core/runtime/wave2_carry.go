@@ -187,9 +187,9 @@ func wave2FindingsOf(findings []domain.Finding) []domain.Finding {
 }
 
 // stampFindingFirstSeen returns newRows with FindingFirstSeen populated for
-// every finding code each row currently carries, plus a count of the
-// (row, code) pairs newly appearing since oldRows — per FindingCode, summed
-// across every row (#463). A code already present on the matching oldRows
+// every finding code each row currently carries (#463).
+//
+// A code already present on the matching oldRows
 // entry (by row ID) carries its FirstSeen forward unchanged; a code with no
 // match in oldRows — because the row is new, or the code is new on an
 // existing row, or the code previously resolved and has now reappeared — is
@@ -202,13 +202,12 @@ func wave2FindingsOf(findings []domain.Finding) []domain.Finding {
 // so a Wave-2-carried finding keeps the FirstSeen stamp its earlier
 // observation already earned, rather than being treated as newly observed
 // just because this particular save's raw fetch didn't itself re-report it.
-func stampFindingFirstSeen(oldRows, newRows []cache.Row, now time.Time) ([]cache.Row, map[domain.FindingCode]int) {
+func stampFindingFirstSeen(oldRows, newRows []cache.Row, now time.Time) []cache.Row {
 	oldByID := make(map[string]cache.Row, len(oldRows))
 	for _, r := range oldRows {
 		oldByID[r.ID] = r
 	}
 
-	newPairs := make(map[domain.FindingCode]int)
 	out := make([]cache.Row, len(newRows))
 	for i, row := range newRows {
 		if len(row.Findings) == 0 {
@@ -227,12 +226,11 @@ func stampFindingFirstSeen(oldRows, newRows []cache.Row, now time.Time) ([]cache
 				continue
 			}
 			stamped[f.Code] = now
-			newPairs[f.Code]++
 		}
 		row.FindingFirstSeen = stamped
 		out[i] = row
 	}
-	return out, newPairs
+	return out
 }
 
 // baselineWave2FieldKey is always eligible to carry alongside a carried

@@ -15,9 +15,6 @@
 package runtime
 
 import (
-	"maps"
-	"time"
-
 	awsclient "github.com/k2m30/a9s/v3/core/aws"
 	"github.com/k2m30/a9s/v3/core/cache"
 	"github.com/k2m30/a9s/v3/core/catalog"
@@ -451,48 +448,6 @@ func (c *Core) ForEachResourceCache(fn func(rt string, entry *domain.ListViewCac
 	for rt, tr := range c.session.RowStore.SnapshotAll(false) {
 		fn(rt, listSeedEntry(tr.Rows, tr.Pagination, tr.Population()))
 	}
-}
-
-// NewFindingPairsSincePrev returns a deep copy of every resource type's
-// new-finding-pair counts recorded by the most recent on-disk cache save for
-// that type — the (row, finding-code) pairs absent from the previous
-// on-disk generation, per domain.FindingCode (#463). Empty for a type that
-// has never been saved this session, or when caching is disabled. Backed by
-// session.AllNewFindingPairs, itself already a deep copy — this wrapper
-// exists only so app/ and other renderer-facing callers never reach through
-// Core into session.Session directly.
-func (c *Core) NewFindingPairsSincePrev() map[string]map[domain.FindingCode]int {
-	return c.session.AllNewFindingPairs()
-}
-
-// FindingFirstSeenForType returns a defensive-copy map of rowID ->
-// domain.FindingCode -> first-observation time, read from the on-disk
-// availability cache for shortName's canonical type (#463). Empty when
-// caching is disabled (NoCache/demo), no cache entry exists yet for
-// shortName, or shortName carries no findings — callers treat a missing
-// entry as "unknown" (zero time), never as an error. This is the single
-// accessor through which core/app reads FirstSeen, so *cache.Store never
-// leaks past this package.
-func (c *Core) FindingFirstSeenForType(shortName string) map[string]map[domain.FindingCode]time.Time {
-	canon := resource.CanonicalShortName(shortName)
-	out := make(map[string]map[domain.FindingCode]time.Time)
-	_ = c.ReadCacheStore(func(store *cache.Store) error {
-		if store == nil {
-			return nil
-		}
-		tf, ok := store.Type(canon)
-		if !ok {
-			return nil
-		}
-		for _, r := range tf.Rows {
-			if len(r.FindingFirstSeen) == 0 {
-				continue
-			}
-			out[r.ID] = maps.Clone(r.FindingFirstSeen)
-		}
-		return nil
-	})
-	return out
 }
 
 // LazyResourceCache returns the lazy-cache slice for the given resource

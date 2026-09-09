@@ -31,24 +31,36 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"sort"
 	"strings"
 	"testing"
 )
 
-// failureRecorders are the calls that put a Failure into a caller-owned list.
-var failureRecorders = map[string]bool{
-	"MarkSkipped":        true,
-	"MarkUnusable":       true,
-	"FailedCall":         true,
-	"FailedCallInRegion": true,
-	"FailedOnPage":       true,
-	"UnusableAnswer":     true,
+// failureRecorders maps a recorder call to the 0-based index of the argument
+// naming the list it writes into, or listByReturn when the call builds a
+// Failure its caller appends itself.
+//
+// The index is what lets the gate follow the slice rather than read the
+// function's shape: a call site hands one list and a second call site in the
+// same function may hand another, and only the one each recorder actually
+// wrote to has to leave.
+var failureRecorders = map[string]int{
+	"MarkSkipped":  2,
+	"MarkUnusable": 2,
 	// markAllUninspected was deleted in this task's round 1 when the ebs-snap
 	// public-share walk moved onto walkAccountPages. Named here so that if it
 	// ever comes back it is covered from the start.
-	"markAllUninspected": true,
+	"markAllUninspected": 2,
+	"FailedCall":         listByReturn,
+	"FailedCallInRegion": listByReturn,
+	"FailedOnPage":       listByReturn,
+	"UnusableAnswer":     listByReturn,
 }
+
+// listByReturn marks a recorder that returns the Failure instead of taking the
+// list: the destination is whatever the enclosing assignment appends to.
+const listByReturn = -1
 
 // failureDischargers build the composite error a caller returns.
 var failureDischargers = map[string]bool{
@@ -56,15 +68,13 @@ var failureDischargers = map[string]bool{
 	"Finish":            true,
 }
 
-// failureDischargeExempt lists functions that record failures, do not
-// discharge them, and do not carry them out through the signature either —
-// each with the reason its caller can still see them.
+// failureDischargeExempt is empty and stays empty. The gate follows the slice
+// each recorder writes to, so a function that carries its failures out on a
+// struct field is read correctly rather than allowlisted; an entry here would
+// be a function whose dropped list nobody has to account for.
 //
 // Key shape: "<file>:<func>".
-var failureDischargeExempt = map[string]string{
-	"iam_roles.go:enumerateRoleInlinePolicies": "returns inlinePolicyScan, whose failures field FetchIAMRolesPage and " +
-		"roleToResource both aggregate; the carrier is a struct field, which this gate does not read types for",
-}
+var failureDischargeExempt = map[string]string{}
 
 func TestFailureDischargeGate_ARecordedFailureLeavesItsFunction(t *testing.T) {
 	_, thisFile, _, ok := runtime.Caller(0)
@@ -126,54 +136,159 @@ func TestFailureDischargeGate_ARecordedFailureLeavesItsFunction(t *testing.T) {
 	}
 }
 
-// scanFailureCalls returns the recorder and discharger calls made directly in
-// body, by name. Nested function literals count: an enricher's ForEachParallel
-// closure is where most recording happens, and it shares the enclosing
-// function's failure slice.
-func scanFailureCalls(body *ast.BlockStmt) (records, discharges []string) {
+// rootIdent names the variable an expression is rooted at: "failures" for
+// failures, &failures, *failures and failures[0], "scan" for scan.failures.
+// Empty when the expression is rooted at something that is not a variable (a
+// call result, a literal), which is a destination the gate cannot follow and
+// therefore does not accuse.
+func rootIdent(e ast.Expr) string {
+	switch v := e.(type) {
+	case *ast.Ident:
+		return v.Name
+	case *ast.UnaryExpr:
+		if v.Op == token.AND {
+			return rootIdent(v.X)
+		}
+	case *ast.StarExpr:
+		return rootIdent(v.X)
+	case *ast.SelectorExpr:
+		return rootIdent(v.X)
+	case *ast.IndexExpr:
+		return rootIdent(v.X)
+	case *ast.ParenExpr:
+		return rootIdent(v.X)
+	}
+	return ""
+}
+
+// failureScan is what one function's body says about its failure lists: the
+// recorder names it called (for the message), which list each of them wrote
+// to, and which of those lists demonstrably leaves the function.
+type failureScan struct {
+	records []string
+	// destinations maps a list's root variable to the recorders that wrote to
+	// it. A destination the gate could not follow is keyed "".
+	destinations map[string][]string
+	// carried names every list that leaves: a *[]Failure the caller owns, a
+	// list handed to AggregateFailures/Finish, a value the function returns.
+	carried map[string]bool
+}
+
+// scanFailureCalls reads body for recorder and discharger calls and follows
+// the list each recorder writes to. Nested function literals count: an
+// enricher's ForEachParallel closure is where most recording happens, and it
+// shares the enclosing function's failure slice.
+func scanFailureCalls(sig *ast.FuncType, body *ast.BlockStmt) failureScan {
+	scan := failureScan{destinations: map[string][]string{}, carried: map[string]bool{}}
 	seen := map[string]bool{}
+
+	// A *[]Failure parameter is a list its caller owns and discharges.
+	for _, p := range paramsOf(sig) {
+		if star, isPtr := p.Type.(*ast.StarExpr); isPtr && isFailureSlice(star.X) {
+			for _, name := range p.Names {
+				scan.carried[name.Name] = true
+			}
+		}
+	}
+
+	note := func(name, dest string) {
+		if !seen[name] {
+			seen[name] = true
+			scan.records = append(scan.records, name)
+		}
+		scan.destinations[dest] = append(scan.destinations[dest], name)
+	}
+
 	ast.Inspect(body, func(n ast.Node) bool {
-		call, isCall := n.(*ast.CallExpr)
-		if !isCall {
-			return true
-		}
-		name, isIdent := call.Fun.(*ast.Ident)
-		if !isIdent || seen[name.Name] {
-			return true
-		}
-		switch {
-		case failureRecorders[name.Name]:
-			seen[name.Name] = true
-			records = append(records, name.Name)
-		case failureDischargers[name.Name]:
-			seen[name.Name] = true
-			discharges = append(discharges, name.Name)
+		switch v := n.(type) {
+		case *ast.FuncLit:
+			// A closure may take its own *[]Failure; its body is walked by
+			// this same Inspect, so record the parameter and carry on.
+			for _, p := range paramsOf(v.Type) {
+				if star, isPtr := p.Type.(*ast.StarExpr); isPtr && isFailureSlice(star.X) {
+					for _, name := range p.Names {
+						scan.carried[name.Name] = true
+					}
+				}
+			}
+		case *ast.ReturnStmt:
+			for _, r := range v.Results {
+				if root := rootIdent(r); root != "" {
+					scan.carried[root] = true
+				}
+			}
+		case *ast.AssignStmt:
+			// A recorder that returns its Failure writes to whatever the
+			// enclosing append assigns back to. Only the append shape counts:
+			// a Failure bound to a plain variable, or one built inside a
+			// closure the statement happens to assign, is not a write to a
+			// list this statement names.
+			if len(v.Lhs) != 1 || len(v.Rhs) != 1 {
+				break
+			}
+			for _, name := range appendedRecorderNames(v.Rhs[0]) {
+				note(name, rootIdent(v.Lhs[0]))
+			}
+		case *ast.CallExpr:
+			name, isIdent := v.Fun.(*ast.Ident)
+			if !isIdent {
+				return true
+			}
+			if failureDischargers[name.Name] {
+				for _, arg := range v.Args {
+					if root := rootIdent(arg); root != "" {
+						scan.carried[root] = true
+					}
+				}
+				return true
+			}
+			idx, isRecorder := failureRecorders[name.Name]
+			if !isRecorder || idx == listByReturn {
+				return true
+			}
+			dest := ""
+			if idx < len(v.Args) {
+				dest = rootIdent(v.Args[idx])
+			}
+			note(name.Name, dest)
 		}
 		return true
 	})
-	sort.Strings(records)
-	return records, discharges
+	sort.Strings(scan.records)
+	return scan
 }
 
-// carriesFailuresInSignature reports whether the function takes a *[]Failure
-// (its caller owns the list) or returns a Failure / []Failure (its caller
-// receives them) — either way the discharging is demonstrably elsewhere.
-func carriesFailuresInSignature(sig *ast.FuncType) bool {
-	if sig.Params != nil {
-		for _, p := range sig.Params.List {
-			if star, isPtr := p.Type.(*ast.StarExpr); isPtr && isFailureSlice(star.X) {
-				return true
-			}
+// paramsOf returns sig's parameter fields, or nil when it declares none.
+func paramsOf(sig *ast.FuncType) []*ast.Field {
+	if sig == nil || sig.Params == nil {
+		return nil
+	}
+	return sig.Params.List
+}
+
+// appendedRecorderNames lists the Failure-returning recorders e appends, when
+// e is an append(...) call. Nothing else: a Failure read for one of its fields
+// is not a write to any list, and a closure e assigns carries its own
+// destinations, which the walk reaches on its own.
+func appendedRecorderNames(e ast.Expr) []string {
+	call, isCall := e.(*ast.CallExpr)
+	if !isCall {
+		return nil
+	}
+	if id, isIdent := call.Fun.(*ast.Ident); !isIdent || id.Name != "append" {
+		return nil
+	}
+	var names []string
+	for _, arg := range call.Args[1:] {
+		inner, isInner := arg.(*ast.CallExpr)
+		if !isInner {
+			continue
+		}
+		if id, isIdent := inner.Fun.(*ast.Ident); isIdent && failureRecorders[id.Name] == listByReturn {
+			names = append(names, id.Name)
 		}
 	}
-	if sig.Results != nil {
-		for _, r := range sig.Results.List {
-			if isFailureSlice(r.Type) || isFailureIdent(r.Type) {
-				return true
-			}
-		}
-	}
-	return false
+	return names
 }
 
 func isFailureSlice(e ast.Expr) bool {
@@ -196,22 +311,33 @@ func failureDischargeViolations(fset *token.FileSet, fileName string, file *ast.
 		if !isFunc || fn.Body == nil {
 			continue
 		}
-		records, discharges := scanFailureCalls(fn.Body)
-		if len(records) == 0 {
+		scan := scanFailureCalls(fn.Type, fn.Body)
+		if len(scan.records) == 0 {
 			continue
 		}
 		recording++
 		if exempt != nil && exempt(fileName+":"+fn.Name.Name) {
 			continue
 		}
-		if len(discharges) > 0 || carriesFailuresInSignature(fn.Type) {
+		var dropped []string
+		for dest, recorders := range scan.destinations {
+			// "" is a destination the gate could not follow to a variable; it
+			// accuses nothing it cannot name.
+			if dest == "" || scan.carried[dest] {
+				continue
+			}
+			sort.Strings(recorders)
+			dropped = append(dropped, fmt.Sprintf("%s (written by %s)", dest, strings.Join(slices.Compact(recorders), ", ")))
+		}
+		if len(dropped) == 0 {
 			continue
 		}
+		sort.Strings(dropped)
 		violations = append(violations, fmt.Sprintf(
-			"%s:%d %s records %s and neither discharges it (AggregateFailures/Finish) "+
-				"nor carries it out (a *[]Failure parameter, or a Failure result)",
+			"%s:%d %s records into %s and neither discharges that list (AggregateFailures/Finish) "+
+				"nor hands it on (a *[]Failure parameter, or returning it)",
 			fileName, fset.Position(fn.Pos()).Line, fn.Name.Name,
-			strings.Join(records, ", ")))
+			strings.Join(dropped, "; ")))
 	}
 	return violations, recording
 }
