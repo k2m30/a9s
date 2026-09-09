@@ -10,7 +10,6 @@ import (
 	"strings"
 	"unicode"
 
-	lipgloss "charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
 
 	"github.com/k2m30/a9s/v3/core/catalog"
@@ -695,9 +694,9 @@ const detailKeyFloor = 22
 //
 // It is measured in terminal columns, because that is what the padding under
 // it fills: a key counted in bytes reserves three times the room a CJK field
-// name paints. lipgloss.Width is the same measure the painter's PadOrTrunc
-// pads to, and it is a package both this lane and the terminal may import —
-// the layout is decided here, once per build, and every renderer reads
+// name paints. domain.Width is the same measure the painter's PadOrTrunc pads
+// to — the painter calls it underneath — so the layout is decided here, once
+// per build, and every renderer reads
 // DetailBody.KeyWidth rather than arriving at its own answer from its own
 // width.
 func DetailKeyWidth(fields []FieldRow, viewport int) int {
@@ -706,7 +705,7 @@ func DetailKeyWidth(fields []FieldRow, viewport int) int {
 		if f.IsHeader || f.IsSubField {
 			continue
 		}
-		w = max(w, lipgloss.Width(f.Key)+1)
+		w = max(w, domain.Width(f.Key)+1)
 	}
 	if viewport > 0 {
 		return min(w, viewport*2/5)

@@ -7,6 +7,8 @@ import (
 	"slices"
 	"strings"
 	"unicode/utf8"
+
+	"github.com/charmbracelet/x/ansi"
 )
 
 // Sanitize returns s with every terminal control sequence replaced by a single
@@ -433,4 +435,26 @@ func SanitizedAttentionDetails(m map[FindingCode]AttentionDetail) map[FindingCod
 		out[FindingCode(Sanitize(string(code)))] = ad
 	}
 	return out
+}
+
+// Width returns the number of terminal columns s occupies: the widest of its
+// lines, with any styling skipped.
+//
+// It is the one measure. The body build reserves columns with it (the detail
+// key column, the status column) and the painter fills them with it
+// (internal/tui/text.Width and PadOrTrunc are this function underneath), so a
+// reservation and the text that lands in it cannot disagree — a rune-count
+// reservation is half the room a CJK name needs. It lives here because core
+// must not depend on a renderer: github.com/charmbracelet/x/ansi is the
+// measurement library the painter's own stack uses underneath, not a
+// rendering one.
+func Width(s string) int {
+	if !strings.Contains(s, "\n") {
+		return ansi.StringWidth(s)
+	}
+	widest := 0
+	for line := range strings.SplitSeq(s, "\n") {
+		widest = max(widest, ansi.StringWidth(line))
+	}
+	return widest
 }

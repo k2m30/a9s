@@ -8,8 +8,6 @@ import (
 	"strconv"
 	"strings"
 
-	lipgloss "charm.land/lipgloss/v2"
-
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 	"github.com/k2m30/a9s/v3/core/runtime"
@@ -670,7 +668,7 @@ func widenStatusColumn(columns []ColumnDef, rows []ListRow, statusCol int) []Col
 	w := columns[statusCol].Width
 	for _, row := range rows {
 		if statusCol < len(row.Cells) {
-			w = max(w, lipgloss.Width(row.Cells[statusCol]))
+			w = max(w, domain.Width(row.Cells[statusCol]))
 		}
 	}
 	if w == columns[statusCol].Width {

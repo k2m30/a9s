@@ -5,8 +5,9 @@ package text
 import (
 	"strings"
 
-	lipgloss "charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
+
+	"github.com/k2m30/a9s/v3/core/domain"
 )
 
 // Width returns the number of terminal columns s occupies. It is the measure
@@ -14,7 +15,7 @@ import (
 // for a string cannot disagree with the renderer that fills it: a rune-count
 // reservation is half the room a CJK title needs.
 func Width(s string) int {
-	return lipgloss.Width(s)
+	return domain.Width(s)
 }
 
 // unpaintable reports whether r occupies no terminal column yet survives as a
