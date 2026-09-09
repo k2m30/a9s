@@ -358,13 +358,17 @@ detail:
 
 // TestTwoFilesForOneTypeAreReported pins row 24. Two files in one directory
 // can name the same type — an operator who renamed a file and kept the old
-// one, or a case-insensitive filesystem's two spellings — and the loader
-// merges them in directory order with the last one winning. Whichever it
-// picks, the operator has two files and one screen, and only the loader knows
-// which one they are looking at.
+// one, or one file named for the type and another for its alias — and the
+// loader merges them in directory order with the last one winning. Whichever
+// it picks, the operator has two files and one screen, and only the loader
+// knows which one they are looking at.
+//
+// The two names differ by more than case on purpose: this filesystem is
+// case-insensitive, so ec2.yaml and EC2.yaml are one file and there is no
+// collision to report. "instances" is ec2's own alias.
 func TestTwoFilesForOneTypeAreReported(t *testing.T) {
 	dir := t.TempDir()
-	views7WriteViewFile(t, dir, "EC2", `generated: 7
+	views7WriteViewFile(t, dir, "instances", `generated: 7
 list:
   Instance ID:
     key: instance_id
@@ -395,7 +399,7 @@ detail:
 	}
 	active := "ec2.yaml"
 	if view.List[0].Width == 99 {
-		active = "EC2.yaml"
+		active = "instances.yaml"
 	}
 
 	if err == nil {
@@ -403,7 +407,7 @@ detail:
 			"other was read, discarded and never mentioned", active)
 	}
 	report := err.Error()
-	for _, name := range []string{"EC2.yaml", "ec2.yaml"} {
+	for _, name := range []string{"instances.yaml", "ec2.yaml"} {
 		if n := strings.Count(report, name); n != 1 {
 			t.Errorf("the load names %s %d times in %q; the report names both files, once each",
 				name, n, report)
