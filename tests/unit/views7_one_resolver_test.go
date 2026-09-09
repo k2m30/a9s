@@ -12,11 +12,8 @@
 package unit
 
 import (
-	"fmt"
 	"go/ast"
 	"path/filepath"
-	"sort"
-	"strings"
 	"testing"
 
 	_ "github.com/k2m30/a9s/v3/core/aws"
@@ -24,36 +21,56 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// TestOneResolverForATypeName pins row 23's shape: the parent-only and
-// child-only lookups are the catalog's own business, and every caller outside
-// it asks the one resolver that answers for both.
-func TestOneResolverForATypeName(t *testing.T) {
-	fset, files := views7GoFilesUnder(t, "core", "internal", "cmd")
+// views7LookupSurface is every exported way to turn a type name into a type
+// definition. FindAny answers for a parent and a child alike; the two narrow
+// ones exist because two callers mean one half and say so — the parents
+// accessor and the child registry. A fourth is a caller somewhere resolving
+// half the catalog again, which is the defect this task removed from eight
+// places.
+var views7LookupSurface = map[string]bool{
+	"FindAny":      true,
+	"TopLevelOnly": true,
+	"ChildOnly":    true,
+}
 
-	var offenders []string
+// TestCatalogLookupSurfaceIsTheThree pins row 25. Naming the two lookups that
+// used to be exported made the gate green the day they were renamed; the shape
+// is the surface, so it is the surface that is asserted.
+func TestCatalogLookupSurfaceIsTheThree(t *testing.T) {
+	_, files := views7GoFilesUnder(t, filepath.Join("core", "catalog"))
+
+	found := map[string]bool{}
 	for path, f := range files {
-		if strings.Contains(path, filepath.Join("core", "catalog")+string(filepath.Separator)) {
-			continue
+		for _, decl := range f.Decls {
+			fn, ok := decl.(*ast.FuncDecl)
+			if !ok || fn.Recv != nil || !fn.Name.IsExported() || fn.Type.Results == nil {
+				continue
+			}
+			for _, r := range fn.Type.Results.List {
+				star, ok := r.Type.(*ast.StarExpr)
+				if !ok {
+					continue
+				}
+				if id, ok := star.X.(*ast.Ident); ok && id.Name == "ResourceTypeDef" {
+					found[fn.Name.Name] = true
+					if !views7LookupSurface[fn.Name.Name] {
+						rel, _ := filepath.Rel(projectRoot(t), path)
+						t.Errorf("core/catalog exports %s, a fourth way to resolve a type name (%s) — "+
+							"one resolver answers for a parent and a child, and the two narrow lookups "+
+							"exist because their callers mean one half and say so. A third narrow one is "+
+							"a caller resolving half the catalog again",
+							fn.Name.Name, rel)
+					}
+				}
+			}
 		}
-		ast.Inspect(f, func(n ast.Node) bool {
-			sel, ok := n.(*ast.SelectorExpr)
-			if !ok || (sel.Sel.Name != "Find" && sel.Sel.Name != "FindChild") {
-				return true
-			}
-			pkg, ok := sel.X.(*ast.Ident)
-			if !ok || pkg.Name != "catalog" {
-				return true
-			}
-			rel, _ := filepath.Rel(projectRoot(t), path)
-			offenders = append(offenders, fmt.Sprintf("%s:%d: catalog.%s", rel, fset.Position(sel.Pos()).Line, sel.Sel.Name))
-			return true
-		})
 	}
-	sort.Strings(offenders)
-	for _, o := range offenders {
-		t.Errorf("a type name is resolved by half the catalog: %s — one resolver answers for a parent "+
-			"and a child, and a caller that picks one registry is a caller that is wrong for the other "+
-			"half of the types", o)
+
+	for name := range views7LookupSurface {
+		if !found[name] {
+			t.Errorf("core/catalog no longer exports %s — the gate names the surface, so the surface "+
+				"and this list are changed together", name)
+		}
 	}
 }
 
