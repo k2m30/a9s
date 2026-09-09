@@ -13,22 +13,23 @@ import (
 
 	"github.com/k2m30/a9s/v3/core/app"
 	"github.com/k2m30/a9s/v3/internal/tui/styles"
-	"github.com/k2m30/a9s/v3/internal/tui/text"
 )
 
 // matchPos records the position of a single query match in plain-text
-// content, in the unit the painter walks the line in: rune offsets. The
-// published unit is display columns (app.SearchMatch), and setMatches is the
-// one conversion between them.
+// content, in the unit both the body and the painter use: byte offsets into
+// the painted line with its styling stripped. There is no conversion — a
+// display column cannot name a position a combining mark shares with the
+// letter it sits on.
 type matchPos struct {
 	line      int // 0-based line index in plain text
-	startRune int // starting rune offset in the plain line
-	endRune   int // ending rune offset in the plain line
+	startByte int // starting byte offset in the plain line
+	endByte   int // ending byte offset in the plain line
 }
 
-// highlightEvent is used internally by highlightLine to track open/close positions.
+// highlightEvent is used internally by highlightLine to track open/close
+// positions, in plain-text byte offsets.
 type highlightEvent struct {
-	visRune  int
+	visByte  int
 	matchIdx int
 	isOpen   bool
 }
@@ -255,14 +256,13 @@ type searchLineEntry struct {
 // Positions are expressed in plain-text byte offsets.
 func highlightLine(styledLine string, entries []searchLineEntry, currentIdx int) string {
 	plainLine := ansi.Strip(styledLine)
-	plainRunes := []rune(plainLine)
 
 	// Build sorted event list (open/close per match).
 	events := make([]highlightEvent, 0, len(entries)*2)
 	for _, e := range entries {
 		events = append(events,
-			highlightEvent{e.mp.startRune, e.matchIdx, true},
-			highlightEvent{e.mp.endRune, e.matchIdx, false},
+			highlightEvent{e.mp.startByte, e.matchIdx, true},
+			highlightEvent{e.mp.endByte, e.matchIdx, false},
 		)
 	}
 	sortHighlightEvents(events)
@@ -270,25 +270,25 @@ func highlightLine(styledLine string, entries []searchLineEntry, currentIdx int)
 	var out strings.Builder
 	out.Grow(len(styledLine) + len(entries)*40)
 
-	visPos := 0  // current visible rune column
+	visPos := 0  // current byte position in the plain line
 	bytePos := 0 // current byte position in styledLine
 	eIdx := 0    // next event to process
 
 	for {
 		// Fire events at the current visible position.
-		for eIdx < len(events) && events[eIdx].visRune == visPos {
+		for eIdx < len(events) && events[eIdx].visByte == visPos {
 			ev := events[eIdx]
 			if ev.isOpen {
 				// Find the matching close to know the span length.
-				endRune := visPos
+				endByte := visPos
 				for k := eIdx + 1; k < len(events); k++ {
 					if events[k].matchIdx == ev.matchIdx && !events[k].isOpen {
-						endRune = events[k].visRune
+						endByte = events[k].visByte
 						break
 					}
 				}
-				if endRune > visPos && endRune <= len(plainRunes) {
-					matchText := string(plainRunes[visPos:endRune])
+				if endByte > visPos && endByte <= len(plainLine) {
+					matchText := plainLine[visPos:endByte]
 					var rendered string
 					if ev.matchIdx == currentIdx {
 						rendered = styles.SearchCurrentStyle.Render(matchText)
@@ -296,9 +296,9 @@ func highlightLine(styledLine string, entries []searchLineEntry, currentIdx int)
 						rendered = styles.SearchOtherStyle.Render(matchText)
 					}
 					out.WriteString(rendered)
-					// Skip past the visible characters in the styled bytes.
-					bytePos = advanceStyledBytes(styledLine, bytePos, endRune-visPos)
-					visPos = endRune
+					// Skip past the matched text in the styled bytes.
+					bytePos = advanceStyledBytes(styledLine, bytePos, endByte-visPos)
+					visPos = endByte
 					// Advance eIdx past the close event for this match.
 					eIdx = skipCloseEvent(events, eIdx)
 					continue
@@ -328,15 +328,15 @@ func highlightLine(styledLine string, entries []searchLineEntry, currentIdx int)
 			r, size := decodeRune(styledLine[bytePos:])
 			out.WriteRune(r)
 			bytePos += size
-			visPos++
+			visPos += size
 		}
 	}
 
 	return out.String()
 }
 
-// advanceStyledBytes advances bytePos in styledLine past n visible rune positions,
-// skipping ANSI escapes transparently.
+// advanceStyledBytes advances bytePos in styledLine past count bytes of plain
+// text, skipping ANSI escapes transparently.
 func advanceStyledBytes(styledLine string, bytePos, count int) int {
 	consumed := 0
 	pos := bytePos
@@ -353,7 +353,7 @@ func advanceStyledBytes(styledLine string, bytePos, count int) int {
 		} else {
 			_, size := decodeRune(styledLine[pos:])
 			pos += size
-			consumed++
+			consumed += size
 		}
 	}
 	return pos
@@ -370,14 +370,14 @@ func skipCloseEvent(events []highlightEvent, openIdx int) int {
 	return openIdx + 1
 }
 
-// sortHighlightEvents sorts events by rune offset; at the same offset, closes before opens.
+// sortHighlightEvents sorts events by byte offset; at the same offset, closes before opens.
 func sortHighlightEvents(events []highlightEvent) {
 	// Insertion sort — event counts are tiny (single-digit per line typically).
 	for i := 1; i < len(events); i++ {
 		for j := i; j > 0; j-- {
 			a, b := events[j-1], events[j]
-			// a < b if a.visRune > b.visRune (swap), or same offset and a is open but b is close.
-			if a.visRune > b.visRune || (a.visRune == b.visRune && a.isOpen && !b.isOpen) {
+			// a < b if a.visByte > b.visByte (swap), or same offset and a is open but b is close.
+			if a.visByte > b.visByte || (a.visByte == b.visByte && a.isOpen && !b.isOpen) {
 				events[j-1], events[j] = events[j], events[j-1]
 			} else {
 				break
@@ -434,44 +434,16 @@ func (s *SearchModel) recomputeMatches() {
 	}
 }
 
-// setMatches records the published match set — display columns, the unit
-// app.SearchMatch is named for — as the rune offsets the painter walks in.
-// The published set is the one the controller computed, so a text screen and
-// its body cannot disagree about where a match is; a screen that has no
-// published set (the detail view, whose content is rendered rows rather than
-// carried lines) computes one from the same function first.
+// setMatches records the published match set. Both sides speak plain-text
+// byte offsets, so this copies rather than converts: the body decided where
+// the matches are, and the painter paints there.
 func (s *SearchModel) setMatches(published []app.SearchMatch) {
 	if len(published) == 0 {
 		s.matches = nil
 		return
 	}
-	lines := strings.Split(s.content, "\n")
 	s.matches = make([]matchPos, 0, len(published))
 	for _, m := range published {
-		if m.Line < 0 || m.Line >= len(lines) {
-			continue
-		}
-		plain := ansi.Strip(lines[m.Line])
-		s.matches = append(s.matches, matchPos{
-			line:      m.Line,
-			startRune: runeOffsetAtColumn(plain, m.ColStart),
-			endRune:   runeOffsetAtColumn(plain, m.ColEnd),
-		})
+		s.matches = append(s.matches, matchPos{line: m.Line, startByte: m.ColStart, endByte: m.ColEnd})
 	}
-}
-
-// runeOffsetAtColumn returns the rune offset in plain at display column col.
-// A column past the end of the line is the end of the line.
-func runeOffsetAtColumn(plain string, col int) int {
-	if col <= 0 {
-		return 0
-	}
-	w := 0
-	for i, r := range []rune(plain) {
-		if w >= col {
-			return i
-		}
-		w += text.Width(string(r))
-	}
-	return len([]rune(plain))
 }

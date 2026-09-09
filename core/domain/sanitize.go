@@ -4,6 +4,7 @@ package domain
 
 import (
 	"maps"
+	"reflect"
 	"slices"
 	"strings"
 	"unicode/utf8"
@@ -88,15 +89,21 @@ func isC1Introducer(r rune) bool {
 }
 
 // sequenceLen returns the byte length of the control sequence at the start of
-// s, which begins with the introducer r of size bytes. A CSI runs to its final
-// byte, a string sequence (OSC, DCS, SOS, PM, APC) to its BEL or ST
-// terminator, and anything else is the introducer and the byte after it. An
-// unterminated sequence is the whole rest of the string: it would have
-// swallowed everything after it on a real terminal too.
+// s, whose introducer is the rune r of size bytes.
 //
-// The payload goes with the introducer, never only the control byte: "31m"
-// left behind as text is the sequence still on the screen, minus the part that
-// made it invisible.
+// It parses what a terminal parses, because anything it does not consume is
+// left on the screen as text nobody wrote. A CSI runs over its parameter and
+// intermediate bytes to a final byte in 0x40-0x7e — a BEL inside it is just
+// another byte, not a terminator. A string control (OSC, DCS, SOS, PM, APC)
+// runs to BEL or ST, scanned rune by rune so that the 0x9c byte inside a
+// multi-byte rune cannot be read as ST. An ESC followed by intermediates runs
+// to its own final byte (ESC ( B selects a character set, and stopping after
+// the "(" would leave a capital B on screen). An ESC followed by anything
+// else consumes the ESC alone, which keeps a multi-byte rune after it whole
+// rather than splitting it into an invalid tail.
+//
+// An unterminated sequence is the whole rest of the string: it would have
+// swallowed everything after it on a real terminal too.
 func sequenceLen(s string, r rune, size int) int {
 	kind := byte(0)
 	switch r {
@@ -104,8 +111,28 @@ func sequenceLen(s string, r rune, size int) int {
 		if len(s) < 2 {
 			return len(s)
 		}
-		kind = s[1]
-		size = 2
+		next := s[1]
+		switch {
+		case next == '[', next == ']', next == 'P', next == 'X', next == '^', next == '_':
+			kind = next
+			size = 2
+		case next >= 0x20 && next <= 0x2f: // intermediate bytes, then a final
+			for i := 1; i < len(s); i++ {
+				if s[i] >= 0x30 && s[i] <= 0x7e {
+					return i + 1
+				}
+				if s[i] < 0x20 || s[i] > 0x2f {
+					return i
+				}
+			}
+			return len(s)
+		case next >= 0x30 && next <= 0x7e: // a two-character escape
+			return 2
+		default:
+			// A control byte, or the first byte of a rune. The ESC goes, the
+			// rune stays.
+			return 1
+		}
 	case 0x9b:
 		kind = '['
 	case 0x9d:
@@ -119,33 +146,31 @@ func sequenceLen(s string, r rune, size int) int {
 	case 0x9f:
 		kind = '_'
 	}
-	switch kind {
-	case '[': // CSI: parameter and intermediate bytes, then a final byte.
+	if kind == '[' {
 		for i := size; i < len(s); i++ {
 			if s[i] >= 0x40 && s[i] <= 0x7e {
 				return i + 1
 			}
 		}
 		return len(s)
-	case ']', 'P', 'X', '^', '_': // string sequences, terminated by BEL or ST.
-		for i := size; i < len(s); i++ {
-			if s[i] == 0x07 {
-				return i + 1
-			}
-			if s[i] == 0x1b && i+1 < len(s) && s[i+1] == '\\' {
-				return i + 2
-			}
-			if s[i] == 0x9c {
-				return i + 1
-			}
-			if s[i] == 0xc2 && i+1 < len(s) && s[i+1] == 0x9c {
-				return i + 2
-			}
-		}
-		return len(s)
-	default:
-		return size
 	}
+	// A string control: BEL or ST ends it, and the payload is scanned on rune
+	// boundaries.
+	for i := size; i < len(s); {
+		c, n := utf8.DecodeRuneInString(s[i:])
+		switch {
+		case c == 0x07:
+			return i + 1
+		case c == 0x9c:
+			return i + n
+		case c == utf8.RuneError && n == 1 && s[i] == 0x9c:
+			return i + 1
+		case c == 0x1b && i+1 < len(s) && s[i+1] == '\\':
+			return i + 2
+		}
+		i += n
+	}
+	return len(s)
 }
 
 // Sanitized returns r with every AWS-supplied string that reaches a surface in
@@ -159,14 +184,169 @@ func sequenceLen(s string, r rune, size int) int {
 // of them, nearly always) is returned as it came, at the cost of one scan per
 // string and no allocation at all.
 //
-// RawStruct is left alone: the one surface that shows it marshals it to YAML,
-// which escapes a control byte to literal text rather than emitting it.
+// RawStruct is cleaned too, string leaf by string leaf. It is not a
+// presentation copy of Fields: a configured Path column and the generic detail
+// projection read it directly, so an alarm description that never reaches
+// Fields still reaches a painter. Cleaning it here is what lets every reader
+// downstream stay a reader.
+//
+// ID is the one string deliberately left raw. It is what the next AWS call and
+// the clipboard need byte for byte, so the places that PAINT an ID ask for its
+// displayed form instead (resource.DisplayID).
 func (r Resource) Sanitized() Resource {
+	if !r.NeedsSanitizing() {
+		return r
+	}
 	r.Name = Sanitize(r.Name)
 	r.Fields = sanitizedFields(r.Fields)
 	r.Findings = SanitizedFindings(r.Findings)
 	r.AttentionDetails = SanitizedAttentionDetails(r.AttentionDetails)
+	r.RawStruct = SanitizedRawStruct(r.RawStruct)
 	return r
+}
+
+// NeedsSanitizing reports whether Sanitized would change r. It is the scan
+// half of the boundary on its own, for the caller that has to know whether
+// anything moved — the row store returns the caller's own page when nothing
+// did, rather than paying a deep copy per page to hand back rows identical to
+// the ones it was given.
+func (r Resource) NeedsSanitizing() bool {
+	if Sanitize(r.Name) != r.Name {
+		return true
+	}
+	for k, v := range r.Fields {
+		if Sanitize(k) != k || Sanitize(v) != v {
+			return true
+		}
+	}
+	for _, f := range r.Findings {
+		if Sanitize(f.Phrase) != f.Phrase || Sanitize(f.Detail) != f.Detail {
+			return true
+		}
+	}
+	for _, ad := range r.AttentionDetails {
+		for _, row := range ad.Rows {
+			if Sanitize(row.Label) != row.Label || Sanitize(row.Value) != row.Value {
+				return true
+			}
+		}
+	}
+	return r.RawStruct != nil && hasHostileString(reflect.ValueOf(r.RawStruct), 0)
+}
+
+// maxRawStructDepth bounds the walk over an SDK struct. The AWS types are
+// trees a handful of levels deep; the bound is what keeps a type that ever
+// grows a cycle from hanging a fetch.
+const maxRawStructDepth = 32
+
+// SanitizedRawStruct returns v with every string leaf inert, as a deep copy
+// when one of them changed and v itself when none did — which is the case for
+// every well-behaved resource, and the reason this costs a walk and not an
+// allocation. The copy matters: the value is the fetcher's, and the row store
+// hands the same pointer to whoever asks.
+func SanitizedRawStruct(v any) any {
+	if v == nil {
+		return nil
+	}
+	src := reflect.ValueOf(v)
+	if !hasHostileString(src, 0) {
+		return v
+	}
+	dst := reflect.New(src.Type()).Elem()
+	copyClean(dst, src, 0)
+	return dst.Interface()
+}
+
+// hasHostileString reports whether any string reachable from v would change.
+func hasHostileString(v reflect.Value, depth int) bool {
+	if depth > maxRawStructDepth || !v.IsValid() {
+		return false
+	}
+	switch v.Kind() {
+	case reflect.String:
+		return Sanitize(v.String()) != v.String()
+	case reflect.Pointer, reflect.Interface:
+		return !v.IsNil() && hasHostileString(v.Elem(), depth+1)
+	case reflect.Struct:
+		for i := range v.NumField() {
+			if v.Type().Field(i).IsExported() && hasHostileString(v.Field(i), depth+1) {
+				return true
+			}
+		}
+	case reflect.Slice, reflect.Array:
+		for i := range v.Len() {
+			if hasHostileString(v.Index(i), depth+1) {
+				return true
+			}
+		}
+	case reflect.Map:
+		for _, key := range v.MapKeys() {
+			if hasHostileString(key, depth+1) || hasHostileString(v.MapIndex(key), depth+1) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// copyClean writes src into the addressable dst with every string leaf
+// sanitised. An unexported field is copied as it stands by the struct
+// assignment below and never visited: the AWS types carry only serde markers
+// there, and reflect could not write to it anyway.
+func copyClean(dst, src reflect.Value, depth int) {
+	if depth > maxRawStructDepth || !src.IsValid() {
+		return
+	}
+	switch src.Kind() {
+	case reflect.String:
+		dst.SetString(Sanitize(src.String()))
+	case reflect.Pointer:
+		if src.IsNil() {
+			return
+		}
+		dst.Set(reflect.New(src.Type().Elem()))
+		copyClean(dst.Elem(), src.Elem(), depth+1)
+	case reflect.Interface:
+		if src.IsNil() {
+			return
+		}
+		inner := reflect.New(src.Elem().Type()).Elem()
+		copyClean(inner, src.Elem(), depth+1)
+		dst.Set(inner)
+	case reflect.Struct:
+		dst.Set(src)
+		for i := range src.NumField() {
+			if src.Type().Field(i).IsExported() {
+				copyClean(dst.Field(i), src.Field(i), depth+1)
+			}
+		}
+	case reflect.Slice:
+		if src.IsNil() {
+			return
+		}
+		dst.Set(reflect.MakeSlice(src.Type(), src.Len(), src.Len()))
+		for i := range src.Len() {
+			copyClean(dst.Index(i), src.Index(i), depth+1)
+		}
+	case reflect.Array:
+		for i := range src.Len() {
+			copyClean(dst.Index(i), src.Index(i), depth+1)
+		}
+	case reflect.Map:
+		if src.IsNil() {
+			return
+		}
+		dst.Set(reflect.MakeMapWithSize(src.Type(), src.Len()))
+		for _, key := range src.MapKeys() {
+			cleanKey := reflect.New(key.Type()).Elem()
+			copyClean(cleanKey, key, depth+1)
+			cleanVal := reflect.New(src.Type().Elem()).Elem()
+			copyClean(cleanVal, src.MapIndex(key), depth+1)
+			dst.SetMapIndex(cleanKey, cleanVal)
+		}
+	default:
+		dst.Set(src)
+	}
 }
 
 func sanitizedFields(in map[string]string) map[string]string {

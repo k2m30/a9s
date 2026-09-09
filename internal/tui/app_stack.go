@@ -120,13 +120,29 @@ func (m *Model) innerSize() (int, int) {
 	return w, h
 }
 
-// propagateSize copies inner dimensions onto every rendererState in the stack.
+// propagateSize copies inner dimensions onto every rendererState in the stack,
+// and tells the controller the width the detail pane now has.
+//
+// The controller decides the detail layout — the key column's width, where the
+// attention sentence wraps — against the viewport it was told about. A resize
+// that reached only the renderer left those decisions made for the old width,
+// so a narrower terminal clipped a sentence wrapped for a wider one instead of
+// re-wrapping it.
 func (m *Model) propagateSize() {
 	w, h := m.innerSize()
 	for _, rs := range m.stack {
 		rs.width = w
 		rs.height = h
 	}
+	if m.ctrl == nil {
+		return
+	}
+	relatedVisible := false
+	if body := m.ctrl.Snapshot().Body.Detail; body != nil {
+		relatedVisible = body.RelatedVisible
+	}
+	m.ctrl.SetDetailViewportWidth(views.DetailContentWidth(w, views.DefaultRightColWidth, relatedVisible))
+	m.ctrl.SetDetailViewportHeight(h)
 }
 
 // cacheTopLevelResourceList writes the active list's interactive state into

@@ -5,7 +5,6 @@ package app
 import (
 	"regexp"
 
-	lipgloss "charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
 
 	"github.com/k2m30/a9s/v3/core/resource"
@@ -83,7 +82,7 @@ func (c *Controller) UpdateTextLines(lines []string) {
 	if ts == nil {
 		return
 	}
-	ts.Lines = lines
+	ts.setLines(lines)
 }
 
 // SetTextResource sets the Resource on the top text screen's TextState.
@@ -120,21 +119,19 @@ func (c *Controller) GetTextScreenContext() (runtime.ScreenID, runtime.ScreenCon
 }
 
 // TextSearchMatches scans lines for every case-insensitive occurrence of query
-// and returns them as SearchMatch values whose ColStart/ColEnd are what they
-// are called: display columns of the line as the terminal paints it.
+// and returns them as SearchMatch values whose ColStart/ColEnd are byte
+// offsets into the line as it is painted, with its styling stripped.
 //
-// This is the one place a text screen's match set is computed. The offsets
-// cross to the web lane and back into the terminal's painter, and the three
-// candidate numbers for "where the match starts" — the byte offset, the rune
-// offset and the column — are three different numbers the moment a line holds
-// a CJK name, so the published offset carries the unit its name claims and
-// every reader converts from that one.
+// This is the one place a text screen's match set is computed. Bytes rather
+// than display columns, because the painter needs to name a position and a
+// column cannot: a combining mark occupies no column, so the mark and the
+// letter it sits on share one, and a highlight asked for that column covers
+// both. A byte offset names exactly one position in the text the terminal
+// paints, which is what both lanes are looking at.
 //
-// The walk runs over the line that is painted, with its styling stripped and
-// nothing else changed. A folded copy is not that line: "İ" is two bytes and
-// lowercases to three, so an offset read off the folded copy sits one byte
-// past the text it names and the highlight lands beside the match. The
-// case-insensitivity is the regexp's, applied to the painted bytes.
+// The walk runs over that painted line and nothing else — no folded copy,
+// whose length differs from what it folds the moment a rune's lowercase form
+// is longer ("İ"), which used to move every offset after it.
 func TextSearchMatches(lines []string, query string) []SearchMatch {
 	if query == "" {
 		return nil
@@ -145,13 +142,8 @@ func TextSearchMatches(lines []string, query string) []SearchMatch {
 	}
 	var matches []SearchMatch
 	for lineIdx, line := range lines {
-		plain := ansi.Strip(line)
-		for _, at := range re.FindAllStringIndex(plain, -1) {
-			matches = append(matches, SearchMatch{
-				Line:     lineIdx,
-				ColStart: lipgloss.Width(plain[:at[0]]),
-				ColEnd:   lipgloss.Width(plain[:at[1]]),
-			})
+		for _, at := range re.FindAllStringIndex(ansi.Strip(line), -1) {
+			matches = append(matches, SearchMatch{Line: lineIdx, ColStart: at[0], ColEnd: at[1]})
 		}
 	}
 	return matches
@@ -160,7 +152,7 @@ func TextSearchMatches(lines []string, query string) []SearchMatch {
 // buildTextBody constructs a TextBody from TextState, mirroring the data that
 // YAMLModel.View() / JSONModel.View() consume via their viewport content.
 func buildTextBody(ts *TextState) *TextBody {
-	matches := TextSearchMatches(ts.Lines, ts.Search)
+	matches := ts.searchMatches()
 
 	// Clamp SearchCursor to valid range.
 	cursor := ts.SearchCursor

@@ -183,7 +183,9 @@ func ExtractCellValue(col ColumnDef, td *resource.ResourceTypeDef, r resource.Re
 // one exit, says how it reads.
 func extractCellText(col ColumnDef, td *resource.ResourceTypeDef, r resource.Resource) string {
 	if col.Key == "@id" {
-		return r.ID
+		// A cell is painted: the identity column shows the displayed form,
+		// while the copy surface and every AWS call keep r.ID as it is.
+		return resource.DisplayID(r.ID)
 	}
 
 	// Status/lifecycle column — OWNER CONTRACT: the type DECLARES its status

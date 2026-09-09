@@ -173,6 +173,27 @@ func dedupAgainstExistingRows(existing, incoming []resource.Resource) []resource
 // and need a fresh allocation, which (RawStruct) are deliberately left
 // aliased — is resource.Resource's own decision (domain.Resource.Clone);
 // this function only maps that decision over the slice.
+// cloneIncomingRows is cloneRows for the two paths that write rows INTO the
+// store. The store is behind the text boundary: a page reaches it from lanes
+// that never pass a controller door — the availability probe and the prefetch
+// write here directly, and an exact related navigation seeds its visible rows
+// straight back out — so the crossing happens here or not at all for them.
+// Cleaning is copy-on-write, so a page that needs none costs a scan.
+func cloneIncomingRows(rows []resource.Resource) (cleaned []resource.Resource, changed bool) {
+	if rows == nil {
+		return nil, false
+	}
+	out := make([]resource.Resource, len(rows))
+	for i, r := range rows {
+		if r.NeedsSanitizing() {
+			changed = true
+			r = r.Sanitized()
+		}
+		out[i] = r.Clone()
+	}
+	return out, changed
+}
+
 func cloneRows(rows []resource.Resource) []resource.Resource {
 	if rows == nil {
 		return nil
@@ -263,9 +284,13 @@ func (s *RowStore) Observe(canon string, rows []resource.Resource, pagination *r
 	}
 
 	// callerRows is what the caller handed in; rows becomes the store's own
-	// deep copy of it from here on.
+	// clean deep copy of it from here on. When the boundary changed nothing —
+	// every page from a lane that already crossed it, which is every page but
+	// a probe's or a prefetch's — the caller's slice still holds exactly what
+	// the store now holds, and the replace path below can hand it straight
+	// back without a second deep copy of the whole page.
 	callerRows := rows
-	rows = cloneRows(rows)
+	rows, rowsCleaned := cloneIncomingRows(rows)
 
 	var newRows []resource.Resource
 	if appendPage {
@@ -301,7 +326,7 @@ func (s *RowStore) Observe(canon string, rows []resource.Resource, pagination *r
 		ViewState:  existing.ViewState,
 	}
 	s.types[canon] = next
-	if !appendPage {
+	if !appendPage && !rowsCleaned {
 		return callerRows, next.Gen
 	}
 	return cloneRows(next.Rows), next.Gen
@@ -350,7 +375,7 @@ func (s *RowStore) ObservePartial(canon string, rows []resource.Resource) ([]res
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	rows = cloneRows(rows)
+	rows, _ = cloneIncomingRows(rows)
 	existing := s.types[canon]
 	merged := append(append([]resource.Resource(nil), existing.Rows...), dedupAgainstExistingRows(existing.Rows, rows)...)
 

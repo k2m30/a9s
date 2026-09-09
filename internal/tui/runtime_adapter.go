@@ -71,12 +71,16 @@ func (m *Model) applyIntent(intent runtime.UIIntent) tea.Cmd {
 		// therefore withhold FlashIntent from their forward and re-emit it
 		// through handleFlash, which lands back here — one application per
 		// flash, one entry.
-		m.ctrl.ApplyIntents([]runtime.UIIntent{v})
+		snap := m.ctrl.ApplyIntents([]runtime.UIIntent{v})
 		if v.LogOnly {
 			break
 		}
-		m.flash.text = v.Text
-		m.flash.isError = v.IsError
+		// The banner reads the text the controller kept, never the intent's
+		// own copy: an AWS message crosses the text boundary as the controller
+		// applies the flash, and a second copy here would be a second answer
+		// to a question already answered — the raw one.
+		m.flash.text = snap.Header.Flash.Text
+		m.flash.isError = snap.Header.Flash.IsError
 		m.flash.active = true
 	case runtime.ClearFlash:
 		m.flash.active = false

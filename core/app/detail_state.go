@@ -348,9 +348,9 @@ func (c *Controller) regenerateTextScreenLocked(resourceType, resourceID string,
 		}
 		switch s.ID {
 		case runtime.ScreenYAML:
-			ts.Lines = resourceYAMLLines(enriched)
+			ts.setLines(resourceYAMLLines(enriched))
 		case runtime.ScreenJSON:
-			ts.Lines = resourceJSONLines(enriched)
+			ts.setLines(resourceJSONLines(enriched))
 		}
 		ts.Resource = enriched
 	}
@@ -672,5 +672,5 @@ func (c *Controller) detailFrameTitleLocked() string {
 	if ds.Resource.Name != "" {
 		return ds.Resource.Name
 	}
-	return ds.Resource.ID
+	return resource.DisplayID(ds.Resource.ID)
 }

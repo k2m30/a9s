@@ -95,7 +95,7 @@ func (c *Controller) handleActionSearchNext(a Action) (ViewState, []runtime.Task
 		return vs, tasks
 	}
 	if ts := c.topTextState(); ts != nil && ts.Search != "" {
-		matches := TextSearchMatches(ts.Lines, ts.Search)
+		matches := ts.searchMatches()
 		if len(matches) > 0 {
 			ts.SearchCursor = (ts.SearchCursor + 1) % len(matches)
 			if ts.SearchCursor < len(matches) {
@@ -112,7 +112,7 @@ func (c *Controller) handleActionSearchPrev(a Action) (ViewState, []runtime.Task
 		return vs, tasks
 	}
 	if ts := c.topTextState(); ts != nil && ts.Search != "" {
-		matches := TextSearchMatches(ts.Lines, ts.Search)
+		matches := ts.searchMatches()
 		if len(matches) > 0 {
 			ts.SearchCursor = (ts.SearchCursor - 1 + len(matches)) % len(matches)
 			if ts.SearchCursor < len(matches) {

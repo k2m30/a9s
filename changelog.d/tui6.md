@@ -44,3 +44,17 @@
   the one value taken away to be used verbatim, so it is not cleaned on its
   way to the clipboard — but painting its control characters would let it
   drive the terminal.
+
+- Text an operator can put in AWS no longer reaches the screen raw from the
+  places the first pass missed: a description read straight off the SDK
+  struct, an identifier painted in a frame title, a row cached by the
+  background availability probe, and the banner the terminal paints for a
+  failed fetch. Identifiers are still copied exactly as AWS knows them.
+
+- Searching a text screen highlights the match itself, whatever the text
+  holds: a combining mark before or inside it, a double-width name, a letter
+  whose lowercase form is a different length. The scan also runs once per
+  document and query instead of on every keypress and every frame.
+
+- Shrinking the terminal re-lays-out an open detail screen instead of
+  clipping the text that was wrapped for the old width.

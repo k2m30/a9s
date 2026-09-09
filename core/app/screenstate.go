@@ -273,6 +273,39 @@ type TextState struct {
 	Wrap         bool              `json:"wrap,omitempty"`
 	ScrollY      int               `json:"scroll_y"`
 	Resource     resource.Resource `json:"resource,omitzero"`
+
+	// The match set for (Lines, Search), computed at most once per pair. A
+	// text screen is a document: scanning it is the most expensive thing a
+	// keypress can trigger, and moving the highlight down one line changes
+	// neither the content nor the query. linesGen identifies the content —
+	// setLines is the one writer that bumps it.
+	linesGen     int
+	matches      []SearchMatch
+	matchQuery   string
+	matchGen     int
+	matchesValid bool
+}
+
+// setLines replaces the screen's content and retires the match set computed
+// for the old content.
+func (ts *TextState) setLines(lines []string) {
+	ts.Lines = lines
+	ts.linesGen++
+}
+
+// searchMatches returns the match set for this content and this query,
+// computing it only when one of them has moved. Both lanes and every
+// navigation read the same slice, which is what makes "computed once"
+// observable rather than a claim.
+func (ts *TextState) searchMatches() []SearchMatch {
+	if ts.matchesValid && ts.matchQuery == ts.Search && ts.matchGen == ts.linesGen {
+		return ts.matches
+	}
+	ts.matches = TextSearchMatches(ts.Lines, ts.Search)
+	ts.matchQuery = ts.Search
+	ts.matchGen = ts.linesGen
+	ts.matchesValid = true
+	return ts.matches
 }
 
 // SelectorState holds the mutable display state for a profile/region/theme

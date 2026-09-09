@@ -84,6 +84,25 @@ func (m DetailModel) currentRightColWidth() int {
 	return ComputeRightColWidth(m.width, m.rightColWidth)
 }
 
+// DefaultRightColWidth is the related panel's base width, which every detail
+// model starts at.
+const DefaultRightColWidth = 32
+
+// DetailContentWidth returns the width the field list is laid out in: the
+// whole inner width, less the related panel and its separator when the panel
+// is showing and the terminal is wide enough for it.
+//
+// It is the one statement of that split. The renderer sizes its left viewport
+// with it, and the terminal hands the same number to the controller on a
+// resize, so the body's layout decisions (the key width, the attention
+// wrapping) are made for the pane the operator is looking at.
+func DetailContentWidth(innerWidth, baseRightColWidth int, relatedVisible bool) int {
+	if !relatedVisible || innerWidth < layout.MinInnerContentWidth {
+		return innerWidth
+	}
+	return innerWidth - ComputeRightColWidth(innerWidth, baseRightColWidth) - 1
+}
+
 // ComputeRightColWidth returns the right-column width for a given terminal
 // inner width and base right-column width. Used by the renderer stack to size
 // the right column without a DetailModel instance (e.g., after Ctrl+R resets
@@ -170,7 +189,7 @@ func (m *DetailModel) RenderDetail(body app.DetailBody) string {
 	// Width guard matches the TUI's MinInnerContentWidth check.
 	if body.RelatedVisible && m.width >= layout.MinInnerContentWidth {
 		rightW := m.currentRightColWidth()
-		leftW := m.width - rightW - 1
+		leftW := DetailContentWidth(m.width, m.rightColWidth, true)
 		// Size the viewport to the left-panel width so its View() clips content
 		// to leftW, not to m.width. Without this, transient detail paths (e.g.
 		// renderDetail in renderer.go) that create a fresh viewport at rs.width

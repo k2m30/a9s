@@ -104,18 +104,27 @@ func CanonicalShortName(name string) string {
 // Otherwise it renders the standard "detail -- <ID> (<Name>)" form. Pure
 // string composition — callers resolve TitleOmitsID via GetChildType /
 // FindResourceType and pass it in.
+// DisplayID is the displayed form of a resource identifier. The identifier
+// itself is deliberately left raw by the text boundary — the next AWS call and
+// the clipboard need the bytes AWS knows, and an S3 object key is
+// operator-supplied text that arrives as one — so every place that PAINTS an
+// identifier asks here instead, and nowhere else decides.
+func DisplayID(id string) string {
+	return domain.Sanitize(id)
+}
+
 func DetailFrameTitle(id, name string, omitID bool) string {
 	if omitID {
 		if name != "" {
 			return "detail -- " + name
 		}
-		return "detail -- " + id
+		return "detail -- " + DisplayID(id)
 	}
 	if id == "" {
 		return "detail"
 	}
 	if name != "" {
-		return "detail -- " + id + " (" + name + ")"
+		return "detail -- " + DisplayID(id) + " (" + name + ")"
 	}
-	return "detail -- " + id
+	return "detail -- " + DisplayID(id)
 }
