@@ -3,7 +3,6 @@
 package domain
 
 import (
-	"maps"
 	"reflect"
 	"slices"
 	"strings"
@@ -211,27 +210,60 @@ func (r Resource) Sanitized() Resource {
 // did, rather than paying a deep copy per page to hand back rows identical to
 // the ones it was given.
 func (r Resource) NeedsSanitizing() bool {
-	if Sanitize(r.Name) != r.Name {
+	if anyDirty(r.Name) {
 		return true
 	}
 	for k, v := range r.Fields {
-		if Sanitize(k) != k || Sanitize(v) != v {
+		if anyDirty(k, v) {
 			return true
 		}
 	}
-	for _, f := range r.Findings {
-		if Sanitize(f.Phrase) != f.Phrase || Sanitize(f.Detail) != f.Detail {
+	return findingsDirty(r.Findings) ||
+		attentionDirty(r.AttentionDetails) ||
+		(r.RawStruct != nil && hasHostileString(reflect.ValueOf(r.RawStruct), 0))
+}
+
+// anyDirty reports whether Sanitize would change any of ss. It is the one
+// answer to "is this dirty": a caller that writes the comparison itself is a
+// second copy of the rule, and two copies drift by omission rather than by
+// disagreement — the strings one of them forgets to list are the ones nothing
+// cleans.
+func anyDirty(ss ...string) bool {
+	for _, s := range ss {
+		if Sanitize(s) != s {
 			return true
 		}
 	}
-	for _, ad := range r.AttentionDetails {
+	return false
+}
+
+// findingsDirty and attentionDirty are the two shapes' string lists, written
+// once each: the entry points below and NeedsSanitizing above both ask them,
+// so a string added to a Finding or to an attention row is listed in one
+// place. A finding's Code is one of them — it keys the attention block the
+// detail groups by and the web lane decodes — and so is a row's Tier, which
+// is the selector a painter switches a style on.
+func findingsDirty(fs []Finding) bool {
+	for _, f := range fs {
+		if anyDirty(string(f.Code), f.Phrase, f.Detail) {
+			return true
+		}
+	}
+	return false
+}
+
+func attentionDirty(m map[FindingCode]AttentionDetail) bool {
+	for code, ad := range m {
+		if anyDirty(string(code)) {
+			return true
+		}
 		for _, row := range ad.Rows {
-			if Sanitize(row.Label) != row.Label || Sanitize(row.Value) != row.Value {
+			if anyDirty(row.Label, row.Value, row.Tier) {
 				return true
 			}
 		}
 	}
-	return r.RawStruct != nil && hasHostileString(reflect.ValueOf(r.RawStruct), 0)
+	return false
 }
 
 // maxRawStructDepth bounds the walk over an SDK struct. The AWS types are
@@ -367,22 +399,16 @@ func sanitizedFields(in map[string]string) map[string]string {
 	return out
 }
 
-// SanitizedFindings returns fs with the operator-facing wording of every
-// finding inert, as a fresh slice when any of it changed and fs itself when
-// none did.
+// SanitizedFindings returns fs with every string a finding puts on a surface
+// inert — its code as well as its wording — as a fresh slice when any of it
+// changed and fs itself when none did.
 func SanitizedFindings(fs []Finding) []Finding {
-	dirty := false
-	for _, f := range fs {
-		if Sanitize(f.Phrase) != f.Phrase || Sanitize(f.Detail) != f.Detail {
-			dirty = true
-			break
-		}
-	}
-	if !dirty {
+	if !findingsDirty(fs) {
 		return fs
 	}
 	out := slices.Clone(fs)
 	for i := range out {
+		out[i].Code = FindingCode(Sanitize(string(out[i].Code)))
 		out[i].Phrase = Sanitize(out[i].Phrase)
 		out[i].Detail = Sanitize(out[i].Detail)
 	}
@@ -393,29 +419,18 @@ func SanitizedFindings(fs []Finding) []Finding {
 // attention row inert, as a fresh map when any of it changed and m itself when
 // none did.
 func SanitizedAttentionDetails(m map[FindingCode]AttentionDetail) map[FindingCode]AttentionDetail {
-	dirty := false
-	for _, ad := range m {
-		for _, row := range ad.Rows {
-			if Sanitize(row.Label) != row.Label || Sanitize(row.Value) != row.Value {
-				dirty = true
-				break
-			}
-		}
-		if dirty {
-			break
-		}
-	}
-	if !dirty {
+	if !attentionDirty(m) {
 		return m
 	}
-	out := maps.Clone(m)
-	for code, ad := range out {
+	out := make(map[FindingCode]AttentionDetail, len(m))
+	for code, ad := range m {
 		ad.Rows = slices.Clone(ad.Rows)
 		for i := range ad.Rows {
 			ad.Rows[i].Label = Sanitize(ad.Rows[i].Label)
 			ad.Rows[i].Value = Sanitize(ad.Rows[i].Value)
+			ad.Rows[i].Tier = Sanitize(ad.Rows[i].Tier)
 		}
-		out[code] = ad
+		out[FindingCode(Sanitize(string(code)))] = ad
 	}
 	return out
 }
