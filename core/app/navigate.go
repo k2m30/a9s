@@ -83,6 +83,9 @@ func (c *Controller) applyNavResult(res runtime.NavigateResult) []runtime.TaskRe
 		// (Popping via ApplyIntents would now stop at the len<=1 guard anyway;
 		// pop directly to keep the intent clear.)
 		if len(c.stack) > 1 {
+			for _, s := range c.stack[1:] {
+				c.forgetListFetchSeqOf(s)
+			}
 			c.stack = c.stack[:1]
 		}
 

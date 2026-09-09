@@ -77,10 +77,6 @@ keys() {
 	tmux send-keys -t "$SESSION" "$@"
 }
 
-# The demo profile persists its cost cache like any profile; a stale file
-# from an earlier run (older fixture anchor or names) would poison every
-# assertion below. Start cold.
-rm -f "$HOME/.a9s/cache/demo--costs.yaml"
 
 # A cache root of the run's own: the demo now keeps a cache like any other
 # session, and a smoke must neither read the operator's nor leave anything in

@@ -126,9 +126,12 @@ func TestHandleResourcesLoaded_AMIStub_AutoOpensDetail_NoClients(t *testing.T) {
 		t.Fatalf("Model.Update(messages.RelatedNavigate) returned %T; want tui.Model", navResult)
 	}
 
+	// The page carries the identity of the list the navigation pushed, as a
+	// real dispatch stamps it; auto-open runs only for the page's own list.
 	loadedResult, cmd := m.Update(messages.ResourcesLoaded{
 		ResourceType: "ami",
 		Resources:    []resource.Resource{},
+		ScreenID:     m.ctrl.GetListInstance(),
 	})
 	if _, ok := loadedResult.(Model); !ok {
 		t.Fatalf("Model.Update(messages.ResourcesLoaded) returned %T; want tui.Model", loadedResult)

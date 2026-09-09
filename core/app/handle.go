@@ -95,14 +95,18 @@ func (c *Controller) Handle(ev runtime.Event) (ViewState, []runtime.TaskRequest)
 		// c.mu (line 25), so call the lock-free core directly — the exported
 		// ApplyReapplyCheckerAgainst would re-lock the non-reentrant RWMutex and
 		// self-deadlock. No-op when no reapply-checker is registered for the type.
-		if ls := c.topListState(); ls != nil && len(c.stack) > 0 {
+		// Both steps below act on the list on top, so they run only when the
+		// page's owner IS the list on top: a page routed to a screen beneath a
+		// same-type drill must neither feed the drill's checker nor fire its
+		// auto-open.
+		if ls := c.topListState(); ls != nil && len(c.stack) > 0 && ls.instance == msg.ScreenID {
 			c.reapplyCheckerAgainst(ls, c.stack[len(c.stack)-1].Ctx.ResourceType, msg.Resources)
+			// Web/headless by-ID drill: replace a flagged placeholder list with the
+			// target's detail once its single row loads. TUI-safe — Handle is the
+			// headless/web entry point; the TUI routes ResourcesLoaded through the
+			// HandleResourcesLoadedEvent seam and drills to detail in its own adapter.
+			tasks = append(tasks, c.autoOpenSingleDetail()...)
 		}
-		// Web/headless by-ID drill: replace a flagged placeholder list with the
-		// target's detail once its single row loads. TUI-safe — Handle is the
-		// headless/web entry point; the TUI routes ResourcesLoaded through the
-		// HandleResourcesLoadedEvent seam and drills to detail in its own adapter.
-		tasks = append(tasks, c.autoOpenSingleDetail()...)
 	}
 
 	// A by-ID placeholder list's own fetch can also resolve as

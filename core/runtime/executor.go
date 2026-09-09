@@ -136,9 +136,12 @@ func (c *Core) LatestListFetchSeq(screen domain.Gen) domain.Gen {
 //
 // A zero seq carries no ordering claim — a cache-seed replay, a
 // filtered/child/by-ID result, a synthetic construction — and is never
-// superseded.
+// superseded. A screen whose counter is gone (popped before its page
+// arrived) has dispatched nothing later, so its page is not superseded
+// either: it reaches no screen and still feeds the shared row state.
 func (c *Core) ListResultSuperseded(screen, seq domain.Gen) bool {
-	return seq != 0 && seq != c.LatestListFetchSeq(screen)
+	latest := c.LatestListFetchSeq(screen)
+	return seq != 0 && latest != 0 && seq != latest
 }
 
 // ExecuteTask runs a task using a snapshot captured now. Synchronous callers

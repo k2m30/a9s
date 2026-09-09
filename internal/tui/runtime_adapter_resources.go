@@ -90,12 +90,17 @@ func (m Model) handleResourcesLoaded(msg messages.ResourcesLoaded) (tea.Model, t
 	if msg.Superseded {
 		return m, nil
 	}
-	// Re-apply the checker if the active list has one (related-navigation lists).
+	// The checker re-apply and the auto-open below act on the active list, so
+	// they run only when the page's owner IS the active list: a page routed to
+	// a screen beneath a same-type drill must not touch the drill.
 	rs := m.activeRS()
+	coreCmd := m.dispatchCoreScreenResult(intents, tasks)
+	if m.ctrl.GetListInstance() != msg.ScreenID {
+		return m, coreCmd
+	}
 	if rs.kind == rsKindList {
 		m.ctrl.ApplyReapplyCheckerAgainst(msg.Resources)
 	}
-	coreCmd := m.dispatchCoreScreenResult(intents, tasks)
 
 	// Auto-open-single-detail: when the active list was created with
 	// autoOpenSingleDetail (e.g. related navigation from a detail field), and
