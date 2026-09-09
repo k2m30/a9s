@@ -5,7 +5,7 @@ package unit
 // They compile and pass only after the Coder (AS-799) implements the scaffold.
 //
 // Coverage:
-//   1. Smoke: aws.Install() → catalog.Find("ec2") non-nil
+//   1. Smoke: aws.Install() → catalog.FindAny("ec2") non-nil
 //   2. Idempotence: double-Install does not panic, count stable
 //   3. SetTypes panics on second call with different slice
 //   4. catalog.Find panics before SetTypes (sub-process)
@@ -27,11 +27,11 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// Test 1 — Smoke: Install() makes catalog.Find("ec2") return a non-nil entry.
+// Test 1 — Smoke: Install() makes catalog.FindAny("ec2") return a non-nil entry.
 func TestCatalogInstall_Smoke_EC2NonNil(t *testing.T) {
-	got := catalog.Find("ec2")
+	got := catalog.FindAny("ec2")
 	if got == nil {
-		t.Fatal("catalog.Find(\"ec2\") returned nil after aws.Install(); expected non-nil entry")
+		t.Fatal("catalog.FindAny(\"ec2\") returned nil after aws.Install(); expected non-nil entry")
 	}
 }
 
@@ -101,8 +101,8 @@ func TestCatalogSetTypes_PanicsOnEmptyRelatedTargetType(t *testing.T) {
 	if after != before {
 		t.Fatalf("catalog.All() count changed from %d to %d after a rejected SetTypes call; the panic must fire before any global mutation", before, after)
 	}
-	if got := catalog.Find("ec2"); got == nil {
-		t.Fatal("catalog.Find(\"ec2\") returned nil after a rejected SetTypes call — the installed catalog must survive an empty-TargetType rejection untouched")
+	if got := catalog.FindAny("ec2"); got == nil {
+		t.Fatal("catalog.FindAny(\"ec2\") returned nil after a rejected SetTypes call — the installed catalog must survive an empty-TargetType rejection untouched")
 	}
 }
 
@@ -141,8 +141,8 @@ func TestCatalogSetChildTypes_PanicsOnEmptyRelatedTargetType(t *testing.T) {
 	if after != before {
 		t.Fatalf("catalog.AllChildren() count changed from %d to %d after a rejected SetChildTypes call; the panic must fire before any global mutation", before, after)
 	}
-	if got := catalog.FindChild("s3_objects"); got == nil {
-		t.Fatal("catalog.FindChild(\"s3_objects\") returned nil after a rejected SetChildTypes call — the installed child catalog must survive an empty-TargetType rejection untouched")
+	if got := catalog.ChildOnly("s3_objects"); got == nil {
+		t.Fatal("catalog.ChildOnly(\"s3_objects\") returned nil after a rejected SetChildTypes call — the installed child catalog must survive an empty-TargetType rejection untouched")
 	}
 }
 
@@ -153,7 +153,7 @@ func TestCatalogFind_PanicsBeforeSetTypes(t *testing.T) {
 	if os.Getenv("TEST_CATALOG_PANIC") == "1" {
 		// Running in the sub-process. TEST_SKIP_INSTALL=1 was set by the
 		// parent so TestMain skipped aws.Install(). Calling Find now must panic.
-		catalog.Find("ec2")
+		catalog.FindAny("ec2")
 		os.Exit(0) // unreachable when panic fires correctly
 	}
 
@@ -201,9 +201,9 @@ func TestCatalogInstall_GoldenParity(t *testing.T) {
 	for _, g := range golden {
 		g := g
 		t.Run(g.findKey, func(t *testing.T) {
-			got := catalog.Find(g.findKey)
+			got := catalog.FindAny(g.findKey)
 			if got == nil {
-				t.Fatalf("catalog.Find(%q) returned nil; type missing after aws.Install()", g.findKey)
+				t.Fatalf("catalog.FindAny(%q) returned nil; type missing after aws.Install()", g.findKey)
 			}
 			if got.ShortName != g.shortName {
 				t.Errorf("ShortName: got %q, want %q", got.ShortName, g.shortName)

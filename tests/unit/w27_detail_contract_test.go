@@ -221,7 +221,7 @@ func TestDetailContract_ExistingBatchW1Bench(t *testing.T) {
 	for _, row := range rows {
 		defsByCode, ok := defsByType[row.typeName]
 		if !ok {
-			td := catalog.Find(row.typeName)
+			td := catalog.FindAny(row.typeName)
 			if td == nil {
 				t.Fatalf("%s has no catalog entry", row.typeName)
 			}

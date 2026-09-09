@@ -5,7 +5,6 @@ package resource
 import (
 	"fmt"
 
-	"github.com/k2m30/a9s/v3/core/catalog"
 	"github.com/k2m30/a9s/v3/core/domain"
 )
 
@@ -36,10 +35,7 @@ func SetDetailEnricherForTest(shortName string, f DetailEnricher) {
 // falls through to the legacy map so test overrides via SetDetailEnricherForTest
 // continue to work for synthetic short names.
 func GetDetailEnricher(shortName string) DetailEnricher {
-	if ct := catalog.Find(shortName); ct != nil && ct.DetailEnrich != nil {
-		return ct.DetailEnrich
-	}
-	if ct := catalog.FindChild(shortName); ct != nil && ct.DetailEnrich != nil {
+	if ct := typeDef(shortName); ct != nil && ct.DetailEnrich != nil {
 		return ct.DetailEnrich
 	}
 	return detailEnricherRegistry[shortName]
@@ -49,10 +45,7 @@ func GetDetailEnricher(shortName string) DetailEnricher {
 // Catalog-backed: checks the catalog (both top-level and child) first; falls
 // through to the legacy map.
 func HasDetailEnricher(shortName string) bool {
-	if ct := catalog.Find(shortName); ct != nil && ct.DetailEnrich != nil {
-		return true
-	}
-	if ct := catalog.FindChild(shortName); ct != nil && ct.DetailEnrich != nil {
+	if ct := typeDef(shortName); ct != nil && ct.DetailEnrich != nil {
 		return true
 	}
 	_, ok := detailEnricherRegistry[shortName]

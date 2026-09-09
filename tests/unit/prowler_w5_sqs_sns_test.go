@@ -955,9 +955,9 @@ func TestW5_SNSSubCatalogDefOnBothLiterals(t *testing.T) {
 	w2AssertFindingDef(t, "sns-sub", "sns-sub.plain-http",
 		"delivers over plain HTTP", domain.SevWarn, "wave1")
 
-	child := catalog.FindChild("sns_subscriptions")
+	child := catalog.ChildOnly("sns_subscriptions")
 	if child == nil {
-		t.Fatal(`catalog.FindChild("sns_subscriptions") returned nil`)
+		t.Fatal(`catalog.ChildOnly("sns_subscriptions") returned nil`)
 	}
 	for _, fd := range child.Findings {
 		if string(fd.Code) != "sns-sub.plain-http" {

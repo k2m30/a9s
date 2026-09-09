@@ -76,9 +76,9 @@ func w2Codes(fs []domain.Finding) []string {
 // read the catalog rather than the finding itself.
 func w2AssertFindingDef(t *testing.T, shortName, code, phrase string, sev domain.Severity, source string) {
 	t.Helper()
-	def := catalog.Find(shortName)
+	def := catalog.FindAny(shortName)
 	if def == nil {
-		t.Fatalf("catalog.Find(%q) returned nil", shortName)
+		t.Fatalf("catalog.FindAny(%q) returned nil", shortName)
 	}
 	for _, fd := range def.Findings {
 		if string(fd.Code) != code {

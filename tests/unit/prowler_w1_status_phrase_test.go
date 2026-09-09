@@ -146,7 +146,7 @@ func pw1ComputeBench(t *testing.T) []pw1BenchRow {
 
 	var rows []pw1BenchRow
 	for _, short := range []string{"ec2", "ami", "ecs-svc", "ecs-task", "lambda", "asg", "ebs-snap", "lt"} {
-		td := catalog.Find(short)
+		td := catalog.FindAny(short)
 		if td == nil || td.Fetcher == nil {
 			t.Fatalf("%s has no catalog Fetcher", short)
 		}
@@ -314,7 +314,7 @@ func TestProwlerW1_ExposedInstanceReadsAsBrokenNotWarned(t *testing.T) {
 // two did not drift apart on any row of the eight batch types.
 func TestProwlerW1_ColourAndStatusCellAgreeOnEveryDemoRow(t *testing.T) {
 	for _, row := range pw1ComputeBench(t) {
-		td := catalog.Find(row.typeName)
+		td := catalog.FindAny(row.typeName)
 		if td == nil {
 			t.Fatalf("%s not in the catalog", row.typeName)
 		}

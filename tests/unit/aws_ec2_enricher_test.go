@@ -550,9 +550,9 @@ func TestEnrichEC2InstanceStatus_ImpairedAndScheduledEventProduceTwoFindings(t *
 // declares only
 // ec2CodeInstanceStatusImpaired for Wave 2.
 func TestEC2Catalog_FindingDefsDeclareDistinctCodesAndSeverities(t *testing.T) {
-	td := catalog.Find("ec2")
+	td := catalog.FindAny("ec2")
 	if td == nil {
-		t.Fatal(`catalog.Find("ec2") returned nil`)
+		t.Fatal(`catalog.FindAny("ec2") returned nil`)
 	}
 	want := map[domain.FindingCode]domain.Severity{
 		ec2CodeInstanceStatusImpaired:     domain.SevBroken,
@@ -567,11 +567,11 @@ func TestEC2Catalog_FindingDefsDeclareDistinctCodesAndSeverities(t *testing.T) {
 	for code, wantSev := range want {
 		gotSev, ok := got[code]
 		if !ok {
-			t.Errorf("catalog.Find(%q).Findings missing declaration for code %q", "ec2", code)
+			t.Errorf("catalog.FindAny(%q).Findings missing declaration for code %q", "ec2", code)
 			continue
 		}
 		if gotSev != wantSev {
-			t.Errorf("catalog.Find(%q).Findings[%q].Severity = %v, want %v", "ec2", code, gotSev, wantSev)
+			t.Errorf("catalog.FindAny(%q).Findings[%q].Severity = %v, want %v", "ec2", code, gotSev, wantSev)
 		}
 	}
 }

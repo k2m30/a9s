@@ -81,7 +81,7 @@ func TestFetchRelatedTarget_RowsLessErrorOnly_StaysAnError(t *testing.T) {
 func TestEKSASGPivot_DeniedNodeGroupOnOneCluster_DoesNotCorruptSiblingCluster(t *testing.T) {
 	clients := demo.NewServiceClients()
 
-	eksTD := catalog.Find("eks")
+	eksTD := catalog.FindAny("eks")
 	if eksTD == nil {
 		t.Fatal("no catalog entry for eks")
 	}

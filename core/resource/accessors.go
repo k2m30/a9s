@@ -43,10 +43,7 @@ func GetFieldKeys(shortName string) []string {
 	if keys, ok := fieldKeyRegistry[shortName]; ok {
 		return keys
 	}
-	if ct := catalog.Find(shortName); ct != nil && len(ct.FieldKeys) > 0 {
-		return ct.FieldKeys
-	}
-	if ct := catalog.FindChild(shortName); ct != nil && len(ct.FieldKeys) > 0 {
+	if ct := typeDef(shortName); ct != nil && len(ct.FieldKeys) > 0 {
 		return ct.FieldKeys
 	}
 	return nil
@@ -91,7 +88,7 @@ func GetIssueEnricherFieldKeys(shortName string) []string {
 	if keys, ok := issueEnricherFieldKeysRegistry[shortName]; ok {
 		return keys
 	}
-	if ct := catalog.Find(shortName); ct != nil && len(ct.IssueEnricherFieldKeys) > 0 {
+	if ct := typeDef(shortName); ct != nil && len(ct.IssueEnricherFieldKeys) > 0 {
 		return ct.IssueEnricherFieldKeys
 	}
 	return nil
@@ -155,7 +152,7 @@ func ApplyFieldAliases(shortName string, fields map[string]string) map[string]st
 		aliases = fieldAliasBuiltins[shortName]
 	}
 	if len(aliases) == 0 {
-		if ct := catalog.Find(shortName); ct != nil && len(ct.FieldAliases) > 0 {
+		if ct := typeDef(shortName); ct != nil && len(ct.FieldAliases) > 0 {
 			aliases = ct.FieldAliases
 		}
 	}
@@ -205,14 +202,28 @@ func SetChildTypeForTest(def ResourceTypeDef) {
 	childTypes[def.ShortName] = &copy
 }
 
+// typeDef resolves a type name the way every reader of a declaration must:
+// the child registry first, so a type a test registered is a type, then the
+// installed catalog, parents and children alike (catalog.FindAny). Every
+// getter below and in related.go and enricher.go asks here, so none of them
+// answers for half the catalog — a child type's Related and Navigable were
+// declarations nothing read, because the getters that read them looked among
+// the parents only.
+func typeDef(shortName string) *ResourceTypeDef {
+	if td := GetChildType(shortName); td != nil {
+		return td
+	}
+	return catalog.FindAny(shortName)
+}
+
 // GetChildType returns the child type definition for the given short name,
 // or nil if no child type is registered. Legacy-first: test overrides via
-// SetChildTypeForTest take effect; otherwise reads catalog.FindChild.
+// SetChildTypeForTest take effect; otherwise reads catalog.ChildOnly.
 func GetChildType(shortName string) *ResourceTypeDef {
 	if def, ok := childTypes[shortName]; ok {
 		return def
 	}
-	if ct := catalog.FindChild(shortName); ct != nil {
+	if ct := catalog.ChildOnly(shortName); ct != nil {
 		return ct
 	}
 	return nil
@@ -334,7 +345,7 @@ func sanitizeFetchResult(res FetchResult, err error) (FetchResult, error) {
 func GetPaginatedFetcher(shortName string) PaginatedFetcher {
 	fn, ok := paginatedRegistry[shortName]
 	if !ok {
-		if ct := catalog.Find(shortName); ct != nil && ct.Fetcher != nil {
+		if ct := typeDef(shortName); ct != nil && ct.Fetcher != nil {
 			fn = ct.Fetcher
 		}
 	}
@@ -385,7 +396,7 @@ func SetAvailabilityFetcherForTest(shortName string, f AvailabilityFetcher) {
 func GetAvailabilityFetcher(shortName string) AvailabilityFetcher {
 	fn, ok := availabilityRegistry[shortName]
 	if !ok {
-		if ct := catalog.Find(shortName); ct != nil && ct.AvailabilityFetcher != nil {
+		if ct := typeDef(shortName); ct != nil && ct.AvailabilityFetcher != nil {
 			fn = ct.AvailabilityFetcher
 		}
 	}
@@ -418,7 +429,7 @@ func SetPaginatedChildForTest(shortName string, f PaginatedChildFetcher) {
 func GetPaginatedChildFetcher(shortName string) PaginatedChildFetcher {
 	fn, ok := paginatedChildRegistry[shortName]
 	if !ok {
-		if ct := catalog.FindChild(shortName); ct != nil && ct.ChildFetcher != nil {
+		if ct := catalog.ChildOnly(shortName); ct != nil && ct.ChildFetcher != nil {
 			fn = ct.ChildFetcher
 		}
 	}
@@ -455,7 +466,7 @@ func SetFilteredPaginatedForTest(shortName string, f FilteredPaginatedFetcher) {
 func GetFilteredPaginatedFetcher(shortName string) FilteredPaginatedFetcher {
 	fn, ok := filteredPaginatedRegistry[shortName]
 	if !ok {
-		if ct := catalog.Find(shortName); ct != nil && ct.FilteredFetcher != nil {
+		if ct := typeDef(shortName); ct != nil && ct.FilteredFetcher != nil {
 			fn = ct.FilteredFetcher
 		}
 	}
@@ -493,7 +504,7 @@ func GetRevealFetcher(shortName string) RevealFetcher {
 	if fn, ok := revealRegistry[shortName]; ok {
 		return fn
 	}
-	if ct := catalog.Find(shortName); ct != nil && ct.Reveal != nil {
+	if ct := typeDef(shortName); ct != nil && ct.Reveal != nil {
 		return ct.Reveal
 	}
 	return nil
@@ -511,7 +522,7 @@ func HasRevealFetcher(shortName string) bool {
 	if _, ok := revealRegistry[shortName]; ok {
 		return true
 	}
-	if ct := catalog.Find(shortName); ct != nil && ct.Reveal != nil {
+	if ct := typeDef(shortName); ct != nil && ct.Reveal != nil {
 		return true
 	}
 	return false

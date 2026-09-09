@@ -102,7 +102,7 @@ func d1MessagingBench(t *testing.T) map[string][]resource.Resource {
 
 	rows := map[string][]resource.Resource{}
 	for _, short := range d1MessagingTypes {
-		td := catalog.Find(short)
+		td := catalog.FindAny(short)
 		if td == nil || td.Fetcher == nil {
 			t.Fatalf("%s has no catalog Fetcher", short)
 		}

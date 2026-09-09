@@ -267,13 +267,20 @@ func ParseSingle(data []byte) (*ViewDef, error) {
 // Returns (nil, nil) when no directories exist or contain no .yaml files.
 func LoadFromDirs(dirs []string) (*ViewsConfig, error) {
 	merged := make(map[string]ViewDef)
-	var unresolved []string
+	var unresolved, collisions []string
 
 	for _, dir := range dirs {
 		info, err := os.Stat(dir)
 		if err != nil || !info.IsDir() {
 			continue
 		}
+		// Two files in ONE directory can name one type — a file renamed and
+		// the old one kept, or two spellings a case-insensitive filesystem
+		// let through. Only one of them is on screen, and the loader is the
+		// only thing that knows which. Across directories it is not a
+		// collision: a later directory overlaying an earlier one is the
+		// documented lookup chain.
+		fileFor := map[string]string{}
 
 		entries, err := os.ReadDir(dir)
 		if err != nil {
@@ -316,6 +323,18 @@ func LoadFromDirs(dirs []string) (*ViewsConfig, error) {
 			}
 			resourceName = td.ShortName
 
+			if first, twice := fileFor[resourceName]; twice {
+				// The later file replaces the earlier one WHOLE. Merging them
+				// per field would put one file's columns beside the other's
+				// detail rows, which is a screen neither file describes.
+				collisions = append(collisions,
+					fmt.Sprintf("%s: not read, %s is the one in use for %s", first, name, resourceName))
+				merged[resourceName] = *vd
+				fileFor[resourceName] = name
+				continue
+			}
+			fileFor[resourceName] = name
+
 			if existing, ok := merged[resourceName]; ok {
 				if len(vd.List) > 0 {
 					existing.List = vd.List
@@ -334,23 +353,25 @@ func LoadFromDirs(dirs []string) (*ViewsConfig, error) {
 		// No file this build can use — but a file whose name names no type is
 		// still a file the operator wrote, and the report is the only thing
 		// that tells them the screen they are looking at is not theirs.
-		return nil, loadReport(nil, unresolved)
+		return nil, loadReport(nil, unresolved, collisions)
 	}
 
 	cfg := &ViewsConfig{Views: merged}
-	return cfg, loadReport(cfg, unresolved)
+	return cfg, loadReport(cfg, unresolved, collisions)
 }
 
 // loadReport is everything the load has to say about the files it read: a file
 // whose name is no type this build has, and a column nothing can fill. Both
 // are the same mistake — a line the operator wrote that reaches no screen —
 // and both are reported rather than rejected, so the rest of the file is used.
-func loadReport(cfg *ViewsConfig, unresolved []string) error {
-	reports := make([]string, 0, len(unresolved))
+func loadReport(cfg *ViewsConfig, unresolved, collisions []string) error {
+	reports := make([]string, 0, len(unresolved)+len(collisions))
 	sort.Strings(unresolved)
 	for _, name := range unresolved {
 		reports = append(reports, fmt.Sprintf("%s: names no resource type this build has", name))
 	}
+	sort.Strings(collisions)
+	reports = append(reports, collisions...)
 	if cfg != nil {
 		reports = append(reports, unfillableColumnKeys(cfg)...)
 	}

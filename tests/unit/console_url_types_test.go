@@ -34,9 +34,9 @@ const consoleTestAccountID = "123456789012"
 // failing loudly if the type is not registered.
 func consoleURLTypeDef(t *testing.T, shortName string) resource.ResourceTypeDef {
 	t.Helper()
-	td := catalog.Find(shortName)
+	td := catalog.FindAny(shortName)
 	if td == nil {
-		t.Fatalf("catalog.Find(%q) returned nil — type not registered", shortName)
+		t.Fatalf("catalog.FindAny(%q) returned nil — type not registered", shortName)
 	}
 	return *td
 }

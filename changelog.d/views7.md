@@ -41,6 +41,10 @@
   reads an AWS field by path is no longer reported as unfillable — it renders,
   live and after a restart.
 
+- Two view files in one directory naming the same resource type are reported at
+  startup, saying which of them is the one on screen. One of them is used whole
+  rather than half of each.
+
 - A resource whose status the list computes now shows that status, not another
   value stored beside it. A target group whose own column said `unhealthy
   targets: 2/5` displayed `available`, and a build project reading `last build

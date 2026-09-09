@@ -53,12 +53,12 @@ func TestCatalog_TitleOmitsID_SetForLogEventChildTypes(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.shortName, func(t *testing.T) {
-			def := catalog.FindChild(tc.shortName)
+			def := catalog.ChildOnly(tc.shortName)
 			if def == nil {
-				t.Fatalf("catalog.FindChild(%q) returned nil — child type not registered", tc.shortName)
+				t.Fatalf("catalog.ChildOnly(%q) returned nil — child type not registered", tc.shortName)
 			}
 			if !def.TitleOmitsID {
-				t.Errorf("catalog.FindChild(%q).TitleOmitsID = false, want true (clean-Name bug fix requires suppressing the raw ID in the detail frame title)", tc.shortName)
+				t.Errorf("catalog.ChildOnly(%q).TitleOmitsID = false, want true (clean-Name bug fix requires suppressing the raw ID in the detail frame title)", tc.shortName)
 			}
 		})
 	}
@@ -68,11 +68,11 @@ func TestCatalog_TitleOmitsID_SetForLogEventChildTypes(t *testing.T) {
 // resource types (e.g. "ec2") are unaffected — their frame title must still
 // include the ID per the existing "detail -- <ID> (<Name>)" contract.
 func TestCatalog_TitleOmitsID_DefaultsFalseForOtherTypes(t *testing.T) {
-	def := catalog.Find("ec2")
+	def := catalog.FindAny("ec2")
 	if def == nil {
-		t.Fatal("catalog.Find(\"ec2\") returned nil — top-level type not registered")
+		t.Fatal("catalog.FindAny(\"ec2\") returned nil — top-level type not registered")
 	}
 	if def.TitleOmitsID {
-		t.Errorf("catalog.Find(\"ec2\").TitleOmitsID = true, want false — normal resource types must keep showing the ID in the detail frame title")
+		t.Errorf("catalog.FindAny(\"ec2\").TitleOmitsID = true, want false — normal resource types must keep showing the ID in the detail frame title")
 	}
 }

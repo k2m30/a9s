@@ -29,11 +29,11 @@ import (
 // carries no Wave 2 registration once its only spec'd Wave 2 signals are
 // backlog/NOT IMPLEMENTED and its expiry/orphan checks live in Wave 1.
 func TestACMCatalog_HasNoWave2IssueEnricher(t *testing.T) {
-	td := catalog.Find("acm")
+	td := catalog.FindAny("acm")
 	if td == nil {
-		t.Fatal(`catalog.Find("acm") returned nil`)
+		t.Fatal(`catalog.FindAny("acm") returned nil`)
 	}
 	if td.Wave2 != nil {
-		t.Errorf(`catalog.Find("acm").Wave2 = %v, want nil — acm has no spec'd Wave 2 signal (docs/attention-signals.md "acm" row: Wave 2 column is RenewalSummary/DomainValidationOptions checks marked NOT IMPLEMENTED)`, td.Wave2)
+		t.Errorf(`catalog.FindAny("acm").Wave2 = %v, want nil — acm has no spec'd Wave 2 signal (docs/attention-signals.md "acm" row: Wave 2 column is RenewalSummary/DomainValidationOptions checks marked NOT IMPLEMENTED)`, td.Wave2)
 	}
 }

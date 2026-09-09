@@ -35,7 +35,7 @@ var testWave2Overrides = map[string]IssueEnricher{} //nolint:gochecknoglobals //
 //
 // Lookup order:
 //  1. testWave2Overrides (only populated by SetWave2EnricherForTest)
-//  2. catalog.Find(shortName).Wave2 cast to IssueEnricher
+//  2. catalog.FindAny(shortName).Wave2 cast to IssueEnricher
 //
 // ok is false when neither source has a non-nil Fn for the name.
 func Wave2EnricherFor(shortName string) (IssueEnricher, bool) {
@@ -48,7 +48,7 @@ func Wave2EnricherFor(shortName string) (IssueEnricher, bool) {
 		}
 		return override, true
 	}
-	ct := catalog.Find(shortName)
+	ct := catalog.FindAny(shortName)
 	if ct == nil || ct.Wave2 == nil {
 		return IssueEnricher{}, false
 	}

@@ -510,7 +510,7 @@ func TestECSTask_TaskDefinitionErrorMarksOnlyItsOwnTasks(t *testing.T) {
 // TestECSTask_DemoBench_EachSignalHasExactlyOneWitness pins the demo fixture
 // contract for all five ecs-task signals.
 func TestECSTask_DemoBench_EachSignalHasExactlyOneWitness(t *testing.T) {
-	td := catalog.Find("ecs-task")
+	td := catalog.FindAny("ecs-task")
 	if td == nil || td.Fetcher == nil {
 		t.Fatal("ecs-task has no catalog Fetcher")
 	}
@@ -625,7 +625,7 @@ func TestECSTask_TeardownStatesKeepTheirLifecycleFinding(t *testing.T) {
 		"DEACTIVATING":   "deactivating",
 		"STOPPED":        "stopped",
 	}
-	td := catalog.Find("ecs-task")
+	td := catalog.FindAny("ecs-task")
 	if td == nil || td.Fetcher == nil {
 		t.Fatal("ecs-task has no catalog Fetcher")
 	}

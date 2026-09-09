@@ -1924,9 +1924,9 @@ var _ resource.RelatedChecker = func(
 // type with no SetRelatedForTest override in effect returns exactly the
 // catalog's Related defs.
 func TestGetRelated_NoOverride_ReturnsCatalogDefs(t *testing.T) {
-	ct := catalog.Find("sqs")
+	ct := catalog.FindAny("sqs")
 	if ct == nil {
-		t.Fatal(`catalog.Find("sqs") = nil, want a registered catalog entry`)
+		t.Fatal(`catalog.FindAny("sqs") = nil, want a registered catalog entry`)
 	}
 	if len(ct.Related) == 0 {
 		t.Fatal(`catalog sqs.Related is empty — test needs a type with real catalog Related defs`)
@@ -1935,7 +1935,7 @@ func TestGetRelated_NoOverride_ReturnsCatalogDefs(t *testing.T) {
 	got := resource.GetRelated("sqs")
 
 	if len(got) != len(ct.Related) {
-		t.Fatalf(`GetRelated("sqs") returned %d defs, want %d (catalog.Find("sqs").Related)`, len(got), len(ct.Related))
+		t.Fatalf(`GetRelated("sqs") returned %d defs, want %d (catalog.FindAny("sqs").Related)`, len(got), len(ct.Related))
 	}
 	for i, def := range got {
 		if def.TargetType != ct.Related[i].TargetType {
@@ -1948,7 +1948,7 @@ func TestGetRelated_NoOverride_ReturnsCatalogDefs(t *testing.T) {
 // SetRelatedForTest override for a catalog-registered type wins over the
 // catalog's own Related defs for the same short name.
 func TestGetRelated_SetRelatedForTest_OverridesCatalog(t *testing.T) {
-	ct := catalog.Find("sqs")
+	ct := catalog.FindAny("sqs")
 	if ct == nil || len(ct.Related) == 0 {
 		t.Fatal(`catalog sqs.Related must be non-empty for this test to prove override precedence`)
 	}
@@ -1962,7 +1962,7 @@ func TestGetRelated_SetRelatedForTest_OverridesCatalog(t *testing.T) {
 
 	if len(got) != 1 || got[0].TargetType != "probe-target" {
 		t.Fatalf(`GetRelated("sqs") after SetRelatedForTest = %+v, want the override [{TargetType: probe-target}] `+
-			`(must win over catalog.Find("sqs").Related's %d real defs)`, got, len(ct.Related))
+			`(must win over catalog.FindAny("sqs").Related's %d real defs)`, got, len(ct.Related))
 	}
 }
 
@@ -1972,7 +1972,7 @@ func TestGetRelated_SetRelatedForTest_OverridesCatalog(t *testing.T) {
 // cleanup lands on the CATALOG view (not a deleted/nil entry), since "sqs"
 // had no prior legacy-map registration to restore to.
 func TestGetRelated_CleanupRelatedForTest_RestoresCatalogView(t *testing.T) {
-	ct := catalog.Find("sqs")
+	ct := catalog.FindAny("sqs")
 	if ct == nil || len(ct.Related) == 0 {
 		t.Fatal(`catalog sqs.Related must be non-empty for this test`)
 	}
@@ -2000,7 +2000,7 @@ func TestGetRelated_CleanupRelatedForTest_RestoresCatalogView(t *testing.T) {
 // catalog entirely — GetRelated returns the empty override, not a fallback
 // to the catalog's real (non-empty) defs.
 func TestGetRelated_SetRelatedForTest_EmptyDefsSlice_MasksCatalog(t *testing.T) {
-	ct := catalog.Find("sqs")
+	ct := catalog.FindAny("sqs")
 	if ct == nil || len(ct.Related) == 0 {
 		t.Fatal(`catalog sqs.Related must be non-empty for this test to prove masking`)
 	}

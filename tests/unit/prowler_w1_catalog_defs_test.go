@@ -55,7 +55,7 @@ var pw1ComputeDefs = []pw1DefExpectation{
 // TestProwlerW1_ComputeFindingDefsDeclared pins each new code's catalog row.
 func TestProwlerW1_ComputeFindingDefsDeclared(t *testing.T) {
 	for _, want := range pw1ComputeDefs {
-		td := catalog.Find(want.shortName)
+		td := catalog.FindAny(want.shortName)
 		if td == nil {
 			t.Errorf("%s: not in the catalog", want.shortName)
 			continue
@@ -87,7 +87,7 @@ func TestProwlerW1_ComputeFindingDefsDeclared(t *testing.T) {
 // the same type — a duplicate row makes the findings overview double-count.
 func TestProwlerW1_ComputeCodesAreUnique(t *testing.T) {
 	for _, want := range pw1ComputeDefs {
-		td := catalog.Find(want.shortName)
+		td := catalog.FindAny(want.shortName)
 		if td == nil {
 			continue
 		}

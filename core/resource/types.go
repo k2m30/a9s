@@ -79,7 +79,7 @@ func AllShortNames() []string {
 
 // FindResourceType looks up a resource type by its ShortName or any of its Aliases.
 func FindResourceType(name string) *ResourceTypeDef {
-	return catalog.Find(name)
+	return catalog.TopLevelOnly(name)
 }
 
 // CanonicalShortName resolves an alias to its type's canonical ShortName, and

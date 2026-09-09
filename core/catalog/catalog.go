@@ -67,13 +67,20 @@ func SetChildTypes(children []ResourceTypeDef) {
 	indexDetails(children)
 }
 
-// Find returns the ResourceTypeDef for the given name (ShortName or Alias),
-// or nil if the catalog does not have an entry for it.
+// find returns the ResourceTypeDef for the given name (ShortName or Alias)
+// among the TOP-LEVEL types, or nil.
 // Case-insensitive match against ShortName and all Aliases.
+//
+// Unexported on purpose: a lookup that answers for half the catalog reads
+// like a general one at the call site, and every caller that picked a half
+// was wrong for the other — a child view file was "no such type", a child's
+// Related was a declaration nothing read. Outside this package there is
+// FindAny, and TopLevelOnly / ChildOnly for the three callers that mean one
+// half and say so.
 //
 // Panics with a clear message if SetTypes has not been called — this catches
 // test binaries that forget to invoke aws.Install in TestMain.
-func Find(name string) *ResourceTypeDef {
+func find(name string) *ResourceTypeDef {
 	requireInstalled()
 	for i := range registry {
 		if strings.EqualFold(registry[i].ShortName, name) {
@@ -111,11 +118,11 @@ func AllShortNames() []string {
 	return names
 }
 
-// FindChild returns the child-type ResourceTypeDef for the given short name,
-// or nil if no child type with that name is registered.
+// findChild returns the child-type ResourceTypeDef for the given short name,
+// or nil. Unexported for the reason find is.
 //
 // Panics if SetChildTypes has not been called.
-func FindChild(name string) *ResourceTypeDef {
+func findChild(name string) *ResourceTypeDef {
 	if !childInstalled {
 		panic("catalog.SetChildTypes not called — programmer must invoke aws.Install() before any child-catalog accessor")
 	}
@@ -132,11 +139,21 @@ func FindChild(name string) *ResourceTypeDef {
 // "no such type" for every child view, which is how child files were stamped
 // as migrated and migrated by nothing.
 func FindAny(name string) *ResourceTypeDef {
-	if td := Find(name); td != nil {
+	if td := find(name); td != nil {
 		return td
 	}
-	return FindChild(name)
+	return findChild(name)
 }
+
+// TopLevelOnly answers for the top-level types alone, and ChildOnly for the
+// children alone. They exist for the three callers whose answer IS the half —
+// resource.FindResourceType is the parents accessor, GetChildType the
+// children one, and GetPaginatedChildFetcher reads a field only a child has —
+// and their names say so at the call site, which "Find" never did.
+func TopLevelOnly(name string) *ResourceTypeDef { return find(name) }
+
+// ChildOnly is TopLevelOnly's other half. See its comment.
+func ChildOnly(name string) *ResourceTypeDef { return findChild(name) }
 
 // AllChildren returns the installed child-type catalog as a slice. The order
 // is not stable — child types are stored in a map for ShortName lookup. Use

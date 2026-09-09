@@ -12,7 +12,6 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/aws/arn"
 
-	"github.com/k2m30/a9s/v3/core/catalog"
 	"github.com/k2m30/a9s/v3/core/domain"
 )
 
@@ -499,7 +498,7 @@ func GetRelated(shortName string) []RelatedDef {
 		return defs
 	}
 	relatedTestOverridesMu.RUnlock()
-	if ct := catalog.Find(shortName); ct != nil && len(ct.Related) > 0 {
+	if ct := typeDef(shortName); ct != nil && len(ct.Related) > 0 {
 		return ct.Related
 	}
 	return nil
@@ -558,7 +557,7 @@ func GetFetchByIDs(shortName string) FetchByIDsFunc {
 	if fn, ok := fetchByIDsRegistry[shortName]; ok {
 		return fn
 	}
-	if ct := catalog.Find(shortName); ct != nil && ct.FetchByIDs != nil {
+	if ct := typeDef(shortName); ct != nil && ct.FetchByIDs != nil {
 		return ct.FetchByIDs
 	}
 	return nil
@@ -608,7 +607,7 @@ func GetNavigableFields(shortName string) []NavigableField {
 	}
 	navigableFieldMu.RUnlock()
 	// Catalog fallback — active during 04b–04m for migrated types.
-	if ct := catalog.Find(shortName); ct != nil && len(ct.Navigable) > 0 {
+	if ct := typeDef(shortName); ct != nil && len(ct.Navigable) > 0 {
 		return ct.Navigable
 	}
 	return nil
@@ -679,7 +678,7 @@ func GetDefaultNavFields(shortName string) []NavigableField {
 		return fields
 	}
 	defaultNavFieldMu.RUnlock()
-	if ct := catalog.Find(shortName); ct != nil && len(ct.Navigable) > 0 {
+	if ct := typeDef(shortName); ct != nil && len(ct.Navigable) > 0 {
 		return ct.Navigable
 	}
 	return nil
