@@ -65,18 +65,22 @@ func TestFieldSelect_ByID_FetchesAndOpensDetail(t *testing.T) {
 	// Click the field: the ami is not cached and has a FetchByIDs helper, so
 	// HandleRelatedNavigate returns a by-ID detail drill.
 	_, tasks := c.Apply(Action{Kind: ActionFieldSelect, Arg: strconv.Itoa(fieldIdx)})
-	foundByID := false
-	for _, tk := range tasks {
-		if tk.Key.Kind == runtime.KindFetchByIDDetail {
-			foundByID = true
+	var byID *runtime.TaskRequest
+	for i := range tasks {
+		if tasks[i].Key.Kind == runtime.KindFetchByIDDetail {
+			byID = &tasks[i]
 		}
 	}
-	if !foundByID {
+	if byID == nil {
 		t.Fatalf("ActionFieldSelect on the ami field returned no KindFetchByIDDetail task; tasks=%+v", tasks)
 	}
 
 	// The by-ID fetch result arrives via Handle (the web/headless entry point) →
-	// the placeholder list is replaced by the ami's detail.
+	// the placeholder list is replaced by the ami's detail. ScreenID is the
+	// identity the controller stamped on the task above, not one this test
+	// chose: the placeholder the drill pushed is the only screen the single
+	// row belongs to, and without it the result reaches none and the
+	// placeholder never resolves.
 	c.Handle(messages.ResourcesLoaded{
 		ResourceType: "ami",
 		Gen:          c.core.AvailabilityGen(),
@@ -84,6 +88,7 @@ func TestFieldSelect_ByID_FetchesAndOpensDetail(t *testing.T) {
 			{ID: amiID, Name: "acme-ami", Type: "ami", Fields: map[string]string{"image_id": amiID}},
 		},
 		Provenance: messages.FetchProvenanceByID,
+		ScreenID:   byID.ScreenID,
 	})
 
 	snap = c.Snapshot()

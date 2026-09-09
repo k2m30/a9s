@@ -33,6 +33,10 @@ func TestAutoOpenSingleDetail_ByIDPlaceholderOpensDetail(t *testing.T) {
 	// the canonical-only Provenance gate (handle.go).
 	ls.EscPops = true
 
+	// ScreenID names the placeholder. A real dispatch applies this stamp —
+	// stampListDispatchLocked (controller.go) does it for a by-ID task issued
+	// while an AutoOpenSingle placeholder is on top — so removing it here does
+	// not simplify the test, it stops it driving the path it exists for.
 	c.Handle(messages.ResourcesLoaded{
 		ResourceType: "ec2",
 		Gen:          c.core.AvailabilityGen(),
@@ -40,6 +44,7 @@ func TestAutoOpenSingleDetail_ByIDPlaceholderOpensDetail(t *testing.T) {
 			{ID: "i-0target00000001", Name: "target", Type: "ec2",
 				Fields: map[string]string{"instance_id": "i-0target00000001"}},
 		}, Provenance: messages.FetchProvenanceByID,
+		ScreenID: ls.instance,
 	})
 
 	snap := c.Snapshot()
