@@ -38,4 +38,4 @@ if [[ -n "$matches" ]]; then
   exit 1
 fi
 
-exit 0
+exec "$repo_root/.githooks/run-global-hook" commit-msg "$msg_file"

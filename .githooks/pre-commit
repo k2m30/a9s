@@ -4,4 +4,6 @@
 # the local, git-ignored .githooks/sensitive_patterns.txt term list (never
 # committed). Enable with: make install-hooks.
 # Bypassing this hook with --no-verify is FORBIDDEN.
-exec "$(git rev-parse --show-toplevel)/scripts/check-no-real-data.sh" --staged
+root="$(git rev-parse --show-toplevel)"
+"$root/scripts/check-no-real-data.sh" --staged || exit 1
+exec "$root/.githooks/run-global-hook" pre-commit "$@"

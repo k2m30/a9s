@@ -1,0 +1,9 @@
+#!/bin/sh
+# The repo pins core.hooksPath to .githooks, and git runs one hooks path
+# only, so the user's global hooks would be silent here. Run the global hook
+# of the same name after the repo's own checks; its verdict is final.
+hook="$1"; shift
+global="$(git config --global --get core.hooksPath 2>/dev/null || true)"
+case "$global" in "~"*) global="$HOME${global#\~}" ;; esac
+[ -n "$global" ] && [ -x "$global/$hook" ] && exec "$global/$hook" "$@"
+exit 0
