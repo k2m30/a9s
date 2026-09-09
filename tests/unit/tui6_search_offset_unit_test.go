@@ -9,11 +9,16 @@
 // costs three bytes and paints two columns, so the byte offset, the rune
 // offset and the column offset are three different numbers on the same line.
 //
-// These pins say the published offsets are display columns, matching what
-// they are called, and that the terminal's own highlight still lands on the
-// match text after the conversion — the terminal computes its highlight from
-// the query rather than from these offsets, so a change here must not be
-// allowed to quietly move it.
+// INVERTED for tui6 row 20. These pins used to say the published offsets were
+// display COLUMNS, on the reasoning that the field is named ColStart and
+// crosses to a lane with no painter of its own. That unit cannot be mapped
+// back. A combining mark occupies no column, so two different positions in the
+// text share one column, and the painter asked to highlight column 1 of "éx"
+// covers the mark as well as the x — while a search for the mark itself
+// highlights nothing at all. The painter needs the exact position, so the
+// published offset is a BYTE offset into the line as it is painted, with its
+// styling stripped. Do not restore the column assertions: they encode a unit
+// that loses information the painter needs.
 package unit
 
 import (
@@ -48,18 +53,18 @@ func tui6TextMatches(t *testing.T, lines []string, query string) []app.SearchMat
 	return body.SearchMatches
 }
 
-// TestSearchOffsets_AreDisplayColumnsAfterADoubleWidthRune pins the unit the
-// field name claims. The three candidate numbers are spelled out in the
-// failure message so a reader can see which one the offset actually is.
-func TestSearchOffsets_AreDisplayColumnsAfterADoubleWidthRune(t *testing.T) {
+// TestSearchOffsets_AreByteOffsetsAfterADoubleWidthRune pins the unit: the
+// exact position in the painted line. The three candidate numbers are spelled
+// out in the failure message so a reader can see which one the offset is.
+func TestSearchOffsets_AreByteOffsetsAfterADoubleWidthRune(t *testing.T) {
 	prefix := tui6WideLine[:strings.Index(tui6WideLine, tui6WideQuery)]
-	wantStart := text.Width(prefix)
-	wantEnd := wantStart + text.Width(tui6WideQuery)
+	wantStart := len(prefix)
+	wantEnd := wantStart + len(tui6WideQuery)
 
-	byteStart := len(prefix)
+	colStart := text.Width(prefix)
 	runeStart := len([]rune(prefix))
-	if wantStart == byteStart || wantStart == runeStart {
-		t.Fatalf("the fixture line does not separate the three units (cols=%d bytes=%d runes=%d), so this pin proves nothing", wantStart, byteStart, runeStart)
+	if wantStart == colStart || wantStart == runeStart {
+		t.Fatalf("the fixture line does not separate the three units (bytes=%d cols=%d runes=%d), so this pin proves nothing", wantStart, colStart, runeStart)
 	}
 
 	matches := tui6TextMatches(t, []string{tui6WideLine, "State: running"}, tui6WideQuery)
@@ -71,10 +76,10 @@ func TestSearchOffsets_AreDisplayColumnsAfterADoubleWidthRune(t *testing.T) {
 		t.Errorf("match is on line %d, want 0", got.Line)
 	}
 	if got.ColStart != wantStart {
-		t.Errorf("ColStart is %d; the match starts at display column %d (byte offset %d, rune offset %d)", got.ColStart, wantStart, byteStart, runeStart)
+		t.Errorf("ColStart is %d; the match starts at byte %d of the painted line (display column %d, rune offset %d)", got.ColStart, wantStart, colStart, runeStart)
 	}
 	if got.ColEnd != wantEnd {
-		t.Errorf("ColEnd is %d; the match ends at display column %d", got.ColEnd, wantEnd)
+		t.Errorf("ColEnd is %d; the match ends at byte %d", got.ColEnd, wantEnd)
 	}
 }
 
@@ -105,9 +110,9 @@ func TestSearchOffsets_EveryMatchOnALineIsPublished(t *testing.T) {
 	}
 	first := strings.Index(line, tui6WideQuery)
 	second := strings.Index(line[first+len(tui6WideQuery):], tui6WideQuery) + first + len(tui6WideQuery)
-	for i, want := range []int{text.Width(line[:first]), text.Width(line[:second])} {
+	for i, want := range []int{first, second} {
 		if matches[i].ColStart != want {
-			t.Errorf("match %d starts at %d, want display column %d", i, matches[i].ColStart, want)
+			t.Errorf("match %d starts at %d, want byte %d of the painted line", i, matches[i].ColStart, want)
 		}
 	}
 }
@@ -200,17 +205,17 @@ func TestSearchOffsets_UnshiftedByALengthChangingFold(t *testing.T) {
 		t.Fatal("the fixture line's fold does not change its byte length, so this pin proves nothing")
 	}
 	prefix := tui6FoldLine[:strings.Index(tui6FoldLine, tui6WideQuery)]
-	wantStart := text.Width(prefix)
+	wantStart := len(prefix)
 
 	matches := tui6TextMatches(t, []string{tui6FoldLine}, tui6WideQuery)
 	if len(matches) != 1 {
 		t.Fatalf("want 1 match, got %d: %+v", len(matches), matches)
 	}
 	if matches[0].ColStart != wantStart {
-		t.Errorf("ColStart is %d; the match starts at display column %d — the fold made the line one byte longer and every offset after it moved", matches[0].ColStart, wantStart)
+		t.Errorf("ColStart is %d; the match starts at byte %d — the fold made the line one byte longer and every offset after it moved", matches[0].ColStart, wantStart)
 	}
-	if want := wantStart + text.Width(tui6WideQuery); matches[0].ColEnd != want {
-		t.Errorf("ColEnd is %d, want display column %d", matches[0].ColEnd, want)
+	if want := wantStart + len(tui6WideQuery); matches[0].ColEnd != want {
+		t.Errorf("ColEnd is %d, want byte %d", matches[0].ColEnd, want)
 	}
 }
 
@@ -234,6 +239,122 @@ func TestSearchHighlight_LandsOnTheMatchAfterALengthChangingFold(t *testing.T) {
 	for _, wrong := range []string{"-productio", "roduction", "n-producti"} {
 		if strings.Contains(out, styles.SearchCurrentStyle.Render(wrong)) {
 			t.Errorf("the highlight covers %q instead of the match", wrong)
+		}
+	}
+}
+
+// tui6MarkLine holds a combining acute after its base letter. The mark paints
+// no column of its own, so two distinct positions in this line share one
+// display column — which is why a column offset cannot be mapped back to a
+// position, and why the published offset is a byte.
+const tui6MarkLine = "Name: e\u0301x-production"
+
+// TestSearchOffsets_ExactAroundACombiningMark pins the case the column unit
+// could not express: a search for the letter after the mark, and a search for
+// the mark itself.
+func TestSearchOffsets_ExactAroundACombiningMark(t *testing.T) {
+	t.Run("the letter after the mark", func(t *testing.T) {
+		matches := tui6TextMatches(t, []string{tui6MarkLine}, "x")
+		if len(matches) != 1 {
+			t.Fatalf("want 1 match for %q, got %d: %+v", "x", len(matches), matches)
+		}
+		want := strings.Index(tui6MarkLine, "x")
+		if matches[0].ColStart != want || matches[0].ColEnd != want+1 {
+			t.Errorf("the match is published as [%d,%d); the letter sits at bytes [%d,%d) of the painted line, and a display column cannot name it — the mark before it shares that column", matches[0].ColStart, matches[0].ColEnd, want, want+1)
+		}
+	})
+
+	t.Run("the mark itself", func(t *testing.T) {
+		matches := tui6TextMatches(t, []string{tui6MarkLine}, "\u0301")
+		if len(matches) != 1 {
+			t.Fatalf("searching the combining mark found %d matches, want the 1 that is there: %+v", len(matches), matches)
+		}
+		want := strings.Index(tui6MarkLine, "\u0301")
+		if matches[0].ColStart != want {
+			t.Errorf("the mark is published at %d, want byte %d — it occupies no column, so a column offset has nowhere to put it", matches[0].ColStart, want)
+		}
+	})
+}
+
+// TestSearchHighlight_CoversExactlyTheMatchedBytes pins the painter across
+// every shape that separates the units: a combining mark before the match, a
+// combining mark inside it, a double-width pair, and a fold whose lowercase
+// form is longer than what it folds.
+func TestSearchHighlight_CoversExactlyTheMatchedBytes(t *testing.T) {
+	for _, tc := range []struct {
+		name  string
+		line  string
+		query string
+		wrong []string
+	}{
+		{"a combining mark before the match", tui6MarkLine, "x-production", []string{"\u0301x-production", "-production"}},
+		{"a combining mark inside the match", "Name: production-e\u0301nv", "production-e\u0301nv", nil},
+		{"a double-width pair before the match", tui6WideLine, tui6WideQuery, []string{"-production", "roduction"}},
+		{"a fold that changes byte length", tui6FoldLine, tui6WideQuery, []string{"-productio", "roduction"}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			c := newTextScreenController(runtime.ScreenYAML, []string{tc.line})
+			c.Apply(app.Action{Kind: app.ActionSearch, Arg: tc.query})
+			body := c.Snapshot().Body.Text
+			if body == nil || len(body.SearchMatches) == 0 {
+				t.Fatalf("no match published for %q in %q", tc.query, tc.line)
+			}
+			vp := viewport.New(viewport.WithWidth(80), viewport.WithHeight(6))
+			m := views.NewTransientYAML(80, 6, vp)
+			out := m.RenderText(*body)
+
+			if !strings.Contains(out, styles.SearchCurrentStyle.Render(tc.query)) {
+				t.Errorf("the highlight does not cover exactly %q\nrendered: %q", tc.query, out)
+			}
+			for _, wrong := range tc.wrong {
+				if strings.Contains(out, styles.SearchCurrentStyle.Render(wrong)) {
+					t.Errorf("the highlight covers %q instead of the match", wrong)
+				}
+			}
+		})
+	}
+}
+
+// TestSearchMatches_ComputedOncePerContentAndQuery pins the cost. A text
+// screen is a document, and scanning it is not free: the match set was
+// recomputed by the action that set the query, by every snapshot, and again by
+// the renderer, so pressing n on a six-thousand-line document rescanned it
+// three times to move a highlight down one line.
+//
+// The observable is the published set itself. Computing it again yields an
+// equal slice in a new allocation; handing back the one already decided for
+// this content and this query yields the same slice.
+func TestSearchMatches_ComputedOncePerContentAndQuery(t *testing.T) {
+	lines := make([]string, 0, 64)
+	for i := range 64 {
+		lines = append(lines, "Name: web-0"+string(rune('0'+i%10))+"-production")
+	}
+	c := newTextScreenController(runtime.ScreenYAML, lines)
+	c.Apply(app.Action{Kind: app.ActionSearch, Arg: tui6WideQuery})
+
+	first := c.Snapshot().Body.Text.SearchMatches
+	if len(first) < 2 {
+		t.Fatalf("the fixture must publish several matches, it published %d", len(first))
+	}
+
+	// A keypress that changes nothing about the content or the query, then two
+	// navigations: three more snapshots, no new scan.
+	same := c.Snapshot().Body.Text.SearchMatches
+	c.Apply(app.Action{Kind: app.ActionSearchNext})
+	afterNext := c.Snapshot().Body.Text.SearchMatches
+	c.Apply(app.Action{Kind: app.ActionSearchPrev})
+	afterPrev := c.Snapshot().Body.Text.SearchMatches
+
+	for name, got := range map[string][]app.SearchMatch{
+		"a second snapshot":  same,
+		"the next match":     afterNext,
+		"the previous match": afterPrev,
+	} {
+		if len(got) != len(first) {
+			t.Fatalf("%s published %d matches, the first snapshot published %d", name, len(got), len(first))
+		}
+		if &got[0] != &first[0] {
+			t.Errorf("%s rescanned the document: the match set is a fresh slice, not the one already decided for this content and this query", name)
 		}
 	}
 }
