@@ -14,13 +14,12 @@
 // this is the regression that reached disk and survived restart, so a
 // unit-level stub on the gate function would have passed happily while the
 // bug was live.
-// NOTE: every delivery in this file goes through ctrl.Handle rather than the
-// handlePage helper the rest of the suite uses. The helper stamps a hand-built
-// page for the screen on top, and this file's whole subject is which screen a
-// page reaches when it is NOT the one on top — a canonical result arriving
-// under a drill, a filtered result arriving under a fresh canonical list.
-// Stamping them would make every case here trivially true. These are the pins
-// that describe the by-type scan itself, so they stand or fall with it.
+// NOTE on delivery: a page reaches the screen whose instance it names, at any
+// depth in the stack. Most deliveries here are for the screen on top and use
+// handlePage, which stamps that instance; the two aimed at a screen further
+// down name it explicitly, captured when that screen was opened. Neither is a
+// by-type shortcut — the identity is what the routing reads, and a test that
+// left it off would be asserting about a page nothing dispatched.
 package unit
 
 import (
@@ -93,10 +92,10 @@ func provenancePinReadTypeFile(t *testing.T, ctrl *app.Controller, profile, regi
 // the in-memory RowStore snapshot and the persisted disk TypeFile show
 // exactly 200 rows with TotalCount/Count 200 — the precondition every
 // subtest below builds on.
-func seedCanonical200(t *testing.T, ctrl *app.Controller, core *runtime.Core, profile, region string) {
+func seedCanonical200(t *testing.T, ctrl *app.Controller, core *runtime.Core, profile, region string) domain.Gen {
 	t.Helper()
 	ctrl.Apply(app.Action{Kind: app.ActionCommand, Arg: provenancePinType})
-	ctrl.Handle(messages.ResourcesLoaded{
+	handlePage(ctrl, messages.ResourcesLoaded{
 		ResourceType: provenancePinType,
 		Resources:    provenancePinEC2Rows(200, "i-canon"),
 		Pagination:   &resource.PaginationMeta{IsTruncated: false},
@@ -111,6 +110,9 @@ func seedCanonical200(t *testing.T, ctrl *app.Controller, core *runtime.Core, pr
 	if len(tf.Rows) != 200 || tf.Count != 200 {
 		t.Fatalf("precondition failed: disk TypeFile after canonical seed = %d rows, Count=%d, want 200/200", len(tf.Rows), tf.Count)
 	}
+	// The identity of the screen this seed opened, for a subtest that later
+	// delivers to it from underneath something else.
+	return ctrl.GetListInstance()
 }
 
 // assertStillCanonical200 re-reads both the RowStore snapshot and the disk
@@ -164,7 +166,7 @@ func TestObserveResourcesLoadedRows_FilteredDrill_RealRepro_DoesNotReplaceCanoni
 
 	// The filtered fetch result: same resourceType "ec2", 3 rows, the
 	// provenance a real KindFetchFiltered task would carry.
-	ctrl.Handle(messages.ResourcesLoaded{
+	handlePage(ctrl, messages.ResourcesLoaded{
 		ResourceType: provenancePinType,
 		Resources:    provenancePinEC2Rows(3, "i-filtered"),
 		Provenance:   messages.FetchProvenanceFilteredList,
@@ -220,6 +222,7 @@ func TestObserveResourcesLoadedRows_FilteredScreenBuriedUnderFreshCanonical_Stil
 	if !ctrl.GetListEscPops() {
 		t.Fatal("test setup problem: screen2 (related-filtered ec2) must have EscPops=true")
 	}
+	screen2 := ctrl.GetListInstance()
 
 	// screen3: a FRESH canonical ec2 list pushed on top of screen2 via the
 	// same command-palette seam seedCanonical200 used to build screen1 —
@@ -251,6 +254,7 @@ func TestObserveResourcesLoadedRows_FilteredScreenBuriedUnderFreshCanonical_Stil
 		ResourceType: provenancePinType,
 		Resources:    buriedRows,
 		Provenance:   messages.FetchProvenanceFilteredList,
+		ScreenID:     screen2,
 	})
 
 	// screen3 (still topmost) must be completely untouched: a
@@ -320,7 +324,7 @@ func TestObserveResourcesLoadedRows_FilteredScreenBuriedUnderFreshCanonical_Stil
 // RowStore/disk TypeFile.
 func TestObserveResourcesLoadedRows_CanonicalResult_TopmostFilteredScreen_FallsThroughToCanonicalBeneath(t *testing.T) {
 	ctrl, core, profile, region := newProvenancePinController(t)
-	seedCanonical200(t, ctrl, core, profile, region)
+	screen1 := seedCanonical200(t, ctrl, core, profile, region)
 
 	ctrl.ApplyIntents([]runtime.UIIntent{runtime.PushScreen{ID: runtime.ScreenDetail}})
 	ctrl.EnsureDetailState(resource.Resource{ID: "sg-reverse-src", Name: "sg-reverse-src", Type: "sg"}, "sg")
@@ -331,7 +335,7 @@ func TestObserveResourcesLoadedRows_CanonicalResult_TopmostFilteredScreen_FallsT
 	if !ctrl.GetListEscPops() {
 		t.Fatal("test setup problem: the pushed related-filtered ec2 list must have EscPops=true")
 	}
-	ctrl.Handle(messages.ResourcesLoaded{
+	handlePage(ctrl, messages.ResourcesLoaded{
 		ResourceType: provenancePinType,
 		Resources:    provenancePinEC2Rows(3, "i-drill"),
 		Provenance:   messages.FetchProvenanceFilteredList,
@@ -353,6 +357,7 @@ func TestObserveResourcesLoadedRows_CanonicalResult_TopmostFilteredScreen_FallsT
 		Resources:    provenancePinEC2Rows(250, "i-late-canon"),
 		Pagination:   &resource.PaginationMeta{IsTruncated: false},
 		Provenance:   messages.FetchProvenanceCanonicalList,
+		ScreenID:     screen1,
 	})
 
 	// The drill (still topmost) must be completely untouched.
@@ -414,7 +419,10 @@ func TestObserveResourcesLoadedRows_CanonicalResult_TopmostFilteredScreen_DoesNo
 	}
 
 	// A CanonicalList-provenance result for "ct-events" lands while the
-	// FetchFilter drill is still topmost.
+	// FetchFilter drill is still topmost. No canonical ct-events screen was
+	// ever opened, so this page names none — deliberately unstamped, and it
+	// reaches no screen. It is still observed into the row store; what it must
+	// not do is seed the drill's filtered cache.
 	ctrl.Handle(messages.ResourcesLoaded{
 		ResourceType: "ct-events",
 		Resources: []resource.Resource{
@@ -464,7 +472,7 @@ func TestObserveResourcesLoadedRows_ByIDFetch_DoesNotReplaceCanonical(t *testing
 	seedCanonical200(t, ctrl, core, profile, region)
 	popTopScreenForProvenancePin(t, ctrl)
 
-	ctrl.Handle(messages.ResourcesLoaded{
+	handlePage(ctrl, messages.ResourcesLoaded{
 		ResourceType: provenancePinType,
 		Resources:    provenancePinEC2Rows(1, "i-byid"),
 		Provenance:   messages.FetchProvenanceByID,
@@ -478,7 +486,7 @@ func TestObserveResourcesLoadedRows_ChildFetch_DoesNotReplaceCanonical(t *testin
 	seedCanonical200(t, ctrl, core, profile, region)
 	popTopScreenForProvenancePin(t, ctrl)
 
-	ctrl.Handle(messages.ResourcesLoaded{
+	handlePage(ctrl, messages.ResourcesLoaded{
 		ResourceType: provenancePinType,
 		Resources:    provenancePinEC2Rows(4, "i-child"),
 		Provenance:   messages.FetchProvenanceChild,
@@ -496,7 +504,7 @@ func TestObserveResourcesLoadedRows_CanonicalList_DoesReplace(t *testing.T) {
 	ctrl, core, profile, region := newProvenancePinController(t)
 	seedCanonical200(t, ctrl, core, profile, region)
 
-	ctrl.Handle(messages.ResourcesLoaded{
+	handlePage(ctrl, messages.ResourcesLoaded{
 		ResourceType: provenancePinType,
 		Resources:    provenancePinEC2Rows(5, "i-refresh"),
 		Pagination:   &resource.PaginationMeta{IsTruncated: false},
@@ -525,7 +533,7 @@ func TestObserveResourcesLoadedRows_UnknownProvenance_FailSafe_DoesNotReplaceCan
 	popTopScreenForProvenancePin(t, ctrl)
 
 	// Provenance intentionally omitted — the zero value, FetchProvenanceUnknown.
-	ctrl.Handle(messages.ResourcesLoaded{Provenance: messages.FetchProvenanceUnknown,
+	handlePage(ctrl, messages.ResourcesLoaded{Provenance: messages.FetchProvenanceUnknown,
 		ResourceType: provenancePinType,
 		Resources:    provenancePinEC2Rows(7, "i-unknown"),
 	})
@@ -567,7 +575,7 @@ func TestWebLane_FilteredDrill_SetsEscPops_AndFilteredRowsSetFires(t *testing.T)
 		{ID: "evt-provenance-1", Type: "ct-events"},
 		{ID: "evt-provenance-2", Type: "ct-events"},
 	}
-	ctrl.Handle(messages.ResourcesLoaded{
+	handlePage(ctrl, messages.ResourcesLoaded{
 		ResourceType: "ct-events",
 		Resources:    rows,
 		Provenance:   messages.FetchProvenanceFilteredList,

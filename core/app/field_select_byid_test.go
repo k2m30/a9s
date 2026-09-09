@@ -84,6 +84,7 @@ func TestFieldSelect_ByID_FetchesAndOpensDetail(t *testing.T) {
 			{ID: amiID, Name: "acme-ami", Type: "ami", Fields: map[string]string{"image_id": amiID}},
 		},
 		Provenance: messages.FetchProvenanceByID,
+		ScreenID:   c.GetListInstance(),
 	})
 
 	snap = c.Snapshot()

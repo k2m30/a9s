@@ -39,7 +39,7 @@ func TestFlushCacheWrites_HoldsNoLockAcrossTheEncode(t *testing.T) {
 	})
 	defer restore()
 
-	c.Handle(messages.ResourcesLoaded{
+	handlePage(c, messages.ResourcesLoaded{
 		ResourceType: "ec2",
 		Resources:    wipfixSaveLaneRows(6000),
 		Provenance:   messages.FetchProvenanceCanonicalList,

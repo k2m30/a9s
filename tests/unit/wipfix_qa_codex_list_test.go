@@ -178,8 +178,11 @@ func wipfixRefreshSeq(t *testing.T, b *wipfixBench) domain.Gen {
 }
 
 // TestAliasFailure_ReachesTheCanonicalScreen pins row 46's second half: a
-// failure for "rds" has to find the "dbi" screen, or that screen loads for
-// ever with nothing to show for it.
+// failure for a list opened under an alias has to reach that list, or it
+// loads for ever with nothing to show for it. The alias half of the question
+// is answered by the identity now — the failure names the screen that asked,
+// and "rds" versus "dbi" never enters into it — so what is left to pin is
+// that a failure retires the loading flag and leaves a marker.
 func TestAliasFailure_ReachesTheCanonicalScreen(t *testing.T) {
 	c := newTestController(t)
 	_, _ = c.Apply(app.Action{Kind: app.ActionCommand, Arg: "rds"})
@@ -191,6 +194,7 @@ func TestAliasFailure_ReachesTheCanonicalScreen(t *testing.T) {
 		ResourceType: "rds",
 		Err:          errors.New("operation error RDS: DescribeDBInstances, api error AccessDenied"),
 		Provenance:   messages.FetchProvenanceCanonicalList,
+		ScreenID:     c.GetListInstance(),
 	})
 
 	body := c.Snapshot().Body.List

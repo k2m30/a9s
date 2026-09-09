@@ -1429,15 +1429,15 @@ func TestHandleResourcesLoaded_StackedSameType_DoesNotCorruptUnderlyingList(t *t
 		},
 	}
 	// Step 4: assert the TOP list (screen 2) now has exactly the 1 row we sent.
-	// Provenance is FetchProvenanceChild — this event targets the pushed
-	// ScreenChildList screen, never the canonical top-level list underneath
-	// it, so it must carry the same provenance a real child-list fetch would
-	// (core/runtime/executor.go's TaskKindFetchChildResources case) — the
-	// symmetric provenance gate (handle.go) requires this to reach screen 2
-	// at all instead of being skipped past to canonical screen 1.
+	// ScreenID names screen 2, which is the whole of what routes this event:
+	// a real child-list fetch is stamped with the instance of the screen that
+	// issued it (core/runtime/executor.go's TaskKindFetchChildResources case),
+	// and the result reaches that screen and no other. Provenance still
+	// matches what such a fetch carries.
 	_, _ = c.Handle(messages.ResourcesLoaded{ //nolint:ineffassign,staticcheck // return values not needed here
 		ResourceType: "ec2",
 		Resources:    singleRow, Provenance: messages.FetchProvenanceChild,
+		ScreenID: c.GetListInstance(),
 	})
 
 	lb2 := listBodyOrFail(t, c)

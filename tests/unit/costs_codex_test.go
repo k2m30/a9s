@@ -188,6 +188,11 @@ func TestCostsCodex_X1_GrowthStory_ResourceChain_EndToEnd_OverDemoTransport(t *t
 	if byIDTask == nil {
 		t.Fatal("Enter 3 (resource row) did not emit KindFetchByIDDetail — SC-001's 3rd Enter must jump straight to the resource detail")
 	}
+	// The by-ID detail fetch is not a list-producing kind, so the dispatch
+	// leaves its ScreenID at zero and the ResourcesLoaded it answers with
+	// reaches no screen. The placeholder list this Enter pushed is the screen
+	// the result belongs to, so the task names it here.
+	byIDTask.ScreenID = c.GetListInstance()
 	event, err := core.ExecuteTask(context.Background(), *byIDTask)
 	if err != nil {
 		t.Fatalf("ExecuteTask(KindFetchByIDDetail) against the demo transport: %v", err)

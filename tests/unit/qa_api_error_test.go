@@ -374,12 +374,18 @@ func TestBug_S3Refresh_InsidePrefix(t *testing.T) {
 	}
 
 	// Load objects including a folder
+	// "kind": "folder" is what marks a prefix row; without it Enter opens a
+	// detail instead of drilling, which is the shape the sibling
+	// TestBug_S3_EnterOnFolder_NavigatesIntoPrefix uses. The row reached this
+	// list for the first time when pages started being routed by identity —
+	// before that this delivery landed on the bucket list beneath and the
+	// Enter below never saw an object row at all.
 	objects := []resource.Resource{
 		{ID: "data/", Name: "data/", Fields: map[string]string{
-			"key": "data/", "size": "", "last_modified": "", "storage_class": "",
+			"key": "data/", "size": "", "last_modified": "", "storage_class": "", "kind": "folder",
 		}},
 	}
-	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{ResourceType: "s3", Resources: objects, Provenance: messages.FetchProvenanceCanonicalList})
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{ResourceType: "s3_objects", Resources: objects, Provenance: messages.FetchProvenanceChild})
 
 	// Navigate into the prefix
 	m, cmd = rootApplyMsg(m, tea.KeyPressMsg{Code: tea.KeyEnter})
@@ -394,7 +400,7 @@ func TestBug_S3Refresh_InsidePrefix(t *testing.T) {
 			"key": "data/file.csv", "size": "2048", "last_modified": "2025-02-01", "storage_class": "STANDARD",
 		}},
 	}
-	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{ResourceType: "s3", Resources: prefixObjects, Provenance: messages.FetchProvenanceCanonicalList})
+	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{ResourceType: "s3_objects", Resources: prefixObjects, Provenance: messages.FetchProvenanceChild})
 
 	// Press Ctrl+R to refresh
 	_, cmd = rootApplyMsg(m, tea.KeyPressMsg{Code: 'r', Mod: tea.ModCtrl})
