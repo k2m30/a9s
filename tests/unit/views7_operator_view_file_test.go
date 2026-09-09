@@ -43,13 +43,24 @@ func views7LifecycleKey(td *resource.ResourceTypeDef) string {
 	return "state"
 }
 
+// views7TypeOf resolves a view name to its type, parent or child — the two
+// registries a view file can name.
+func views7TypeOf(t *testing.T, shortName string) *resource.ResourceTypeDef {
+	t.Helper()
+	if td := resource.FindResourceType(shortName); td != nil {
+		return td
+	}
+	if child := resource.GetChildType(shortName); child != nil {
+		return child
+	}
+	t.Fatalf("no resource type %q", shortName)
+	return nil
+}
+
 // views7ResolvedColumn returns the resolved column with the given title.
 func views7ResolvedColumn(t *testing.T, cfg *config.ViewsConfig, shortName, title string) config.ListColumn {
 	t.Helper()
-	td := resource.FindResourceType(shortName)
-	if td == nil {
-		t.Fatalf("no resource type %q", shortName)
-	}
+	td := views7TypeOf(t, shortName)
 	for _, col := range resource.ResolveListColumnCascade(cfg, shortName, td) {
 		if col.Title == title {
 			return col
