@@ -710,7 +710,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   document and query instead of on every keypress and every frame.
 - Shrinking the terminal re-lays-out an open detail screen instead of
   clipping the text that was wrapped for the old width.
-- A row the attention checks could not inspect now names the check that did not answer: its detail view reads "not inspected: DescribeInstanceStatus" instead of only saying that something refused.
+- A row the attention checks could not inspect now names the check that did not answer: its detail view reads "Not inspected: DescribeInstanceStatus" instead of only saying that something refused.
 - A drill and the list it was opened from now order their own refreshes separately. They shared one counter, so each superseded the other's requests and a refreshed drill could revert to the rows the refresh replaced.
 - A child list is drawn from the same resource definition as the rest of its screen: it shows its own title instead of an internal short name, and a finding on a child row now colours it.
 - The main menu no longer stalls behind a cache write. A large type file was encoded while holding a lock the screen needs, so one key press per write waited out the whole encode.
