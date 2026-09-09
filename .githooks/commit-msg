@@ -18,6 +18,15 @@ effective_patterns="$(grep -vE '^[[:space:]]*(#|$)' "$patterns")"
 
 matches="$(grep -niE "$effective_patterns" "$msg_file" || true)"
 
+# No AI attribution in history: a trailer or byline naming the assistant is
+# refused whatever produced it.
+attribution="$(grep -niE 'co-authored-by:.*(claude|anthropic)|generated (with|by) claude|authored by claude' "$msg_file" || true)"
+if [[ -n "$attribution" ]]; then
+  echo "[commit-msg] BLOCKED: commit message carries AI attribution" >&2
+  echo "$attribution" >&2
+  exit 1
+fi
+
 if [[ -n "$matches" ]]; then
   echo "============================================================" >&2
   echo "[commit-msg] BLOCKED: commit message contains sensitive data" >&2
