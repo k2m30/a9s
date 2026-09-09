@@ -66,6 +66,7 @@ func SetChildTypes(children []ResourceTypeDef) {
 		m[c.ShortName] = c
 	}
 	childRegistry.Store(&m)
+	installedChildren.Store(&m)
 	indexDetails(children)
 }
 
@@ -152,10 +153,26 @@ func SetChildTypeForTest(def ResourceTypeDef) {
 	swapChildren(func(m map[string]ResourceTypeDef) { m[def.ShortName] = def })
 }
 
+// installedChildren is the map SetChildTypes installed, kept so cleanup can
+// tell a test's own registration from an override of a shipped child. No
+// lookup reads it: it exists only so removing an override restores what the
+// catalog ships instead of deleting it for the rest of the process, which is
+// what the registry this replaced did by having two maps.
+var installedChildren atomic.Pointer[map[string]ResourceTypeDef] //nolint:gochecknoglobals // process-scope catalog
+
 // CleanupChildTypeForTest removes a child type registered by
-// SetChildTypeForTest. Same copy-on-write rule.
+// SetChildTypeForTest, restoring the shipped definition when the test
+// registration shadowed one. Same copy-on-write rule.
 func CleanupChildTypeForTest(shortName string) {
-	swapChildren(func(m map[string]ResourceTypeDef) { delete(m, shortName) })
+	swapChildren(func(m map[string]ResourceTypeDef) {
+		if base := installedChildren.Load(); base != nil {
+			if shipped, ok := (*base)[shortName]; ok {
+				m[shortName] = shipped
+				return
+			}
+		}
+		delete(m, shortName)
+	})
 }
 
 // swapChildren applies edit to a copy of the installed child map and swaps it
