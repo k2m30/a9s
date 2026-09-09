@@ -389,7 +389,7 @@ func (c *Controller) stampDispatchSnapshotLocked(tasks []runtime.TaskRequest) []
 //
 // Callers must hold c.mu.
 func (c *Controller) stampListDispatchLocked(task *runtime.TaskRequest, top *ListState) {
-	if task.ScreenID == 0 && top != nil && runtime.TaskProducesListResult(task.Key.Kind) {
+	if task.ScreenID == 0 && top != nil && stampsScreen(task.Key.Kind, top) {
 		task.ScreenID = top.instance
 	}
 	c.core.StampListFetchSeq(task)
@@ -403,6 +403,22 @@ func (c *Controller) stampListDispatchLocked(task *runtime.TaskRequest, top *Lis
 			top.loadingSeq = task.ListSeq
 		}
 	}
+}
+
+// stampsScreen reports whether a task of this kind, dispatched while top is the
+// list screen on top, produces a result that top is the one screen able to
+// receive.
+//
+// KindFetchByIDDetail is not a list-producing kind — it draws no sequence and
+// raises no loading flag — but the executor answers it with a
+// messages.ResourcesLoaded all the same, and the screen that answer belongs to
+// is the by-ID placeholder pushByIDPlaceholderList raised AutoOpenSingle on.
+// The flag is the condition, not the kind: on an ordinary list of the same type
+// the single row would be applied over the list's own rows, because the apply
+// path does not re-check provenance once a screen has been resolved.
+func stampsScreen(kind runtime.TaskKind, top *ListState) bool {
+	return runtime.TaskProducesListResult(kind) ||
+		(kind == runtime.KindFetchByIDDetail && top.AutoOpenSingle)
 }
 
 // StampListDispatch stamps a task the runtime built directly, outside the
