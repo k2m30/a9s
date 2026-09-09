@@ -344,9 +344,8 @@ func TestWiring_ClientsReady_DemoMode_NoCache_SkipsAvailability(t *testing.T) {
 // flash is cleared.
 
 // TestWiring_AvailabilityComplete_ClearsFlash walks the full probe cycle
-// after ClientsReady (commit 89f0f69d "availability sweep waits for client
-// readiness"): a disk-cache load with nil clients no longer dequeues ANY
-// probes upfront — it latches Session.AvailSweepPending instead, and
+// after ClientsReady: a disk-cache load with nil clients dequeues no probes
+// upfront — it latches Session.AvailSweepPending instead, and
 // HandleClientsReady's drain (fireNextAvailabilityProbes(4)) is what
 // dequeues the first batch. Without a ClientsReady in between, the queue
 // starts at len(AllShortNames()) undiminished, so exactly
@@ -356,10 +355,10 @@ func TestWiring_ClientsReady_DemoMode_NoCache_SkipsAvailability(t *testing.T) {
 // ClearFlash branch — see handleAvailabilityChecked's queue-then-total
 // check order in core/runtime/handlers_availability.go) — one message
 // short of ever emitting ClearFlash. Sending ClientsReady first (dequeuing
-// 4) restores the real production sequence: the cache-loaded handler
-// dispatches nothing, ClientsReady dequeues 4, and exactly
-// len(AllShortNames()) AvailabilityCheckedMsg then drains the remaining
-// len(AllShortNames())-4 queue entries plus reaches the terminal branch.
+// 4) is the real production sequence: the cache-loaded handler dispatches
+// nothing, ClientsReady dequeues 4, and exactly len(AllShortNames())
+// AvailabilityCheckedMsg then drains the remaining len(AllShortNames())-4
+// queue entries plus reaches the terminal branch.
 func TestWiring_AvailabilityComplete_ClearsFlash(t *testing.T) {
 	m := newRootSizedModel()
 
@@ -391,7 +390,7 @@ func TestWiring_AvailabilityComplete_ClearsFlash(t *testing.T) {
 	// send len(AllShortNames()) messages total to drain everything.
 	allNames := resource.AllShortNames()
 	var lastCmd tea.Cmd
-	// session.New seeds AvailabilityGen=1 (AS-659) — capture and reuse so the
+	// session.New seeds AvailabilityGen=1 — capture and reuse so the
 	// AvailabilityChecked stale guard (AcceptZeroGen=false) accepts each msg.
 	gen := m.Core().Session().AvailabilityGen
 	for _, name := range allNames {
@@ -686,9 +685,8 @@ func TestWiring_ValueRevealedMsg_Error(t *testing.T) {
 	}
 
 	plain := stripANSI(rootViewContent(m))
-	// INVERTED by spec row 6 (task "errors"): the flash is "reveal: <cause>"
-	// now. What this test is about — the failure reaches the rendered header —
-	// is unchanged.
+	// The flash is "reveal: <cause>"; what this test is about — the failure
+	// reaches the rendered header — does not depend on the wording.
 	if !containsSubstring(plain, "reveal: ") {
 		t.Errorf("should show error flash for reveal failure, got: %s", truncateForLog(plain))
 	}

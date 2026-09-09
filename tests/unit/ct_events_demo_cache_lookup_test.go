@@ -175,12 +175,9 @@ func TestCtEventsCheckersResolveFromDemoCache_CaseKUserChecker(t *testing.T) {
 		t.Fatal("no iam-user RelatedCheckResult returned for Case K — checker not registered?")
 	}
 
-	// INVERTED for row 4. This was filed as "Bug E": Unknown from nil clients
-	// and an empty cache was read as a defect, and a resolved Count=0 as the
-	// fix. Row 4 settles it the other way — with nothing to read and nothing to
-	// call, the checker has not established that the user is absent, and a
-	// definitive zero would be a guess dressed as a fact. Unknown is now the
-	// required answer, so the assertion is reversed rather than retuned.
+	// With nothing to read and nothing to call, the checker has not
+	// established that the user is absent, and a definitive zero would be a
+	// guess dressed as a fact; Unknown is the required answer.
 	if iamUserResult.State() != domain.RelatedUnknown {
 		t.Errorf("event=e-e1f2a3b4 (AttachUserPolicy/alice.johnson): state = %v with nil clients and an empty cache,"+
 			" want RelatedUnknown — nothing read the user list, so neither a count nor a zero is established."+
@@ -198,10 +195,9 @@ func TestCtEventsCheckersResolveFromDemoCache_CaseKUserChecker(t *testing.T) {
 // for AssumedRole events.
 //
 // AssumedRole events are identified by a non-empty role_name field.
-// INVERTED (was: "Bug E", which read Unknown on an empty cache as the defect and
-// demanded a definitive 0). A role id in an event body is a claim about the past;
-// with no list to confirm it against, Unknown is the only honest answer, and a
-// confident 0 would deny a role that exists.
+// A role id in an event body is a claim about the past; with no list to
+// confirm it against, Unknown is the only honest answer, and a confident 0
+// would deny a role that exists.
 func TestCtEventsCheckersResolveFromDemoCache_RoleCheckerAssumedRoleEvents(t *testing.T) {
 	ctClient := fakes.NewCloudTrail()
 	fixtures, fetchErr := collectAllPages(func(token string) (resource.FetchResult, error) {

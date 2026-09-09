@@ -411,19 +411,11 @@ func TestRestartSeed_S3_Wave2FindingAndStatusVisibleOnFirstRender(t *testing.T) 
 	if row.ResourceID != "s3-bucket-x" {
 		t.Fatalf("Rows[0].ResourceID = %q, want %q", row.ResourceID, "s3-bucket-x")
 	}
-	// Since the color-findings-conformance wave, colorS3 is
-	// colorFromAnyFinding-only (core/aws/catalog_databases.go) — the
-	// carried SevBroken Finding now resolves td.ResolveColor(r) to
-	// ColorBroken directly, so no glyph is produced at all: the branch that
-	// used to fire when ResolveColor()==ColorHealthy was deleted as
-	// unreachable. The row instead renders as a full broken row via colorTag
-	// (the WHOLE row is coloured) and
-	// Severity=="issue" (see resolveListRowSeverity's IsIssue() branch).
-	// This is the CORRECT, stronger contract — whole-row color beats a small
-	// glyph prefix — not a regression; see
-	// .claude/agent-memory/a9s-coder/project_color_findings_conformance_glyph_interplay.md.
-	// The Decorator half of this pin is gone with the row-decorator plumbing
-	// (tui5 row 5). Whole-row colour, which is what it argued for, is asserted
+	// colorS3 is colorFromAnyFinding-only (core/aws/catalog_databases.go), so
+	// the carried SevBroken Finding resolves td.ResolveColor(r) to ColorBroken
+	// directly and no glyph is produced: the row renders as a full broken row
+	// via colorTag (the WHOLE row is coloured) and Severity=="issue" (see
+	// resolveListRowSeverity's IsIssue() branch). Whole-row colour is asserted
 	// through colorTag and Severity above.
 
 	// HandleNavigate's disk-store fallback (handlers_navigate.go:205-224) seeds

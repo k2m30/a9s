@@ -80,12 +80,10 @@ func TestHandleAPIError_NilErr_NoPanic(t *testing.T) {
 // its fields. A matched APIError with an empty code (Code:"") is the boundary
 // row: the code contributes nothing, so the message stands alone.
 //
-// INVERTED by the acceptance ruling on pass 1 of the "errors" task (spec row
-// 3): the classified row required "[code] message" built from the
-// classifier's RAW message, which put an encoded authorization blob on the
-// flash for a denial while every other surface showed the cause. Do not
-// restore the bracketed shape — it is a second phrasing of two fields the one
-// formatter already renders.
+// A classified row built as "[code] message" from the classifier's RAW
+// message would put an encoded authorization blob on the flash for a denial
+// while every other surface showed the cause; the bracketed shape is a
+// second phrasing of two fields the one formatter already renders.
 func TestHandleAPIError_MessageSelectionTable(t *testing.T) {
 	tests := []struct {
 		name string

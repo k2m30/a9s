@@ -23,15 +23,14 @@ import (
 )
 
 // ---------------------------------------------------------------------------
-// AS-1393 W1.1 color-signal regression suite.
+// Color-signal regression suite.
 //
-// When Wave-1 fetchers stopped writing Resource.Status, the per-row color
-// signal disappeared for all child types whose ResourceTypeDef had no Color
-// func (cb_builds, cfn_resources, glue_runs, log_events,
-// lambda_invocation_logs, role_policies). The fix emits wave1 domain.Findings
-// + adds Color: colorAnyFindingOrHealthy to each catalog entry; the tests below
-// pin both halves so a future regression fails loudly instead of silently
-// rendering FAILED rows green.
+// Wave-1 fetchers do not write Resource.Status, so child types whose
+// ResourceTypeDef has no Color func (cb_builds, cfn_resources, glue_runs,
+// log_events, lambda_invocation_logs, role_policies) get their per-row colour
+// from wave1 domain.Findings plus Color: colorAnyFindingOrHealthy on each
+// catalog entry; the tests below pin both halves so a regression fails loudly
+// instead of silently rendering FAILED rows green.
 // ---------------------------------------------------------------------------
 
 func fetchOneCBBuild(t *testing.T, status cbtypes.StatusType) resource.Resource {

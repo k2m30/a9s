@@ -459,9 +459,9 @@ func TestOpenSearch_Fetch_MultiW2UpdatePlusEncryptionSuffix(t *testing.T) {
 	}
 	r := resources[0]
 
-	// Inverted in d1: both signals read the DescribeDomains response the fetcher
-	// already holds and made no AWS call, so they are wave-1 findings on the row
-	// rather than enricher output. The status cell is built from those findings.
+	// Both signals read the DescribeDomains response the fetcher already holds
+	// and make no AWS call, so they are wave-1 findings on the row rather than
+	// enricher output. The status cell is built from those findings.
 	if r.Fields["status"] != "software update forced soon (+1)" {
 		t.Errorf("Fields[\"status\"] = %q, want %q", r.Fields["status"], "software update forced soon (+1)")
 	}

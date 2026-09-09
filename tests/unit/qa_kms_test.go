@@ -230,7 +230,7 @@ func TestKMS_ResourceTypeDef(t *testing.T) {
 		{"Alias", "alias", 32},
 		{"Key ID", "key_id", 38},
 		{"Status", "status", 12},
-		// w197: Rotation comes from the view list folded into this one.
+		// Rotation comes from the view list folded into this one.
 		{"Rotation", "rotation_enabled", 10},
 		{"Description", "description", 36},
 	}
@@ -316,12 +316,10 @@ func TestFetchKMSKeys_DescribeKeyPartialFailure(t *testing.T) {
 
 	result, err := awsclient.FetchKMSKeysPage(context.Background(), &awsclient.ServiceClients{KMS: newMockKMSFull(listKeysMock, describeKeyMock, listAliasesMock)}, "")
 	resources := result.Resources
-	// FetchKMSKeysPage (successor to the deleted FetchKMSKeys) folds a
-	// per-key DescribeKey failure into a composite error via
-	// AggregateFailures — same never-silent-skip contract as the
-	// EKS/NG/ECS fetchers — rather than swallowing it silently. The key
-	// still gets skipped from the results; the failure is just no longer
-	// invisible.
+	// FetchKMSKeysPage folds a per-key DescribeKey failure into a composite
+	// error via AggregateFailures — same never-silent-skip contract as the
+	// EKS/NG/ECS fetchers. The key still gets skipped from the results; the
+	// failure is not invisible.
 	if err == nil || !strings.Contains(err.Error(), "key-denied") {
 		t.Fatalf("expected composite error naming the undescribable key %q, got %v", "key-denied", err)
 	}

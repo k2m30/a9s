@@ -934,7 +934,7 @@ func TestWebRichTypes_AllHaveNonEmptyRows(t *testing.T) {
 }
 
 // =============================================================================
-// 11. LIST → DETAIL — open-detail flow (PR-E new, wired in commit 2fb04f2b)
+// 11. LIST → DETAIL — open-detail flow
 // =============================================================================
 
 // navigateToDetail is a helper: navigates list → selects first row → opens

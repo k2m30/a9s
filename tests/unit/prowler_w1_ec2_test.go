@@ -386,10 +386,10 @@ func TestEC2_InternetExposed_SensitivePortFromSGCache(t *testing.T) {
 // TestEC2_InternetExposed_WideOpenSGReportsAll pins that an all-protocols
 // rule reports every port rather than enumerating a list.
 //
-// Inverted by misc4 row 1: the wide-open case is now ec2.internet-exposed-all
-// with its own sentence, because "port(s) all reachable from the internet"
-// read the word "all" as a port list and carried an unresolved hedge. Do not
-// restore the old assertion — the port-list code must stay silent here.
+// The wide-open case is ec2.internet-exposed-all with its own sentence,
+// because "port(s) all reachable from the internet" reads the word "all" as
+// a port list and carries an unresolved hedge; the port-list code stays
+// silent here.
 func TestEC2_InternetExposed_WideOpenSGReportsAll(t *testing.T) {
 	const id = "i-0wideopen0aaaaa1"
 	cache := pw1SGCache(t, pw1SG("sg-0wide0000aaaaaa1", 0, 0, true))

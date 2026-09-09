@@ -1,6 +1,4 @@
-// costs_round7_test.go — Cost Explorer: external reviewer's fifth pass (7
-// findings, all independently verified against current code with zero
-// disproofs).
+// costs_round7_test.go — Cost Explorer: seven contract pins.
 //
 // package unit_test (not unit): every finding here is reachable via the
 // headless app.Controller / pure core/costs / core/app package
@@ -9,29 +7,11 @@
 // monthRecord and costs_interaction_test.go's findFetchCostsTask directly
 // (same package).
 //
-// Reconciliation performed alongside this file (not scoped to this file,
-// but required by item 3's fix): costs_interaction_test.go's two D3
-// DataThrough tests both fetched window[len(window)-1] — fixedCostsNow's
-// own, still-OPEN month — and asserted the OLD End-1 value. Once item 3's
-// cap lands, an open period's DataThrough no longer equals End-1, so both
-// tests were repointed to a CLOSED column (window[len-2]/[len-4]) to keep
-// testing the exclusive-End-vs-inclusive-day contract they exist for
-// without colliding with the new open-period cap. See that file's inline
-// comments for the exact change.
-//
-// Reconciliations checked and found UNNECESSARY:
-//   - Item 2 (ResourceDrillAllowed EC2-exact gate): grepped every
-//     ResourceDrillAllowed call site in tests/unit — only
-//     costs_drill_test.go's TestResourceDrillAllowed, whose sole "allowed"
-//     case already uses "Amazon Elastic Compute Cloud - Compute". No other
-//     test pins a non-EC2 single-service drill as allowed. Nothing to
-//     reconcile.
-//   - Item 7 (14-day cutoff day-truncation): the existing
-//     TestClampResourceDrillWindow_* tests in costs_drill_test.go both use
-//     a midnight `now` (time.Date(2026,7,15,0,0,0,0,UTC)), where the
-//     missing day-truncation is invisible (midnight minus 14 days is still
-//     midnight) — they stay green unchanged; this round's test below adds
-//     the missing mid-afternoon-now coverage rather than replacing them.
+// Item 7 (14-day cutoff day-truncation): the TestClampResourceDrillWindow_*
+// tests in costs_drill_test.go use a midnight `now`
+// (time.Date(2026,7,15,0,0,0,0,UTC)), where a missing day-truncation is
+// invisible (midnight minus 14 days is still midnight); the test below
+// covers a mid-afternoon `now`.
 package unit_test
 
 import (
@@ -332,27 +312,15 @@ func TestCostsRound7_Item5_KindFetchCosts_ClassifiedLikeKindFetchResources(t *te
 }
 
 // ===========================================================================
-// Item 6 (P2, core/app/costs_body.go:~122 + costs_state.go) — hiding
-// zero rows must keep SELECTION aligned, not just the highlight.
-//
-// Root cause traced precisely: applyCostsMoveRow/applyCostsSelect both
-// index the RAW, unfiltered liveCostGrid via cur.Cursor.Row (costs_state.go
-// L340/L590), while buildCostsBody's filterCostsZeroDisplayRows remap
-// (costs_body.go L122-125) is a RENDER-ONLY local value
-// (displayRows/displayCursorRow) that is NEVER written back into
-// cs.DrillStack — so the state layer and the display layer silently
-// diverge whenever a hidden row sits above a visible one in the raw sort
-// order. Fix direction pinned here per the coordinator: the state layer's
-// own Cursor.Row must operate on the FILTERED view (one source of truth),
-// not gain a second display-side remap.
-//
-// RECONCILED (architecture.md Seam 8, CostsViewModel): this "one source of
-// truth" mechanism is exactly what BuildViewModel's clamped Cursor now
-// owns — pinned at the typed seam in costs_screen_test.go
-// (TestCostsScreen_BuildViewModel_CursorClamp_AlwaysValidIndex). This
-// controller-level test stays as the full-stack acceptance pin (also see
-// costs_codex_test.go's X6 reconciliation note, updated alongside this
-// one: the mechanism now lives in the ViewModel seam, not the reducer).
+// Item 6 (core/app/costs_body.go + costs_state.go) — hiding zero rows must
+// keep SELECTION aligned, not just the highlight: applyCostsMoveRow and
+// applyCostsSelect index the same FILTERED view the display shows (one
+// source of truth), never the raw unfiltered liveCostGrid with a
+// render-only remap that is never written back into cs.DrillStack. The
+// mechanism is BuildViewModel's clamped Cursor, pinned at the typed seam in
+// costs_screen_test.go
+// (TestCostsScreen_BuildViewModel_CursorClamp_AlwaysValidIndex); this is
+// the full-stack pin.
 // ===========================================================================
 
 func TestCostsRound7_Item6_HiddenRowAbove_SelectionStaysAlignedWithDisplayedHighlight(t *testing.T) {

@@ -57,10 +57,10 @@ func TestFetchSESIdentities_ParsesMultipleIdentities(t *testing.T) {
 	if r.Fields["identity_name"] != "example.com" {
 		t.Errorf("expected Fields[identity_name] 'example.com', got %q", r.Fields["identity_name"])
 	}
-	// Inverted deliberately: the Type column renders this field verbatim, and
-	// an operator reads a column, not an SDK enum. The rendered-surface style
-	// gate forbids raw enum text on any surface, so the fetcher humanizes here
-	// rather than every renderer re-deriving the same mapping.
+	// The Type column renders this field verbatim, and an operator reads a
+	// column, not an SDK enum. The rendered-surface style gate forbids raw
+	// enum text on any surface, so the fetcher humanizes here rather than
+	// every renderer re-deriving the same mapping.
 	if r.Fields["identity_type"] != "domain" {
 		t.Errorf("expected Fields[identity_type] 'domain', got %q", r.Fields["identity_type"])
 	}

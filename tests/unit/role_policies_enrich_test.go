@@ -744,14 +744,12 @@ func TestEnrichRolePolicy_DetailEnrichmentCtx_NilPolicyDocs(t *testing.T) {
 // decodePolicyDocument additional tests (exercised via FetchManagedPolicyDocument)
 // ---------------------------------------------------------------------------
 
-// TestDecodePolicyDocument_QueryStyleEncodingIsNotRescued is the INVERTED
-// former TestDecodePolicyDocument_QueryUnescapeFallback: it used to assert
-// that a query-style document was rescued by a second QueryUnescape pass.
-// That fallback is what silently turned a literal '+' inside a policy — a
-// resource name, a regex — into a space, so d3 row 12 removed it and every
-// site now decodes path-style only. Do not "restore" this to the old
-// expectation: a document that only parses after '+' becomes a space is not a
-// document IAM produced.
+// TestDecodePolicyDocument_QueryStyleEncodingIsNotRescued: a query-style
+// document is not rescued by a second QueryUnescape pass. That fallback
+// would silently turn a literal '+' inside a policy — a resource name, a
+// regex — into a space, so every site decodes path-style only: a document
+// that only parses after '+' becomes a space is not a document IAM
+// produced.
 func TestDecodePolicyDocument_QueryStyleEncodingIsNotRescued(t *testing.T) {
 	// PathUnescape("%7B%22a%22%3A+1%7D") → {"a":+1} — invalid JSON, and that
 	// is the honest answer.

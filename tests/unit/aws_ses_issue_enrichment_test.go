@@ -12,7 +12,7 @@
 //   - nil resources slice → no findings (nothing to replicate onto).
 //   - Two resources passed → two entries in Findings map (one per row).
 //   - PROBATION beats quota: PROBATION takes precedence, quota not checked.
-//   - AS-1397: the enricher does NOT write FieldUpdates["status"]; the Wave-2
+//   - the enricher does NOT write FieldUpdates["status"]; the Wave-2
 //     phrase reaches the list view via r.Findings[0].Phrase (phraseFromFindings)
 //     and row color via colorSES reading r.Findings.
 //   - nil clients.SESv2 → empty Findings map (non-nil), 0 IssueCount, no error.
@@ -316,16 +316,15 @@ func TestEnrichSESAccount_ProbationBeatsQuota(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// FieldUpdates — AS-1397: never written, always non-nil
+// FieldUpdates — never written, always non-nil
 // ---------------------------------------------------------------------------
 
-// TestEnrichSESAccount_FieldUpdatesNeverWritten pins AS-1397: the SES enricher
+// TestEnrichSESAccount_FieldUpdatesNeverWritten pins that the SES enricher
 // must not write to FieldUpdates on any path. The Wave-2 phrase reaches the
 // list view via r.Findings[0].Phrase (phraseFromFindings at render time) and
 // the row color via colorSES reading r.Findings.
 //
-// Covers all three §4 paths plus the Wave-1-preceded row (former
-// BumpFindingSuffix path) — none may write a status entry.
+// Covers all three §4 paths plus the Wave-1-preceded row — none may write a status entry.
 func TestEnrichSESAccount_FieldUpdatesNeverWritten(t *testing.T) {
 	cases := []struct {
 		name string
@@ -584,17 +583,17 @@ func TestEnrichSESAccount_FixtureHealthyAccountProducesNoFindings(t *testing.T) 
 }
 
 // ---------------------------------------------------------------------------
-// AS-1397 — colorSES must source Wave-2 SES findings from r.Findings
+// colorSES must source Wave-2 SES findings from r.Findings
 // ---------------------------------------------------------------------------
 
-// TestSES_ColorReadsWave2FindingsForAccountFindings pins AS-1397's rendering
+// TestSES_ColorReadsWave2FindingsForAccountFindings pins the rendering
 // invariant: the SES Color resolver returns the Wave-2 finding's severity color
 // when the account-level finding lives in r.Findings (Source="wave2").
-// FieldUpdates["status"] is no longer written; the Wave-2 phrase reaches color
+// FieldUpdates["status"] is never written; the Wave-2 phrase reaches color
 // classification via r.Findings, not via Fields["status"].
 //
-// Without this path, pure-Wave-2 rows would silently render ColorHealthy after
-// AS-1397 even though phraseFromFindings still surfaces "sending paused by AWS
+// Without this path, pure-Wave-2 rows would silently render ColorHealthy
+// even though phraseFromFindings still surfaces "sending paused by AWS
 // (shutdown)" in the Status column.
 func TestSES_ColorReadsWave2FindingsForAccountFindings(t *testing.T) {
 	td := resource.FindResourceType("ses")
@@ -645,9 +644,8 @@ func TestSES_ColorReadsWave2FindingsForAccountFindings(t *testing.T) {
 		},
 		{
 			// The quota row reaches S2 along with the rest: docs/resources/ses.md
-			// §4 lists S1 through S5 for it. It used to be excluded from the row
-			// colour by a per-code special case in colorSES, which meant a Warn
-			// finding could sit on a green row.
+			// §4 lists S1 through S5 for it, so a Warn finding never sits on a
+			// green row.
 			name: "quota 80%+ Wave-2 finding (SevWarn) → ColorWarning",
 			r: resource.Resource{
 				ID: "acme-corp.com",

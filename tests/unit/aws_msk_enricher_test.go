@@ -213,17 +213,14 @@ func TestEnrichMSKCluster_NilClientReturnsEmptyFindingsNoError(t *testing.T) {
 	}
 }
 
-// TestEnrichMSKCluster_OutdatedVersionAndPlaintextEncryption_ProducesBothFindings
-// is a RED regression pin for a P2 bug found by Codex in the v3.47.0 #52 landing:
-// EnrichMSKCluster's encryption-in-transit check is gated by
-// `if _, alreadyFound := result.Findings[r.ID]; !alreadyFound` (msk_issue_enrichment.go),
-// a pre-#52 "only one finding per resource" short-circuit that setWave2Finding's
-// append-style contract (#52) obsoletes. When cluster-1 is BOTH broker-outdated
-// (KafkaVersion 2.6.0) AND not using TLS (ClientBroker=PLAINTEXT), the broker check
-// runs first and its setWave2Finding call populates result.Findings[r.ID], so the
-// encryption check's alreadyFound guard trips and the second, independently-evaluated
-// condition is silently dropped — the cluster shows only "broker software outdated",
-// never "encryption in transit not enforced", even though both are true.
+// TestEnrichMSKCluster_OutdatedVersionAndPlaintextEncryption_ProducesBothFindings:
+// when cluster-1 is BOTH broker-outdated (KafkaVersion 2.6.0) AND not using
+// TLS (ClientBroker=PLAINTEXT), both findings are produced. The broker check
+// runs first and its setWave2Finding call populates result.Findings[r.ID];
+// setWave2Finding appends, so the encryption check's independently-evaluated
+// condition must not be dropped behind an "only one finding per resource"
+// guard — the cluster shows "broker software outdated" AND "encryption in
+// transit not enforced".
 func TestEnrichMSKCluster_OutdatedVersionAndPlaintextEncryption_ProducesBothFindings(t *testing.T) {
 	fake := &fakeMSKDescribeClusterV2{
 		Results: map[string]*kafkatypes.Cluster{
@@ -283,10 +280,9 @@ func TestEnrichMSKCluster_APIErrorMarksRowTruncatedIDNotBadge(t *testing.T) {
 	if err == nil {
 		t.Fatal("enricher must surface a composite error when an API call fails")
 	}
-	// INVERTED for the "skipped" spec row 6: the label was "msk-enrich:", which
-	// made the rendered line say the type twice ("enrich msk: DescribeClusterV2 ..."). The
-	// type comes from the registry key at the surface; the aggregate names
-	// the call. Do not restore the type in the label.
+	// The aggregate names the call, not the type: the type comes from the
+	// registry key at the surface, and a type in the label would render it
+	// twice ("enrich msk: msk: DescribeClusterV2 ...").
 	if errStr := err.Error(); !strings.Contains(errStr, "DescribeClusterV2") {
 		t.Errorf("composite error must name the call, %q, got: %q", "DescribeClusterV2", errStr)
 	}

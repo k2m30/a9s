@@ -119,12 +119,11 @@ func chainEsc(m tui.Model) tui.Model {
 // ---------------------------------------------------------------------------
 
 // TestEC2_027_ASG_Count1_OpensDetail verifies that a RelatedNavigateMsg with
-// TargetType "asg" and a single TargetID opens the asg's DETAIL view. Rule
-// (owner, 2026-07-06 — supersedes the 2026-04-24 "mirror manual Enter"
-// rule): a related pivot that narrows to exactly ONE resource always opens
-// that resource's detail view, even though asg registers
-// Children[Key="enter"] → asg_activities. Pressing Enter inside asg's own
-// list still reaches asg_activities unchanged.
+// TargetType "asg" and a single TargetID opens the asg's DETAIL view: a
+// related pivot that narrows to exactly ONE resource always opens that
+// resource's detail view, even though asg registers Children[Key="enter"] →
+// asg_activities. Pressing Enter inside asg's own list still reaches
+// asg_activities unchanged.
 func TestEC2_027_ASG_Count1_OpensDetail(t *testing.T) {
 	m := newChainDemoModel(t)
 	m = chainNavigateToEC2Detail(t, m)
@@ -159,7 +158,7 @@ func TestEC2_027_ASG_Count1_OpensDetail(t *testing.T) {
 	if strings.Contains(view, "asg(1)") {
 		t.Errorf("EC2-027: RelatedNavigateMsg with TargetID must enter detail, not show a filtered list; got:\n%s", view)
 	}
-	// Must NOT enter asg_activities — the 2026-07-06 rule always opens detail.
+	// Must NOT enter asg_activities — a single-target pivot always opens detail.
 	if strings.Contains(view, "asg_activities") {
 		t.Errorf("EC2-027: RelatedNavigateMsg for asg must NOT enter asg_activities (2026-07-06 rule: Count=1 pivot always opens detail); got:\n%s", view)
 	}
@@ -494,11 +493,10 @@ func TestEC2_037_ChainC_EC2ToSGAndBack(t *testing.T) {
 }
 
 // TestEC2_038_ChainD_EC2TabToTGAndBack verifies EC2 detail → TG detail view
-// (right column, count=1) → Esc → EC2 detail. Rule (owner, 2026-07-06 —
-// supersedes the 2026-04-24 "mirror manual Enter" rule): a related pivot
-// that narrows to exactly ONE resource always opens that resource's detail
-// view, even though tg registers Children[Key="enter"] → tg_health.
-// Pressing Enter inside tg's own list still reaches tg_health unchanged.
+// (right column, count=1) → Esc → EC2 detail: a related pivot that narrows
+// to exactly ONE resource always opens that resource's detail view, even
+// though tg registers Children[Key="enter"] → tg_health. Pressing Enter
+// inside tg's own list still reaches tg_health unchanged.
 func TestEC2_038_ChainD_EC2TabToTGAndBack(t *testing.T) {
 	m := newChainDemoModel(t)
 	m = chainNavigateToEC2Detail(t, m)
@@ -528,7 +526,7 @@ func TestEC2_038_ChainD_EC2TabToTGAndBack(t *testing.T) {
 	}
 
 	viewTG := chainStrip(chainViewContent(m))
-	// Must NOT enter tg_health — the 2026-07-06 rule always opens detail.
+	// Must NOT enter tg_health — a single-target pivot always opens detail.
 	if strings.Contains(viewTG, "tg_health") {
 		t.Errorf("EC2-038: RelatedNavigateMsg to TG must NOT enter tg_health (2026-07-06 rule: Count=1 pivot always opens detail); got:\n%s", viewTG)
 	}
@@ -803,14 +801,8 @@ func TestEC2_042_NavToMissingResource_FlashMessage(t *testing.T) {
 	}
 }
 
-// TestEC2_046_DepthIndicator verifies that the depth indicator feature is either
-// present (shows [N] when depth > 4) or documents that it is not yet implemented.
-//
-// Current production code in layout/frame.go does NOT have depth-aware header logic.
-// This test documents the EXPECTED behaviour (from story EC2-046) and will fail
-// until the coder implements the depth indicator in the header.
-//
-// FAILS AT RUNTIME — depth indicator is not yet implemented.
+// TestEC2_046_DepthIndicator covers story EC2-046: the header shows [N] when
+// depth > 4.
 func TestEC2_046_DepthIndicator(t *testing.T) {
 	m := newChainDemoModel(t)
 	// Stack depth starts at 1 (main menu).
@@ -876,13 +868,8 @@ func TestEC2_046_DepthIndicator(t *testing.T) {
 	}
 }
 
-// TestEC2_058_CloudTrailPreFiltered documents the expected behaviour when the user
-// navigates to CloudTrail Events from an EC2 detail right column.
-//
-// The CloudTrail search/pre-filter feature does not yet exist. This test is written
-// to document expected behaviour and will fail until the feature is implemented.
-//
-// Priority: P2 — FAILS AT RUNTIME (feature not yet implemented).
+// TestEC2_058_CloudTrailPreFiltered covers story EC2-058: navigating to
+// CloudTrail Events from an EC2 detail right column pre-filters the search.
 func TestEC2_058_CloudTrailPreFiltered(t *testing.T) {
 	m := newChainDemoModel(t)
 	m = chainNavigateToEC2Detail(t, m)

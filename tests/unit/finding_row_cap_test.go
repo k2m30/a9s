@@ -82,11 +82,10 @@ func assertCappedRows(t *testing.T, rows []domain.DetailRow, totalItems int) {
 	if got, want := overflow.Value, capOverflowValue(totalItems-capN); got != want {
 		t.Errorf("overflow row Value = %q, want %q", got, want)
 	}
-	// Inverted for the cap batch's spec row 9. This asserted that the closing
-	// row wore the last kept row's label, which rendered the backup detail as
-	// "State  … +5 more" — a failed job whose state is that text. The closing
-	// row is the count of what is not shown, not another member of the list,
-	// so it carries no label. Do not restore the inherited form.
+	// The closing row is the count of what is not shown, not another member of
+	// the list, so it carries no label; wearing the last kept row's label would
+	// render the backup detail as "State  … +5 more" — a failed job whose state
+	// is that text.
 	if overflow.Label != "" {
 		t.Errorf("overflow row Label = %q, want empty — a labelled closing row reads as one more %q row", overflow.Label, last.Label)
 	}
@@ -578,10 +577,8 @@ func TestFindingRowCap_RoleInlinePrivEscRowsAreCapped(t *testing.T) {
 	// The role's own list, not a generic one: the Policy row survives at the
 	// head, and the closing row carries the "!" tier the combo rows carry so
 	// it is coloured with them.
-	//
-	// Inverted for the cap batch's spec row 9: this required the closing row's
-	// label to be "Combo", the label of the row above it. A closing row is the
-	// count of the combos not shown, not another combo. Do not restore.
+	// The closing row is the count of the combos not shown, not another
+	// combo, so it does not carry the "Combo" label of the row above it.
 	if got, want := ad.Rows[0].Label, "Policy"; got != want {
 		t.Errorf("first kept row Label = %q, want %q", got, want)
 	}

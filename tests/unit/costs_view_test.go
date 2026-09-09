@@ -1,8 +1,8 @@
 // costs_view_test.go — Cost Explorer Phase 2: TUI renderer parity with
 // wireframe.md (specs/021-cost-explorer/wireframe.md).
 //
-// Target: views.RenderCosts(body app.CostsBody, width, height int) string —
-// signature frozen by the coordinator's execute dispatch. A thin renderer
+// Target: views.RenderCosts(body app.CostsBody, width, height int) string.
+// A thin renderer
 // per the CostsBody doc comment ("renderers consume verbatim, never
 // recompute — same contract as ListRow.Color"), so every test here builds
 // an app.CostsBody literal directly rather than routing through a

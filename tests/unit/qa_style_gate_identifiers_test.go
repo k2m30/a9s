@@ -118,12 +118,10 @@ type styleGateIdentifierSurface struct {
 // sentence a type can render, from the row the app actually builds: fixtures
 // folded through runtime.ApplyWave2ToRow by mergeWave2Findings.
 //
-// Reading the enricher result directly instead — which this helper used to do,
-// on the reasoning that it kept the gate independent of how the waves are
-// folded — is what made the gate blind. Independence from the fold means
-// scanning surfaces the operator never sees and missing ones they do: the fold
-// decides which wave-2 rows survive onto the row and under which code, so a
-// gate that skips it is not independent, it is looking somewhere else.
+// Reading the enricher result directly instead would make the gate blind:
+// the fold decides which wave-2 rows survive onto the row and under which
+// code, so a gate that skips it scans surfaces the operator never sees and
+// misses ones they do.
 func collectAuthoredSurfaces(t *testing.T, td resource.ResourceTypeDef, fixtures []resource.Resource, cache resource.ResourceCache, clients *awsclient.ServiceClients) []styleGateIdentifierSurface {
 	t.Helper()
 	var out []styleGateIdentifierSurface

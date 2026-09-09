@@ -16,15 +16,11 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// Issue #463 — per-finding FirstSeen persisted in the availability cache
+// Per-finding FirstSeen persisted in the availability cache
 // (cache.Row.FindingFirstSeen), read back off the file the save wrote.
 //
-// The new-since-previous-scan pair COUNTS this file also pinned, and the two
-// Core accessors that exposed them, were deleted for runtime8 row 5 (backlog
-// w96): nothing in the app read either, so the counts were computed and stored
-// on every save for no reader. The FirstSeen stamps themselves stay — a first
-// observation time cannot be reconstructed once it is not recorded, and the
-// pins below are what hold the stamping honest.
+// A first observation time cannot be reconstructed once it is not recorded;
+// the pins below hold the stamping honest.
 //
 // Drives the real save path (newTestControllerAndCore + Controller.Apply +
 // Controller.ApplyResourcesLoaded, the same wiring
@@ -33,9 +29,9 @@ import (
 // inside Core.saveResourceListCache is what's actually under test, not a
 // hand-built cache.Row. Two "sweeps" against the SAME Controller/session
 // give saveResourceListCache's `existing, _ := store.Type(canon)` a real
-// previous generation to diff against, without needing a second Controller
-// (and therefore without needing a second, allowlist-violating construction
-// site — see qa_controller_construction_discipline_test.go).
+// previous generation to diff against, without a second Controller (every
+// test constructs the app through the one blessed helper — see
+// qa_controller_construction_discipline_test.go).
 
 func TestCacheFirstSeen_PersistsAcrossSaves(t *testing.T) {
 	ctrl, _ := newTestControllerAndCore(t)

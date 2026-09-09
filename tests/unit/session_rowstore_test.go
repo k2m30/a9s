@@ -1,15 +1,12 @@
-// session_rowstore_test.go — Stage-1 pin suite for the row-store
-// unification plan (rowstore-unification-plan.md, Stage 1: "Introduce
-// RowStore behind existing maps, dual-write scaffolding, zero behavior
-// change"). Pins the CONTRACT of core/session.RowStore /
+// session_rowstore_test.go — the CONTRACT of core/session.RowStore /
 // core/session.TypeRows (core/session/rowstore.go) against
 // docs/design/cache-requirements.md C2/C5/C6/C6a/C6b/C9 and the defects
 // those rules rule out (D7, D12-D17), mirroring the semantics
-// core/runtime/probes.go:reconcileTypeFile already enforces for the
-// on-disk file and core/app/list_body.go's dedupAgainstExisting/
-// isStaleReplace already enforce for the per-screen ListState.
+// core/runtime/probes.go:reconcileTypeFile enforces for the on-disk file and
+// core/app/list_body.go's dedupAgainstExisting/isStaleReplace enforce for
+// the per-screen ListState.
 //
-// API pinned here (core/session/rowstore.go, landed):
+// API pinned here (core/session/rowstore.go):
 //
 //	type Origin int
 //	const (OriginDisk Origin = iota; OriginProbe; OriginFetch)
@@ -115,16 +112,14 @@ func TestRowStore_Observe_AppendDedupsByID_NewRowsStillAdded(t *testing.T) {
 // Pin 2 — stale truncated ID-subset replace rejected once exact (D14).
 // -----------------------------------------------------------------------
 
-// INVERTED (listgen row 5): the store does not decide which of two results is
-// older. It used to guess from content shape — a smaller, still-truncated,
-// strict-ID-subset replace was rejected — and that guess could only see one
-// shape while getting a legitimate Ctrl+R reset to page 1 wrong. Ordering is
-// now decided before the store is reached, by the per-type request sequence
+// The store does not decide which of two results is older: ordering is
+// decided before the store is reached, by the per-type request sequence
 // (runtime.Core.ListResultSuperseded), so a replace that gets this far has
-// already been established as the newest one and is applied. The guarantee
-// the old assertion protected is pinned end to end by
-// TestLateReplace_DoesNotStompDeeperList. Do not restore the rejection: a
-// second, disagreeing opinion about staleness is what this row removed.
+// already been established as the newest one and is applied. A content
+// guess (a smaller, still-truncated, strict-ID-subset replace rejected)
+// could only see one shape and would get a legitimate Ctrl+R reset to page
+// 1 wrong. The guarantee is pinned end to end by
+// TestLateReplace_DoesNotStompDeeperList.
 func TestRowStore_Observe_StaleTruncatedSubsetRejectedOnceExact(t *testing.T) {
 	store := session.NewRowStore()
 
@@ -636,13 +631,12 @@ func idFor(i int) string {
 }
 
 // -----------------------------------------------------------------------
-// Pin 9 — Controller.Handle wiring into RowStore (ported from the retired
-// rowstore_differential_test.go at Stage 5: those store-only assertions
-// pinned the SAME contract this file pins at the RowStore-direct level, but
-// through the real Controller.Handle event path rather than calling
-// RowStore/Core methods directly — a regression here would mean the wiring
-// between an inbound event and the store broke even though RowStore's own
-// unit contract (Pins 1-8 above) stayed intact.
+// Pin 9 — Controller.Handle wiring into RowStore: the SAME contract this
+// file pins at the RowStore-direct level, but through the real
+// Controller.Handle event path rather than calling RowStore/Core methods
+// directly — a regression here would mean the wiring between an inbound
+// event and the store broke even though RowStore's own unit contract (Pins
+// 1-8 above) stayed intact.
 // -----------------------------------------------------------------------
 
 // newRowStoreControllerPin mirrors the other per-file controller

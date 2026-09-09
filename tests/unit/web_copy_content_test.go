@@ -26,7 +26,7 @@ import (
 
 // wave4AssertCopyContent calls c.CopyContent() and cross-checks that
 // Snapshot().CopyText/CopyLabel expose the exact same pair at that moment —
-// the dispatch's "single source of truth for both renderers" contract.
+// the "single source of truth for both renderers" contract.
 // Every test in this file routes through this helper so the snapshot
 // exposure is pinned across all 9 behaviors, not just once.
 func wave4AssertCopyContent(t *testing.T, c *app.Controller) (content, label string) {
@@ -419,16 +419,14 @@ func TestCopyContent_Identity_NoOp(t *testing.T) {
 	})
 }
 
-// TestCopyContent_Identity_ClearedAfterRotation is a Codex P2 finding: the
-// controller caches the resolved identity in c.identityResult (set via
-// SetIdentityIntent, core/app/intents.go, from a messages.IdentityLoaded
-// delivery) and clears it ONLY in handleActionOpenIdentity
-// (core/app/actions_view.go). handleActionSelectProfile/
-// handleActionSelectRegion rotate the session (which clears
-// Session.Identity) but never touch identityLoading/identityResult/
-// identityErrMsg — so CopyContent() on an already-open identity screen keeps
-// serving the PREVIOUS profile's ARN across a profile/region switch, until
-// the refetch eventually lands.
+// TestCopyContent_Identity_ClearedAfterRotation: the controller caches the
+// resolved identity in c.identityResult (set via SetIdentityIntent,
+// core/app/intents.go, from a messages.IdentityLoaded delivery).
+// handleActionSelectProfile/handleActionSelectRegion rotate the session
+// (which clears Session.Identity) and must also reset
+// identityLoading/identityResult/identityErrMsg, or CopyContent() on an
+// already-open identity screen keeps serving the PREVIOUS profile's ARN
+// across a profile/region switch until the refetch eventually lands.
 //
 // HandleProfileSelected's own intents are MenuClearAvailabilityIntent,
 // PopSelectorIntent, and a FlashIntent — PopSelectorIntent (core/app/
@@ -521,16 +519,14 @@ func TestCopyContent_NoOpScreens_ReturnEmpty(t *testing.T) {
 
 // ===========================================================================
 // 8. Concurrency — CopyContent() must be safe to call from multiple
-// goroutines. Codex P2 finding (core/app/copy.go): CopyContent() takes only
-// c.mu.RLock(), but its detail branch calls buildDetailBody ->
-// buildDetailFieldItems, which — whenever ds.Resource.AttentionDetails is
-// already a non-nil map — merges ds.AttentionDetails into it in place via
-// maps.Copy (detail_body.go). That merge MUTATES a map shared across every
-// call, the same class of builder-mutation snapshot.go's own doc comment
-// says requires the WRITE lock ("buildListBody ... may populate
+// goroutines. CopyContent() (core/app/copy.go) takes only c.mu.RLock(), and
+// its detail branch calls buildDetailBody -> buildDetailFieldItems, which —
+// whenever ds.Resource.AttentionDetails is already a non-nil map — merges
+// ds.AttentionDetails into it; that merge must not MUTATE a map shared
+// across every call, the same class of builder-mutation snapshot.go's own
+// doc comment says requires the WRITE lock ("buildListBody ... may populate
 // ListState.bodyMemo on a cache miss"). Concurrent CopyContent() calls on a
-// detail screen with pre-populated AttentionDetails therefore race on that
-// shared map.
+// detail screen with pre-populated AttentionDetails must not race.
 // ===========================================================================
 
 // wave4ConcurrentCopyResource carries a non-nil, non-empty AttentionDetails

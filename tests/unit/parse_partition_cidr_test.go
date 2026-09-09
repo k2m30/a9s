@@ -145,9 +145,8 @@ func parseEKSCluster(t *testing.T, publicAccess bool, cidrs []string) resource.R
 func TestEKSPublicEndpoint_OpenIsDecidedByThePrefixNotTheSpelling(t *testing.T) {
 	const openCode = domain.FindingCode("eks.public-endpoint")
 	const openPhrase = "cluster endpoint reachable from the internet"
-	// Inverted for the spec row that gave severity one owner: the scoped case
-	// is its own code, because it is its own tier and a code declares one.
-	// Do not restore a second severity under eks.public-endpoint.
+	// The scoped case is its own code, because it is its own tier and a code
+	// declares one severity.
 	const scopedCode = domain.FindingCode("eks.public-endpoint-restricted")
 	const scopedPhrase = "cluster endpoint reachable from listed networks"
 
@@ -229,9 +228,8 @@ func parseSGIngress(ipv4, ipv6 []string) ec2types.IpPermission {
 // rule permits.
 func TestSGInternetFacing_AnyZeroLengthPrefixIsTheInternet(t *testing.T) {
 	const code = domain.FindingCode("sg.ingress.dangerous-ports")
-	// Inverted for aws3 round 2's row on the sg port list: the declaration
-	// agrees its noun with the list it names, and this fixture opens one port.
-	// Do not restore the unconditional plural.
+	// The declaration agrees its noun with the list it names, and this
+	// fixture opens one port.
 	const phrase = "port 22 open to 0.0.0.0/0"
 
 	tests := []struct {

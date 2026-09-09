@@ -1,15 +1,13 @@
-// qa_load_more_dedup_test.go — RED pins for the load-more duplication defect (D13).
+// qa_load_more_dedup_test.go — load-more never duplicates a page (D13).
 //
-// Defect (observed live, TUI cold pilot): cold `:s3` open (fresh pair) lands
-// on page 1 (50 rows, truncated, NextToken="p2"). Pressing 'm' (load more)
-// appends a FULL DUPLICATE of page 1 instead of fetching page 2 — title
-// grows 50+ -> 100+, row IDs repeat consecutively, the More hint persists.
-// The persisted per-type cache file then carries Count:100 with only 50
-// distinct rows — a mismatched pair the persisted-pair invariant in
-// Core.SaveResourceListCache (core/runtime/probes.go) forbids.
+// A cold `:s3` open (fresh pair) lands on page 1 (50 rows, truncated,
+// NextToken="p2"). Pressing 'm' (load more) must fetch page 2, never append
+// a duplicate of page 1 (title 50+ -> 100+, repeated row IDs, More hint
+// persisting, and a persisted per-type cache file carrying Count:100 with
+// only 50 distinct rows — a mismatched pair the persisted-pair invariant in
+// Core.SaveResourceListCache, core/runtime/probes.go, forbids).
 //
-// A coder is root-causing the mechanism in parallel. These pins target the
-// symptom at four seams:
+// Four seams:
 //
 //  1. LoadMore_TUI_ColdOpen_NoDuplicates — real Bubble Tea Update loop, real
 //     'm' keypress through internal/tui/views/resourcelist.go's
@@ -324,16 +322,11 @@ func TestLoadMore_TokenPresent_AfterColdOpen(t *testing.T) {
 // Test 3 — headless append-dedup backstop.
 // ────────────────────────────────────────────────────────────────────────────
 
-// TestLoadMore_AppendDedup_Backstop pins the coder's ID-dedup backstop:
+// TestLoadMore_AppendDedup_Backstop pins the ID-dedup backstop:
 // Controller.ApplyResourcesLoaded(append=true) with rows whose IDs already
-// exist on the screen must not duplicate them. Drives the exact poisoning
-// shape observed live — page 1 landing, then an append call that (as if by
-// the load-more duplication bug) resends page 1's own rows instead of page 2's.
-//
-// RED today: core/app/list_body.go's applyResourcesLoaded appends
-// unconditionally (`ls.Rows = append(ls.Rows, resources...)`) with no ID
-// dedup, so a poisoned append lands 100 rows (50 originals + 50 duplicates)
-// instead of the intended distinct set.
+// exist on the screen must not duplicate them. Drives the poisoning shape a
+// load-more duplication would produce — page 1 landing, then an append call
+// that resends page 1's own rows instead of page 2's.
 func TestLoadMore_AppendDedup_Backstop(t *testing.T) {
 	tmp := t.TempDir()
 	t.Setenv("A9S_CONFIG_FOLDER", tmp)

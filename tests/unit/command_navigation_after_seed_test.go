@@ -1,16 +1,15 @@
-// command_navigation_after_seed_test.go — RED regression tests for the
-// navigation-race half of D11: `-p <profile> -c <type>` races the one-shot -c
-// navigation against the disk-cache ProbeResources seed. Today the
-// EmitNavigate task fires directly from handleClientsReadySuccess, before
-// handleAvailabilityCacheLoaded has had a chance to seed
-// session.ProbeResources from the on-disk per-type cache — so when the
-// adapter's navigation cmd wins the race, HandleNavigate sees an empty
-// ProbeResources map and pushes a bare Loading list with no title count.
+// command_navigation_after_seed_test.go — the navigation-race half of D11:
+// `-p <profile> -c <type>` must not race the one-shot -c navigation against
+// the disk-cache ProbeResources seed (an EmitNavigate fired straight from
+// handleClientsReadySuccess, before handleAvailabilityCacheLoaded has seeded
+// session.ProbeResources from the on-disk per-type cache, lets HandleNavigate
+// see an empty ProbeResources map and push a bare Loading list with no title
+// count).
 //
-// Target behavior (coder, in parallel): the one-shot -c navigation is armed
-// at ClientsReady (StackDepth==1 gate) but the actual EmitNavigate task is
-// emitted from handleAvailabilityCacheLoaded, AFTER ProbeResources seeding,
-// so a HandleNavigate driven by that task always sees a seeded cache entry.
+// The one-shot -c navigation is armed at ClientsReady (StackDepth==1 gate)
+// but the actual EmitNavigate task is emitted from
+// handleAvailabilityCacheLoaded, AFTER ProbeResources seeding, so a
+// HandleNavigate driven by that task always sees a seeded cache entry.
 // The demo / NoCache early-return path (handleAvailabilityPrefetched is
 // synchronous — there is no seed race to lose) keeps firing EmitNavigate
 // directly from handleClientsReadySuccess.

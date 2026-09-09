@@ -1,79 +1,50 @@
-// costs_screen_test.go — contract tests for the Cost Explorer domain
-// refactor (specs/021-cost-explorer/architecture.md). TDD compile-red: the
-// new package core/costs/screen does not exist yet, and core/costs
-// (existing) does not yet carry AnomalyResult/FetchResult/
-// Store.ApplyFetchResult/Money/TotalOutcome/SumCells/TrailingWindow/
-// WindowWithin. This whole test binary is expected to fail to compile until
-// the coder lands both. Per the dispatch: do NOT run `make test` against
-// this state.
+// costs_screen_test.go — contract tests for the Cost Explorer domain seams
+// (specs/021-cost-explorer/architecture.md).
 //
-// Package attribution (deduced from the doc's own type signatures, not
-// merely its package-layout intro, to avoid an import cycle):
-//   - core/costs (EXISTING, extended): AnomalyResult, FetchResult,
-//     (*Store).ApplyFetchResult, Money, TotalOutcome, SumCells,
-//     TrailingWindow, WindowWithin — BuildGrid (existing, core/costs)
-//     must call SumCells directly, and (*Store) methods must reference
+// Package attribution (from the doc's type signatures, to avoid an import
+// cycle):
+//
+//   - core/costs: AnomalyResult, FetchResult, (*Store).ApplyFetchResult,
+//     Money, TotalOutcome, SumCells, TrailingWindow, WindowWithin — BuildGrid
+//     calls SumCells directly, and (*Store) methods reference
 //     FetchResult/AnomalyResult directly; core/costs cannot import
-//     core/costs/screen (screen imports costs), so these types cannot
-//     live in screen without a cycle.
-//   - core/costs/screen (NEW): CoverageView, FetchPlan, PlanFetch,
-//     DrillPath, SelectOutcome (+ NoSelection/PushDrill/OpenResource/
-//     Refuse — NoSelection replaces the former WaitForRows/NoSelectableRow
-//     pair: the sole consumer (applyCostsSelect) always treated them
-//     identically, so the ponytail-review cut merged them into one outcome),
-//     ScreenState, GridRowRef, PeriodRef, Select, ResourceLocator,
-//     ViewModel, CursorPos, Viewport, BuildViewModel — the screen-level
-//     "what should happen"/"what should render" decisions the doc's intro
-//     describes moving out of core/app. InitOutcome (one-field bool
-//     ceremony wrapping Store.Recovered()) was cut by the same review —
-//     callers read Store.Recovered() directly now.
+//     core/costs/screen (screen imports costs), so these types cannot live
+//     in screen without a cycle.
 //
-// Speculative construction (the doc gives full field-level types for these
-// but no constructor/helper signatures — ScreenState/GridRowRef/PeriodRef
-// in particular are never typed in the doc beyond their use in Select's own
-// signature). Chosen minimally, directly from the doc's prose:
+//   - core/costs/screen: CoverageView, FetchPlan, PlanFetch, DrillPath,
+//     SelectOutcome (+ NoSelection/PushDrill/OpenResource/Refuse — the sole
+//     consumer, applyCostsSelect, treats a loading shape and an unresolved
+//     row identically, so both are NoSelection), ScreenState, GridRowRef,
+//     PeriodRef, Select, ResourceLocator, ViewModel, CursorPos, Viewport,
+//     BuildViewModel — the screen-level "what should happen"/"what should
+//     render" decisions. Callers read Store.Recovered() directly.
 //
-//	type ScreenState struct {
-//	    RowDim          costs.Dimension   // current frame's pivot/grouping dim
-//	    Path            screen.DrillPath  // ancestor dims already pinned (order only)
-//	    Filter          costs.Filter      // ancestor dims' actual pinned VALUES
-//	    Granularity     costs.Granularity // current frame granularity
-//	    Loading         bool              // shape in flight (blocks Select unconditionally —
-//	                                       // this is X7's fix: the old "blind chain" exclusion
-//	                                       // is gone, WaitForRows fires even for a just-pushed frame)
-//	    Now             time.Time
-//	    ResourceTypeFor func(service string) (shortName string, ok bool) // catalog lookup, injected for purity
-//	}
-//	type GridRowRef struct { Present bool; Value string }
-//	type PeriodRef struct { Period costs.Period }
+//     type ScreenState struct {
+//     RowDim          costs.Dimension   // current frame's pivot/grouping dim
+//     Path            screen.DrillPath  // ancestor dims already pinned (order only)
+//     Filter          costs.Filter      // ancestor dims' actual pinned VALUES
+//     Granularity     costs.Granularity // current frame granularity
+//     Loading         bool              // shape in flight (blocks Select unconditionally)
+//     Now             time.Time
+//     ResourceTypeFor func(service string) (shortName string, ok bool) // catalog lookup, injected for purity
+//     }
+//     type GridRowRef struct { Present bool; Value string }
+//     type PeriodRef struct { Period costs.Period }
 //
-// PushDrill.Granularity (added this round) — closes the "two homes"
-// duplication where core/app kept its own copy of finerGranularity to
-// set the pushed frame's Granularity, alongside Select's OWN internal
-// finerGranularity call that already built Window at that same step. Field
-// added directly to the existing PushDrill struct:
+// PushDrill.Granularity is set by Select, the one place the finer
+// granularity is decided, alongside the Window it builds at that same step:
 //
 //	type PushDrill struct { Dim costs.Dimension; Value string; Window []costs.Period; Granularity costs.Granularity }
 //
-// Seam 8 (CostsViewModel, added this round) speculative construction —
-// CursorPos/Viewport are named in the doc's BuildViewModel signature but
-// never typed beyond that. Chosen to carry exactly what the CURRENT adapter
-// mechanics being extracted need (core/app/costs_state.go's
+// Seam 8 (CostsViewModel): CursorPos/Viewport carry exactly what the adapter
+// mechanics need (core/app/costs_state.go's
 // liveCostGrid/costsVisibleColumnRange/costsGridCacheKey,
-// core/app/costs_body.go's buildCostsBody cursor-clamp block — read
-// directly to ground this hypothesis, not guessed from the doc's prose
-// alone):
+// core/app/costs_body.go's buildCostsBody cursor-clamp block):
 //
-//	type CursorPos struct { Row, Col int } // Col indexes VisibleCols directly
-//	                                        // post-clamp (unifies the old adapter's
-//	                                        // separate absolute cursorCol + relative
-//	                                        // relCursorCol into one valid index)
+//	type CursorPos struct { Row, Col int } // Col indexes VisibleCols directly post-clamp
 //	type Viewport struct { Cols int; ScrollX int } // Cols<=0 means "unsliced, show everything"
-//	                                                 // (ViewportCols<=0 fallback, costsVisibleColumnRange)
 //
-// If the coder's real shape differs, these tests are the negotiable part —
-// the outcome assertions (which fields, which values) are the contract; the
-// input-construction shape is this file's working hypothesis.
+// The outcome assertions (which fields, which values) are the contract.
 package unit_test
 
 import (
@@ -261,10 +232,7 @@ func (e *costsScreenTestError) Error() string { return e.msg }
 //
 // "skips pinned" is the X5 behavior: from usage-type pivot, USAGE_TYPE
 // pinned, drilled to SERVICE and pinned that too — Next() must not offer
-// USAGE_TYPE again. Production already carries this fix in costs.NextDim
-// (round of pins ago); this pins it green on the NEW seam once the coder
-// ports the algorithm — a passing result here is expected, not a
-// regression signal.
+// USAGE_TYPE again (the costs.NextDim algorithm on the DrillPath seam).
 // ===========================================================================
 
 func TestCostsScreen_DrillPath_Next(t *testing.T) {
@@ -314,21 +282,17 @@ func TestCostsScreen_DrillPath_Next(t *testing.T) {
 // ===========================================================================
 // Seam 4 — Select outcomes (core/costs/screen)
 //
-// Reconciles the X6/X7 codex pins where their mechanism moves into this
-// seam: X7 (fast Enter through a still-loading level pins an empty value)
-// is the "loading -> NoSelection" case (state.Loading now gates
-// UNCONDITIONALLY — the old "blind chain" exclusion this seam removes).
-// X6 (stale cursor beyond the filtered row count no-ops instead of
-// drilling the clamped row) is orthogonal to this seam — clamping happens
-// in the reducer BEFORE Select ever sees a row (per the doc's "Selection/
-// rendering single source" note), so X6 stays a controller-level pin: by
-// the time Select runs, row is already the clamped one.
+// A fast Enter through a still-loading level is the "loading -> NoSelection"
+// case (state.Loading gates UNCONDITIONALLY). A stale cursor beyond the
+// filtered row count is orthogonal to this seam — clamping happens in the
+// reducer BEFORE Select ever sees a row (per the doc's "Selection/rendering
+// single source" note), so that stays a controller-level pin: by the time
+// Select runs, row is already the clamped one.
 //
-// NoSelection (ponytail-review cut) replaces the former two-outcome
-// WaitForRows/NoSelectableRow pair — applyCostsSelect's own switch always
-// treated both as the identical no-op, so the two scenarios below assert
-// the SAME outcome type now; only the input (Loading vs an unresolved row)
-// still distinguishes them, kept for its own documentation value.
+// applyCostsSelect treats a loading shape and an unresolved row as the
+// identical no-op, so the two scenarios below assert the SAME outcome type
+// (NoSelection); only the input still distinguishes them, kept for its own
+// documentation value.
 // ===========================================================================
 
 // screenTestScreenState/screenTestGridRow/screenTestPeriodRef are this
@@ -417,11 +381,7 @@ func TestCostsScreen_Select_RowPresent_PushDrill_NonEmptyValue_WindowWithinSelec
 // pins the OTHER end of the finerGranularity chain the previous test covers
 // (month -> week): a year-granularity frame's PushDrill must report
 // GranularityMonth, with Window built at that same granularity — the one
-// place this decision is made, never re-derived by the caller (the "two
-// homes" duplication this pin closes: core/app used to keep its own
-// copy of finerGranularity to set the pushed frame's Granularity field,
-// even though Select already computed the equivalent chain step internally
-// to build Window).
+// place this decision is made, never re-derived by the caller.
 func TestCostsScreen_Select_RowPresent_PushDrill_Granularity_YearCellStepsToMonth(t *testing.T) {
 	now := fixedCostsNow
 	window := costs.BuildWindow(costs.GranularityYear, now)
@@ -618,10 +578,9 @@ func TestCostsScreen_TrailingWindow_AnchorAndNow_ClampCeilingComesFromNow(t *tes
 // Seam 5 — Money / TotalOutcome / SumCells (core/costs, extended:
 // BuildGrid, existing core/costs, must call SumCells directly)
 //
-// Absorbs the X8 pin at the domain level (a USD+EUR sum cannot leave the
-// domain layer as a bare number); the body-level X8 pin (costs_codex_test.go,
-// asserting the RENDERED note) stays as the controller/render acceptance
-// test.
+// A USD+EUR sum cannot leave the domain layer as a bare number; the
+// body-level pin (costs_codex_test.go, asserting the RENDERED note) covers
+// the controller/render half.
 // ===========================================================================
 
 func TestCostsScreen_SumCells_SingleUnit_TotalWithUnit(t *testing.T) {
@@ -645,19 +604,6 @@ func TestCostsScreen_SumCells_MixedUnits_NoTotalValueConsumed(t *testing.T) {
 		t.Error("SumCells over USD+EUR did not report Mixed=true")
 	}
 }
-
-// ===========================================================================
-// Seam 6 (init half) — InitOutcome DELETED (ponytail-review cut: one-field
-// bool ceremony wrapping Store.Recovered() with no logic of its own).
-// Callers read Store.Recovered() directly now — the real behavior pin lives
-// where the corrupt/alien-version recovery actually happens, over a REAL
-// Store: TestStore_CorruptYAML_RenamedToBakFreshStoreNoPanic and
-// TestStore_AlienVersion_RenamedToBakFreshStoreNoPanic (costs_store_test.go).
-// This file's own former InitOutcome test asserted nothing but a struct
-// literal's own field — a real coverage gap never opened by deleting it.
-// The controller-level X9 flash pin (costs_codex_test.go) stays unchanged
-// as the acceptance test that the flash actually renders.
-// ===========================================================================
 
 // ===========================================================================
 // Seam 8 — CostsViewModel / BuildViewModel (core/costs/screen)
@@ -850,13 +796,12 @@ func TestCostsScreen_BuildViewModel_RevisionBump_WithNewGrid_YieldsRebuiltResult
 
 // ---------------------------------------------------------------------------
 // 5. Honesty notes: the empty finer-grain note is sourced from the
-// ViewModel now (one source) — pinned for a grid with zero rows.  The
-// controller-level X11 pin (costs_codex_test.go) stays as the full-stack
-// acceptance test for the depth-gated ("not at root") refinement the
-// current adapter also applies; BuildViewModel's own pure signature (grid,
-// pivot, cursor, viewport, revision) carries no drill-depth input, so this
-// pins the seam's OWN observable contract: an empty grid produces a
-// non-empty, granularity-honest Note.
+// ViewModel (one source) — pinned for a grid with zero rows. The
+// controller-level pin (costs_codex_test.go) covers the depth-gated ("not at
+// root") refinement the adapter also applies; BuildViewModel's own pure
+// signature (grid, pivot, cursor, viewport, revision) carries no drill-depth
+// input, so this pins the seam's OWN observable contract: an empty grid
+// produces a non-empty, granularity-honest Note.
 // ---------------------------------------------------------------------------
 
 func TestCostsScreen_BuildViewModel_Note_EmptyFinerGrainHonesty(t *testing.T) {

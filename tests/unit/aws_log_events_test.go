@@ -146,17 +146,16 @@ func TestFetchLogEvents_APIError(t *testing.T) {
 
 // TestFetchLogEvents_StatusClassification verifies that event Status is classified
 // based on message content:
-// - Lines containing "ERROR", "FATAL", "Exception", "Traceback" → "ERROR"
+// - Lines containing "ERROR", "FATAL", "Exception", "Traceback" → "error"
 // - Lines containing "WARN" → "warn"
 // - Lines containing "REPORT" → "report"
 // - Lines containing "START" or "END" → "meta"
 // - All other lines → ""
 //
-// INVERTED for aws6 row 6 (one humanize owner): the class is a9s's OWN
-// judgement about the line, not a value CloudWatch returned, so it is written
-// in the words the status cell renders. The old UPPER-CASE expectations are
-// not to be restored — an all-caps token here is a9s writing an SDK-shaped
-// constant of its own and then having to translate it back on every surface.
+// The class is a9s's OWN judgement about the line, not a value CloudWatch
+// returned, so it is written in the words the status cell renders; an
+// all-caps token here would be a9s writing an SDK-shaped constant of its own
+// and then having to translate it back on every surface.
 func TestFetchLogEvents_StatusClassification(t *testing.T) {
 	mock := &mockCWLogsGetLogEventsClient{
 		output: &cloudwatchlogs.GetLogEventsOutput{

@@ -60,17 +60,10 @@ func newFetchOriginPinSession(t *testing.T) (*session.Session, *runtime.Core, *a
 // TestProbeEnrichment_FetchOriginRows_ReachesRealEnricher is the primary
 // pin: the exact `-c <type>` startup shape — a top-level list fetch stamps
 // OriginFetch on the type BEFORE the Wave-2 sweep's enrich task runs for it.
-//
-// Pre-fix (accessors.go @ 61c33e96): ProbeResources gates on
-// tr.Origin == OriginProbe || tr.Origin == OriginDisk, so an OriginFetch-only
-// entry never satisfies the gate; ProbeResources returns (nil, false) and
-// ProbeEnrichment's `resources, _ := c.ProbeResources(shortName)` feeds the
-// registered enricher a nil slice. This test's captureFn records len(rows),
-// so it FAILS (wantLen=1, got 0) against the pre-fix accessor.
-//
-// Post-fix: ProbeResources accepts any full-population origin (Disk, Probe,
-// or Fetch) and only excludes tr.Partial, so the fetch-origin row reaches
-// the enricher intact.
+// ProbeResources accepts any full-population origin (Disk, Probe, or Fetch)
+// and only excludes tr.Partial, so the fetch-origin row reaches the
+// enricher intact; a gate on OriginProbe || OriginDisk alone would feed the
+// registered enricher a nil slice. This test's captureFn records len(rows).
 func TestProbeEnrichment_FetchOriginRows_ReachesRealEnricher(t *testing.T) {
 	const sentinelType = "dbi-fetch-origin-enrich-pin"
 

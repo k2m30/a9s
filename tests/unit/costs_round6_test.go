@@ -1,18 +1,11 @@
-// costs_round6_test.go — Cost Explorer: external reviewer's fourth pass (6
-// findings) plus a live-reproduced state corruption (items 2/7) and a
-// mid-write spec amendment (item 9, display-level zero-row filtering).
+// costs_round6_test.go — Cost Explorer: six contract pins plus a state
+// corruption (items 2/7) and display-level zero-row filtering (item 9).
 //
 // package unit (not unit_test): item 2 needs the TUI key-routing helpers
 // (rootApplyMsg/rootKeyPress/newRootSizedModel, tui_root_test.go) which
 // only live in package unit — every other item reuses only EXPORTED
 // app/costs/runtime/aws surface, so it's cheaper to keep the whole file in
 // one package (local round6* helpers below) than to split it.
-//
-// Item 7 is NOT a red pin: my own scoring-time verification (a scratch
-// BuildGrid run against the reviewer's exact scenario) DISPROVED the
-// claimed NaN-demotion mechanism — see its doc comment. Kept as a cheap
-// GREEN regression pin per the coordinator's explicit instruction, since it
-// still guards the user-visible symptom the reviewer described.
 //
 // Item 1 is a static template-content check, not a template EXECUTION
 // test — see its doc comment for why (no exported web-render hook, zero
@@ -421,24 +414,17 @@ func TestCostsRound6_Item6_FooterSurvives_HeightBudget_WhenClipping(t *testing.T
 }
 
 // ===========================================================================
-// Item 7 (live repro) — row totals must treat missing cells as zero, never
-// NaN, so a row with real amounts in covered columns and no record for one
-// visible column keeps its real total and is never demoted below tiny
-// complete rows.
+// Item 7 — row totals must treat missing cells as zero, never NaN, so a row
+// with real amounts in covered columns and no record for one visible column
+// keeps its real total and is never demoted below tiny complete rows.
 //
-// GREEN BY DESIGN: verified during scoring, not merely assumed. I built
-// this exact scenario against the CURRENT BuildGrid (a scratch test,
-// discarded after running) and it already sorts correctly — the claimed
-// "NaN total" mechanism does not reproduce: a missing column's cellAgg is
-// the zero value (sum=0), never NaN; BuildGrid's per-row total is a plain
-// sum over every column, so a missing column simply contributes 0, and NaN
-// can only enter via a genuinely malformed Amount.Value (never produced on
-// this path — core/aws/costs.go's mapCEGroup hard-errors on an
-// unparseable amount rather than substituting NaN). Kept per the
-// coordinator's instruction as a cheap regression pin for the user-visible
-// symptom the reviewer described ("all-zero viewports on every pivot"),
-// since a future refactor of BuildGrid's total/sort math could reintroduce
-// it silently.
+// A missing column's cellAgg is the zero value (sum=0), never NaN; BuildGrid's
+// per-row total is a plain sum over every column, so a missing column simply
+// contributes 0, and NaN can only enter via a genuinely malformed
+// Amount.Value (never produced on this path — core/aws/costs.go's mapCEGroup
+// hard-errors on an unparseable amount rather than substituting NaN). A
+// refactor of BuildGrid's total/sort math that reintroduced NaN would show
+// as all-zero viewports on every pivot.
 // ===========================================================================
 
 func TestCostsRound6_Item7_MissingCellRow_SortsByRealTotal_GreenRegressionPin(t *testing.T) {
@@ -516,27 +502,18 @@ func TestCostsRound6_Item8_VersionOneFile_TreatedAsAlien_AfterSchemaBump(t *test
 }
 
 // ===========================================================================
-// Item 9 (NEW, mid-write spec amendment) — display-level zero-row filter:
-// a row whose every visible cell FORMATS as "0.0" (real sub-cent data that
-// rounds to zero at display precision) must not render — on any pivot
-// EXCEPT LINKED_ACCOUNT, where rows always show. Interaction with item 3:
-// the offsetting +100/-100 row still renders (its cells format non-zero:
-// "100.0"/"-100.0"); a row of sub-cent noise does not — pinned at the
-// CostsBody row level, one render-level absence check, and the
-// LINKED_ACCOUNT exemption.
-//
-// Reconciliation check performed: grepped every tests/unit/costs*.go file
-// for sub-$1 fractional Amount.Value literals — none exist. No existing
-// test seeds a sub-cent row and expects it rendered, so nothing needed
-// updating.
-//
-// RECONCILED (architecture.md Seam 8, CostsViewModel): this whole group's
-// mechanism — filterCostsZeroDisplayGridRows' sub-cent hide + the
-// LINKED_ACCOUNT exemption (core/app/costs_state.go's liveCostGrid) —
-// is pinned at the typed seam in costs_screen_test.go
-// (TestCostsScreen_BuildViewModel_DisplayFilter_SubCentHidden_
-// LinkedAccountExempt). These four tests stay unchanged as the full-stack
-// (controller -> CostsBody) acceptance pins.
+// Item 9 — display-level zero-row filter: a row whose every visible cell
+// FORMATS as "0.0" (real sub-cent data that rounds to zero at display
+// precision) must not render — on any pivot EXCEPT LINKED_ACCOUNT, where
+// rows always show. Interaction with item 3: the offsetting +100/-100 row
+// still renders (its cells format non-zero: "100.0"/"-100.0"); a row of
+// sub-cent noise does not — pinned at the CostsBody row level, one
+// render-level absence check, and the LINKED_ACCOUNT exemption. The
+// mechanism (filterCostsZeroDisplayGridRows' sub-cent hide + the
+// LINKED_ACCOUNT exemption, core/app/costs_state.go's liveCostGrid) is
+// pinned at the typed seam in costs_screen_test.go
+// (TestCostsScreen_BuildViewModel_DisplayFilter_SubCentHidden_LinkedAccountExempt);
+// these four tests pin the full stack (controller -> CostsBody).
 // ===========================================================================
 
 func TestCostsRound6_Item9_SubCentNoiseRow_HiddenAtDisplayLevel_DefaultPivot(t *testing.T) {

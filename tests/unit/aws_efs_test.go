@@ -1,7 +1,6 @@
 // aws_efs_test.go — Wave-1 fetcher behavioral tests for EFS file systems.
 //
-// Tests the CONTRACT from docs/historical/resources-impl-plans/efs-impl-plan.md §1, not the current
-// implementation. Phase 7 coder will make these pass.
+// Tests the CONTRACT from docs/historical/resources-impl-plans/efs-impl-plan.md §1.
 //
 // Covered invariants:
 //   - TEST: efs_available_silence (U1) — healthy baseline: Status="", Issues=nil, Fields["status"]="".

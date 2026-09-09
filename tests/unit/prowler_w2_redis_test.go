@@ -6,8 +6,8 @@ package unit
 //
 // All four are Wave-1 signals derived from the ReplicationGroup the fetcher
 // already holds, so the tests drive FetchRedisPage and read the findings off
-// the produced resource. That also pins that the fetcher passes the whole
-// replication group to the classifier rather than the four scalars it used to.
+// That also pins that the fetcher passes the whole replication group to the
+// classifier.
 
 import (
 	"context"

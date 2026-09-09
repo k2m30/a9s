@@ -2,9 +2,9 @@
 
 package unit
 
-// aws3_degraded_recovery_test.go — spec row 1 (task aws3): the finding a
-// Fields-only row recovers is the one whose CODE the row carries, never the
-// one whose rendered status text matches a phrase constant.
+// aws3_degraded_recovery_test.go — the finding a Fields-only row recovers is
+// the one whose CODE the row carries, never the one whose rendered status
+// text matches a phrase constant.
 
 import (
 	"errors"

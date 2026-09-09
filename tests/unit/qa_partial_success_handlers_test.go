@@ -59,7 +59,7 @@ func TestHandleAvailabilityChecked_PartialErrAppliesState(t *testing.T) {
 	}
 
 	// Dispatch the partial-success AvailabilityCheckedMsg.
-	// session.New seeds AvailabilityGen=1 (AS-659) — stamp the live value so
+	// session.New seeds AvailabilityGen=1 — stamp the live value so
 	// the AvailabilityChecked stale guard (AcceptZeroGen=false) accepts it.
 	m, cmd := rootApplyMsg(m, messages.AvailabilityChecked{
 		ResourceType: "ec2", // registered type so menu can track it

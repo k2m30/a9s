@@ -238,7 +238,7 @@ func TestResolveRelatedNavigate_FetchFilterHonoredForCtEvents(t *testing.T) {
 }
 
 // TestResolveRelatedNavigate_TargetIDCacheHitWinsOverFetchFilter pins the
-// precedence rule from issue #278: when an exact target is already known
+// precedence rule: when an exact target is already known
 // (TargetID is set and the resource is in the cache), the resolver must drill
 // in directly rather than run a filtered fetch, even if FetchFilter is also
 // present and the target type has a registered FilteredPaginatedFetcher.

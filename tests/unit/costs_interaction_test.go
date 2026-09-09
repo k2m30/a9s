@@ -1,28 +1,20 @@
-// costs_interaction_test.go — Cost Explorer interaction defects (D1-D5)
-// found via a live tmux smoke of ./a9s --demo, not covered by
-// costs_state_test.go/costs_body_test.go (which assert state fields but
-// never fetch dispatch or window anchoring). Contract sources:
+// costs_interaction_test.go — Cost Explorer interaction contracts (D1-D5),
+// not covered by costs_state_test.go/costs_body_test.go (which assert state
+// fields but never fetch dispatch or window anchoring). Contract sources:
 // specs/021-cost-explorer/spec.md FR-004/FR-005/FR-010/FR-011/FR-017,
-// data-model.md, and the current production code in
-// core/app/costs_state.go + core/costs/window.go.
-//
-// New API this file assumes (none of it exists on disk yet — the whole
-// file is a compile-red TDD pin until the coder adds it):
+// data-model.md, core/app/costs_state.go + core/costs/window.go.
 //
 //   - Controller.SetCostsViewportCols(n int) — the D4/D5 renderer-supplied
-//     visible-column-count seam, named and shaped after the existing
+//     visible-column-count seam, named and shaped after
 //     DetailState.ViewportHeight / Controller.SetDetailViewportHeight
-//     precedent (core/app/screenstate.go, core/app/detail_state.go).
-//     Reconciling CostsBody.ScrollX against CursorCol once ViewportCols is
-//     known mirrors detail_cursor.go's reconcileDetailScrollToCursor.
-//
-// Everything else (D1's fetch-task assertions via Controller.Apply's
-// existing []runtime.TaskRequest return, D2/D3's CostsBody/DrillLevel
-// field assertions) drives fixes into the EXISTING costs_state.go/
-// costs_body.go surface — runtime.KindFetchCosts and
-// runtime.FetchCostsPayload already exist (used today only by
-// HandleNavigate's initial NavigateTargetCosts dispatch); D1's job is
-// wiring the SAME mechanism into handleActionCostPivot/Metric/ZoomIn.
+//     (core/app/screenstate.go, core/app/detail_state.go). Reconciling
+//     CostsBody.ScrollX against CursorCol once ViewportCols is known mirrors
+//     detail_cursor.go's reconcileDetailScrollToCursor.
+//   - D1's fetch-task assertions go through Controller.Apply's
+//     []runtime.TaskRequest return: handleActionCostPivot/Metric/ZoomIn
+//     dispatch runtime.KindFetchCosts with a runtime.FetchCostsPayload, the
+//     same mechanism as HandleNavigate's initial NavigateTargetCosts
+//     dispatch. D2/D3 assert CostsBody/DrillLevel fields.
 package unit_test
 
 import (
@@ -416,16 +408,14 @@ func TestCostsInteraction_D3_DataThrough_StaysPinnedToLatestAcrossOutOfOrderFetc
 }
 
 // ===========================================================================
-// D4/D5 — horizontal window scroll
-//
-// RECONCILED (architecture.md Seam 8, CostsViewModel): the viewport-slice
-// mechanism this group exercises (costsVisibleColumnRange's [start,count)
-// window, ScrollX reconciliation) is now BuildViewModel's VisibleCols
-// output — pinned at the typed seam in costs_screen_test.go
-// (TestCostsScreen_BuildViewModel_ViewportSlice_AppliesScrollWindow). This
-// group (D4/D5's four tests, including TestRenderCosts_D4D5_
-// LabelColumnStaysWhileTimeColumnsShift below) stays as the full-stack
-// (controller -> render) acceptance pins.
+// D4/D5 — horizontal window scroll. The viewport-slice mechanism
+// (costsVisibleColumnRange's [start,count) window, ScrollX reconciliation) is
+// BuildViewModel's VisibleCols output, pinned at the typed seam in
+// costs_screen_test.go
+// (TestCostsScreen_BuildViewModel_ViewportSlice_AppliesScrollWindow); this
+// group (four tests, including
+// TestRenderCosts_D4D5_LabelColumnStaysWhileTimeColumnsShift below) pins the
+// full stack (controller -> render).
 // ===========================================================================
 
 func TestCostsInteraction_D4_ScrollRight_AdvancesWindowToNewestPeriod_ClampsThere(t *testing.T) {

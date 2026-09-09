@@ -110,15 +110,11 @@ func TestW4bWildcardTrustWitnessesUnchanged(t *testing.T) {
 // TestW4bPowerUserGroupIsNotAdminAttached pins the near-miss on the bench: a
 // group holding only PowerUserAccess is not an administrator.
 //
-// INVERTED by codex2 row 6 (Codex finding 8). This test used to assert the
-// opposite — that platform-engineers carries iam-group.admin-attached with a
-// "PowerUserAccess" Policy row — because PowerUserAccess was in the
-// admin-equivalent set. AWS's PowerUserAccess allows every action EXCEPT IAM,
-// Organizations and Account, so its holder can neither grant itself
-// permissions nor touch the account; flagging it reported every developer
-// group as an administrator. Do not restore the positive assertion. Whether
-// PowerUserAccess deserves a warn-tier finding of its own is a separate
-// product question, deliberately not answered here.
+// AWS's PowerUserAccess allows every action EXCEPT IAM, Organizations and
+// Account, so its holder can neither grant itself permissions nor touch the
+// account; flagging it would report every developer group as an
+// administrator. Whether PowerUserAccess deserves a warn-tier finding of its
+// own is a separate product question.
 func TestW4bPowerUserGroupIsNotAdminAttached(t *testing.T) {
 	rows, _ := w4bBench(t, "iam-group")
 	r := w4bRow(t, rows, fixtures.IAMGroupPowerUser)
@@ -130,11 +126,6 @@ func TestW4bPowerUserGroupIsNotAdminAttached(t *testing.T) {
 // TestW4bAdminAttachedWitnessIsTheOneAdminGroup pins that exactly one demo
 // group carries the finding and that its Policy row names the policy that
 // fired.
-//
-// INVERTED by codex2 row 6 (Codex finding 8): the want map used to hold a
-// second entry, platform-engineers -> PowerUserAccess. There is now one
-// administrator-equivalent AWS-managed policy, so there is one witness. Do
-// not restore the second entry.
 func TestW4bAdminAttachedWitnessIsTheOneAdminGroup(t *testing.T) {
 	rows, _ := w4bBench(t, "iam-group")
 	const code domain.FindingCode = "iam-group.admin-attached"

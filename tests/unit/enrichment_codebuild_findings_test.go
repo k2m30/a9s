@@ -126,11 +126,8 @@ func TestEnrichCodeBuildStatus_SummaryContainsDateAndStatus(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	// Inverted for the spec row that gave a wave-2 phrase one owner: the
-	// declared wording is "latest build <status>", so the build's end date is
-	// a supporting row rather than a second shape of the phrase. The old
-	// assertion described a wording no declaration carried when EndTime was
-	// nil; do not restore it.
+	// The declared wording is "latest build <status>", so the build's end date
+	// is a supporting row rather than a second shape of the phrase.
 	summary := result.Findings["proj-a"][0].Phrase
 	wantSummary := "latest build failed"
 	if summary != wantSummary {

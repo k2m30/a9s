@@ -106,19 +106,19 @@ func TestFetchACMCertificates_ParsesMultipleCertificates(t *testing.T) {
 	if r0.Fields["in_use"] != "true" {
 		t.Errorf("resource[0].Fields[\"in_use\"]: expected %q, got %q", "true", r0.Fields["in_use"])
 	}
-	// ISSUED certs now carry their expiry signal as a wave1 Finding
+	// ISSUED certs carry their expiry signal as a wave1 Finding
 	// (docs/attention-signals.md `acm` Wave 1: "NotAfter - now() < 30d ->
 	// Warning, < 7d -> Broken" — read straight off ListCertificates, zero
-	// extra calls; acm no longer has a Wave 2 IssueEnricher at all). This
+	// extra calls; acm has no Wave 2 IssueEnricher at all). This
 	// fixture's NotAfter (2026-06-15) is already in the past relative to
 	// "now", so it falls in the expired bucket: exactly 1 Finding,
 	// code "acm.expired", severity SevBroken.
 	if len(r0.Findings) != 1 {
 		t.Fatalf("resource[0].Findings: expected 1 (expires-critical) for an expired ISSUED cert, got %d: %v", len(r0.Findings), r0.Findings)
 	}
-	// Inverted for spec row "phrase": a cert past NotAfter carries its own code
-	// now, because "expired" and "expires in 3 days" are different things to do
-	// and one code cannot declare both wordings. Do not restore the old code.
+	// A cert past NotAfter carries its own code: "expired" and "expires in 3
+	// days" are different things to do, and one code cannot declare both
+	// wordings.
 	if r0.Findings[0].Code != "acm.expired" {
 		t.Errorf("resource[0].Findings[0].Code: expected %q, got %q", "acm.expired", r0.Findings[0].Code)
 	}

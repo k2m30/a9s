@@ -655,19 +655,10 @@ func TestTransferAgreementDetailEnrich_CertExpiry(t *testing.T) {
 
 // TestTransferAgreementDetailEnrich_As2IdVisibleInRenderedDetail verifies that
 // enrichTransferAgreement's resolved As2Id values actually reach the rendered
-// detail content, not just Resource.Fields.
-//
-// Regression origin: enrichTransferAgreement wrote the resolved As2Id into
-// Fields["local_profile"]/Fields["partner_profile"] while the Detail config
-// path was "LocalProfileId"/"PartnerProfileId", which fieldpath resolves to
-// the different key "local_profile_id"; the first fix wrote BOTH spellings.
-//
-// INVERTED for aws6 row 2 (one key per fact): the second spelling is deleted
-// and the Detail declares the surviving key directly, so the rendered path is
-// now "local_profile"/"partner_profile". The old "LocalProfileId" assertion
-// is NOT to be restored — restoring it would re-create the duplicate key
-// this row removed. What the test still pins is unchanged: the resolved
-// As2Id, not the bare profile id, reaches the render path.
+// detail content, not just Resource.Fields: the enricher writes
+// Fields["local_profile"]/Fields["partner_profile"] and the Detail declares
+// those keys directly (one key per fact), so the resolved As2Id, not the bare
+// profile id, reaches the render path.
 func TestTransferAgreementDetailEnrich_As2IdVisibleInRenderedDetail(t *testing.T) {
 	childShortName := transferAgreementsChildShortName(t)
 	enrich := resource.GetDetailEnricher(childShortName)
@@ -751,14 +742,12 @@ func newTestController(t *testing.T) *app.Controller {
 // `ApplyDetailEnrichmentForResource(msg.ResourceType, msg.ResourceID,
 // msg.EnrichedRes, ef, ad)`.
 //
-// Regression origin: primaryWave2Finding (internal/tui/app_enrich_fold.go)
-// used to only recognize findings whose Source has the "wave2:" prefix,
-// folding to a single worst one. The agreement's cert findings are Source
-// "wave1" (transfer_children.go's transferCertificateFinding), so it computed
-// (nil, nil) for this exact resource and neither cert finding — not even the
-// Broken "expired" one — reached ds.Findings, even though enriched.Findings
-// already held both. Fixed — this test pins that both findings survive the
-// same fold+apply sequence internal/tui's on-demand path actually runs.
+// primaryWave2Finding (internal/tui/app_enrich_fold.go) must recognize
+// findings whose Source is "wave1" (transfer_children.go's
+// transferCertificateFinding), not only the "wave2:" prefix, or neither cert
+// finding — not even the Broken "expired" one — would reach ds.Findings even
+// though enriched.Findings holds both. This pins that both findings survive
+// the same fold+apply sequence internal/tui's on-demand path runs.
 func TestTransferAgreementDetailEnrich_BothCertFindingsReachOpenDetailAttention(t *testing.T) {
 	childShortName := transferAgreementsChildShortName(t)
 	enrich := resource.GetDetailEnricher(childShortName)

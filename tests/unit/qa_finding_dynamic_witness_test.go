@@ -1,18 +1,18 @@
 // qa_finding_dynamic_witness_test.go — the DYNAMIC witness gate.
 //
-// OWNER GAP this test closes: the STATIC state-coverage gate
+// The STATIC state-coverage gate
 // (qa_demo_state_coverage_test.go, TestDemoStateCoverage_EveryDocumentedFindingHasAFixture)
 // only proves a (type, code) pair is either witnessed or explicitly
 // allowlisted as a known gap — it never separately reports, in one place,
-// the exact live census of every FindingDef that fires today. The user's
-// live AWS accounts don't contain every resource type or state; the demo
-// fixtures are the only bench he can use to see a finding actually fire.
-// Two proven live failures motivate this file:
-//   - elb.misconfigured passed the static gate's bookkeeping while never
-//     actually firing in demo mode: no DescribeLoadBalancerAttributes fake
-//     was wired, so the Wave-2 enricher had nothing to classify against.
-//   - dbc-snap rows rendered colored with NO finding behind them at all —
-//     a color/finding divergence the static gate does not check per-code.
+// the exact live census of every FindingDef that fires today. Live AWS
+// accounts don't contain every resource type or state; the demo fixtures
+// are the only bench an operator can use to see a finding actually fire.
+// Two failure shapes the static gate cannot see:
+//   - a code that passes the static gate's bookkeeping while never actually
+//     firing in demo mode (e.g. no DescribeLoadBalancerAttributes fake wired,
+//     so the Wave-2 enricher has nothing to classify against);
+//   - rows rendered colored with NO finding behind them at all — a
+//     color/finding divergence the static gate does not check per-code.
 //
 // This gate re-derives, from scratch, per (type, code): does at least one
 // demo fixture resource — after the exact same Wave-1-then-Wave-2 fold used
@@ -31,18 +31,9 @@
 //   - An allowlisted code that NOW fires dynamically fails with a "prune
 //     from allowlist" message — forces the fixture/fake fix and this list
 //     to land in the same PR.
-//   - An allowlisted code still unwitnessed is skipped (logged), pre-existing
+//   - An allowlisted code still unwitnessed is skipped (logged), known
 //     debt — this IS the burn-down deliverable: it names, per type, exactly
 //     which demo fake or fixture is missing.
-//
-// knownUnwitnessedFindings was seeded from a full census run at the END of
-// this file's authoring session. A parallel coder was, at that time, actively
-// wiring the elb DescribeLoadBalancerAttributes demo fake and the
-// dbc-snap/dbi-snap witnesses; two consecutive census runs against the live
-// working tree still showed all five of those codes failing dynamically, so
-// they are pinned below as honest, current debt rather than omitted — the
-// moment that fix lands, this gate flips those five to "PRUNE" failures,
-// forcing the allowlist entries out in the same PR as the fix.
 package unit_test
 
 import (

@@ -70,16 +70,10 @@ func TestLazyAdd_MissingFromCache_DedupsRepeatedIDsInChecker(t *testing.T) {
 			TargetType:       targetType,
 			DisplayName:      "Dedup Test Target",
 			NeedsTargetCache: false,
-			// NOTE (RelatedCheckResult migration): KnownRelated dedupes ids
-			// internally (domain.KnownRelated), so a checker can no longer
-			// return duplicate ResourceIDs at all — the raw ["idA","idA",
-			// "idB","idB","idA"] this test used to feed missingFromCache is no
-			// longer constructible. Deduped to the 2 unique IDs; Count()==2
-			// (not the original arbitrary Count:3, which relied on Count and
-			// ResourceIDs being independently settable — now structurally
-			// impossible, Count is always len(uniqueIDs)). This narrows what
-			// this test can prove: it no longer exercises missingFromCache's
-			// OWN dedup logic, since KnownRelated already deduped upstream.
+			// KnownRelated dedupes ids internally (domain.KnownRelated), so a
+			// checker cannot return duplicate ResourceIDs and Count is always
+			// len(uniqueIDs); this feeds the 2 unique IDs and does not exercise
+			// missingFromCache's own dedup.
 			Checker: func(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 				return resource.KnownRelated(targetType, []string{"idA", "idA", "idB", "idB", "idA"}, false)
 			},

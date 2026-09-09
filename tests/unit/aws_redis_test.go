@@ -422,7 +422,6 @@ func rgOutputMulti(rgs ...elasticachetypes.ReplicationGroup) *elasticache.Descri
 
 // TestRedis_Fetch_SkipsNonRedisEngines verifies that a Valkey RG is excluded
 // and only the Redis RG is returned. This is the regression pin for §0b.1.
-// EXPECTED FAIL until coder adds engine filter in FetchRedisPage.
 func TestRedis_Fetch_SkipsNonRedisEngines(t *testing.T) {
 	mock := &mockRedisRGClient{
 		output: rgOutputMulti(
@@ -453,7 +452,6 @@ func TestRedis_Fetch_SkipsNonRedisEngines(t *testing.T) {
 
 // TestRedis_Fetch_MemcachedEngineFiltered verifies that a Memcached RG is
 // excluded and only the Redis RG is returned.
-// EXPECTED FAIL until coder adds engine filter in FetchRedisPage.
 func TestRedis_Fetch_MemcachedEngineFiltered(t *testing.T) {
 	mock := &mockRedisRGClient{
 		output: rgOutputMulti(
@@ -484,7 +482,6 @@ func TestRedis_Fetch_MemcachedEngineFiltered(t *testing.T) {
 
 // TestRedis_Fetch_NilEngineFiltered verifies that a RG with Engine==nil is
 // treated as non-redis and dropped (defensive nil guard per §0b.1).
-// EXPECTED FAIL until coder adds engine filter in FetchRedisPage.
 func TestRedis_Fetch_NilEngineFiltered(t *testing.T) {
 	mock := &mockRedisRGClient{
 		output: rgOutputMulti(
@@ -568,7 +565,6 @@ func TestRedis_Fetch_SingleShardModifying_UsesRGPhrase(t *testing.T) {
 
 // TestRedis_Fetch_MultiShard_OneShardModifying verifies that a 3-shard RG with
 // only shard 0001 modifying emits a shard-scoped phrase.
-// EXPECTED FAIL until coder adds per-NodeGroup logic in computeRedisIssues.
 func TestRedis_Fetch_MultiShard_OneShardModifying(t *testing.T) {
 	mock := &mockRedisRGClient{
 		output: rgOutput(elasticachetypes.ReplicationGroup{
@@ -602,7 +598,6 @@ func TestRedis_Fetch_MultiShard_OneShardModifying(t *testing.T) {
 // with 0001 modifying and 0002 snapshotting emits the leading phrase with (+1).
 // Rule 7: top phrase is alphabetically first; hidden count is 1.
 // Alphabetical: "shard 0001: modifying" < "shard 0002: snapshotting".
-// EXPECTED FAIL until coder adds per-NodeGroup logic in computeRedisIssues.
 func TestRedis_Fetch_MultiShard_TwoShardsTransitioning(t *testing.T) {
 	mock := &mockRedisRGClient{
 		output: rgOutput(elasticachetypes.ReplicationGroup{
@@ -642,7 +637,6 @@ func TestRedis_Fetch_MultiShard_TwoShardsTransitioning(t *testing.T) {
 // TestRedis_Fetch_MultiShard_AllShardAvailableButRGModifying verifies that when
 // all NodeGroups are available but the RG itself reports Status=modifying, the
 // fetcher falls back to the RG-level phrase (transient state).
-// EXPECTED FAIL until coder adds the anyShard fallback in computeRedisIssues.
 func TestRedis_Fetch_MultiShard_AllShardAvailableButRGModifying(t *testing.T) {
 	mock := &mockRedisRGClient{
 		output: rgOutput(elasticachetypes.ReplicationGroup{
@@ -677,7 +671,6 @@ func TestRedis_Fetch_MultiShard_AllShardAvailableButRGModifying(t *testing.T) {
 // a shard-level phrase coexists with the multi-AZ without auto-failover warning.
 // Alphabetical: "multi-AZ without auto-failover" < "shard 0001: modifying"
 // ("multi" < "shard") → multi-AZ phrase is the top phrase; shard is hidden.
-// EXPECTED FAIL until coder adds per-NodeGroup logic in computeRedisIssues.
 func TestRedis_Fetch_MultiShard_ShardPlusMultiAZNoFailover(t *testing.T) {
 	mock := &mockRedisRGClient{
 		output: rgOutput(elasticachetypes.ReplicationGroup{

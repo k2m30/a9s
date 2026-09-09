@@ -1,9 +1,6 @@
 package unit
 
-// aws_eventbridge_pagination_test.go — Failing tests for EnrichEventBridgeRuleTargets pagination.
-//
-// These tests document the REQUIRED behavior after the coder implements
-// pagination for ListTargetsByRule.
+// aws_eventbridge_pagination_test.go — EnrichEventBridgeRuleTargets pagination.
 //
 // ListTargetsByRule uses the NextToken pagination pattern (up to 100 targets
 // per page). After full pagination, counts are exact. If pagination exceeds

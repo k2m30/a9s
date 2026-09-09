@@ -317,7 +317,7 @@ func TestQA_Secrets_ListColumnsFromTypeDef(t *testing.T) {
 		key   string
 	}{
 		{"Secret Name", 36, "secret_name"},
-		// w197: Status comes from the built-in view's list, folded into this one.
+		// Status comes from the built-in view's list, folded into this one.
 		{"Status", 10, "status"},
 		{"Description", 30, "description"},
 		{"Last Accessed", 18, "last_accessed"},

@@ -30,11 +30,8 @@ import (
 	"testing"
 )
 
-// knownSnapshotOrderDebt allowlists sites already reported/tracked outside
-// this gate (none as of this gate's introduction — Q4's own finding,
-// core/app/actions_list.go:170's forceRefreshCostsLocked call, and its
-// sibling activeListRefreshTasks call at line ~206, are both left
-// unallowlisted so the coder sees both go red until fixed).
+// knownSnapshotOrderDebt allowlists sites tracked outside this gate; a site
+// not listed here fails the gate.
 var knownSnapshotOrderDebt = map[string]bool{}
 
 // sodSite is one `return <snapshotCall>, <mutatingCall>[, ...]` statement

@@ -208,8 +208,6 @@ func TestEnrichECSServices_DeploymentRolloutFailedEmitsFinding(t *testing.T) {
 	if f.Severity != domain.SevBroken {
 		t.Errorf("severity = %v, want %v", f.Severity, "!")
 	}
-	// Inverted for spec row "phrase": the wording belongs to the code and the
-	// offending item is a supporting row. Do not restore the old assertion.
 	if want := catalog.Phrase("ecs-svc.deployment-failed"); f.Phrase != want {
 		t.Errorf("Phrase = %q, want the catalog's %q", f.Phrase, want)
 	}
@@ -241,10 +239,9 @@ func TestEnrichECSServices_APIErrorSetsTruncated(t *testing.T) {
 	if err == nil {
 		t.Fatal("enricher must surface a composite error when DescribeServices fails")
 	}
-	// INVERTED for the "skipped" spec row 6: the label was "ecs-svc-enrich:", which
-	// made the rendered line say the type twice ("enrich ecs-svc: DescribeServices ..."). The
-	// type comes from the registry key at the surface; the aggregate names
-	// the call. Do not restore the type in the label.
+	// The aggregate names the call, not the type: the type comes from the
+	// registry key at the surface, and a type in the label would render it
+	// twice ("enrich ecs-svc: ecs-svc: DescribeServices ...").
 	if errStr := err.Error(); !strings.Contains(errStr, "DescribeServices") {
 		t.Errorf("composite error must name the call, %q, got: %q", "DescribeServices", errStr)
 	}
@@ -448,9 +445,8 @@ func TestEnrichECSClusters_BatchErrorMarksRowsTruncatedIDsNotBadge(t *testing.T)
 	}
 
 	result, err := awsclient.EnrichECSClusters(context.Background(), clients, resources, nil)
-	// INVERTED for the "skipped" spec row 5: this required err == nil, which
-	// meant the row could render "?" with nothing in the error log to say what
-	// refused. The call that failed is recorded now. Do not restore.
+	// The call that failed is recorded, so the row never renders "?" with
+	// nothing in the error log to say what refused.
 	if err == nil {
 		t.Fatal("a failed per-resource call returned no error — the reason never reaches the log")
 	}
@@ -547,8 +543,6 @@ func TestEnrichECSTasks_TaskFailedToStartEmitsFinding(t *testing.T) {
 	if f.Severity != domain.SevBroken {
 		t.Errorf("severity = %v, want %v", f.Severity, "!")
 	}
-	// Inverted for spec row "phrase": the wording belongs to the code and the
-	// offending item is a supporting row. Do not restore the old assertion.
 	if want := catalog.Phrase("ecs-task.task-failed"); f.Phrase != want {
 		t.Errorf("Phrase = %q, want the catalog's %q", f.Phrase, want)
 	}
@@ -826,10 +820,9 @@ func TestEnrichCFNStackEvents_APIErrorSetsPerResourceTruncation(t *testing.T) {
 	if err == nil {
 		t.Fatal("enricher must surface a composite error when DescribeStackEvents fails")
 	}
-	// INVERTED for the "skipped" spec row 6: the label was "cfn-enrich:", which
-	// made the rendered line say the type twice ("enrich cfn: DescribeStackEvents ..."). The
-	// type comes from the registry key at the surface; the aggregate names
-	// the call. Do not restore the type in the label.
+	// The aggregate names the call, not the type: the type comes from the
+	// registry key at the surface, and a type in the label would render it
+	// twice ("enrich cfn: cfn: DescribeStackEvents ...").
 	if errStr := err.Error(); !strings.Contains(errStr, "DescribeStackEvents") {
 		t.Errorf("composite error must name the call, %q, got: %q", "DescribeStackEvents", errStr)
 	}
@@ -921,19 +914,12 @@ var _ awsclient.ELBv2API = (*fakeELBEnricher)(nil)
 // EnrichELBAttributes
 // =============================================================================
 
-// TestEnrichELBAttributes_BothMisconfigurations_TildeFinding pins the CURRENT
-// (correct) contract: a load balancer missing both deletion protection and
-// access logging still produces only a "~" (SevWarn) finding, per commit
-// 8555b124 ("elb enricher stops promoting warn to broken") — both flags
-// missing at once is the AWS create-load-balancer default and must not
-// escalate to SevBroken (see EnrichELBAttributes' own doc comment in
-// core/aws/elb_issue_enrichment.go), or every freshly-created,
-// unhardened LB would render red.
-//
-// RETIRED the old "both-missing promotion rule" invariant this test used to
-// pin (TestEnrichELBAttributes_BothMisconfigurations_BangFinding): that
-// promotion was deliberately removed in 8555b124, predating this task —
-// this test was simply never updated to match.
+// TestEnrichELBAttributes_BothMisconfigurations_TildeFinding: a load balancer
+// missing both deletion protection and access logging produces only a "~"
+// (SevWarn) finding — both flags missing at once is the AWS
+// create-load-balancer default and must not escalate to SevBroken (see
+// EnrichELBAttributes' own doc comment in core/aws/elb_issue_enrichment.go),
+// or every freshly-created, unhardened LB would render red.
 func TestEnrichELBAttributes_BothMisconfigurations_TildeFinding(t *testing.T) {
 	lbARN := "arn:aws:elasticloadbalancing:us-east-1:123456789012:loadbalancer/app/my-lb/abc"
 	fake := &fakeELBEnricher{
@@ -1108,8 +1094,6 @@ func TestEnrichEBEnvironmentHealth_CausesEmitsTildeFinding(t *testing.T) {
 	if f.Severity != domain.SevWarn {
 		t.Errorf("severity = %v, want %v", f.Severity, "~")
 	}
-	// Inverted for spec row "phrase": the wording belongs to the code and the
-	// offending item is a supporting row. Do not restore the old assertion.
 	if want := catalog.Phrase("eb.environment-causes"); f.Phrase != want {
 		t.Errorf("Phrase = %q, want the catalog's %q", f.Phrase, want)
 	}
@@ -1142,9 +1126,8 @@ func TestEnrichEBEnvironmentHealth_APIErrorMarksRowTruncatedIDNotBadge(t *testin
 	}
 
 	result, err := awsclient.EnrichEBEnvironmentHealth(context.Background(), clients, resources, nil)
-	// INVERTED for the "skipped" spec row 5: this required err == nil, which
-	// meant the row could render "?" with nothing in the error log to say what
-	// refused. The call that failed is recorded now. Do not restore.
+	// The call that failed is recorded, so the row never renders "?" with
+	// nothing in the error log to say what refused.
 	if err == nil {
 		t.Fatal("a failed per-resource call returned no error — the reason never reaches the log")
 	}

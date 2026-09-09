@@ -175,10 +175,8 @@ func TestRelated_Kinesis_Lambda_Found(t *testing.T) {
 // lambdaEventSourceMappingLambdaCheck): a ListEventSourceMappings-confirmed
 // FunctionArn that is NOT the one resolved in a non-truncated lambda
 // ResourceCache is not dropped — it is still counted via the bare function
-// name parsed from its own ARN. Renamed from
-// TestRelated_Kinesis_Lambda_NotFound (pre-fix behavior asserted a
-// definitive Count=0 here; the API result is authoritative regardless of
-// cache membership).
+// name parsed from its own ARN: the API result is authoritative regardless
+// of cache membership.
 func TestRelated_Kinesis_Lambda_MappedFnNotInCache_FallsBackToARNBareName(t *testing.T) {
 	const streamARN = "arn:aws:kinesis:us-east-1:123456789012:stream/clickstream-ingest"
 	const mappedFnArn = "arn:aws:lambda:us-east-1:123456789012:function:process-clickstream"
@@ -503,9 +501,9 @@ func TestRelated_Kinesis_CFN_NoTag(t *testing.T) {
 // has its KeyId extracted and returned as Count=1. "alias/aws/kinesis/mrk-abc1234"
 // is a bare alias name (no "arn:aws:kms:...:alias/" prefix for
 // kmsKeyIDFromField's ":alias/" strip to match), so it must pass through
-// WHOLE — including the embedded "aws/kinesis/" segment. Splitting on the
-// last "/" (the pre-fix behavior) would truncate this to "mrk-abc1234",
-// discarding a real, meaningful part of the alias name.
+// WHOLE — including the embedded "aws/kinesis/" segment; splitting on the
+// last "/" would truncate this to "mrk-abc1234", discarding a real part of
+// the alias name.
 func TestRelated_Kinesis_KMS_Present(t *testing.T) {
 	const streamName = "clickstream-ingest"
 

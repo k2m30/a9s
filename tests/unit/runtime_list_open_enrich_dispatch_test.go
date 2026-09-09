@@ -48,8 +48,7 @@ func listOpenEnrichHasTask(xs []runtime.TaskRequest, k runtime.TaskKind, scope s
 
 // findWave2TypeShortName returns the ShortName of the first catalog entry
 // whose Wave2 field is non-nil AND awsclient.Wave2EnricherFor confirms it via
-// HasIssueEnricher, per the dispatch's "verify via HasIssueEnricher"
-// instruction. Fails the test immediately if none exists (would mean the
+// HasIssueEnricher. Fails the test immediately if none exists (would mean the
 // whole pin is meaningless).
 func findWave2TypeShortName(t *testing.T, core *runtime.Core) string {
 	t.Helper()

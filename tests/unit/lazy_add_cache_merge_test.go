@@ -257,7 +257,7 @@ func collectECSTaskCacheViaChecker(t *testing.T, _ tui.Model, source resource.Re
 func TestLazyAdd_NoEntry_CreatesTruncatedEntry(t *testing.T) {
 	m, efsSource := setupLiveModeEFSDetail(t)
 
-	// replayRelatedCache's per-def completeness check (#261 Codex P1) matches
+	// replayRelatedCache's per-def completeness check matches
 	// cache entries against resource.GetRelated(rt) by DefDisplayName, not by
 	// TargetType alone — use the real "ecs-task" def's own DisplayName rather
 	// than a guessed literal, so this fixture stays correct if the catalog

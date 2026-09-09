@@ -35,14 +35,13 @@ import (
 const raceProbeChildName = "qa-race-probe-child"
 
 // TestTypeLookupIsSafeBesideATestRegistration runs the two production readers
-// the acceptance trace names — awsclient.Wave2EnricherFor directly, and
-// runtime.Core.HasIssueEnricher, which is what reaches it from the cache-writer
-// goroutine — against a concurrent stream of test registrations.
+// — awsclient.Wave2EnricherFor directly, and runtime.Core.HasIssueEnricher,
+// which is what reaches it from the cache-writer goroutine — against a
+// concurrent stream of test registrations.
 //
 // Meaningful under -race only; without it the read and the write simply
-// interleave and nothing reports. `make test-race` is where this pin speaks,
-// and it is the same shape as the failure acceptance reproduced 8 times out of
-// 8: SetChildTypeForTest writing the map while HasIssueEnricher reads it.
+// interleave and nothing reports. `make test-race` is where this pin speaks:
+// SetChildTypeForTest writing the map while HasIssueEnricher reads it.
 func TestTypeLookupIsSafeBesideATestRegistration(t *testing.T) {
 	core := runtime.New(session.New(), nil)
 

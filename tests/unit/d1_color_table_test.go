@@ -3,12 +3,10 @@ package unit
 // d1_color_table_test.go — the shared oracle for the per-type status→colour
 // tables.
 //
-// Those tables used to construct a bare Fields map and ask the classifier what
-// colour it produced. d1 made colour derive from findings, so the mapping they
-// pin now runs status → the type's findings predicate → severity → colour. The
-// input becomes an SDK struct fed through the type's fetcher, and the expected
-// colour is computed here from the severity rather than asked of the classifier
-// under test.
+// Colour derives from findings, so the mapping those tables pin runs status →
+// the type's findings predicate → severity → colour. The input is an SDK
+// struct fed through the type's fetcher, and the expected colour is computed
+// here from the severity rather than asked of the classifier under test.
 
 import (
 	"testing"

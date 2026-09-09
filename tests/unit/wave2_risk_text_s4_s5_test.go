@@ -1,59 +1,32 @@
 package unit
 
-// wave2_risk_text_s4_s5_test.go — RED (TDD) tests for the Wave-2 "risk text"
-// framework: domain.Finding.Detail (S5 operator sentence) + the list-view S4
-// override that shows the finding's concrete Phrase in the Status/lifecycle
-// column instead of the raw AWS state.
+// wave2_risk_text_s4_s5_test.go — the Wave-2 "risk text" framework:
+// domain.Finding.Detail (S5 operator sentence) + the list-view S4 override
+// that shows the finding's concrete Phrase in the Status/lifecycle column
+// instead of the raw AWS state.
 //
-// Bugs pinned by this file (see docs/resources/<sn>.md §4 for each type):
-//   (3) A flagged LIST row shows no cause text — the Status column keeps the
-//       raw AWS state/lifecycle value even when an issue-severity Finding
-//       exists for that row's enrichment-map entry.
-//   (4) domain.Finding exposes only Phrase (a short S4 cause) — there is no
-//       S5 "concrete operator sentence" field, so the detail Attention
-//       section can only ever show the short phrase, never the full remedy
-//       sentence the spec calls for.
-//
-// Expected fix (implemented by a9s-coder, NOT in this file):
-//   - core/domain/finding.go: Finding gains `Detail string` (S5 sentence;
+// Contract (see docs/resources/<sn>.md §4 for each type):
+//   - core/domain/finding.go: Finding carries `Detail string` (S5 sentence;
 //     empty ⇒ render falls back to Phrase, no stray blank line).
-//   - core/app/list_columns.go (listExtractCellValue) and/or
+//   - core/app/list_columns.go (listExtractCellValue) and
 //     internal/tui/views/resourcelist.go (renderListDataRow): when a row's
 //     enrichment-map Finding (delivered via SetEnrichmentState /
 //     GetListEnrichmentFindings, see core/app/list_filter.go
 //     applyEnrichmentState) is issue-severity (SevWarn/SevBroken), the
-//     Status/lifecycle cell must show that Finding's Phrase — not just a
-//     glyph prefix on the identity column (no glyph prefix is produced any more).
+//     Status/lifecycle cell shows that Finding's Phrase — there is no glyph
+//     prefix on the identity column.
 //   - core/app/detail_body.go (buildAttentionSectionDetail): each Attention
-//     entry must render both the short Phrase line (capitalized for display)
+//     entry renders both the short Phrase line (capitalized for display)
 //     AND — on lines of its own below it — the full Detail sentence, wrapped
 //     to the panel, falling back to Phrase alone when Detail == "".
-//
-// RED classification:
-//   - Tests #2 and #3 (detail S5) are COMPILE-RED right now: domain.Finding
-//     has no Detail field, so `domain.Finding{..., Detail: "..."}` fails to
-//     compile until the coder adds the field.
-//   - Test #1 (list S4) is LOGIC-RED: it compiles today (Finding literals use
-//     only existing fields) but fails at assertion time because
-//     SetEnrichmentState's findings map never reaches listExtractCellValue —
-//     it only drives the "! "/"~ " glyph prefix on the identity column, per
-//     resolveListRowSeverity (core/app/list_columns.go) and
-//     buildMarkerModel-style harnesses (see qa_enrichment_marker_test.go).
-//   - Tests #5-#7 (s3/ec2/dbi exemplars, driven through the real Wave-2
-//     enrichers) are COMPILE-RED for the same reason as #2/#3 (they assert
-//     on Finding.Detail) AND LOGIC-RED even post-compile-fix: none of
-//     EnrichS3Posture, EnrichEC2InstanceStatus, EnrichDBIMaintenance
-//     (core/aws/*.go) call setWave2Finding with a Detail argument; ec2's
-//     enricher additionally emits "system status: impaired" (built from
-//     strings.ToLower(row.Label)+": "+row.Value) instead of the §4-mandated
-//     "impaired: system checks failing", and dbi's enricher emits the
-//     buzzword Phrase "pending maintenance" instead of the §4-mandated
-//     "maintenance scheduled".
-//   - Test #4 (logs, driven through the real Wave-1 fetcher
-//     FetchCloudWatchLogGroupsPage) was LOGIC-RED independent of the Detail
-//     field: the fetcher did not classify retention-nil into a
-//     domain.Finding at all, it only stored a number. It classifies it now,
-//     and stores the policy in words under Fields["retention"].
+//   - Tests #5-#7 drive the real Wave-2 enrichers (EnrichS3Posture,
+//     EnrichEC2InstanceStatus, EnrichDBIMaintenance in core/aws/*.go), which
+//     pass a Detail argument to setWave2Finding; ec2's phrase is the
+//     §4-mandated "impaired: system checks failing", dbi's is "maintenance
+//     scheduled".
+//   - Test #4 drives the real Wave-1 fetcher FetchCloudWatchLogGroupsPage,
+//     which classifies retention-nil into a domain.Finding and stores the
+//     policy in words under Fields["retention"].
 
 import (
 	"context"
@@ -117,14 +90,10 @@ var _ awsclient.CWLogsDescribeLogGroupsAPI = (*logsRetentionNilFake)(nil)
 // TestWave2_Logs_RetentionNil_PinsS4S5Strings drives the real
 // FetchCloudWatchLogGroupsPage fetcher against a log group with
 // RetentionInDays == nil and asserts the resulting resource carries a
-// Finding with the exact §4-mandated Phrase and Detail.
-//
-// It was LOGIC-RED regardless of the Detail field: FetchCloudWatchLogGroupsPage
-// (core/aws/cwlogs.go) did not classify retention-nil into a domain.Finding at
-// all, so the resource came back with zero Findings and the Wave-1
-// classification had to be added before the Detail string could be pinned.
-// Both exist now: the fetcher emits the finding and writes the policy in words
-// ("never expire", "<N> days") under Fields["retention"].
+// Finding with the exact §4-mandated Phrase and Detail. The fetcher
+// (core/aws/cwlogs.go) classifies retention-nil into a domain.Finding and
+// writes the policy in words ("never expire", "<N> days") under
+// Fields["retention"].
 func TestWave2_Logs_RetentionNil_PinsS4S5Strings(t *testing.T) {
 	fake := &logsRetentionNilFake{logGroupName: "/aws/lambda/never-expire-fn"}
 
@@ -161,10 +130,6 @@ func TestWave2_Logs_RetentionNil_PinsS4S5Strings(t *testing.T) {
 // configuration (reusing s3PABFake from aws_s3_issue_enrichment_test.go, the
 // existing sibling test's fake for this exact enricher) and asserts the exact
 // §4-mandated Phrase and Detail.
-//
-// COMPILE-RED: domain.Finding has no Detail field yet, and
-// EnrichS3Posture's setWave2Finding call site has no Detail
-// argument to populate one even after the field exists.
 func TestWave2_S3_PABIncomplete_PinsS4S5Strings(t *testing.T) {
 	fake := &s3PABFake{
 		configs: map[string]*s3.GetPublicAccessBlockOutput{
@@ -221,10 +186,6 @@ var _ awsclient.EC2API = (*ec2ImpairedFake)(nil)
 // EnrichEC2InstanceStatus enricher against an instance with
 // SystemStatus.Status == impaired and asserts the exact §4-mandated Phrase
 // and Detail.
-//
-// COMPILE-RED: domain.Finding has no Detail field yet, and
-// EnrichEC2InstanceStatus's setWave2Finding call site has no Detail argument
-// to populate one even after the field exists.
 func TestWave2_EC2_SystemStatusImpaired_PinsS4S5Strings(t *testing.T) {
 	fake := &ec2ImpairedFake{
 		statuses: []ec2types.InstanceStatus{
@@ -276,15 +237,6 @@ func TestWave2_EC2_SystemStatusImpaired_PinsS4S5Strings(t *testing.T) {
 //     fixtures.NewDBIFixtures() PendingMaintenanceActions fixture used by
 //     aws_dbi_issue_enrichment_test.go's TestDBI_Enrich_MaintenancePending_HealthyRow):
 //     "Pending maintenance action overdue: system-update (New minor engine patch 16.2.3)."
-//
-// NOTE: today's EnrichDBIMaintenance emits the buzzword Phrase
-// "pending maintenance" (see dbi_issue_enrichment.go setWave2Finding call),
-// not the §4-mandated "maintenance scheduled" — this is bug (4) concretely
-// pinned for dbi.
-//
-// COMPILE-RED: domain.Finding has no Detail field yet.
-// LOGIC-RED (post-compile-fix): the enricher's Phrase text and missing
-// Detail argument both need coder changes.
 // ---------------------------------------------------------------------------
 
 type dbiMaintOverdueFake struct {

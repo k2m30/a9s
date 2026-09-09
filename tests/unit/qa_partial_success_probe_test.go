@@ -175,7 +175,7 @@ func TestProbeEnrichment_PartialSuccess(t *testing.T) {
 		{ID: "res-pe-002", Name: "res-pe-002"},
 	}
 	// Deliver AvailabilityCheckedMsg to seed probeResources[shortName].
-	// session.New seeds AvailabilityGen=1 (AS-659) — stamp the live value so
+	// session.New seeds AvailabilityGen=1 — stamp the live value so
 	// the AvailabilityChecked stale guard (AcceptZeroGen=false) accepts it.
 	// availTotal=0 → availChecked(1) >= 0 → finalize → startEnrichment.
 	_, enrichCmd := rootApplyMsg(m, messages.AvailabilityChecked{

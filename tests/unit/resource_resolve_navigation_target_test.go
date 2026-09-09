@@ -8,8 +8,6 @@ import (
 
 // TestResolveNavigationTarget validates that ResolveNavigationTarget correctly
 // looks up both top-level resource types and child types by short name.
-// These tests intentionally FAIL against the stub implementation (which always
-// returns "", false, false). They pass only once the coder fills in the body.
 func TestResolveNavigationTarget(t *testing.T) {
 	cases := []struct {
 		name        string

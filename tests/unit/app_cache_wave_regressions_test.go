@@ -1,7 +1,4 @@
-// app_cache_wave_regressions_test.go — regression pins for the Codex+
-// CodeRabbit fix wave on core/app (branch feat/cache).
-//
-// Covers:
+// app_cache_wave_regressions_test.go — three core/app invariants.
 //
 //  1. Non-destructive refresh (C8): ActionRefresh over a list with rows
 //     already on screen must keep Loading=false/Rows intact immediately
@@ -9,15 +6,9 @@
 //  2. Truncated disk seed shows N+ (C1/C5): a warm list open seeded from a
 //     disk cache TypeFile whose Count is a truncated lower bound must render
 //     the "N+" title / HasPagination=true BEFORE any refetch lands.
-//  3. Badge fallback (S1 regression): a row whose td.ResolveColor is
-//     an issue color but whose ONLY finding is a non-badge Wave-2 "~"
-//     (SevWarn) finding must still count in listIssueCount/GetListIssueCount
-//     — gating the color check on len(r.Findings)==0 undercounts any row
-//     that carries ANY finding, badge or not.
-//
-// All tests are hermetic: A9S_CONFIG_FOLDER redirected to t.TempDir() where
-// disk state is involved, no AWS credentials, no network. Fake resource IDs
-// only.
+//  3. Badge (S1): a row whose ONLY finding is a non-badge Wave-2 "~"
+//     (SevWarn) finding does not count in listIssueCount/GetListIssueCount,
+//     so the list frame title matches the menu badge's unifiedIssueCount.
 package unit_test
 
 import (
@@ -177,21 +168,12 @@ func TestWarmListOpen_TruncatedDiskSeed_ShowsNPlus_BeforeRefetch(t *testing.T) {
 // Test 10 — S1 badge fallback: color-issue row with only a non-badge finding
 // ────────────────────────────────────────────────────────────────────────────
 
-// TestGetListIssueCount_ColorIssueRow_OnlyNonBadgeFinding_StillCounted pins
-// the S1 badge fallback regression: an ec2 row whose td.ResolveColor(r)
-// resolves to an issue color (state="stopped" -> ColorBroken, per colorEC2)
-// but whose ONLY finding is a non-badge Wave-2 "~" (SevWarn) finding — which
-// listHasBadgeFinding correctly does NOT count as a badge finding — must
-// STILL be counted via the td.ResolveColor(r).IsIssue() fallback. Gating
-// that fallback on len(r.Findings)==0 (the pre-fix behavior) undercounts any
-// row carrying ANY finding at all, badge or not, even though the row's own
-// color is independently an issue.
-// A row whose ONLY finding is a non-badge Wave-2 "~" (SevWarn) must NOT bump the
+// TestGetListIssueCount_ColorIssueRow_OnlyNonBadgeFinding_NotCounted: a row
+// whose ONLY finding is a non-badge Wave-2 "~" (SevWarn) must NOT bump the
 // issue count: per docs/attention-signals.md S1 "~ findings do not bump", and
 // colorEC2 is colorFromAnyFinding-only (it does not read Fields["state"]), so
 // once runtime.Wave1Only strips the lone Wave-2 warn no issue signal remains.
-// This is the reversal of the former any-finding-counts behavior — the list frame title now
-// matches the menu badge's unifiedIssueCount exactly.
+// The list frame title then matches the menu badge's unifiedIssueCount.
 func TestGetListIssueCount_LoneWave2Warn_NotCounted(t *testing.T) {
 	_, ctrl := newLiveWebStyleController(t, "", "us-east-1")
 

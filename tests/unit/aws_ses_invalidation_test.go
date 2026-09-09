@@ -11,16 +11,6 @@
 // concurrent callers of SESActiveReceiptRuleSetForTest (which delegates to the
 // unexported sesActiveReceiptRuleSet) result in exactly 1 upstream API call when
 // singleflight is in place.
-//
-// NOTE TO CODER: This test requires the following exported test helper to be added
-// to core/aws/ses_related.go (or a new ses_related_export_test.go file):
-//
-//	// SESActiveReceiptRuleSetForTest is a test-only export of sesActiveReceiptRuleSet.
-//	func SESActiveReceiptRuleSetForTest(ctx context.Context, c *ServiceClients) (*ses.DescribeActiveReceiptRuleSetOutput, error) {
-//	    return sesActiveReceiptRuleSet(ctx, c)
-//	}
-//
-// The test will fail to compile until this export exists.
 package unit_test
 
 import (
@@ -357,19 +347,15 @@ func TestSESRuleSetSwap_LateWriterDoesNotPoisonNewStore(t *testing.T) {
 // ---------------------------------------------------------------------------
 // PIN 3 — singleflight coalescing of concurrent sesActiveReceiptRuleSet callers
 // ---------------------------------------------------------------------------
-// Pre-fix: two concurrent callers both observe a cache miss and both invoke
-// DescribeActiveReceiptRuleSet. When one succeeds and the sibling transiently
-// fails (throttle / 5xx), the failing checker returns State: RelatedError even though the
-// cache now holds the successful result.
-//
-// Post-fix: singleflight ensures exactly one upstream call is issued; all
-// concurrent waiters share the single result.
+// Two concurrent callers observing a cache miss must not both invoke
+// DescribeActiveReceiptRuleSet: when one succeeds and the sibling transiently
+// fails (throttle / 5xx), the failing checker would return State:
+// RelatedError even though the cache now holds the successful result.
+// singleflight issues exactly one upstream call; all concurrent waiters share
+// the single result.
 //
 // This test calls the unexported sesActiveReceiptRuleSet via the exported
-// test wrapper SESActiveReceiptRuleSetForTest. The coder MUST add that
-// wrapper to core/aws/ses_related.go (see the package-level NOTE at the
-// top of this file). Until the wrapper exists the test fails to compile —
-// that IS the intended red light for Plan B.
+// test wrapper SESActiveReceiptRuleSetForTest (core/aws/ses_related.go).
 
 // atomicBlockingSESV1 is a goroutine-safe SES v1 mock that:
 //   - counts calls atomically
@@ -400,12 +386,6 @@ var _ awsclient.SESV1API = (*atomicBlockingSESV1)(nil)
 // TestSESActiveReceiptRuleSet_Singleflight_CoalescesConcurrentMisses verifies
 // that N concurrent callers of sesActiveReceiptRuleSet result in exactly 1
 // upstream API invocation when singleflight coalescing is in place.
-//
-// Expected red light (pre-fix): a.calls == 5 (one per goroutine) — the assertion
-// `a.calls.Load() == 1` fires, failing the test.
-//
-// Expected green light (post-fix): a.calls == 1; all goroutines received the
-// same successful output.
 func TestSESActiveReceiptRuleSet_Singleflight_CoalescesConcurrentMisses(t *testing.T) {
 	const N = 5
 
@@ -540,22 +520,20 @@ func (c *ctxAwareSESV1) DescribeActiveReceiptRuleSet(
 var _ awsclient.SESV1API = (*ctxAwareSESV1)(nil)
 
 // TestSESActiveReceiptRuleSet_Singleflight_LeaderCancelDoesNotPoisonFollower
-// is the regression pin for the ctx-coupling bug introduced in PR #307.
+// pins ctx decoupling in the singleflight.
 //
 // The invariant pinned here is: a follower goroutine with a long-lived ctx
 // must succeed even when the singleflight leader's ctx is canceled before
 // the upstream API call completes.
 //
-// Regarding call count: we accept 1 or 2 upstream calls. A correct fix may
-// either (a) detach the fetcher from the leader's ctx so the single in-flight
-// call completes for everyone (1 call), or (b) retry with a context-independent
-// ctx when the leader's ctx fires (2 calls). Both are valid — we pin only the
-// follower-success invariant, not the exact implementation strategy.
+// Call count: 1 or 2 upstream calls are both correct — the fetcher may
+// detach from the leader's ctx so the single in-flight call completes for
+// everyone (1 call), or retry with a context-independent ctx when the
+// leader's ctx fires (2 calls). Only the follower-success invariant is
+// pinned.
 //
-// Leader outcome (errA): NOT asserted strictly. Depending on the fix, the leader
-// may receive context.Canceled (if it cancelled before the API responded) or a
-// successful result (if the fix retries on a background ctx and shares the result).
-// Leader's outcome is an impl-detail; follower's success is the regression pin.
+// Leader outcome (errA) is not asserted: the leader may receive
+// context.Canceled or a successful result shared from a background retry.
 func TestSESActiveReceiptRuleSet_Singleflight_LeaderCancelDoesNotPoisonFollower(t *testing.T) {
 	ruleSetOutput := &ses.DescribeActiveReceiptRuleSetOutput{
 		Rules: []sestypes.ReceiptRule{
@@ -739,7 +717,7 @@ func TestSESActiveReceiptRuleSet_NilResultIsNotCached(t *testing.T) {
 	if out2 != nil {
 		t.Fatalf("call 2: expected nil output, got %v", out2)
 	}
-	// REGRESSION PIN: pre-fix mock.calls == 1 (sticky nil); post-fix mock.calls == 2.
+	// A nil result is not sticky: the second call reaches the mock.
 	if got := mock.calls.Load(); got != 2 {
 		t.Errorf("mock.calls = %d, want 2 — nil result was cached as a success (sticky nil regression)", got)
 	}

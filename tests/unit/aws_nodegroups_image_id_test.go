@@ -213,13 +213,12 @@ func TestFetchNodeGroups_ImageIDEmptyWhenLaunchTemplateResolveFails(t *testing.T
 
 	pf := resource.GetPaginatedFetcher("ng")
 	result, err := pf(context.Background(), &awsclient.ServiceClients{EKS: eksFull, EC2: ltFake}, "")
-	// INVERTED for runtime8 row 15. This required err == nil, which read the
-	// refused DescribeLaunchTemplateVersions as nothing at all: the row landed
-	// with a blank image_id an operator cannot tell from a template that
-	// declares no image. Non-fatal is still non-fatal — the node group is
-	// emitted, asserted below — but the refusal is now carried out in the
-	// fetcher's partial-failure aggregate, which is what every other per-item
-	// call in this fetcher already does. Do not "restore" the nil error.
+	// A refused DescribeLaunchTemplateVersions is carried in the fetcher's
+	// partial-failure aggregate, like every other per-item call in this
+	// fetcher; a nil error would read the refusal as nothing at all, and the
+	// row would land with a blank image_id an operator cannot tell from a
+	// template that declares no image. Non-fatal is still non-fatal — the node
+	// group is emitted, asserted below.
 	if err == nil {
 		t.Fatal("the refused launch-template read is not carried out of the fetcher, so the blank " +
 			"image_id below reads as a node group whose template declares no image")
@@ -275,7 +274,7 @@ func TestFetchNodeGroups_UsesDefaultVersionWhenVersionIsEmpty(t *testing.T) {
 	ltFake := &fakeEC2DescribeLaunchTemplateVersions{
 		EC2Fake: fakes.NewEC2(),
 		outputs: map[string]*ec2.DescribeLaunchTemplateVersionsOutput{
-			// The coder must call with Versions=["$Default"] when Version is nil
+			// The fetcher calls with Versions=["$Default"] when Version is nil
 			"lt-002:$Default": {
 				LaunchTemplateVersions: []ec2types.LaunchTemplateVersion{
 					{

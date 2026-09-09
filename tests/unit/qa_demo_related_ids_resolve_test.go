@@ -29,19 +29,15 @@
 // what you can actually open" — a strictly worse user experience, so it does
 // not get a grace period.
 //
-// INVERTED for aws6 row 8, and narrowly. Exactly one witnessed ID is expected
-// NOT to resolve, and it is REQUIRED to be present: a demo role attaches
-// fixtures.RetiredManagedPolicyName, a policy AWS has retired, so the
-// attachment survives on the role while GetPolicy answers NoSuchEntity.
-//
-// That is not the defect this gate hunts. The lie is a FIXTURE gap — the demo
-// referencing something it never modelled — and the operator sees a count with
-// nothing behind it. Here the name came from the role's OWN attachment list,
-// which is what AWS itself reports, and the aggregate says which id it could
-// not read. Dropping the name instead would render the role's attachments one
-// row short with no sign anything was missing.
-//
-// The exception is not an allowlist: it names one id, and it goes red if that
+// Exactly one witnessed ID is expected NOT to resolve, and it is REQUIRED to
+// be present: a demo role attaches fixtures.RetiredManagedPolicyName, a
+// policy AWS has retired, so the attachment survives on the role while
+// GetPolicy answers NoSuchEntity. That is not the defect this gate hunts:
+// the lie is a FIXTURE gap, and here the name came from the role's OWN
+// attachment list, which is what AWS itself reports, and the aggregate says
+// which id it could not read. Dropping the name instead would render the
+// role's attachments one row short with no sign anything was missing. The
+// exception is not an allowlist: it names one id, and it goes red if that
 // id ever starts resolving or stops being witnessed, so it cannot quietly
 // widen to cover a real orphan.
 package unit_test

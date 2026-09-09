@@ -96,7 +96,7 @@ func w4EnrichKMS(t *testing.T, fake *w4KMSFake, rs []resource.Resource) awsclien
 }
 
 // w4EnrichKMSErr is w4EnrichKMS for the case that expects a refusal: a key
-// policy the role may not read is a recorded failure ("skipped" spec row 5).
+// policy the role may not read is a recorded failure.
 func w4EnrichKMSErr(t *testing.T, fake *w4KMSFake, rs []resource.Resource) (awsclient.IssueEnricherResult, error) {
 	t.Helper()
 	clients := &awsclient.ServiceClients{KMS: fake, Region: "us-east-1"}
@@ -162,8 +162,8 @@ func TestW4KMSPolicyFetchFailureIsUnknown(t *testing.T) {
 		w4KMSResource(w4KMSPublicKeyID, "alias/acme-shared-key", kmstypes.KeyManagerTypeCustomer),
 	})
 
-	// INVERTED for the "skipped" spec row 5: the helper failed the test on any
-	// error, so a refused key policy was marked "?" and never explained.
+	// A helper that failed the test on any error would leave a refused key
+	// policy marked "?" and never explained.
 	if err == nil {
 		t.Error("a refused GetKeyPolicy returned no error")
 	}

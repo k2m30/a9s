@@ -860,8 +860,8 @@ func TestWithDetailOp_DifferentOperations_BothExecuteIndependently(t *testing.T)
 // structural guarantee coalesce.go's doc comment describes: a refresh begins
 // a brand-new operation — a new ID, a new namespace — so it is structurally
 // unable to join whatever pre-refresh call is still in flight under the old
-// ID. No Forget call is involved (unlike the deleted bypass mechanism this
-// test replaces): the namespaces simply never collide, so the new
+// ID. No Forget call is involved: the namespaces simply never collide, so
+// the new
 // operation's call executes immediately rather than waiting for the older,
 // still-blocked one to complete.
 func TestWithDetailOp_NewOperationNeverJoinsOlderOperationsInFlightCall(t *testing.T) {

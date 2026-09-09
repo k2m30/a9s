@@ -21,17 +21,13 @@ import (
 
 // --- row 44: a canonical sequence for a lane that is not canonical ---------
 
-// TestStampListFetchSeq_EveryLaneTakesItsOwnScreensSequence is row 44's rule
-// re-stated for the key runtime8 row 4 moved the guard to.
-//
-// INVERTED for runtime8 row 4. It used to require that ONLY the canonical lane
-// draws a sequence, because one counter served the whole type and a drill
-// drawing from it superseded the canonical refresh in flight. The counter is
-// now keyed by the issuing screen, so a drill's sequence orders the drill's own
-// requests and reaches no other screen — every lane draws one, and the lane is
-// not consulted at all. What decides is whether a screen owns the task. Do not
-// "restore" the lane test: with the per-screen key it would leave every drill
-// unable to order its own two refreshes, which is the defect row 4 fixes.
+// TestStampListFetchSeq_EveryLaneTakesItsOwnScreensSequence: the sequence
+// counter is keyed by the issuing screen, so a drill's sequence orders the
+// drill's own requests and reaches no other screen — every lane draws one,
+// and the lane is not consulted at all. What decides is whether a screen
+// owns the task; a counter shared across the type would let a drill
+// supersede the canonical refresh in flight, and a lane test would leave
+// every drill unable to order its own two refreshes.
 func TestStampListFetchSeq_EveryLaneTakesItsOwnScreensSequence(t *testing.T) {
 	b := newWipfixBench(t)
 

@@ -1,8 +1,6 @@
-// costs_review_findings_test.go — Cost Explorer: 7 defects found by an
-// external code review of the committed Phase-1/2 costs code, each
-// independently verified against current code before being scoped here.
-// Contract: specs/021-cost-explorer/data-model.md (updated Filter with
-// NotEquals), spec.md FR-011/FR-016/FR-017.
+// costs_review_findings_test.go — Cost Explorer: 7 contract pins.
+// Contract: specs/021-cost-explorer/data-model.md (Filter with NotEquals),
+// spec.md FR-011/FR-016/FR-017.
 //
 // package unit (not unit_test): finding #3 needs the full TUI Model
 // (newRootSizedModel/rootApplyMsg/assertStackInSync, all package-unit-only)
@@ -12,19 +10,16 @@
 // costs_interaction_test.go's unit_test helpers, to avoid implying they are
 // the same functions across packages.
 //
-// New API this file assumes (none of it exists on disk yet):
-//   - costs.Filter.NotEquals map[Dimension][]string (finding #5) — data-model.md
-//     was just updated to add this to the Filter contract.
-//   - messages.CostsLoaded.Gen domain.Gen (finding #7) — named field only;
-//     the GenStamp()/GenAspect()/AcceptZeroGen() methods and the
-//     messages.IsStale guard in handle.go's CostsLoaded case are the coder's
-//     wiring, following the IdentityError precedent this file does not
-//     itself need to reference.
-//
-// Everything else drives fixes into EXISTING surface: core/costs/store.go
-// (#1), core/runtime/executor.go's KindFetchCosts case (#2),
-// internal/tui/app_input.go's generic Esc path (#3), core/app/costs_state.go
-// (#4, #6), core/aws/costs.go's buildFilterExpression (#5).
+// Surface:
+//   - costs.Filter.NotEquals map[Dimension][]string (#5).
+//   - messages.CostsLoaded.Gen domain.Gen (#7) with the
+//     GenStamp()/GenAspect()/AcceptZeroGen() methods and the messages.IsStale
+//     guard in handle.go's CostsLoaded case, following the IdentityError
+//     precedent.
+//   - core/costs/store.go (#1), core/runtime/executor.go's KindFetchCosts
+//     case (#2), internal/tui/app_input.go's generic Esc path (#3),
+//     core/app/costs_state.go (#4, #6), core/aws/costs.go's
+//     buildFilterExpression (#5).
 package unit
 
 import (

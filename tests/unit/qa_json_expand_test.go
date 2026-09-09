@@ -296,12 +296,11 @@ func TestQA_JSONExpand_JSONView_NotAffected(t *testing.T) {
 // so expandJSONItems never runs on CT events. Uses a real cloudtrailtypes.Event
 // with a CloudTrailEvent JSON payload containing embedded JSON in RequestParameters.
 //
-// Retargeted (wave3 detail-family cleanup round 4, specs/022-codebase-cleanup)
-// off views.NewDetail(...).View() onto the live Controller.EnsureDetailState +
-// NewTransientDetail.RenderDetail seam. Not a duplicate of wave3_detail_ports_
-// test.go's Test_CTEvents_LiveProjector_SectionHeadersPresentInOrder: that
-// test pins section ORDER via a minimal fixture with no embedded JSON: this one
-// pins the distinct "requestParameters.policy embedded JSON string is not
+// Drives the live Controller.EnsureDetailState + NewTransientDetail.RenderDetail
+// seam. Not a duplicate of detail_ports_test.go's
+// Test_CTEvents_LiveProjector_SectionHeadersPresentInOrder: that test pins
+// section ORDER via a minimal fixture with no embedded JSON; this one pins
+// the distinct "requestParameters.policy embedded JSON string is not
 // exploded into sub-fields by expandJSONItems" no-crash contract.
 func TestQA_JSONExpand_CloudTrail_OutOfScope(t *testing.T) {
 	ctJSON := `{"eventVersion":"1.08","eventSource":"s3.amazonaws.com","eventName":"PutObject","requestParameters":{"bucketName":"my-bucket","key":"data.json","policy":"{\"Version\":\"2012-10-17\"}"},"responseElements":null}`

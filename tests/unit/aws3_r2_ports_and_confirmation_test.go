@@ -2,10 +2,11 @@
 
 package unit
 
-// aws3_r2_ports_and_confirmation_test.go — task aws3 round 2. Three facts that
-// were each computed from a rendered sentence or spelled twice: the port list
-// a security group leaves open, the number agreement in a phrase declared with
-// a bare "(s)", and whether an SNS endpoint confirmed its subscription.
+// aws3_r2_ports_and_confirmation_test.go — three facts that are each read
+// from their field rather than computed from a rendered sentence or spelled
+// twice: the port list a security group leaves open, the number agreement in
+// a phrase declared with a bare "(s)", and whether an SNS endpoint confirmed
+// its subscription.
 
 import (
 	"context"
@@ -77,10 +78,9 @@ func TestSGPublishesItsOpenPortsAsAField(t *testing.T) {
 }
 
 // TestEC2ExposureReadsThePortListNotTheSentence rewords the cached group's
-// risk_summary and reads the instance's exposure finding back intact. The
-// cross-ref used to recover the ports by cutting that sentence around the
-// declared phrase, so a reworded phrase answered "no ports" and the instance
-// went quiet.
+// risk_summary and reads the instance's exposure finding back intact: the
+// cross-ref reads the port list, not the sentence, so a reworded phrase does
+// not answer "no ports" and silence the instance.
 func TestEC2ExposureReadsThePortListNotTheSentence(t *testing.T) {
 	const id = "i-0exposed0aaaaaa2"
 	sgRows := aws3FetchSGs(t, aws3SG("sg-0mongo000aaaaaa2", 27017, 27017))

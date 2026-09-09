@@ -3,15 +3,14 @@ package unit_test
 // wave2_clear_preserves_wave1_attention_test.go — the wave-2 CLEAR paths, the
 // sibling class of the wave-2 FOLD.
 //
-// ApplyWave2ToRow was fixed to drop only the entries keyed by outgoing wave-2
-// findings. Three other sites do the same job — strip wave-2 findings from a
-// row before a refresh — and each still pairs that strip with
-// `AttentionDetails = nil`, destroying the wave-1 supporting rows the fetcher
-// alone can produce. The fold is correct and the clear is not, so a Ctrl+R
-// reintroduces exactly the defect acceptance rejected.
+// ApplyWave2ToRow drops only the entries keyed by outgoing wave-2 findings.
+// Three other sites do the same job — strip wave-2 findings from a row
+// before a refresh — and must not pair that strip with
+// `AttentionDetails = nil`, which destroys the wave-1 supporting rows the
+// fetcher alone can produce, so that a Ctrl+R loses them.
 //
-// All three should route through runtime.ApplyWave2ToRow with nil findings and
-// nil details: that call already means "drop the wave-2 slice, keep the rest"
+// All three route through runtime.ApplyWave2ToRow with nil findings and nil
+// details: that call already means "drop the wave-2 slice, keep the rest"
 // and is pinned by TestApplyWave2ToRow_EmptyResultKeepsWave1.
 
 import (

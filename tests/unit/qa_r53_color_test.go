@@ -1,19 +1,14 @@
 package unit
 
-// qa_r53_color_test.go — a zone's record count no longer colours its row.
+// qa_r53_color_test.go — a zone's record count does not colour its row.
 //
-// INVERTED for batch w6a, the same way qa_acm_color_test.go, qa_cf_color_test.go
-// and qa_logs_color_test.go were. This table used to assert the record_count
-// branch in r53Color: <= 2 records rendered ColorWarning. That branch was a
-// second read of a fact the row already carried — r53CodeUnusedZone fires on
-// the same condition over the same data — so a zone could be coloured for a
-// reason no finding named and the detail view never showed. Colour now derives
-// from findings only, and a resource carrying none is Healthy whatever its
-// fields say.
-//
-// The counts are kept as the enumeration of what must no longer colour a row on
-// its own. Do not "restore" the old wants — a raw-field branch coming back is
-// exactly what this now catches.
+// A record_count branch in r53Color would be a second read of a fact the row
+// already carries — r53CodeUnusedZone fires on the same condition over the
+// same data — so a zone could be coloured for a reason no finding named and
+// the detail view never showed. Colour derives from findings only, and a
+// resource carrying none is Healthy whatever its fields say. The counts are
+// the enumeration of what must not colour a row on its own, so a raw-field
+// branch is what this catches.
 
 import (
 	"testing"
@@ -50,12 +45,9 @@ func TestR53Color(t *testing.T) {
 			if tc.recordCount != "" {
 				fields["record_count"] = tc.recordCount
 			}
-			// Each case asserts its own want again. w6a made the driver demand
-			// Healthy for all of them, on the reading that a colour with no
-			// finding behind it is a colour nobody can explain. w29 converted
-			// this classifier: the fields reach the type's own predicate, which
-			// produces the finding, so the colour the table always named is the
-			// one the row now carries for a reason the detail view shows.
+			// The fields reach the type\'s own predicate, which produces the
+			// finding, so the colour the table names is one the row carries for a
+			// reason the detail view shows.
 			got := td.Color(resource.Resource{Fields: fields})
 			if got != tc.want {
 				t.Errorf("Color(record_count=%q) = %v, want %v", tc.recordCount, got, tc.want)

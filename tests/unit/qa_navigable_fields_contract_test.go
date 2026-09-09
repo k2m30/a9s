@@ -3,24 +3,17 @@ package unit
 // qa_navigable_fields_contract_test.go — per-resource-type navigable-field
 // contract.
 //
-// This file is NOT a PR #273 regression pin. It surfaced accidentally
-// during PR #273 review as a fundamental gap in the detail view's
-// navigable-field coverage: SetNavigableFieldsForTest entries had drifted
-// away from the AWS API cross-references that should drive them.
-//
-// The detail view (DetailModel) underlines fields that are registered via
+// The detail view underlines fields that are registered via
 // resource.SetNavigableFieldsForTest so the user can press Enter and jump to
 // a filtered list of the target resource type. Any cross-reference that
 // AWS exposes on the list/describe response and that a9s already knows how
 // to browse as its own resource type MUST be navigable — otherwise the
 // user sees the value printed but has no way to drill into it.
 //
-// The user's screenshot for a VPC Endpoint detail view showed VpcId
-// rendered as navigable (good) but SubnetIds, NetworkInterfaceIds, and
-// Groups[].GroupId printed as plain sub-list items with no navigable
-// affordance — all three fields are registered AWS cross-references to
-// other a9s-browseable types. That shape of gap exists across multiple
-// resource types today.
+// A VPC Endpoint detail that renders VpcId as navigable but SubnetIds,
+// NetworkInterfaceIds and Groups[].GroupId as plain sub-list items with no
+// navigable affordance is the shape of gap this contract closes — all three
+// fields are registered AWS cross-references to other a9s-browseable types.
 //
 // Contract: navigableContracts lists, for every registered shortName, the
 // AWS API response field paths that MUST be navigable and the target

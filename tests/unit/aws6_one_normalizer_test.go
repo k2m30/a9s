@@ -65,12 +65,9 @@ func TestOneNormalizerFoldsEverySpelling(t *testing.T) {
 // view file: the cell the bench renders and the cell an installation renders
 // are the same cell.
 //
-// They were resolved by two different rules. ResolveListColumnCascade merged
-// the catalog's Key onto the view's columns only when no config was loaded,
-// and returned a loaded file verbatim otherwise — so the demo bench, which is
-// what acceptance looks at, read cells by one rule and every real user by
-// another. A defect could therefore be invisible on the bench and on screen
-// for everyone, which is what cb's Source Type was.
+// The demo bench, which is what acceptance looks at, and an installation
+// with a loaded view file must read cells by one rule; otherwise a defect
+// can be invisible on the bench and on screen for everyone.
 //
 // The comparison needs no second opinion about which spelling is right: a
 // column that renders one thing under the built-in defaults and another under
@@ -130,13 +127,13 @@ func TestAnOperatorsOwnViewFileRendersTheSameCells(t *testing.T) {
 	}
 }
 
-// TestLambdaListShowsItsHandler pins row 17. The catalog declares a Handler
-// column and the shipped view file did not, and the view owns which columns
-// there are — so the column existed on the bench, which resolved its own set,
-// and on no operator's screen.
+// TestLambdaListShowsItsHandler: the catalog declares a Handler column and the
+// shipped view file must declare it too, since the view owns which columns
+// there are — otherwise the column exists on the bench, which resolves its own
+// set, and on no operator's screen.
 //
-// Whether a column list should have two owners at all is backlog w197. What
-// this pins is that the two agree for lambda.
+// This pins only that the two agree for lambda, not whether a column list
+// should have two owners at all.
 func TestLambdaListShowsItsHandler(t *testing.T) {
 	byType, _ := buildVisibilityTypeCache(t)
 	rows := byType["lambda"]

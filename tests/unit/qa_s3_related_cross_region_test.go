@@ -1,9 +1,9 @@
 package unit_test
 
-// qa_s3_related_cross_region_test.go — AS-489 regression: the four S3 related-def
-// checkers that issue a per-bucket S3 API call (checkS3CFN → GetBucketTagging,
-// checkS3KMS → GetBucketEncryption, checkS3Logs → GetBucketLogging,
-// checkS3Role → GetBucketPolicy) must NOT bubble PermanentRedirect (301) or
+// qa_s3_related_cross_region_test.go — the four S3 related-def checkers that
+// issue a per-bucket S3 API call (checkS3CFN → GetBucketTagging, checkS3KMS →
+// GetBucketEncryption, checkS3Logs → GetBucketLogging, checkS3Role →
+// GetBucketPolicy) must NOT bubble PermanentRedirect (301) or
 // IllegalLocationConstraintException (400) up as a State: RelatedError result.
 // Both codes indicate the configured S3 client's region differs from the target
 // bucket's region — a legitimate environmental condition on multi-region
@@ -11,14 +11,9 @@ package unit_test
 // ("0+"), preserving the existing RelatedError (resource.ErrorRelated) contract
 // for genuine failures (e.g. AccessDenied).
 //
-// Discovery: `TestLiveFullIntegration_AllResourcesBaseline/s3` failed on a live
-// account containing buckets in eu-west-2 + ap-south-1; opening any related-pivot
-// on the out-of-region bucket emitted State: RelatedError and the related panel showed no
-// count for the affected pivot.
-//
-// Pattern A precedent: see s3_issue_enrichment.go EnrichS3Posture,
-// which already classifies this exact error pair as operational, not a bug,
-// and marks TruncatedIDs (row "?") rather than spamming the failure log.
+// Precedent: s3_issue_enrichment.go EnrichS3Posture classifies this exact
+// error pair as operational, not a bug, and marks TruncatedIDs (row "?")
+// rather than spamming the failure log.
 
 import (
 	"context"

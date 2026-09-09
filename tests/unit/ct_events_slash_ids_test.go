@@ -671,12 +671,10 @@ func TestCtEventsPivots_AnARNSegmentIsNotAnID(t *testing.T) {
 // name may itself contain slashes, so the whole of it after the type word is
 // the secret the event named.
 //
-// The second case is INVERTED against an earlier revision of this file, which
-// expected the trailing segment to resolve when nothing held the whole name.
-// It does not: "stripe-key" is a piece of "prod/api/stripe-key", so a secret
-// under that name is a different secret, and answering with it invents a row
-// for one the account no longer holds. Restoring the old expectation would
-// re-open that.
+// The second case: "stripe-key" is a piece of "prod/api/stripe-key", so a
+// secret under that name is a different secret, and answering with it when
+// nothing holds the whole name invents a row for one the account no longer
+// holds.
 func TestCtEventsSecrets_ARNNamedSecretResolvesTheWholeName(t *testing.T) {
 	const (
 		name = "prod/api/stripe-key"

@@ -12,7 +12,7 @@ import (
 )
 
 // ═══════════════════════════════════════════════════════════════════════════
-// "t" key navigation tests — issue #247
+// "t" key navigation tests
 // ═══════════════════════════════════════════════════════════════════════════
 
 // ctEventsEC2Resource returns a test EC2 resource with an ARN field.

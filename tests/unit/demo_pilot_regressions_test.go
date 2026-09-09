@@ -42,7 +42,7 @@ func TestDemo_S3ListDoesNotPanic(t *testing.T) {
 	}
 
 	// Execute the fetch command in a goroutine so a panic is caught as a test
-	// failure rather than crashing the whole test binary (pre-fix behaviour).
+	// failure rather than crashing the whole test binary.
 	type result struct {
 		msg      tea.Msg
 		panicked bool
@@ -194,8 +194,7 @@ func TestDemo_EC2RelatedPanelsPopulate(t *testing.T) {
 		countByName[r.DefDisplayName] = r.Result.Count()
 	}
 
-	// These four defs require NeedsTargetCache=true prefetch via nil clients pre-fix.
-	// They are the specific ones that crash before F1 lands.
+	// These four defs require NeedsTargetCache=true prefetch via nil clients.
 	transportDependentDefs := []string{
 		"Target Groups",
 		"Auto Scaling Groups",

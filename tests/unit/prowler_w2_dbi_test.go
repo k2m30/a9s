@@ -228,10 +228,8 @@ func TestW2DBICACertExpiringWarn(t *testing.T) {
 // Inside 30 days the operator has a rotation window measured in weeks, not
 // months — the row escalates so it sorts above the ordinary warnings.
 //
-// Inverted for the spec row that gave severity one owner: the escalation is
-// now a second code carrying the catalog's broken severity, not the same code
-// emitted at a severity its declaration does not have. Do not restore the
-// dbi.ca-cert-expiring assertion here.
+// The escalation is a second code carrying the catalog's broken severity,
+// not the same code emitted at a severity its declaration does not have.
 func TestW2DBICACertExpiringBroken(t *testing.T) {
 	db := w2DBIInstance("acme-orders-db")
 	db.CertificateDetails = &rdstypes.CertificateDetails{
@@ -413,8 +411,7 @@ func TestW2DBIEngineLookupErrorMarksTruncated(t *testing.T) {
 		errs:   map[string]error{"oracle-se2|19.0.0.0": &smithy.GenericAPIError{Code: "AccessDenied", Message: "denied"}},
 	}
 	// Not w2DBIEnrich: that helper fatals on any error, and a denied lookup
-	// legitimately returns the composite one (codex2 round 5 — the pass used
-	// to record the failure and drop it). w2AssertEnricherShape is the map
+	// legitimately returns the composite one. w2AssertEnricherShape is the map
 	// half of the invariants, documented for exactly this case.
 	res, err := w2Enricher(t, "dbi")(context.Background(),
 		&awsclient.ServiceClients{RDS: fake}, codex2DBIRows(t, denied, ok), nil)
@@ -493,10 +490,9 @@ func TestW2DBIDeletingInstanceEmitsNoWave2Finding(t *testing.T) {
 	w2AssertNoCode(t, res.Findings["acme-old-db"], w2DBICodeEngineDeprecated)
 }
 
-// TestW2DBICACertSingularDay pins spec row 3 (task aws3) at this emit site:
-// number agreement in the wording is the slot filler's, read off the declared
-// phrase, so a certificate one day out reads "1 day" and not "1 days". The
-// site passes the number and nothing else.
+// TestW2DBICACertSingularDay: number agreement in the wording is the slot
+// filler's, read off the declared phrase, so a certificate one day out reads
+// "1 day" and not "1 days". The site passes the number and nothing else.
 func TestW2DBICACertSingularDay(t *testing.T) {
 	one := w2DBIInstance("acme-db-1")
 	one.CertificateDetails = &rdstypes.CertificateDetails{

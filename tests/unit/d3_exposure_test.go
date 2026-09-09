@@ -116,7 +116,7 @@ func TestD3ListenerOnSecondPageIsSeen(t *testing.T) {
 	res := d3EnrichELB(t, fake)
 	w4AssertFinding(t, res.Findings["acme-web"], d3CodeELBPlainHTTP,
 		"port 80 in the clear", domain.SevWarn, "wave2")
-	// d4 row 26: one listener, so the phrase is singular. Do not restore "ports".
+	// One listener, so the phrase is singular.
 }
 
 // TestD3EveryCleartextPortIsNamed pins row 10: three listeners in the clear

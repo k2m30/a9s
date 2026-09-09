@@ -1,18 +1,12 @@
 package unit
 
-// enrichment_pagination_audit_test.go — TDD tests for account-wide enricher
-// pagination (Gap S7) and a meta-test AST audit.
+// enrichment_pagination_audit_test.go — account-wide enricher pagination and
+// a meta-test AST audit.
 //
-// # Background
-//
-// Three account-wide enrichers currently call their respective AWS List/Describe
-// API exactly once, reading only the first page. This file:
-//
-//  1. Pins the required multi-page contract so the coder can implement it (tests
-//     fail before the fix, pass after).
-//  2. Caps the walk at EnrichmentCap pages to avoid unbounded API calls.
-//  3. Provides a structural meta-test (AST walk of *_issue_enrichment.go files) that flags any
-//     future regression: a new enricher that calls a paginated API without a loop.
+// Account-wide enrichers walk every page of their List/Describe API, capped
+// at EnrichmentCap pages to avoid unbounded API calls. The structural
+// meta-test (AST walk of *_issue_enrichment.go files) flags an enricher that
+// calls a paginated API without a loop.
 //
 // # Covered enrichers
 //
@@ -568,9 +562,9 @@ var nonPaginatedAPIs = []string{
 	"GetKeyRotationStatus",
 	// GetRepositoryPermissionsPolicy — one repository's resource policy
 	// document. codeartifact.GetRepositoryPermissionsPolicyOutput carries a
-	// single Policy and no token field. Surfaced once the audit began judging
-	// each call rather than each function: its enricher paginates a different
-	// call, which used to exempt this one.
+	// single Policy and no token field. The audit judges each call rather than
+	// each function: its enricher paginating a different call does not exempt
+	// this one.
 	"GetRepositoryPermissionsPolicy",
 	// DescribeEnvironmentHealth — single environment health object.
 	"DescribeEnvironmentHealth",
@@ -897,13 +891,11 @@ func collectThreeLevelCalls(body ast.Node, rootIdent string) []callSite {
 // and an allowlist entry then hides the real single-call regression the audit
 // exists to catch.
 //
-// The walkAccountPages arm inverts what this audit asserted before the cap
-// batch's spec row 1 ("one page-cap helper owns the walk bound"): an
-// account-wide enricher no longer writes its own loop, because the loop and
-// the marking of the rows past the last walked page are one rule. A call
-// inside that helper's page reader is paginated AND bounded AND accounted
-// for, which is strictly more than the loop this used to demand — do not
-// restore the loop-only form.
+// The walkAccountPages arm: an account-wide enricher does not write its own
+// loop, because the loop and the marking of the rows past the last walked
+// page are one rule (one page-cap helper owns the walk bound). A call inside
+// that helper's page reader is paginated AND bounded AND accounted for,
+// which is strictly more than a loop-only form would demand.
 func inPaginatedWalk(stack []ast.Node) bool {
 	for _, n := range stack {
 		switch node := n.(type) {

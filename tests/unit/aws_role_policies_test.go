@@ -346,8 +346,7 @@ func TestFetchRolePolicies_NilFields(t *testing.T) {
 
 // TestFetchRolePolicies_AdminHighlight verifies that AdministratorAccess
 // emits an over-privileged wave1 Finding so the row resolves as ColorBroken
-// (red). Pins both the storage migration (Fields["status"]="failed") and
-// the user-visible color contract that AS-1393 must preserve.
+// (red). Pins both Fields["status"]="failed" and the user-visible color.
 func TestFetchRolePolicies_AdminHighlight(t *testing.T) {
 	attachedMock := &mockIAMListAttachedRolePoliciesClient{
 		outputs: []*iam.ListAttachedRolePoliciesOutput{

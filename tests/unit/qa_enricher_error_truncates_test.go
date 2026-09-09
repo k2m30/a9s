@@ -49,11 +49,10 @@ func TestEnrichCodeBuildStatus_ListBuildsError_SetsTruncated(t *testing.T) {
 	resources := []resource.Resource{{ID: "proj-error"}, {ID: "proj-ok"}}
 
 	result, err := awsclient.EnrichCodeBuildStatus(context.Background(), clients, resources, nil)
-	// INVERTED for the "skipped" spec row 5: this asserted err == nil, a proxy
-	// for "the run was not aborted" that also required the reason to be
-	// dropped. The run still continues — the other resource is processed and
-	// Truncated is raised below — and the call that failed now says so. Do not
-	// restore the nil-error assertion.
+	// A nil error here would be a proxy for "the run was not aborted" that
+	// also requires the reason to be dropped. The run continues — the other
+	// resource is processed and Truncated is raised below — and the call that
+	// failed says so.
 	if err == nil {
 		t.Fatal("a failed per-resource call returned no error — the reason never reaches the log")
 	}
@@ -81,10 +80,9 @@ func TestEnrichTargetGroupHealth_DescribeError_SetsTruncated(t *testing.T) {
 	if err == nil {
 		t.Fatal("enricher must surface a composite error when DescribeTargetHealth fails")
 	}
-	// INVERTED for the "skipped" spec row 6: the label carried the type, so
-	// the rendered line said it twice ("enrich tg: tg-enrich: ..."). The type
-	// comes from the registry key at the surface; the aggregate names the
-	// call. Do not restore the type in the label.
+	// The aggregate names the call, not the type: the type comes from the
+	// registry key at the surface, and a type in the label would render it
+	// twice ("enrich tg: tg-enrich: ...").
 	if errStr := err.Error(); !strings.Contains(errStr, "DescribeTargetHealth") {
 		t.Errorf("composite error must name the call, DescribeTargetHealth, got: %q", errStr)
 	}
@@ -113,10 +111,9 @@ func TestEnrichCodePipelineStatus_GetStateError_SetsTruncated(t *testing.T) {
 	if err == nil {
 		t.Fatal("enricher must surface a composite error when GetPipelineState fails")
 	}
-	// INVERTED for the "skipped" spec row 6: the label carried the type, so
-	// the rendered line said it twice ("enrich pipeline: pipeline-enrich: ..."). The type
-	// comes from the registry key at the surface; the aggregate names the
-	// call. Do not restore the type in the label.
+	// The aggregate names the call, not the type: the type comes from the
+	// registry key at the surface, and a type in the label would render it
+	// twice ("enrich pipeline: pipeline-enrich: ...").
 	if errStr := err.Error(); !strings.Contains(errStr, "GetPipelineState") {
 		t.Errorf("composite error must name the call, GetPipelineState, got: %q", errStr)
 	}
@@ -144,10 +141,9 @@ func TestEnrichStepFunctionsStatus_ListExecutionsError_SetsTruncated(t *testing.
 	if err == nil {
 		t.Fatal("enricher must surface a composite error when ListExecutions fails")
 	}
-	// INVERTED for the "skipped" spec row 6: the label carried the type, so
-	// the rendered line said it twice ("enrich sfn: sfn-enrich: ..."). The type
-	// comes from the registry key at the surface; the aggregate names the
-	// call. Do not restore the type in the label.
+	// The aggregate names the call, not the type: the type comes from the
+	// registry key at the surface, and a type in the label would render it
+	// twice ("enrich sfn: sfn-enrich: ...").
 	if errStr := err.Error(); !strings.Contains(errStr, "ListExecutions") {
 		t.Errorf("composite error must name the call, ListExecutions, got: %q", errStr)
 	}
@@ -172,11 +168,10 @@ func TestEnrichGlueJobStatus_GetJobRunsError_SetsTruncated(t *testing.T) {
 	}
 
 	result, err := awsclient.EnrichGlueJobStatus(context.Background(), clients, resources, nil)
-	// INVERTED for the "skipped" spec row 5: this asserted err == nil, a proxy
-	// for "the run was not aborted" that also required the reason to be
-	// dropped. The run still continues — the other resource is processed and
-	// Truncated is raised below — and the call that failed now says so. Do not
-	// restore the nil-error assertion.
+	// A nil error here would be a proxy for "the run was not aborted" that
+	// also requires the reason to be dropped. The run continues — the other
+	// resource is processed and Truncated is raised below — and the call that
+	// failed says so.
 	if err == nil {
 		t.Fatal("a failed per-resource call returned no error — the reason never reaches the log")
 	}

@@ -1,10 +1,7 @@
 package unit
 
-// wave2_field_updates_test.go — TDD contracts for Wave-2 enricher FieldUpdates and
-// Wave-1 fetcher-computed field additions introduced in the 017-issue-counts branch.
-//
-// These tests will FAIL until the coder lands the corresponding production changes.
-// Once the coder's implementation is merged, all tests in this file must PASS.
+// wave2_field_updates_test.go — contracts for Wave-2 enricher FieldUpdates and
+// Wave-1 fetcher-computed field additions.
 //
 // Groups:
 //   Group 1  (#1–14)  Wave-2 enricher FieldUpdates
@@ -343,7 +340,7 @@ func TestEnrichSNSSubscriptions_WritesSubsCount(t *testing.T) {
 	}
 }
 
-// Test #6 — sfn: last_run FieldUpdates (coder must add this)
+// Test #6 — sfn: last_run FieldUpdates
 
 // sfnFakeW implements SFNAPI for the last_run FieldUpdates test.
 type sfnFakeW struct {
@@ -408,7 +405,7 @@ func TestEnrichStepFunctionsStatus_WritesLastRun(t *testing.T) {
 	}
 }
 
-// Test #7 — policy: risk FieldUpdates (coder must add this)
+// Test #7 — policy: risk FieldUpdates
 
 // TestEnrichIAMPolicy_WritesRiskField verifies that EnrichIAMPolicy populates
 // FieldUpdates[policyID]["risk"] == "admin policy" for a policy with Effect:Allow Action:* Resource:*.
@@ -467,7 +464,7 @@ func TestEnrichIAMPolicy_WritesRiskField(t *testing.T) {
 	}
 }
 
-// Test #8 — waf: rules_summary FieldUpdates (coder must add this)
+// Test #8 — waf: rules_summary FieldUpdates
 
 // TestEnrichWAF_WritesRulesSummary verifies that EnrichWAFLogging populates
 // FieldUpdates[wafARN]["rules_summary"] containing "0 rules" for a WebACL
@@ -501,7 +498,7 @@ func TestEnrichWAF_WritesRulesSummary(t *testing.T) {
 	}
 }
 
-// Test #9 — apigw: stages_count FieldUpdates (coder must add this)
+// Test #9 — apigw: stages_count FieldUpdates
 
 // TestEnrichAPIGatewayStage_WritesStagesCount verifies that EnrichAPIGatewayStage
 // populates FieldUpdates[apiID]["stages_count"] with the number of stages.
@@ -556,7 +553,7 @@ func TestEnrichAPIGatewayStage_WritesStagesCount(t *testing.T) {
 	}
 }
 
-// Test #10 — pipeline: last_status FieldUpdates (coder must add this)
+// Test #10 — pipeline: last_status FieldUpdates
 
 // cpGetPipelineStateFake implements CodePipelineAPI for last_status test.
 type cpGetPipelineStateFake struct {
@@ -622,7 +619,7 @@ func TestEnrichCodePipelineStatus_WritesLastStatus(t *testing.T) {
 	}
 }
 
-// Test #11 — cb: last_build FieldUpdates (coder must add this)
+// Test #11 — cb: last_build FieldUpdates
 
 // cbFakeW implements CodeBuildAPI for the last_build test.
 type cbFakeW struct {
@@ -702,7 +699,7 @@ func TestEnrichCodeBuildStatus_WritesLastBuild(t *testing.T) {
 	}
 }
 
-// Test #12 — codeartifact: package_count FieldUpdates (coder must add this)
+// Test #12 — codeartifact: package_count FieldUpdates
 
 // codeArtifactPackageFake implements CodeArtifactAPI for package_count FieldUpdates test.
 // It overrides ListPackages to return a controlled set of packages per domain/repository.
@@ -777,7 +774,7 @@ func TestEnrichCodeArtifactRepository_WritesPackageCount(t *testing.T) {
 	}
 }
 
-// Test #13 — glue: last_run FieldUpdates (coder must add this)
+// Test #13 — glue: last_run FieldUpdates
 
 // glueFakeW implements GlueAPI for the last_run test.
 type glueFakeW struct {
@@ -1039,7 +1036,7 @@ func TestFetchEIP_WritesStatus(t *testing.T) {
 	}
 }
 
-// Test #20 — dbc: multi-warning §4 status phrase (formerly cis_flags)
+// Test #20 — dbc: multi-warning §4 status phrase
 
 // docdbFake implements DocDBDescribeDBClustersAPI for dbc tests.
 type docdbFake struct {

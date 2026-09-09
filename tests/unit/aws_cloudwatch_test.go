@@ -156,11 +156,9 @@ func TestFetchCloudWatchAlarms_EmptyResponse(t *testing.T) {
 // actions_count field counts only AlarmActions, not OKActions or
 // InsufficientDataActions.
 //
-// CodeRabbit PR-273 finding: core/aws/alarm.go sums all three
-// action slices, but docs/attention-signals.md specifies the alarm attention
-// signal keys off AlarmActions==[] only. Mixing in OKActions and
-// InsufficientDataActions inflates the count and masks alarms with no real
-// actions configured.
+// docs/attention-signals.md specifies the alarm attention signal keys off
+// AlarmActions==[] only. Mixing in OKActions and InsufficientDataActions
+// inflates the count and masks alarms with no real actions configured.
 func TestFetchCloudWatchAlarms_ActionsCount_AlarmActionsOnly(t *testing.T) {
 	mock := &fakeCloudWatchDescribeAlarms{
 		Output: &cloudwatch.DescribeAlarmsOutput{

@@ -3,22 +3,14 @@ package unit
 // runtime_refresh_list_enrichment_test.go — coverage for
 // Core.RefreshListEnrichment (core/runtime/handlers_resources.go): the
 // neutral list-refresh enrichment-rerun bundle handleActionRefresh's list
-// branch (core/app/actions_list.go) now calls — canonicalize the resource
+// branch (core/app/actions_list.go) calls — canonicalize the resource
 // type, strip wave2-sourced findings from its cached rows, bump the per-type
 // enrichment gen, clear the EnrichmentRan latch and the truncated-ID set —
 // returning the bumped token (0 for a type with no registered issue
 // enricher) that rides onto the refetch's FetchResourcesPayload.TypeGen so
 // the resulting ResourcesLoaded can trigger a fresh enrichment probe.
-//
-// Transplanted from ref/detail-enrichment-261-attempt1 (git show); adapted:
-//   - core.SnapshotCache()[rt] (no such method in v2) -> core.AnyLaneResources(rt).
-//   - Dropped TestApply_ActionRefresh_ListScreen_FetchTask_AdmittedOverInFlightOriginalFetch
-//     entirely and stripped the Generation/ReplaceInFlight assertions from the
-//     TypeGen pin below: TaskRequest carries no Generation/ReplaceInFlight
-//     fields in v2 and runtime.ShouldAdmitTask does not exist — that
-//     same-key-admission concern is being redesigned as op-aware admission at
-//     the core/web dispatch layer instead (see the coordinator's item E), not
-//     as a per-TaskRequest field on the Controller/runtime side.
+// Same-key admission is op-aware admission at the core/web dispatch layer,
+// not a per-TaskRequest field on the Controller/runtime side.
 
 import (
 	"testing"

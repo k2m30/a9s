@@ -1,19 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-// scan_health_errorlog_test.go — pins CONTRACT 2 of the observability
-// slice: an availability probe that fails or times out must add one entry
-// to the TUI's existing "!" error log (core/runtime/scan_status.go:29 has
-// promised per-type scan health to hosts since #462; nothing has ever
-// surfaced it there).
-//
-// INVERTED by the acceptance ruling on pass 1 of the "errors" task (spec row
-// 3): the entry was pinned in the "probe <type>: <outcome>: <detail>" shape,
-// whose <outcome> and <detail> are the internal ProbeOutcome and class names
-// from core/runtime/scan_status.go. That put "probe ec2: failed: transport"
-// on the banner beside "availability ec2: <cause>" in the log for the same
-// event. The shape is now the one sentence every failed call gets. Do not
-// restore the internal names — what the contract is about is that exactly one
-// entry appears per type per sweep, which the assertions below still pin.
+// scan_health_errorlog_test.go — an availability probe that fails or times
+// out adds exactly one entry per type per sweep to the TUI's "!" error log
+// (core/runtime/scan_status.go promises per-type scan health to hosts). The
+// entry is the one sentence every failed call gets — never the internal
+// ProbeOutcome and class names ("probe ec2: failed: transport") beside
+// "availability ec2: <cause>" for the same event.
 package unit
 
 import (

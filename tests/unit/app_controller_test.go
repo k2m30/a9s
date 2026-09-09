@@ -48,10 +48,9 @@ import (
 // in this file that drives a ResourcesLoaded/AvailabilityChecked event
 // through the returned Controller can queue an async availability-cache
 // save (queueAvailabilitySave); without this ordering the writer goroutine
-// can still be running cache.Store.SaveType when RemoveAll fires, which is
-// task #41's flaky "TempDir RemoveAll cleanup: ... directory not empty"
-// failure (see app_availsave_tempdir_cleanup_race_test.go for the traced
-// mechanism and canary).
+// can still be running cache.Store.SaveType when RemoveAll fires and the
+// directory is not empty when it is removed (see
+// app_availsave_tempdir_cleanup_race_test.go for the mechanism).
 func newTestController(t *testing.T) *app.Controller {
 	t.Helper()
 	t.Setenv("A9S_CONFIG_FOLDER", t.TempDir())

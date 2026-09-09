@@ -186,10 +186,8 @@ func TestCTTargetFallback_BothEmpty_IsNone_RegressionGuard(t *testing.T) {
 // §4 per-event-name fallback table tests.
 //
 // Each test embeds requestParameters in the CloudTrailEvent JSON and asserts
-// that _ct.target resolves to the expected value via the fallback table.
-//
-// These tests are expected to FAIL until the P1 coder implements the §4
-// fallback table in ExtractCTTarget / buildCTResource.
+// that _ct.target resolves to the expected value via the fallback table
+// (ExtractCTTarget / buildCTResource).
 // ===========================================================================
 
 // buildCTEventWithRequestParams constructs a cloudtrailtypes.Event whose

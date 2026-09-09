@@ -1,11 +1,7 @@
-// costs_codex_test.go — Cost Explorer: external-review round (Codex, X1-X11)
-// + two live-tmux repros. Every item traced against current source before
-// writing; a trace disproving the reviewer's stated claim is called out
-// inline where found. package unit_test: every finding is reachable via the
-// headless app.Controller / core/costs / core/aws surface, reusing
-// sibling unit_test files' helpers (newCostsController/topDrill/
-// fixedCostsNow/monthRecord/fullMetricRecord/findFetchCostsTask/
-// baseServiceQuery), same convention as costs_selfreview_test.go.
+// costs_codex_test.go — Cost Explorer pins reachable via the headless
+// app.Controller / core/costs / core/aws surface, reusing sibling unit_test
+// files' helpers (newCostsController/topDrill/fixedCostsNow/monthRecord/
+// fullMetricRecord/findFetchCostsTask/baseServiceQuery).
 package unit_test
 
 import (
@@ -28,30 +24,15 @@ import (
 )
 
 // ===========================================================================
-// X1 (P1) — demo acceptance path. Traced precisely: costs.ResourceDrillAllowed
-// (core/costs/drill.go) refuses any SERVICE other than the literal
-// resourceDrillAllowedService ("Amazon Elastic Compute Cloud - Compute")
-// BEFORE ever reaching CostsResourceRowsByService — and the planted growth
-// story lives under fixtures.CostsGrowthService = "EC2 - Other", which is
-// NOT that string. So SC-001's spike -> usage type -> resource chain is
-// refused at the USAGE_TYPE -> RESOURCE_ID Enter, regardless of the
-// fixture's resource-row keying. Pinned via the constants (not literals):
-// once the coder re-plants the story under CostExplorerServiceNameEC2, this
-// test needs no edit.
-//
-// FIXED (fix/resourcesloaded-provenance): this test previously failed at the
-// 3rd Enter (Body.Kind stuck on "list") because costs_state.go's
-// `case screen.OpenResource:` pushed its placeholder ScreenResourceList
-// without setting ls.EscPops, so handle.go's isTopLevelCanonicalList gate
-// treated it as a top-level canonical screen and refused to apply rows from
-// the real KindFetchByIDDetail executor path's Provenance: FetchProvenanceByID
-// result — leaving ls.Loading true and autoOpenSingleDetail bailing before it
-// ever reached the row it needed. The fix routes that placeholder through the
-// same pushByIDPlaceholderList constructor navigate.go's applyRelatedNavResult
-// already used (list_state.go), which always sets ls.EscPops = true so
-// isTopLevelCanonicalList excludes it — no change to FetchProvenanceByID or
-// to this test was needed. Verified passing as of this branch; see
-// TestCostsSelfReview_C2 (costs_selfreview_test.go) for the same confirmation.
+// Demo acceptance path: costs.ResourceDrillAllowed (core/costs/drill.go)
+// refuses any SERVICE other than the literal resourceDrillAllowedService
+// BEFORE reaching CostsResourceRowsByService, so the planted growth story
+// must live under that service for SC-001's spike -> usage type -> resource
+// chain to resolve. Pinned via the constants, not literals, so a re-plant
+// needs no edit here. The placeholder ScreenResourceList costs_state.go
+// pushes for screen.OpenResource goes through pushByIDPlaceholderList, which
+// sets ls.EscPops, so isTopLevelCanonicalList excludes it and the by-ID
+// result's rows apply.
 // ===========================================================================
 
 // deliverCodexDemoFetch executes payload's KindFetchCosts task against the
@@ -201,21 +182,10 @@ func TestCostsCodex_X1_GrowthStory_ResourceChain_EndToEnd_OverDemoTransport(t *t
 }
 
 // ===========================================================================
-// X2 (P1) — a CostsLoaded produced under SkipAnomalies must not clear cached
-// marks nor renew the anomaly TTL. Traced precisely: ApplyCostsLoaded
-// (core/app/costs_state.go) calls cs.Store.PutAnomalies(ev.Anomalies,
-// cs.Now) UNCONDITIONALLY on every successful delivery — CostsLoaded carries
-// no AnomaliesFetched/authoritative flag distinguishing "genuinely fetched
-// zero" from "skipped, anomalies untouched" (the executor leaves
-// ev.Anomalies nil in both cases when p.SkipAnomalies is true). A skip
-// delivery therefore wrongly clears/re-stamps the cache.
-//
-// RECONCILED (architecture.md Seam 2/6): this pin's intent — a skip must
-// preserve marks and TTL — now has a mechanism-level pin at the typed seam
-// in costs_screen_test.go (TestCostsScreen_ApplyFetchResult_AnomalyResult_
-// WriteSemantics, case "not requested"), reconciled there against C4a's
-// opposite intent (an authoritative empty result must clear). This
-// controller-level test stays as the full-stack acceptance pin.
+// A CostsLoaded produced under SkipAnomalies must not clear cached marks
+// nor renew the anomaly TTL. The typed-seam pin is in costs_screen_test.go
+// (TestCostsScreen_ApplyFetchResult_AnomalyResult_WriteSemantics, case "not
+// requested"); this is the full-stack pin.
 // ===========================================================================
 
 func TestCostsCodex_X2_SkipAnomalies_PreservesMarksAndTTL(t *testing.T) {
@@ -330,20 +300,11 @@ func TestCostsCodex_X2_SkipAnomalies_PreservesMarksAndTTL(t *testing.T) {
 }
 
 // ===========================================================================
-// X3 (P2) — a warm-cache restart (cost data fully covered, anomaly slot
-// absent) must still emit an anomalies-only fetch. Traced precisely:
-// ensureCostsShapeFetched (core/app/costs_state.go) returns nil the
-// moment len(missing)==0, WITHOUT ever checking cs.Store.Anomalies(cs.Now)
-// freshness — that check only happens inside the missing!=0 branch (there,
-// only to set the SkipAnomalies flag on an already-needed main fetch).
-//
-// RECONCILED (architecture.md Seam 1): this pin's exact bug class ("warm
-// cost rows suppress anomaly refresh") is the doc's own named example for
-// why Grid/Anomalies must derive independently — pinned at the typed seam
-// in costs_screen_test.go
-// (TestCostsScreen_PlanFetch_GridAndAnomalyFreshnessDeriveIndependently,
-// case "grid warm, anomalies stale"). This controller-level test stays as
-// the full-stack acceptance pin.
+// A warm-cache restart (cost data fully covered, anomaly slot absent) must
+// still emit an anomalies-only fetch: Grid/Anomalies freshness derive
+// independently (architecture.md Seam 1; typed-seam pin in
+// costs_screen_test.go,
+// TestCostsScreen_PlanFetch_GridAndAnomalyFreshnessDeriveIndependently).
 // ===========================================================================
 
 func TestCostsCodex_X3_WarmCostCache_AbsentAnomalies_StillEmitsFetch(t *testing.T) {
@@ -404,25 +365,12 @@ func TestCostsCodex_X3_WarmCostCache_AbsentAnomalies_StillEmitsFetch(t *testing.
 }
 
 // ===========================================================================
-// X4 — the drilled frame's window must lie WITHIN the selected cell's
-// period. Traced precisely: applyCostsSelect (core/app/costs_state.go)
-// computes anchor := selectedPeriod.Start then newWindow :=
-// costs.BuildWindow(newGran, anchor) — for newGran==Month (drilling out of a
-// YEAR cell), BuildWindow(Month, anchor) calls monthWindow(anchor, 12),
-// which is a TRAILING 12-month window ENDING at anchor's month, not "the
-// 12 months of anchor's own year" — so a year cell (Jan 1-Dec 31) drills
-// into a window spanning Feb of the PRIOR year through January of the
-// selected year, never the year's own Feb-Dec. Month->week (finerGranularity
-// (Month)==Week) does NOT share this defect: BuildWindow(Week, anchor) is
-// weekWindowsInMonth(anchor), always anchored on anchor's own month, never
-// trailing — verified both at cursor col=0 and col=len-1 below.
-//
-// RECONCILED (architecture.md Seam 4): X4a's intent now has a
-// mechanism-level GREEN pin at the typed constructor in
-// costs_screen_test.go (TestCostsScreen_WindowWithin_YearToMonths_
-// InsideSelectedYear) — WindowWithin replaces the overloaded BuildWindow
-// this bug lived in. This controller-level test stays as the full-stack
-// acceptance pin.
+// The drilled frame's window must lie WITHIN the selected cell's period: a
+// year cell (Jan 1-Dec 31) drills into that year's months, never a trailing
+// 12-month window ending at the anchor's month. WindowWithin
+// (costs_screen_test.go, TestCostsScreen_WindowWithin_YearToMonths_InsideSelectedYear)
+// is the typed-seam pin; this is the full-stack pin, checked at cursor col=0
+// and col=len-1.
 // ===========================================================================
 
 func TestCostsCodex_X4a_YearCellDrill_MonthWindowStaysWithinSelectedYear(t *testing.T) {
@@ -505,24 +453,12 @@ func TestCostsCodex_X4b_MonthCellDrill_WeekWindowStaysWithinSelectedMonth_BothCu
 }
 
 // ===========================================================================
-// X6 (P2) — the STATE cursor must clamp when the display filter shrinks
-// rows (metric change), so Enter always acts on the row the user actually
-// sees highlighted. Traced precisely: applyCostsSelect reads
-// cur.Cursor.Row directly against the CURRENT liveCostGrid — if Cursor.Row
-// is stale from BEFORE a metric cycle shrank the visible row count (no move
-// action re-clamped it), rowKey resolves to "" and, since the store already
-// has records for the new shape, applyCostsSelect's own guard
-// (records present -> no-op) fires instead of drilling the clamped row.
-//
-// UPDATED reconciliation (architecture.md gained Seam 8, CostsViewModel,
-// after this note was first written under Seam 3/4 alone): the cursor
-// clamp this test exercises is NOT a reducer-only concern after all — Seam
-// 8's BuildViewModel is the seam that now clamps Cursor against the
-// display-filtered Rows/VisibleCols in one place, and callers (including
-// whatever runs before Select sees a row) read the clamped Cursor FROM the
-// ViewModel. Pinned at the typed seam in costs_screen_test.go
-// (TestCostsScreen_BuildViewModel_CursorClamp_AlwaysValidIndex). This
-// controller-level test stays as the full-stack acceptance pin.
+// The STATE cursor must clamp when the display filter shrinks rows (metric
+// change), so Enter always acts on the row the user actually sees
+// highlighted. BuildViewModel (architecture.md Seam 8) clamps Cursor against
+// the display-filtered Rows/VisibleCols in one place and callers read the
+// clamped Cursor FROM the ViewModel; the typed-seam pin is
+// TestCostsScreen_BuildViewModel_CursorClamp_AlwaysValidIndex.
 // ===========================================================================
 
 func TestCostsCodex_X6_CursorBeyondFilteredEnd_EnterDrillsClampedRow_NeverNoOps(t *testing.T) {
@@ -577,23 +513,10 @@ func TestCostsCodex_X6_CursorBeyondFilteredEnd_EnterDrillsClampedRow_NeverNoOps(
 }
 
 // ===========================================================================
-// X7 — Enter must never pin Equals[dim]=[""]. Traced precisely:
-// applyCostsSelect's own AwaitedIdentity no-op gate deliberately excludes a
-// just-pushed fresh child frame (cs.AwaitedIdentity is cleared right after
-// the push, "always immediately drillable further, blind") — a second,
-// fast Enter on that still-loading frame finds rowKey=="" (grid empty,
-// nothing fetched yet) and, since the store has NO records anywhere for
-// this brand-new shape either, the "records present -> no-op" guard does
-// not fire — so it proceeds to drill, pinning Filter.Equals[dim]=[""].
-//
-// RECONCILED (architecture.md Seam 3/4): this pin's mechanism is the
-// "loading -> WaitForRows" outcome, pinned at the typed seam in
-// costs_screen_test.go (TestCostsScreen_Select_LoadingShape_
-// AlwaysWaitForRows) — the new seam removes the old "blind chain"
-// exclusion entirely (state.Loading gates Select unconditionally), closing
-// this bug class outright rather than special-casing the empty-value
-// symptom. This controller-level test stays as the full-stack acceptance
-// pin.
+// Enter must never pin Equals[dim]=[""]: state.Loading gates Select
+// unconditionally, so a second, fast Enter on a still-loading frame waits for
+// rows instead of drilling with rowKey=="". The typed-seam pin is
+// TestCostsScreen_Select_LoadingShape_AlwaysWaitForRows.
 // ===========================================================================
 
 func TestCostsCodex_X7_FastEnterEnter_ThroughLoadingLevel_NeverPinsEmptyValue(t *testing.T) {
@@ -602,11 +525,11 @@ func TestCostsCodex_X7_FastEnterEnter_ThroughLoadingLevel_NeverPinsEmptyValue(t 
 	newestCol := root.Window[len(root.Window)-1]
 
 	// ActionCostPivot resets Cursor.Col to 0 (oldest) as a side effect —
-	// use the resource-drill-allowed service name (Codex X1's own gate) and
-	// re-position to the newest column so a fast SERVICE -> USAGE_TYPE ->
-	// (fast Enter) chain actually reaches the RESOURCE_ID push this test
-	// targets, instead of being refused earlier by an unrelated gate
-	// (stale window or disallowed service).
+	// use the resource-drill-allowed service name and re-position to the
+	// newest column so a fast SERVICE -> USAGE_TYPE -> (fast Enter) chain
+	// actually reaches the RESOURCE_ID push this test targets, instead of
+	// being refused earlier by an unrelated gate (stale window or disallowed
+	// service).
 	_, tasks := c.Apply(app.Action{Kind: app.ActionCostPivot, N: 1})
 	payload, found := findFetchCostsTask(tasks)
 	if !found {
@@ -642,18 +565,11 @@ func TestCostsCodex_X7_FastEnterEnter_ThroughLoadingLevel_NeverPinsEmptyValue(t 
 }
 
 // ===========================================================================
-// X8 — mixed currencies: with two Amount.Units in the same window, the
-// TOTAL row must not render a bare numeric sum across incompatible units.
-// Traced precisely: costs.BuildGrid sets Currency="" when len(unitSet)!=1,
-// but Totals is still buildCellValues(totalsCells) — a plain numeric sum of
-// every cell's .sum regardless of unit — with no suppression or note.
-//
-// RECONCILED (architecture.md Seam 5): the domain-level half of this pin
-// (a USD+EUR sum cannot leave the domain layer as a bare number) is pinned
-// at the typed seam in costs_screen_test.go
-// (TestCostsScreen_SumCells_MixedUnits_NoTotalValueConsumed). This
-// controller/render-level test stays as the acceptance pin for the
-// RENDERED note itself.
+// Mixed currencies: with two Amount.Units in the same window, the TOTAL row
+// must not render a bare numeric sum across incompatible units. The
+// domain-level half is pinned at the typed seam
+// (TestCostsScreen_SumCells_MixedUnits_NoTotalValueConsumed); this pins the
+// RENDERED note.
 // ===========================================================================
 
 func TestCostsCodex_X8_MixedCurrencies_TotalNotBareNumber(t *testing.T) {
@@ -690,22 +606,12 @@ func TestCostsCodex_X8_MixedCurrencies_TotalNotBareNumber(t *testing.T) {
 }
 
 // ===========================================================================
-// X9 — LoadStore.Recovered()==true must surface a user-visible flash when
-// the costs screen initializes. Traced precisely: costs.Store.Recovered()
-// exists (store.go) but has zero references anywhere in
-// core/app/costs_state.go — a corrupt on-disk cache is silently
-// discarded with no notification.
-//
-// RECONCILED (architecture.md Seam 6): the mechanism this pin originally
-// needed (Recovered() becoming part of a typed InitOutcome result the
-// caller cannot forget to check) was itself cut by a later ponytail-review
-// pass — InitOutcome was one-field bool ceremony with no logic of its own,
-// so callers read Store.Recovered() directly now. The real Recovered()
-// behavior pin lives over a REAL Store in costs_store_test.go
-// (TestStore_CorruptYAML_RenamedToBakFreshStoreNoPanic/
-// TestStore_AlienVersion_RenamedToBakFreshStoreNoPanic). This
-// controller-level test stays as the acceptance pin that the flash
-// actually renders.
+// LoadStore.Recovered()==true must surface a user-visible flash when the
+// costs screen initializes: a corrupt on-disk cache is renamed and replaced,
+// never silently discarded. The Store behaviour is pinned in
+// costs_store_test.go (TestStore_CorruptYAML_RenamedToBakFreshStoreNoPanic /
+// TestStore_AlienVersion_RenamedToBakFreshStoreNoPanic); this pins that the
+// flash actually renders.
 // ===========================================================================
 
 func TestCostsCodex_X9_RecoveredStore_SurfacesFlashOnInit(t *testing.T) {
@@ -739,26 +645,12 @@ func TestCostsCodex_X9_RecoveredStore_SurfacesFlashOnInit(t *testing.T) {
 }
 
 // ===========================================================================
-// X10 — a by-ID resource-drill fetch that finds nothing (instance in
-// another region/account) must return the user to the costs screen with an
-// honest region-caveat footer note, never an empty stranded resource list.
-// Traced precisely: KindFetchByIDDetail's executor case (executor.go)
-// returns messages.Flash{IsError:true} on a zero-result fetch — Flash is
-// never handled by the placeholder ScreenResourceList (AutoOpenSingle)
-// applyCostsSelect pushed, and autoOpenSingleDetail only ever fires on a
-// matching ResourcesLoaded, so nothing ever pops the placeholder back.
-//
-// RECONCILED (architecture.md Seam 7): per the dispatch, X10 stays
-// entirely at the controller level (the not-found pop-back + footer
-// caveat is an app-level concern, not the locator's own construction).
-// The LOCATOR construction half used to also pin region/account populated
-// from pinned filter dims at the typed seam
-// (costs_screen_test.go:TestCostsScreen_ResourceLocator_
-// PopulatesRegionAndAccountFromPinnedFilter) — a later ponytail-review
-// pass cut ResourceLocator.Region/AccountID entirely (written-never-read),
-// so that test is deleted; only Type/ID construction remains pinned there
-// (TestCostsScreen_Select_ResourceLeaf_CatalogMapped_OpenResource). This
-// test (X10) is not otherwise reconciled.
+// A by-ID resource-drill fetch that finds nothing (instance in another
+// region/account) must return the user to the costs screen with an honest
+// region-caveat footer note, never an empty stranded resource list. The
+// not-found pop-back and footer caveat are app-level concerns; Type/ID
+// construction of the locator is pinned in costs_screen_test.go
+// (TestCostsScreen_Select_ResourceLeaf_CatalogMapped_OpenResource).
 // ===========================================================================
 
 func TestCostsCodex_X10_ResourceJump_NotFound_ReturnsToCostsWithHonestNote(t *testing.T) {
@@ -808,34 +700,18 @@ func TestCostsCodex_X10_ResourceJump_NotFound_ReturnsToCostsWithHonestNote(t *te
 }
 
 // ===========================================================================
-// X11 — a legitimately empty finer-grain drill (a cell that HAD a monthly
-// amount, but the finer window's fetch returns zero records because the
-// charge is billed monthly, e.g. NoRegion support-fee-style items) must
-// explain itself, not render a silent zero grid. Traced precisely:
-// costsFooterNote (costs_body.go) returns "" the moment
-// cursorRow>=len(grid.Rows) — no special-case distinguishes "genuinely
-// nothing to show at this granularity" from any other empty state.
-//
-// RECONCILED (architecture.md Seam 8, CostsViewModel): the honesty-note
-// mechanism this test needs is now sourced from ViewModel.Note (one
-// source for renderers/Enter alike), pinned at the typed seam in
-// costs_screen_test.go (TestCostsScreen_BuildViewModel_Note_
-// EmptyFinerGrainHonesty). That seam-level pin only covers the pure
-// "empty grid -> non-empty Note" contract (BuildViewModel's signature
-// carries no drill-depth input); this controller-level test stays as the
-// full-stack acceptance pin for the additional "not at root" gating the
-// current adapter applies.
-//
-// RECONCILED AGAIN (costs_noregion_test.go's N3, the live-verified NoRegion
-// defect): a zero finer-grain result for a NON-zero parent cell — exactly
-// this test's own scenario — no longer stops at a note. It now re-plans
-// ONE coarser (parent-granularity) re-fetch, and once that lands the data
-// itself renders, with the note explaining WHY the columns are coarser
-// than the drilled level rather than explaining an empty grid. The "note
-// alone, no re-fetch" contract this test used to pin now belongs only to a
-// genuinely ZERO-parent drill (costs_noregion_test.go's
-// TestCostsNoRegion_N3_ZeroParentCell_NoFallback) — this test drives the
-// fallback through to completion instead.
+// A legitimately empty finer-grain drill (a cell that HAD a monthly amount,
+// but the finer window's fetch returns zero records because the charge is
+// billed monthly, e.g. NoRegion support-fee-style items) must explain
+// itself, not render a silent zero grid. A zero finer-grain result for a
+// NON-zero parent cell re-plans ONE coarser (parent-granularity) re-fetch;
+// once that lands the data itself renders, with ViewModel.Note explaining
+// WHY the columns are coarser than the drilled level. The "note alone, no
+// re-fetch" contract belongs only to a genuinely ZERO-parent drill
+// (costs_noregion_test.go, TestCostsNoRegion_N3_ZeroParentCell_NoFallback);
+// this test drives the fallback through to completion. The pure "empty grid
+// -> non-empty Note" half is pinned at the typed seam
+// (TestCostsScreen_BuildViewModel_Note_EmptyFinerGrainHonesty).
 // ===========================================================================
 
 func TestCostsCodex_X11_EmptyFinerGrainDrill_ExplainsInsteadOfSilentZeroGrid(t *testing.T) {

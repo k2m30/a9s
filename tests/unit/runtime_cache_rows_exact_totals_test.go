@@ -164,12 +164,10 @@ func TestLoadMoreExhausted_SurvivesReturnToMenu(t *testing.T) {
 // unimplemented (an unimplemented sync-back would leave availability untouched
 // in BOTH sub-cases, which the "wins" sub-case catches).
 //
-// INVERTED: the first sub-case used to assert that an EXACT load-more result
-// of 2 leaves a stored exact 500 alone. That was the list-open lane's private
-// rule, and it is the reason a canonical list of 5 rows could sit under a
-// badge of 200 and queue that 200 to the disk writer. The rule both lanes now
-// share is the probe lane's: an untruncated observation always wins. Do not
-// "restore" the old expectation.
+// An untruncated observation always wins, in both lanes: a list-open lane
+// private rule that let an EXACT load-more result of 2 leave a stored exact
+// 500 alone is why a canonical list of 5 rows could sit under a badge of 200
+// and queue that 200 to the disk writer.
 func TestLoadMoreExhausted_OnlyIncreaseGuard(t *testing.T) {
 	newCtrl := func(seedCount int, seedTruncated bool) (*runtime.Core, *app.Controller) {
 		s := session.New()
@@ -267,12 +265,9 @@ func TestLoadMoreExhausted_OnlyIncreaseGuard(t *testing.T) {
 // probes.go seam) must be able to write that exact/untruncated state to
 // disk when invoked with the controller's updated menu availability maps —
 // and cache.LoadDirForTest must read back the same exact, untruncated per-type
-// entry, modeling "survives an app restart". Round-2 migration: repinned at
-// the same controller seam (core.SaveAvailabilityCache/LoadAvailabilityCache)
-// but the on-disk assertion now goes through cache.LoadDirForTest/Store.Type
-// directly, since the exact-total persistence flows through
-// (*cache.Store).SaveType's per-type file, not the deleted single-file
-// cache.File/cache.Entry shape.
+// entry, modeling "survives an app restart". The on-disk assertion goes
+// through cache.LoadDirForTest/Store.Type directly, since the exact-total
+// persistence flows through (*cache.Store).SaveType's per-type file.
 func TestLoadMoreExhausted_PersistsToDiskCache(t *testing.T) {
 	tmp := t.TempDir()
 	t.Setenv("A9S_CONFIG_FOLDER", tmp)

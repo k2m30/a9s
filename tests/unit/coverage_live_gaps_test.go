@@ -353,15 +353,6 @@ type livegapRawStruct struct {
 	N    int
 }
 
-// TestLiveGap_RawYAML_MarshalsRawStructWhenPresent and
-// TestLiveGap_RawYAML_EmptyWhenNoDataAtAll deleted (round 5,
-// specs/022-codebase-cleanup, DetailModel core cleanup): both drove the
-// retired views.NewDetail(...).RawYAML() construction path (NewDetail is
-// dead) to exercise the exact struct-present/empty-data cases already
-// pinned below via views.RawYAMLFromResource (a live, construction-free
-// package function RawYAML delegates to — see
-// TestLiveGap_RawYAMLFromResource_MirrorsRawYAML).
-
 // TestLiveGap_RawYAML_MarshalsFieldsWhenNoRawStruct is the live-seam
 // replacement for the retired views.NewDetail(...).RawYAML() call: the
 // Fields-only (no RawStruct) case isn't covered by the RawYAMLFromResource

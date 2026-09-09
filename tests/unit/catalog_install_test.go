@@ -1,8 +1,6 @@
 package unit
 
-// catalog_install_test.go — AS-800: failing tests for the AS-795a cycle-break scaffold.
-// These tests assert aws.Install() + catalog.SetTypes behaviors.
-// They compile and pass only after the Coder (AS-799) implements the scaffold.
+// catalog_install_test.go — aws.Install() + catalog.SetTypes behaviors.
 //
 // Coverage:
 //   1. Smoke: aws.Install() → catalog.FindAny("ec2") non-nil
@@ -10,9 +8,9 @@ package unit
 //   3. SetTypes panics on second call with different slice
 //   4. catalog.Find panics before SetTypes (sub-process)
 //   5. 12-type golden parity (one per category)
-//   6. AS-795a invariant: Fetcher/Related/Navigable/Wave2 are zero for all types
-//   6b. AS-795a invariant: new fields FieldKeys/FieldAliases/FetchByIDs/
-//       FilteredFetcher/IssueEnricherFieldKeys/ChildFetcher are zero for all types
+//   6. Fetcher/Related/Navigable/Wave2 are zero for all types
+//   6b. FieldKeys/FieldAliases/FetchByIDs/FilteredFetcher/
+//       IssueEnricherFieldKeys/ChildFetcher are zero for all types
 
 import (
 	"context"
@@ -221,22 +219,13 @@ func TestCatalogInstall_GoldenParity(t *testing.T) {
 	}
 }
 
-// Test 6 — AS-795 progressive-migration invariant: every entry with a non-nil
-// Fetcher must also carry FieldKeys + (Related OR Navigable) so partial
-// scaffolds don't slip into main. AS-795b–m flip types one category at a time;
-// this test grows with each migration but the shape stays identical.
+// Test 6 — every entry with a non-nil Fetcher must also carry FieldKeys +
+// (Related OR Navigable) so partial scaffolds don't slip into main.
 //
-// AS-795n exception: Wave2 migration is global (one PR migrates every
-// remaining Wave 2 enricher into the catalog so the IssueEnricherRegistry map
-// can be deleted). Wave2 in catalog without Fetcher in catalog is therefore
-// expected for any type whose Fetcher hasn't been moved out of its
-// legacy init() yet (acm/efs/r53/ecs-task are the remaining stragglers as
-// of AS-795n). When the Wave2 field is non-nil but Fetcher is nil, we only
-// require that the type still has a fetcher reachable via the legacy
-// resource.GetPaginatedFetcher map (populated by the file's package init()).
-//
-// Replaces the AS-795a-era "zero wiring" guards, which were valid only while
-// no category had been migrated (PR #392).
+// Wave2 in catalog without Fetcher in catalog is allowed for a type whose
+// Fetcher lives in a legacy init(): when the Wave2 field is non-nil but
+// Fetcher is nil, the type must still have a fetcher reachable via
+// resource.GetPaginatedFetcher (populated by the file's package init()).
 func TestCatalogInstall_AS795_MigrationShape(t *testing.T) {
 	all := catalog.All()
 	if len(all) == 0 {
@@ -248,7 +237,7 @@ func TestCatalogInstall_AS795_MigrationShape(t *testing.T) {
 				t.Errorf("type %q: FieldKeys populated without Fetcher — partial migration?", rt.ShortName)
 			}
 			if rt.Wave2 != nil {
-				// AS-795n: Wave2 may be in catalog while Fetcher is still in
+				// Wave2 may be in catalog while Fetcher is still in
 				// legacy init(). Require the legacy fetcher to be present so
 				// the type is still reachable in the running app.
 				if resource.GetPaginatedFetcher(rt.ShortName) == nil {

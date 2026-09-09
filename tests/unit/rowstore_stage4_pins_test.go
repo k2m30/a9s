@@ -1,18 +1,6 @@
-// rowstore_stage4_pins_test.go — behavior pins for Stage 4 of the row-store
-// unification plan (rowstore-unification-plan.md, Stage 4: "ListState.Rows
-// becomes a store-derived VIEW; Controller.resourceCache dies; ONE save lane
-// through reconcileTypeFile"). Written against HEAD 7ac3b5ca (Stage 3
-// landed: session.ResourceCache/LazyResourceCache are gone, RowStore is the
-// sole per-type row store; Stage 4 has NOT landed — Controller still owns
-// its own resourceCache map (core/app/controller.go:35-37) and
-// applyResourcesLoaded still writes both ls.Rows AND c.resourceCache
-// (core/app/list_body.go)).
-//
-// Each pin states its own honest RED/GREEN status at HEAD in its doc
-// comment. Several are GREEN today (regression guards for the deletion);
-// pin 4 is a source-scan that is RED today by construction (it fails while
-// resourceCache still exists, and is designed to flip GREEN once Stage 4
-// deletes it).
+// rowstore_stage4_pins_test.go — ListState.Rows is a store-derived VIEW,
+// the Controller owns no resourceCache map of its own, and there is ONE save
+// lane through reconcileTypeFile.
 package unit
 
 import (
@@ -111,8 +99,7 @@ func stage4PinS3Resource(id string) resource.Resource {
 // handlers_related.go), selected via ActionRelatedSelect (the same path
 // app_related_cursor_skip_test.go's newRelatedSkipController drives). This
 // is the real Controller.dispatchRelatedNavigate -> applyRelatedNavResult
-// path Stage 4 touches (core/app/navigate.go), NOT the separate legacy
-// internal/tui ResourceListModel stacking mechanism.
+// path (core/app/navigate.go).
 func pushStackedRelatedFilteredS3List(t *testing.T, ctrl *app.Controller, relatedIDs []string) {
 	t.Helper()
 	ctrl.ApplyIntents([]runtime.UIIntent{
@@ -126,9 +113,8 @@ func pushStackedRelatedFilteredS3List(t *testing.T, ctrl *app.Controller, relate
 	if len(tasks) != 0 {
 		// A cache-miss multi-ID filtered list dispatches relatedFetchTasks; this
 		// harness never executes them (no fetch is needed — the stacked list's
-		// own rows are seeded directly below via ApplyResourcesLoaded, exactly
-		// like every other Stage 2/3 pin's list-lane seeding), so any returned
-		// tasks are simply left dangling. Not an error.
+		// own rows are seeded directly below via ApplyResourcesLoaded), so any
+		// returned tasks are simply left dangling. Not an error.
 		_ = tasks
 	}
 }
@@ -138,26 +124,18 @@ func pushStackedRelatedFilteredS3List(t *testing.T, ctrl *app.Controller, relate
 // related-filtered s3 list (2 different rows, exact) -> Ctrl+R refresh +
 // load-more append on the TOP (stacked) screen only -> pop back to the
 // underlying top-level list and assert its Rows/SelectedRow/title are
-// completely unchanged by what happened on the screen above it. Then the
-// reverse: re-push a stacked list, mutate the UNDERLYING list instead (not
-// possible without popping first, since only the top screen is
-// addressable) — so the isolation direction actually exercised end-to-end is
-// "stacked screen's own actions never leak downward or upward", which is
-// the only direction Ctrl+R/load-more (both topListState()-scoped) can ever
-// violate.
+// completely unchanged by what happened on the screen above it. Only the
+// top screen is addressable, so the isolation direction exercised
+// end-to-end is "stacked screen's own actions never leak downward or
+// upward", which is the only direction Ctrl+R/load-more (both
+// topListState()-scoped) can ever violate.
 //
-// HONEST STATUS AT HEAD (7ac3b5ca): GREEN. core/app/list_body.go's
-// applyResourcesLoaded already writes exclusively to the SCREEN's own
-// ls.Rows (the "Bug 1 fix" comment: "Writing to ls.Rows ensures that two
-// stacked list screens of the same resource type never share a row
-// slice"); topListState()/handleActionRefresh/handleActionLoadMore already
-// scope to c.stack[len(c.stack)-1] only. This is the exact per-screen
-// isolation contract Stage 4's "ListState.Rows becomes a store-derived
-// VIEW... keeps per-screen protocol" must NOT regress when the write moves
-// from a direct field assignment to store.Observe + a per-screen view
-// re-derivation — a naive Stage-4 implementation that assigned ls.Rows from
-// a bare RowStore.Snapshot(canon).Rows (shared across every screen of the
-// same type) would break this test immediately.
+// core/app/list_body.go's applyResourcesLoaded writes exclusively to the
+// SCREEN's own ls.Rows, so two stacked list screens of the same resource
+// type never share a row slice; topListState()/handleActionRefresh/
+// handleActionLoadMore scope to c.stack[len(c.stack)-1] only. A ls.Rows
+// assigned from a bare RowStore.Snapshot(canon).Rows (shared across every
+// screen of the same type) would break this test immediately.
 func TestStage4Pin_StackedIsolation_TopScreenActionsNeverTouchUnderlyingList(t *testing.T) {
 	ctrl := newStage4PinController(t)
 
@@ -304,37 +282,20 @@ func stage4PinReorderedS3ViewConfig() *config.ViewsConfig {
 //
 //   - List-lane save: Controller.maybeSaveResourceListCache, fired
 //     synchronously on every Handle(messages.ResourcesLoaded) delivery
-//     (core/app/handle.go:212) via materializeAllListFieldsForSave,
-//     which resolves columns through resolveListColumnsForBuild(c.viewConfig,
-//     ...) — SEES the session's SetViewConfig override.
+//     (core/app/handle.go) via materializeAllListFieldsForSave.
 //   - Sweep-lane save: the EnrichmentChecked "all done" TaskKindSaveCache
 //     dispatch, executed via app.DrainSync (Core.ExecuteTaskAt ->
-//     saveProbeResourcesToTypeFiles -> materializeListFieldsForSave, which
-//     resolves columns through resolveSaveColumns(shortName) — this function
-//     takes NO *config.ViewsConfig parameter at all and unconditionally calls
-//     config.GetViewDef(nil, shortName), i.e. built-in defaults only.
+//     saveProbeResourcesToTypeFiles -> materializeListFieldsForSave).
 //
-// HONEST STATUS AT HEAD (7ac3b5ca): RED — this is the live D16-class
-// divergence the dispatch asked this pin to either confirm-green or catch.
-// Verified by direct code reading (core/runtime/probes.go's
-// resolveSaveColumns vs core/app/list_columns.go's
-// resolveListColumnsForBuild): resolveSaveColumns has no viewConfig
-// parameter and always resolves against config.GetViewDef(nil, shortName),
-// so a session-level SetViewConfig column reorder/rename is applied by the
-// list-lane save but silently ignored by the sweep-lane save. With this
-// test's reordered ViewDef (Region first, "Region (moved)" title -> Fields
-// key stays "region" since Key is unset and the Title's lowercased form is
-// used as the fallback key — see materializeAllPathFields/
-// materializeResourceFields's `key := col.Key; if key == "" { key =
-// strings.ToLower(col.Title) }`), the two lanes persist DIFFERENT Fields
-// key sets for the same underlying row: the list lane's Fields carry a
-// "region (moved)" key (lowercased user title) while the sweep lane's
-// Fields carry the built-in "region" key (from BucketRegion's built-in
-// title-derived key, since s3.yaml's Region column has no explicit Key
-// either) — a genuine cache-key mismatch. Stage 4's "ONE save lane... a
-// single materializer with an injected column resolver" is exactly the fix:
-// once both lanes resolve columns via the SAME injected resolver (which
-// must include c.viewConfig), this test flips GREEN.
+// Both lanes must resolve columns through the SAME injected resolver,
+// including c.viewConfig: a sweep-lane resolver that always used
+// config.GetViewDef(nil, shortName) (built-in defaults only) would persist a
+// DIFFERENT Fields key set for the same row — with this test's reordered
+// ViewDef (Region first, "Region (moved)" title -> the Title's lowercased
+// form is the fallback key when Key is unset, see
+// materializeAllPathFields/materializeResourceFields), the list lane would
+// carry a "region (moved)" key while the sweep lane carried the built-in
+// "region" key — a cache-key mismatch.
 func TestStage4Pin_D16_ListLaneAndSweepLaneSaveByteIdenticalRows_UserReorderedColumns(t *testing.T) {
 	ctrl := newStage4PinController(t)
 	ctrl.SetViewConfig(stage4PinReorderedS3ViewConfig())
@@ -416,21 +377,13 @@ func TestStage4Pin_D16_ListLaneAndSweepLaneSaveByteIdenticalRows_UserReorderedCo
 // same "seeded WAVE-2 finding survives a same-ID zero-findings replace"
 // contract, but ALSO asserts the finding survives a SUBSEQUENT stacked
 // screen's own independent silent swap of the SAME type — i.e. the carry
-// mechanism must be per-screen (Stage 4's "keeps per-screen protocol"
-// requirement), not leak or double-apply across two ListState instances of
-// the same resource type.
-//
-// HONEST STATUS AT HEAD (7ac3b5ca): GREEN for the base silent-swap carry
-// (already pinned at HEAD by TestSilentSwap_NeverDropsKnownFindings — this
-// extension re-verifies the same mechanism rather than assuming it).
-// Genuinely NEW assertion (not previously pinned anywhere): the stacked
-// second screen's OWN silent swap must independently carry ITS OWN prior
-// findings (sourced from its own ls.Rows, per outgoingRowFindingsByID's
-// "prefers ls.Rows... falls back to the type-keyed resourceCache mirror"
-// doc comment) without being contaminated by the top-level screen's
-// findings or vice versa — a regression this test would catch if Stage 4's
-// re-architecture accidentally sourced "prior findings" from a single
-// shared store view instead of each screen's own ls.Rows.
+// mechanism is per-screen, and does not leak or double-apply across two
+// ListState instances of the same resource type. The stacked second
+// screen's OWN silent swap must independently carry ITS OWN prior findings
+// (sourced from its own ls.Rows, per outgoingRowFindingsByID's doc comment)
+// without being contaminated by the top-level screen's findings or vice
+// versa; sourcing "prior findings" from a single shared store view instead
+// of each screen's own ls.Rows would fail this.
 func TestStage4Pin_FindingsCarrySurvivesSilentSwap_ThroughNewLane(t *testing.T) {
 	ctrl := newStage4PinController(t)
 	openTopLevelList(ctrl, stage4PinType)
@@ -446,12 +399,9 @@ func TestStage4Pin_FindingsCarrySurvivesSilentSwap_ThroughNewLane(t *testing.T) 
 	}
 	ctrl.ApplyResourcesLoaded(stage4PinType, seeded, nil, false)
 
-	// Since the color-findings-conformance wave, colorS3 is
-	// colorFromAnyFinding-only (core/aws/catalog_databases.go) — a
-	// SevBroken Finding resolves the row's whole-row color to "broken"
-	// directly (the glyph branch that used to fire when
-	// ResolveColor()==ColorHealthy was deleted as unreachable).
-	// ListRow.Color=="broken" is the stronger, correct check throughout this test.
+	// colorS3 is colorFromAnyFinding-only (core/aws/catalog_databases.go), so
+	// a SevBroken Finding resolves the row's whole-row color to "broken".
+	// ListRow.Color=="broken" is the check throughout this test.
 	preSwap := ctrl.Snapshot()
 	foundBefore := false
 	for _, r := range preSwap.Body.List.Rows {
@@ -536,19 +486,16 @@ func TestStage4Pin_FindingsCarrySurvivesSilentSwap_ThroughNewLane(t *testing.T) 
 
 // =============================================================================
 // Pin 4 — Controller.resourceCache absence: a source-scan asserting no
-// `resourceCache map[string]` field exists under core/app. Written to
-// FAIL today (the field still exists), listing current readers, so it
-// flips to pass once the coder deletes it (mirrors
-// rowstore_stage2_pins_test.go's caseInsensitiveGrepSyncProbeResourcesForTypeCallers
-// pattern applied to a field declaration instead of a function name).
+// `resourceCache map[string]` field exists under core/app, listing any
+// readers (mirrors rowstore_stage2_pins_test.go's
+// caseInsensitiveGrepSyncProbeResourcesForTypeCallers pattern applied to a
+// field declaration instead of a function name).
 // =============================================================================
 
 // scanForResourceCacheFieldDeclaration walks core/app's production Go
 // source (*.go, excluding *_test.go) for the literal field declaration
-// pattern `resourceCache map[string]` — the exact shape of
-// Controller.resourceCache's declaration at core/app/controller.go:37
-// today. Comment-only lines are skipped (a future doc comment referencing
-// the deleted field by name, e.g. explaining what replaced it, must not
+// pattern `resourceCache map[string]`. Comment-only lines are skipped (a
+// doc comment naming the field, e.g. explaining what replaced it, must not
 // keep this pin permanently red). Returns every non-comment match found as
 // "path:line: text", or an error if the tree could not be walked.
 func scanForResourceCacheFieldDeclaration(t *testing.T) (string, error) {
@@ -638,21 +585,8 @@ func scanForResourceCacheReaders(t *testing.T) (string, error) {
 // TestStage4Pin_ControllerResourceCacheField_NoLongerExists asserts that no
 // production file under core/app declares a `resourceCache
 // map[string]` field, and (as a companion sub-test) that no production file
-// under core/app references `resourceCache` at all — the full deletion
-// the plan's Stage 4 mandates ("Controller.resourceCache dies with all its
-// readers").
-//
-// HONEST STATUS AT HEAD (7ac3b5ca): RED, by construction and confirmed by
-// direct source reading — core/app/controller.go:35-37 declares
-// `resourceCache map[string][]resource.Resource` today, with readers/writers
-// at controller.go:197, footer.go:97, list_body.go (writer at
-// applyResourcesLoaded:126-142, readers/mutators at
-// ApplyListFieldUpdates:713-714, ClearRowFindings:770-775,
-// applyRowFindings:819-824, GetListAllResources's listScreenResources
-// helper), list_state.go:104-107, and text.go:219. This test lists every
-// current hit in its failure message so the coder has a literal checklist;
-// it must flip GREEN the moment Stage 4 deletes the field and every one of
-// these call sites.
+// under core/app references `resourceCache` at all. This test lists every
+// hit in its failure message.
 func TestStage4Pin_ControllerResourceCacheField_NoLongerExists(t *testing.T) {
 	t.Run("no_resourceCache_field_declaration_remains", func(t *testing.T) {
 		out, err := scanForResourceCacheFieldDeclaration(t)
@@ -688,27 +622,13 @@ func TestStage4Pin_ControllerResourceCacheField_NoLongerExists(t *testing.T) {
 // duplicated, or applied twice with a different final value from a
 // double-apply race) — then performs a subsequent silent swap and asserts
 // findings are not double-appended (exactly one copy of the carried
-// finding survives, not two).
-//
-// HONEST STATUS AT HEAD (7ac3b5ca): GREEN for the field-value half.
-// applyListFieldUpdates (core/app/list_body.go) applies
-// map[string]string updates via maps.Copy onto EACH row's Fields map
-// independently on ls.Rows and (separately) on c.resourceCache[typeName] —
-// two DISTINCT Resource value slices (ls.Rows and c.resourceCache hold
-// independently-materialized copies per applyResourcesLoaded, not shared
-// backing arrays), so applying the SAME update map to both does not
-// "double" a scalar string value (maps.Copy(dst, src) is idempotent for a
-// given src) — the field ends up correct on ls.Rows regardless of whether
-// the dead mirror is also updated. This test is a regression guard for
-// Stage 4: the risk it catches is not today's behavior but a careless
-// Stage-4 rewrite that accidentally ran the update loop TWICE over the SAME
-// ls.Rows slice (once via a leftover legacy path, once via the new
-// store-view derivation), which WOULD show up as an incorrect final value
-// if the update function were non-idempotent (it is not, today — Fields are
-// scalar strings — but the assertion below checks the update landed exactly
-// as given, catching a future non-idempotent-update regression too). The
-// findings-double-append half is GREEN already: outgoingRowFindingsByID's
-// per-swap capture + fold only ever runs once per applyResourcesLoaded call.
+// finding survives, not two). applyListFieldUpdates (core/app/list_body.go)
+// applies map[string]string updates via maps.Copy onto EACH row's Fields
+// map on ls.Rows once; an update loop that ran TWICE over the SAME ls.Rows
+// slice (once via a leftover legacy path, once via the store-view
+// derivation) would show up as an incorrect final value if the update
+// function were non-idempotent. outgoingRowFindingsByID's per-swap capture
+// + fold only ever runs once per applyResourcesLoaded call.
 func TestStage4Pin_FieldUpdatesApplyExactlyOnce_NoDualApplyThroughDeadMirror(t *testing.T) {
 	ctrl := newStage4PinController(t)
 	openTopLevelList(ctrl, stage4PinType)

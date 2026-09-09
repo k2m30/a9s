@@ -15,10 +15,6 @@ import (
 // a cold resource cache (no preloading). It navigates to the EC2 resource list,
 // executes the fetch command through the fake EC2 client, and verifies at least
 // one EC2 instance appears in the rendered view.
-//
-// Expected to FAIL initially with a panic from EC2Fake.DescribeInstances because
-// that method is still a stub ("not yet implemented"). The coder's task (T013) is
-// to implement the fake and provide fixture data — at that point this test passes.
 func TestDemoColdCacheEC2_ListPopulates(t *testing.T) {
 	t.Parallel()
 	m := newDemoColdCacheApp(t)
@@ -44,9 +40,8 @@ func TestDemoColdCacheEC2_ListPopulates(t *testing.T) {
 		t.Fatal("expected a cmd after NavigateMsg{ec2}, got nil")
 	}
 
-	// extractMsg walks tea.BatchMsg to find ResourcesLoadedMsg. This triggers the
-	// EC2Fake.DescribeInstances call — which panics with "not yet implemented".
-	// That panic is the expected initial failure (the test correctly fails before T013).
+	// extractMsg walks tea.BatchMsg to find ResourcesLoadedMsg; this triggers
+	// the EC2Fake.DescribeInstances call.
 	raw := extractMsg(t, navCmd, func(msg tea.Msg) bool {
 		_, ok := msg.(messages.ResourcesLoaded)
 		return ok

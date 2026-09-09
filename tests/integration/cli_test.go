@@ -34,7 +34,7 @@ func TestMain(m *testing.M) {
 	// Build the binary once for all CLI tests. Stamp main.version via
 	// ldflags so TestQA_012_VersionFlag's X.Y.Z assertion holds — without
 	// ldflags, buildinfo.ResolveVersion falls back to "dev" and `--version`
-	// prints "a9s dev" with no "." in it (AS-768).
+	// prints "a9s dev" with no "." in it.
 	//
 	// The binary lives in a directory of this run's own, never at a fixed
 	// name under $TMPDIR: several worktrees run this suite at once, and a

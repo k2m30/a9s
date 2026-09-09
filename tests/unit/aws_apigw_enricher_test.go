@@ -191,8 +191,6 @@ func TestEnrichAPIGatewayStage_NoThrottlingProducesFindingSevTilde(t *testing.T)
 	if f.Severity != domain.SevWarn {
 		t.Errorf("severity = %v, want %v", f.Severity, "~")
 	}
-	// Inverted for spec row "phrase": the wording belongs to the code and the
-	// offending item is a supporting row. Do not restore the old assertion.
 	if want := catalog.Phrase("apigw.stage-config-issues"); f.Phrase != want {
 		t.Errorf("Phrase = %q, want the catalog's %q", f.Phrase, want)
 	}
@@ -237,8 +235,6 @@ func TestEnrichAPIGatewayStage_NoAccessLogsProducesFindingSevTilde(t *testing.T)
 	if f.Severity != domain.SevWarn {
 		t.Errorf("severity = %v, want %v", f.Severity, "~")
 	}
-	// Inverted for spec row "phrase": the wording belongs to the code and the
-	// offending item is a supporting row. Do not restore the old assertion.
 	if want := catalog.Phrase("apigw.stage-config-issues"); f.Phrase != want {
 		t.Errorf("Phrase = %q, want the catalog's %q", f.Phrase, want)
 	}
@@ -273,12 +269,6 @@ func TestEnrichAPIGatewayStage_NilClientReturnsEmptyFindingsNoError(t *testing.T
 //
 // Per docs/attention-signals.md Wave 2: "no deployed stage" is a signal worth
 // surfacing to the operator — a REST/HTTP API with no stage is inactive.
-//
-// CODER NOTE: Currently apigw_issue_enrichment.go `continue`s without
-// emitting any finding when stages == 0. This must change. After the fix,
-// TestEnrichAPIGatewayStage_ZeroStagesAcrossPages in aws_apigw_v2_pagination_test.go
-// (which asserts len(result.Findings)==0 for 0 stages) will need its expectation
-// updated to reflect the new behavior — that is the coder's responsibility.
 func TestEnrichAPIGatewayStage_ZeroStagesEmitsWarning(t *testing.T) {
 	const emptyAPIID = "empty-api-warn-001"
 
@@ -336,9 +326,8 @@ func TestEnrichAPIGatewayStage_APIErrorMarksRowTruncatedIDNotBadge(t *testing.T)
 	resources := apigwResources(apigwAPIID1, apigwAPIID2)
 
 	result, err := awsclient.EnrichAPIGatewayStage(context.Background(), clients, resources, nil)
-	// INVERTED for the "skipped" spec row 5: this required err == nil, which
-	// meant the row could render "?" with nothing in the error log to say what
-	// refused. The call that failed is recorded now. Do not restore.
+	// The call that failed is recorded, so the row never renders "?" with
+	// nothing in the error log to say what refused.
 	if err == nil {
 		t.Fatal("a failed per-resource call returned no error — the reason never reaches the log")
 	}

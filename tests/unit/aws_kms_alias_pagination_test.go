@@ -1,23 +1,10 @@
 package unit
 
-// aws_kms_alias_pagination_test.go — Failing tests for KMS alias full-pagination.
+// aws_kms_alias_pagination_test.go — KMS alias full-pagination.
 //
-// CODER CHECKLIST — new export required from core/aws/kms.go:
-//
-//   func FetchKMSKeysPage(ctx context.Context, c *ServiceClients, continuationToken string) (resource.FetchResult, error)
-//
-// This helper must be extracted from the init() registered closure at kms.go:17-123.
-// The current init() closure calls ListAliases only once (lines 51-59), which misses
-// aliases on subsequent pages. The new FetchKMSKeysPage must fully paginate
-// ListAliases before building the alias map (matching the behavior of FetchKMSKeys
-// at kms.go:169-191, which already paginates correctly).
-//
-// After FetchKMSKeysPage is added, the init() registration should call it:
-//
-//   resource.SetPaginatedForTest("kms", func(ctx context.Context, clients any, tok string) (resource.FetchResult, error) {
-//       c, _ := clients.(*ServiceClients)
-//       return FetchKMSKeysPage(ctx, c, tok)
-//   })
+// FetchKMSKeysPage (core/aws/kms.go) fully paginates ListAliases before
+// building the alias map, matching FetchKMSKeys; a single ListAliases call
+// misses aliases on subsequent pages.
 
 import (
 	"context"
@@ -137,8 +124,6 @@ var _ awsclient.KMSAPI = (*kmsAliasPaginationFake)(nil)
 // ---------------------------------------------------------------------------
 
 func TestFetchKMSKeysPage_FullyPaginatesListAliases(t *testing.T) {
-	// CODER NOTE: This test will fail to compile until FetchKMSKeysPage is
-	// exported from core/aws/kms.go. That is intentional — TDD red phase.
 
 	const (
 		keyA   = "aaaa0000-0000-0000-0000-000000000001"
@@ -258,15 +243,13 @@ func TestFetchKMSKeysPage_FullyPaginatesListAliases(t *testing.T) {
 // ---------------------------------------------------------------------------
 // TestFetchKMSKeysPage_TruncatedAliasesWithNilMarkerTerminates
 //
-// Pins a real production defect: before the fix, a ListAliases response with
-// Truncated=true and a nil NextMarker reset the marker to nil and restarted
-// pagination from page 1 — since kmsRunawayAliasFake always returns that
-// exact malformed response regardless of the Marker it was called with, the
-// pre-fix code would call it forever. kmsRunawayAliasFake bounds that risk
-// itself: it fails the test the instant ListAliases is called more times
-// than the fixed code could ever need, instead of letting a reverted fix
-// spin the suite for real. Against the fixed code the cap is never
-// approached — the nil-marker guard breaks out on the very first call.
+// A ListAliases response with Truncated=true and a nil NextMarker must end
+// pagination, not reset the marker to nil and restart from page 1.
+// kmsRunawayAliasFake always returns that exact malformed response regardless
+// of the Marker it was called with, and bounds the risk itself: it fails the
+// test the instant ListAliases is called more times than the guard could ever
+// need, instead of letting a runaway loop spin the suite for real. The
+// nil-marker guard breaks out on the very first call.
 // ---------------------------------------------------------------------------
 
 // kmsRunawayAliasFake implements awsclient.KMSAPI. Its ListAliases always

@@ -1,13 +1,11 @@
 package unit
 
-// aws_retry_slowdown_test.go — issue #456: "SlowDown" is a legitimate S3
-// (and DynamoDB) throttle error code that ClassifyAWSError does not
-// currently recognize, so RetryOnThrottle gives up on the first attempt
-// instead of backing off and retrying like it does for Throttling /
+// aws_retry_slowdown_test.go — "SlowDown" is a legitimate S3 (and DynamoDB)
+// throttle error code, so ClassifyAWSError must recognize it and
+// RetryOnThrottle must back off and retry like it does for Throttling /
 // ThrottlingException / TooManyRequestsException / RequestLimitExceeded.
 //
-// Reuses MockAPIError from mocks_test.go (same package unit) — no new
-// mocks needed.
+// Reuses MockAPIError from mocks_test.go (same package unit).
 
 import (
 	"context"

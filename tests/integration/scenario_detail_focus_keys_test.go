@@ -2,12 +2,11 @@
 
 package integration
 
-// scenario_detail_focus_keys_test.go — regression pin for the focused-related
-// key routing defect (user-reported 2026-07-14): y (YAML), J (JSON) and
-// t (CloudTrail) were dead while the related column held the cursor, because
-// handleDetailKeyMsg's focused default case fed every unowned key to the
-// right-column widget as filter input. The fix routes unowned keys to the
-// detail screen's own cases whenever the filter input is not active.
+// scenario_detail_focus_keys_test.go — y (YAML), J (JSON) and t (CloudTrail)
+// stay live while the related column holds the cursor: handleDetailKeyMsg
+// routes unowned keys to the detail screen's own cases whenever the filter
+// input is not active, instead of feeding them to the right-column widget as
+// filter input.
 
 import (
 	"strings"

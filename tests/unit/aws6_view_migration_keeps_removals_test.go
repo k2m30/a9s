@@ -24,7 +24,7 @@ import (
 	"github.com/k2m30/a9s/v3/core/config"
 )
 
-// lambdaViewName is the view file the Codex scenario names.
+// lambdaViewName is the view file under test.
 const lambdaViewName = "lambda"
 
 // lambdaDefaultsWithout returns the built-in lambda columns with the named
@@ -51,7 +51,7 @@ func lambdaDefaultsWithout(t *testing.T, title string) ([]config.ListColumn, []c
 	return kept, def.Detail
 }
 
-// TestMigrationKeepsARemovedColumnOnTheWholesalePath pins the path Codex names:
+// TestMigrationKeepsARemovedColumnOnTheWholesalePath pins the wholesale path:
 // every column that REMAINS matches what a build generated, so the file reads as
 // untouched and is replaced with the current defaults, restoring the one the
 // operator deleted.

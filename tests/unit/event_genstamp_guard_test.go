@@ -172,13 +172,10 @@ func esgWalkProductionGo(t *testing.T, roots []string, genFieldByType map[string
 // TestProductionGenStampGuard_EveryConstructionSiteStampsItsGenField is the
 // structural guard: every production construction site of a GenStamped event
 // type (core/, internal/, cmd/, excluding tests and the messages package
-// itself) must set its Gen-bearing field. Zero exceptions today — the coder's
-// audit found exactly two unstamped sites (EmitAPIErrorPayload, since fixed
-// by threading Gen through emitAPIErrorCmd, and the dead-code
-// runtime.RelatedCacheReplay, since deleted) — so this asserts an empty
-// violation set, not a tolerated allowlist. A future forgot-to-stamp site
-// fails this test by name, with the exact file:line, rather than silently
-// shipping the next ConnectGen-shaped leak.
+// itself) must set its Gen-bearing field. This asserts an empty violation
+// set, not a tolerated allowlist: a forgot-to-stamp site fails this test by
+// name, with the exact file:line, rather than silently shipping a
+// ConnectGen-shaped leak.
 func TestProductionGenStampGuard_EveryConstructionSiteStampsItsGenField(t *testing.T) {
 	genFieldByType := esgScanGenFieldNames(t, filepath.Join(esgRepoRoot(), "core", "runtime", "messages"))
 	if len(genFieldByType) == 0 {

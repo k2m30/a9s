@@ -3,20 +3,14 @@ package unit
 // qa_navigable_absent_contract_test.go — absent/nil AWS fields must not
 // be marked navigable.
 //
-// This file is NOT a PR #273 regression pin. It surfaced during PR #273
-// review as a fundamental bug in fieldpath.ExtractFieldList: when the
-// AWS API returns nil for a navigable pointer, the "-" placeholder is
-// still marked IsNavigable=true, producing a dead affordance on every
-// registered navigable field across every resource type.
-//
-// Bug report: a DocDB cluster with KmsKeyId=nil rendered the KmsKeyId row
-// as "-" but with the navigable style. Pressing Enter tries to navigate
-// to a kms resource identified by "-" — a dead affordance.
-//
-// The bug lives in fieldpath.ExtractFieldList: when the AWS API value is
-// absent, the function emits a FieldItem with Value="-" AND
-// IsNavigable=true if the path is in the navigable map. The "navigable"
-// annotation is unconditional on path match; it ignores whether a real
+// fieldpath.ExtractFieldList must not mark the "-" placeholder
+// IsNavigable=true when the AWS API returns nil for a navigable pointer:
+// that is a dead affordance on every registered navigable field across
+// every resource type (a DocDB cluster with KmsKeyId=nil would render the
+// KmsKeyId row as "-" in the navigable style, and Enter would try to
+// navigate to a kms resource identified by "-"). The "navigable" annotation
+// must depend on a real value existing to navigate to, not only on the path
+// match.
 // value exists to navigate to.
 //
 // Contract (asserted below for every registered shortName × every

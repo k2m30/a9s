@@ -1,8 +1,5 @@
-// list_ports_test.go — live-seam port pins for the ResourceList/MainMenu
-// family. Ports three narrow, verified-missing behavior pins from the doomed
-// legacy view-model tests (specs/022-codebase-cleanup/wave3-map-list-menu.md)
-// onto the LIVE controller seams, so the legacy pins can be deleted in a
-// later round without losing coverage:
+// list_ports_test.go — pins on the LIVE controller seams for the
+// ResourceList/MainMenu family:
 //
 //  1. listFilterResources (core/app/list_filter.go) — Fields-value and
 //     Findings-phrase text-filter match branches. core/app/list_test.go's
@@ -10,17 +7,11 @@
 //  2. reapplyCheckerAgainst (core/app/list_filter.go), driven through the
 //     real c.Handle(messages.ResourcesLoaded{...}) event path — merge-across-
 //     LoadMore, non-truncated extension, zero-initial filtering, and sort
-//     preservation. Existing coverage (reapply_checker_leak_test.go,
-//     headless_regression_test.go) only pins leak-prevention and payload
+//     preservation. reapply_checker_leak_test.go and
+//     headless_regression_test.go only pin leak-prevention and payload
 //     shape, never the merge/grow/sort behavior itself.
-//  3. IdentityColumnIndex (core/app/list_columns.go) — byte-parity
-//     against the legacy identity-column cascade (resolveIdentityColumn in
-//     internal/tui/views/table_render.go), across every real catalog type.
-//     Nothing else checks that IdentityColumnIndex COMPUTES the same index
-//     the legacy cascade would for real types: the purity file's
-//     render-consumption counterpart went with the glyph it used to translate
-//     body.IdentityCol into. Self-contained on purpose — it shares no helper
-//     with the parity file it outlived.
+//  3. IdentityColumnIndex (core/app/list_columns.go) — the identity-column
+//     cascade across every real catalog type. Self-contained on purpose.
 package unit_test
 
 import (
@@ -53,11 +44,8 @@ func openListController(t *testing.T, shortName string) *app.Controller {
 }
 
 // newListController is a compatibility shim: qa_controller_frame_title_issue_badge_test.go
-// and qa_title_warning_findings_test.go depend on a helper of this exact name
-// that used to live in resourcelist_render_parity_test.go (deleted after its
-// pins were ported here, construction now routed through
-// openListController/newTestController instead of a raw app.New call). Kept
-// here so those two out-of-scope files keep compiling unchanged.
+// and qa_title_warning_findings_test.go depend on a helper of this exact
+// name; construction is routed through openListController/newTestController.
 func newListController(t *testing.T, shortName string) *app.Controller {
 	return openListController(t, shortName)
 }
@@ -371,16 +359,14 @@ func wave3IdentityColResources(td resource.ResourceTypeDef, n int) []resource.Re
 }
 
 // ===========================================================================
-// 4. applyListFilters attention branch (round 4 unique-pin port) — CodeRabbit
-//    PR-273: a resource whose Wave-1 Color always resolves Healthy and whose
-//    embedded r.Findings is empty must still be shown under the attention
-//    filter (ctrl+z) when it carries a Wave-2 enrichment finding correlated
-//    by ID only (c.listEnrichmentFindings, fed by ApplyEnrichmentState).
+// 4. applyListFilters attention branch: a resource whose Wave-1 Color
+//    always resolves Healthy and whose embedded r.Findings is empty must
+//    still be shown under the attention filter (ctrl+z) when it carries a
+//    Wave-2 enrichment finding correlated by ID only
+//    (c.listEnrichmentFindings, fed by ApplyEnrichmentState).
 //    core/app/list_test.go's TestListAttention_* only exercise resources
 //    with a populated r.Findings — this branch (`len(r.Findings) == 0` +
-//    `findings[r.ID]` lookup in applyListFilters) was otherwise unpinned.
-//    Ported from the deleted qa_attention_filter_test.go's
-//    TestAttentionFilter_IncludesResourcesWithFindings.
+//    `findings[r.ID]` lookup in applyListFilters) is pinned here.
 // ===========================================================================
 
 func TestAttentionFilter_IncludesResourcesWithWave2OnlyFindings(t *testing.T) {
@@ -452,17 +438,13 @@ func TestAttentionFilter_ReappliesOnLateEnrichmentArrival(t *testing.T) {
 }
 
 // ===========================================================================
-// 5. handleResourcesLoadedEvent mismatched/alias ResourceType routing (round
-//    4 unique-pin port) — a ResourcesLoaded event is applied only to a screen
-//    whose canonicalized ResourceType (resource.FindResourceType(...).ShortName)
-//    matches the message's own canonicalized ResourceType; a late fetch for a
-//    different type must never populate the active list, and an alias on
-//    either side (e.g. "rds" wire-stamped for canonical "dbi") must still
-//    match. Ported from the deleted resourcelist_mismatched_type_test.go's
-//    TestResourceListModel_ResourcesLoaded_DropsMismatchedType/
-//    AppliesMatchingType — the alias-specific cases were not otherwise pinned
-//    at the controller level (core/app/handle.go:187-230 documents the
-//    canonicalization intent but had no positive test).
+// 5. handleResourcesLoadedEvent mismatched/alias ResourceType routing — a
+//    ResourcesLoaded event is applied only to a screen whose canonicalized
+//    ResourceType (resource.FindResourceType(...).ShortName) matches the
+//    message's own canonicalized ResourceType; a late fetch for a different
+//    type must never populate the active list, and an alias on either side
+//    (e.g. "rds" wire-stamped for canonical "dbi") must still match
+//    (core/app/handle.go documents the canonicalization intent).
 // ===========================================================================
 
 func TestResourcesLoaded_DropsMismatchedType(t *testing.T) {
@@ -539,13 +521,11 @@ func TestResourcesLoaded_AppliesMatchingType(t *testing.T) {
 }
 
 // ===========================================================================
-// 6. RenderList narrow-screen column fit — port of tui_resourcelist_test.go's
-// TestResourceList_NarrowScreen_ShowsAllColumns (a fixed bug: a narrow
-// terminal used to DROP a wide column entirely instead of shrinking it).
-// m.fitColumns (resourcelist.go), called from the live RenderList seam, is
-// otherwise untested — the legacy pin only exercised it via the dead View().
-// log_events's real catalog columns (Timestamp:22, Message:120) already
-// exceed an 80-col terminal, so no synthetic type is needed.
+// 6. RenderList narrow-screen column fit: a narrow terminal must shrink a
+// wide column, never DROP it. m.fitColumns (resourcelist.go) is called from
+// the live RenderList seam. log_events's real catalog columns (Timestamp:22,
+// Message:120) already exceed an 80-col terminal, so no synthetic type is
+// needed.
 // ===========================================================================
 
 func TestRenderList_NarrowScreen_ShrinksWideColumnInsteadOfDropping(t *testing.T) {

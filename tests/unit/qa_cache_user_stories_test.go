@@ -45,11 +45,10 @@ func TestQA_CacheStories_WarmReentryRestoresListState(t *testing.T) {
 		Target:       messages.TargetResourceList,
 		ResourceType: "ec2",
 	})
-	// INVERTED (listgen row 2, cache review finding 11): a warm re-entry now
-	// re-verifies. HandleNavigate returns the KindFetchResources task for the
-	// row-store hit, so both adapters seed the retained rows AND fetch. The
-	// old "cmd == nil" assertion encoded a list that was fresh forever; do not
-	// restore it. The rows-rendered-instantly half below is unchanged.
+	// A warm re-entry re-verifies: HandleNavigate returns the KindFetchResources
+	// task for the row-store hit, so both adapters seed the retained rows AND
+	// fetch; a list is never fresh forever. The rows-rendered-instantly half
+	// below is unchanged.
 	if cmd == nil {
 		t.Fatal("warm re-entry should be served from cache AND re-verified")
 	}
@@ -105,11 +104,10 @@ func TestQA_CacheStories_LoadMoreUpdatesWarmCache(t *testing.T) {
 		Target:       messages.TargetResourceList,
 		ResourceType: "ct-events",
 	})
-	// INVERTED (listgen row 2, cache review finding 11): a warm re-entry now
-	// re-verifies. HandleNavigate returns the KindFetchResources task for the
-	// row-store hit, so both adapters seed the retained rows AND fetch. The
-	// old "cmd == nil" assertion encoded a list that was fresh forever; do not
-	// restore it. The rows-rendered-instantly half below is unchanged.
+	// A warm re-entry re-verifies: HandleNavigate returns the KindFetchResources
+	// task for the row-store hit, so both adapters seed the retained rows AND
+	// fetch; a list is never fresh forever. The rows-rendered-instantly half
+	// below is unchanged.
 	if cmd == nil {
 		t.Fatal("re-entering a paginated list after load-more should re-verify the merged page set")
 	}
@@ -139,12 +137,10 @@ func TestQA_CacheStories_RelatedNavigationUsesTargetDataCachedFromBackgroundLoad
 		Fields: map[string]string{"instance_id": "i-cache-001"},
 	}
 	// tg registers Children[Key="enter"] → tg_health with ContextKeys
-	// {"target_group_arn":"target_group_arn"}. Rule (owner, 2026-07-06 —
-	// supersedes the 2026-04-24 "mirror manual Enter" rule): a related pivot
-	// that narrows to exactly ONE resource always opens that resource's
-	// plain detail view, even when the target registers an enter-keyed
-	// child view. Pressing Enter inside tg's own list still reaches
-	// tg_health unchanged.
+	// {"target_group_arn":"target_group_arn"}. A related pivot that narrows to
+	// exactly ONE resource always opens that resource's plain detail view,
+	// even when the target registers an enter-keyed child view. Pressing Enter
+	// inside tg's own list still reaches tg_health unchanged.
 	tg1 := resource.Resource{
 		ID:     "tg-cache-1",
 		Name:   "frontend-tg",
@@ -179,7 +175,7 @@ func TestQA_CacheStories_RelatedNavigationUsesTargetDataCachedFromBackgroundLoad
 	}
 
 	plain := stripANSI(rootViewContent(m))
-	// Must NOT enter tg_health — the 2026-07-06 rule always opens detail.
+	// Must NOT enter tg_health — a single-target pivot always opens detail.
 	if strings.Contains(plain, "tg_health") {
 		t.Fatalf("related cache hit on tg must NOT enter tg_health (2026-07-06 rule: Count=1 pivot always opens detail), got:\n%s", plain)
 	}
@@ -342,11 +338,10 @@ func TestQA_CacheStories_RefreshingChildViewDoesNotEvictTopLevelCache(t *testing
 		Target:       messages.TargetResourceList,
 		ResourceType: "ct-events",
 	})
-	// INVERTED (listgen row 2, cache review finding 11): a warm re-entry now
-	// re-verifies. HandleNavigate returns the KindFetchResources task for the
-	// row-store hit, so both adapters seed the retained rows AND fetch. The
-	// old "cmd == nil" assertion encoded a list that was fresh forever; do not
-	// restore it. The rows-rendered-instantly half below is unchanged.
+	// A warm re-entry re-verifies: HandleNavigate returns the KindFetchResources
+	// task for the row-store hit, so both adapters seed the retained rows AND
+	// fetch; a list is never fresh forever. The rows-rendered-instantly half
+	// below is unchanged.
 	if cmd == nil {
 		t.Fatal("refreshing a child view must not evict an unrelated top-level cache entry")
 	}

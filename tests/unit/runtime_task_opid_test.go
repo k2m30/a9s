@@ -11,8 +11,7 @@ package unit
 // The admission DECISION itself (entry.inFlight bookkeeping, the running/opID
 // comparison) lives in core/web's unexported sessionEntry/drainBackgroundTasks
 // and is not reachable from tests/unit (external, unexported). TaskOpID is the
-// one piece of that mechanism the coordinator's spec asked to be covered
-// instead, since it landed as exported core/runtime API: every TaskRequest
+// exported core/runtime piece of that mechanism: every TaskRequest
 // admission decision starts from whatever this function returns for a given
 // payload, so a wrong return here (e.g. a payload type that should carry an op
 // ID falling through to the zero default) would silently defeat the

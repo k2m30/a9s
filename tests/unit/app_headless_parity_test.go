@@ -1,4 +1,4 @@
-// app_headless_parity_test.go — issue #464 headless-lane parity tests for
+// app_headless_parity_test.go — headless-lane parity tests for
 // core/app.Controller: a failed AWS connect (via Handle's ClientsReady lane
 // and via BootstrapLive) must roll back and surface an error flash exactly
 // like the TUI does, and Controller.OpenProfileSelector is the blessed
@@ -45,8 +45,8 @@ func writeHeadlessAWSConfig(t *testing.T, profiles []string) string {
 	return path
 }
 
-// TestHeadless_SelectProfile_FailedConnect_RollsBackAndFlashes is the issue
-// #464 acceptance test: a headless caller selects a broken profile, the
+// TestHeadless_SelectProfile_FailedConnect_RollsBackAndFlashes: a headless
+// caller selects a broken profile, the
 // connect task is never drained (this test feeds the failure result
 // directly), and Controller.Handle must roll the session back to the prior
 // stable profile and surface an error flash — the same outcome the TUI's

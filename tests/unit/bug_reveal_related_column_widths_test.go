@@ -14,10 +14,9 @@ import (
 
 // TestBugReveal_EC2Detail_RelatedVisibleAcrossWidths verifies the RELATED
 // panel remains visible on the EC2 detail view across a spectrum of terminal
-// widths. Widths 76 and 95 were previously covered by two separate bug-reveal
-// files (see issue #248 Batch 3a); 60 (minimum supported boundary), 120, and
-// 160 are additional probes. Width 40 is below the app's 60-column floor and
-// shows "Terminal too narrow" instead of the detail view, so it is excluded.
+// widths: 60 (minimum supported boundary), 76, 95, 120, and 160. Width 40 is
+// below the app's 60-column floor and shows "Terminal too narrow" instead of
+// the detail view, so it is excluded.
 func TestBugReveal_EC2Detail_RelatedVisibleAcrossWidths(t *testing.T) {
 	ec2 := mustDemoEC2(t)
 	for _, w := range []int{60, 76, 95, 120, 160} {

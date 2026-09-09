@@ -4,11 +4,9 @@
 //
 // The phrase row reaches the renderer carrying the finding's raw wording as
 // its label and the glyph-and-capital display form as its value. Only the
-// display form is painted. A flag on the detail model used to be able to turn
-// that into "raw phrase: display form" for a plain-text copy of the screen;
-// nothing in the app ever set it and no such copy is taken through this
-// renderer, so it is gone. This pins what the screen is supposed to show, so
-// the flag cannot come back by accident.
+// display form is painted; there is no flag that turns it into "raw phrase:
+// display form", since nothing in the app takes a plain-text copy of the
+// screen through this renderer.
 package unit
 
 import (

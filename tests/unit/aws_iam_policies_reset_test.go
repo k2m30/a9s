@@ -1,11 +1,10 @@
 package unit
 
-// aws_iam_policies_reset_test.go — Regression pins for the PolicyStore-based
-// IAM policy cache (replaces the former package-level ResetIAMPoliciesCache).
+// aws_iam_policies_reset_test.go — pins for the PolicyStore-based IAM policy
+// cache.
 //
-// Two Scenarios verified:
-//   TestPolicyStore_ClearForcesRebuild — proves the cache is rebuilt
-//     from a new mock after store.Clear(), not from stale prior data.
+//   TestPolicyStore_ClearForcesRebuild — the cache is rebuilt from a new mock
+//     after store.Clear(), not from stale prior data.
 //   TestPolicyStore_ClearIdempotent — calling Clear twice in a row must not panic.
 
 import (
@@ -23,9 +22,8 @@ import (
 
 // countingListPoliciesAPI is an IAMAPI mock that returns a single policy from
 // ListPolicies (counting calls) and stubs ListGroups empty — FetchIAMPoliciesByIDsFull
-// (successor to the removed FetchIAMPoliciesByIDs) always runs the inline
-// group-policy sweep too, so a bare ListPolicies-only mock would panic through
-// the embedded nil IAMAPI on the first ListGroups call.
+// always runs the inline group-policy sweep too, so a bare ListPolicies-only
+// mock would panic through the embedded nil IAMAPI on the first ListGroups call.
 type countingListPoliciesAPI struct {
 	awsclient.IAMAPI
 	calls      atomic.Int64

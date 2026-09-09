@@ -1,9 +1,7 @@
 package unit
 
-// aws_iam_group_pagination_test.go — Failing tests for EnrichIAMGroup pagination.
-//
-// These tests document the REQUIRED behavior after the coder implements
-// pagination for GetGroup, ListAttachedGroupPolicies, and ListGroupPolicies.
+// aws_iam_group_pagination_test.go — EnrichIAMGroup pagination over GetGroup,
+// ListAttachedGroupPolicies, and ListGroupPolicies.
 //
 // All three operations use IAM's Marker/IsTruncated pagination pattern.
 // After pagination, counts are exact (not truncated) unless the walk is

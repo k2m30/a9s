@@ -510,10 +510,8 @@ func TestQA_S3_YAML_FromObjectList(t *testing.T) {
 
 // Test that the S3 bucket list has the four columns the operator sees.
 //
-// w197: it used to assert two, which was the type's own list before the
-// per-type list in core/config was folded into it. The built-in view has
-// rendered Region and Status all along, so two was never what a bucket list
-// showed — do not restore it.
+// The built-in view renders Region and Status as well as the two the type
+// lists by itself.
 func TestQA_S3_BucketList_ExpectedColumns(t *testing.T) {
 	rt := resource.FindResourceType("s3")
 	if rt == nil {
@@ -534,7 +532,7 @@ func TestQA_S3_BucketList_ExpectedColumns(t *testing.T) {
 
 func TestQA_S3_ObjectList_ExpectedColumns(t *testing.T) {
 	cols := resource.S3ObjectColumns()
-	// w197: the order is the built-in view's, which is the order rendered.
+	// The order is the built-in view's, which is the order rendered.
 	expectedTitles := []string{"Key", "Size", "Storage Class", "Last Modified"}
 
 	if len(cols) != len(expectedTitles) {

@@ -1,24 +1,13 @@
 package unit
 
-// qa_enrichment_rerun_navigation_test.go — RED test for Bug 2: Ctrl+R rerun skipped
-// when user navigates away before the fetch returns.
+// qa_enrichment_rerun_navigation_test.go — the Ctrl+R enrichment rerun must
+// fire even when the user navigates away before the fetch returns.
 //
-// Bug: The tail branch in app.go (lines 452-482) that fires probeEnrichment after a
-// Ctrl+R-wrapped ResourcesLoadedMsg is nested inside:
-//
-//	if rl, ok := updatedModel.activeView().(*views.ResourceListModel); ok {
-//	    if rl.ParentContext() == nil && !rl.EscPops() {
-//	        // ... tail branch here
-//	    }
-//	}
-//
-// If the user navigates away (e.g., back to main menu) before the fetch returns,
-// activeView() is no longer a *ResourceListModel, the outer type-assert fails,
-// and the entire block — including the TypeGen tail — is skipped. The enrichment
-// rerun is never dispatched and findings stay cleared forever.
-//
-// Demanded behavior (post-fix): the TypeGen tail must run unconditionally of the
-// active view, whenever msg.TypeGen != 0 && msg.TypeGen == enrichmentTypeGen[T].
+// The TypeGen tail that fires probeEnrichment after a Ctrl+R-wrapped
+// ResourcesLoadedMsg runs unconditionally of the active view, whenever
+// msg.TypeGen != 0 && msg.TypeGen == enrichmentTypeGen[T]; a tail nested
+// inside an activeView().(*views.ResourceListModel) assertion is skipped
+// once the user is back on the main menu, and findings stay cleared forever.
 //
 // Test T067:
 //   T067 — Ctrl+R + navigate away: probeEnrichment must still fire when wrapped
@@ -108,7 +97,7 @@ func TestListCtrlR_RerunDispatchedEvenAfterNavigatingAway(t *testing.T) {
 			"active-ResourceListModel check which fails when active view is MainMenuModel.")
 	}
 
-	// Step 6: If probeCmd is non-nil (post-fix), execute it and verify it does not
+	// Step 6: If probeCmd is non-nil, execute it and verify it does not
 	// panic. With nil clients the enricher will return an error, which is acceptable
 	// — we only need to confirm the cmd was dispatched (the branch ran).
 	if probeCmd != nil {

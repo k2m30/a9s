@@ -273,13 +273,6 @@ func TestRelated_Apigw_KMS_WrongRawStructType(t *testing.T) {
 // names by calling apigatewayv2:GetDomainNames then apigatewayv2:GetApiMappings
 // per domain. Domains whose mappings include the target API ID contribute their
 // DomainNameConfigurations[*].CertificateArn to the result set.
-//
-// CODER: implement checkApigwACM in core/aws/apigw_related.go so that it
-// calls GetDomainNames + GetApiMappings via the APIGatewayV2API client (which
-// must also embed APIGatewayV2GetDomainNamesAPI and APIGatewayV2GetApiMappingsAPI
-// — both defined in core/aws/interfaces_apigateway.go).
-// Update APIGatewayV2API in core/aws/interfaces_apigateway.go to embed both
-// sub-interfaces alongside APIGatewayV2GetApisAPI and APIGatewayV2GetStagesAPI.
 // ---------------------------------------------------------------------------
 
 // fakeAPIGWV2ACM satisfies the extended APIGatewayV2API interface (including

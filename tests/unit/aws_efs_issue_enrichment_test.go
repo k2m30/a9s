@@ -3,18 +3,17 @@
 // Tests the CONTRACT from docs/historical/resources-impl-plans/efs-impl-plan.md §1 Wave-2,
 // U7b, U7c, U7e (detail content), U11.
 //
-// AS-140 (Wave-2 enricher migration): FieldUpdates["status"] is no longer
-// written by EnrichEFSMountTargets. The merged §4 status phrase is computed
-// at render time by phraseFromFindings(r.Findings) in extractCellValue —
+// EnrichEFSMountTargets never writes FieldUpdates["status"]. The merged §4
+// status phrase is computed at render time by phraseFromFindings(r.Findings) in extractCellValue —
 // wave-1 findings reach r.Findings via the fetcher, wave-2 findings via
 // applyEnrichment.
 //
 // Covered invariants:
 //   - TestEnrichEFSMountTargets_HealthyRowWithDown — healthy FS + MT-B creating:
-//     Summary="mount target down", FieldUpdates is empty (AS-140),
+//     Summary="mount target down", FieldUpdates is empty,
 //     Rows include {MountTarget,AZ,State,Degraded}, U11 (Summary ≠ Row values).
 //   - TestEnrichEFSMountTargets_W1WarningPlusW2Bumps — W1 "updating" + W2 "mount target down":
-//     Finding emitted, FieldUpdates empty (AS-140 — bump now at render time).
+//     Finding emitted, FieldUpdates empty (bump at render time).
 //   - TestEnrichEFSMountTargets_AllHealthyMounts_NoFinding — graph-root 3 MTs all available:
 //     no finding produced for ProdEFSID.
 //   - TestEnrichEFSMountTargets_SummaryDoesNotContainRowValues — U11 pin.
@@ -40,7 +39,7 @@ import (
 //   - Enricher produces ONE finding for fs-0healthymtdown001.
 //   - Severity = "!"
 //   - Summary = "mount target down" (exact §4 phrase; ≤ 40 chars)
-//   - FieldUpdates is empty (AS-140: status overlay removed; phrase reaches
+//   - FieldUpdates is empty (no status overlay; phrase reaches
 //     S4 via phraseFromFindings(r.Findings) at render time)
 //   - Rows contain: {Mount Target, AZ, State, Degraded}
 //   - U11: Summary must NOT contain any Row Value as substring.
@@ -84,7 +83,7 @@ func TestEnrichEFSMountTargets_HealthyRowWithDown(t *testing.T) {
 		t.Errorf("Phrase length %d > 40 chars: %q", len(finding.Phrase), finding.Phrase)
 	}
 
-	// AS-140: FieldUpdates must be empty — the merged display phrase is
+	// FieldUpdates must be empty — the merged display phrase is
 	// computed by phraseFromFindings(r.Findings) at render time.
 	if updates, hasUpdates := result.FieldUpdates[fsID]; hasUpdates && len(updates) != 0 {
 		t.Errorf("AS-140: expected empty FieldUpdates for %q (status overlay removed); got %v", fsID, updates)
@@ -138,7 +137,7 @@ func TestEnrichEFSMountTargets_HealthyRowWithDown(t *testing.T) {
 //   - Fetcher sets Status="updating", Issues=["updating"].
 //   - Enricher: W2 Broken > W1 Warning in severity.
 //   - Finding emitted for fsID with Summary="mount target down".
-//   - FieldUpdates is empty (AS-140: the "(+1)" suffix is computed at render
+//   - FieldUpdates is empty (the "(+1)" suffix is computed at render
 //     time by phraseFromFindings(r.Findings) over the stacked W1+W2 findings).
 //   - Resource.Issues (Wave-1 only) stays = ["updating"].
 // ---------------------------------------------------------------------------
@@ -163,8 +162,8 @@ func TestEnrichEFSMountTargets_W1WarningPlusW2Bumps(t *testing.T) {
 		t.Fatalf("expected finding for %q, got none", fsID)
 	}
 
-	// AS-140: FieldUpdates must be empty. The W1+W2 stack merge to
-	// "mount target down (+1)" now happens at render time via
+	// FieldUpdates must be empty. The W1+W2 stack merge to
+	// "mount target down (+1)" happens at render time via
 	// phraseFromFindings(r.Findings) on the unified findings slice.
 	if updates, hasUpdates := result.FieldUpdates[fsID]; hasUpdates && len(updates) != 0 {
 		t.Errorf("AS-140: expected empty FieldUpdates for %q (status overlay removed); got %v", fsID, updates)
@@ -310,9 +309,9 @@ func TestEnrichEFSMountTargets_FindingRowsStructure(t *testing.T) {
 // ---------------------------------------------------------------------------
 // TEST: TestEnrichEFSMountTargets_FieldUpdates_EmptyAS140
 //
-// AS-140: EnrichEFSMountTargets no longer writes FieldUpdates entries — the
-// merged display phrase is computed at render time. The result.FieldUpdates
-// map may legitimately be nil or non-nil but length 0 after this migration.
+// EnrichEFSMountTargets writes no FieldUpdates entries — the merged display
+// phrase is computed at render time. result.FieldUpdates may be nil or
+// non-nil but length 0.
 // ---------------------------------------------------------------------------
 
 func TestEnrichEFSMountTargets_FieldUpdates_EmptyAS140(t *testing.T) {

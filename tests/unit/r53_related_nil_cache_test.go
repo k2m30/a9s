@@ -208,11 +208,11 @@ func TestR53Related_NoCacheNoFetcher_Unknown(t *testing.T) {
 	}
 }
 
-// TestR53Related_TruncatedTargetPageNoMatch_Truncated is INVERTED (was: the
-// same case asserted Unknown). Row 16 settled it the other way: a list that WAS
-// read is evidence, so nothing matching in it is a real zero so far, and the
-// truncation flag is what says a later page may add to it. Unknown is reserved
-// for a list that was never read at all, which the test above covers.
+// TestR53Related_TruncatedTargetPageNoMatch_Truncated: a list that WAS read
+// is evidence, so nothing matching in it is a real zero so far, and the
+// truncation flag is what says a later page may add to it. Unknown is
+// reserved for a list that was never read at all, which the test above
+// covers.
 func TestR53Related_TruncatedTargetPageNoMatch_Truncated(t *testing.T) {
 	for _, tc := range nilCacheCases() {
 		t.Run(tc.target, func(t *testing.T) {

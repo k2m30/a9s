@@ -226,9 +226,7 @@ func TestCR273_AllTypes_ColorClassification(t *testing.T) {
 					Fields: map[string]string{c.statusField: status},
 				}
 				// Every type reads its colour from findings, so the probe row
-				// needs the finding that carries the bucket's severity. The
-				// allowlist this used to consult listed the handful of types
-				// that had got there first.
+				// needs the finding that carries the bucket's severity.
 				if want != resource.ColorHealthy {
 					var sev domain.Severity
 					switch want {

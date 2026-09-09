@@ -2,9 +2,9 @@
 
 package unit
 
-// aws3_partial_failure_vocabulary_test.go — spec row 6 (task aws3): a
-// resource that refused more than one check says so, and a walk stopped by a
-// failed page names the page as a page rather than posing as a resource id.
+// aws3_partial_failure_vocabulary_test.go — a resource that refused more
+// than one check says so, and a walk stopped by a failed page names the page
+// as a page rather than posing as a resource id.
 
 import (
 	"context"

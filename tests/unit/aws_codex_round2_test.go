@@ -1,7 +1,4 @@
-// aws_codex_round2_test.go pins three externally-reviewed findings against
-// HEAD. Each test is expected to be RED until the paired coder task lands
-// the fix; the assertions encode the documented/correct mechanism, not the
-// current (broken) behavior.
+// aws_codex_round2_test.go pins three related-checker contracts.
 package unit_test
 
 import (

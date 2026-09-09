@@ -342,13 +342,13 @@ func TestDetailWorkload_CacheReplay_CompleteCoverage_RelatedOmitted_EnrichPresen
 }
 
 // TestDetailWorkload_CacheReplay_PartialCoverage_RelatedStillDispatched
-// covers the replay carve-out's PARTIAL-coverage half (#261 Codex P1): a
-// related cache covering only SOME of ec2's registered defs must still
-// merge every cached entry it has into the panel (render what you know), but
-// must NOT suppress KindRelatedCheck — the still-uncached defs' rows would
-// otherwise be stranded in Loading forever, since BeginDetailOperation has
-// already invalidated whatever was still running for them under any prior
-// operation ID.
+// covers the replay carve-out's PARTIAL-coverage half: a related cache
+// covering only SOME of ec2's registered defs must still merge every cached
+// entry it has into the panel (render what you know), but must NOT suppress
+// KindRelatedCheck — the still-uncached defs' rows would otherwise be
+// stranded in Loading forever, since BeginDetailOperation has already
+// invalidated whatever was still running for them under any prior operation
+// ID.
 func TestDetailWorkload_CacheReplay_PartialCoverage_RelatedStillDispatched(t *testing.T) {
 	c, core := newDetailParityHeadlessController(t)
 	const id = "i-workload0000010"
@@ -394,16 +394,15 @@ func TestDetailWorkload_CacheReplay_PartialCoverage_RelatedStillDispatched(t *te
 }
 
 // ---------------------------------------------------------------------------
-// YAML/JSON direct-open cache-replay suppression (#261 Codex-flagged
-// regression, item b): beginDetailWorkloadLocked's suppression decision
-// (relatedCacheCoverage) is screen-independent — a YAML/JSON-only open has
-// no detail panel to merge into, but must still suppress KindRelatedCheck on
-// complete coverage exactly like the plain-detail path above
+// YAML/JSON direct-open cache-replay suppression: beginDetailWorkloadLocked's
+// suppression decision (relatedCacheCoverage) is screen-independent — a
+// YAML/JSON-only open has no detail panel to merge into, but must still
+// suppress KindRelatedCheck on complete coverage exactly like the
+// plain-detail path above
 // (TestDetailWorkload_CacheReplay_CompleteCoverage_.../_PartialCoverage_...).
-// Before the fix, replayRelatedCache bailed out (incomplete) whenever
-// topDetailState() was nil — always true under a YAML/JSON screen — so
-// every such open re-ran the ENTIRE related fan-out against AWS regardless
-// of cache completeness.
+// A replay that bailed out whenever topDetailState() was nil — always true
+// under a YAML/JSON screen — would re-run the ENTIRE related fan-out against
+// AWS on every such open regardless of cache completeness.
 // ---------------------------------------------------------------------------
 
 func TestDetailWorkload_YAMLOpen_CompleteCoverage_RelatedOmitted(t *testing.T) {
@@ -735,21 +734,19 @@ func TestStickyRefresh_EnricherlessTypeDoesNotArmIt(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// regenerateTextScreenLocked stack-wide regeneration (#261 Codex-flagged
-// regression, item b): open YAML, open JSON on top of it — a newer
-// DetailOperation begins for the JSON open, invalidating the YAML
-// operation's own in-flight enrich result, so only the JSON operation's
-// result ever folds. Before the fix, regenerateTextScreenLocked only touched
-// c.stack[len(c.stack)-1] (JSON, the top), so popping back to the buried
-// YAML screen revealed it permanently unenriched. It now regenerates EVERY
-// stacked YAML/JSON screen whose (ResourceType, ResourceID) matches.
+// regenerateTextScreenLocked stack-wide regeneration: open YAML, open JSON
+// on top of it — a newer DetailOperation begins for the JSON open,
+// invalidating the YAML operation's own in-flight enrich result, so only the
+// JSON operation's result ever folds. regenerateTextScreenLocked regenerates
+// EVERY stacked YAML/JSON screen whose (ResourceType, ResourceID) matches,
+// not only c.stack[len(c.stack)-1], so popping back to the buried YAML
+// screen does not reveal it permanently unenriched.
 //
-// ActionBack behavior found landed (core/app/actions_nav.go,
-// handleActionBack): unchanged — its re-dispatch branch only fires for
-// c.topDetailState() (a revealed ScreenDetail), nothing analogous exists for
-// a revealed text screen. Regeneration alone suffices: a revealed YAML/JSON
-// screen already shows enriched content from the stack-wide fold, with no
-// new task dispatch on the pop.
+// ActionBack (core/app/actions_nav.go, handleActionBack): its re-dispatch
+// branch only fires for c.topDetailState() (a revealed ScreenDetail);
+// nothing analogous exists for a revealed text screen. Regeneration alone
+// suffices: a revealed YAML/JSON screen already shows enriched content from
+// the stack-wide fold, with no new task dispatch on the pop.
 // ---------------------------------------------------------------------------
 
 func TestDetailState_RegenerateTextScreen_StackedYAMLBeneathJSON_BothRegenerateOnEnrich(t *testing.T) {

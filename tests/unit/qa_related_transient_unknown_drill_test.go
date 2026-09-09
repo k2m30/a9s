@@ -1,10 +1,10 @@
-// qa_related_transient_unknown_drill_test.go — pins FEATURE #38 (owner
-// decision 2026-07-06): a related-panel row showing the transient "(?)"
-// badge (resolved-unknown, cold-cache State: RelatedUnknown with NO
-// FetchFilter — see resource.FormatRelatedCount / related_unknown_badge_test.go for the badge
-// contract, and TestNGColdCacheGuard_EBS_NoCacheEntry_NoLiveFetch in
+// qa_related_transient_unknown_drill_test.go — a related-panel row showing
+// the transient "(?)" badge (resolved-unknown, cold-cache State:
+// RelatedUnknown with NO FetchFilter — see resource.FormatRelatedCount /
+// related_unknown_badge_test.go for the badge contract, and
+// TestNGColdCacheGuard_EBS_NoCacheEntry_NoLiveFetch in
 // aws_ng_cold_cache_guard_test.go for the real checker that produces this
-// exact shape) must be ACTIONABLE end-to-end:
+// exact shape) is ACTIONABLE end-to-end:
 //
 //  1. Enter on a "(?)" row opens the TARGET TYPE's plain top-level list —
 //     the same navigation any menu entry would produce — not a filtered/
@@ -17,25 +17,21 @@
 // related_unknown_badge_test.go and TestNGColdCacheGuard_EBS_NoCacheEntry_NoLiveFetch
 // use. checkNGEBS (core/aws/ng_related.go) returns
 // resource.UnknownRelated("ebs") (State: RelatedUnknown, Count: 0) — no
-// FetchFilter, no RelatedIDs — whenever the "ec2" RowStore entry is cold, because it joins
-// against the EC2 cache by tag rather than issuing a live AWS call
-// (docs/resources/ng.md §2 ebs bullet). This is constructible directly from
-// the harness: build an ng resource.Resource by hand (mirroring
-// ngResourceForCacheMissBadge in related_unknown_badge_test.go) and never
-// load "ec2" resources before opening its detail — the checker result is
-// then fed via a real messages.RelatedCheckResult, exactly as production's
-// fan-out would deliver it.
+// FetchFilter, no RelatedIDs — whenever the "ec2" RowStore entry is cold,
+// because it joins against the EC2 cache by tag rather than issuing a live
+// AWS call (docs/resources/ng.md §2 ebs bullet). This is constructible
+// directly from the harness: build an ng resource.Resource by hand
+// (mirroring ngResourceForCacheMissBadge in related_unknown_badge_test.go)
+// and never load "ec2" resources before opening its detail — the checker
+// result is then fed via a real messages.RelatedCheckResult, exactly as
+// production's fan-out would deliver it.
 //
 // Registry scoping: "ng" registers NINE related defs in production
 // (catalog_containers.go). The real keyboard-cursor machinery
 // (detailSkipUnselectableRelated / stepToSelectable, core/app/detail_cursor.go
 // + actions_nav.go) only stops the cursor on a row that is ALREADY
-// actionable — it can never land on a purely non-actionable row when no
-// actionable row exists anywhere in the panel (stepToSelectable returns the
-// cursor unchanged when no non-skippable index is found in either
-// direction). Since a transient "(?)" row is, by definition, the exact state
-// this feature makes actionable for the FIRST time, there is no way to reach
-// it via Up/Down against the full 9-def panel pre-fix. This file scopes "ng"
+// actionable, and stepToSelectable returns the cursor unchanged when no
+// non-skippable index is found in either direction. This file scopes "ng"
 // down to its real, single ebs def via resource.SetRelatedForTest (restored
 // via t.Cleanup(CleanupRelatedForTest)) so the lone row starts focused at
 // cursor 0 — the checker, DisplayName, and TargetType are all captured live
@@ -49,54 +45,41 @@
 // internal state). Package unit (not unit_test) is required to reach those
 // harness helpers.
 //
-// Root-cause seams this file pins (for the coder):
+// Seams pinned:
 //
-//   - Pin 1 (RED today): the live keyboard Enter path on a focused related
-//     row is internal/tui/app_stack.go's handleDetailKeyMsg, case
-//     `!rs.rightCol.IsFiltering() && key.Matches(msg, m.keys.Enter)`
-//     (app_stack.go:315-346). It reads m.ctrl.SelectedRelatedRow() (the
-//     controller-owned ds.RelatedCursor/ds.RelatedRows — NOT the renderer's
-//     own RightColumnModel.rows) and gates on
-//     resource.IsRelatedActionable(row.State, row.Count, row.Truncated).
-//     For State: RelatedUnknown with no FetchFilter, IsRelatedActionable
-//     now returns true (core/resource/related.go:290-306) — the owner's
-//     2026-07-06 decision made this transient (no-filter, resolved-unknown)
-//     row actionable so Enter fires the RelatedNavigate dispatch.
+//   - Pin 1: the live keyboard Enter path on a focused related row is
+//     internal/tui/app_stack.go's handleDetailKeyMsg, case
+//     `!rs.rightCol.IsFiltering() && key.Matches(msg, m.keys.Enter)`. It
+//     reads m.ctrl.SelectedRelatedRow() (the controller-owned
+//     ds.RelatedCursor/ds.RelatedRows — NOT the renderer's own
+//     RightColumnModel.rows) and gates on
+//     resource.IsRelatedActionable(row.State, row.Count, row.Truncated),
+//     which returns true for State: RelatedUnknown with no FetchFilter
+//     (core/resource/related.go), so Enter fires the RelatedNavigate
+//     dispatch.
 //
-//   - Pin 2 (RED today): even if Pin 1's gate is opened, ResolveRelatedNavigate
-//     (core/runtime/handlers_related.go) resolves a RelatedNavigate with
-//     empty TargetID/RelatedIDs/FetchFilter to NavigationKindResourceList
-//     (its documented "otherwise" fallback, case 7). The TUI adapter's
-//     NavigationKindResourceList branch (internal/tui/runtime_adapter_related.go:392-406)
-//     calls m.newRelatedList, which ALWAYS sets a title suffix
-//     (runtime.RelatedTitleSuffix(src)) and SetEscPops(true) — a
-//     related/contextual list, not "the same navigation any menu entry would
-//     produce" (messages.Navigate{Target: TargetResourceList}, which carries
-//     no title suffix and does not force EscPops). This test pins the
-//     user-visible distinguishing facts rendered straight into the frame:
-//     the frame TITLE (app_view.go's frameTitle -> ctrl.ListFrameTitle(),
-//     rendered by layout.RenderFrameWithHints) must not carry the
-//     RelatedTitleSuffix, and the footer must not show the "esc Back" hint
-//     (core/app/footer.go: buildListFooterHints only appends that hint
-//     when ls.EscPops is true) that every related/contextual list forces.
+//   - Pin 2: ResolveRelatedNavigate (core/runtime/handlers_related.go)
+//     resolves a RelatedNavigate with empty TargetID/RelatedIDs/FetchFilter
+//     to the same navigation a menu entry produces
+//     (messages.Navigate{Target: TargetResourceList}, no title suffix, no
+//     forced EscPops), not a related/contextual list via m.newRelatedList
+//     (which sets runtime.RelatedTitleSuffix(src) and SetEscPops(true)).
+//     This test pins the user-visible distinguishing facts rendered straight
+//     into the frame: the frame TITLE (app_view.go's frameTitle ->
+//     ctrl.ListFrameTitle(), rendered by layout.RenderFrameWithHints) must
+//     not carry the RelatedTitleSuffix, and the footer must not show the
+//     "esc Back" hint (core/app/footer.go: buildListFooterHints only
+//     appends that hint when ls.EscPops is true) that every
+//     related/contextual list forces.
 //
-//   - Pin 3 (RED today): app_input.go's Escape handler pops a related-drill
-//     list with zero re-dispatch of any related-check machinery — the
-//     `rs.kind == rsKindList && m.ctrl.GetListEscPops()` branch
-//     (app_input.go:120-123) calls popRS() (app_stack.go's
-//     popRS/popRSWithCtrlPop), a bare stack pop with no RelatedCheckStarted
-//     dispatch anywhere in that path (contrast with the Detail-view Ctrl+R
-//     handler in runtime_adapter_navigate.go:599-644, which explicitly
-//     re-dispatches RelatedCheckStarted — Esc-return has no analogous hook).
-//     The revealed detail's rendererState.rightCol is the SAME
+//   - Pin 3: after Esc-return, once the target cache has warmed, the
+//     ng->ebs row's badge must show the real resolved count, not a stale
+//     "(?)". The revealed detail's rendererState.rightCol is the SAME
 //     RightColumnModel instance from before the drill (rendererState fields
 //     live underneath the popped list on m.stack, untouched by popRS), so
-//     its cached State: RelatedUnknown row for "EBS Volumes" is never
-//     re-evaluated — the badge stays stale "(?)" forever without a manual
-//     Ctrl+R. This test
-//     pins that after Esc-return, once the target cache has warmed, the
-//     ng->ebs row's badge must show the real resolved count, not the stale
-//     "(?)".
+//     the return path must re-evaluate its cached State: RelatedUnknown
+//     row, the way the Detail-view Ctrl+R handler in
+//     runtime_adapter_navigate.go re-dispatches RelatedCheckStarted.
 package unit
 
 import (
@@ -306,6 +289,5 @@ func TestTransientUnknownDrill_EnterRecomputesInPlace(t *testing.T) {
 	}
 }
 
-// (Owner decision #38's "return via Esc recomputes" pin is retired: fix #3
-// makes a scoreless row resolve in place on the drill itself, so there is no
+// (A scoreless row resolves in place on the drill itself, so there is no
 // list to Esc back from — see TestTransientUnknownDrill_EnterRecomputesInPlace.)

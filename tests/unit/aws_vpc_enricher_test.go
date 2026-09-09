@@ -222,9 +222,8 @@ func TestEnrichVPCFlowLogs_APIErrorMarksRowTruncatedIDFindsOtherVPCNoBadge(t *te
 	resources := vpcResources("vpc-00000001", "vpc-00000002")
 
 	result, err := awsclient.EnrichVPCFlowLogs(context.Background(), clients, resources, nil)
-	// INVERTED for the "skipped" spec row 5: this required err == nil, which
-	// meant the row could render "?" with nothing in the error log to say what
-	// refused. The call that failed is recorded now. Do not restore.
+	// The call that failed is recorded, so the row never renders "?" with
+	// nothing in the error log to say what refused.
 	if err == nil {
 		t.Fatal("a failed per-resource call returned no error — the reason never reaches the log")
 	}

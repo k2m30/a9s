@@ -35,8 +35,6 @@ import (
 // Given: tui.New is called with empty profile and region
 // When:  we read m.AppContext()
 // Then:  the returned context is non-nil and not yet cancelled
-//
-// This test will FAIL TO COMPILE until the coder adds AppContext() Context on Model.
 // ---------------------------------------------------------------------------
 
 func TestModel_HasAppContext(t *testing.T) {
@@ -56,8 +54,6 @@ func TestModel_HasAppContext(t *testing.T) {
 // Given: a freshly constructed Model
 // When:  tea.QuitMsg{} is sent via Update
 // Then:  m.AppContext().Err() == context.Canceled
-//
-// This test will FAIL TO COMPILE until the coder adds AppContext() on Model.
 // ---------------------------------------------------------------------------
 
 func TestModel_QuitCancelsAppContext(t *testing.T) {
@@ -98,8 +94,7 @@ func TestModel_QuitCancelsAppContext(t *testing.T) {
 // When:  we read each file and count occurrences of "context.Background()"
 // Then:  count == 0 in every file
 //
-// This is a static pin test: it will FAIL today (~12 occurrences across files)
-// and PASS only after the coder threads the app context through all fetch sites.
+// Static pin: the app context is threaded through every fetch site.
 // ---------------------------------------------------------------------------
 
 func TestFetchersUseContextNotBackground(t *testing.T) {

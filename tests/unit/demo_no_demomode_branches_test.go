@@ -9,12 +9,8 @@ import (
 
 // TestDemo_NoDemoModeBranches walks every non-test .go file under
 // internal/tui/, core/aws/, and core/resource/ and fails if any file
-// contains the substring "demoMode" or "DemoMode".
-//
-// This is a TDD guardrail for feature 014-demo-transport-mock: once the coder
-// deletes every demoMode branch (T034–T037*), this test must pass. Until then
-// it must fail (current code has many references). Do NOT delete the
-// references — that is the coder's job.
+// contains the substring "demoMode" or "DemoMode": demo behaviour lives in
+// the transport mock, never in production branches.
 //
 // go test sets the working directory to tests/unit/, so the paths below are
 // relative to that directory.

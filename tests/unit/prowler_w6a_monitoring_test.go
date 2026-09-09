@@ -217,8 +217,8 @@ func w6aEnrichTrail(t *testing.T, fake *w6aTrailS3Fake, rs ...resource.Resource)
 }
 
 // w6aEnrichTrailErr is w6aEnrichTrail for the case that expects a refusal: a
-// bucket the role may not read is a recorded failure ("skipped" spec row 5),
-// so the shape half of the invariants is checked and the error is returned.
+// bucket the role may not read is a recorded failure, so the shape half of
+// the invariants is checked and the error is returned.
 func w6aEnrichTrailErr(t *testing.T, fake *w6aTrailS3Fake, rs ...resource.Resource) (awsclient.IssueEnricherResult, error) {
 	t.Helper()
 	res, err := w2Enricher(t, "trail")(context.Background(), &awsclient.ServiceClients{S3: fake}, rs, nil)
@@ -304,9 +304,8 @@ func TestW6ATrailLogBucket_UnreadableBucketIsUnknownNotClean(t *testing.T) {
 		w6aTrailRes("acme-public-bucket-trail", "acme-public-audit-logs"),
 	)
 
-	// INVERTED for the "skipped" spec row 5: the shared helper failed the test
-	// on any error, so a refused bucket read was marked "?" and never
-	// explained. Do not restore the error-free helper here.
+	// The shared helper fails the test on any error, which would leave a
+	// refused bucket read marked "?" and never explained.
 	if err == nil || !strings.Contains(err.Error(), "acme-denied-trail") {
 		t.Errorf("trail enricher err = %v, want it to name the trail whose bucket it could not read", err)
 	}

@@ -1,101 +1,65 @@
 package unit
 
-// iam_inline_sweep_test.go pins the live production defect where the "policy"
-// resource type's availability/count probe blocks the whole main-menu badge
+// iam_inline_sweep_test.go pins that the "policy" resource type's
+// availability/count probe must never block the whole main-menu badge
 // refresh on a per-group IAM inline-policy sweep.
 //
-// Verified root-cause chain (traced against the code at HEAD, not assumed):
+// The chain:
 //
-//  1. core/runtime/probes.go:630-649 (Core.ProbeResourceAvailability)
-//     resolves pf := resource.GetPaginatedFetcher("policy"), opens a 10s
-//     context.WithTimeout at line 644, and calls pf(probeCtx, clients, "")
-//     — i.e. the FIRST PAGE of the "policy" fetcher, continuationToken="".
-//  2. core/aws/catalog_security.go:144-169 registers that exact Fetcher
-//     closure for ShortName "policy". On the first page (continuationToken
-//     == "") it calls FetchIAMPoliciesPage (cheap, ListPolicies Scope=Local
-//     only) and THEN unconditionally calls fetchInlineGroupPolicies(ctx,
-//     c.IAM) before returning — so the probe's cheap managed-only intent is
-//     defeated: it always also runs the full per-group inline sweep.
-//  3. core/aws/iam_policies.go:420-462 (fetchInlineGroupPolicies) lists
-//     ALL IAM groups via ListGroups, then loops them SEQUENTIALLY, issuing
-//     one ListGroupPolicies per group, each wrapped in RetryOnThrottle
-//     (core/aws/retry.go:38). On a profile with many groups this burns
-//     the probe's shared 10s deadline; groups whose call lands after the
-//     deadline fail with a non-retryable ctx error (context errors are not
-//     smithy.APIError, so ClassifyAWSError — core/aws/errors.go:11 —
-//     always returns retryable=false for them, so RetryOnThrottle does not
-//     even get a backoff cycle to make things worse, it just fails fast).
+//  1. core/runtime/probes.go (Core.ProbeResourceAvailability) resolves the
+//     type's availability fetcher, opens a 10s context.WithTimeout, and
+//     calls it with continuationToken="" — the FIRST PAGE only.
+//  2. core/aws/catalog_security.go registers the "policy" Fetcher closure,
+//     which on the first page calls FetchIAMPoliciesPage (cheap,
+//     ListPolicies Scope=Local only) and then fetchInlineGroupPolicies(ctx,
+//     c.IAM) before returning.
+//  3. core/aws/iam_policies.go (fetchInlineGroupPolicies) lists ALL IAM
+//     groups via ListGroups, then issues one ListGroupPolicies per group,
+//     each wrapped in RetryOnThrottle (core/aws/retry.go). Context errors
+//     are not smithy.APIError, so ClassifyAWSError (core/aws/errors.go)
+//     returns retryable=false for them and a group whose call lands after
+//     the deadline fails fast.
 //  4. Per-group failures are collected into one composite via
-//     core/aws/partial_errors.go:33 AggregateFailures("ListGroupPolicies",
-//     failures, total), which joins EVERY failing ID with no cap — on the
-//     reported profile (49 IAM groups, 36 timed out) this produced the
-//     single unbounded flash line:
-//     "availability policy: ListGroupPolicies failed for 36 of 49 IDs: <36
-//     joined per-group reasons>" (formatted by
-//     core/runtime/handlers_availability.go:317).
+//     core/aws/partial_errors.go AggregateFailures("ListGroupPolicies",
+//     failures, total), formatted by core/runtime/handlers_availability.go
+//     as "availability policy: ListGroupPolicies failed for N of M IDs: ...".
 //
-// Three independent, behavior-level regressions are pinned below, each
-// against the real seam a fix must touch.
+// Three behavior-level pins, each against the real seam:
 //
-// Item 1 was re-pinned after a coder proved the original item-1 and item-2
-// tests were mutually exclusive at the shared seam: both drove
-// resource.GetPaginatedFetcher("policy") with continuationToken="", and
-// there is no production-observable signal at that single function that
-// tells a "probe wants cheap managed-only" call apart from a "real list-open
-// wants everything" call — the coder's item-2 fix (bounded concurrency,
-// landed) legitimately keeps fetchInlineGroupPolicies in that same closure
-// for real list-opens. Per the repo's stated preference for deterministic
-// per-type config over signal-guessing, item 1 now pins an EXPLICIT new
-// registry seam instead, following the existing per-type registration
-// family in core/resource (SetPaginatedForTest / GetPaginatedFetcher /
-// CleanupPaginatedForTest in accessors.go; SetFetchByIDsForTest /
-// GetFetchByIDs / CleanupFetchByIDsForTest in related.go):
-//
-//   - resource.SetAvailabilityFetcherForTest(shortName, f) /
-//     resource.GetAvailabilityFetcher(shortName) /
-//     resource.CleanupAvailabilityFetcherForTest(shortName) — a new registry,
-//     same PaginatedFetcher shape, NOT YET IMPLEMENTED as of this test file.
-//   - core/runtime/probes.go's Core.ProbeResourceAvailability must call
-//     resource.GetAvailabilityFetcher(shortName) first and use it WHEN
-//     REGISTERED, falling back to resource.GetPaginatedFetcher(shortName)
-//     otherwise — zero behavior change for the other 66 types that never
-//     register one.
-//   - core/aws must register a cheap managed-only availability fetcher
-//     for "policy" (e.g. alongside the Fetcher closure in
-//     catalog_security.go) that never calls ListGroupPolicies.
-//
-// The three new item-1 tests below (TestProbeResourceAvailability_*,
-// TestPolicyAvailabilityFetcher_Registered*) reference these not-yet-existing
-// resource.*AvailabilityFetcher* symbols directly. This is a deliberate,
-// scoped TDD RED step (per this repo's established multi-symbol red-phase
-// practice): tests/unit will not build until a coder lands the registry +
-// probe wiring + "policy" registration. Items 2 and 3 below are unchanged
-// from the prior (already-landed, green) round; their source is left as-is
-// so the diff a coder needs to unblock the package is exactly the three new
-// symbols plus the probes.go branch and the "policy" registration — nothing
-// else in this file changes.
-//
-//   - TestFetchInlineGroupPolicies_SequentialSweepMissesDeadline and
-//     TestFetchInlineGroupPolicies_ConcurrencyStaysBounded pin (3): a
-//     deadline-bound completion assertion (RED today — sequential can't
-//     finish 49 groups before a deadline sized to make that structurally
-//     impossible) plus a forward-looking max-in-flight guard (already green
-//     today, since sequential trivially satisfies "at most 5 concurrent" —
-//     it becomes a real regression guard once a bounded-concurrency fix
-//     lands, per the confirmed scope: "keep item 2's in-flight-bound
-//     assertion as the forward-looking guard").
-//     fetchInlineGroupPolicies itself is unexported, so both tests drive it
-//     indirectly through the same resource.GetPaginatedFetcher("policy")
-//     seam used above (and by the existing
+//   - Item 1 — a per-type availability fetcher registry, following the
+//     per-type registration family in core/resource
+//     (SetPaginatedForTest / GetPaginatedFetcher / CleanupPaginatedForTest
+//     in accessors.go; SetFetchByIDsForTest / GetFetchByIDs /
+//     CleanupFetchByIDsForTest in related.go):
+//       - resource.SetAvailabilityFetcherForTest(shortName, f) /
+//         resource.GetAvailabilityFetcher(shortName) /
+//         resource.CleanupAvailabilityFetcherForTest(shortName) — same
+//         PaginatedFetcher shape.
+//       - Core.ProbeResourceAvailability calls
+//         resource.GetAvailabilityFetcher(shortName) first and uses it WHEN
+//         REGISTERED, falling back to resource.GetPaginatedFetcher(shortName)
+//         otherwise — zero behavior change for types that never register one.
+//       - core/aws registers a cheap managed-only availability fetcher for
+//         "policy" that never calls ListGroupPolicies.
+//     A single GetPaginatedFetcher("policy") call with continuationToken=""
+//     carries no signal that tells a "probe wants cheap managed-only" call
+//     apart from a "real list-open wants everything" call, and the repo
+//     prefers deterministic per-type config over signal-guessing.
+//   - Item 2 — TestFetchInlineGroupPolicies_SequentialSweepMissesDeadline and
+//     TestFetchInlineGroupPolicies_ConcurrencyStaysBounded: a deadline-bound
+//     completion assertion (a sequential sweep cannot finish 49 groups
+//     before a deadline sized to make that structurally impossible) plus a
+//     max-in-flight guard (at most 5 concurrent). fetchInlineGroupPolicies
+//     itself is unexported, so both tests drive it through the same
+//     resource.GetPaginatedFetcher("policy") seam (and the
 //     tests/unit/aws_iam_group_inline_policy_test.go callPolicyFetcher
 //     pattern) — there is no other way to reach it from package unit.
-//   - The three AggregateFailures tests pin (4): the composite builder must
+//   - Item 3 — the three AggregateFailures tests: the composite builder must
 //     cap per-ID enumeration and summarize the remainder instead of joining
-//     an unbounded list. RED today (current implementation joins every
-//     failure with no cap — see core/aws/partial_errors.go:33-39).
+//     an unbounded list.
 //
-// Timing values below are scaled down from the reported 200ms/10s numbers
-// to keep this file fast (whole-file wall time budget: a few seconds), while
+// Timing values below are scaled down from the live 200ms/10s numbers to
+// keep this file fast (whole-file wall time budget: a few seconds), while
 // preserving the same structural ratio: sequential total time clearly
 // exceeds the deadline, bounded-concurrency time clearly does not.
 
@@ -566,9 +530,8 @@ func TestFetchInlineGroupPolicies_ConcurrencyStaysBounded(t *testing.T) {
 
 // syntheticGroupFailures builds n realistic failure records in the exact
 // shape fetchInlineGroupPolicies feeds to AggregateFailures
-// (core/aws/iam_policies.go:444). The reason is the real error, not a
-// rendered string: the "skipped" spec row 1 removed the string lane, so a
-// failure only ever reaches the aggregate as id, class and cause.
+// (core/aws/iam_policies.go). The reason is the real error, not a rendered
+// string: a failure only ever reaches the aggregate as id, class and cause.
 func syntheticGroupFailures(n, startIdx int) []awsclient.Failure {
 	failures := make([]awsclient.Failure, 0, n)
 	for i := 0; i < n; i++ {
@@ -578,17 +541,11 @@ func syntheticGroupFailures(n, startIdx int) []awsclient.Failure {
 	return failures
 }
 
-// TestAggregateFailures_GroupsByCause_36of49GroupSweep reproduces the exact
-// reported scenario (49 groups, 36 failing) against the CURRENT contract.
-//
-// INVERTED for the "firstscreen" spec row 3 (a denied enrichment logs one line
-// per type per cause). This test was
-// TestAggregateFailures_CapsPerIDEnumeration_36of49GroupSweep and asserted
-// that 5 failures are named verbatim and the rest summarized as "and 31 more".
-// That shape is gone: 36 resources failing the SAME way is one fact, so the
-// aggregate now states the cause once with a count and one example. Do not
-// restore the per-ID enumeration or the "and N more" suffix — a wall of
-// per-resource lines carrying request ids is exactly what row 3 removed.
+// TestAggregateFailures_GroupsByCause_36of49GroupSweep reproduces the
+// reported scenario (49 groups, 36 failing): 36 resources failing the SAME
+// way is one fact, so the aggregate states the cause once with a count and
+// one example — never a wall of per-resource lines carrying request ids, and
+// no "and N more" suffix.
 func TestAggregateFailures_GroupsByCause_36of49GroupSweep(t *testing.T) {
 	const total = 49
 	const failCount = 36
@@ -604,8 +561,8 @@ func TestAggregateFailures_GroupsByCause_36of49GroupSweep(t *testing.T) {
 		t.Errorf("composite error dropped its header shape; got: %s", msg)
 	}
 	// "timeout", not "context deadline exceeded": the class supplies the
-	// cause now that the record carries it ("skipped" spec row 1). Do not
-	// restore the Go error's own words — no site renders them any more.
+	// cause, since the record carries it; no site renders the Go error's own
+	// words.
 	if !strings.Contains(msg, "timeout") {
 		t.Errorf("composite error dropped the shared cause; got: %s", msg)
 	}
@@ -631,11 +588,8 @@ func TestAggregateFailures_GroupsByCause_36of49GroupSweep(t *testing.T) {
 // TestAggregateFailures_SmallFailureSet_StillOneLinePerCause pins that a small
 // failure set is phrased by the same rule as a large one.
 //
-// INVERTED for the "firstscreen" spec row 3. This test was
-// TestAggregateFailures_NoCapWhenFailureCountIsSmall and required all 3 IDs
-// verbatim below the enumeration cap. Enumeration is gone; three resources
-// refused for one reason is still one cause with one example. Do not restore
-// the per-ID enumeration.
+// Three resources refused for one reason is still one cause with one
+// example; there is no per-ID enumeration.
 func TestAggregateFailures_SmallFailureSet_StillOneLinePerCause(t *testing.T) {
 	const total = 49
 	const failCount = 3
@@ -664,10 +618,6 @@ func TestAggregateFailures_SmallFailureSet_StillOneLinePerCause(t *testing.T) {
 // TestAggregateFailures_DistinctCauses_EachNamedOnce pins that grouping is per
 // cause: two different reasons in one batch each keep their own count and
 // example, so a genuinely mixed failure set is not collapsed into one.
-//
-// INVERTED for the "firstscreen" spec row 3. This test was
-// TestAggregateFailures_CapsEnumeration_AllIDsFailing and required the
-// "and 44 more" suffix on an all-failing batch. Do not restore it.
 func TestAggregateFailures_DistinctCauses_EachNamedOnce(t *testing.T) {
 	const total = 49
 	failures := append(syntheticGroupFailures(4, 0),

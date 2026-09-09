@@ -143,14 +143,10 @@ func TestFetchCloudTrailTrails_NilBoolFields(t *testing.T) {
 	}
 }
 
-// TestFetchCloudTrailTrails_LogFileValidationFieldKey verifies that the fetcher
-// stores the log file validation flag under the key "log_file_validation_enabled",
-// which is exactly the key the colorer in types_monitoring.go:113 reads.
-//
-// CodeRabbit PR-273 finding: core/aws/trail.go:111 writes key "log_validation"
-// but the colorer at types_monitoring.go:113 reads "log_file_validation_enabled" —
-// they never match in production, so the colorer always sees "" and skips the check.
-// This test will FAIL until trail.go uses the correct key name.
+// TestFetchCloudTrailTrails_LogFileValidationFieldKey verifies that the
+// fetcher stores the log file validation flag under the key
+// "log_file_validation_enabled", which is exactly the key the colorer reads;
+// with the two keys apart the colorer always sees "" and skips the check.
 func TestFetchCloudTrailTrails_LogFileValidationFieldKey(t *testing.T) {
 	mock := &mockCloudTrailClient{
 		output: &cloudtrail.DescribeTrailsOutput{
@@ -215,9 +211,8 @@ func TestFetchCloudTrailTrails_LogFileValidationFieldKey(t *testing.T) {
 // (silent delivery)." A trail that is actively logging (IsLogging==true) but
 // whose most recent successful S3 delivery is more than an hour old must be
 // classified Broken — CloudTrail is silently failing to ship log files even
-// though it reports itself as "logging". This is RED at HEAD: trail.go never
-// reads GetTrailStatusOutput.LatestDeliveryTime, so no finding or field is
-// ever produced for this condition and colorTrail has no way to see it.
+// though it reports itself as "logging"; trail.go reads
+// GetTrailStatusOutput.LatestDeliveryTime so colorTrail can see it.
 func TestFetchCloudTrailTrails_StaleDeliveryIsBroken(t *testing.T) {
 	staleDelivery := time.Now().Add(-2 * time.Hour)
 

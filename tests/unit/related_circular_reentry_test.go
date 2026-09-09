@@ -1,28 +1,23 @@
 package unit
 
-// related_circular_reentry_test.go — Pins for the live, deterministic bug:
-// a circular related drill (detail A -> drill count-1 row -> detail B ->
-// drill count-1 row back to A) leaves the re-entered A's RELATED panel with
-// ALL rows bare (no badges, not even a loading state) because the cache
-// replay in the NavigationKindDetail branch of handleRelatedNavigate
-// (internal/tui/runtime_adapter_related.go) runs BEFORE the first render of
-// the re-pushed detail screen, and nothing re-seeds the panel on a cache
-// MISS either (no related-check task dispatch).
+// related_circular_reentry_test.go — a circular related drill (detail A ->
+// drill count-1 row -> detail B -> drill count-1 row back to A) must re-seed
+// the re-entered A's RELATED panel: the cache replay in the
+// NavigationKindDetail branch of handleRelatedNavigate
+// (internal/tui/runtime_adapter_related.go) lands on the re-pushed detail
+// screen, and a cache MISS dispatches the related-check tasks again.
 //
 // Harness follows related_cache_bug_test.go / related_navigate_cache_enter_child_test.go:
 // build a demo root model, drive it via rootApplyMsg/drainCmds, and assert
 // on the ANSI-stripped rendered view. Package unit (not unit_test) is
 // required to reach those harness helpers.
 //
-// Pin 4 (header/version, on coordinator guidance): the invariant that holds
-// regardless of what the parallel coder determines "[N]" to be (deliberate
-// depth badge vs. accidental corruption) is that the header of a
+// Pin 4 (header/version): regardless of whether "[N]" is rendered, the
+// header of a
 // drill-entered detail screen must contain the resolved buildinfo version
 // string. tui.Version is a package var (set from cmd/a9s/main.go at real
 // run time) so the test sets it directly to a sentinel and asserts its
-// well-formed presence ("v"+sentinel) in the rendered header — no assertion
-// is made here about whether "[N]" also appears, since that is the coder's
-// call to make.
+// well-formed presence ("v"+sentinel) in the rendered header.
 
 import (
 	"strings"
@@ -254,8 +249,8 @@ func TestRelatedCircularReentry_CacheMiss_DispatchesChecks(t *testing.T) {
 // var normally set by cmd/a9s/main.go from core/buildinfo at real
 // startup; the test sets it directly so the assertion is independent of the
 // build-time injection mechanism. This pins the direction-agnostic half of
-// the header contract: whatever the coder decides "[N]" should be (present
-// alongside the version or not at all), the version substring itself must
+// the header contract: whether or not "[N]" is present alongside the
+// version, the version substring itself must
 // never be displaced.
 func TestRelatedCircularReentry_HeaderShowsResolvedVersion(t *testing.T) {
 	const sentinelVersion = "9.9.9-test"

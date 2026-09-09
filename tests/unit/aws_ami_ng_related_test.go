@@ -1,16 +1,10 @@
 package unit_test
 
-// aws_ami_ng_related_test.go — Failing tests for the AMI→NG related checker.
+// aws_ami_ng_related_test.go — the AMI→NG related checker.
 //
-// checkAMING currently has a comment noting it "will never match" because
-// Fields["image_id"] is absent from nodegroup resources. These tests pin the
-// expected behaviour AFTER the coder:
-//
-//  1. Extends FetchNodeGroups to resolve and populate Fields["image_id"] from the
-//     nodegroup's custom LaunchTemplate via EC2 DescribeLaunchTemplateVersions.
-//  2. Removes the placeholder comment from checkAMING in ami_related_extra.go.
-//
-// Tests are RED until both changes land.
+// checkAMING matches on Fields["image_id"], which FetchNodeGroups resolves
+// from the nodegroup's custom LaunchTemplate via EC2
+// DescribeLaunchTemplateVersions.
 
 import (
 	"context"

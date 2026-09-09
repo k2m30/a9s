@@ -1,6 +1,4 @@
-// aws_review_pins_test.go — pinning tests added in response to code review.
-// Each test pins a specific invariant that previously had no regression guard.
-// They must fail before the corresponding fix lands (red-first) and pass after.
+// aws_review_pins_test.go — efs registration and fixture pins.
 package unit
 
 import (
@@ -13,13 +11,12 @@ import (
 )
 
 // ---------------------------------------------------------------------------
-// #9 PIN — efs SetFieldKeysForTest must include every key the fetcher writes.
-//
-// The fetcher populates Fields["throughput_mode"] (efs.go:152) but the initial
-// SetFieldKeysForTest list at efs.go:15 omitted it. This makes the key invisible
-// to tooling that enumerates the registered keys (viewsgen, YAML merging).
 // ---------------------------------------------------------------------------
-
+// efs SetFieldKeysForTest must include every key the fetcher writes: the
+// fetcher populates Fields["throughput_mode"], and a key missing from the
+// registered list is invisible to tooling that enumerates the registered
+// keys (viewsgen, YAML merging).
+// ---------------------------------------------------------------------------
 func TestEFS_RegisterFieldKeys_IncludesThroughputMode(t *testing.T) {
 	keys := resource.GetFieldKeys("efs")
 	for _, k := range keys {
@@ -31,14 +28,11 @@ func TestEFS_RegisterFieldKeys_IncludesThroughputMode(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// #10 PIN — EFS mount-target ENI Groups[].GroupName must match the GroupName
-// on the SecurityGroup fixtures with the same GroupId.
-//
-// The ENI fixtures for ProdEFSSecurityGroupA/B were literals "efs-prod-app-data-sg-a/b"
-// while buildSecurityGroups emitted GroupName="acme-efs-prod-sg-a/b". A name
-// mismatch for the same GroupId is a self-inconsistent graph.
 // ---------------------------------------------------------------------------
-
+// EFS mount-target ENI Groups[].GroupName must match the GroupName on the
+// SecurityGroup fixtures with the same GroupId; a name mismatch for the same
+// GroupId is a self-inconsistent graph.
+// ---------------------------------------------------------------------------
 func TestEFS_FixtureENIGroupNamesMatchSecurityGroups(t *testing.T) {
 	fix := fixtures.NewEC2Fixtures()
 
@@ -75,41 +69,3 @@ func TestEFS_FixtureENIGroupNamesMatchSecurityGroups(t *testing.T) {
 		}
 	}
 }
-
-// ---------------------------------------------------------------------------
-// #11 PIN — DELETED by AS-140.
-//
-// The original test pinned the EnrichEFSMountTargets suffix-bump idempotency
-// invariant against the FieldUpdates["status"] write path. AS-140 removed
-// that write entirely (the merged "mount target down (+N)" phrase is now
-// computed at render time by phraseFromFindings(r.Findings) in
-// internal/tui/views/table_render.go), making the bug structurally
-// impossible: the enricher no longer computes or stores the merged phrase.
-// This is parallel to the QA deletion of snapshot_cross_ref_internal_test.go
-// (which pinned the now-deleted computeMergedStatus helper).
-//
-// The new structural invariant ("FieldUpdates is empty after enrichment") is
-// pinned by the AS-140 assertions in tests/unit/aws_efs_issue_enrichment_test.go.
-// ---------------------------------------------------------------------------
-
-// ---------------------------------------------------------------------------
-// The Redshift phrase-probe pin is gone. It asserted that the Color func could
-// classify a resource carrying nothing but Fields["status"], because the
-// unified Attention renderer used to probe severity by handing the classifier a
-// synthetic phrase. Severity now travels on the finding that produced the
-// phrase, so there is no probe to answer and no phrase table to keep in step
-// with the fetcher. The status to colour mapping it stood in for is pinned
-// against the fetcher in qa_redshift_color_test.go.
-// ---------------------------------------------------------------------------
-
-// ---------------------------------------------------------------------------
-// P2 PIN — OpenSearch enricher must NOT emit a finding for a Deleted domain
-// even when UpdateAvailable is true. A deleted domain's pending update is not
-// actionable; emitting it would contaminate the unified S1 menu badge count.
-// ---------------------------------------------------------------------------
-
-// The deleted-domain guard moved to the fetcher with the checks it guarded, so
-// TestOpenSearch_Enrich_DeletedDomain_SkipsFinding is deleted rather than
-// inverted: TestOpenSearch_Fetch_DeletedPlusBackgroundBackgroundSuppressed
-// (aws_opensearch_test.go) pins the same fact, anchor included, on the surface
-// that now decides it.

@@ -164,17 +164,15 @@ func min(a, b int) int {
 }
 
 // ---------------------------------------------------------------------------
-// Row-store unification (task #17) — no parallel per-type row store outside
+// Row-store unification — no parallel per-type row store outside
 // RowStore; no store-row mutation outside the Amend/AmendRows seam.
 // ---------------------------------------------------------------------------
 
 // forbiddenRowStoreShapeFieldPatterns matches STRUCT FIELD declarations shaped
-// like the legacy per-type row maps the row-store unification plan retired
-// (session.ProbeResources/ResourceCache/LazyResourceCache, all
-// map[string][]resource.Resource, and the runtime.RuntimeState-adjacent
-// map[string]*domain.ListViewCacheEntry shape). A field of either shape
-// outside the store itself would be a new parallel per-type row cache
-// reintroducing the exact class of dual-write drift task #17 eliminated.
+// like a parallel per-type row map (map[string][]resource.Resource, and the
+// runtime.RuntimeState-adjacent map[string]*domain.ListViewCacheEntry shape).
+// A field of either shape outside the store itself would be a new parallel
+// per-type row cache, the dual-write drift class RowStore exists to prevent.
 //
 // Deliberately anchored on "<fieldName> map[...]" (an identifier immediately
 // followed by the map type) rather than a bare "map[string][]resource.Resource"
@@ -194,26 +192,19 @@ var forbiddenRowStoreShapeFieldPatterns = []*regexp.Regexp{
 // field of one of the forbiddenRowStoreShapeFieldPatterns shapes:
 //
 //   - core/session/rowstore.go: RowStore itself — the sole per-type row
-//     store task #17 unifies onto; TypeRows/RowStore's own fields are the
-//     allowed destination, not a violation of the rule they enforce.
+//     store; TypeRows/RowStore's own fields are the allowed destination.
 //   - core/runtime/state.go: RuntimeState.ResourceCache is a documented
 //     derived SNAPSHOT field ("mirrors RowStore's retained... entries for the
 //     active session", state.go's own doc comment) — RuntimeState has no
-//     production constructor call site at HEAD (verified: no
-//     `RuntimeState{` literal anywhere outside this declaration), so it
-//     cannot itself become a second source of truth to drift against
-//     RowStore. If a future change adds a production `RuntimeState{...}`
-//     construction path, this allowance should be revisited alongside it.
+//     production constructor call site, so it cannot itself become a second
+//     source of truth to drift against RowStore.
 //   - The remaining five entries below are all one-shot MESSAGE/EVENT/INTENT/
 //     TASK payload structs, not per-session state: each is constructed fresh
 //     per call/dispatch, carries its Resources/Adds/LazyAddedResources batch
 //     through exactly one handoff (a function call or a single Bubble Tea
 //     message delivery), and is then discarded — never held by reference
-//     across multiple calls the way session.ProbeResources/ResourceCache/
-//     LazyResourceCache were. This is the message-passing analogue of the
-//     "fetchers building NEW rows before Observe" row-construction carve-out:
-//     a transport payload is not a competing store to drift against RowStore.
-//     Verified by direct inspection of each field's owning type at HEAD:
+//     across multiple calls. A transport payload is not a competing store to
+//     drift against RowStore:
 //   - runtime/handlers_resources.go: RelatedCheckResultEvent.LazyAddedResources
 //     (a related-check RESULT event, one per checker completion)
 //   - runtime/intent.go: PatchLazyResourceCache.Adds (a UIIntent value,
@@ -235,12 +226,10 @@ var allowedRowStoreShapeFiles = map[string]struct{}{
 }
 
 // TestConformance_NoParallelPerTypeRowStore_OutsideRowStore scans every
-// non-test production file under internal/ for a struct field shaped like
-// the legacy per-type row maps task #17 (row-store unification) retired.
-// RowStore (core/session/rowstore.go) is the sole per-type row store as
-// of Stage 3+; a new field of either forbidden shape elsewhere would
-// reintroduce the dual-write-drift defect class (D13-D18) that motivated the
-// unification.
+// non-test production file under internal/ for a struct field shaped like a
+// parallel per-type row map. RowStore (core/session/rowstore.go) is the sole
+// per-type row store; a new field of either forbidden shape elsewhere would
+// reintroduce the dual-write-drift defect class (D13-D18).
 func TestConformance_NoParallelPerTypeRowStore_OutsideRowStore(t *testing.T) {
 	for _, root := range confProductionScanRoots {
 		err := filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
@@ -303,20 +292,15 @@ func stripGoComments(src []byte) []byte {
 	return goLineCommentPattern.ReplaceAll(src, []byte(""))
 }
 
-// rowStoreMutationSeamFiles lists the known production call sites of
-// ApplyWave2ToRow/applyWave2ToRow — the two enrich-fold mutators task #17's
-// RowStore.Amend/Core.AmendRows exist to make copy-on-write-safe (see
-// RowStore.Amend's doc comment: "the two enrich-fold implementations in
-// runtime/helpers.go and tui/app_enrich_fold.go both mutate resource.Resource
-// fields in place on a shared backing array; Amend is their eventual
-// dual-write / replacement target"). Verified against HEAD by direct
-// inspection: every one of these files either (a) mutates only a
-// ListState-owned row slice (never RowStore's own backing array), or (b)
-// wraps the mutation inside an Amend/AmendRows copy-on-write callback,
-// operating on that callback's freshly-copied slice — never a bare
-// RowStore.Snapshot/SnapshotAll result. A file added to this set in the
-// future without satisfying (a) or (b) is exactly the mutate-in-place
-// regression this pin exists to catch.
+// rowStoreMutationSeamFiles lists the production call sites of
+// ApplyWave2ToRow/applyWave2ToRow, the two enrich-fold mutators
+// RowStore.Amend/Core.AmendRows make copy-on-write-safe. Every one of these
+// files either (a) mutates only a ListState-owned row slice (never RowStore's
+// own backing array), or (b) wraps the mutation inside an Amend/AmendRows
+// copy-on-write callback, operating on that callback's freshly-copied slice —
+// never a bare RowStore.Snapshot/SnapshotAll result. A file added to this set
+// without satisfying (a) or (b) is the mutate-in-place regression this pin
+// exists to catch.
 var rowStoreMutationSeamFiles = map[string]struct{}{
 	"app/list_columns.go":              {}, // read-only Findings[0] access, not a mutation call site
 	"app/list_body.go":                 {}, // applyRowFindings: ListState.Rows direct + AmendRows-wrapped store leg

@@ -4,10 +4,8 @@ package unit
 //
 // TestClassifyCTVerb_V2Table is a single table-driven test covering every entry
 // in the §2.1 verb table plus the bug-fix cases (BatchGetImage, Decrypt, Encrypt,
-// Sign, ReEncrypt, GenerateDataKey*).
-//
-// Expected to FAIL for the bug-fix cases until the P1 coder updates ClassifyCTVerb
-// in core/aws/ct_events.go (currently Batch* → W, Decrypt → W, etc.).
+// Sign, ReEncrypt, GenerateDataKey*) for ClassifyCTVerb in
+// core/aws/ct_events.go.
 
 import (
 	"testing"

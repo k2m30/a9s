@@ -5,7 +5,7 @@ package unit
 // Tests drive EnrichDynamoDBPITR and assert:
 //   - PITR enabled  → no finding, no FieldUpdates["status"].
 //   - PITR disabled on Healthy row → Findings[id].Severity == "~",
-//     Findings[id].Summary == "PITR off". AS-140 (W1.2 of AS-1390): no
+//     Findings[id].Summary == "PITR off". No
 //     FieldUpdates["status"] is written — the merged display phrase is
 //     computed at render time by phraseFromFindings(r.Findings).
 //   - PITR disabled on non-Healthy row (e.g. "archived: kms key lost") →
@@ -146,8 +146,7 @@ func TestDDB_Enrich_PITREnabled_NoFinding(t *testing.T) {
 }
 
 // TestDDB_Enrich_PITRDisabled_HealthyRow verifies a Healthy ACTIVE table with
-// PITR disabled produces the correct EnrichmentFinding. AS-140 (W1.2 of
-// AS-1390): no FieldUpdates["status"] is written — the display phrase is
+// PITR disabled produces the correct EnrichmentFinding. No FieldUpdates["status"] is written — the display phrase is
 // computed at render time by phraseFromFindings(r.Findings).
 func TestDDB_Enrich_PITRDisabled_HealthyRow(t *testing.T) {
 	fake := &ddbContinuousBackupsFake{
@@ -176,8 +175,8 @@ func TestDDB_Enrich_PITRDisabled_HealthyRow(t *testing.T) {
 		t.Errorf("Phrase = %q, want %q", finding.Phrase, "point-in-time recovery disabled")
 	}
 
-	// AS-140: FieldUpdates must be empty for this resource — the merged
-	// display phrase is now computed at render time by phraseFromFindings.
+	// FieldUpdates must be empty for this resource — the merged
+	// display phrase is computed at render time by phraseFromFindings.
 	if updates, ok := result.FieldUpdates[fixtures.AuditPITROffID]; ok && len(updates) != 0 {
 		t.Errorf("AS-140: expected empty FieldUpdates for %q (status overlay removed); got %v", fixtures.AuditPITROffID, updates)
 	}
@@ -186,8 +185,7 @@ func TestDDB_Enrich_PITRDisabled_HealthyRow(t *testing.T) {
 
 // TestDDB_Enrich_PITRDisabled_NonHealthyRow verifies that a table already
 // carrying "archived: kms key lost" (Wave-1 fetcher phrase) still gets the
-// Wave-2 EnrichmentFinding emitted when PITR is disabled. AS-140 (W1.2 of
-// AS-1390): no FieldUpdates["status"] is written and no (+N) suffix is
+// Wave-2 EnrichmentFinding emitted when PITR is disabled. No FieldUpdates["status"] is written and no (+N) suffix is
 // applied; the merged display phrase is computed at render time by
 // phraseFromFindings(r.Findings).
 func TestDDB_Enrich_PITRDisabled_NonHealthyRow(t *testing.T) {
@@ -218,7 +216,7 @@ func TestDDB_Enrich_PITRDisabled_NonHealthyRow(t *testing.T) {
 		t.Errorf("Phrase = %q, want %q", finding.Phrase, "point-in-time recovery disabled")
 	}
 
-	// AS-140: FieldUpdates must be empty for this resource — the merged
+	// FieldUpdates must be empty for this resource — the merged
 	// Wave-1 + Wave-2 display phrase is computed at render time by
 	// phraseFromFindings(r.Findings).
 	if updates, ok := result.FieldUpdates[fixtures.LegacyArchivedID]; ok && len(updates) != 0 {
@@ -277,10 +275,8 @@ func TestDDB_Enrich_ErrorPath_TruncatedIDNotBadge(t *testing.T) {
 	resources := []resource.Resource{makeDDBResource(errorTableID, "")}
 
 	result, err := awsclient.EnrichDynamoDBPITR(context.Background(), clients, resources, nil)
-	// INVERTED for the "skipped" spec row 4: this asserted err == nil, which
-	// is what a silent skip looks like — the row was marked uninspected and
-	// the reason was dropped on the floor. The failed call is recorded now.
-	// Do not restore the error-free assertion.
+	// The failed call is recorded on the error; a nil error here is a silent
+	// skip, the row marked uninspected with the reason dropped on the floor.
 	if err == nil {
 		t.Fatal("a failed DescribeContinuousBackups returned no error — the reason never reaches the log")
 	}
@@ -300,8 +296,7 @@ func TestDDB_Enrich_ErrorPath_TruncatedIDNotBadge(t *testing.T) {
 	}
 }
 
-// TestDDB_Enrich_PITRDisabled_NoFieldUpdates_WithStackedWave1 verifies AS-140
-// (W1.2 of AS-1390): when the existing status already carries a stacked
+// TestDDB_Enrich_PITRDisabled_NoFieldUpdates_WithStackedWave1 verifies that when the existing status already carries a stacked
 // Wave-1 phrase (e.g. "kms key inaccessible (+2)"), the enricher must NOT
 // write FieldUpdates["status"] — no suffix-bump arithmetic happens here.
 // The merged display phrase is computed at render time by
@@ -333,7 +328,7 @@ func TestDDB_Enrich_PITRDisabled_NoFieldUpdates_WithStackedWave1(t *testing.T) {
 	if _, ok := result.Findings[id]; !ok {
 		t.Errorf("expected PITR-off Finding for %q even when row carries stacked Wave-1 phrase", id)
 	}
-	// AS-140: no FieldUpdates write — no suffix-bump arithmetic from this enricher.
+	// no FieldUpdates write — no suffix-bump arithmetic from this enricher.
 	if updates, ok := result.FieldUpdates[id]; ok && len(updates) != 0 {
 		t.Errorf("AS-140: expected empty FieldUpdates for %q (status overlay removed); got %v", id, updates)
 	}

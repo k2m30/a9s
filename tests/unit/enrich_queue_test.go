@@ -3,14 +3,12 @@ package unit
 // enrich_queue_test.go — Regression tests for declarative Wave 2 issue-enricher
 // priority metadata.
 //
-// Wave 2 enricher metadata is now declared on each catalog.ResourceTypeDef
-// literal's Wave2 field (post-AS-795n); reads go through
-// awsclient.AllWave2 / Wave2EnricherFor / SetWave2EnricherForTest. The seven
-// "batchable" types (dbi, ebs, cb, tg, pipeline, sfn, glue) get Priority=10;
-// all remaining types get Priority=100. buildEnrichQueue sorts by Priority
-// (asc) then alphabetically within each tier.
-//
-// These tests verify resulting ordering behaviour against the registry.
+// Wave 2 enricher metadata is declared on each catalog.ResourceTypeDef
+// literal's Wave2 field; reads go through awsclient.AllWave2 /
+// Wave2EnricherFor / SetWave2EnricherForTest. The seven "batchable" types
+// (dbi, ebs, cb, tg, pipeline, sfn, glue) get Priority=10; all remaining
+// types get Priority=100. buildEnrichQueue sorts by Priority (asc) then
+// alphabetically within each tier.
 //
 // Seeding strategy: AvailabilityPrefetchedMsg.Resources populates all
 // probeResources in one shot and triggers startEnrichment, avoiding the
@@ -56,8 +54,8 @@ func seedAllEnricherTypes(m tui.Model) (tui.Model, tea.Cmd) {
 	m, cmd := rootApplyMsg(m, messages.AvailabilityPrefetched{
 		Entries:   make(map[string]int),
 		Resources: allResources,
-		// Stamp the live AvailabilityGen so the AS-657/AS-659 staleness guard
-		// accepts the message (AcceptZeroGen=false after AS-659).
+		// Stamp the live AvailabilityGen so the staleness guard accepts the
+		// message (AcceptZeroGen=false).
 		Gen: m.Core().Session().AvailabilityGen,
 	})
 	return m, cmd
@@ -75,8 +73,8 @@ func seedEnricherSubset(m tui.Model, names []string) (tui.Model, tea.Cmd) {
 	m, cmd := rootApplyMsg(m, messages.AvailabilityPrefetched{
 		Entries:   make(map[string]int),
 		Resources: subset,
-		// Stamp the live AvailabilityGen so the AS-657/AS-659 staleness guard
-		// accepts the message (AcceptZeroGen=false after AS-659).
+		// Stamp the live AvailabilityGen so the staleness guard accepts the
+		// message (AcceptZeroGen=false).
 		Gen: m.Core().Session().AvailabilityGen,
 	})
 	return m, cmd

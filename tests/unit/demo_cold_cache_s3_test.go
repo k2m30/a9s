@@ -7,8 +7,6 @@ package unit
 //      a LoadResourcesMsg / fetch cmd for "s3_objects".
 //   3. The child-view fetch produces a ResourcesLoadedMsg for "s3_objects".
 //   4. An unknown bucket returns an error, not an empty list (contract rule 4).
-//
-// Expected to fail until coder-1 wires S3 into the typed-fake path (T013/T028).
 
 import (
 	"strings"

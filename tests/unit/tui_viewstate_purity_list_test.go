@@ -74,14 +74,6 @@ func newPurityListModel(td resource.ResourceTypeDef) views.ResourceListModel {
 }
 
 // ---------------------------------------------------------------------------
-// Case 1 — deleted with the row-decorator plumbing (tui5 row 5). It pinned
-// that the renderer prefers row.Decorator over a re-derivation from
-// EnrichmentFindings; there is no row decorator any more, so the only half of
-// that contract left to hold is Case 2's: no glyph is prepended to any cell,
-// whatever the findings map says. Do not restore a Decorator-carrying pin.
-// ---------------------------------------------------------------------------
-
-// ---------------------------------------------------------------------------
 // Case 2 — the findings map DOES carry an issue finding for the row, and the
 // row still renders with no glyph on any cell. A row's colour is the worst
 // finding over both waves, so there is nothing for a marker to add; a renderer
@@ -194,14 +186,6 @@ func TestViewStatePurity_List_StatusCellFollowsCellsNotFindingsPhrase(t *testing
 			bakedPhrase, out)
 	}
 }
-
-// ---------------------------------------------------------------------------
-// Case 4 — deleted with the row-decorator plumbing (tui5 row 5). It pinned
-// that the glyph landed on body.IdentityCol's cell rather than on a re-derived
-// identity column; no cell carries a glyph any more. body.IdentityCol survives
-// for the widen pass, and Case 2 covers the "no glyph, whatever the findings
-// say" half. Do not restore a glyph-placement pin.
-// ---------------------------------------------------------------------------
 
 // ---------------------------------------------------------------------------
 // app.ListBody.StatusCol exists, and is what RenderList consumes instead of

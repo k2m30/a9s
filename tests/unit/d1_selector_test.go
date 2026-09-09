@@ -168,10 +168,9 @@ func TestD1_EveryDemoRowColourIsExplainedByAFinding(t *testing.T) {
 
 // ─── row 1: the phrases the seven classifiers' branches were computing ──────
 
-// d1ExpectedPhrases are the phrases dev's round-0 census found already emitted
-// by each type's own fetcher, on the same fields the deleted branches read.
-// Pinned unchanged: this row adds no codes, so a phrase moving here means an
-// emitter was rewritten rather than a branch deleted.
+// d1ExpectedPhrases are the phrases each type's own fetcher emits on these
+// fields. Pinned unchanged: a phrase moving here means an emitter was
+// rewritten.
 var d1ExpectedPhrases = map[string][]string{
 	"alarm":     {"alarm triggered", "insufficient data", "no actions"},
 	"trail":     {"not logging", "log file validation disabled"},

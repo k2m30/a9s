@@ -84,8 +84,8 @@ func TestRelated_DBC_Subnet_NilClientsW5(t *testing.T) {
 	}
 	checker := dbcCheckerByTarget(t, "subnet")
 	result := checker(context.Background(), nil, src, resource.ResourceCache{})
-	// Inverted: nothing was read, so the answer is the error rather than the
-	// "?" that used to stand for three different states.
+	// Nothing was read, so the answer is the error rather than a "?" that
+	// would stand for three different states.
 	if result.State() != domain.RelatedError {
 		t.Errorf("State = %v, want RelatedError (nil clients)", result.State())
 	}
@@ -100,8 +100,8 @@ func TestRelated_DBC_Subnet_WrongRawStruct(t *testing.T) {
 	}
 	checker := dbcCheckerByTarget(t, "subnet")
 	result := checker(context.Background(), nil, src, resource.ResourceCache{})
-	// Inverted: nothing was read, so the answer is the error rather than the
-	// "?" that used to stand for three different states.
+	// Nothing was read, so the answer is the error rather than a "?" that
+	// would stand for three different states.
 	if result.State() != domain.RelatedError {
 		t.Errorf("State = %v, want RelatedError (RawStruct is not a DBCluster)", result.State())
 	}
@@ -119,8 +119,8 @@ func TestRelated_DBC_Subnet_NoSubnetGroup(t *testing.T) {
 	}
 	checker := dbcCheckerByTarget(t, "subnet")
 	result := checker(context.Background(), nil, src, resource.ResourceCache{})
-	// Inverted: a cluster naming no subnet group has no subnets, which is a
-	// fact about the cluster rather than a gap in what could be read.
+	// A cluster naming no subnet group has no subnets, which is a fact about
+	// the cluster rather than a gap in what could be read.
 	if result.State() != domain.RelatedResolved || result.Count() != 0 {
 		t.Errorf("State = %v, Count = %d; want Resolved 0 (no DBSubnetGroup name)", result.State(), result.Count())
 	}

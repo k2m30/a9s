@@ -1,6 +1,6 @@
 package unit
 
-// qa67_malformed_data_test.go — §C Corrupted / Malformed Data (issue #67)
+// qa67_malformed_data_test.go — §C Corrupted / Malformed Data
 //
 // Bugs caught:
 //   - C.1: nil optional fields in fetcher output panic the resource list render

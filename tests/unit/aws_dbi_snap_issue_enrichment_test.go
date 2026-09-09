@@ -60,7 +60,7 @@ func snapResource(snap rdstypes.DBSnapshot) resource.Resource {
 		id = *snap.DBSnapshotIdentifier
 	}
 	// The enricher operates on Resources produced by FetchDBISnapshotsPage;
-	// it reads RawStruct + Findings (post-W1.4b.3), not the legacy Status field.
+	// it reads RawStruct + Findings.
 	r := resource.Resource{
 		ID:        id,
 		Name:      id,
@@ -166,7 +166,7 @@ func TestDBISnap_Enricher_Orphan_DbiMissingFromCache(t *testing.T) {
 	if finding.Phrase != "orphan: source DB deleted" {
 		t.Errorf("Findings[%q].Phrase = %q, want %q", snapID, finding.Phrase, "orphan: source DB deleted")
 	}
-	// AS-140: FieldUpdates must be empty — the merged display phrase is
+	// FieldUpdates must be empty — the merged display phrase is
 	// computed at render time by phraseFromFindings(r.Findings).
 	if updates, ok := result.FieldUpdates[snapID]; ok && len(updates) != 0 {
 		t.Errorf("AS-140: expected empty FieldUpdates for %q (status overlay removed); got %v", snapID, updates)
@@ -180,8 +180,8 @@ func TestDBISnap_Enricher_AutomatedPastRetention_BasicCase(t *testing.T) {
 	enricher := dbiSnapEnricher(t)
 
 	// "prod-dbi-retention-parent" is the value of fixtures.WarnDbiPastRetentionParentID
-	// (defined in core/demo/fixtures/dbi.go by the coder). Using the literal here
-	// so this test does not create a circular compile dependency on an in-flight constant.
+	// (core/demo/fixtures/dbi.go); the literal keeps this test independent of
+	// the fixtures package.
 	const parentID = "prod-dbi-retention-parent"
 	// Snapshot: automated, 30 days old, parent has 7-day retention.
 	pastTime := time.Now().UTC().Add(-30 * 24 * time.Hour)
@@ -221,7 +221,7 @@ func TestDBISnap_Enricher_AutomatedPastRetention_BasicCase(t *testing.T) {
 	if strings.Contains(finding.Phrase, "past retention") && !strings.Contains(finding.Phrase, "23d") {
 		t.Errorf("past-retention Summary %q should say 23d (30-7=23), got different days", finding.Phrase)
 	}
-	// AS-140: FieldUpdates must be empty — the merged display phrase is
+	// FieldUpdates must be empty — the merged display phrase is
 	// computed at render time by phraseFromFindings(r.Findings).
 	if updates, ok := result.FieldUpdates[snapID]; ok && len(updates) != 0 {
 		t.Errorf("AS-140: expected empty FieldUpdates for %q (status overlay removed); got %v", snapID, updates)
@@ -345,7 +345,7 @@ func TestDBISnap_Enricher_MultiW1_UnencryptedPlusOrphan_Suffix(t *testing.T) {
 	if finding.Phrase != "orphan: source DB deleted" {
 		t.Errorf("Findings[%q].Phrase = %q, want \"orphan: source DB deleted\"", snapID, finding.Phrase)
 	}
-	// AS-140: FieldUpdates must be empty — the merged "unencrypted (+1)"
+	// FieldUpdates must be empty — the merged "unencrypted (+1)"
 	// stack is computed at render time by phraseFromFindings(r.Findings),
 	// which aggregates the Wave-1 "unencrypted" finding and this enricher's
 	// Wave-2 orphan finding.
@@ -385,15 +385,14 @@ func TestDBISnap_Enricher_NoOp_WhenNoCrossRefSignalsApply(t *testing.T) {
 	if _, has := result.Findings[snapID]; has {
 		t.Errorf("Findings[%q] present, want absent (no cross-ref signals)", snapID)
 	}
-	// AS-140: FieldUpdates is no longer written by the cross-ref enricher;
+	// FieldUpdates is never written by the cross-ref enricher;
 	// the merged display phrase is computed at render time. Either nil or
 	// empty for this key is correct.
 	if updates, ok := result.FieldUpdates[snapID]; ok && len(updates) != 0 {
 		t.Errorf("AS-140: expected empty FieldUpdates for %q (status overlay removed); got %v", snapID, updates)
 	}
 	// Findings and TruncatedIDs must still be non-nil on success (still-active
-	// contract for these channels). FieldUpdates is no longer in the contract
-	// after AS-140.
+	// contract for these channels). FieldUpdates is not in the contract.
 	if result.Findings == nil {
 		t.Error("Findings is nil, want non-nil empty map on success")
 	}

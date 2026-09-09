@@ -2,20 +2,14 @@ package unit
 
 // app_restart_availability_sweep_test.go — coverage for
 // Controller.RestartAvailabilitySweep (core/app/actions_list.go): the neutral
-// main-menu refresh bundle handleActionRefresh's menu branch now calls — bump
+// main-menu refresh bundle handleActionRefresh's menu branch calls — bump
 // AvailabilityGen + EnrichmentGen, reset the enrichment maps, strip
 // wave2-sourced findings from every retained type's rows
-// (Core.ClearAllWave2Findings, the cross-type twin of the deleted TUI
-// clearAllWave2), reset the probe maps, clear the menu's cached
-// availability/issue state (MenuClearAvailabilityIntent), and clear the
-// swept-pair latch — returning the single TaskKindLoadAvailCache task that
-// chains the sweep through the drain loop. No-op (nil tasks, gens unchanged)
-// in no-cache mode.
-//
-// Transplanted from ref/detail-enrichment-261-attempt1 (git show); adapted
-// away from attempt-1's dead core.SnapshotCache() (no such method in v2) to
-// core.AnyLaneResources(rt), the current RowStore accessor for a type's
-// cached rows regardless of lane.
+// (Core.ClearAllWave2Findings), reset the probe maps, clear the menu's
+// cached availability/issue state (MenuClearAvailabilityIntent), and clear
+// the swept-pair latch — returning the single TaskKindLoadAvailCache task
+// that chains the sweep through the drain loop. No-op (nil tasks, gens
+// unchanged) in no-cache mode.
 
 import (
 	"testing"

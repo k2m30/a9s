@@ -1,4 +1,4 @@
-// qa_childview_color_doctrine_test.go — extends the OWNER RULE gate in
+// qa_childview_color_doctrine_test.go — extends the gate in
 // qa_color_findings_conformance_test.go ("color derives from findings") to
 // CHILD views, which that gate never covers (it only walks
 // resource.AllResourceTypes(), the top-level catalog — resource.AllChildTypes()
@@ -115,14 +115,10 @@ func fetchTargetHealthDemoResources(t *testing.T) []resource.Resource {
 }
 
 // TestChildViewColorDoctrine_TGHealth_UnhealthyTargetCarriesWave1Finding pins
-// item 1 of the owner doctrine: convertTargetHealth (via the exported
-// FetchTargetHealth) must emit a wave1 Finding for an unhealthy target whose
-// Phrase names the cause (owner: "lowercase, names the cause, e.g. contains
-// 'health check'") — not silently drop the signal into Fields only.
-//
-// RED today: convertTargetHealth (core/aws/tg_health.go) never appends to
-// Resource.Findings at all; every tg_health resource has Findings == nil
-// regardless of TargetHealth.State.
+// item 1 of the doctrine: convertTargetHealth (core/aws/tg_health.go, via
+// the exported FetchTargetHealth) must emit a wave1 Finding for an unhealthy
+// target whose Phrase names the cause (lowercase, e.g. contains 'health
+// check') — not silently drop the signal into Fields only.
 func TestChildViewColorDoctrine_TGHealth_UnhealthyTargetCarriesWave1Finding(t *testing.T) {
 	resources := fetchTargetHealthDemoResources(t)
 
@@ -320,30 +316,23 @@ func TestChildViewColorDoctrine_TGHealth_ReasonCellNeverShowsRawEnum(t *testing.
 // colorFallback on a structural field instead of ever consulting Findings).
 //
 // This mirrors knownColorDivergence's ratchet contract (qa_color_findings_
-// conformance_test.go) but is seeded, not empty: unlike the top-level gate
-// (which the owner's prior wave already burned down to zero), this is the
-// FIRST census of the child-view analogue, taken as part of the SAME PR that
-// discovered the tg_health instance of the bug. Every entry here is
-// today's real, verified inventory (Findings declared, Color nil) — the
-// coder's worklist, not aspirational debt.
+// conformance_test.go) but is seeded, not empty: every entry here is the
+// verified inventory (Findings declared, Color nil) — the worklist, not
+// aspirational debt.
 //
 // Key: child ResourceTypeDef.ShortName.
 //
 // Census method (static, catalog-driven — see TestChildViewColorDoctrine_
 // GenericCensus_FindingsChildTypesHaveColorFunc for why): walk resource.
 // AllChildTypes(), keep only types with len(Findings) > 0 and at least one
-// issue-severity entry, and require Color != nil. A live-fetch-driven census
-// (drain each ChildFetcher through demo fixtures, mirroring qa_issue_
-// visibility_gate_test.go's per-type drain) was evaluated and rejected for
-// this pass: child fetchers require a real ParentContext (target_group_arn,
+// issue-severity entry, and require Color != nil. The census is static
+// because child fetchers require a real ParentContext (target_group_arn,
 // bucket, zone id, listener_arn, ...) per type, most of which have no
 // standalone demo-fixture entry point independent of first fetching and
-// selecting a live parent row of a DIFFERENT type — that plumbing is a
-// separate, larger effort than this bug-fix PR's scope. The static
-// Color-vs-Findings mismatch this census checks is still a real, correct
-// signal: a type cannot claim "color derives from findings" (the doctrine)
-// while its Color func is nil and therefore structurally never reads
-// Findings at all.
+// selecting a live parent row of a DIFFERENT type. The static
+// Color-vs-Findings mismatch is a correct signal on its own: a type cannot
+// claim "color derives from findings" (the doctrine) while its Color func
+// is nil and therefore structurally never reads Findings at all.
 var knownColorlessChildTypes = map[string]bool{
 	// Empty: tg_health, the type this inventory was opened for, now declares
 	// its target-health findings and derives its colour from them.
@@ -364,7 +353,7 @@ var knownColorlessChildTypes = map[string]bool{
 //   - An allowlisted violation that NOW has a Color func fails with a
 //     "remove from allowlist" message.
 //   - An allowlisted violation still Color==nil is skipped (logged),
-//     pre-existing debt — this list IS the coder's worklist.
+//     known debt — this list IS the worklist.
 func TestChildViewColorDoctrine_GenericCensus_FindingsChildTypesHaveColorFunc(t *testing.T) {
 	childTypes := resource.AllChildTypes()
 
@@ -419,9 +408,9 @@ func TestChildViewColorDoctrine_GenericCensus_FindingsChildTypesHaveColorFunc(t 
 // TestChildViewColorDoctrine_GenericCensus_ColorlessChildTypesNeverEmitFindings
 // is the COMPLEMENT ratchet: today's full census of child types that have
 // NEITHER a Color func NOR any declared Findings at all — the exact
-// structural shape of the tg_health bug before this PR (no Color, no
+// structural shape of the tg_health bug (no Color, no
 // Findings, so a raw structural signal like TargetHealth.State has no path
-// to ever influence row color or the Attention block). This is the coder's
+// to ever influence row color or the Attention block). This is the
 // broader worklist beyond tg_health: any type in this list that starts
 // emitting issue-relevant status information without also wiring Color+
 // Findings will silently repeat this exact bug class.

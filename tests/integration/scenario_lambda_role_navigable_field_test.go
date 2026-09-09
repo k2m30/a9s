@@ -2,32 +2,23 @@
 
 package integration
 
-// scenario_lambda_role_navigable_field_test.go — end-to-end RED pin for BUG 5.
+// scenario_lambda_role_navigable_field_test.go — end-to-end pin for the
+// Lambda detail view's "Role:" navigable field.
 //
-// The Lambda detail view's "Role:" navigable field carries the execution-role
-// ARN, which may include an IAM path (e.g.
-// "arn:aws:iam::123456789012:role/service-role/acme-lambda-execution").
-// Pressing Enter on that field is supposed to drill straight to the role's
-// detail view. Root cause of the bug: the "role" resource type has no
-// registered FetchByIDs (see core/aws/catalog_security.go), so on a COLD
-// cache (the role list has never been opened this session) the single-ID
-// navigation path in HandleRelatedNavigate cannot dispatch the
-// KindFetchByIDDetail task and instead resolves through a different fallback
-// path. Empirically, against the demo fixtures, that fallback currently lands
-// on an unrelated IAM POLICY resource ("acme-cloudwatch-logs") rather than
-// the intended role ("acme-lambda-execution") — confirming the exact
-// "lands on a policy" symptom called out in the bug report, not merely an
-// empty list.
+// The field carries the execution-role ARN, which may include an IAM path
+// (e.g. "arn:aws:iam::123456789012:role/service-role/acme-lambda-execution").
+// Pressing Enter on that field drills straight to the role's detail view
+// through the "role" type's registered FetchByIDs (GetRole by name,
+// path-safe; core/aws/catalog_security.go): on a COLD cache (the role list
+// has never been opened this session) HandleRelatedNavigate's single-ID
+// path dispatches the KindFetchByIDDetail task, so the drill lands exactly
+// on the demo fixture role named "acme-lambda-execution"
+// (core/demo/fixtures/iam.go), the execution role referenced by every demo
+// lambda fixture via lambdaProdRoleARN (core/demo/fixtures/lambda.go) —
+// never on an unrelated IAM POLICY resource from a full-list fallback.
 //
 // This test deliberately does NOT open the "role" list before following the
-// navigable field, to reproduce the cold-cache path that triggers the bug.
-//
-// Fix direction (confirmed, not yet implemented): register a FetchByIDs for
-// "role" (GetRole by name, path-safe) mirroring the "policy" registration.
-// Once fixed, FollowNavigableField("Role") must land exactly on the demo
-// fixture role named "acme-lambda-execution" (core/demo/fixtures/iam.go),
-// which is the execution role referenced by every demo lambda fixture via
-// lambdaProdRoleARN (core/demo/fixtures/lambda.go).
+// navigable field, to drive the cold-cache path.
 
 import (
 	"strings"

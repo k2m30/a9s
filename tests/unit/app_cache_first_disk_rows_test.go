@@ -1,38 +1,24 @@
-// app_cache_first_disk_rows_test.go — RED tests for the CACHE-FIRST LIST UX
-// epic, Contract B (on-disk row cache + generic field materialization).
+// app_cache_first_disk_rows_test.go — the on-disk row cache and generic
+// field materialization (cache-first list UX, Contract B).
 //
-// Contract B: the on-disk cache (core/cache) additionally persists, per
-// type, the last first-page rows (ID, Name, Fields map — NO RawStruct) and
-// the last enrichment findings per row. On a cold start with a valid cache
-// file, opening a list before probes complete seeds rows+findings from disk
-// with Refreshing=true. Fields must be render-sufficient: a generic
-// materialization step runs on every fetch result (controller/runtime
-// layer, before caching/rendering) that, for each view-config column with a
-// Path and empty Key, extracts the scalar via fieldpath and writes it into
-// Fields under the column key — so cached rows render identically without
-// RawStruct.
+// Contract B: the on-disk cache (core/cache) persists, per type, the last
+// first-page rows (ID, Name, Fields map — NO RawStruct) and the last
+// enrichment findings per row (cache.Row.Findings, a per-row slice). On a
+// cold start with a valid cache file, opening a list before probes complete
+// seeds rows+findings from disk with Refreshing=true. Fields must be
+// render-sufficient: a generic materialization step runs on every fetch
+// result (controller/runtime layer, before caching/rendering) that, for each
+// view-config column with a Path and empty Key, extracts the scalar via
+// fieldpath and writes it into Fields under the column key — so cached rows
+// render identically without RawStruct.
 //
-// Round-2 migration note: the disk-cache surface below is repinned onto
-// cache.TypeFile/cache.Row/cache.LoadDirForTest/(*Store).Put/SaveType per
-// docs/design/cache-requirements.md round 2 (per-type files, C7). Findings
-// live on cache.Row.Findings ([]domain.Finding) — a per-row slice — not a
-// type-level map, since each row carries its own findings now.
-//
-// AMBIGUITY RESOLUTIONS (stated, not deferred):
-//   - "Generic materialization step" is pinned as a new exported function
-//     app.MaterializeListFields(r resource.Resource, columns []app.ColumnDef)
-//     resource.Resource — placed in core/app (same package as
-//     extractListCells/resolveListColumnsForBuild in list_columns.go, which
-//     already do per-column Path/Key resolution) since Contract B explicitly
-//     scopes this to "controller/runtime layer, before caching/rendering",
-//     and core/app.applyResourcesLoaded is that seam today. If the coder
-//     places it in core/runtime instead, only the call site in this test
-//     needs updating — the round-trip behavior pinned by
-//     TestMaterializeListFields_* is what matters.
-//   - Pinned with "ec2" because its "State" column is Path-based with an
-//     empty Key (Path: "State.Name", Key: "") in
-//     core/config/defaults_compute.go — exactly the column shape the
-//     contract calls out.
+// The materialization step is app.MaterializeListFields(r resource.Resource,
+// columns []app.ColumnDef) resource.Resource in core/app, beside
+// extractListCells/resolveListColumnsForBuild in list_columns.go, and
+// core/app.applyResourcesLoaded is the seam that calls it. "ec2" is the
+// pinned type because its "State" column is Path-based with an empty Key
+// (Path: "State.Name", Key: "") in core/config/defaults_compute.go — exactly
+// the column shape the contract calls out.
 package unit_test
 
 import (

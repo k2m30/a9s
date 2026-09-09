@@ -65,7 +65,7 @@ func detailOpFindTaskKind(tasks []runtime.TaskRequest, kind runtime.TaskKind) *r
 }
 
 // ---------------------------------------------------------------------------
-// Group 1 — acceptance ordering invariant
+// Group 1 — ordering invariant
 // ---------------------------------------------------------------------------
 
 // TestDetailOperation_AcceptanceOrdering_SupersededResultNeverFoldsRegardlessOfDeliveryOrder
@@ -434,7 +434,7 @@ func TestBeginDetailOperation_MonotonicallyIncreasingAcrossCalls(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// Group 6 — Operation Type backfill (#261 Codex-flagged gap)
+// Group 6 — Operation Type backfill
 // ---------------------------------------------------------------------------
 
 // TestBeginDetailOperation_BackfillsEmptyResourceType pins that

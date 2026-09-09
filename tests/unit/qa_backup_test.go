@@ -151,8 +151,8 @@ func TestBackup_ResourceTypeDef(t *testing.T) {
 		width int
 	}{
 		{"Plan Name", "plan_name", 32},
-		// w197: the Status column the built-in view has always shown is
-		// declared here now, where the rest of the list is.
+		// The Status column the built-in view shows is declared here, where the
+		// rest of the list is.
 		{"Status", "status", 40},
 		{"Plan ID", "plan_id", 38},
 		{"Created", "creation_date", 22},

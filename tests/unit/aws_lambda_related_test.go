@@ -660,10 +660,9 @@ func TestRelated_Lambda_KMS_EmptyKMSArn(t *testing.T) {
 // TestRelated_Lambda_KMS_KMSKeyNoSlash: "alias/aws/lambda" is a bare alias
 // name (no "arn:aws:kms:...:alias/" prefix for kmsKeyIDFromField's ":alias/"
 // strip to match), so it must pass through WHOLE. Splitting on the last "/"
-// (the pre-fix behavior) would truncate this to "lambda" — the trailing
-// service-name segment of the AWS-managed alias, not a real DescribeKey-
-// compatible identifier — which is exactly the fabrication bug class this
-// helper now guards against.
+// would truncate this to "lambda" — the trailing service-name segment of the
+// AWS-managed alias, not a real DescribeKey-compatible identifier — which is
+// the fabrication class this helper guards against.
 func TestRelated_Lambda_KMS_KMSKeyNoSlash(t *testing.T) {
 	src := resource.Resource{
 		ID:   "function-bare-kms",

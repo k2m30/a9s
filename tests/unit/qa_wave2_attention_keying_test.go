@@ -1,10 +1,8 @@
-// qa_wave2_attention_keying_test.go — pins the second architectural finish
-// Codex required for the v3.47.0 multi-finding work: AttentionDetail rows
-// must be retrievable per FINDING, not per RESOURCE, so two independently-
-// evaluated findings on the same resource can each carry their own
-// supporting rows.
+// qa_wave2_attention_keying_test.go — AttentionDetail rows are retrievable
+// per FINDING, not per RESOURCE, so two independently-evaluated findings on
+// the same resource can each carry their own supporting rows.
 //
-// LANDED SHAPE: IssueEnricherResult.AttentionDetails is
+// IssueEnricherResult.AttentionDetails is
 // map[string]map[domain.FindingCode]domain.AttentionDetail (Resource.ID, then
 // FindingCode), and runtime.ApplyWave2ToRow threads that nested map — so
 // setWave2Finding records each independently-evaluated condition's own rows
@@ -14,10 +12,10 @@
 // reads attentionDetails[f.Code] per finding, so each finding surfaces its own
 // Attention rows end to end.
 //
-// This test drives the REAL, exported runtime.ApplyWave2ToRow fold with
-// today's types and asserts each finding's rows survive independently — the
-// exact case issue_enrichment.go names as motivating per-Code keying
-// (opensearch's forced-update + encryption-off).
+// This test drives the REAL, exported runtime.ApplyWave2ToRow fold and
+// asserts each finding's rows survive independently — the exact case
+// issue_enrichment.go names as motivating per-Code keying (opensearch's
+// forced-update + encryption-off).
 package unit_test
 
 import (

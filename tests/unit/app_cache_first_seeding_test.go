@@ -1,38 +1,26 @@
-// app_cache_first_seeding_test.go — RED tests for the CACHE-FIRST LIST UX epic,
-// the cache-first seeding contract (in-session seeding) and the
-// menu-refreshing contract (menu Refreshing signal).
+// app_cache_first_seeding_test.go — cache-first seeding (in-session seeding)
+// and the menu-refreshing signal.
 //
-// Cache-first seeding: when a list screen opens and the session already holds rows for
-// that type (RowStore — first-page rows retained by availability probes, task
-// #17 wave 1 stage 2's replacement for the removed session.ProbeResources/
-// ProbeTruncated maps), the list must render those rows IMMEDIATELY:
-// ListBody.Loading=false, rows visible, and ListBody.Refreshing=true while the
-// fresh fetch runs. On ResourcesLoaded the rows swap in place and
-// Refreshing=false. When no rows are known, today's behavior (Loading=true, no
-// Refreshing) stays unchanged.
+// Cache-first seeding: when a list screen opens and the session already
+// holds rows for that type (RowStore — first-page rows retained by
+// availability probes), the list must render those rows IMMEDIATELY:
+// ListBody.Loading=false, rows visible, and ListBody.Refreshing=true while
+// the fresh fetch runs. On ResourcesLoaded the rows swap in place and
+// Refreshing=false. When no rows are known: Loading=true, no Refreshing.
 //
-// Menu-refreshing: MenuBody gains Refreshing=true while a background availability
-// sweep is running after a cache-seeded startup. It flips false when the sweep
-// completes.
+// Menu-refreshing: MenuBody gains Refreshing=true while a background
+// availability sweep is running after a cache-seeded startup. It flips false
+// when the sweep completes.
 //
-// AMBIGUITY RESOLUTIONS (stated, not deferred):
-//   - Seeding source: driven via core.Session().RowStore.Observe(type, rows,
-//     ..., session.OriginProbe, false) directly. Session() and RowStore are
-//     already public/exported today (core/runtime.Core.Session,
-//     core/session.Session.RowStore) — only the NEW ListBody.Refreshing
-//     field and the seed-on-open behavior are red.
-//   - List-open trigger: app.Action{Kind: app.ActionCommand, Arg: shortName}
-//     is the existing, precedented list-open path (see
-//     TestController_Apply_PRB_Command_ResourceShortName_PushesListScreen in
-//     app_controller_pr_b_test.go) — driving applyNavResult's
-//     NavigateKindPushResourceList branch.
-//   - "Fresh fetch running / completes" is modeled as the existing
-//     ResourcesLoaded task-result lane (Handle), which already swaps
-//     ls.Rows and clears ls.Loading/LoadingMore — Refreshing must join that
-//     same clear-on-load contract.
-//   - Two resource types pinned per the generic-ness requirement: "ec2"
-//     (Path-based columns) and "s3" (Key-based columns) — both go through the
-//     identical seeding path with no per-type special-casing.
+// Seeding source: core.Session().RowStore.Observe(type, rows, ...,
+// session.OriginProbe, false). List-open trigger: app.Action{Kind:
+// app.ActionCommand, Arg: shortName}, driving applyNavResult's
+// NavigateKindPushResourceList branch. The fresh fetch is the
+// ResourcesLoaded task-result lane (Handle), which swaps ls.Rows and clears
+// ls.Loading/LoadingMore; Refreshing joins that same clear-on-load contract.
+// Two resource types are pinned: "ec2" (Path-based columns) and "s3"
+// (Key-based columns) go through the identical seeding path with no
+// per-type special-casing.
 package unit_test
 
 import (
@@ -323,9 +311,7 @@ func TestListOpen_ResourcesLoaded_ClearsRefreshingAndSwapsRows(t *testing.T) {
 // the availability pipeline models "in flight" state — via a per-type
 // AvailChecked/AvailTotal progress counter already present on MenuState
 // (see menuProgressIndicator in menu.go). This test pins the OUTCOME
-// (MenuBody.Refreshing) rather than assuming a specific internal counter
-// name, so the coder is free to wire it through PatchMenuAvailability/
-// AvailabilityChecked intents however is cleanest.
+// (MenuBody.Refreshing) rather than a specific internal counter name.
 func TestMenu_Refreshing_TrueDuringBackgroundSweep_FalseOnComplete(t *testing.T) {
 	core, c := newSeededTestController(t)
 

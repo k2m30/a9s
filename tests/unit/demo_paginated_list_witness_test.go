@@ -4,9 +4,9 @@ package unit_test
 // not fit on its first page.
 //
 // A list read in part is a resolved lower bound: what matched is real, and the
-// truncation flag carries "there may be more". Every demo list used to answer in
-// one page, so that rule rendered nowhere and a regression back to a question
-// mark, or to a bare count, would have left every screen identical. The log
+// truncation flag carries "there may be more". A rule that renders nowhere on
+// the bench cannot be checked there: a regression back to a question mark, or
+// to a bare count, would leave every screen identical. The log
 // groups are the paginated one, and these pins hold the three facts the rendered
 // witnesses rest on: the first page is short of the whole fixture set, it says
 // so, and the count oracle reports that page rather than the fixture total.

@@ -1,6 +1,6 @@
 package unit
 
-// qa67_terminal_size_test.go — §H Terminal Size Edge Cases (issue #67)
+// qa67_terminal_size_test.go — §H Terminal Size Edge Cases
 //
 // Bugs caught:
 //   - H.1: terminal at exactly 60 columns renders UI correctly (not "too narrow")

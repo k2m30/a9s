@@ -96,9 +96,8 @@ func TestEcsTaskColor(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			// "status", not "last_status": the fetcher wrote one variable
-			// under both names and the classifier read the one the column
-			// does not persist (aws5 round 6). Do not restore the pair.
+			// "status", not "last_status": the classifier reads the one name the
+			// column persists.
 			fields := map[string]string{}
 			if tc.lastStatus != "" {
 				fields["status"] = tc.lastStatus

@@ -1,19 +1,9 @@
 package unit
 
-// qa_pagination_view_test.go — TDD tests for Phase 2 pagination view-layer.
-//
-// These tests exercise 'M' key (LoadMore) Update() behavior when truncated,
-// non-truncated, or already loading. The FrameTitle()/Append format and
-// cursor-stability pins this file used to carry have been ported onto the
-// live Controller seam (see pagination_frametitle_ports_test.go and
-// list_loadmore_ports_test.go) since ResourceListModel.FrameTitle() is
-// dead code.
-//
-// Phase 0+1 prerequisites (must be merged before these compile):
-//   - resource.PaginationMeta  (IsTruncated, NextToken)
-//   - messages.ResourcesLoaded gains Pagination, Append fields
-//   - messages.LoadMore type
-//   - keys.Map gains LoadMore binding (M key)
+// qa_pagination_view_test.go — the 'M' key (LoadMore) Update() behavior when
+// truncated, non-truncated, or already loading. The FrameTitle()/Append
+// format and cursor-stability pins are on the live Controller seam
+// (pagination_frametitle_ports_test.go and list_loadmore_ports_test.go).
 
 import (
 	"fmt"

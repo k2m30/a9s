@@ -58,8 +58,7 @@ func TestDemoScenarioHarness_ListFilterAndSort(t *testing.T) {
 	}
 
 	// For iam-user, Resource.ID is the UserName (col 1), not the AWS UserId
-	// column (col 4 since AS-140 inserted "MFA" and "Risk" between Name and
-	// User ID). Sort by the Name column so the cursor row tracks ids[].
+	// column (col 4: "MFA" and "Risk" sit between Name and User ID). Sort by the Name column so the cursor row tracks ids[].
 	scenario.SortByName()
 	scenario.OpenSelectedDetail()
 	scenario.ExpectCurrentResourceID(ids[0])

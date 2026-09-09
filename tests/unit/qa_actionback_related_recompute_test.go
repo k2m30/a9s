@@ -1,43 +1,29 @@
-// qa_actionback_related_recompute_test.go — RED regression pin for a P2 bug
-// found by Codex in the v3.47.0 #38 landing: the web/headless Back path never
-// re-dispatches the related-check recompute that owner decision #38
-// (2026-07-06) requires.
+// qa_actionback_related_recompute_test.go — the web/headless Back path
+// re-dispatches the related-check recompute.
 //
-// #38 made a transient "(?)" related row (State: RelatedUnknown, no
-// FetchFilter — see resource.IsRelatedActionable) actionable in every
-// renderer: Enter/select on
-// such a row opens the target type's plain top-level list, the same
-// navigation a menu entry would produce. Returning to the source detail must
-// then RECOMPUTE that pivot's count now that the target's cache is warm — but
-// the re-dispatch (a messages.RelatedCheckStarted-equivalent) was wired ONLY
-// into the TUI's Escape handler (internal/tui/app_stack.go's
-// recomputeRelatedOnReveal, invoked from app_input.go). The renderer-agnostic
-// Back path — core/app/actions_nav.go's handleActionBack, the ONLY Back
-// handler for web/headless — just pops the screen:
-//
-//	func (c *Controller) handleActionBack(_ Action) (ViewState, []runtime.TaskRequest) {
-//	    c.applyIntents([]runtime.UIIntent{runtime.PopScreen{}})
-//	    return c.snapshot(), nil
-//	}
-//
-// No TaskRequest is ever returned, so the revealed detail's stale "(?)" row
-// for the pivot the user just drilled through never recomputes for a
-// web/headless client — only the TUI (via its own Escape-key path, not
-// ActionBack) gets the fix.
+// A transient "(?)" related row (State: RelatedUnknown, no FetchFilter — see
+// resource.IsRelatedActionable) is actionable in every renderer:
+// Enter/select on such a row opens the target type's plain top-level list,
+// the same navigation a menu entry would produce. Returning to the source
+// detail must then RECOMPUTE that pivot's count now that the target's cache
+// is warm. The TUI's Escape handler does this (internal/tui/app_stack.go's
+// recomputeRelatedOnReveal, invoked from app_input.go);
+// core/app/actions_nav.go's handleActionBack, the ONLY Back handler for
+// web/headless, must return the same re-dispatch, or the revealed detail's
+// stale "(?)" row never recomputes for a web/headless client.
 //
 // Fixture pair: "ng" (node group) -> "ebs" (EBS Volumes), the same pair
 // qa_related_transient_unknown_drill_test.go pins at the TUI/keyboard
-// altitude (that file's Pin 3, GREEN today — the TUI Escape path already
-// works). This file mirrors that setup at the controller/headless altitude,
-// driving the drill via app.ActionRelatedSelect (the renderer-agnostic
-// counterpart of the TUI's keyboard Enter on a focused related row) and the
-// return via app.ActionBack (the renderer-agnostic counterpart of Esc),
-// asserting on the TaskRequest a real Core.HandleRelatedCheckStarted-shaped
-// re-dispatch would produce (runtime.KindRelatedCheck, Scope "ng/<id>") —
-// exactly what core/runtime/related.go's HandleRelatedCheckStarted
-// returns, and what openRelatedDetail (core/app/navigate.go) returns
-// on a cache-miss fresh detail open, so a real fix would make this
-// assertion pass without inventing a new task shape.
+// altitude. This file mirrors that setup at the controller/headless
+// altitude, driving the drill via app.ActionRelatedSelect (the
+// renderer-agnostic counterpart of the TUI's keyboard Enter on a focused
+// related row) and the return via app.ActionBack (the renderer-agnostic
+// counterpart of Esc), asserting on the TaskRequest a
+// Core.HandleRelatedCheckStarted-shaped re-dispatch produces
+// (runtime.KindRelatedCheck, Scope "ng/<id>") — exactly what
+// core/runtime/related.go's HandleRelatedCheckStarted returns, and what
+// openRelatedDetail (core/app/navigate.go) returns on a cache-miss fresh
+// detail open.
 package unit_test
 
 import (

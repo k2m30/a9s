@@ -42,14 +42,12 @@ import (
 // in lazyResourceCache, the probe goroutine still calls GetPaginatedFetcher and
 // invokes it to build a real first page.
 //
-// The pre-fix bug: the prefetch guard was `if _, inCache := localCache[def.TargetType]; !inCache`
-// where localCache was the full snapshot (including lazy entries). A lazy-only
-// entry with IsTruncated=true would satisfy `inCache=true`, suppressing the
-// prefetch — so NeedsTargetCache checkers would see only the sparse lazy rows
-// and miss actual resources on the first page.
-//
-// Post-fix: the guard uses mainCacheKeys (built only from resourceCache) so
-// lazy-only entries do NOT suppress prefetch.
+// The prefetch guard uses mainCacheKeys (built only from resourceCache), so
+// a lazy-only entry does not suppress prefetch: with the full snapshot
+// (including lazy entries) as the guard, a lazy-only entry with
+// IsTruncated=true would satisfy `inCache=true` and NeedsTargetCache
+// checkers would see only the sparse lazy rows and miss actual resources on
+// the first page.
 func TestNeedsTargetCache_PrefetchFires_WhenLazyOnlyEntry(t *testing.T) {
 	tui.Version = "test"
 
@@ -154,9 +152,9 @@ func TestNeedsTargetCache_PrefetchFires_WhenLazyOnlyEntry(t *testing.T) {
 		t.Skip("GF checker was not invoked — cannot verify prefetch behavior")
 	}
 
-	// CONTRACT ASSERTION: paginated fetcher must have been called for targetType.
-	// If pre-fix guard is used (snapshot keys), the lazy-only entry would suppress
-	// prefetch and paginatedFetchCallCount would remain 0.
+	// The paginated fetcher must have been called for targetType; a guard on
+	// snapshot keys would let the lazy-only entry suppress prefetch and leave
+	// paginatedFetchCallCount at 0.
 	if atomic.LoadInt32(&paginatedFetchCallCount) == 0 {
 		t.Error("NeedsTargetCache prefetch was NOT triggered for lazy-only target — " +
 			"PRE-FIX BUG: snapshot-key guard suppressed prefetch; want mainCacheKeys guard to fire prefetch")
@@ -261,9 +259,9 @@ func TestLazyFastPath_RequiresAllIDs(t *testing.T) {
 		drainAllMessages(drillCmd)
 	}
 
-	// CONTRACT ASSERTION: fetchResources must have been triggered because partial
-	// coverage prevents lazy fast path. If the pre-fix condition (`len(filtered) > 0`)
-	// were in place, fetchCallCount would be 0 (fast path used).
+	// fetchResources must have been triggered because partial coverage
+	// prevents the lazy fast path; a `len(filtered) > 0` condition would take
+	// the fast path and leave fetchCallCount at 0.
 	if atomic.LoadInt32(&fetchCallCount) == 0 {
 		t.Error("lazy fast path fired for partial ID coverage — " +
 			"PRE-FIX BUG: fast path should only fire when ALL IDs are in lazy cache; " +

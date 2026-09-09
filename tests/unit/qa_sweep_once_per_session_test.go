@@ -1,32 +1,25 @@
-// qa_sweep_once_per_session_test.go — pins the "availability sweep runs once
-// per session per profile--region pair" contract (fixed defect, landed
-// 2026-07-14: `:profile` switching used to re-run the FULL availability
-// sweep, all types plus Wave-2 enrichment, on EVERY switch instead of once
-// per pair).
+// qa_sweep_once_per_session_test.go — the availability sweep's per-pair memo.
 //
-// Pinned production contract under test:
+// Session holds SweptPairs map[string]bool keyed profile+"--"+region, plus
+// MarkPairSwept()/PairSwept() bool operating on the CURRENT pair under
+// pairMu. Session-lifetime: Rotate() does NOT clear it; New() initializes
+// it.
 //
-//	Session gains SweptPairs map[string]bool keyed profile+"--"+region, plus
-//	MarkPairSwept()/PairSwept() bool operating on the CURRENT pair under the
-//	existing pairMu. Session-lifetime: Rotate() does NOT clear it; New()
-//	initializes it.
+// handleAvailabilityCacheLoaded (core/runtime/handlers_availability.go): a
+// pair re-entry sweeps again (C1: everything cached is re-verified on
+// sight), and the sweep start clears the pair's memo. The memo only stops a
+// duplicate probe result from re-running one sweep's completion. Disk-cache
+// seeding of rows/counts/issue badges is unaffected either way.
 //
-//	handleAvailabilityCacheLoaded (core/runtime/handlers_availability.go):
-//	AMENDED by cachegen row 10 — a pair re-entry sweeps again (C1: everything
-//	cached is re-verified on sight), and the sweep start clears the pair's
-//	memo. The memo now only stops a duplicate probe result from re-running
-//	one sweep's completion. Disk-cache seeding of rows/counts/issue badges is
-//	unaffected either way.
+// handleAvailabilityChecked: on sweep completion (AvailChecked reaches
+// AvailTotal for a non-empty sweep) it must call MarkPairSwept().
 //
-//	handleAvailabilityChecked: on sweep completion (AvailChecked reaches
-//	AvailTotal for a non-empty sweep) it must call MarkPairSwept().
-//
-//	internal/tui's Model.handleRefresh (Ctrl+R on the main menu,
-//	runtime_adapter_navigate.go:591) is the one existing manual full-menu
-//	refresh gesture (the headless Controller.handleActionRefresh in
-//	core/app/actions_list.go has no menu-level branch at all — it is a
-//	no-op on the menu screen). It must clear the current pair's memo before
-//	re-triggering the availability-cache reload.
+// internal/tui's Model.handleRefresh (Ctrl+R on the main menu,
+// runtime_adapter_navigate.go) is the one manual full-menu refresh gesture
+// (the headless Controller.handleActionRefresh in core/app/actions_list.go
+// has no menu-level branch — it is a no-op on the menu screen). It must
+// clear the current pair's memo before re-triggering the availability-cache
+// reload.
 package unit_test
 
 import (
@@ -56,20 +49,20 @@ func countProbeTasks(tasks []runtime.TaskRequest) int {
 
 // fireAvailabilitySweep drives the real two-message sequence a live
 // cache-seeded sweep needs to actually dispatch probes rather than merely
-// latch AvailSweepPending. Since commit 89f0f69d ("availability sweep waits
-// for client readiness"), handleAvailabilityCacheLoaded dispatches
+// latch AvailSweepPending. handleAvailabilityCacheLoaded dispatches
 // TaskKindProbeAvailability tasks ONLY when c.session.Clients != nil; a
 // controller built without pre-supplied clients (as newRowStoreControllerPin
-// builds — pinned GREEN by TestProbeResourceAvailability_NilClients, which
-// this helper must not relax) instead latches AvailSweepPending and dispatches
+// builds — pinned by TestProbeResourceAvailability_NilClients, which this
+// helper must not relax) instead latches AvailSweepPending and dispatches
 // nothing until a follow-up messages.ClientsReady drains it
 // (fireNextAvailabilityProbes(4) inside handleClientsReadySuccess runs
-// unconditionally off the latch, independent of whether real *ServiceClients
-// ever land — see TestWebBoot_Refreshing_TrueDuringCacheSeededSweep_
-// FalseOnComplete, tests/unit/app_web_live_cold_boot_test.go:206, for the
-// same two-call sequence against the same nil-clients construction). Gen must
-// match the CURRENT ConnectGen (bumped by every Rotate()) or
-// Core.HandleClientsReady's own equality guard drops the event silently.
+// unconditionally off the latch, independent of whether real
+// *ServiceClients ever land — see
+// TestWebBoot_Refreshing_TrueDuringCacheSeededSweep_FalseOnComplete in
+// tests/unit/app_web_live_cold_boot_test.go for the same two-call sequence
+// against the same nil-clients construction). Gen must match the CURRENT
+// ConnectGen (bumped by every Rotate()) or Core.HandleClientsReady's own
+// equality guard drops the event silently.
 func fireAvailabilitySweep(c *app.Controller, s *session.Session, entries map[string]int, truncated map[string]bool) []runtime.TaskRequest {
 	_, tasks := c.Handle(messages.AvailabilityCacheLoaded{
 		Entries:   entries,
@@ -257,14 +250,12 @@ func TestSweepOnce_CompletionMarksPairSwept(t *testing.T) {
 }
 
 // -----------------------------------------------------------------------
-// 3 — INVERTED (cachegen row 10, C1 verify-on-sight): A (fully swept) -> B
-// -> A. The revisit must sweep AGAIN. The old expectation — zero probes and
-// progress reported as done — was the defect: the account moves on while the
-// operator is looking at the other pair, so disk values looked verified when
-// nothing had verified them this visit. The swept memo survives as a
-// completion latch only (it stops a duplicate probe result from re-running
-// one sweep's completion); it is no longer permission to skip. Do not
-// restore the skip.
+// 3 — A (fully swept) -> B -> A. The revisit must sweep AGAIN (C1:
+// everything cached is re-verified on sight): the account moves on while the
+// operator is looking at the other pair, so disk values would look verified
+// when nothing had verified them this visit. The swept memo is a completion
+// latch only (it stops a duplicate probe result from re-running one sweep's
+// completion); it is not permission to skip.
 // -----------------------------------------------------------------------
 
 func TestSweepOnce_RevisitSweptPair_SweepsAgain_UnsweptPairAlsoProbes(t *testing.T) {

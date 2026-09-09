@@ -461,9 +461,8 @@ func TestEnrichS3_GenericAPIError_Propagated(t *testing.T) {
 	}
 }
 
-// TestEnrichS3_ClientWithoutBucketAPIs_ReturnsError pins the parity fix
-// (landing alongside this test from the same Stage 5 review finding): when
-// the S3 client implements NONE of S3GetBucketPolicyAPI/S3GetBucketCorsAPI/
+// TestEnrichS3_ClientWithoutBucketAPIs_ReturnsError: when the S3 client
+// implements NONE of S3GetBucketPolicyAPI/S3GetBucketCorsAPI/
 // S3GetBucketLifecycleAPI, enrichS3 must return a hard error — matching the
 // other five enrichers' "client does not support <op>" contract — rather
 // than silently succeeding with all three fields left nil.

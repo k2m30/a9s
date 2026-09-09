@@ -2,16 +2,13 @@ package unit
 
 // aws_snapshot_cross_ref_test.go — Behavioral tests for EnrichSnapshotCrossRef.
 //
-// AS-140 (Wave-2 enricher migration): FieldUpdates["status"] is no longer
-// written by this enricher. The merged §4 status phrase (wave-1 + wave-2,
-// "phrase (+N)" form) is now computed at render time by
+// The enricher never writes FieldUpdates["status"]. The merged §4 status
+// phrase (wave-1 + wave-2, "phrase (+N)" form) is computed at render time by
 // phraseFromFindings(r.Findings) in extractCellValue, since wave-1 findings
 // reach r.Findings via the fetcher and wave-2 findings via applyEnrichment.
 //
 // All FieldUpdates assertions in this file pin "no FieldUpdates entry written
-// by the enricher". Tests that previously pinned merged-status arithmetic
-// (TestSnapshotCrossRef_FieldUpdatesStatusMerge*) have been retargeted to
-// pin "FieldUpdates is empty" while keeping the Findings assertions intact.
+// by the enricher".
 //
 // Test strategy:
 //   - All stubs (testSnap, testParent) are defined inline — no AWS SDK imports.
@@ -214,7 +211,7 @@ func TestSnapshotCrossRef_TruncatedCache_NoFalseOrphan(t *testing.T) {
 
 // TestSnapshotCrossRef_OrphanFinding verifies that when the parent is NOT in
 // the cache and the cache is NOT truncated, a full orphan Finding is emitted.
-// AS-140: FieldUpdates["status"] is no longer written — the merged phrase is
+// FieldUpdates["status"] is never written — the merged phrase is
 // computed at render time by phraseFromFindings(r.Findings). Findings still
 // carries the orphan signal for S5 Attention rendering.
 func TestSnapshotCrossRef_OrphanFinding(t *testing.T) {
@@ -241,9 +238,8 @@ func TestSnapshotCrossRef_OrphanFinding(t *testing.T) {
 	if finding.Severity != domain.SevBroken {
 		t.Errorf("expected Severity=SevBroken, got %v", finding.Severity)
 	}
-	// Inverted for the spec row that gave a wave-2 phrase one owner: the
-	// wording is the code's, declared once in the catalog, not a string this
-	// config carries. Do not restore a per-config phrase here.
+	// The wording is the code's, declared once in the catalog, not a string
+	// this config carries.
 	if want := catalog.Phrase("dbi-snap.orphan"); finding.Phrase != want {
 		t.Errorf("expected Phrase=%q, got %q", want, finding.Phrase)
 	}
@@ -265,8 +261,8 @@ func TestSnapshotCrossRef_OrphanFinding(t *testing.T) {
 		t.Errorf("expected a row with Label=%q, rows were: %+v", "Source Parent", result.AttentionDetails["snap-1"][finding.Code].Rows)
 	}
 
-	// AS-140: FieldUpdates must be nil or empty — the enricher no longer overlays
-	// the status field. The merged display phrase is computed by
+	// FieldUpdates must be nil or empty — the enricher never overlays the
+	// status field. The merged display phrase is computed by
 	// phraseFromFindings(r.Findings) in extractCellValue at render time.
 	if updates, hasUpdates := result.FieldUpdates["snap-1"]; hasUpdates && len(updates) != 0 {
 		t.Errorf("AS-140: expected no FieldUpdates entry for snap-1 (status overlay removed); got %v", updates)
@@ -345,8 +341,8 @@ func TestSnapshotCrossRef_PastRetention_Automated(t *testing.T) {
 		t.Errorf("missing Created row; rows: %+v", result.AttentionDetails["snap-1"][finding.Code].Rows)
 	}
 
-	// AS-140: FieldUpdates must be nil or empty for snap-1 — the enricher no
-	// longer overlays the status field; the past-retention phrase reaches the
+	// FieldUpdates must be nil or empty for snap-1 — the enricher never
+	// overlays the status field; the past-retention phrase reaches the
 	// list column via Findings → phraseFromFindings at render time.
 	if updates, hasUpdates := result.FieldUpdates["snap-1"]; hasUpdates && len(updates) != 0 {
 		t.Errorf("AS-140: expected no FieldUpdates entry for snap-1 (status overlay removed); got %v", updates)
@@ -440,17 +436,12 @@ func TestSnapshotCrossRef_RetentionDisabled(t *testing.T) {
 	})
 }
 
-// TestSnapshotCrossRef_OrphanFinding_NoFieldUpdates_WithWave1 verifies AS-140:
+// TestSnapshotCrossRef_OrphanFinding_NoFieldUpdates_WithWave1 verifies that
 // even when the resource already carries Wave-1 phrases (Status + Issues set
 // by the legacy fetcher form), the enricher MUST NOT write FieldUpdates.
 // The merged "wave-1 (+1)" display is built at render time by
 // phraseFromFindings(r.Findings) — wave-1 findings reach r.Findings via the
 // fetcher, wave-2 via applyEnrichment.
-//
-// This replaces the pre-AS-140 TestSnapshotCrossRef_FieldUpdatesStatusMerge
-// pair which asserted "unencrypted (+1)"/"unencrypted (+2)" on FieldUpdates.
-// That behavior is being deleted; the equivalent visual test moves to the
-// table_render layer in `extractCellValue`.
 func TestSnapshotCrossRef_OrphanFinding_NoFieldUpdates_WithWave1(t *testing.T) {
 	t.Run("legacy_form_single_wave1_phrase_plus_orphan", func(t *testing.T) {
 		cfg := makeCrossRefCfg(true)
@@ -471,7 +462,7 @@ func TestSnapshotCrossRef_OrphanFinding_NoFieldUpdates_WithWave1(t *testing.T) {
 			t.Errorf("expected orphan Finding for snap-1 — wave-1 stacking must NOT suppress the wave-2 Finding")
 		}
 
-		// AS-140: FieldUpdates must be empty/nil.
+		// FieldUpdates must be empty/nil.
 		if updates, hasUpdates := result.FieldUpdates["snap-1"]; hasUpdates && len(updates) != 0 {
 			t.Errorf("AS-140: expected empty FieldUpdates for snap-1; got %v", updates)
 		}
@@ -546,18 +537,12 @@ func TestSnapshotCrossRef_Idempotent(t *testing.T) {
 	})
 }
 
-// TestSnapshotCrossRef_PostPR03eShape_NoFieldUpdates verifies AS-140 on the
-// post-PR-03e fetcher shape (Findings populated, Status / Issues empty,
+// TestSnapshotCrossRef_PostPR03eShape_NoFieldUpdates covers the
+// fetcher shape (Findings populated, Status / Issues empty,
 // Fields["status"] carrying the §4 phrase). The Wave-2 orphan signal must
-// still produce a Finding for the resource, but FieldUpdates is no longer
+// still produce a Finding for the resource, but FieldUpdates is not
 // written — the (+N) suffix is computed at render time by
 // phraseFromFindings(r.Findings).
-//
-// This pin descends from the AS-132 regression check
-// `TestSnapshotCrossRef_FieldUpdatesStatusMerge_Wave1Findings`. The AS-132
-// concern (cross-ref must read wave-1 from Findings, not Status) is now
-// fully delegated to applyEnrichment / phraseFromFindings — the enricher
-// only emits to result.Findings.
 func TestSnapshotCrossRef_PostPR03eShape_NoFieldUpdates(t *testing.T) {
 	cfg := makeCrossRefCfg(true)
 	fn := awsclient.EnrichSnapshotCrossRef(cfg)
@@ -588,8 +573,8 @@ func TestSnapshotCrossRef_PostPR03eShape_NoFieldUpdates(t *testing.T) {
 		t.Errorf("expected orphan Finding for snap-1 even on post-PR-03e wave-1 shape")
 	}
 
-	// AS-140: FieldUpdates must be nil/empty. The merged "unencrypted (+1)"
-	// phrase the old code produced is now computed at render time by
+	// FieldUpdates must be nil/empty. The merged "unencrypted (+1)"
+	// phrase is computed at render time by
 	// phraseFromFindings(r.Findings) in extractCellValue.
 	if updates, hasUpdates := result.FieldUpdates["snap-1"]; hasUpdates && len(updates) != 0 {
 		t.Errorf("AS-140: expected empty FieldUpdates for snap-1 (status overlay removed); got %v", updates)

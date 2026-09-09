@@ -4,9 +4,9 @@
 //
 // Every fixed-width cell in the TUI is laid out by reserving w columns and
 // handing the content to text.PadOrTrunc. When the content is wider than w and
-// the cut lands in the middle of a double-width rune, the truncation used to
-// come back one column short, so everything painted to the right of that cell
-// slid left by one and the row stopped lining up with its header.
+// the cut lands in the middle of a double-width rune, the truncation must
+// still come back exactly w columns, or everything painted to the right of
+// that cell slides left by one and the row stops lining up with its header.
 package unit
 
 import (

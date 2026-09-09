@@ -1,12 +1,10 @@
-// costs_selfreview_test.go — Cost Explorer: pre-Codex self-review pass
-// (C2-C12, C1/resource-drill-refusal already pinned in costs_round8_test.go).
-// Every item below is code-cited: traced against current source before
-// writing, not guessed from the review prose alone.
+// costs_selfreview_test.go — Cost Explorer pins C2-C12 (C1, resource-drill
+// refusal, is pinned in costs_round8_test.go).
 //
 // package unit_test (not unit): every finding here is reachable via the
-// headless app.Controller / pure core/costs / core/aws surface —
-// no TUI helper is needed (C2 explicitly requires NO TUI adapter
-// involvement) — so this file reuses costs_state_test.go's
+// headless app.Controller / pure core/costs / core/aws surface — no TUI
+// helper is needed (C2 explicitly requires NO TUI adapter involvement) — so
+// this file reuses costs_state_test.go's
 // newCostsController/topDrill/fixedCostsNow/monthRecord and
 // costs_interaction_test.go's findFetchCostsTask/baseServiceQuery/
 // fullMetricRecord directly (same package), same convention as
@@ -38,35 +36,19 @@ import (
 )
 
 // ===========================================================================
-// C2 (P1) — web/headless resource jump. Traced precisely: applyCostsSelect's
-// RESOURCE_ID branch (core/app/costs_state.go) returns a BARE
-// runtime.TaskRequest{Key: KindFetchByIDDetail, ...} with no placeholder-
-// list/AutoOpenSingle wiring. autoOpenSingleDetail (core/app/handle.go)
-// — the seam the related panel's own by-ID single-target drill uses
-// (navigate.go:495-506's placeholder list + AutoOpenSingle) — only fires
-// when the TOP screen is ScreenResourceList or ScreenChildList (handle.go
-// line 322); the costs screen is neither, so nothing on the web/headless
-// lane ever converts a successful KindFetchByIDDetail delivery into a
-// detail navigation. The TUI's own special-cased m.fetchByIDDetail (fixed
-// in an earlier round) is TUI-only and never reached here.
-//
-// RECONCILED and FIXED (fix/resourcesloaded-provenance): costs_state.go's
-// screen.OpenResource case has since gained the placeholder-list/
-// AutoOpenSingle wiring this finding asked for, and now mirrors
-// navigate.go's applyRelatedNavResult TargetID branch byte-for-byte: both
-// route through the shared pushByIDPlaceholderList constructor
-// (list_state.go), which always sets ls.EscPops = true. That is what makes
-// D's handleResourcesLoadedEvent gate (isTopLevelCanonicalList requires
+// C2 — web/headless resource jump. applyCostsSelect's RESOURCE_ID branch
+// (core/app/costs_state.go, screen.OpenResource) routes through the shared
+// pushByIDPlaceholderList constructor (list_state.go), mirroring
+// navigate.go's applyRelatedNavResult TargetID branch: the placeholder list
+// always has ls.EscPops = true, so handleResourcesLoadedEvent's
+// isTopLevelCanonicalList gate (which requires
 // msg.Provenance.CanonicalList() only for EscPops-false, ParentContext-nil
-// screens) correctly skip this placeholder — the real executor's
-// Provenance: FetchProvenanceByID delivery (executor.go) is applied,
-// ls.Loading clears, and autoOpenSingleDetail reaches the target row. Same
-// fix, same root cause, as costs_codex_test.go's TestCostsCodex_X1. No
-// change to FetchProvenanceByID or to this test was needed — it must not be
-// "fixed" by stamping its ResourcesLoaded literal
-// Provenance: FetchProvenanceCanonicalList, which would be false (a real
-// KindFetchByIDDetail result is never canonical) and would hide a
-// regression instead of pinning it.
+// screens) skips it, the executor's Provenance: FetchProvenanceByID delivery
+// is applied, ls.Loading clears, and autoOpenSingleDetail (handle.go, fires
+// only when the TOP screen is ScreenResourceList or ScreenChildList) reaches
+// the target row. This test must not be made green by stamping its
+// ResourcesLoaded literal Provenance: FetchProvenanceCanonicalList — a real
+// KindFetchByIDDetail result is never canonical.
 // ===========================================================================
 
 func TestCostsSelfReview_C2_WebResourceJump_HeadlessReachesEC2Detail(t *testing.T) {
@@ -157,17 +139,15 @@ func TestCostsSelfReview_C2_WebResourceJump_HeadlessReachesEC2Detail(t *testing.
 }
 
 // ===========================================================================
-// C3 (P1) — mapAnomaly (core/aws/costs.go) must normalize CE's anomaly
-// date strings to date-only so marks match grid columns. Traced precisely:
-// mapAnomaly sets `Period: costs.Period{Start: aws.ToString(a.AnomalyStartDate),
-// End: aws.ToString(a.AnomalyEndDate)}` verbatim from the raw AWS response —
-// no parsing/reformatting at all. AWS's GetAnomalies API reference documents
-// these as ISO 8601; live CE sends full RFC3339 timestamps
-// ("2026-06-15T00:00:00Z"), the synthetic demo fixture sends bare dates
-// ("2026-06-15") — grid column matching is exact costs.Period string
-// equality against date-only ("2006-01-02") periods, so an RFC3339-shaped
-// Period.Start/End NEVER equals any grid column, and live anomalies never
-// render as cell marks even though the fetch itself succeeds.
+// C3 — mapAnomaly (core/aws/costs.go) must normalize CE's anomaly date
+// strings to date-only so marks match grid columns. AWS's GetAnomalies API
+// reference documents AnomalyStartDate/AnomalyEndDate as ISO 8601; live CE
+// sends full RFC3339 timestamps ("2026-06-15T00:00:00Z"), the synthetic demo
+// fixture sends bare dates ("2026-06-15") — grid column matching is exact
+// costs.Period string equality against date-only ("2006-01-02") periods, so
+// an RFC3339-shaped Period.Start/End would never equal any grid column and
+// live anomalies would never render as cell marks even though the fetch
+// succeeds.
 // ===========================================================================
 
 type selfReviewAnomaliesStub struct {
@@ -226,20 +206,12 @@ func strPtrSelfReview(s string) *string { return &s }
 // ===========================================================================
 
 // C4(a): a successful fetch delivering ZERO anomalies must clear cached
-// marks (PutAnomalies unconditional on success). Traced precisely:
-// ApplyCostsLoaded (core/app/costs_state.go) only calls
-// `cs.Store.PutAnomalies(ev.Anomalies, cs.Now)` inside `if
-// len(ev.Anomalies) > 0`, so a genuine "no anomalies this fetch" result
-// never overwrites a stale cached mark from an earlier fetch.
-//
-// RECONCILED (specs/021-cost-explorer/architecture.md, Seam 2/6): this
-// test's intent — an authoritative empty result clears — now has a
-// mechanism-level pin at the typed seam in costs_screen_test.go
+// marks (PutAnomalies unconditional on success), so a genuine "no anomalies
+// this fetch" result overwrites a stale cached mark from an earlier fetch.
+// The typed-seam pin is in costs_screen_test.go
 // (TestCostsScreen_ApplyFetchResult_AnomalyResult_WriteSemantics, case
-// "requested, empty"), which also reconciles it against the X2 codex pin's
-// opposite intent (a SKIP must preserve). This controller-level test stays
-// unchanged as the full-stack acceptance pin — see the architecture doc's
-// "Behavior pins survive the refactor unchanged."
+// "requested, empty"), reconciled there against the SKIP-must-preserve
+// case; this is the full-stack pin.
 func TestCostsSelfReview_C4a_ZeroAnomalyResult_ClearsCachedMarks(t *testing.T) {
 	c := newCostsController(t, fixedCostsNow)
 	q := costs.Query{Granularity: costs.GranularityMonth.APIGranularity(), GroupBy: []costs.Dimension{costs.DimensionService}}
@@ -356,13 +328,10 @@ func TestCostsSelfReview_C4b_AnomalyFetch_RequestCountFoldsIntoCostsLoadedReques
 }
 
 // C4(c): when the store's anomaly TTL is fresh, the dispatched payload must
-// ask the executor to skip the anomaly fetch. FetchCostsPayload
-// (core/runtime/handlers_navigate.go) has NO such flag today — only
-// Query and Window. Since this field does not exist yet, this pins its
-// PRESENCE compile-safely via reflection (matching this session's
-// established "quality-batch Currency field" pattern for a not-yet-landed
-// struct field) rather than referencing a name directly, which would break
-// the whole package's compilation until the coder adds it.
+// ask the executor to skip the anomaly fetch. The flag's PRESENCE on
+// FetchCostsPayload (core/runtime/handlers_navigate.go) is pinned via
+// reflection rather than by name, so a missing field fails this one test
+// instead of the whole package's compilation.
 func TestCostsSelfReview_C4c_FetchCostsPayload_HasAnomalySkipFlag(t *testing.T) {
 	payload := runtime.FetchCostsPayload{}
 	fields := selfReviewStructFieldNames(payload)
@@ -379,9 +348,8 @@ func TestCostsSelfReview_C4c_FetchCostsPayload_HasAnomalySkipFlag(t *testing.T) 
 }
 
 // selfReviewStructFieldNames returns v's exported struct field names via
-// reflection — used to pin the PRESENCE of a not-yet-landed field without
-// referencing it directly (which would break compilation for the whole
-// package until the field exists).
+// reflection, so a field's PRESENCE can be pinned without referencing it
+// directly.
 func selfReviewStructFieldNames(v any) []string {
 	t := reflect.TypeOf(v)
 	if t.Kind() != reflect.Struct {
@@ -711,10 +679,8 @@ func TestCostsSelfReview_C12_BatchNotFound_RecoversLiveInstances(t *testing.T) {
 // selfReviewEC2BatchAPI simulates AWS's real DescribeInstances behavior:
 // a batch call naming ANY invalid ID fails the WHOLE call with
 // InvalidInstanceID.NotFound (never a partial Reservations list). A retry
-// with only the known-good IDs succeeds. This lets the test pass once the
-// coder adds the retry-without-bad-ids recovery; today (no such retry
-// exists) the mock's first call is the ONLY call made, so the whole batch
-// errors and zero resources come back.
+// with only the known-good IDs succeeds, so the fetcher's
+// retry-without-bad-ids recovery is what brings the good resources back.
 type selfReviewEC2BatchAPI struct {
 	badID, liveID string
 }

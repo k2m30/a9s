@@ -208,17 +208,15 @@ func TestTUISaveCache_AvailabilityCountsStillPersist(t *testing.T) {
 	if tf.Count != 1 {
 		t.Errorf("s3 TypeFile.Count = %d, want 1 — availability count persistence must survive the save-cache routing fix", tf.Count)
 	}
-	// Issues is intentionally NOT asserted here: post-fix, TaskKindSaveCache's
-	// issue count is derived from c.session.ResourceCache via
+	// Issues is intentionally NOT asserted here: TaskKindSaveCache's issue
+	// count is derived from c.session.ResourceCache via
 	// availabilityFromResourceCache (core/runtime/executor.go), which
 	// classifies issues through the s3 catalog's own domain.Color function —
 	// a synthetic single-field fixture built purely for this cache-routing
-	// test does not reliably trigger that per-type classification, and a
-	// diagnostic run confirmed the identical (Issues=0) outcome through the
-	// headless executor path in this same "sweep-only, no list ever opened"
-	// scenario. That classification fidelity is a different subsystem than
-	// this file's routing pin (which is about Rows, not Issues); Count/HasResources above are
-	// the load-bearing counts-still-work assertions for this guard.
+	// test does not reliably trigger that per-type classification. That
+	// classification fidelity is a different subsystem than this file's
+	// routing pin (which is about Rows, not Issues); Count/HasResources above
+	// are the load-bearing counts-still-work assertions for this guard.
 }
 
 // A third test driving the same session state through BOTH the headless

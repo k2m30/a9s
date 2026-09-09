@@ -2,9 +2,9 @@
 
 package unit
 
-// aws3_r3_view_migration_test.go — task aws3 round 3. A built-in column whose
-// SOURCE changed never reached an operator who had already run a9s once: the
-// merge only ever added a column whose title was missing, and both of the
+// aws3_r3_view_migration_test.go — a built-in column whose SOURCE changed
+// reaches an operator who has already run a9s once: the merge upgrades a
+// column whose title is present but whose source is stale, and both of the
 // corrected SNS columns keep their titles. These pin the upgrade, and the two
 // cases it must not touch.
 

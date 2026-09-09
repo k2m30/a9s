@@ -95,12 +95,10 @@ func TestErrorHistoryAccumulation_NonErrorFlashesNotAdded(t *testing.T) {
 // error takes the same header slot every other flash takes, so the profile and
 // region survive beside it.
 //
-// INVERTED by misc4 row 7. This test previously asserted the opposite: that an
-// error reserved all but six columns and so was NOT cut at width-40. That
-// reservation left the frame renderer nothing for the left side, and it
-// truncated the account identity away — "which account am I looking at" is not
-// readable anywhere else on the screen, and it outranks the text of one
-// failure. Do not restore the width-6 assertion.
+// An error that reserved all but six columns would leave the frame renderer
+// nothing for the left side and truncate the account identity away — "which
+// account am I looking at" is not readable anywhere else on the screen, and
+// it outranks the text of one failure.
 func TestErrorFlashWidth_MessageIsCutToTheSlotLeftByTheIdentity(t *testing.T) {
 	tui.Version = "test"
 

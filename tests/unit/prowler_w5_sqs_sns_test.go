@@ -296,12 +296,10 @@ func TestW5_SQSPublicPolicy_ConditionedWildcardIsHealthy(t *testing.T) {
 	w2AssertNoCode(t, res.Findings[name], "sqs.public-policy")
 }
 
-// Open item 1 of dev's round 0, inverted here: EnrichSQSAttributes used to
-// emit sqs.missing-dlq for a missing dead-letter queue AND for a missing KMS
-// key, taking its phrase from whichever row happened to be first. Rule 4
-// makes those two independent conditions, so a queue missing only encryption
-// must not report the dead-letter-queue code, and a queue missing only the
-// dead-letter queue must not report the encryption one.
+// A missing dead-letter queue and a missing KMS key are two independent
+// conditions (rule 4): a queue missing only encryption must not report the
+// dead-letter-queue code, and a queue missing only the dead-letter queue
+// must not report the encryption one.
 func TestW5_SQSOneCodePerCondition(t *testing.T) {
 	tests := []struct {
 		name       string
@@ -879,8 +877,7 @@ func TestW5_SNSSubPlainHTTP_EndpointRowDropsThePath(t *testing.T) {
 }
 
 // The by-topic child fetcher renders the same rows as the top-level list, so
-// it must derive the same finding. This is the site the ARN-only helper
-// signature used to hide.
+// it must derive the same finding.
 func TestW5_SNSSubPlainHTTP_ByTopicFetcherAgrees(t *testing.T) {
 	out, err := awsclient.FetchSNSTopicSubscriptions(
 		context.Background(),

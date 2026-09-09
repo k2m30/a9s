@@ -2,12 +2,10 @@ package unit
 
 // qa_tier_a_coverage_test.go — Group 5: column-key cross-check sweep.
 //
-// Verifies that DefaultViewDef for every resource type that the 017-issue-counts
-// branch targets actually contains a List column whose Key (or Path for path-backed
-// columns) matches the intended attention-column field.
-//
-// This test will FAIL until the coder adds all 23 attention columns to the
-// core/config/defaults_*.go files.
+// Verifies that DefaultViewDef for every resource type with an attention
+// column actually contains a List column whose Key (or Path for path-backed
+// columns) matches the intended attention-column field
+// (core/config/defaults_*.go).
 
 import (
 	"strings"

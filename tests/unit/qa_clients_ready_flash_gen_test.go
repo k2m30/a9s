@@ -1,18 +1,13 @@
-// qa_clients_ready_flash_gen_test.go — adapter-level regression for the
-// `handleClientsReady` flash.gen gate, covering the CXR/Architect Stage 5
-// R3+R4 finding on `internal/tui/app_session.go`.
+// qa_clients_ready_flash_gen_test.go — the `handleClientsReady` flash.gen
+// gate on `internal/tui/app_session.go`.
 //
-// The R2 rework introduced a broad gate (`len(intents) > 0 ||
-// len(tasks) > 0`) that bumped `m.flash.gen` on any non-stale Core result.
-// That silently invalidated any in-flight `ClearFlashMsg` for the current
-// flash because the normal success path returns non-flash tasks
-// (`FetchIdentity`, `LoadAvailCache`) even when no FlashIntent or
-// FlashTickPayload is emitted.
-//
-// R3 narrowed the gate to `hasFlashWork(intents, tasks)`. These tests
-// exercise the adapter directly (via `m.Update(ClientsReadyMsg)`) and
-// fail if the gate is reverted to anything broader than "FlashIntent in
-// intents OR FlashTickPayload in tasks".
+// The gate is `hasFlashWork(intents, tasks)`: `m.flash.gen` is bumped only
+// when a FlashIntent is in intents OR a FlashTickPayload is in tasks. A
+// broader gate (`len(intents) > 0 || len(tasks) > 0`) would silently
+// invalidate any in-flight `ClearFlashMsg` for the current flash, because
+// the normal success path returns non-flash tasks (`FetchIdentity`,
+// `LoadAvailCache`) even when no flash work is emitted. These tests exercise
+// the adapter directly (via `m.Update(ClientsReadyMsg)`).
 package unit
 
 import (

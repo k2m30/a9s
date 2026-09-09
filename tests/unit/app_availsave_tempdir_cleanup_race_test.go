@@ -1,31 +1,27 @@
-// app_availsave_tempdir_cleanup_race_test.go — canary for task #41's
-// flaky `testing.go:1464: TempDir RemoveAll cleanup: ... directory not
-// empty` failure.
+// app_availsave_tempdir_cleanup_race_test.go — a test that queues an
+// availability save must call Controller.Close BEFORE its t.TempDir()
+// cleanup runs.
 //
-// Root cause (traced, not assumed): Controller.Close's own doc comment
-// (core/app/menu.go) already states the contract precisely — a test
-// that queues an availability save (directly or via Handle/Apply) must
-// call Close BEFORE its t.TempDir() cleanup runs, or the async writer
-// goroutine (runAvailabilitySaveLoop, started by queueAvailabilitySave)
-// can still be calling cache.Store.SaveType (os.MkdirAll + os.CreateTemp +
-// os.Rename, all rooted at cache.DirForTest(profile, region)) while
-// RemoveAll(t.TempDir()) concurrently walks/removes that same tree.
-// cache.cacheRoot() reads os.Getenv("A9S_CONFIG_FOLDER") LIVE at SaveType
-// call time, not at goroutine-launch time, and os.Setenv/os.Unsetenv are
-// process-global with no synchronization against a concurrent Getenv — so
-// the leaked writer can just as easily land in whatever OTHER test's
-// A9S_CONFIG_FOLDER is current by the time the OS scheduler finally runs
-// it, explaining why the reported flake hits a different, seemingly
+// Controller.Close's doc comment (core/app/menu.go) states the contract:
+// the async writer goroutine (runAvailabilitySaveLoop, started by
+// queueAvailabilitySave) can still be calling cache.Store.SaveType
+// (os.MkdirAll + os.CreateTemp + os.Rename, all rooted at
+// cache.DirForTest(profile, region)) while RemoveAll(t.TempDir())
+// concurrently walks/removes that same tree. cache.cacheRoot() reads
+// os.Getenv("A9S_CONFIG_FOLDER") LIVE at SaveType call time, not at
+// goroutine-launch time, and os.Setenv/os.Unsetenv are process-global with
+// no synchronization against a concurrent Getenv — so the leaked writer can
+// land in whatever OTHER test's A9S_CONFIG_FOLDER is current by the time
+// the OS scheduler runs it, and the flake hits a different, seemingly
 // unrelated test on each shuffled run.
 //
-// This file reproduces the mechanism directly (not through the shared
-// newTestController* helpers, which the fix migrates separately) so the
-// canary stays valid regardless of that migration: it drives the exact
-// production seam (Controller.Handle(messages.ResourcesLoaded{...}) ->
+// This file drives the exact production seam
+// (Controller.Handle(messages.ResourcesLoaded{...}) ->
 // handleResourcesLoadedEvent -> syncExactTotalToMenu ->
 // persistMenuAvailabilityCache -> queueAvailabilitySave) against a
-// manually-owned temp directory, then races os.RemoveAll against the
-// writer with and without Close.
+// manually-owned temp directory, not through the shared newTestController*
+// helpers, then races os.RemoveAll against the writer with and without
+// Close.
 package unit_test
 
 import (
@@ -88,13 +84,12 @@ func buildAvailSaveRaceController(t testing.TB, profile, region string) *app.Con
 	return c
 }
 
-// TestAvailSaveTempDirRace_WithoutClose_DirectoryNotEmptyOnRemoval is the RED
-// canary: it reproduces, at high probability across many iterations, the
-// exact `RemoveAll` failure mode task #41 reports — a leaked
-// runAvailabilitySaveLoop goroutine recreating files under a directory that
-// is concurrently being torn down — by omitting Close entirely (the bug
-// class: a test that never registers Close at all, or registers it after
-// its TempDir cleanup already ran).
+// TestAvailSaveTempDirRace_WithoutClose_DirectoryNotEmptyOnRemoval
+// reproduces, at high probability across many iterations, the RemoveAll
+// failure — a leaked runAvailabilitySaveLoop goroutine recreating files
+// under a directory that is concurrently being torn down — by omitting Close
+// entirely (a test that never registers Close, or registers it after its
+// TempDir cleanup already ran).
 //
 // This test intentionally has NO t.TempDir()/t.Cleanup dependency of its
 // own: it owns and removes its directory manually so it can assert on the

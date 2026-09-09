@@ -946,11 +946,10 @@ func TestBackup_Enricher_U11_SummaryNeverContainsRowValues(t *testing.T) {
 	}
 }
 
-// TestBackup_Enricher_PartialOfOne_ReadsAsOneResource pins spec row (b) of
-// task aws3 round 2 at this site: the partial phrase and the status cell come
-// from the code's own declaration, and the declaration agrees its noun with
-// the total it names — one job in the window is "of 1 resource skipped", not
-// "of 1 resources skipped".
+// TestBackup_Enricher_PartialOfOne_ReadsAsOneResource: the partial phrase and
+// the status cell come from the code's own declaration, and the declaration
+// agrees its noun with the total it names — one job in the window is "of 1
+// resource skipped", not "of 1 resources skipped".
 func TestBackup_Enricher_PartialOfOne_ReadsAsOneResource(t *testing.T) {
 	const planID = "plan-partial-of-one"
 	fake := &backupJobsOnlyFake{

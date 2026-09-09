@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
 
-// wipfix_qa_aws_blind_test.go reproduces the reviewer's three fetch-side
-// scenarios literally:
+// wipfix_qa_aws_blind_test.go drives three fetch-side
+// scenarios:
 //
 //   - a CodeArtifact repository whose package count hit its page cap, beside a
 //     permissions-policy check that completed;

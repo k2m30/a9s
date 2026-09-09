@@ -1,31 +1,22 @@
 package unit
 
-// qa_logs_color_test.go — Behavioral tests for the logs (CloudWatch Log Groups) Color function.
+// qa_logs_color_test.go — the logs (CloudWatch Log Groups) Color function.
 //
-// Contract assertions:
-//   - retention_days set, stored_bytes>0, recent creation, kms_key_id set → ColorHealthy.
-//   - retention_days empty, with no `retention` word → ColorHealthy.
-//   - kms_key_id empty alone (retention set, not orphan) → ColorHealthy per
-//     docs/attention-signals.md (KMS issue only triggers when key is PendingDeletion, a
-//     cross-ref check, not "missing"). Changed from ColorWarning per CodeRabbit PR-273 finding.
-//   - stored_bytes=0 with old creation_time (>90d orphan) → ColorWarning.
-//   - Empty fields → ColorHealthy: an absent word is unknown, not bad.
-
-// The raw-field branch this table was written against is gone twice over. w6a
-// removed it, and w29 gave the classifier the type's own predicate over Fields
-// instead — so the states below are reported again, but from the words the
-// fetcher derives (`retention`, `encryption`) rather than the raw keys the old
-// branch read.
+// The classifier runs the type's own predicate over Fields, so the states
+// below are reported from the words the fetcher derives (`retention`,
+// `encryption`) rather than raw keys.
 //
 // The rows naming raw keys therefore want Healthy: a row carrying
 // `retention_days` and no `retention` word says nothing, which is what proves
-// the classifier stopped reading it. The row naming the word wants the colour
-// the word earns.
+// the classifier does not read it. The row naming the word wants the colour
+// the word earns. kms_key_id empty alone is Healthy per
+// docs/attention-signals.md (the KMS issue only triggers when the key is
+// PendingDeletion, a cross-ref check, not "missing").
 //
-// `retention_days` is a key no fetcher writes anymore — aws5 row 1 collapsed
-// the log group's retention into one field, `retention`, carrying words. It
-// stays in this table on purpose: a key colorLogs does not know must still
-// leave the row healthy, and this is the only place that is pinned.
+// `retention_days` is a key no fetcher writes — the log group's retention is
+// one field, `retention`, carrying words. It stays in this table on purpose:
+// a key colorLogs does not know must still leave the row healthy, and this
+// is the only place that is pinned.
 
 import (
 	"testing"
@@ -77,11 +68,9 @@ func TestLogsColor(t *testing.T) {
 			want:   resource.ColorWarning,
 		},
 		{
-			// CodeRabbit PR-273 finding: core/resource/types_monitoring.go:68-69
-			// currently returns ColorWarning when kms_key_id is empty, but
-			// docs/attention-signals.md only raises a KMS issue when the referenced
-			// key is PendingDeletion (a cross-ref check). Missing KMS alone is not
-			// enough to warn. This test will FAIL until the production colorer is fixed.
+			// docs/attention-signals.md only raises a KMS issue when the
+			// referenced key is PendingDeletion (a cross-ref check). Missing KMS
+			// alone is not enough to warn.
 			name: "no_kms",
 			fields: map[string]string{
 				"retention_days": "30",
@@ -121,12 +110,9 @@ func TestLogsColor(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			// Each case asserts its own want again. w6a made the driver demand
-			// Healthy for all of them, on the reading that a colour with no
-			// finding behind it is a colour nobody can explain. w29 converted
-			// this classifier: the fields reach the type's own predicate, which
-			// produces the finding, so the colour the table always named is the
-			// one the row now carries for a reason the detail view shows.
+			// The fields reach the type\'s own predicate, which produces the
+			// finding, so the colour the table names is one the row carries for a
+			// reason the detail view shows.
 			got := td.Color(resource.Resource{Fields: tc.fields})
 			if got != tc.want {
 				t.Errorf("Color(%v) = %v, want %v", tc.name, got, tc.want)

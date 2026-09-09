@@ -38,12 +38,11 @@ func TestSecretsColor(t *testing.T) {
 		},
 		{
 			// A secret nobody has read in 200 days is dormant, and the fetcher
-			// says so in the status field: secrets.go:64 sets DORMANT on that
-			// exact threshold and that exact field. The case used to omit the
-			// status and expect the classifier to re-derive dormancy from
-			// last_accessed, which is a row no fetch can produce and a second
-			// place for the same rule to live. It carries the status the
-			// fetcher writes instead.
+			// says so in the status field: secrets.go sets DORMANT on that exact
+			// threshold and that exact field. The case carries the status the
+			// fetcher writes; re-deriving dormancy from last_accessed in the
+			// classifier would be a row no fetch can produce and a second place
+			// for the same rule to live.
 			name: "stale_access_is_dormant",
 			fields: map[string]string{
 				"status":           "DORMANT",

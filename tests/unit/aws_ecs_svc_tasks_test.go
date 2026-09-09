@@ -97,10 +97,9 @@ func TestFetchEcsSvcTasks_Basic(t *testing.T) {
 		}
 	})
 
-	// Inverted deliberately: this used to expect "HEALTHY". Fields["health"]
-	// is drawn straight into the Health column, and the SDK's enum spelling is
-	// not a word an operator uses, so the cell reads in lowercase words. Do
-	// not "restore" the uppercase expectation.
+	// Fields["health"] is drawn straight into the Health column, and the SDK's
+	// enum spelling is not a word an operator uses, so the cell reads in
+	// lowercase words.
 	t.Run("task_0_health", func(t *testing.T) {
 		r := result.Resources[0]
 		if r.Fields["health"] != "healthy" {
@@ -246,10 +245,8 @@ func TestFetchEcsSvcTasks_MixedStatus(t *testing.T) {
 		// The stop code is what makes this row actionable, so it is a finding
 		// rather than a field the reader has to open the row to see. A task
 		// stopped by anything other than a person is broken.
-		// Inverted for the spec row on the stop-code phrase: the phrase now
-		// reads the stop code in plain English and the identifier itself is
-		// stated once, in the finding's supporting row. Do not restore the
-		// raw-identifier assertion.
+		// The phrase reads the stop code in plain English; the identifier
+		// itself is stated once, in the finding's supporting row.
 		if len(r.Findings) != 1 || r.Findings[0].Phrase != "stopped: essential container exited" {
 			t.Errorf("Findings = %+v, want one stop-code finding", r.Findings)
 		}

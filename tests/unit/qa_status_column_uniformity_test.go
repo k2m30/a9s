@@ -1,4 +1,4 @@
-// qa_status_column_uniformity_test.go — the standing OWNER RULE gate: every
+// qa_status_column_uniformity_test.go — the gate: every
 // registered top-level list view must present exactly ONE status column,
 // uniformly titled "Status", whose cell the shared pipeline in
 // core/app/list_columns.go (listExtractCellValue's isStatusCol cascade)
@@ -15,9 +15,9 @@
 //     fails, unconditionally.
 //   - An allowlisted violation that NOW conforms (single Status-titled
 //     status column, no duplicate cause column) fails with a "remove from
-//     allowlist" message — the burn-down signal for the conversion coder.
+//     allowlist" message — the burn-down signal.
 //   - An allowlisted violation still violating is skipped (logged),
-//     pre-existing debt this gate exists to track down.
+//     known debt this gate exists to track down.
 //
 // Two independent rules are checked per type, each with its own allowlist
 // key suffix so a type can be pinned for one violation without masking the
@@ -51,30 +51,26 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// knownStatusColumnDebt pins the exact inventory of (shortName, ruleKey)
-// violations found by this gate at seeding time. Key shape:
-// "<shortName>:<status-title|duplicate-cause>". Same burn-down semantics as
-// knownVisibilityGaps in qa_issue_visibility_gate_test.go:
+// knownStatusColumnDebt is the inventory of (shortName, ruleKey) violations
+// found by this gate. Key shape: "<shortName>:<status-title|duplicate-cause>".
+// Same burn-down semantics as knownVisibilityGaps in
+// qa_issue_visibility_gate_test.go:
 //   - present + still violating today   -> skip (logged), expected
-//     pre-existing debt for the conversion coder to burn down.
+//     pre-existing debt.
 //   - present + now conformant           -> FAIL ("remove from allowlist").
 //   - a violation NOT present here       -> FAIL unconditionally, a new
 //     regression the allowlist was never told about.
 //
-// SEEDED CENSUS (2026-07-07, first run of this gate): every entry originally
-// pinned here was discovered by driving the REAL production
-// column-resolution path (app.ResolveListColumns, which mirrors
-// resolveColumns in table_render.go) against every registered top-level
-// type's default view, back when the OWNER RULE required a status-qualifying
-// column to be Key-less to have its Title checked. The single-Status-column
-// conversion (list_columns.go's listExtractCellValue / resolveListStatusCol
-// title-based cascade, applied regardless of Key) burned down every single
-// pinned entry — all 36 status-title violations (State→Status column-title
-// renames, and previously keyed columns like cb's "Last Status" that now
-// route to the shared Status cell by Title) plus all 5 duplicate-cause
-// violations (eks/ng's "Issues", elb's "State Reason", sg's/ssm's "Risk" —
-// each folded into the Status cell's finding phrase). The allowlist is
-// empty: any violation below is a NEW regression, not pre-existing debt.
+// The gate drives the REAL production column-resolution path
+// (app.ResolveListColumns, which mirrors resolveColumns in table_render.go)
+// against every registered top-level type's default view. The single-Status
+// column (list_columns.go's listExtractCellValue / resolveListStatusCol
+// title-based cascade, applied regardless of Key) routes State→Status
+// column-title renames and keyed columns like cb's "Last Status" to the
+// shared Status cell by Title, and folds duplicate causes (eks/ng's
+// "Issues", elb's "State Reason", sg's/ssm's "Risk") into the Status cell's
+// finding phrase. The allowlist is empty: any violation below is a NEW
+// regression.
 var knownStatusColumnDebt = map[string]bool{}
 
 // statusColumnUniformityRuleKeys enumerates the two independent violation
@@ -85,7 +81,7 @@ const (
 	ruleDuplicateCause = "duplicate-cause"
 )
 
-// duplicateCausePattern mirrors the OWNER RULE's enumerated duplicate/cause
+// duplicateCausePattern mirrors the rule's enumerated duplicate/cause
 // signal list: issues, health_issues, risk, state, state reason, and a
 // status2-style numeric-suffixed variant of "status". Applied
 // case-insensitively against both column Key and Title.
@@ -112,7 +108,7 @@ func isStatusQualifyingColumn(col app.ColumnDef, lifecycleKey string) bool {
 }
 
 // isDuplicateCauseColumn reports whether col's Key or Title
-// case-insensitively matches the OWNER RULE's enumerated duplicate/cause
+// case-insensitively matches the rule's enumerated duplicate/cause
 // signal set (issues, health_issues, risk, state, state reason,
 // status2-style variants).
 func isDuplicateCauseColumn(col app.ColumnDef) bool {
@@ -153,7 +149,7 @@ func statusColumnCensus(columns []app.ColumnDef, lifecycleKey string) (statusIdx
 }
 
 // TestStatusColumnUniformityGate_ExactlyOneStatusColumnTitledStatus is the
-// standing OWNER RULE gate. For every registered top-level type, resolves
+// gate. For every registered top-level type, resolves
 // the DEFAULT list columns via app.ResolveListColumns (which mirrors
 // resolveColumns in table_render.go — the same column set the TUI renders),
 // then checks:

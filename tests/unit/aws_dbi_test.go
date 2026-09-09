@@ -42,13 +42,12 @@ func findDBI(t *testing.T, id string) rdstypes.DBInstance {
 }
 
 // fetchSingle calls FetchRDSInstancesPage with one instance and returns
-// status (always "" post-W1.4b.3 — the legacy Resource.Status field is gone;
-// the phrase lives on r.Fields["status"] and r.Findings), fields, and findings.
+// status (always "" — Resource has no Status field; the phrase lives on
+// r.Fields["status"] and r.Findings), fields, and findings.
 //
-// The "status" return value is retained as "" so historical "status must be
-// empty (fold contract)" assertions remain meaningful: pre-W1.4b.3 they
-// verified the fetcher never wrote to Resource.Status; post-W1.4b.3 that
-// invariant is structurally enforced by the type system.
+// The "status" return value is retained as "" so the "status must be empty
+// (fold contract)" assertions stay meaningful: the fetcher never writes a
+// status outside Fields and Findings.
 func fetchSingle(t *testing.T, inst rdstypes.DBInstance) (status string, fields map[string]string, findings []domain.Finding) {
 	t.Helper()
 	mock := &fakeRDSDescribeDBInstances{Output: &rds.DescribeDBInstancesOutput{DBInstances: []rdstypes.DBInstance{inst}}}
@@ -732,12 +731,11 @@ func TestDBI_Fetch_FindingsPopulated_EveryFixture(t *testing.T) {
 		{fixtures.WarnDbiPublicMaintID, []string{"public endpoint"}},
 		// Wave-2 only on Healthy row — Findings must be nil/empty (Wave-2 is not in Findings).
 		{fixtures.MaintDbiScheduledID, nil},
-		// Legacy fixture from the full RDS pool. d4 row 1 took "deletion
-		// protection off" off this row: normalizeRDSInstancePosture now sets
-		// DeletionProtection on the whole bulk pool, so the finding has the
-		// one witness it is supposed to have (warn-dbi-unprotected, dbi.go).
-		// Do not restore the fourth phrase — TestD4_DeletionProtectionHasOneWitness
-		// fails on it.
+		// Legacy fixture from the full RDS pool. normalizeRDSInstancePosture
+		// sets DeletionProtection on the whole bulk pool, so the finding has the
+		// one witness it is supposed to have (warn-dbi-unprotected, dbi.go) and
+		// this row does not carry "deletion protection off"
+		// (TestD4_DeletionProtectionHasOneWitness).
 		{"db-public-no-encryption", []string{"no automated backups", "public endpoint", "unencrypted storage"}},
 	}
 

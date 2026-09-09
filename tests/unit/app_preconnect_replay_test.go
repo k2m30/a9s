@@ -1,43 +1,28 @@
-// app_preconnect_replay_test.go — RED regression pins for the pre-connect
-// replay (docs/design/cache-requirements.md C10): a navigation issued BEFORE the
-// AWS connect completes renders the cached list correctly (C1), but its
-// fetch task fails with "AWS clients not initialized" and is never replayed
-// once the connect lands — the list is stuck on cached rows plus a
-// permanent LastFetchError forever. C10 requires the last navigation to
-// replay automatically once connected.
+// app_preconnect_replay_test.go — pre-connect replay
+// (docs/design/cache-requirements.md C10): a navigation issued BEFORE the
+// AWS connect completes renders the cached list (C1), its fetch task fails
+// with "AWS clients not initialized", and the last navigation must replay
+// automatically once the connect lands — never a list stuck on cached rows
+// plus a permanent LastFetchError.
 //
-// Root causes pinned here (implementation lands in parallel):
-//  1. session.New() must seed PendingRefresh: true so a fresh session (no
-//     prior profile/region switch) still has a pending post-connect
-//     refresh armed at STARTUP, not only after HandleProfileSelected /
+// The mechanism pinned here:
+//  1. session.New() seeds PendingRefresh: true so a fresh session (no
+//     prior profile/region switch) has a pending post-connect refresh armed
+//     at STARTUP, not only after HandleProfileSelected /
 //     HandleRegionSelected set it on switch.
-//  2. BootstrapLive must pass the REAL StackDepth (len(c.stack)) and
-//     HasActiveRL (c.topListState() != nil) into ClientsReadyEvent instead
-//     of the hardcoded StackDepth: 1 / omitted HasActiveRL — otherwise
-//     maybeRefreshIntents (core/runtime/handlers.go) can never see an
-//     active list and never emits RefreshActiveListIntent.
-//  3. RefreshActiveListIntent is a documented no-op in the headless
-//     controller (core/app/intents.go's ApplyIntents default-case
-//     comment) — some new controller-side mechanism (a helper the coder
-//     will name activeListRefreshTasks, extracted from
-//     handleActionRefresh's list branch, core/app/actions_list.go
-//     lines 184-199) must turn that intent into a real
-//     KindFetchResources task for the active list's type, at BOTH:
+//  2. BootstrapLive passes the REAL StackDepth (len(c.stack)) and
+//     HasActiveRL (c.topListState() != nil) into ClientsReadyEvent —
+//     otherwise maybeRefreshIntents (core/runtime/handlers.go) can never see
+//     an active list and never emits RefreshActiveListIntent.
+//  3. activeListRefreshTasks (core/app/actions_list.go) turns
+//     RefreshActiveListIntent into a real KindFetchResources task for the
+//     active list's type, at BOTH:
 //     - BootstrapLive's return (the STARTUP connect seam), and
 //     - Controller.Handle's messages.ClientsReady path (the web
 //     profile-switch reconnect seam) — reached when DrainSync/
 //     DrainSyncPartition executes a TaskKindConnect task and feeds the
 //     resulting messages.ClientsReady through Controller.Handle
-//     (core/app/drainsync.go, c.Handle(ev) at the end of the loop
-//     body). NOTE: as committed at HEAD, core/runtime/orchestrator.go's
-//     Core.HandleEvent switch has NO case for messages.ClientsReady at
-//     all (it is explicitly documented as a TUI-shim-only event,
-//     handled outside HandleEvent) — so today a ClientsReady fed
-//     through Controller.Handle hits the default nil,nil branch and is
-//     silently dropped for headless/web callers. Wiring this seam is
-//     therefore part of the pre-connect replay fix, not a pre-existing green path;
-//     test 1 below drives this exact path and pins the TARGET (fixed)
-//     behavior.
+//     (core/app/drainsync.go). Test 1 below drives this exact path.
 //
 // All tests are hermetic: A9S_CONFIG_FOLDER redirected to t.TempDir(), no
 // AWS credentials, no network. Cache seeding uses the real

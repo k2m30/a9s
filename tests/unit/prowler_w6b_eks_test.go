@@ -34,8 +34,7 @@ import (
 
 const (
 	w6bEKSCodePublicEndpoint = domain.FindingCode("eks.public-endpoint")
-	// Inverted for the spec row that gave severity one owner: the scoped
-	// exposure is its own code at its own declared tier.
+	// The scoped exposure is its own code at its own declared tier.
 	w6bEKSCodePublicEndpointScoped = domain.FindingCode("eks.public-endpoint-restricted")
 	w6bEKSCodeLoggingOff           = domain.FindingCode("eks.control-plane-logging-off")
 	w6bEKSCodeSecretsNotKMS        = domain.FindingCode("eks.secrets-not-kms")
@@ -315,8 +314,7 @@ func TestW6BEKS_LogTypesSplitAcrossEntries_IsHealthy(t *testing.T) {
 // The cluster is below 1.28 on purpose: from 1.28 AWS envelope-encrypts
 // Kubernetes secrets with an AWS-owned key on every cluster, so an absent
 // EncryptionConfig there means no CUSTOMER key rather than no encryption, and
-// the finding no longer fires. The version this test used to pass (1.33) is
-// not to be restored.
+// the finding does not fire.
 func TestW6BEKS_SecretsNotKMS_NoEncryptionConfig(t *testing.T) {
 	c := w6bEKSCluster("acme-prod-updating", "1.26")
 	c.EncryptionConfig = nil

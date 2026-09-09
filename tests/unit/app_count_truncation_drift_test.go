@@ -146,12 +146,11 @@ func TestSyncExactTotalToMenu_ClearsPriorRowsDerivedTruncation_OnEqualExactRows(
 	}
 
 	// Seed the truncation the rows-derived way this case is about: a
-	// truncated first page carrying the same five broken rows. (It used to be
-	// seeded with a PatchMenu intent, which no rows-derived lane emits — every
-	// PatchMenu producer is a live probe or a Wave-2 result, so its truncation
-	// is authoritative and an equal-count rows-derived resync may not clear
-	// it. Seeding it through the lane the case names keeps the distinction the
-	// test isolates.)
+	// truncated first page carrying the same five broken rows. Every PatchMenu
+	// producer is a live probe or a Wave-2 result, whose truncation is
+	// authoritative and which an equal-count rows-derived resync may not
+	// clear, so seeding through PatchMenu would not isolate the distinction
+	// this case is about.
 	handlePage(c, messages.ResourcesLoaded{
 		ResourceType: "s3",
 		Resources:    rows,

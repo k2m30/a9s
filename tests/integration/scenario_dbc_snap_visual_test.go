@@ -139,11 +139,6 @@ func TestScenario_DBCSnapVisual_AuroraBackupPivot(t *testing.T) {
 //
 // Also asserts that WarnDBCSnapIncompatibleRestoreID renders
 // "incompatible-restore" (single Broken phrase, no multi-suffix).
-//
-// These tests FAIL until the coder ships:
-//   - ComputeDBCSnapStatusAndIssues in core/aws/dbc_snap.go
-//   - WarnDBCSnapFailedAndManualOldID fixture in core/demo/fixtures/dbc.go
-//   - WarnDBCSnapIncompatibleRestoreID fixture in core/demo/fixtures/dbc.go
 func TestScenario_DBCSnapVisual_FailedPlusManualOldStacks(t *testing.T) {
 	scenario := fullIntegrationNewDemoScenario(t)
 	runDemoStartup(t, scenario)

@@ -1,14 +1,12 @@
-// tui_toplevel_list_persistence_test.go — pin tests for #17 wave 2,
-// verifying the coder's fix in internal/tui/runtime_adapter_navigate.go: a
-// top-level, menu-driven list open now pushes runtime.ScreenResourceList
-// (via app.Controller.ApplyIntents + EnsureListState), not
-// PushChildListScreen's runtime.ScreenChildList. Before that fix, EVERY
-// top-level TUI list open silently disabled Controller.maybeSaveResourceListCache's
-// C6 disk-cache save gate (core/app/handle.go's syncExactTotalToMenu,
-// which only persists when screen.ID == runtime.ScreenResourceList) — a
-// genuine navigate-and-append session in the running TUI never wrote a
-// per-type cache file to disk, RED at commit effdd465 (confirmed by reading
-// PushChildListScreen's runtime.ScreenChildList push at that commit).
+// tui_toplevel_list_persistence_test.go — a top-level, menu-driven list
+// open in internal/tui/runtime_adapter_navigate.go pushes
+// runtime.ScreenResourceList (via app.Controller.ApplyIntents +
+// EnsureListState), not PushChildListScreen's runtime.ScreenChildList.
+// Controller.maybeSaveResourceListCache's C6 disk-cache save gate
+// (core/app/handle.go's syncExactTotalToMenu) only persists when screen.ID
+// == runtime.ScreenResourceList, so a top-level open that pushed
+// ScreenChildList would mean a navigate-and-append session in the running
+// TUI never wrote a per-type cache file to disk.
 //
 // See core/app/handle.go, core/app/list_body.go,
 // core/app/navigate.go, core/runtime/handlers_navigate.go for the
@@ -145,15 +143,14 @@ func TestTopLevelListOpen_TUI_PersistsAppendedRowsToDisk(t *testing.T) {
 // -----------------------------------------------------------------------
 
 // TestScreenIDGuard_TopLevelCommandVsPushChildListScreen pins, at the
-// core/app layer, the exact invariant the TUI adapter's fix depends on:
-// a top-level command-driven list open (the app.Controller path
-// handleActionCommand -> applyNavResult mirrors what the TUI's fixed
-// handleNavigate now drives via ApplyIntents{PushScreen{ScreenResourceList}})
-// pushes runtime.ScreenResourceList, while PushChildListScreen (the OLD,
-// wrong call the TUI used to make for a top-level open, still correct for a
-// genuine child/related list) pushes runtime.ScreenChildList. Both screen
-// IDs are asserted in the SAME test so it cannot pass merely because
-// ScreenIDs() always reports one fixed value.
+// core/app layer, the exact invariant the TUI adapter depends on: a
+// top-level command-driven list open (the app.Controller path
+// handleActionCommand -> applyNavResult mirrors what the TUI's
+// handleNavigate drives via ApplyIntents{PushScreen{ScreenResourceList}})
+// pushes runtime.ScreenResourceList, while PushChildListScreen (correct for
+// a genuine child/related list, wrong for a top-level open) pushes
+// runtime.ScreenChildList. Both screen IDs are asserted in the SAME test so
+// it cannot pass merely because ScreenIDs() always reports one fixed value.
 func TestScreenIDGuard_TopLevelCommandVsPushChildListScreen(t *testing.T) {
 	newCtrl := func(profile string) *app.Controller {
 		s := session.New()
@@ -272,14 +269,14 @@ func TestSeededC6aPair_TitleShowsCountNotRowsLen_ThenClearsOnRealFetch(t *testin
 // TestRowStoreSeededPair_CachedEntryCarriesTotalCount pins the RowStore-observed
 // sibling of TestSeededC6aPair_TitleShowsCountNotRowsLen_ThenClearsOnRealFetch
 // above: HandleNavigate's OTHER cache-hit branch (core/runtime/handlers_navigate.go,
-// `tr := c.session.RowStore.Snapshot(canon); if tr.Gen != 0 { ... }`) used to
-// build its ListViewCacheEntry/CachedEntry WITHOUT carrying tr.TotalCount, so a
-// count wider than the retained page (e.g. handleAvailabilityCacheLoaded's
-// ObserveCountRows seeding 50 rows then a counts-only RowStore.ObserveCount(55))
-// was silently dropped on the first rendered frame — the title showed "s3(50+)"
-// instead of "s3(55+)". This exercises the RowStore path directly (Observe +
-// ObserveCount, no on-disk cache.Store involved at all), distinct from the
-// disk-store-fallback branch the sibling test above covers.
+// `tr := c.session.RowStore.Snapshot(canon); if tr.Gen != 0 { ... }`) builds
+// its ListViewCacheEntry/CachedEntry carrying tr.TotalCount, so a count
+// wider than the retained page (e.g. handleAvailabilityCacheLoaded's
+// ObserveCountRows seeding 50 rows then a counts-only
+// RowStore.ObserveCount(55)) reaches the first rendered frame — the title
+// shows "s3(55+)", not "s3(50+)". This exercises the RowStore path directly
+// (Observe + ObserveCount, no on-disk cache.Store involved at all), distinct
+// from the disk-store-fallback branch the sibling test above covers.
 func TestRowStoreSeededPair_CachedEntryCarriesTotalCount(t *testing.T) {
 	tmp := t.TempDir()
 	t.Setenv("A9S_CONFIG_FOLDER", tmp)

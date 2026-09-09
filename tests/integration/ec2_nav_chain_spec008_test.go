@@ -4,16 +4,6 @@ package integration
 //
 // These tests verify the complete navigation chain in demo mode:
 //   Menu → EC2 list → EC2 detail → (related nav) → Target resource
-//
-// TestEC2_008_NavChain_FieldCursorGetterExists and
-// TestEC2_008_NavChain_JMovesFieldCursor deleted (round 4, specs/022-codebase-
-// cleanup): both drove DetailModel.FieldCursor()/.Update()/.View() directly
-// (dead legacy API). Covered by tests/unit's live controller path:
-// detail_livepath_migration_test.go's TestDetailController_MoveDown_
-// SkipsSectionHeadersAndSpacers (ActionMoveDown repeatedly advances
-// Body.Detail.FieldCursor, always landing on a real field row) and
-// detail_ports_test.go's TestWave3_DetailController_MoveDown_
-// ClampsAtLastField / MoveUp_ClampsAtFirstField (boundary clamp).
 
 import (
 	"regexp"
@@ -118,10 +108,9 @@ func TestEC2_008_NavChain_RightCol_Count1_OpensDrillTarget(t *testing.T) {
 	})
 
 	// Deliver RelatedNavigateMsg with TargetID (count=1 path).
-	// Rule (user, 2026-07-06, supersedes 2026-04-24): a related drill that
-	// narrows to exactly one resource opens that resource's DETAIL view for
-	// every target type; enter-keyed child views stay reachable only via
-	// Enter inside the target's own list.
+	// A related drill that narrows to exactly one resource opens that
+	// resource's DETAIL view for every target type; enter-keyed child views
+	// stay reachable only via Enter inside the target's own list.
 	m, cmd := navApplyMsg(m, messages.RelatedNavigate{
 		TargetType: "tg",
 		TargetID:   "tg-ec2chain-001",

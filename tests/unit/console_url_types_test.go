@@ -842,15 +842,14 @@ func TestConsoleURL_HostileInput_SecretsNameEncoding(t *testing.T) {
 	}
 }
 
-// ─── Incomplete-row hardening (Codex review) ────────────────────────────────
+// ─── Incomplete-row hardening ───────────────────────────────────────────────
 //
 // A related-panel stub/ID-only resource (no StubCreator registered for its
-// type) carries just ID+Type — Name and Fields are zero-valued. Before the
-// Codex-driven fix, waf/codeartifact/dbc's builders would either panic-free
-// but WRONG-guess a URL (dbc defaulting to the RDS console for an empty
-// engine) or build a structurally-empty-but-non-empty path segment
-// (waf/codeartifact with an empty Name/domain_name). All three now guard
-// explicitly and return "" instead.
+// type) carries just ID+Type — Name and Fields are zero-valued.
+// waf/codeartifact/dbc's builders guard explicitly and return "" rather than
+// guess a URL (dbc defaulting to the RDS console for an empty engine) or
+// build an empty path segment (waf/codeartifact with an empty
+// Name/domain_name).
 
 func TestConsoleURL_IncompleteRow_Waf_EmptyNameOrScopeReturnsEmpty(t *testing.T) {
 	td := consoleURLTypeDef(t, "waf")
@@ -872,8 +871,8 @@ func TestConsoleURL_IncompleteRow_Waf_EmptyNameOrScopeReturnsEmpty(t *testing.T)
 func TestConsoleURL_IncompleteRow_Codeartifact_EmptyDomainNameReturnsEmpty(t *testing.T) {
 	td := consoleURLTypeDef(t, "codeartifact")
 	// domain_owner and arn are present (account resolves fine) — only
-	// domain_name is missing, which used to still build a URL with an empty
-	// path segment ("d/123456789012//r/my-repo").
+	// domain_name is missing, which must not build a URL with an empty path
+	// segment ("d/123456789012//r/my-repo").
 	row := domain.Resource{ID: "my-repo", Fields: map[string]string{
 		"domain_owner": "123456789012",
 		"domain_name":  "",
@@ -894,7 +893,7 @@ func TestConsoleURL_IncompleteRow_Dbc_EmptyEngineNeverGuessesRDS(t *testing.T) {
 	}
 }
 
-// ─── elb cache-restored shape (Codex review) ────────────────────────────────
+// ─── elb cache-restored shape ───────────────────────────────────────────────
 
 // TestConsoleURL_Elb_CacheRestoredShape_LoadBalancerArnOnlyResolves proves
 // the exact row shape an on-disk cache file written before this feature

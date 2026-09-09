@@ -1,45 +1,28 @@
-// aws_classifier_fivepack_test.go — pins five verified production bugs found
-// during the demo-state-coverage wave (qa_demo_state_coverage_test.go), each
-// mirrored by a REMOVED allowlist entry there so the ratchet goes red until
-// the paired coder fix lands in the same PR:
+// aws_classifier_fivepack_test.go — five fetcher/classifier pairs, each
+// mirrored by the demo-state-coverage ratchet (qa_demo_state_coverage_test.go):
 //
-//  1. colorKMS reads Fields["key_state"], but FetchKMSKeysPage only ever
-//     writes Fields["status"] — Broken/Dim/Warning are unreachable through
-//     the real fetcher + real classifier pair. Per docs/resources/kms.md §3.2
-//     the documented buckets are: PendingDeletion/PendingImport -> Broken,
-//     Disabled -> Warning, Unavailable -> Broken.
-//  2. colorIAMUser requires Fields["has_console_password"]=="true", but
-//     FetchIAMUsersPage hardcodes "false" and EnrichIAMUserMFA (the type's
-//     only Wave-2 enricher) never writes that field back — it only updates
-//     "mfa" and "risk". Per docs/resources/iam-user.md §3.2 a console user
-//     without MFA classifies Broken via the wave2 finding path (not via
-//     colorIAMUser's dead "true" branch at all).
-//  3. colorLambda checks Fields["dlq_target_arn"]=="" (forcing Warning)
-//     BEFORE the Inactive->Dim and Healthy-fallthrough branches, but
-//     FetchLambdaFunctionsPage never writes a "dlq_target_arn" field —
-//     every non-Failed, non-deprecated-runtime function is permanently
-//     forced into Warning regardless of its real state or DLQ config.
-//  4. colorRedis matches phrase=="deleted", but computeRedisFindings has no
+//  1. colorKMS reads the field FetchKMSKeysPage writes, so Broken/Dim/Warning
+//     are reachable through the real fetcher + real classifier pair. Per
+//     docs/resources/kms.md §3.2 the buckets are: PendingDeletion/
+//     PendingImport -> Broken, Disabled -> Warning, Unavailable -> Broken.
+//  2. Per docs/resources/iam-user.md §3.2 a console user without MFA
+//     classifies Broken via the wave2 finding path; colorIAMUser carries no
+//     dead Fields["has_console_password"]=="true" branch (FetchIAMUsersPage
+//     never sets it and EnrichIAMUserMFA only updates "mfa" and "risk").
+//  3. colorLambda must not force Warning on a Fields["dlq_target_arn"]==""
+//     check ahead of the Inactive->Dim and Healthy-fallthrough branches:
+//     FetchLambdaFunctionsPage never writes "dlq_target_arn", so that check
+//     would force every non-Failed, non-deprecated-runtime function into
+//     Warning regardless of its real state or DLQ config.
+//  4. colorRedis has no "deleted" branch: computeRedisFindings has no
 //     "deleted" case (docs/resources/redis.md §3.1/§3.2/§5 document no
-//     deleted/dim state for redis at all — ElastiCache simply stops
-//     returning a torn-down replication group instead of reporting
-//     "deleted"). This is dead code: the pin is a source-scan asserting
-//     colorRedis has no unreachable "deleted" branch, not fabricated
-//     fixture data.
-//  5. EnrichRDSDocDBMaintenance (rds_issue_enrichment.go) is a near-duplicate
-//     of the already-wired EnrichDBIMaintenance (dbi's Wave2 in
-//     catalog_databases.go) but is never itself assigned to any catalog
-//     Wave2 field — it is dead code, referenced only by its own test suite.
-//     Verdict for the "is a distinct rds.pending-maintenance signal
-//     documented anywhere" question: docs/resources/dbi.md §4 documents
-//     "Pending maintenance overdue" (dbi.pending-maintenance, Warning on
-//     Healthy row) and docs/resources/dbc.md §3.2/§4 documents "Cluster has
-//     a pending maintenance action ... -> Warning" / "maintenance overdue"
-//     (dbc side, Broken/!). Both are served by EnrichDBIMaintenance and
-//     EnrichDBCMaintenance respectively — there is no third, distinct
-//     "rds" signal anywhere in the golden docs. EnrichRDSDocDBMaintenance
-//     duplicates the dbi half of that coverage under a different resource
-//     name that no catalog entry uses.
+//     deleted/dim state for redis — ElastiCache simply stops returning a
+//     torn-down replication group). The pin is a source-scan.
+//  5. There is no third, distinct "rds" pending-maintenance enricher:
+//     docs/resources/dbi.md §4 ("Pending maintenance overdue",
+//     dbi.pending-maintenance, Warning on Healthy row) is served by
+//     EnrichDBIMaintenance and docs/resources/dbc.md §3.2/§4 ("maintenance
+//     overdue", Broken/!) by EnrichDBCMaintenance.
 package unit_test
 
 import (

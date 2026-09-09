@@ -53,11 +53,9 @@ func TestFetchCloudWatchLogGroups_ParsesMultipleLogGroups(t *testing.T) {
 		t.Fatalf("expected 2 resources, got %d", len(resources))
 	}
 
-	// Verify required fields exist
-	// "retention" replaced "retention_days": the policy is one field now
-	// (aws5 row 1), carrying "30 days" or "never expire" rather than a number
-	// that was empty for exactly the groups the never-expire warning fires on.
-	// Do not restore the number-only key.
+	// "retention" is one field, carrying "30 days" or "never expire" rather
+	// than a number that is empty for exactly the groups the never-expire
+	// warning fires on.
 	requiredFields := []string{"log_group_name", "stored_bytes", "retention", "creation_time"}
 	for i, r := range resources {
 		for _, key := range requiredFields {

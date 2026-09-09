@@ -1,14 +1,13 @@
 package unit
 
-// qa_cache_issues_test.go — T013: cache TypeFile round-trip with issue count
+// qa_cache_issues_test.go — cache TypeFile round-trip with issue count
 // fields.
 //
-// Tests that cache.TypeFile carries Issues int, IssuesTruncated bool, and
-// IssuesKnown bool fields, and that they survive a YAML marshal/unmarshal
-// round-trip correctly — including the tri-state where IssuesKnown=true,
-// Issues=0 distinguishes "probed and found zero issues" from "not yet
-// probed". Round-2 migration: repinned from the deleted cache.Entry onto
-// cache.TypeFile (docs/design/cache-requirements.md C7).
+// cache.TypeFile carries Issues int, IssuesTruncated bool, and IssuesKnown
+// bool fields, and they survive a YAML marshal/unmarshal round-trip —
+// including the tri-state where IssuesKnown=true, Issues=0 distinguishes
+// "probed and found zero issues" from "not yet probed"
+// (docs/design/cache-requirements.md C7).
 
 import (
 	"testing"

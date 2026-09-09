@@ -12,9 +12,6 @@ package unit
 //   3. At least one checker returns a RelatedCheckResult with Count >= 0
 //      (not the -1 panic-recovery sentinel), confirming the live checker path
 //      works against the demo transport — no demoMode shortcut is taken.
-//
-// Expected to fail until coder-1 wires CloudTrail and related services into the
-// demo transport (T013 scope for ct-events).
 
 import (
 	"fmt"
@@ -216,11 +213,8 @@ func TestDemoColdCacheCtEvents_DetailRelatedChecksRunLivePath(t *testing.T) {
 }
 
 // TestDemoColdCacheCtEvents_NoDemoShortcut verifies that the ct-events related
-// checks do NOT take a demo shortcut. Specifically: after the coder removes all
-// demoMode branches (T034–T037), the related-check task dispatch must go
-// through def.Checker (live path), not a demo override. This test passes when
-// the live path produces the same or better results than any shortcut would
-// have.
+// checks do NOT take a demo shortcut: the related-check task dispatch goes
+// through def.Checker (live path), not a demo override.
 //
 // This is a structural test: it verifies that the dispatch produces real
 // RelatedCheckResult values (not nil messages or panics) carrying the exact

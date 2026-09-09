@@ -575,7 +575,7 @@ func TestFetchVpcPeeringConnectionsPage_WaveThreeAntiTests(t *testing.T) {
 // EnrichVpcPeerRoutes — cache-scan enricher (zero SDK calls, mirrors
 // EnrichLTDeprecatedAMI's signature over the loaded "rtb" ResourceCache).
 // Both derived signals ship as "~" (SevWarn) background checks, matching the
-// lt deprecated-AMI treatment (spec amended 2026-07-15).
+// lt deprecated-AMI treatment.
 // ---------------------------------------------------------------------------
 
 // vpcPeerRTBCache builds an "rtb" ResourceCache entry from the REAL demo rtb

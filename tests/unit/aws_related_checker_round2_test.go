@@ -1,10 +1,7 @@
-// aws_related_checker_round2_test.go pins the CORRECT related-panel checker
-// mechanism (quoted from the golden per-type specs in docs/resources/*.md)
-// for a second wave of pivots that today return zero, -1, or garbage on
-// realistic data. Each test is expected to be RED at HEAD until the paired
-// coder task lands the fix; the mechanism it asserts is the documented one,
-// not the current (broken) implementation. Mirrors the harness patterns in
-// aws_related_checker_mechanism_test.go.
+// aws_related_checker_round2_test.go pins the related-panel checker
+// mechanism quoted from the golden per-type specs in docs/resources/*.md
+// for a second set of pivots, driven on realistic data. Mirrors the harness
+// patterns in aws_related_checker_mechanism_test.go.
 package unit_test
 
 import (
@@ -1363,10 +1360,10 @@ func TestTrail_Fetcher_EmitsFindingsForDocumentedWave1And2Signals(t *testing.T) 
 }
 
 // TestDemoIssueCoverage_TrailNowHasAFlaggedFixture is the mirror-image
-// assertion of the knownIssueCoverageGaps["trail"] allowlist entry this PR
-// removes: once FetchCloudTrailTrails emits Findings for the fixtures above,
-// "trail" is issue-capable AND has a flagged demo fixture, so it must no
-// longer be pinned as a known gap.
+// assertion of a knownIssueCoverageGaps["trail"] allowlist entry: since
+// FetchCloudTrailTrails emits Findings for the fixtures above, "trail" is
+// issue-capable AND has a flagged demo fixture, so it must not be pinned as
+// a known gap.
 func TestDemoIssueCoverage_TrailNowHasAFlaggedFixture(t *testing.T) {
 	clients := demo.NewServiceClients()
 	resources, err := awsclient.FetchCloudTrailTrails(context.Background(), clients.CloudTrail)

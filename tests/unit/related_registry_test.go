@@ -68,7 +68,7 @@ func TestRegisterRelated_ReplacesExisting(t *testing.T) {
 	defer resource.CleanupRelatedForTest("test_reg")
 
 	resource.SetRelatedForTest("test_reg", second)
-	// AS-67: Each SetRelatedForTest pushes a snapshot. To leave the registry
+	// Each SetRelatedForTest pushes a snapshot. To leave the registry
 	// clean for the next test, every Register must be paired with an
 	// Unregister. Defers run LIFO, so this one pops `first` first, then the
 	// outer defer pops the original (nil) snapshot.
@@ -1749,22 +1749,18 @@ func TestAppendRelated_NilChecker_Panics(t *testing.T) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// AS-67 — CleanupRelatedForTest must restore production defs, not destroy them.
+// CleanupRelatedForTest must restore production defs, not destroy them.
 // ═══════════════════════════════════════════════════════════════════════════
 //
-// Background: CleanupRelatedForTest previously called delete(relatedRegistry, key),
-// which destroyed the production registration that aws/*.go init() established.
-// Tests using Register-then-defer-Unregister stomped production state for the
-// rest of the test process; this was order-dependent and only surfaced once
-// AS-26 / AS-41 introduced t.Parallel() to detail tests, deferring the parallel
-// batch until after the sequential batch had emptied the registry.
-//
-// The fix is a per-key snapshot stack: Register pushes the previous value and
-// Unregister pops it. A pop of nil (no prior registration) deletes the entry,
-// which preserves the historical destructive semantics for test-only types
-// that production never registered.
+// Register pushes the previous value onto a per-key snapshot stack and
+// Unregister pops it, so a test's Register-then-defer-Unregister leaves the
+// registration aws/*.go init() established intact for the rest of the test
+// process (including t.Parallel() detail tests that run after the
+// sequential batch). A pop of nil (no prior registration) deletes the entry,
+// which is the right semantics for test-only types that production never
+// registered.
 
-// TestUnregisterRelated_RestoresPreviousValue is the AS-67 contract test: a
+// TestUnregisterRelated_RestoresPreviousValue is the contract test: a
 // nested Register-then-Unregister pair must restore the previous registration
 // rather than delete it. A second Unregister (when the previous snapshot was
 // nil) deletes the entry. A third Unregister (popping the empty stack) is a
@@ -1792,7 +1788,7 @@ func TestUnregisterRelated_RestoresPreviousValue(t *testing.T) {
 	}
 
 	// First Unregister must restore defsA — NOT delete the entry. This is the
-	// regression guard for AS-67; the old destructive delete would return nil.
+	// regression guard; a destructive delete would return nil.
 	resource.CleanupRelatedForTest(shortName)
 	got = resource.GetRelated(shortName)
 	if len(got) != 1 || got[0].TargetType != "as67-target-a" {

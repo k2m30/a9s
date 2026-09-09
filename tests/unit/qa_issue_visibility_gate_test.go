@@ -1,4 +1,4 @@
-// qa_issue_visibility_gate_test.go — the standing OWNER RULE gate: if a
+// qa_issue_visibility_gate_test.go — the gate: if a
 // resource row carries a PROBLEM signal — a row color with IsIssue()==true,
 // or an issue-severity Finding (SevWarn/SevBroken; a glyph decorator is just
 // the render-time echo of that same Finding, see isVisibilityViolation) — the
@@ -62,8 +62,8 @@ import (
 	unit "github.com/k2m30/a9s/v3/tests/unit"
 )
 
-// knownVisibilityGaps pins the exact inventory of (type, resource-key)
-// violations found by this gate: a row with an in-scope PROBLEM signal (see
+// knownVisibilityGaps is the inventory of (type, resource-key) violations
+// found by this gate: a row with an in-scope PROBLEM signal (see
 // isVisibilityViolation — IsIssue()==true color or an issue-severity
 // Finding; Dim-only/neutral rows never reach this predicate at all) yet
 // showing the problem on NEITHER the list Status cell NOR the detail
@@ -79,21 +79,13 @@ import (
 // Key shape: "<shortName>:<resourceID>" so per-type resource IDs never
 // collide across types.
 //
-// TERMINAL STATE (2026-07-06, after the wave1-findings conversion —
-// asg/ct-events/lambda/logs/policy/r53/rtb/secrets/sg/sns-sub/ssm — and the
-// gate's own scope refinement to PROBLEM-only signals): EMPTY. Every
-// (type, resource) pair that carries an issue-severity color or Finding now
-// shows the problem on the list Status cell or the detail Attention block.
-// The previous 11-entry inventory here (9 ct-events "routine event" rows,
-// lambda's Inactive-runtime fixture, sns-sub's Deleted fixture) was never a
-// visibility BUG — every one of those rows is Dim-only (SevDim Finding, Dim
-// color), which is a neutral/routine state, not a problem, per
-// domain.Severity.IsIssue()/domain.Color.IsIssue() (same precedent as
-// pivot-coverage's structurally-uncomputable-pivot exclusions). They were
-// removed once the predicate stopped flagging Dim-only rows as violations,
-// not because a fix made them visible. If this map ever needs a new entry
-// again, it means a genuine issue-severity row is invisible on both
-// surfaces — a real regression, not a Dim/neutral non-issue.
+// It is EMPTY: every (type, resource) pair that carries an issue-severity
+// color or Finding shows the problem on the list Status cell or the detail
+// Attention block. Dim-only rows (SevDim Finding, Dim color) are a
+// neutral/routine state, not a problem, per
+// domain.Severity.IsIssue()/domain.Color.IsIssue(). A new entry here would
+// mean a genuine issue-severity row is invisible on both surfaces — a real
+// regression, not a Dim/neutral non-issue.
 var knownVisibilityGaps = map[string]bool{}
 
 // drainVisibilityFixtures drains a type's demo rows through its own Wave-1
@@ -263,7 +255,7 @@ func detailHasAttentionFor(t *testing.T, res resource.Resource, shortName string
 // explicitly OUT of scope: SevDim is a neutral/routine state by the app's own
 // severity design (domain.Severity.IsIssue excludes it, matching the same
 // "dim = neutral" convention used by related-panel rows and menu entries),
-// not a problem the OWNER RULE is meant to police. A ct-events "routine
+// not a problem the rule is meant to police. A ct-events "routine
 // event" tier, a Lambda Inactive function, or a deleted SNS subscription are
 // all Dim-only under this design — they are states to observe, not issues to
 // surface via Status cell / Attention, so they never become gate violations
@@ -291,7 +283,7 @@ func hasIssueSeverityFinding(findings []domain.Finding) bool {
 }
 
 // TestIssueVisibilityGate_EveryColoredOrFlaggedRowIsVisibleSomewhere is the
-// standing OWNER RULE gate. For every registered type with a Wave-1 Fetcher,
+// gate. For every registered type with a Wave-1 Fetcher,
 // every fixture resource that isVisibilityViolation flags as an in-scope
 // PROBLEM signal (issue-severity color or Finding — Wave-1 seeded or Wave-2
 // merged; Dim-only/neutral rows are out of scope, see isVisibilityViolation)

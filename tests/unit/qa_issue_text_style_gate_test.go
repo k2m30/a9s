@@ -1,4 +1,4 @@
-// qa_issue_text_style_gate_test.go — the standing OWNER RULE machine-style
+// qa_issue_text_style_gate_test.go — the machine-style
 // gate: no raw AWS enum / UPPER_SNAKE token may appear in a user-facing
 // cause text. AWS SDK enums come back as either UPPER_SNAKE_CASE
 // ("CREATE_FAILED") or PascalCase ("PendingConfirmation"); domain.HumanizeStatusPhrase
@@ -10,9 +10,8 @@
 //  1. The declarative catalog — every registered FindingDef.Phrase across
 //     every resource type (resource.AllResourceTypes()[i].Findings). These
 //     are hand-authored phrase literals; a violator here is a copy/paste of
-//     a raw AWS constant straight into a FindingDef declaration (e.g. the
-//     historical `Phrase: "ALARM"` in catalog_monitoring.go, fixed to
-//     "alarm triggered").
+//     a raw AWS constant straight into a FindingDef declaration (e.g.
+//     `Phrase: "ALARM"` where "alarm triggered" is the operator phrase).
 //  2. The RENDERED surfaces actually shown to an operator, driven through
 //     the exact same demo-fixture-drain-plus-real-Controller harness as
 //     TestIssueVisibilityGate_EveryColoredOrFlaggedRowIsVisibleSomewhere in
@@ -38,8 +37,7 @@
 //     instance IDs, ARNs, and free-form names are operator-assigned data,
 //     not a machine enum a11n developer chose to display,
 //   - it is a short (<=5 char) acronym already accepted as a domain term
-//     via knownAcronymExemptions (e.g. "PITR" prior to the coder's fix,
-//     "ARN", "VPC", "TLS", "WAF", "DNS", "SSL", "IAM", "KMS", "SG", "AMI",
+//     via knownAcronymExemptions (e.g. "ARN", "VPC", "TLS", "WAF", "DNS", "SSL", "IAM", "KMS", "SG", "AMI",
 //     "CIS" — column *titles* and abbreviations that are conventional
 //     industry shorthand, not verbose enum text an operator must decode).
 //     This list is intentionally narrow: it exempts short, universally
@@ -118,8 +116,8 @@ var knownAcronymExemptions = map[string]bool{
 // an enum a developer chose to leave un-humanized.
 var awsAccessKeyIDPattern = regexp.MustCompile(`^A(KIA|SIA)[A-Z0-9]{12,}$`)
 
-// styleGateAllowlist pins today's known, not-yet-fixable style violations —
-// same burn-down contract as knownVisibilityGaps in qa_issue_visibility_gate_test.go:
+// styleGateAllowlist lists known style violations — same burn-down contract
+// as knownVisibilityGaps in qa_issue_visibility_gate_test.go:
 //   - present + still violating today            -> skip (logged), pre-existing debt.
 //   - present + no longer violating               -> FAIL ("remove from allowlist").
 //   - a violation NOT present here                -> FAIL unconditionally, a new
@@ -129,33 +127,8 @@ var awsAccessKeyIDPattern = regexp.MustCompile(`^A(KIA|SIA)[A-Z0-9]{12,}$`)
 // Key shape for the rendered sweep: "rendered:<shortName>:<resourceID>:<surface>"
 // where surface is "list-status" or "detail-attention".
 //
-// Target: EMPTY. Any entry here names a concrete file/line the coder (or a
-// follow-up PR) must fix; it is not a permanent exemption.
-//
-// PRUNED (2026-07-07): every entry this map ever held has been removed as
-// stale. Two independent classes of staleness were found while verifying
-// this gate, neither of which this file's own switch statements in
-// TestIssueTextStyleGate_CatalogPhrasesNeverRawEnum / checkStyleGateSurface
-// surface as a failure on their own — both silently Skip a no-longer-
-// violating allowlisted key instead of erroring "remove from allowlist",
-// unlike the explicit BURN-DOWN branch other gates in this package use
-// (e.g. qa_status_column_uniformity_test.go's checkRule) — so each entry
-// below was confirmed stale by reading current production source directly:
-//   - The 11 "rendered:<type>:prod-<type>-healthy:list-status" entries named
-//     resource IDs (prod-eks-healthy, prod-ng-healthy, prod-ecs-healthy, ...)
-//     that do not exist anywhere in core/demo/ — dead keys that can never
-//     match a real subtest.
-//   - The 4 "rendered:*:detail-attention[0]" entries (cb, ecr, glue, sfn) and
-//     the 3 "phrase:*" entries (ecr.vulnerabilities, ses.account-shutdown,
-//     ses.account-probation) named enrichers/literals that already route
-//     through domain.HumanizeStatusPhrase or already use lowercase prose
-//     (cb_issue_enrichment.go's statusPhrase, glue_issue_enrichment.go's
-//     statePhrase, sfn_issue_enrichment.go's statusPhrase, ecr_issue_enrichment.go's
-//     "%d critical findings"/"%d high findings", catalog_cicd.go's
-//     "<N> critical, <M> high vulnerabilities", catalog_messaging.go's
-//     "sending paused by AWS (shutdown)" / "account under review (probation)")
-//     — all fixed by the same wave that landed the humanize call, never
-//     needing this allowlist at all.
+// Target: EMPTY. Any entry here names a concrete file/line to fix; it is
+// not a permanent exemption.
 var styleGateAllowlist = map[string]string{}
 
 // extractTokens splits s on any character that is not a letter, digit, or
@@ -312,7 +285,7 @@ func TestIssueTextStyleGate_CatalogPhrasesNeverRawEnum(t *testing.T) {
 // (qa_issue_visibility_gate_test.go) and asserts that neither the list
 // Status cell nor the detail Attention block ever shows a raw AWS enum
 // token, for every registered type's demo fixtures. This is the
-// render-pipeline half of the OWNER RULE: unlike the catalog-literal sweep
+// render-pipeline half of the rule: unlike the catalog-literal sweep
 // above, a violation here means the *pipeline* (a fetcher writing a raw
 // Fields["status"], an enricher doing `Value: string(sdkEnum)` into a
 // DetailRow, or a column-resolution branch that skips the humanize call)
@@ -607,16 +580,16 @@ func findWholeCellEnumViolation(cell, resourceID, resourceName string, col app.C
 }
 
 // cellStyleGateAllowlist pins today's known whole-cell raw-enum violations
-// found by the rendered-cell sweep below — same burn-down contract as
+// for the rendered-cell sweep below — same burn-down contract as
 // styleGateAllowlist/knownVisibilityGaps: present + still violating -> skip
-// (pre-existing debt); present + no longer violating -> FAIL ("remove from
+// (known debt); present + no longer violating -> FAIL ("remove from
 // allowlist"); a violation NOT present here -> FAIL unconditionally (a new
 // regression the allowlist was never told about).
 //
 // Key shape: "<shortName>:<resourceID>:<columnTitle>".
 //
-// Target: EMPTY, and empty is what it is. Any entry here names a concrete
-// production gap the coder must fix rather than record.
+// Target: EMPTY. Any entry here names a concrete production gap to fix,
+// not to record.
 var cellStyleGateAllowlist = map[string]string{}
 
 // TestIssueTextStyleGate_RenderedListCellsNeverRawEnum sweeps EVERY column
@@ -748,7 +721,7 @@ func isVacuousPhrase(text string) bool {
 	return vacuousPhraseWords[strings.ToLower(strings.TrimSpace(text))]
 }
 
-// vacuousPhraseAllowlist pins today's known vacuous-phrase violations — same
+// vacuousPhraseAllowlist lists known vacuous-phrase violations — same
 // burn-down contract as styleGateAllowlist/knownVisibilityGaps: present +
 // still violating today -> skip (pre-existing debt); present + no longer
 // violating -> FAIL ("remove from allowlist"); a violation NOT present here
@@ -759,21 +732,11 @@ func isVacuousPhrase(text string) bool {
 // Key shape for the rendered sweep: "rendered:<shortName>:<resourceID>:<surface>"
 // where surface is "list-status" or "detail-attention[N]".
 //
-// Target: EMPTY. ct-events phrases (ct-danger/ct-attention/ct-info status
-// values) were already fixed by the same wave that landed
-// domain.HumanizeStatusPhrase and are NOT bare vacuous words (they carry the
-// "ct-" event-classification prefix, not a standalone severity word) — this
-// gate is expected green against them without needing an entry here.
-//
-// SEEDED 2026-07-07 (this gate's first run): four catalog FindingDef.Phrase
-// literals are the bare word "error"/"unhealthy" with no cause text at all —
-// all four are production-owned classifier literals
-// (core/aws/ebs.go/ebs_snap state-error branches, ecs_task_codes.go's
-// health-unhealthy branch, efs.go's error branch), not test fixtures, so
-// fixing them is out of QA's write scope. Three of the four also surface on
-// the rendered list-status column via a real demo fixture (efs's "error"
-// finding never becomes the sole/first Finding on any current efs fixture,
-// so it produces no rendered hit today).
+// Target: EMPTY. Any entry names a concrete production literal to fix; it
+// is not a permanent exemption. ct-events phrases
+// (ct-danger/ct-attention/ct-info status values) are NOT bare vacuous words
+// (they carry the "ct-" event-classification prefix, not a standalone
+// severity word), so this gate is green against them without an entry.
 var vacuousPhraseAllowlist = map[string]string{ //nolint:gochecknoglobals // burn-down allowlist, see doc comment
 	"phrase:ebs:ebs.state.error":                             "colorEBS's state=error branch (core/aws/ebs.go) sets Phrase: \"error\" verbatim with no cause text — production classifier literal, not a QA fixture; needs a coder fix (e.g. \"error: volume unusable\").",
 	"phrase:ebs-snap:ebs-snap.state.error":                   "colorEBSSnap's state=error branch (core/aws/ebs.go) sets Phrase: \"error\" verbatim with no cause text — production classifier literal, not a QA fixture; needs a coder fix.",

@@ -230,9 +230,8 @@ func TestEnrichWAFLogging_OrphanACLProducesFindingSevTilde(t *testing.T) {
 	if f.Severity != domain.SevWarn {
 		t.Errorf("severity = %v, want %v", f.Severity, "~")
 	}
-	// Inverted for the spec row that split waf.no-logging in two: an ACL that
-	// is attached to nothing is not a logging gap, and it now carries its own
-	// code and its own wording. Do not restore the waf.no-logging assertion.
+	// An ACL that is attached to nothing is not a logging gap; it carries its
+	// own code and its own wording, not waf.no-logging.
 	if f.Code != "waf.orphan" {
 		t.Errorf("Code = %q, want waf.orphan", f.Code)
 	}
@@ -285,10 +284,9 @@ func TestEnrichWAFLogging_APIErrorMarksRowTruncatedIDNotBadge(t *testing.T) {
 	if err == nil {
 		t.Fatal("enricher must surface a composite error when an API call fails")
 	}
-	// INVERTED for the "skipped" spec row 6: the label was "waf-enrich", which
-	// made the rendered line say the type twice ("enrich waf: GetLoggingConfiguration ..."). The
-	// type comes from the registry key at the surface; the aggregate names
-	// the call. Do not restore the type in the label.
+	// The aggregate names the call, not the type: the type comes from the
+	// registry key at the surface, and a type in the label would render it
+	// twice ("enrich waf: waf: GetLoggingConfiguration ...").
 	if errStr := err.Error(); !strings.Contains(errStr, "GetLoggingConfiguration") {
 		t.Errorf("composite error must name the call, %q, got: %q", "GetLoggingConfiguration", errStr)
 	}

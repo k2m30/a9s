@@ -1,16 +1,13 @@
 package unit
 
-// misc4_r2b_sns_toplevel_key_test.go — misc4 round 2, item (c).
+// misc4_r2b_sns_toplevel_key_test.go — the account-wide SNS subscription
+// list keys a stateless row through the topic.
 //
-// Round 1 fixed the by-topic child; the account-wide list had the same defect
-// one file over. It is worse there: the list spans every topic, so the word
-// AWS sends in place of an ARN is one identity for every deleted subscription
-// in the account.
-//
-// The account-wide list is also why the key carries the topic. Two topics can
-// each have a deleted subscription to the same address — the same on-call
-// mailbox unsubscribed twice is the ordinary case — and protocol plus
-// endpoint alone would make those one row again.
+// The list spans every topic, so the word AWS sends in place of an ARN
+// would be one identity for every deleted subscription in the account. Two
+// topics can each have a deleted subscription to the same address — the
+// same on-call mailbox unsubscribed twice is the ordinary case — and
+// protocol plus endpoint alone would make those one row.
 
 import (
 	"context"

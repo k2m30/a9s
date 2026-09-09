@@ -118,9 +118,9 @@ func TestCtEventsPivots_TruncatedConfirmsOnlyWhatItSaw(t *testing.T) {
 }
 
 // TestCtEventsPivots_TruncatedConfirmingNothingIsALowerBound pins the third
-// case, INVERTED under the row 16 amendment. It asserted Unknown; a truncated
-// list that confirmed nothing is a resolved zero carrying the truncation flag,
-// rendered "(0+)". Unknown belongs to the case above, where nothing was read.
+// case: a truncated list that confirmed nothing is a resolved zero carrying
+// the truncation flag, rendered "(0+)". Unknown belongs to the case above,
+// where nothing was read.
 func TestCtEventsPivots_TruncatedConfirmingNothingIsALowerBound(t *testing.T) {
 	event := ctPivotEvent()
 	for _, p := range ctPivots() {

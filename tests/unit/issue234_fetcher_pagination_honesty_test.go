@@ -1,19 +1,16 @@
-// issue234_fetcher_pagination_honesty_test.go — Tests for issue #234.
+// issue234_fetcher_pagination_honesty_test.go — a fetcher registered via
+// SetPaginatedForTest must stop after one API page and honestly report
+// IsTruncated. A fetcher that internally loops ALL pages before returning
+// does unbounded work on cold start and gives related-view checkers a
+// dishonest IsTruncated=false. eks, kms and ng call the underlying AWS API
+// with a page limit and pass the continuation token through.
 //
-// Business rule: A fetcher registered via SetPaginatedForTest must stop after one
-// API page and honestly report IsTruncated. Fetchers that internally loop ALL
-// pages before returning violate this contract — they do unbounded work on cold
-// start and cause related-view checkers to get dishonest IsTruncated=false.
+// opensearch and trail are genuinely unpaginated AWS APIs (ListDomainNames
+// and DescribeTrails return all results in one call), so IsTruncated=false
+// is honest for them.
 //
-// Three fetchers (eks, kms, ng) previously looped all pages internally while
-// returning IsTruncated=false. They have been refactored to call the underlying
-// AWS API with a page limit and pass the continuation token through.
-//
-// opensearch and trail are genuinely unpaginated AWS APIs (ListDomainNames and
-// DescribeTrails return all results in one call). IsTruncated=false is honest
-// for them — no tests needed.
-//
-// Positive controls: ec2, tg, s3 are genuinely paginated and must stay registered.
+// Positive controls: ec2, tg, s3 are genuinely paginated and must stay
+// registered.
 package unit
 
 import (

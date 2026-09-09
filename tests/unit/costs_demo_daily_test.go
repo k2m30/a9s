@@ -1,25 +1,20 @@
-// costs_demo_daily_test.go — Cost Explorer: FR-018 violation found by a
-// post-fix tmux smoke of ./a9s --demo: week/day zoom renders an empty grid
-// because the demo CE handler (core/demo/costs_handlers.go) ignores the
-// request's Granularity and core/demo/fixtures/costs.go carries monthly
-// rows only, so a DAILY GetCostAndUsage request returns month-sized buckets
-// (or nothing, once TimePeriod narrows to a sub-month range) instead of one
-// bucket per day.
+// costs_demo_daily_test.go — Cost Explorer week/day zoom over the demo
+// transport: the demo CE handler (core/demo/costs_handlers.go) honours the
+// request's Granularity, so a DAILY GetCostAndUsage request returns one
+// bucket per day, never month-sized buckets (or nothing, once TimePeriod
+// narrows to a sub-month range).
 //
-// Reuses newDemoCostsClient from costs_demo_test.go (same package,
-// untouched) for the real *costexplorer.Client-over-demo-transport
-// construction; queries here build their own costs.Query literals rather
-// than demoCostsQuery, since that helper's wide "cover the whole 13-month
-// history" Range is the wrong shape for the narrow month/week ranges these
-// tests need.
+// Reuses newDemoCostsClient from costs_demo_test.go for the real
+// *costexplorer.Client-over-demo-transport construction; queries here build
+// their own costs.Query literals rather than demoCostsQuery, since that
+// helper's wide "cover the whole 13-month history" Range is the wrong shape
+// for the narrow month/week ranges these tests need.
 //
-// Evergreen-demo reconciliation (round 4): core/demo/fixtures/costs.go's
-// month generation is now relative to fixtures.CostsAnchorMonth (computed
-// from "now" at process start, not a stale hardcoded literal) — every month
-// literal below is derived from that exported anchor (and from
+// core/demo/fixtures/costs.go's month generation is relative to
+// fixtures.CostsAnchorMonth (computed from "now" at process start), so every
+// month literal below is derived from that exported anchor (and from
 // fixtures.CostsGrowthMonth for the growth-story-specific case) via
-// costsDemoDailyMonth, rather than the absolute "2026-03-01"/"2026-01-10"
-// dates this file originally pinned.
+// costsDemoDailyMonth.
 package unit_test
 
 import (

@@ -196,9 +196,8 @@ func TestEnrichKMSRotation_MixedDisabledEnabledError(t *testing.T) {
 	resources := makeKMSResources("key-disabled", "key-enabled", "key-error")
 
 	result, err := awsclient.EnrichKMSRotation(context.Background(), clients, resources, nil)
-	// INVERTED for the "skipped" spec row 5: this required err == nil, which
-	// meant the key whose rotation status could not be read was marked "?"
-	// with nothing in the log. The other two keys are still judged below.
+	// The key whose rotation status could not be read is marked "?" and the
+	// refusal is recorded in the log. The other two keys are still judged below.
 	if err == nil {
 		t.Fatal("a failed GetKeyRotationStatus returned no error")
 	}

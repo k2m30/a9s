@@ -446,7 +446,7 @@ func TestQA_Filter_11_17_DetailView_SlashActivatesSearch(t *testing.T) {
 		}
 	}
 	// Search activation means "? for help" is replaced by search info in the header.
-	// We cannot assert exact search info text since the coder owns that format, but we
+	// We cannot assert exact search info text since the header owns that format, but we
 	// can assert the header no longer shows "? for help" when search is active.
 	if strings.Contains(plain, "? for help") {
 		t.Error("header should NOT show '? for help' when detail view search is active")
@@ -485,7 +485,7 @@ func TestQA_Filter_11_18_YAMLView_SlashActivatesSearch(t *testing.T) {
 		}
 	}
 	// Search activation means "? for help" is replaced by search info in the header.
-	// We cannot assert exact search info text since the coder owns that format, but we
+	// We cannot assert exact search info text since the header owns that format, but we
 	// can assert the header no longer shows "? for help" when YAML view search is active.
 	if strings.Contains(plain, "? for help") {
 		t.Error("header should NOT show '? for help' when YAML view search is active")

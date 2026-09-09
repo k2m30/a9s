@@ -1,13 +1,8 @@
 package unit
 
-// Regression guards for Bug P2 (app_handlers.go used to build the help
-// screen via NewHelp, dropping the resource short name so the CloudTrail
-// Events legend never showed for ct-events). The fix — routing through
-// NewHelpWithResource(m.keys, ctx, activeShortName) — landed long ago; the
-// HW1/HW3 "documents the bug" cases that pinned the old NewHelp call sites
-// were retired once NewHelp itself went dead
-// (specs/022-codebase-cleanup/wave3-map-text.md). HW2/HW4 below remain as
-// the live regression guards for the fixed behavior.
+// The help screen is built via NewHelpWithResource(m.keys, ctx,
+// activeShortName), so the CloudTrail Events legend shows for ct-events;
+// HW2/HW4 below are the regression guards.
 
 import (
 	"strings"
@@ -17,10 +12,7 @@ import (
 	"github.com/k2m30/a9s/v3/internal/tui/views"
 )
 
-// HW1 (the NewHelp call-site bug at app_handlers.go:51) is retired: NewHelp
-// is DEAD per specs/022-codebase-cleanup/wave3-map-text.md, and the coder
-// fix this test documented — routing through NewHelpWithResource — has long
-// since landed (see HW2/HW4 below, the live regression guards for it).
+// HW2/HW4 below guard the NewHelpWithResource routing at the help call site.
 
 // ===========================================================================
 // HW2: NewHelpWithResource("ct-events") — legend IS present (target state)

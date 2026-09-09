@@ -1,9 +1,9 @@
 package unit
 
-// apptest_interleaving_test.go — the payoff half of GitHub issue #488 item 1:
-// drives core/app/apptest's deterministic interleaving harness against the
-// REAL detail-view production path (Controller.Apply/ExecuteOne), rather than
-// exercising the harness types in isolation.
+// apptest_interleaving_test.go — drives core/app/apptest's deterministic
+// interleaving harness against the REAL detail-view production path
+// (Controller.Apply/ExecuteOne), rather than exercising the harness types in
+// isolation.
 //
 // Fixture choice: "sfn" (not "ec2", the usual detail_workload_test.go
 // fixture) — it registers both a detail enricher (enrichSfn) and related
@@ -13,18 +13,16 @@ package unit
 // ledger-capable coalescing decorator for (core/aws/call_ledger.go) — the
 // only fixture that lets apptest.NoDuplicateAWSCalls check something real.
 //
-// Action-set cut for scope (a): the full historical action space is open
-// detail / open YAML / open JSON / Ctrl+R refresh / toggle related / Back /
-// related-row retry. Kept: open (mandatory entry), refresh, toggle-related,
-// open-yaml — refresh/toggle/text-screen-opens are where every review-round
-// defect actually lived. Cut: open-json (identical dispatch path to open-yaml
-// through beginDetailWorkloadLocked — see that method's own doc comment: the
-// cache-replay suppression decision is screen-independent, so JSON adds a
-// second search-tree multiplier for zero additional fold/cache coverage),
-// Back and related-row retry (both explicitly lower-yield per the dispatch;
-// both also reduce to the same beginDetailWorkloadLocked(forceRelated=true)
-// call already exercised structurally by refresh). This keeps the search at
-// depth 4 with real branching at 3 of the 4 steps.
+// Action set: of open detail / open YAML / open JSON / Ctrl+R refresh /
+// toggle related / Back / related-row retry, the search keeps open
+// (mandatory entry), refresh, toggle-related and open-yaml. open-json shares
+// open-yaml's dispatch path through beginDetailWorkloadLocked (see that
+// method's own doc comment: the cache-replay suppression decision is
+// screen-independent), so it would add a second search-tree multiplier for
+// zero additional fold/cache coverage; Back and related-row retry both
+// reduce to the same beginDetailWorkloadLocked(forceRelated=true) call
+// refresh already exercises structurally. This keeps the search at depth 4
+// with real branching at 3 of the 4 steps.
 //
 // The two invariants that need a live *app.Controller/*awsclient.CallLedger
 // reference (LatchCleared, NoDuplicateAWSCalls) aren't expressible through
@@ -61,25 +59,17 @@ const sfnInterleavingType = "sfn"
 // real RawStruct (sfntypes.StateMachineListItem with StateMachineArn set) so
 // enrichSfn's own id/fetch actually run instead of short-circuiting.
 //
-// RawStruct must NOT be left nil here. It was, once: core/aws/detail_enrich_
-// engine.go's RawStruct==nil branch used to return (res, nil) — a "silent,
-// error-free no-op" that core/runtime.HandleEnrichDetailResult's old success
-// path (Err == nil) could not distinguish from a genuine completed
-// enrichment, so it cleared session.PendingDetailRefresh for an operation
-// that had fetched nothing. That is the exact defect class
+// RawStruct must NOT be left nil here: core/aws/detail_enrich_engine.go's
+// RawStruct==nil branch returns awsclient.ErrDetailEnrichSkipped (see its
+// own doc comment), which core/runtime.HandleEnrichDetailResult
+// distinguishes from a completed enrichment, so a permanently-nil RawStruct
+// would make the latch permanently unclearable for the wrong reason and
+// never exercise the "genuinely completed" path
 // TestApptestExplorer_DetailViewActionSpace_AllInvariantsHold and
 // TestApptestScheduler_StickyRefreshSupersededByPanelToggle_
-// LatchOnlyClearsOnGenuineFreshFold below exist to catch, via
-// apptest.LatchCleared — and this fixture, by never letting a real fold
-// happen, was calibrated against that broken behavior: LatchCleared always
-// saw a (spuriously) cleared latch and always passed, whatever the code
-// under test did. Now that detail_enrich_engine.go returns the distinguishable
-// awsclient.ErrDetailEnrichSkipped instead (see its own doc comment), a
-// permanently-nil RawStruct here would make the latch permanently unclearable
-// for the wrong reason — never exercising the "genuinely completed" path
-// either test's name promises. Both tests below additionally assert on the
-// fake SFN client's own call counter, not just LatchCleared, so a future nil
-// on this field fails loudly instead of quietly reintroducing this gap.
+// LatchOnlyClearsOnGenuineFreshFold promise. Both tests additionally assert
+// on the fake SFN client's own call counter, not just LatchCleared, so a nil
+// on this field fails loudly.
 func sfnFixtureResource(id string) resource.Resource {
 	arn := "arn:aws:states:us-east-1:123456789012:stateMachine:" + id
 	return resource.Resource{
@@ -145,31 +135,13 @@ func sfnInterleavingActions() []apptest.Action {
 }
 
 // TestApptestExplorer_DetailViewActionSpace_AllInvariantsHold is the
-// permanent regression harness for GitHub issue #488's "action B lands while
-// action A is in flight" defect class: every legal interleaving of
+// regression harness for the "action B lands while action A is in flight"
+// defect class: every legal interleaving of
 // open→refresh→toggle-related→open-yaml against the completion order of the
 // enrich/related tasks those actions spawn must satisfy all five apptest
-// invariants.
-//
-// Historical caveat on that coverage claim: every prior green run of this
-// test (before sfnFixtureResource carried a real RawStruct and before this
-// Check gained the lastFake.describeCalls assertion) proved less than it
-// read. sfnFixtureResource's RawStruct was nil, so every enrich in every
-// explored interleaving hit detail_enrich_engine.go's RawStruct==nil branch
-// and returned early — under that era's semantics (res, nil), indistinguishable
-// from a genuinely completed enrichment. LatchCleared, the one invariant that
-// exists specifically to verify "an enrich fold clears the sticky-refresh
-// demand," was therefore checking a latch that a no-op had already cleared
-// for free on every single replay: it could not have failed regardless of
-// whether the real success-fold path worked, because that path was never
-// entered. The other four invariants (NoOrphanLoadingRelated,
-// MonotonicDetailFold, MonotonicCacheWrites, NoDuplicateAWSCalls) do not
-// depend on a genuine enrich fold the same way and were exercising real
-// coverage throughout — only LatchCleared's specific claim was hollow. This
-// is fixed now (see sfnFixtureResource's doc comment), so a fresh reading of
-// "all invariants hold" is accurate; treat any historical report that quoted
-// this test's LatchCleared result before this fix as unverified for that one
-// invariant.
+// invariants. sfnFixtureResource carries a real RawStruct and Check asserts
+// on lastFake.describeCalls, so LatchCleared is checked against a genuine
+// enrich fold, not a no-op that clears the latch for free.
 func TestApptestExplorer_DetailViewActionSpace_AllInvariantsHold(t *testing.T) {
 	const id = "sfn-explorer-0000001"
 
@@ -367,13 +339,13 @@ func TestApptestScheduler_StickyRefreshSupersededByPanelToggle_LatchOnlyClearsOn
 }
 
 // TestApptestScheduler_PartialRelatedCache_StillDispatchesCheck_NoRowStrandedInLoading
-// pins #261's Codex-flagged "partial related cache" defect
-// (core/app/navigate.go's relatedCacheCoverage doc comment): a related cache
-// covering only SOME of "sfn"'s registered defs — as if a prior operation
-// completed some checks but never finished the rest before this operation
-// began — must still dispatch KindRelatedCheck, or the still-uncached defs'
-// rows are stranded in Loading forever (BeginDetailOperation has already
-// invalidated whatever was running for them under any prior operation).
+// pins the "partial related cache" rule (core/app/navigate.go's
+// relatedCacheCoverage doc comment): a related cache covering only SOME of
+// "sfn"'s registered defs — as if a prior operation completed some checks
+// but never finished the rest before this operation began — must still
+// dispatch KindRelatedCheck, or the still-uncached defs' rows are stranded
+// in Loading forever (BeginDetailOperation has already invalidated whatever
+// was running for them under any prior operation).
 func TestApptestScheduler_PartialRelatedCache_StillDispatchesCheck_NoRowStrandedInLoading(t *testing.T) {
 	const id = "sfn-partial-0000001"
 	ctx := context.Background()

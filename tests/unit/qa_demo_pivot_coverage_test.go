@@ -39,13 +39,9 @@
 // zero fixtures ever flagged means ctrl+z / the issue badge has nothing to
 // demonstrate for that type in demo mode.
 //
-// RATCHET: at the time this test was written, s3's fixture graph was
-// disconnected for 9 of its registered pivots (a coder was rebuilding
-// core/demo/fixtures/s3.go in parallel). That fix landed and s3 is now
-// fully connected. Every OTHER disconnected pivot and issue-coverage gap
-// found at that time is pinned below in knownDisconnectedPivots /
-// knownIssueCoverageGaps — the documented burn-down backlog. The gate is a
-// ratchet, not a static allowlist:
+// RATCHET: every disconnected pivot and issue-coverage gap is pinned below
+// in knownDisconnectedPivots / knownIssueCoverageGaps — the documented
+// burn-down backlog. The gate is a ratchet, not a static allowlist:
 //
 //   - An entry NOT in the allowlist with no witness is a NEW regression —
 //     always fails, unconditionally.
@@ -53,11 +49,10 @@
 //     allowlist" message — this forces the fix to be reflected here in the
 //     same PR that lands it, so the backlog only ever shrinks.
 //   - An allowlisted entry that is still disconnected is skipped (logged,
-//     not failed) — expected, pre-existing debt.
+//     not failed) — known debt.
 //
-// s3 must NOT appear in either allowlist below: it is already connected, and
-// re-adding it would silently mask a regression in the very type this gate
-// was built to protect.
+// s3 must NOT appear in either allowlist below: it is fully connected, and
+// adding it would silently mask a regression.
 package unit_test
 
 import (

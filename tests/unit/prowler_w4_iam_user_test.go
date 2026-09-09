@@ -144,7 +144,7 @@ func w4EnrichUsers(t *testing.T, fake *w4UserFake, rs []resource.Resource) awscl
 }
 
 // w4EnrichUsersErr is w4EnrichUsers for the case that expects a refusal: a
-// call the role may not make is a recorded failure ("skipped" spec row 5).
+// call the role may not make is a recorded failure.
 func w4EnrichUsersErr(t *testing.T, fake *w4UserFake, rs []resource.Resource) (awsclient.IssueEnricherResult, error) {
 	t.Helper()
 	clients := &awsclient.ServiceClients{IAM: fake, Region: "us-east-1"}
@@ -236,9 +236,8 @@ func TestW4UserAccessKeyNeverUsed(t *testing.T) {
 	}
 	res := w4EnrichUsers(t, fake, []resource.Resource{w4UserResource("acme-batch-user", 400, "Never")})
 
-	// Inverted for spec row "phrase": the idle days were in the phrase, so the
-	// first idle key's number stood for every idle key on the user. They are an
-	// Idle row now. Do not restore the old phrase.
+	// The idle days are an Idle row, not part of the phrase, so the first idle
+	// key's number does not stand for every idle key on the user.
 	w4AssertFinding(t, res.Findings["acme-batch-user"], w4CodeUserKeyUnused,
 		catalog.Phrase(w4CodeUserKeyUnused), domain.SevWarn, w4SourceUserWave2)
 	w4AssertRows(t, res.AttentionDetails["acme-batch-user"], w4CodeUserKeyUnused, []domain.DetailRow{
@@ -430,9 +429,8 @@ func TestW4UserBatchErrorLeavesSiblingsEvaluated(t *testing.T) {
 		w4UserResource("acme-broken-user", 400, "Never"),
 		w4UserResource("acme-ci-user", 400, "Never"),
 	}, nil)
-	// INVERTED for the "skipped" spec row 5: this required err == nil, so the
-	// user whose keys could not be listed was marked "?" with nothing in the
-	// log to say what refused. The siblings are still evaluated below.
+	// A user whose keys could not be listed is marked "?" with the refusal in
+	// the log. The siblings are still evaluated below.
 	if err == nil {
 		t.Fatal("a failed ListAccessKeys returned no error")
 	}
@@ -455,8 +453,8 @@ func TestW4UserFindingDefs(t *testing.T) {
 	}{
 		{w4CodeUserAdminAttached, "has an administrator policy"},
 		{w4CodeUserConsoleNeverUse, w4PhraseUserConsoleNever},
-		// Inverted for spec row "phrase": the idle days moved to a supporting
-		// row, so the declaration no longer carries a placeholder for them.
+		// The idle days are a supporting row, so the declaration carries no
+		// placeholder for them.
 		{w4CodeUserKeyUnused, "access key unused"},
 		{w4CodeUserTwoActiveKeys, w4PhraseUserTwoActiveKeys},
 	}

@@ -222,11 +222,7 @@ func TestFetchCostAndUsage_ParsesAllFourMetrics(t *testing.T) {
 	}
 	// The exact 4-key set (invoice/blended/amortized/net-amortized) is
 	// pinned individually below — len==4 together with those 4 named
-	// checks already exhaustively rules out any 5th key, so no separate
-	// costs.MetricNetUnblended absence check is needed. The constant
-	// itself is unreferenced anywhere in tests/unit as of this edit — flag
-	// for the coder: costs.MetricNetUnblended (core/costs/types.go)
-	// can now be deleted, it was only kept alive by this reference.
+	// checks already exhaustively rules out any 5th key.
 	var sum float64
 	for _, amt := range metrics {
 		sum += amt.Value

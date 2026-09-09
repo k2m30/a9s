@@ -1,29 +1,25 @@
-// qa_related_state_no_sentinel_gate_test.go — task #58 conformance gate.
+// qa_related_state_no_sentinel_gate_test.go — no `Count == -1` sentinel on
+// related-resource results/rows; the state is the RelatedRowState enum.
 //
-// The `Count == -1` sentinel on related-resource results/rows is being
-// replaced by an explicit RelatedRowState enum. This gate pins the purge: no
-// composite literal of a related result/row type — production OR test, under
-// internal/ or tests/ — may set its Count (RelatedCheckResult /
+// No composite literal of a related result/row type — production OR test,
+// under internal/ or tests/ — may set its Count (RelatedCheckResult /
 // DetailRelatedRow / RelatedBlock) or count (rightColumnRow) field to a
-// NEGATIVE integer literal. RED today (the checkers hand-roll `Count: -1`);
-// GREEN once every producer routes through a state constructor
-// (UnknownRelated / ErrorRelated / DeferredRelated / LoadingRelated) that
-// sets the enum and leaves Count at its resolved zero value.
+// NEGATIVE integer literal. Every producer routes through a state
+// constructor (UnknownRelated / ErrorRelated / DeferredRelated /
+// LoadingRelated) that sets the enum and leaves Count at its resolved zero
+// value.
 //
-// Scope (Batch 2, task #58 follow-up): the scan walks BOTH internal/ (every
-// .go file, including internal/**_test.go white-box tests) and tests/ (every
-// .go file under tests/unit, tests/integration, tests/stories, tests/testdata
-// — tests/e2e has no .go files). Test-side stub checkers and fake results are
-// exactly as bound by this gate as production checkers: a test fixture that
-// hand-rolls `RelatedCheckResult{Count: -1}` to simulate "unknown" reintroduces
-// the retired sentinel encoding just as surely as a production checker would.
+// Scope: the scan walks BOTH internal/ (every .go file, including
+// internal/**_test.go white-box tests) and tests/ (every .go file under
+// tests/unit, tests/integration, tests/stories, tests/testdata). Test-side
+// stub checkers and fake results are exactly as bound by this gate as
+// production checkers: a test fixture that hand-rolls
+// `RelatedCheckResult{Count: -1}` to simulate "unknown" reintroduces the
+// sentinel encoding just as surely as a production checker would.
 //
-// DESIGN CHOICE (mirrors qa_multifinding_no_legacy_gate_test.go): no
-// allowlist. A fresh AST scan every run, an unconditional t.Errorf listing
-// every violation, GREEN only at zero. This file references no new production
-// symbol, so it compiles clean against HEAD — "RED" here means "runs and
-// fails via t.Errorf", never a compile break, so it carries zero blast radius
-// for concurrent sibling work.
+// No allowlist (mirrors qa_multifinding_no_legacy_gate_test.go): a fresh AST
+// scan every run, an unconditional t.Errorf listing every violation, GREEN
+// only at zero.
 //
 // AST shape matched: an *ast.CompositeLit whose type names one of the four
 // related types — as a bare Ident (RelatedCheckResult{...}), a qualified
@@ -35,11 +31,9 @@
 // A comparison like `r.Count == -1` or `PaginationMeta.TotalHint == -1` is a
 // BinaryExpr, never a CompositeLit element, so it can never false-positive.
 // A prose mention inside a `//` comment or a string literal (e.g. an Errorf
-// format string) is never part of the AST's CompositeLit walk either, so this
-// file's own historical/documentation references to the retired sentinel
-// cannot self-trip the gate — go/parser does not evaluate `//go:build` tags,
-// so build-tag-gated files under tests/integration are parsed (and scanned)
-// unconditionally too.
+// format string) is never part of the AST's CompositeLit walk either.
+// go/parser does not evaluate `//go:build` tags, so build-tag-gated files
+// under tests/integration are parsed (and scanned) unconditionally too.
 package unit_test
 
 import (
@@ -55,11 +49,11 @@ import (
 )
 
 // rsnsRelatedTypes is the set of related result/row type names whose
-// composite literals may not carry a negative Count sentinel. Verified real
-// on 2026-07-07: RelatedCheckResult (core/domain/contracts.go:122 and
-// core/runtime/messages/event.go:112), DetailRelatedRow
-// (core/app/screenstate.go:132), RelatedBlock (core/app/viewstate.go:226),
-// rightColumnRow (internal/tui/views/rightcolumn.go:17, field spelled "count").
+// composite literals may not carry a negative Count sentinel:
+// RelatedCheckResult (core/domain/contracts.go and
+// core/runtime/messages/event.go), DetailRelatedRow (core/app/screenstate.go),
+// RelatedBlock (core/app/viewstate.go), rightColumnRow
+// (internal/tui/views/rightcolumn.go, field spelled "count").
 var rsnsRelatedTypes = map[string]bool{
 	"RelatedCheckResult": true,
 	"DetailRelatedRow":   true,
@@ -180,8 +174,8 @@ func rsnsScanFile(fset *token.FileSet, path, rel string) ([]rsnsViolation, error
 var rsnsScanRoots = []string{"../../core", "../../internal", "../../tests"}
 
 // TestRelatedStateNoSentinel_NoNegativeCountLiteralInRelatedTypes is the
-// task #58 gate: no .go file under internal/ or tests/ — production or test —
-// may construct a related result/row literal with a negative Count sentinel.
+// gate: no .go file under internal/ or tests/ — production or test — may
+// construct a related result/row literal with a negative Count sentinel.
 // See this file's header for the exact AST shape matched and the
 // no-allowlist rationale.
 func TestRelatedStateNoSentinel_NoNegativeCountLiteralInRelatedTypes(t *testing.T) {

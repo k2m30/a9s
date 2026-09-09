@@ -1,10 +1,9 @@
 // tui_list_reentry_verify_test.go — the TUI half of the re-entry
-// re-verification pin (2026-09-08 cache review). Opening a list, returning to
-// the main menu and opening it again used to render the retained rows as
-// verified-fresh: HandleNavigate returned no task for the row-store hit and
-// only the headless controller synthesised one, so the TUI showed no
-// refreshing marker and issued no AWS call however long ago the rows were
-// fetched. The headless half lives in list_request_generation_test.go.
+// re-verification pin. Opening a list, returning to the main menu and
+// opening it again must not render the retained rows as verified-fresh:
+// HandleNavigate returns the task for the row-store hit, so the TUI shows
+// the refreshing marker and issues the AWS call however long ago the rows
+// were fetched. The headless half lives in list_request_generation_test.go.
 package unit_test
 
 import (

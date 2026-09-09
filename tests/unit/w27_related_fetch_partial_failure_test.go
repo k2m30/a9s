@@ -1,12 +1,10 @@
 package unit_test
 
-// w27_related_fetch_partial_failure_test.go — task w27, dev round 2's
-// production fix: FetchRelatedTarget (core/aws/related_fetch.go:47-54) used
-// to discard every row a fetcher returned whenever it also carried a
-// per-item error, so one denied node group corrupted the eks Auto Scaling
-// pivot for every cluster sharing the "ng" cache — exactly the outcome
-// task w27's finding-1 demo witnesses would have triggered widely. Rows
-// beside an error are now a truncated answer, not a dropped one.
+// w27_related_fetch_partial_failure_test.go — FetchRelatedTarget
+// (core/aws/related_fetch.go) keeps the rows a fetcher returned when it
+// also carries a per-item error: rows beside an error are a truncated
+// answer, not a dropped one, so one denied node group does not corrupt the
+// eks Auto Scaling pivot for every cluster sharing the "ng" cache.
 
 import (
 	"context"
@@ -71,13 +69,12 @@ func TestFetchRelatedTarget_RowsLessErrorOnly_StaysAnError(t *testing.T) {
 }
 
 // TestEKSASGPivot_DeniedNodeGroupOnOneCluster_DoesNotCorruptSiblingCluster
-// pins the real consumer this fix repairs: acme-prod carries a node group
-// DescribeNodegroup denies (task w27 finding-1's witness), and acme-staging
-// shares the same "ng" fetch/cache but has no denial at all. Before the fix,
-// the denied node group's error propagated through the shared cache and
-// every cluster's Auto Scaling pivot rendered ErrorRelated. After it,
-// acme-staging resolves cleanly and acme-prod resolves with its own
-// (truncated) answer rather than an error.
+// pins the real consumer: acme-prod carries a node group DescribeNodegroup
+// denies, and acme-staging shares the same "ng" fetch/cache but has no
+// denial at all. acme-staging resolves cleanly and acme-prod resolves with
+// its own (truncated) answer rather than an error; the denied node group's
+// error must not propagate through the shared cache to every cluster's Auto
+// Scaling pivot.
 func TestEKSASGPivot_DeniedNodeGroupOnOneCluster_DoesNotCorruptSiblingCluster(t *testing.T) {
 	clients := demo.NewServiceClients()
 

@@ -1,24 +1,18 @@
-// costs_round4_test.go — Cost Explorer: user feedback round 4 (live-usage
-// bugs on a second account) plus the evergreen-demo prerequisite for the
-// upcoming smoke walk.
+// costs_round4_test.go — Cost Explorer live-usage pins on a second account
+// plus the evergreen-demo prerequisite for the smoke walk.
 //
 // package unit_test (not unit): every item here is reachable via the
-// headless app.Controller / pure core/costs package — no TUI-level
-// helper is needed, so this file reuses costs_state_test.go's
+// headless app.Controller / pure core/costs package — no TUI-level helper is
+// needed, so this file reuses costs_state_test.go's
 // newCostsController/topDrill/fixedCostsNow/monthRecord directly (same
 // package).
 //
-// *** Scoring corrections applied (see the confirmed-score dispatch):
-// *** - Item 3 tests week->day spill ONLY. The month->week half of the
-// ***   original claim ("+ on April produced a window starting Mar 30")
-// ***   does NOT reproduce: weekWindowsInMonth already clips correctly
-// ***   (independently traced by hand against April 1, 2026 — a Wednesday
-// ***   — through mondayOnOrBefore + the s/e clip logic). Only
-// ***   dayWindowsInWeek (week->day) has zero month-boundary clipping.
-// *** - Item 2 pins the OBSERVABLE live symptom end-to-end (seeded daily
-// ***   data must survive a month->week zoom as non-zero service rows),
-// ***   not a specific internal mechanism — see the test's own doc comment
-// ***   for the empirical red/green finding.
+// Item 3 tests week->day spill only: weekWindowsInMonth clips at the month
+// boundary (mondayOnOrBefore + the s/e clip logic), and only
+// dayWindowsInWeek (week->day) has month-boundary clipping to pin. Item 2
+// pins the OBSERVABLE live symptom end-to-end (seeded daily data must
+// survive a month->week zoom as non-zero service rows), not a specific
+// internal mechanism.
 package unit_test
 
 import (
@@ -167,9 +161,7 @@ func TestCostsRound4_WeekZoom_ServiceRowsCarryData_NotEmptyGrid(t *testing.T) {
 }
 
 // TestCostsRound4_WeekZoom_ServiceRowsCarryData_NotEmptyGrid_NonCurrentMonth
-// is the fallback reproduction: the newest-column (open/current month) case
-// above is GREEN today — reported per the round-4 score dispatch's explicit
-// instruction ("if it happens to be green today, report that loudly"). This
+// is the sibling of the newest-column (open/current month) case above: this
 // variant puts the cursor on an OLDER, already-closed month instead.
 func TestCostsRound4_WeekZoom_ServiceRowsCarryData_NotEmptyGrid_NonCurrentMonth(t *testing.T) {
 	c := newCostsController(t, fixedCostsNow)

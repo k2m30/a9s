@@ -1,14 +1,9 @@
-// issue232_truncation_contract_test.go contains specification-driven tests for
-// issue #232: EC2 related checkers must return {Count:0, Truncated:true} (via
-// relatedResultTrunc) when the cache is truncated and 0 local matches are
-// found. A partial page cannot be treated as a definitive zero.
-//
-// New contract (Batch B): truncated-zero produces {Count:0, Truncated:true} —
+// issue232_truncation_contract_test.go — EC2 related checkers must return
+// {Count:0, Truncated:true} (via relatedResultTrunc) when the cache is
+// truncated and 0 local matches are found. A partial page cannot be treated
+// as a definitive zero: truncated-zero produces {Count:0, Truncated:true} —
 // the honest lower bound — not Count=-1 (unknown). See relatedResultTrunc
-// and resource.ValidateRelatedResult (related.go:34-38, 101-114) for the contract.
-//
-// Tests 1-4 FAIL against pre-fix code (ASG, EIP, NodeGroups, CT-Events discard
-// the isTruncated return value). Tests 5-10 must always PASS.
+// and resource.ValidateRelatedResult (related.go) for the contract.
 package unit
 
 import (
@@ -45,7 +40,7 @@ var trunc232Instance = resource.Resource{
 }
 
 // ---------------------------------------------------------------------------
-// Tests 1-4: buggy checkers — MUST fail against pre-fix code
+// Tests 1-4: checkers that must honour the truncated flag
 // ---------------------------------------------------------------------------
 
 // TestContract_TruncatedZeroMatch_ASG_ReturnsTruncated verifies that the ASG

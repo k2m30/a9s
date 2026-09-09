@@ -80,14 +80,12 @@ func TestFetchEKSClusters_ParsesMultipleClusters(t *testing.T) {
 	if r0.Name != "cluster-a" {
 		t.Errorf("resource[0].Name: expected %q, got %q", "cluster-a", r0.Name)
 	}
-	// Post-fold contract: ACTIVE state is healthy → no lifecycle Finding.
+	// ACTIVE state is healthy → no lifecycle Finding.
 	//
-	// Inverted deliberately: this counted Findings and expected 0. It cannot,
-	// now that posture signals share the slice — this fixture declares no
-	// control-plane logging and no encryption configuration, so it legitimately
-	// carries those two findings. Counting the whole slice makes every future
-	// posture row look like a regression here, so the assertion names the
-	// lifecycle codes it is actually about.
+	// The assertion names the lifecycle codes it is about rather than
+	// counting the slice: posture signals share it, and this fixture declares
+	// no control-plane logging and no encryption configuration, so it
+	// legitimately carries those two findings.
 	for _, code := range []domain.FindingCode{
 		awsclient.CodeEKSStateCreating, awsclient.CodeEKSStateUpdating,
 		awsclient.CodeEKSStateFailed, awsclient.CodeEKSHealthIssue,
@@ -283,8 +281,8 @@ func TestFetchEKSClusters_DescribeFailureSurfacesError(t *testing.T) {
 	}
 }
 
-// TestFetchEKSClusters_HealthIssue_PhraseIsNotRepeatedAsARow pins the w6b/w27
-// rebase fold fix (core/aws/ng.go, healthIssueFindingSev): the Attention rows
+// TestFetchEKSClusters_HealthIssue_PhraseIsNotRepeatedAsARow pins the fold
+// (core/aws/ng.go, healthIssueFindingSev): the Attention rows
 // start at the second reported issue code, since the first is already the
 // Phrase. acme-degraded-prod's demo fixture carries two Health.Issues codes
 // (ConfigurationConflict, AccessDenied) so this is witnessed end to end
@@ -319,10 +317,9 @@ func TestFetchEKSClusters_HealthIssue_PhraseIsNotRepeatedAsARow(t *testing.T) {
 	if !haveFinding {
 		t.Fatalf("acme-degraded-prod carries no %s finding, got %v", awsclient.CodeEKSHealthIssue, cluster.Findings)
 	}
-	// Inverted for spec row "phrase": promoting the first health issue into the
-	// phrase made the wording a property of the issue and left the others
-	// unsayable. The phrase is the code's and EVERY issue is a row now. Do not
-	// restore the old assertion.
+	// The phrase is the code's and EVERY issue is a row; promoting the first
+	// health issue into the phrase would make the wording a property of the
+	// issue and leave the others unsayable.
 	if want := catalog.Phrase(awsclient.CodeEKSHealthIssue); finding.Phrase != want {
 		t.Errorf("Phrase = %q, want the catalog's %q", finding.Phrase, want)
 	}

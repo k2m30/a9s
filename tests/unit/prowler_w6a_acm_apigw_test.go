@@ -582,11 +582,11 @@ func TestW6AAPIGWHTTPNoAuthorizer_WalkStopsAtTheFirstAuthorizer(t *testing.T) {
 
 // TestW6AAPIGWRESTEndpointType pins row 22, one case per branch.
 //
-// The endpoint type decides row 18's severity, and the v1 fetcher used to
-// hard-code the field empty: every value including "unknown" fell through to
-// the broken branch, so a genuinely private REST API rendered red and the
-// supporting row that exists to name the endpoint named nothing. The value is
-// on the RestApi the fetcher already keeps, and unknown is not misconfigured.
+// The endpoint type decides row 18's severity. The value is on the RestApi
+// the fetcher already keeps, and unknown is not misconfigured: with the
+// field empty every value would fall through to the broken branch, a
+// genuinely private REST API would render red, and the supporting row that
+// exists to name the endpoint would name nothing.
 func TestW6AAPIGWRESTEndpointType(t *testing.T) {
 	for _, tc := range []struct {
 		endpoint string

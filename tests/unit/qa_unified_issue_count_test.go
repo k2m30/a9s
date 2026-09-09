@@ -99,12 +99,8 @@ func TestMenuCount_MatchesListCount_AfterWave2(t *testing.T) {
 // ─────────────────────────────────────────────────────────────────────────────
 // Target #4 — unifiedIssueCount must not count "~"-severity findings
 //
-// Problem: unifiedIssueCount adds every finding ID to the issue-ID set
-// regardless of finding.Severity. Only "!" findings must bump the badge;
-// "~" (informational) findings must never contribute.
-//
-// These tests FAIL until the coder adds a Severity=="!" guard in the
-// findings loop of unifiedIssueCount.
+// Only "!" findings bump the badge; "~" (informational) findings never
+// contribute to the issue-ID set.
 // ─────────────────────────────────────────────────────────────────────────────
 
 // tildeSeverityEC2Instances returns 3 EC2 resources whose Color is Healthy
@@ -140,7 +136,7 @@ func TestUnifiedIssueCount_IgnoresTildeSeverityFindings(t *testing.T) {
 		m := newRootSizedModel()
 
 		// Use AvailabilityCheckedMsg stamped with the live AvailabilityGen
-		// (session.New seeds it to 1 after AS-659) to seed probeResources["ec2"]
+		// (session.New seeds it to 1) to seed probeResources["ec2"]
 		// so unifiedIssueCount has wave1Resources.
 		// All three resources are running → Wave-1 contributes 0 to issue IDs.
 		resources := tildeSeverityEC2Instances()

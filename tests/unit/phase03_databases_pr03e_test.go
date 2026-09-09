@@ -4,15 +4,12 @@ package unit_test
 // 12 database resource types (dbi, dbi-snap, dbc, dbc-snap, s3, redis,
 // opensearch, ddb, redshift, msk, efs, kinesis).
 //
-// Post-migration invariants:
+// Invariants:
 //   - Fetcher writes Resource.Status == "" (no more Status writes)
 //   - Fetcher writes Resource.Issues == nil (no more Issues writes)
 //   - Fetcher writes Resource.Findings with Source:"wave1" for each non-healthy signal
 //   - Healthy resources have len(Resource.Findings) == 0
 //   - Fields["status"] (or Fields["state"]) preserved for the display column
-//
-// These tests FAIL on RED (before coder migrates the fetchers). They pass GREEN
-// once the coder delivers Findings-emitting implementations.
 //
 // Pattern reference: tests/unit/phase03_networking_pr03d_test.go
 
@@ -126,13 +123,13 @@ func TestPR03e_DBIFetcher_BrokenEmitsBrokenFinding(t *testing.T) {
 	}
 }
 
-// TestPR03e_DBIFetcher_StoppedEmitsBrokenFinding pins the AS-126 regression
-// fix: a "stopped" RDS instance must emit a SevBroken Finding (CodeDBIStopped)
+// TestPR03e_DBIFetcher_StoppedEmitsBrokenFinding: a "stopped" RDS instance
+// must emit a SevBroken Finding (CodeDBIStopped)
 // so colorDBI's wave1-first prelude returns ColorBroken — matching the legacy
 // catalog colorDBI classification ("stopped" listed alongside "failed",
-// "storage-full", etc.). Pre-fix the fetcher's default branch downgraded
-// "stopped" to a SevWarn CodeDBITransitional finding, regressing the row from
-// Broken to Warning under the wave1-first color path.
+// "storage-full", etc.). A default-branch SevWarn CodeDBITransitional
+// finding would regress the row from Broken to Warning under the wave1-first
+// color path.
 func TestPR03e_DBIFetcher_StoppedEmitsBrokenFinding(t *testing.T) {
 	mock := &pr03eRDSMock{
 		instances: []rdstypes.DBInstance{
@@ -1548,11 +1545,9 @@ func (m *pr03eKinesisMock) ListStreams(
 }
 
 // =============================================================================
-// Additional cases — third structural case per type to satisfy AS-90 dispatch's
-// strict 3-case contract (Healthy + Pending + Broken). The cases above already
-// cover Healthy and one of (Pending, Broken) per type; the cases below fill in
-// the missing slot. Added by AS-90 dispatch in Mode: execute on
-// 048-pr03e-databases-rebased.
+// Third structural case per type (Healthy + Pending + Broken): the cases
+// above cover Healthy and one of (Pending, Broken) per type; the cases below
+// fill in the missing slot.
 // =============================================================================
 
 // ----- DBI: Pending (CodeDBITransitional) ------------------------------------
@@ -2062,11 +2057,11 @@ func TestPR03e_EFSFetcher_PendingEmitsWarnFinding(t *testing.T) {
 // =============================================================================
 
 // S3 has no Wave-1 codes — colorS3 returns ColorHealthy at the bucket level
-// and Wave-2 enrichment owns the rest. Per AS-71 §1, no `s3_codes.go` file
+// and Wave-2 enrichment owns the rest. No `s3_codes.go` file
 // exists; the Healthy case above is the only Wave-1 contract that applies.
 // No PendingEmitsWarnFinding / BrokenEmitsBrokenFinding cases for s3 — the
-// dispatch's three-case template explicitly collapses to Healthy here.
+// three-case template collapses to Healthy here.
 //
-// Kinesis has no Wave-1 broken codes per AS-71#document-plan §1 (lifecycle
+// Kinesis has no Wave-1 broken codes (lifecycle
 // states only emit Warn). The Healthy + Pending cases above cover the entire
 // Wave-1 surface; there is no BrokenEmitsBrokenFinding case for kinesis.

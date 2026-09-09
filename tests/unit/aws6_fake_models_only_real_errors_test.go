@@ -103,8 +103,8 @@ func TestNoFakeRefusalUsesCloudWatchResourceNotFound(t *testing.T) {
 	}
 }
 
-// cloudWatchResourceNotFoundProbe is the error the fake used to answer, kept
-// only so the check above has something to classify.
+// cloudWatchResourceNotFoundProbe is a not-found error kept only so the check
+// above has something to classify.
 func cloudWatchResourceNotFoundProbe() error {
 	return &smithy.GenericAPIError{Code: "ResourceNotFound", Message: "The named resource does not exist."}
 }

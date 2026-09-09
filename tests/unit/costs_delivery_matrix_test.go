@@ -7,7 +7,7 @@
 //
 // Grid and Anomalies are INDEPENDENT axes at the executor (SkipGrid and
 // SkipAnomalies are two separate booleans, FetchCostsPayload), so the
-// dispatch's nominal {grid}x{anomalies} cross product is real — except for
+// {grid}x{anomalies} cross product is real — except for
 // "failed", which is NOT a per-half state: messages.CostsLoaded carries one
 // Err field for the WHOLE delivery (ApplyCostsLoaded returns before ever
 // looking at Grid/Anomalies when ev.Err != nil), so a "grid failed, anomaly

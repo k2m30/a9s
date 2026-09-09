@@ -10,10 +10,6 @@ import (
 // classify as "W" (write) despite the "Verify" prefix that would otherwise
 // match the read-prefix table. SES Verify* operations create a verification
 // record and trigger an outbound email — they are state-mutating writes.
-//
-// This test FAILS on pre-fix code (SES Verify* is classified as "R" by the
-// read-prefix table's "Verify" entry) and PASSES after the coder's exact-match
-// override lands in classify.go.
 func TestClassifyCTVerb_SESVerifyIsWrite(t *testing.T) {
 	cases := []struct {
 		name      string

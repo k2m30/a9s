@@ -19,12 +19,8 @@ import (
 
 // TestIssueEnricherResult_HasTruncatedIDsField verifies that IssueEnricherResult carries a
 // TruncatedIDs field of type map[string]string — resource ID to the check that
-// did not answer for it.
-//
-// INVERTED for runtime8 row 2 (backlog w95/w129). It required map[string]bool
-// until then: a set of rows nobody looked at, with no room for the reason. A
-// bare bool reaches the detail view as "a check failed" and cannot say which,
-// which is the half the operator can act on. Do not "restore" the bool.
+// did not answer for it. A bare bool would reach the detail view as "a check
+// failed" and could not say which, which is the half the operator can act on.
 func TestIssueEnricherResult_HasTruncatedIDsField(t *testing.T) {
 	rt := reflect.TypeOf(awsclient.IssueEnricherResult{})
 	f, ok := rt.FieldByName("TruncatedIDs")

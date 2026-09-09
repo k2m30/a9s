@@ -2,10 +2,10 @@
 
 package unit
 
-// aws3_sns_columns_test.go — spec row 9 (task aws3): a list column shows what
-// its heading names. "Topic Name" showed the topic's ARN, and "Confirmed"
-// showed the subscription's ARN, so two headings on the same list read from
-// the same field and neither answered its own question.
+// aws3_sns_columns_test.go — a list column shows what its heading names:
+// "Topic Name" shows the topic's name and "Confirmed" the subscription's
+// confirmation state, so two headings on the same list never read from the
+// same field.
 
 import (
 	"context"
@@ -73,9 +73,9 @@ func TestSNSSubConfirmedColumnShowsTheConfirmationState(t *testing.T) {
 			t.Errorf("Confirmed = %q for %s — the cell shows the subscription ARN, not a confirmation state", got, r.ID)
 		}
 		// Read off the confirmation field rather than re-deriving the state
-		// from the ARN. Since misc4 round 2 the ARN field is empty when AWS
-		// sent a state word in its place, so the ARN is no longer evidence of
-		// anything and a test that reads it is reading a second truth source.
+		// from the ARN: the ARN field is empty when AWS sent a state word in its
+		// place, so the ARN is not evidence of anything and a test that reads it
+		// is reading a second truth source.
 		switch r.Fields["confirmed"] {
 		case "pending":
 			sawPending = true

@@ -55,8 +55,8 @@ func TestPrefetchPaginationSeed_PreservesNextToken(t *testing.T) {
 		IssueTruncated: map[string]bool{targetType: true},
 		Resources:      map[string][]resource.Resource{targetType: {first, second}},
 		Pagination:     map[string]*resource.PaginationMeta{targetType: wantMeta},
-		// Stamp the live AvailabilityGen so the AS-657/AS-659 staleness guard
-		// accepts the message (AcceptZeroGen=false after AS-659).
+		// Stamp the live AvailabilityGen so the staleness guard accepts the
+		// message (AcceptZeroGen=false).
 		Gen: m.Core().Session().AvailabilityGen,
 	})
 
@@ -100,9 +100,8 @@ func TestPrefetchPaginationSeed_FallbackWhenPaginationOmitted(t *testing.T) {
 		IssueCounts:    map[string]int{targetType: 0},
 		IssueTruncated: map[string]bool{targetType: true},
 		Resources:      map[string][]resource.Resource{targetType: {r}},
-		// Pagination intentionally nil — pre-fix shape.
-		// Stamp the live AvailabilityGen so the AS-657/AS-659 staleness guard
-		// accepts the message (AcceptZeroGen=false after AS-659).
+		// Pagination nil. Stamp the live AvailabilityGen so the staleness guard
+		// accepts the message (AcceptZeroGen=false).
 		Gen: m.Core().Session().AvailabilityGen,
 	})
 

@@ -57,12 +57,9 @@ func TestRealDemo_DBIDetailShowsIssues(t *testing.T) {
 			mustBeAfter: "Attention",
 		},
 		{
-			// d4 row 1 took "Deletion protection off" off this row: the bulk
-			// pool now sets DeletionProtection, leaving warn-dbi-unprotected as
-			// the finding's one witness. Do not restore the fourth phrase —
-			// TestD4_DeletionProtectionHasOneWitness fails on it. This is the
-			// third copy of the same expectation; the other two are in
-			// aws_dbi_test.go and scenario_dbi_visual_test.go.
+			// The bulk pool sets DeletionProtection, so warn-dbi-unprotected is
+			// this finding's one witness (TestD4_DeletionProtectionHasOneWitness).
+			// aws_dbi_test.go and scenario_dbi_visual_test.go pin the same rows.
 			id:          "db-public-no-encryption",
 			mustContain: []string{"No automated backups", "Public endpoint", "Unencrypted storage"},
 			mustBeAfter: "Attention",

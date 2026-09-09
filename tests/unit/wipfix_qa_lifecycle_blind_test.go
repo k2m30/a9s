@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
 
-// wipfix_qa_lifecycle_blind_test.go reproduces the reviewer's list-lifecycle
+// wipfix_qa_lifecycle_blind_test.go drives list-lifecycle
 // scenarios from the keys the operator presses, with every message produced by
 // the real executor so the stamping is production's rather than the test's:
 //
@@ -198,10 +198,9 @@ func TestDrillLoadMore_AppendsToTheDrillThatAskedForIt(t *testing.T) {
 			"lands nowhere")
 	}
 
-	// INVERTED for runtime8 row 4: see the same inversion in
-	// wipfix_list_lifecycle_test.go. The sequence is drawn per issuing screen,
-	// so the drill's continuation takes one and it orders nothing but the
-	// drill's own requests.
+	// The sequence is drawn per issuing screen (see
+	// wipfix_list_lifecycle_test.go), so the drill's continuation takes one
+	// and it orders nothing but the drill's own requests.
 	stamped := loadMore[0]
 	b.core.StampListFetchSeq(&stamped)
 	if stamped.ScreenID == 0 {

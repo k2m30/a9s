@@ -1,9 +1,7 @@
-// app_controller_pr_b_test.go — contract tests for core/app.Controller (PR-B).
+// app_controller_pr_b_test.go — contract tests for core/app.Controller.
 //
-// Covers the two lanes added / wired in PR-B:
-//
-// RESULT LANE (Handle) — honest no-op contract for events not yet dispatched
-// through HandleEvent (PR-C/PR-B0 must relocate TUI-shim pre-processing first):
+// RESULT LANE (Handle) — no-op contract for events not dispatched through
+// HandleEvent:
 //
 //	messages.ResourcesLoaded    — Handle returns Snapshot() unchanged, nil tasks.
 //	messages.RelatedCheckResult — Handle returns Snapshot() unchanged, nil tasks.
@@ -12,12 +10,12 @@
 //	messages.ClearFlash         — Handle returns Snapshot() unchanged, nil tasks.
 //	messages.APIError           — Handle returns Snapshot() unchanged, nil tasks.
 //
-// messages.ClientsReady is the one exception (issue #464): both success and
-// failure route through Core.HandleClientsReady (renderer-shape fields
-// computed the same way BootstrapLive computes them). See
-// app_headless_parity_test.go for the failure-path routing contract.
+// messages.ClientsReady is the one exception: both success and failure route
+// through Core.HandleClientsReady (renderer-shape fields computed the same
+// way BootstrapLive computes them). See app_headless_parity_test.go for the
+// failure-path routing contract.
 //
-// COMMAND LANE (Apply) — 6 actions wired for real in PR-B:
+// COMMAND LANE (Apply):
 //
 //	ActionSelectProfile  — pops selector (PopSelectorIntent); returns TaskKindConnect.
 //	ActionSelectRegion   — pops selector (PopSelectorIntent); returns TaskKindConnect.
@@ -27,7 +25,7 @@
 //	ActionOpenIdentity   — pushes identity screen AND returns TaskKindFetchIdentity.
 //	ActionCommand        — dispatches "help","theme","region","root",<shortname>,unknown.
 //
-// PR-C-BLOCKED LANE — no-ops that must not panic and must return Snapshot:
+// NO-OP LANE — must not panic and must return Snapshot:
 //
 //	ActionOpenDetail, ActionSelect, ActionOpenYAML, ActionOpenJSON,
 //	ActionReveal, ActionChildView, ActionToggleRelated, ActionLoadMore.
@@ -331,7 +329,7 @@ func TestController_Handle_PRB_ClientsReady_Success_DispatchesToCore(t *testing.
 
 // TestController_Handle_ClientsReady_Error_RoutesFailurePath verifies that
 // Handle fed a messages.ClientsReady with Err set routes through
-// Core.HandleClientsReady's failure path (issue #464): an error flash is
+// Core.HandleClientsReady's failure path: an error flash is
 // applied to the snapshot and the returned tasks include the FlashTick that
 // clears it. Gen:1 matches newTestController's fresh session (ConnectGen
 // seeds at 1 in session.New(), never rotated), so the event is not dropped

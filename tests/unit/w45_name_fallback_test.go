@@ -37,21 +37,21 @@ import (
 // both delegate to. A nil vc is the column set a fresh install renders; a
 // loaded one is what a user with view files on disk sees.
 //
-// The election is marked here because core/app's resolver marks it: per the
-// cols spec row 2, the identity column is elected once over the resolved set
-// and travels on ColumnDef.Identity, and ExtractCellValue reads that flag
-// instead of re-electing from the type's built-in set. A column set assembled
-// without the election is a set no resolver produces, so asserting the
-// extractor's behaviour on one would test nothing. The old assertion (the
-// extractor finds the identity column from the typeDef alone) is not to be
-// restored: it is what made a loaded view file's identity cell render blank.
+// The election is marked here because core/app's resolver marks it: the
+// identity column is elected once over the resolved set and travels on
+// ColumnDef.Identity, and ExtractCellValue reads that flag instead of
+// re-electing from the type's built-in set. A column set assembled without
+// the election is a set no resolver produces, so asserting the extractor's
+// behaviour on one would test nothing; an extractor that found the identity
+// column from the typeDef alone would render a loaded view file's identity
+// cell blank.
 func w45Columns(vc *config.ViewsConfig, td resource.ResourceTypeDef) []app.ColumnDef {
 	lcs := resource.ResolveListColumnCascade(vc, td.ShortName, &td)
 	if len(lcs) == 0 {
 		return nil
 	}
-	// INVERTED for aws6 rows 4-6: the humanize opt-in is the type's
-	// declaration (ResourceTypeDef.HumanizeFields), not the column's.
+	// The humanize opt-in is the type's declaration
+	// (ResourceTypeDef.HumanizeFields), not the column's.
 	humanized := td.HumanizedFields()
 	cols := make([]app.ColumnDef, len(lcs))
 	for i, lc := range lcs {
@@ -258,10 +258,9 @@ func TestW45_NameFallbackOnlyFillsTheIdentityColumn(t *testing.T) {
 		{
 			// Path branch: "MetricName" is the name of the metric the alarm
 			// watches, never the alarm's own name — which is what this case
-			// guards against. Since misc4 round 2 item (b) the resolved column
-			// carries the catalog's Key, so the struct-less row answers from
-			// Fields with the metric. That is the right cell; the row's own
-			// name must still never appear here.
+			// guards against. The resolved column carries the catalog's Key, so
+			// the struct-less row answers from Fields with the metric. That is
+			// the right cell; the row's own name must still never appear here.
 			name: "path substring — alarm Metric",
 			td:   alarmTD,
 			col:  w45ColumnByTitle(t, *alarmTD, "Metric"),
@@ -270,8 +269,7 @@ func TestW45_NameFallbackOnlyFillsTheIdentityColumn(t *testing.T) {
 		},
 		{
 			// Path branch: "DBName" is the database inside the cluster, never
-			// the cluster's name. Answers from Fields since misc4 round 2
-			// item (b); see the alarm case above.
+			// the cluster's name. Answers from Fields; see the alarm case above.
 			name: "path substring — redshift Database",
 			td:   redshiftTD,
 			col:  w45ColumnByTitle(t, *redshiftTD, "Database"),
@@ -280,8 +278,8 @@ func TestW45_NameFallbackOnlyFillsTheIdentityColumn(t *testing.T) {
 		},
 		{
 			// Path branch: "DomainName" is the CodeArtifact domain the
-			// repository belongs to, not the repository. Answers from Fields
-			// since misc4 round 2 item (b); see the alarm case above.
+			// repository belongs to, not the repository. Answers from Fields;
+			// see the alarm case above.
 			name: "path substring — codeartifact Domain",
 			td:   codeartifactTD,
 			col:  w45ColumnByTitle(t, *codeartifactTD, "Domain"),

@@ -92,12 +92,12 @@ func TestCostsReview6_Q1_ConcurrentDeliveryDuringSave_NeverCorruptsOnDiskCache(t
 }
 
 // ===========================================================================
-// Q2 (core/app/costs_state.go:~1055) — the N3 granularity fallback
-// re-plans a RESOURCE_ID-shaped frame at its parent granularity/period
-// WITHOUT re-applying ClampResourceDrillWindow (core/costs/drill.go) —
-// a clamped-then-allowed RESOURCE_ID drill whose finer (day-level) fetch
-// genuinely returns zero re-queries the UNCLAMPED parent (week) window,
-// which can start before the 14-day resource-drill retention cutoff.
+// Q2 (core/app/costs_state.go) — the N3 granularity fallback re-plans a
+// RESOURCE_ID-shaped frame at its parent granularity/period and must
+// re-apply ClampResourceDrillWindow (core/costs/drill.go): a
+// clamped-then-allowed RESOURCE_ID drill whose finer (day-level) fetch
+// genuinely returns zero must not re-query the UNCLAMPED parent (week)
+// window, which can start before the 14-day resource-drill retention cutoff.
 //
 // Repro: now=2026-07-17 puts the retention cutoff at 2026-07-03. July's
 // first (month-clipped) week is {Start:2026-07-01, End:2026-07-06} — its

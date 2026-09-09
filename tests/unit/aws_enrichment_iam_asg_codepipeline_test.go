@@ -101,15 +101,13 @@ func TestEnrichIAMRoleLastUsed_NilRoleOutputSkipped(t *testing.T) {
 // coverage gap must never lower-bound the aggregate issue badge — Truncated
 // stays false.
 //
-// INVERTED by codex2 round 4: this asserted "must not propagate GetRole
-// errors", which is how a refused call reached the operator as silence. The
-// aggregate error and the Truncated flag are two different answers — only the
-// flag is governed by the "~"-only rule — and the wave-2 runner
+// A refused GetRole call reaches the operator through the aggregate error.
+// The aggregate error and the Truncated flag are two different answers — only
+// the flag is governed by the "~"-only rule — and the wave-2 runner
 // (core/runtime/probes.go, "Always populate fields from result regardless of
 // err") keeps every finding when the enricher returns one, so nothing is lost
-// by reporting it. Do not restore the nil-error assertion; a vanished
-// resource is the one error that stays out of the aggregate, and that is
-// pinned in codex2_round4_test.go.
+// by reporting it. A vanished resource is the one error that stays out of the
+// aggregate (codex2_round4_test.go).
 func TestEnrichIAMRoleLastUsed_APIErrorMarksRowTruncatedIDContinuesNoBadge(t *testing.T) {
 	// broken-role errors on GetRole; dormant-role has nil RoleLastUsed → finding.
 	combo := &iamGetRoleFakeCombo{
@@ -272,10 +270,9 @@ func TestEnrichIAMPolicy_APIErrorSetsTruncatedNoError(t *testing.T) {
 	}
 
 	result, err := awsclient.EnrichIAMPolicy(context.Background(), clients, resources, nil)
-	// INVERTED for the "skipped" spec row 5: "must not propagate" was a proxy
-	// for "must not abort the batch", and it also required the reason to be
-	// dropped. The batch still completes — the safe policy below is evaluated
-	// — and the policy that could not be read says so. Do not restore.
+	// "must not propagate" is a proxy for "must not abort the batch" and does
+	// not require the reason to be dropped: the batch completes — the safe
+	// policy below is evaluated — and the policy that could not be read says so.
 	if err == nil {
 		t.Fatal("a failed document fetch returned no error — the reason never reaches the log")
 	}
@@ -444,10 +441,9 @@ func TestEnrichIAMGroup_GetGroupAPIErrorSkipsGroupMarksTruncatedIDNotBadge(t *te
 	resources := iamGroupResources("broken-group", "ok-group")
 
 	result, err := awsclient.EnrichIAMGroup(context.Background(), clients, resources, nil)
-	// INVERTED by codex2 round 4: EnrichIAMGroup built a failure list and
-	// returned nil, so a refused GetGroup reached the operator as silence. The
+	// A refused GetGroup reaches the operator through the composite error. The
 	// composite error and the Truncated flag are two answers; only the flag is
-	// governed by the "~"-only rule. Do not restore the nil-error assertion.
+	// governed by the "~"-only rule.
 	if err == nil {
 		t.Fatal("a failed GetGroup must reach the operator through the composite error")
 	}
@@ -556,8 +552,6 @@ func TestEnrichASGScalingActivities_FailedWithStatusMessageSummarized(t *testing
 		t.Fatalf("expected finding for capacity-asg, got none")
 	}
 	f := fs[0]
-	// Inverted for spec row "phrase": the wording belongs to the code and the
-	// offending item is a supporting row. Do not restore the old assertion.
 	if want := catalog.Phrase("asg.scaling-activity-failed"); f.Phrase != want {
 		t.Errorf("Phrase = %q, want the catalog's %q", f.Phrase, want)
 	}

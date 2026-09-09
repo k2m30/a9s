@@ -1,6 +1,6 @@
 package unit
 
-// qa67_cross_cutting_test.go — §K Cross-Cutting Error Resilience (issue #67)
+// qa67_cross_cutting_test.go — §K Cross-Cutting Error Resilience
 //
 // Bugs caught:
 //   - K.1: no panic on any input sequence (fuzz sampler)

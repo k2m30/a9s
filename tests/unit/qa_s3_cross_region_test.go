@@ -1,24 +1,18 @@
 package unit
 
-// qa_s3_cross_region_test.go — Regression: EnrichS3Posture must handle
-// cross-region buckets without spamming the error log.
+// qa_s3_cross_region_test.go — EnrichS3Posture must handle cross-region
+// buckets without spamming the error log.
 //
-// Reported 2026-04-25 from a live profile:
-//   [HH:MM:SS] enrich s3: s3-enrich: GetPublicAccessBlock failed for 1 of 35 IDs:
-//     example-bucket-eu.example.cloud: ... api error PermanentRedirect: The bucket
-//     you are attempting to access must be addressed using the specified endpoint.
+// ListBuckets returns ALL buckets globally regardless of the configured
+// client region, but per-bucket calls (GetPublicAccessBlock) require the
+// bucket's own regional endpoint. When the bucket lives in a different
+// region, AWS rejects the call with PermanentRedirect (301, "The bucket you
+// are attempting to access must be addressed using the specified endpoint")
+// or IllegalLocationConstraintException (400, "The <region> location
+// constraint is incompatible for the region specific endpoint this request
+// was sent to").
 //
-// And:
-//   ... api error IllegalLocationConstraintException: The eu-central-2 location
-//   constraint is incompatible for the region specific endpoint this request was
-//   sent to.
-//
-// Root cause: ListBuckets returns ALL buckets globally regardless of the configured
-// client region, but per-bucket calls (GetPublicAccessBlock) require the bucket's
-// own regional endpoint. When the bucket lives in a different region, AWS rejects
-// the call with PermanentRedirect (301) or IllegalLocationConstraintException (400).
-//
-// Contract (post-fix):
+// Contract:
 //   - Cross-region buckets must NOT appear in the AggregateFailures error.
 //   - Cross-region buckets MAY appear in TruncatedIDs (data incomplete) so the
 //     row gets a "?" marker, but they must not spam the `!` error log because

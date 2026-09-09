@@ -145,11 +145,9 @@ func TestW4GroupFindingDef(t *testing.T) {
 // A per-file copy of the set is exactly what would let one principal type
 // recognise the probe and the other two miss it.
 //
-// The probe was PowerUserAccess until codex2 row 6 (Codex finding 8) took it
-// out of the admin set — AWS's PowerUserAccess excludes IAM, Organizations
-// and Account, so it is not administrator-equivalent. The shared-set property
-// this test exists for is unchanged; only the probe moved. Do not restore
-// PowerUserAccess here.
+// The probe is not PowerUserAccess: AWS's PowerUserAccess excludes IAM,
+// Organizations and Account, so it is not administrator-equivalent and is
+// not in the admin set.
 func TestW4AdminPolicySetIsSharedAcrossPrincipals(t *testing.T) {
 	t.Run("role", func(t *testing.T) {
 		fake := &w4RoleAdminFake{attached: map[string]map[string]string{

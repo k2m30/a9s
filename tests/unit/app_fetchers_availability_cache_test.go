@@ -1,9 +1,8 @@
 package unit
 
 // Tests for the disk-cache load path feeding internal/tui/probe_adapter.go's
-// loadAvailabilityCache (Round-2 migration: repinned from the deleted
-// single-file cache.Load/cache.File onto the per-type-file cache.LoadDirForTest/
-// cache.Store/cache.TypeFile per docs/design/cache-requirements.md C7).
+// loadAvailabilityCache (cache.LoadDirForTest / cache.Store / cache.TypeFile,
+// docs/design/cache-requirements.md C7).
 //
 // loadAvailabilityCache delegates to Core.LoadAvailabilityCache, which in
 // turn reads the per-pair Store via cache.LoadDirForTest and maps each type's
@@ -17,9 +16,7 @@ package unit
 //   (e) issue fields       → IssueCounts / IssueKnown / IssueTruncated populated
 //   (f) truncated entry    → Exact=false / truncated-lower-bound populated
 //
-// C1 (round 2) removes TTL/expiry entirely — "There is no TTL — a
-// DELIBERATE product decision" — so the old cache.File.IsExpired coverage
-// has no successor here; those cases are deleted, not repinned.
+// There is no TTL (C1), so there is no expiry case.
 //
 // We also test profile/region isolation of cache.DirForTest to verify the loading
 // key correctly selects the right per-pair directory.

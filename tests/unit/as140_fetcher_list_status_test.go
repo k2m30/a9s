@@ -1,22 +1,18 @@
-// as140_fetcher_list_status_test.go — AS-140 regression pin on the
-// fetcher→list rendering of non-finding lifecycle/status text.
+// as140_fetcher_list_status_test.go — fetcher→list rendering of non-finding
+// lifecycle/status text.
 //
-// AS-140 retired Wave-2 enricher writes to FieldUpdates["status"] and made
-// the renderer's status column read findings first, then Fields[lifecycleKey].
-// The CXR Round 2 NEEDS CHANGES verdict on PR #367 head 103120f5 flagged the
-// gap: production fetchers for status-column types (dbi, dbc, redis, ddb,
-// eks, ng, asg, eb, cfn, cf, acm, kinesis, ses, eni, kms, ecs-svc, ecs,
-// ecs-task, redshift, efs, dbi-snap, dbc-snap) write Fields["status"] for the
-// lifecycle steady-state text — but the catalog left LifecycleKey empty so
-// the renderer's 2-layer read fell back to Fields["state"] (empty) and the
-// "available" / "ACTIVE" / "running" text vanished from the list view.
+// The renderer's status column reads findings first, then
+// Fields[lifecycleKey]. Production fetchers for status-column types (dbi, dbc,
+// redis, ddb, eks, ng, asg, eb, cfn, cf, acm, kinesis, ses, eni, kms, ecs-svc,
+// ecs, ecs-task, redshift, efs, dbi-snap, dbc-snap) write Fields["status"] for
+// the lifecycle steady-state text, so each of those catalog entries must
+// declare LifecycleKey: "status"; with it empty the 2-layer read falls back to
+// Fields["state"] (empty) and the "available" / "ACTIVE" / "running" text
+// vanishes from the list view.
 //
-// This test pins the fix (LifecycleKey: "status" declared on every status-
-// column type) by exercising the full fetcher→list path: a Resource shaped
-// exactly like the fetcher emits (Fields["status"] populated, Findings
-// empty) MUST render the steady-state phrase in the list view. A future
-// removal of LifecycleKey: "status" from any of these catalog entries will
-// fail this test.
+// This test exercises the full fetcher→list path: a Resource shaped exactly
+// like the fetcher emits (Fields["status"] populated, Findings empty) MUST
+// render the steady-state phrase in the list view.
 package unit_test
 
 import (

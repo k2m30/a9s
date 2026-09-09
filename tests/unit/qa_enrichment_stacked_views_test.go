@@ -1,25 +1,13 @@
 package unit
 
-// qa_enrichment_stacked_views_test.go — RED tests for Bug 3: Enrichment completion
-// updates ONLY the active view, leaving stacked views stale.
-//
-// Bug: In app_handlers_navigate.go, handleEnrichmentChecked (lines 638-650) only
-// calls SetEnrichmentState/SetEnrichmentFinding on the ACTIVE view:
-//
-//	if rl, ok := m.activeView().(*views.ResourceListModel); ok && rl.ResourceType() == msg.ResourceType {
-//	    rl.SetEnrichmentState(...)
-//	}
-//	if d, ok := m.activeView().(*views.DetailModel); ok && d.ResourceType() == msg.ResourceType {
-//	    d.SetEnrichmentFinding(...)
-//	}
+// qa_enrichment_stacked_views_test.go — enrichment completion must update
+// EVERY view of the matching type on m.stack, not only the active one.
 //
 // If the user has navigated from ResourceListModel (RDS list) to DetailModel
-// (detail view for one RDS instance), and Wave 2 enrichment completes while the
-// detail is active, only the DetailModel is updated. The ResourceListModel below it
-// in m.stack keeps stale findingsByID. When the user presses Esc, the revealed
-// ResourceListModel shows no markers or banner despite findings being available.
-//
-// Demanded behavior (post-fix): iterate m.stack and update ALL views of matching type.
+// (detail view for one RDS instance), and Wave 2 enrichment completes while
+// the detail is active, the ResourceListModel below it in m.stack must not
+// keep stale findingsByID: when the user presses Esc, the revealed
+// ResourceListModel shows the markers and banner.
 //
 // Tests T068–T069:
 //   T068 — Wave 2 completes while DetailModel is active: stacked ResourceListModel
@@ -116,18 +104,14 @@ func TestEnrichment_UpdatesStackedResourceListWhenDetailActive(t *testing.T) {
 	}
 
 	// ASSERTION: the enrichment-affected row (db-stacked-a-001) must be an
-	// applied issue after the pop. Pre-fix: handleEnrichmentChecked only
-	// updates activeView() (the DetailModel), leaving the stacked
-	// ResourceListModel's findingsByID empty. Post-fix: the stack is
-	// iterated; SetEnrichmentState was called on the ResourceListModel.
+	// applied issue after the pop — handleEnrichmentChecked iterates the
+	// stack and calls SetEnrichmentState on the ResourceListModel beneath the
+	// DetailModel.
 	//
-	// Checked via ctrl+z survival, not the literal "! " glyph text: since the
-	// color-findings-conformance wave, colorDBI prefers colorFromAnyFinding
-	// (core/aws/catalog_databases.go) — once the SevBroken Finding is
-	// applied, no glyph is produced: that branch was deleted as unreachable
-	// (only fires when ResolveColor()==ColorHealthy; see
-	// core/app/list_columns.go and
-	// .claude/agent-memory/a9s-coder/project_color_findings_conformance_glyph_interplay.md).
+	// Checked via ctrl+z survival, not the literal "! " glyph text: colorDBI
+	// prefers colorFromAnyFinding (core/aws/catalog_databases.go), so once the
+	// SevBroken Finding is applied no glyph is produced (the glyph only fires
+	// when ResolveColor()==ColorHealthy; see core/app/list_columns.go).
 	_, ctrlZVisible := isVisibleUnderCtrlZ(m, "db-stacked-a-001")
 	if !ctrlZVisible {
 		t.Errorf("after pop from detail to RDS list, db-stacked-a-001 must survive ctrl+z (finding applied). "+
@@ -216,7 +200,7 @@ func TestEnrichment_UpdatesStackedDetailWhenAnotherDetailActive(t *testing.T) {
 	}
 	m, _ = rootApplyMsg(m, enrichMsg)
 
-	// Verify detail-B (currently active) shows its finding (this should work pre-fix too).
+	// Verify detail-B (currently active) shows its finding.
 	plainB2 := stripANSI(rootViewContent(m))
 	if !strings.Contains(plainB2, "Attention") {
 		// Detail-B not updated either — something more fundamental is broken.

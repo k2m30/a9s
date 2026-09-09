@@ -8,20 +8,14 @@ import (
 )
 
 // ===========================================================================
-// Issue #23: the name column comes first in every default list view.
+// The name column comes first in every default list view.
 //
 // One list is read here. The built-in view is derived from the type's own
 // columns (core/config/defaults.go), and that the two agree whole — set,
 // order, width, key, path — is TestDefaultConfigColumnsAreTheCatalogs. So
 // asserting the order twice, once per declaration, would be asserting the
-// derivation rather than the order.
-//
-// w197: the per-type column COUNTS that used to sit below also went with the
-// derivation. They were written when a swap could drop a column between two
-// hand-maintained lists; a count beside a derived list is a number to update
-// whenever a type gains a column, and it says nothing the columns themselves
-// do not — the titles asserted here are the property, and the whole list is
-// pinned in the file named above.
+// derivation rather than the order; the titles asserted here are the
+// property, and the whole list is pinned in the file named above.
 // ===========================================================================
 
 // nameFirstColumn is the name column each of these 14 types must open with,

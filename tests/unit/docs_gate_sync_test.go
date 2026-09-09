@@ -2,7 +2,7 @@ package unit
 
 // docs_gate_sync_test.go pins the Makefile's `ready-to-push` prerequisite
 // list against the Stage 6 enumeration in docs/development-process.md, so
-// the two cannot drift apart again after either is edited on its own.
+// the two cannot drift apart when either is edited on its own.
 // docs/development-process.md's Stage 6 section names this file directly
 // and states that the enumeration is pinned by it.
 

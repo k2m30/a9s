@@ -1,7 +1,6 @@
 package unit
 
-// codex2_session_findings_test.go — behavioural pins for the Codex
-// session-range findings 1..10 and w132: one cache directory name per
+// codex2_session_findings_test.go — one cache directory name per
 // profile/region pair, no lane that answers "clean" for a call that failed,
 // one policy parser, one AWS error-code table.
 
@@ -35,7 +34,7 @@ import (
 
 // TestEncodePathElem_BoundaryHyphenCannotCollide pins injectivity at the one
 // place the "--" joiner can be forged: a trailing hyphen on the profile or a
-// leading hyphen on the region. Both pairs used to join to
+// leading hyphen on the region. Both pairs would otherwise join to
 // "team---us-east-1" and share one cache directory.
 func TestEncodePathElem_BoundaryHyphenCannotCollide(t *testing.T) {
 	root := t.TempDir()
@@ -562,11 +561,11 @@ func TestTaskFileOverlapScript_DistinctBranchesGetDistinctFiles(t *testing.T) {
 	}
 }
 
-// ─── w132 — the title fallback ranges over a map with case-duplicate keys ───
+// ─── the title fallback ranges over a map with case-duplicate keys ───
 
-// TestExtractCellValue_CaseDuplicateFieldKeysAreDeterministic pins w132: two
-// Fields keys differing only by case both satisfy the EqualFold match, so the
-// cell used to show whichever key Go's map iteration reached first.
+// TestExtractCellValue_CaseDuplicateFieldKeysAreDeterministic: two Fields
+// keys differing only by case both satisfy the EqualFold match, so the cell
+// must not depend on which key Go's map iteration reaches first.
 func TestExtractCellValue_CaseDuplicateFieldKeysAreDeterministic(t *testing.T) {
 	col := app.ColumnDef{Title: "Time"}
 	r := resource.Resource{

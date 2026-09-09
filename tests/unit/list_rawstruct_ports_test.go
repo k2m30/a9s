@@ -189,23 +189,20 @@ func TestListRawStruct_AllTypes(t *testing.T) {
 		{"waf", realisticWAF(), []string{"prod-waf-acl", "a1b2c3d4-5678-90ab-cdef-EXAMPLE11111"}},
 		{"glue", realisticGlueJob(), []string{"etl-daily-job", "4.0", "G.2X"}},
 		{"eb", realisticEB(), []string{"prod-api-env", "my-web-app", "ready"}},
-		// INVERTED for aws6 rows 4-6 and 10 (one humanize owner). Six cells
-		// above name a value in the readable form rather than the SDK
-		// constant — tg's protocol, ecs-svc's launch type, ssm's and sfn's
-		// type, pipeline's type, msk's cluster type. The rule this table
-		// pins is unchanged: those words are on screen only because the
-		// column read the field off RawStruct, and a column that stopped
-		// reading it renders nothing at all. The SDK-constant spellings are
-		// not to be restored — each of those fields is now declared on its
-		// type (ResourceTypeDef.HumanizeFields), and restoring them would
-		// mean the column shows a constant the detail shows as words.
+		// Six cells above name a value in the readable form rather than the
+		// SDK constant — tg's protocol, ecs-svc's launch type, ssm's and
+		// sfn's type, pipeline's type, msk's cluster type — because each of
+		// those fields is declared on its type
+		// (ResourceTypeDef.HumanizeFields). The rule this table pins is
+		// unchanged: those words are on screen only because the column read
+		// the field off RawStruct, and a column that stopped reading it
+		// renders nothing at all.
 		//
-		// ses's Identity column still takes a RawStruct path
-		// (.a9s/views/ses.yaml: path: IdentityName). Its Type column no
-		// longer does — it reads the mapped identity_type field, because the
-		// rendered column shows words and not the SDK enum — so the example
-		// moved to a cell that still exercises the rule rather than the rule
-		// being weakened to accommodate the column.
+		// ses's Identity column takes a RawStruct path (.a9s/views/ses.yaml:
+		// path: IdentityName). Its Type column reads the mapped
+		// identity_type field, because the rendered column shows words and
+		// not the SDK enum, so the example is a cell that still exercises
+		// the rule.
 		{"ses", realisticSESIdentity(), []string{"example.com"}},
 		{"redshift", realisticRedshift(), []string{"analytics-cluster", "dc2.large"}},
 		{"trail", realisticTrail(), []string{"org-trail", "cloudtrail-logs-bucket"}},
@@ -233,25 +230,15 @@ func TestListRawStruct_AllTypes(t *testing.T) {
 }
 
 // ===========================================================================
-// 2. TestListRawStruct_AllTypes_OverridesFields — port of
-// TestQA_ListRawStruct_AllTypes_OverridesFields.
-//
-// INVERTED for aws6 row 16 (one cascade arm). It pinned RawStruct-over-Fields
-// precedence, which held only for a Key-LESS column, and a column was Key-less
-// only on the arm that returned a loaded view file verbatim without merging
-// the catalog's Key. That arm is gone: the view owns which columns there are
-// and in what order, the catalog owns what each cell reads, on every path. So
-// for a title both declare, the cell reads the Fields key the catalog names,
-// which is ExtractCellValue's documented precedence and the only thing that
-// makes a warm-cache row render like a live one.
-//
-// The old direction is not to be restored — restoring it would mean the demo
-// bench and an operator's screen read cells by different rules again, which is
-// how cb's Source Type stayed wrong on every real account while the bench was
-// green. What this test pins now is the surviving half: a stored value under a
-// catalog-declared key is what the cell shows, even when RawStruct disagrees.
-// RawStruct reads are pinned by TestListRawStruct_AllTypes above, which covers
-// every type in the same table.
+// 2. TestListRawStruct_AllTypes_OverridesFields: the view owns which
+// columns there are and in what order, the catalog owns what each cell
+// reads, on every path. So for a title both declare, the cell reads the
+// Fields key the catalog names, which is ExtractCellValue's documented
+// precedence and the only thing that makes a warm-cache row render like a
+// live one: a stored value under a catalog-declared key is what the cell
+// shows, even when RawStruct disagrees. RawStruct reads are pinned by
+// TestListRawStruct_AllTypes above, which covers every type in the same
+// table.
 // ===========================================================================
 
 func TestListRawStruct_AllTypes_OverridesFields(t *testing.T) {
@@ -371,9 +358,9 @@ func TestListRawStruct_AllTypes_OverridesFields(t *testing.T) {
 
 			td := resource.FindResourceType(tc.shortName)
 			cols := resource.ResolveListColumnCascade(nil, tc.shortName, td)
-			// w197 row 15: IsStatusColumn takes the RESOLVED key — every
-			// caller had already defaulted it, and the callee defaulting
-			// again was a fourth copy of the same "" means "state".
+			// IsStatusColumn takes the RESOLVED key — every caller has already
+			// defaulted it, and the callee defaulting again would be a fourth
+			// copy of the same "" means "state".
 			lifecycleKey := "state"
 			if td != nil {
 				lifecycleKey = td.StatusKey()
@@ -410,20 +397,15 @@ func TestListRawStruct_AllTypes_OverridesFields(t *testing.T) {
 }
 
 // ===========================================================================
-// 3. TestListRawStruct_WithProductionViewsYAML — port of
-// TestQA_ListRawStruct_WithProductionViewsYAML: validates against the real
+// 3. TestListRawStruct_WithProductionViewsYAML validates against the real
 // on-disk .a9s/views/ config (config.LoadFromDirs), not the built-in
 // config.DefaultConfig() every other test in this file uses — a genuine
 // drift guard between the generated YAML and the Go defaults it's generated
-// from (go run ./cmd/viewsgen/).
-//
-// INVERTED for aws6 row 16, same as the test above and for the same reason: a
-// column whose title the catalog also declares carries the catalog's Key now,
-// on this path as on every other, so a stored Fields value under that key is
-// what the cell shows. The subtests below that fed a deliberately stale Fields
-// value and demanded RawStruct win were pinning the Key-less arm that no
-// longer exists; they now feed no such value and pin only that the RawStruct
-// path still reaches the cell. Do not restore the stale-Fields halves.
+// from (go run ./cmd/viewsgen/). A column whose title the catalog also
+// declares carries the catalog's Key on this path as on every other, so a
+// stored Fields value under that key is what the cell shows; the subtests
+// below feed no stale Fields value and pin only that the RawStruct path
+// still reaches the cell.
 // ===========================================================================
 
 func TestListRawStruct_WithProductionViewsYAML(t *testing.T) {
@@ -606,13 +588,9 @@ func TestListRawStruct_FieldsFallbackWhenNoRawStruct(t *testing.T) {
 // what a Fields-only (RawStruct-stripped) row must carry for that fallback to
 // find them at all.
 //
-// INVERTED for aws6 row 10: the Domain column used to be the negative case,
-// pinning that a column WITHOUT the flag stays raw. transfer's domain was one
-// of the fields row 10 declares, so it reads as words now and cannot play
-// that part. The negative case it carried has moved to the Server ID cell,
-// which no declaration names and which must stay verbatim because it is an
-// identifier. The "EFS" assertion is not to be restored — restoring it would
-// mean the column shows a constant the detail shows as words.
+// The negative case is the Server ID cell, which no declaration names and
+// which must stay verbatim because it is an identifier; transfer's domain is
+// a declared humanized field and reads as words.
 // ===========================================================================
 
 func TestListRawStruct_HumanizeColumn_FieldsFallbackWhenNoRawStruct(t *testing.T) {
@@ -1106,20 +1084,16 @@ func TestListRawStruct_ChildViews(t *testing.T) {
 }
 
 // ===========================================================================
-// 2. TestListRawStruct_S3ObjectSort_UsesNumericByteOrder — port of
-// qa_s3_test.go's TestQA_S3_B10_3_ObjectList_SortBySize_UsesNumericByteOrder.
-// s3_objects's default view config sets {Key:"size", SortKey:"size_raw"} on
-// the Size column (core/config/defaults_databases.go), so the sort reads the
-// byte count the fetcher stored — not the display string ("1 KB" vs "900 B"),
-// which would sort lexicographically wrong ('1' < '9'). The sort_path this
-// test was written against read the AWS struct instead, which the warm-cache
-// frame does not have, so the same list came back in a different order until
-// the fetch landed; the rows below now carry the stored byte count the way the
-// fetcher writes it. Do not restore a RawStruct-only version of this case.
-// Neither core/app/list_test.go's TestListSort_* (Name-only) nor this file's
+// 2. TestListRawStruct_S3ObjectSort_UsesNumericByteOrder: s3_objects's
+// default view config sets {Key:"size", SortKey:"size_raw"} on the Size
+// column (core/config/defaults_databases.go), so the sort reads the byte
+// count the fetcher stored — not the display string ("1 KB" vs "900 B"),
+// which would sort lexicographically wrong ('1' < '9') — and not the AWS
+// struct, which the warm-cache frame does not have; the rows below carry
+// the stored byte count the way the fetcher writes it. Neither
+// core/app/list_test.go's TestListSort_* (Name-only) nor this file's
 // AllTypes/OverridesFields cases (cell VALUE, not sort ORDER) cover a
-// sort-key-driven numeric sort — this was otherwise unpinned at the
-// controller level.
+// sort-key-driven numeric sort.
 // ===========================================================================
 
 func TestListRawStruct_S3ObjectSort_UsesNumericByteOrder(t *testing.T) {

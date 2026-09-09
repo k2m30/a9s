@@ -2,14 +2,12 @@
 
 package unit_test
 
-// misc4_r2b_cascade_arms_test.go — misc4 round 2, item (b).
-//
-// ResolveListColumnCascade had two arms reading one declaration two ways. When
-// the built-in defaults hold more columns than the catalog literal, it returned
-// the default list whole and the catalog's Key was gone; otherwise it kept the
-// catalog's Key and borrowed the default's Path, SortKey and Humanize. Which
-// arm a type lands in is a column-count comparison, so the same declaration
-// produced different columns for reasons that have nothing to do with the type.
+// misc4_r2b_cascade_arms_test.go — ResolveListColumnCascade reads one
+// declaration one way: the catalog's Key is kept and the default's Path,
+// SortKey and Humanize are borrowed whether or not the built-in defaults
+// hold more columns than the catalog literal, so the same declaration never
+// produces different columns for reasons that have nothing to do with the
+// type.
 
 import (
 	"strings"

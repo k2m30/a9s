@@ -1,17 +1,14 @@
-// list_request_generation_test.go — behaviour pins for the per-list fetch
-// request sequence and the re-entry re-verification, both raised by the
-// 2026-09-08 cache review.
+// list_request_generation_test.go — the per-list fetch request sequence and
+// the re-entry re-verification.
 //
 //  1. A list fetch carries the dispatch-order sequence its screen was at when
-//     it was dispatched, and the apply point accepts only the latest one. The
-//     reviewed defect: the only stale-result guard was a content heuristic
-//     (a smaller, still-truncated, strict-ID-subset replace), so an on-entry
-//     verification overlapping a later Ctrl+R could land AFTER the refresh and
-//     replace the newer screen with its own older rows.
-//  2. Re-entering a list that the row store still holds in full re-verifies it
-//     on both adapters. The reviewed defect: HandleNavigate returned no task
-//     for that branch and only the headless controller synthesised one, so the
-//     TUI rendered retained rows with no refreshing marker and no AWS call.
+//     it was dispatched, and the apply point accepts only the latest one; a
+//     content heuristic (a smaller, still-truncated, strict-ID-subset
+//     replace) is not a stale-result guard, since an on-entry verification
+//     overlapping a later Ctrl+R can land AFTER the refresh.
+//  2. Re-entering a list that the row store still holds in full re-verifies
+//     it on both adapters: HandleNavigate returns the task, so the TUI does
+//     not render retained rows with no refreshing marker and no AWS call.
 //  3. A verify-refetch that comes back shallower than the type's known
 //     population does not regress the rendered total.
 package unit
@@ -94,8 +91,8 @@ func seedListGenDiskFile(t *testing.T, count, rowCount int) {
 // 1. The overlapped on-entry verification loses to the later Ctrl+R
 // ───────────────────────────────────────────────────────────────────────────
 
-// TestListFetch_StaleEntryVerificationLosesToLaterRefresh reproduces the
-// reviewer's scenario end to end through the real Controller: opening a list
+// TestListFetch_StaleEntryVerificationLosesToLaterRefresh drives the race
+// end to end through the real Controller: opening a list
 // dispatches its on-entry verification, the operator hits Ctrl+R before that
 // result arrives, and the refresh completes FIRST. The verification's own
 // result then lands last, carrying a full same-sized page of different rows —
@@ -238,11 +235,11 @@ func TestListReEntry_HeadlessMarksRefreshing(t *testing.T) {
 // 3. A shallower verify-refetch does not regress the rendered total
 // ───────────────────────────────────────────────────────────────────────────
 
-// TestListTotal_ShallowVerifyKeepsKnownPopulation seeds the on-disk file the
-// reviewer described — a type whose population is 55 while only 50 rows were
-// stored — opens the list, and lands a still-truncated 50-row verify-refetch
-// on it. The rendered total must stay the type's known population; regressing
-// to the row depth is the "50+" frame the reviewer saw.
+// TestListTotal_ShallowVerifyKeepsKnownPopulation seeds an on-disk file for
+// a type whose population is 55 while only 50 rows were stored, opens the
+// list, and lands a still-truncated 50-row verify-refetch on it. The
+// rendered total must stay the type's known population, never regress to
+// the row depth ("50+").
 func TestListTotal_ShallowVerifyKeepsKnownPopulation(t *testing.T) {
 	ctrl, _ := newDetailParityHeadlessController(t)
 

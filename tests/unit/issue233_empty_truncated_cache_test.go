@@ -1,31 +1,19 @@
 package unit
 
-// issue233_empty_truncated_cache_test.go — Tests for issue #233.
+// issue233_empty_truncated_cache_test.go — an empty-but-truncated cold-miss
+// page keeps its pagination metadata.
 //
-// Bug: When a cold-cache fetch returns zero resources but IsTruncated=true,
-// the subsequent cache write-back in app.go:383 drops the pagination metadata
-// because of the guard `if entry.IsTruncated && len(entry.Resources) > 0`.
-//
-// This means buildResourceCacheSnapshot() (app_related.go:304) reconstructs
-// IsTruncated from `entry.pagination != nil`, which is nil because step 2 skipped it.
-//
-// Result: After one empty-but-truncated cold miss, all subsequent related checks
-// see IsTruncated=false and report a definitive Count=0 instead of the honest
-// lower bound {Count:0, Truncated:true} (relatedResultTrunc).
-//
-// New contract (Batch B): truncated-zero produces {Count:0, Truncated:true} via
-// relatedResultTrunc. See related.go:34-38 and ValidateRelatedResult.
-//
-// Three-step corruption path (from the issue):
-//   1. app_related.go:67-71 correctly captures IsTruncated=true even on empty Resources
-//   2. app.go:383 has `if entry.IsTruncated && len(entry.Resources) > 0` — skips persistence
-//   3. app_related.go:304 reconstructs IsTruncated from `entry.pagination != nil` — nil
+// When a cold-cache fetch returns zero resources but IsTruncated=true, the
+// cache write-back must persist IsTruncated so buildResourceCacheSnapshot()
+// reconstructs it and every subsequent related check reports the honest
+// lower bound {Count:0, Truncated:true} (relatedResultTrunc), never a
+// definitive Count=0. See related.go and ValidateRelatedResult.
 //
 // Tests:
-//   TestContract_EmptyTruncatedPage_PreservesIsTruncated — FAILS with current code (reveals bug)
-//   TestContract_NonEmptyTruncatedPage_PreservesIsTruncated — PASSES with current code (control)
-//   TestContract_EmptyCompletePage_IsTruncatedFalse — PASSES with current code (negative control)
-//   TestContract_EmptyTruncatedPage_CheckerBehavior_Direct — PASSES (isolates checker from write-back)
+//   TestContract_EmptyTruncatedPage_PreservesIsTruncated — the core case
+//   TestContract_NonEmptyTruncatedPage_PreservesIsTruncated — control
+//   TestContract_EmptyCompletePage_IsTruncatedFalse — negative control
+//   TestContract_EmptyTruncatedPage_CheckerBehavior_Direct — isolates the checker from the write-back
 
 import (
 	"context"
@@ -111,24 +99,17 @@ func execRelatedCheckAndCollectTGResult(t *testing.T, m tui.Model) (result resou
 	return resource.UnknownRelated("tg"), false
 }
 
-// TestContract_EmptyTruncatedPage_PreservesIsTruncated is the core bug test for issue #233.
-//
-// Contract: When CachedPages carries {Resources:[], IsTruncated:true}, the write-back
-// in app.go:378-387 MUST persist IsTruncated=true so that the next checker call
-// (via buildResourceCacheSnapshot) returns {Count:0, Truncated:true}
+// TestContract_EmptyTruncatedPage_PreservesIsTruncated is the core case:
+// when CachedPages carries {Resources:[], IsTruncated:true}, the write-back
+// MUST persist IsTruncated=true so that the next checker call (via
+// buildResourceCacheSnapshot) returns {Count:0, Truncated:true}
 // (relatedResultTrunc — the honest lower bound), not a definitive Count=0.
-//
-// New contract (Batch B): truncated-zero path → {Count:0, Truncated:true}.
-// See related.go:34-38 (Truncated semantics) and TruncatedResult (related.go:101-114).
 //
 // Execution path:
 //
-//	RelatedCheckResultMsg{CachedPages:{"tg":{[],true}}} → app.go:378-387 write-back
+//	RelatedCheckResultMsg{CachedPages:{"tg":{[],true}}} → write-back
 //	→ Ctrl+R refresh → fresh DetailOperation → buildResourceCacheSnapshot()
 //	→ checkEC2TargetGroups sees cache["tg"].IsTruncated → must be true → {Count:0, Truncated:true}
-//
-// This test FAILS with current code because app.go:383 guards persistence with
-// `len(entry.Resources) > 0`, silently dropping IsTruncated on empty pages.
 func TestContract_EmptyTruncatedPage_PreservesIsTruncated(t *testing.T) {
 	m, ec2Res := setupLiveModeEC2Detail(t)
 	firstInstance := ec2Res[0]

@@ -48,9 +48,7 @@ import (
 var failureRecorders = map[string]int{
 	"MarkSkipped":  2,
 	"MarkUnusable": 2,
-	// markAllUninspected was deleted in this task's round 1 when the ebs-snap
-	// public-share walk moved onto walkAccountPages. Named here so that if it
-	// ever comes back it is covered from the start.
+	// Covered by name so a helper of this shape is gated from the start.
 	"markAllUninspected": 2,
 	"FailedCall":         listByReturn,
 	"FailedCallInRegion": listByReturn,

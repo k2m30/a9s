@@ -127,7 +127,7 @@ func TestCoreProbeEnrichment_NilClients_ReturnsErr(t *testing.T) {
 // TestCoreProbeEnrichment_CacheSnapshotMergesRowStore pins the contract that
 // ProbeEnrichment's BuildResourceCacheSnapshot merges RowStore's retained
 // sibling rows into the cache the enricher sees, even when no list has been
-// opened yet (Codex P1 regression — see Core.ProbeEnrichment's doc comment).
+// opened yet (see Core.ProbeEnrichment's doc comment).
 //
 // The registered test enricher returns one sentinel Finding Code when
 // cache["dbi"] carries exactly the RowStore sibling row, and a different

@@ -385,7 +385,7 @@ func TestComputeRDSDBClusterSnapshotStatusAndIssues(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// AS-145: dbc-snap dual-SDK dedup-by-ID — DocDB-side wins.
+// dbc-snap dual-SDK dedup-by-ID — DocDB-side wins.
 // ---------------------------------------------------------------------------
 
 // dbcSnapDocDBMock embeds fullDocDBMock (defined in aws_dbc_test.go, same
@@ -432,7 +432,7 @@ func (m *dbcSnapRDSMock) DescribeDBClusterSnapshots(
 	return &out, nil
 }
 
-// TestDBCSnapFetcher_DedupesAcrossDualAPIByID pins the AS-145 production fix
+// TestDBCSnapFetcher_DedupesAcrossDualAPIByID pins the dedup rule
 // for cluster snapshots: when DocDB and RDS DescribeDBClusterSnapshots both
 // return the same DBClusterSnapshotIdentifier on the same fetch tick, the
 // dbc-snap fetcher must dedup by Resource.ID with first-occurrence wins.

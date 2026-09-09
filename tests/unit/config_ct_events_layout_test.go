@@ -35,11 +35,9 @@ func TestCTEventsViewLayout_MatchesDesignSpec(t *testing.T) {
 		width int
 	}{
 		{"V", 1},
-		// TIME ahead of Status since misc4 round 2 item (a): §8 puts TIME
-		// second and says nothing about Status, which a later change inserted
-		// at index 1. The catalog literal builds the same two columns in
-		// TIME-then-Status order, and the two declarations of one list must
-		// hold one order. Do not move Status back to index 1.
+		// TIME ahead of Status: §8 puts TIME second, the catalog literal builds
+		// the same two columns in TIME-then-Status order, and the two
+		// declarations of one list must hold one order.
 		{"TIME", 15},
 		{"Status", 12},
 		{"ACTOR", 36},

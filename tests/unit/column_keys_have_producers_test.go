@@ -4,18 +4,13 @@ package unit
 // column names where its cell comes from, and a named Fields key has something
 // that writes it.
 //
-// It was two gates. column_key_mismatch_test.go walked the catalog's columns
-// and this file walked the built-in views' columns, checking the same keys
-// against the same registry, reading the same allowlist, and reporting a
-// failure in two different sentences. The two lists are one list now
-// (TestDefaultConfigColumnsAreTheCatalogs), so the second walk could only ever
-// repeat the first: the columns a type declares ARE the columns its view
-// renders, for every parent type and every child type (w197 row 12).
+// The columns a type declares ARE the columns its view renders, for every
+// parent type and every child type (TestDefaultConfigColumnsAreTheCatalogs),
+// so one walk over the catalog's columns covers the built-in views too.
 //
 // TestEnricherFieldKeys_RegisterCallsAreInInitBlock is a stringy smoke test that
-// globs core/aws/*_issue_enrichment.go to verify the coder actually wired up
-// RegisterEnricherFieldKeys calls rather than declaring the helper and leaving it
-// empty.
+// globs core/aws/*_issue_enrichment.go to verify every enricher file makes its
+// RegisterEnricherFieldKeys call.
 
 import (
 	"os"
@@ -102,8 +97,7 @@ func TestColumnKeysHaveProducers(t *testing.T) {
 				// RawStruct path, and the registry answers for the first. A
 				// column that declares neither is not out of scope: its value
 				// is looked up by turning the title into a key, which no
-				// registry knows about and nothing here could check — the one
-				// shape this gate used to skip by construction (w197 row 8).
+				// registry knows about and nothing here could check.
 				if col.Key == "" {
 					if col.Path == "" {
 						t.Errorf(
@@ -123,11 +117,10 @@ func TestColumnKeysHaveProducers(t *testing.T) {
 					}
 				}
 
-				// w197 row 22: config.ColumnFilled is the one rule, asked here
-				// and by the load's own report, so a column this gate accepts
-				// is never one the operator is told is broken. It carries the
-				// status-column exemption (row 11) and counts a Path as the
-				// producer it is.
+				// config.ColumnFilled is the one rule, asked here and by the
+				// load's own report, so a column this gate accepts is never one
+				// the operator is told is broken. It carries the status-column
+				// exemption and counts a Path as the producer it is.
 				if td := resource.FindResourceType(shortName); td != nil && !config.ColumnFilled(*td, col) {
 					t.Errorf(
 						"column %q on type %q has no producer (fetcher or enricher) — "+
@@ -143,7 +136,7 @@ func TestColumnKeysHaveProducers(t *testing.T) {
 
 // TestEnricherFieldKeys_RegisterCallsAreInInitBlock is a stringy smoke test that
 // globs core/aws/catalog_*.go and counts IssueEnricherFieldKeys: literals
-// on per-resource catalog struct literals. Post-AS-795n the Wave 2 field-key
+// on per-resource catalog struct literals. The Wave 2 field-key
 // registrations live in the catalog (the bridge in install.go replays them
 // into the legacy resource.SetIssueEnricherFieldKeysForTest map). Requiring at
 // least 10 occurrences proves the catalog actually wires Wave 2 field keys

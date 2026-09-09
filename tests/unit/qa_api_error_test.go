@@ -688,7 +688,7 @@ func TestQA_APIError_DetailView_FlashStillShown(t *testing.T) {
 
 // TestQA_APIError_ResourceListPath_StillWorks is a regression guard ensuring
 // that the existing ResourceListModel branch of handleAPIError (ClearLoading)
-// is not broken when the coder adds the DetailModel branch.
+// is not broken by the DetailModel branch.
 func TestQA_APIError_ResourceListPath_StillWorks(t *testing.T) {
 	tui.Version = "test"
 

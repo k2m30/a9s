@@ -19,9 +19,7 @@ import (
 func TestDbiColor(t *testing.T) {
 	// Each case feeds the status to the dbi fetcher, which runs the type's own
 	// findings predicate, and the expected colour is computed from the severity
-	// of the finding that comes back. The bare-Fields cases this table used to
-	// carry — empty status, nil Fields, the legacy db_instance_status key and
-	// its precedence — are gone with the raw-field classifier they pinned.
+	// of the finding that comes back.
 	cases := []struct {
 		name   string
 		status string

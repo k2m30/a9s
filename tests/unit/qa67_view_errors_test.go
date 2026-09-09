@@ -1,6 +1,6 @@
 package unit
 
-// qa67_view_errors_test.go — §I View-Specific Error Handling (issue #67)
+// qa67_view_errors_test.go — §I View-Specific Error Handling
 //
 // Bugs caught:
 //   - I.1: clipboard unavailable shows error flash, no crash

@@ -2,17 +2,14 @@
 
 package unit_test
 
-// misc4_r2a_one_formatter_test.go — misc4 round 2, item (a).
+// misc4_r2a_one_formatter_test.go — one formatter for both list-cell lanes.
 //
 // A list cell is filled from one of two lanes: the Fields map the fetcher
-// wrote, or the RawStruct path fieldpath renders. The two rendered the same
-// value differently — a bool was "Yes" down one lane and "true" down the
-// other, a timestamp was "2026-04-20 00:00" or "2026-04-20T00:00:00Z" — so
-// which one an operator saw depended on whether the row came from a live
-// struct or a warm cache, and on a column-count comparison in the cascade.
-//
-// Both lanes now return through one formatter, so the lane a value took
-// changes where it came from and never what it says.
+// wrote, or the RawStruct path fieldpath renders. Both lanes return through
+// one formatter, so the lane a value took changes where it came from and
+// never what it says: a bool is not "Yes" down one lane and "true" down the
+// other, a timestamp is not "2026-04-20 00:00" or "2026-04-20T00:00:00Z"
+// depending on whether the row came from a live struct or a warm cache.
 
 import (
 	"testing"
@@ -77,12 +74,10 @@ func TestBothLanesRenderATimestampTheSameWay(t *testing.T) {
 			t.Errorf("timestamp %q rendered %q, want \"2026-04-20 09:30\"", field, fields)
 		}
 	}
-	// Inverted for tui5 row "one humanizer": this case expected
-	// "2026-04-20 00:00" while its own comment said a date with no time of day
-	// is still a date. A fetcher that writes a bare date knows the day and not
-	// the hour, and a midnight AWS never reported is a wrong answer rather than
-	// a tidier one — the same limit that leaves numbers alone below. Do not
-	// restore the old expectation.
+	// A date with no time of day is still a date: a fetcher that writes a
+	// bare date knows the day and not the hour, and a midnight AWS never
+	// reported is a wrong answer rather than a tidier one — the same limit
+	// that leaves numbers alone below.
 	fields, _ := misc4BothLanes(t, "stamp", "Stamp", "2026-04-20", misc4Raw{Stamp: stamp})
 	if fields != "2026-04-20" {
 		t.Errorf("date-only rendered %q, want \"2026-04-20\"", fields)

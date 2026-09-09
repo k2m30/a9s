@@ -1,16 +1,11 @@
 package unit
 
-// help_test.go — issue #247: CloudTrail "t" key appears in help.
-//
-// views.NewHelp is DEAD per specs/022-codebase-cleanup/wave3-map-text.md
-// (help.go: "LIVE: NewHelpWithResource; DEAD: NewHelp"). No existing test
-// pins that the "t"/cloudtrail keybinding entry itself (not the ct-events
-// data-format legend, which is a separate concern covered by
-// views_help_ct_events_legend_test.go / views_help_resource_wiring_test.go)
-// appears in the general keybinding list for ResourceList/Detail/YAML help
-// contexts — retargeted onto the live NewHelpWithResource constructor
-// (buildGroups/domainContext, the binding-list logic, is shared verbatim
-// between NewHelp and NewHelpWithResource; only the resource name differs).
+// help_test.go — the CloudTrail "t" key appears in help: the "t"/cloudtrail
+// keybinding entry itself (not the ct-events data-format legend, which is
+// covered by views_help_ct_events_legend_test.go /
+// views_help_resource_wiring_test.go) appears in the general keybinding list
+// for ResourceList/Detail/YAML help contexts, through the live
+// NewHelpWithResource constructor (buildGroups/domainContext).
 
 import (
 	"strings"
@@ -21,7 +16,7 @@ import (
 )
 
 // ═══════════════════════════════════════════════════════════════════════════
-// Help view tests — issue #247: CloudTrail "t" key appears in help
+// Help view tests — the CloudTrail "t" key appears in help
 // ═══════════════════════════════════════════════════════════════════════════
 
 // TestHelp_ResourceList_ShowsCloudTrailKey verifies that the ResourceList

@@ -1,16 +1,9 @@
 package unit
 
-// qa_retry_probe_test.go — QA tests for issue #186
-//
-// These tests verify that probeResourceAvailability wraps its paginated
-// fetcher call in RetryOnThrottle. They use the same generic instantiation
-// RetryOnThrottle[resource.FetchResult] that the coder will wire in.
-//
-// Tests 1, 3, and 4 currently PASS because they test RetryOnThrottle
-// directly. Test 2 (NonRetryableErrorFailsImmediately with FetchResult type)
-// also passes. All four tests act as a contract: after the coder's change the
-// probe must honour exactly this retry contract. If the coder changes the
-// generic type or config the assertions will catch the mismatch.
+// qa_retry_probe_test.go — probeResourceAvailability wraps its paginated
+// fetcher call in RetryOnThrottle, with the generic instantiation
+// RetryOnThrottle[resource.FetchResult]. The four tests pin exactly this
+// retry contract; a change to the generic type or config fails them.
 
 import (
 	"context"
@@ -25,7 +18,7 @@ import (
 	"github.com/aws/smithy-go"
 )
 
-// probeRetryConfig matches the RetryConfig the coder is expected to wire into
+// probeRetryConfig matches the RetryConfig wired into
 // probeResourceAvailability. Tests use fast delays to keep the suite quick.
 var probeRetryConfig = awsclient.RetryConfig{
 	MaxAttempts: 3,

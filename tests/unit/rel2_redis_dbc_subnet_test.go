@@ -280,11 +280,11 @@ func TestRel2MemberlessDemoGroupRendersFourZeros(t *testing.T) {
 	rel2AssertRenderedRedisZeros(t, "dev-feature-redis", "sg", "sns", "subnet", "vpc")
 }
 
-// TestRel2NoSubnetGroupDemoGroupRendersZeros pins row 1's demo witness on the
+// TestRel2NoSubnetGroupDemoGroupRendersZeros pins the demo witness on the
 // panel: "legacy-redis-classic" has a member cluster that names no subnet
 // group, so the subnet and vpc pivots have nothing to reach. That is a fact
-// about the group, and the panel must state it as a zero rather than the "?"
-// that used to also mean "the call failed".
+// about the group, and the panel must state it as a zero rather than a "?"
+// that would also mean "the call failed".
 func TestRel2NoSubnetGroupDemoGroupRendersZeros(t *testing.T) {
 	rel2AssertRenderedRedisZeros(t, fixtures.RedisNoSubnetGroupID, "subnet", "vpc")
 }

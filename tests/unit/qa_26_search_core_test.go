@@ -5,7 +5,7 @@ package unit
 // rootApplyMsg so that real key routing is exercised end-to-end.
 //
 // Sections implemented:
-//   A — Activation (detail + YAML; A03-A05 skipped, views not yet implemented)
+//   A — Activation (detail + YAML; A03-A05 skipped, no such views)
 //   B — Typing a search query
 //   C — Confirming search (Enter) and cancellation (Esc)
 //   F — Match counter display

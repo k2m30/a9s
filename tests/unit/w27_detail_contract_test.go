@@ -1,18 +1,15 @@
 package unit
 
-// w27_detail_contract_test.go — task w27 row 1: the Detail sentence has one
-// owner. catalog.FindingDef gained a Detail field in round 0, but nothing
-// declares it yet, so every finding that still carries its own inline
-// *Detail constant (domain.Finding.Detail, set directly by the fetcher or
-// enricher) currently disagrees with its empty definition. This is
-// deliberately red until each type's round moves its sentence onto
-// FindingDef and the emitter starts reading from there instead.
+// w27_detail_contract_test.go — the Detail sentence has one owner:
+// catalog.FindingDef.Detail. Every finding's Detail (domain.Finding.Detail)
+// equals its definition's; no fetcher or enricher carries its own inline
+// sentence.
 //
-// Two independent proof surfaces, per the dispatch: a full-catalog demo-bench
-// walk (every registered type, drained through its own Fetcher/Wave2Enricher
-// with demo.NewServiceClients()), and the existing batch-w1 demo bench
-// (pw1ComputeBench, prowler_w1_status_phrase_test.go) that a sibling suite of
-// emitter tests already exercises and relies on.
+// Two independent proof surfaces: a full-catalog demo-bench walk (every
+// registered type, drained through its own Fetcher/Wave2Enricher with
+// demo.NewServiceClients()), and the batch-w1 demo bench (pw1ComputeBench,
+// prowler_w1_status_phrase_test.go) that a sibling suite of emitter tests
+// already exercises and relies on.
 
 import (
 	"context"
@@ -140,9 +137,7 @@ func runFullCatalogDetailBench(t *testing.T) detailBenchResult {
 }
 
 // TestDetailContract_FullCatalogDemoBench asserts every finding with a
-// non-empty Detail equals its FindingDef's Detail. Deliberately red today:
-// round 0 populated no FindingDef.Detail, so every finding still carrying its
-// old inline *Detail constant mismatches its (empty) definition.
+// non-empty Detail equals its FindingDef's Detail.
 func TestDetailContract_FullCatalogDemoBench(t *testing.T) {
 	result := runFullCatalogDetailBench(t)
 
@@ -276,19 +271,15 @@ func joinLines(lines []string) string {
 	return out
 }
 
-// TestDetailContract_TenDevopsSentencesVerbatim pins TASKDIR/detail_sentences.md's
-// single-state sentences character-for-character (row 3/5 ruling: "the
-// ten sentences ... are declared on the definitions under row 1 verbatim").
+// TestDetailContract_TenDevopsSentencesVerbatim pins the single-state
+// sentences character-for-character.
 //
-// tgw.state.deleted is no longer among them. Task phrase7 row 3 ruled that a
-// Detail exists exactly at the tiers a surface shows, and Dim reaches neither
-// the detail Attention block nor the enrichment line, so its sentence was
-// deleted rather than left unread. Do not restore the assertion without
-// changing that contract in docs/attention-signals.md first.
-// The tenth, tgw.attachment-transitional, is not one of the nine: devops
-// wrote three per-state bullets for it and the ruling has dev consolidate
-// them into one sentence naming pending acceptance as the state that needs a
-// person, so it is pinned separately by shape, not by verbatim text.
+// tgw.state.deleted is not among them: a Detail exists exactly at the tiers
+// a surface shows, and Dim reaches neither the detail Attention block nor
+// the enrichment line (docs/attention-signals.md). tgw.attachment-transitional
+// is one sentence covering its three states, naming pending acceptance as
+// the state that needs a person, so it is pinned separately by shape, not
+// by verbatim text.
 func TestDetailContract_TenDevopsSentencesVerbatim(t *testing.T) {
 	verbatim := map[domain.FindingCode]string{
 		"elb.state.provisioning":    "The load balancer is still being built and is not yet accepting traffic. This normally clears in a few minutes; if it does not, its subnets are usually out of free IP addresses.",
@@ -311,7 +302,7 @@ func TestDetailContract_TenDevopsSentencesVerbatim(t *testing.T) {
 // TestDetailContract_TransitionalAttachmentCode_OneSentence pins the
 // consolidated shape for tgw.attachment-transitional: one sentence covering
 // all three transitional states, naming pending acceptance as the one that
-// needs a person (row 1's ruling on this code specifically).
+// needs a person.
 func TestDetailContract_TransitionalAttachmentCode_OneSentence(t *testing.T) {
 	const code domain.FindingCode = "tgw.attachment-transitional"
 	got := catalog.Detail(code)

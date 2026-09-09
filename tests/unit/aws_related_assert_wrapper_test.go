@@ -1,25 +1,21 @@
 package unit
 
-// aws_related_assert_wrapper_test.go — regression coverage for defect (B)
-// from the independent Codex + CodeRabbit review: assertStruct[T]
-// (core/aws/related_common.go:20) failed to resolve T when RawStruct held a
-// detail enricher's wrapper instead of the raw SDK struct, so Ctrl+R after
-// enrichment degraded related panels (every checker's assertStruct[T] call
-// silently returned the zero value, ok=false).
+// aws_related_assert_wrapper_test.go — assertStruct[T]
+// (core/aws/related_common.go) resolves T when RawStruct holds a detail
+// enricher's wrapper instead of the raw SDK struct, so Ctrl+R after
+// enrichment does not degrade related panels (every checker's assertStruct[T]
+// call would otherwise silently return the zero value, ok=false).
 //
-// The fix (findEmbeddedStruct, core/aws/related_common.go) makes
-// assertStruct search v's exported anonymous embedded struct fields
-// (pointer-deref'd) for a T when the direct/pointer assertions miss.
+// findEmbeddedStruct (core/aws/related_common.go) makes assertStruct search
+// v's exported anonymous embedded struct fields (pointer-deref'd) for a T when
+// the direct/pointer assertions miss.
 //
-// Chosen approach: a real related-checker path (checkEC2SG, registered as
-// the "sg" RelatedDef for "ec2" — Pattern F, no clients/cache needed) rather
-// than the engine-level GetDetailEnricher fallback, since this checker's
-// plumbing is lightweight enough to call directly. Mirrors the existing
-// checker-lookup helper ec2CheckerByTarget and the fixture/assertion style
-// of TestEC2RelatedCheckers_NoUnknownCounts (aws_ec2_related_test.go).
-//
-// May be RED until the parallel assertStruct fix lands — that is the
-// expected TDD state, not a bug in this test.
+// The test drives a real related-checker path (checkEC2SG, registered as the
+// "sg" RelatedDef for "ec2" — Pattern F, no clients/cache needed) rather than
+// the engine-level GetDetailEnricher fallback, since this checker's plumbing
+// is lightweight enough to call directly. Mirrors the checker-lookup helper
+// ec2CheckerByTarget and the fixture/assertion style of
+// TestEC2RelatedCheckers_NoUnknownCounts (aws_ec2_related_test.go).
 
 import (
 	"context"

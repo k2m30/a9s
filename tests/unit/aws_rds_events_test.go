@@ -766,10 +766,6 @@ func TestDbiEventColumns(t *testing.T) {
 		}
 	})
 
-	// w197 row 6: the subtest that asserted every column's Sortable flag is
-	// gone with the field. Nothing ever refused a sort — handleActionSort
-	// sorts on whatever key the action carries — so the flag was a literal
-	// asserted back to itself. Do not restore it without the refusal.
 }
 
 // TestDbiEvents_ChildTypeRegistered verifies that the child type is

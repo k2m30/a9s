@@ -806,10 +806,9 @@ func TestCheckSESS3_ScopesByRecipient(t *testing.T) {
 // ---------------------------------------------------------------------------
 // Target #3 — sesActiveReceiptRuleSet sync.Once must not cache errors
 //
-// Problem: sync.Once freezes both success and error. A transient error on the
-// first call prevents all subsequent calls from ever succeeding, even after
-// the upstream API recovers. This test will FAIL until the coder replaces the
-// sync.Once with a guard that only seals on success.
+// sync.Once would freeze both success and error: a transient error on the
+// first call would prevent all subsequent calls from ever succeeding, even
+// after the upstream API recovers. The guard seals only on success.
 // ---------------------------------------------------------------------------
 
 // TestSESActiveReceiptRuleSet_RetriesAfterTransientError verifies that:

@@ -127,8 +127,7 @@ func d3EnrichUsers(t *testing.T, fake *d3UserFake, rs []resource.Resource) awscl
 }
 
 // d3EnrichUsersErr is d3EnrichUsers for the cases that expect a refusal: a key
-// whose last use could not be read is a recorded failure now, not a silent
-// skip ("skipped" spec row 5).
+// whose last use could not be read is a recorded failure, not a silent skip.
 func d3EnrichUsersErr(t *testing.T, fake *d3UserFake, rs []resource.Resource) (awsclient.IssueEnricherResult, error) {
 	t.Helper()
 	return awsclient.EnrichIAMUserMFA(context.Background(),
@@ -154,9 +153,8 @@ func TestD3KeyLastUsedErrorMarksTheUserUnknown(t *testing.T) {
 		d3UserResource("acme-batch-user"), d3UserResource("acme-ci-user"),
 	})
 
-	// INVERTED for the "skipped" spec row 5: the helper failed the test on any
-	// error, which is what let the unreadable key be marked "?" with nothing
-	// in the log. Do not restore the error-free helper here.
+	// A helper that failed the test on any error would let the unreadable key
+	// be marked "?" with nothing in the log.
 	if err == nil {
 		t.Error("a key whose last use could not be read returned no error")
 	}
@@ -167,9 +165,8 @@ func TestD3KeyLastUsedErrorMarksTheUserUnknown(t *testing.T) {
 	if _, marked := res.TruncatedIDs["acme-ci-user"]; marked {
 		t.Errorf("the sibling user was marked unknown by another user's failure")
 	}
-	// Inverted for spec row "phrase": the idle days were in the phrase, so one
-	// key's number stood for every idle key on the user; they are an Idle row
-	// now. Do not restore the old expectation.
+	// The idle days are an Idle row, not part of the phrase, so one key's
+	// number does not stand for every idle key on the user.
 	w4AssertFinding(t, res.Findings["acme-ci-user"], d3CodeUserKeyUnused,
 		catalog.Phrase(d3CodeUserKeyUnused), domain.SevWarn, "wave2")
 }
@@ -272,7 +269,7 @@ func TestD3AdminPolicyRowsUsePlainWords(t *testing.T) {
 
 // TestD3PrivEscStatusReadsAsWords pins the Status cell of a policy that grants
 // an escalation path. The cell is read by an operator, so it carries the
-// vocabulary word rather than the enum-shaped token the code used to write.
+// vocabulary word rather than an enum-shaped token.
 func TestD3PrivEscStatusReadsAsWords(t *testing.T) {
 	const arn = "arn:aws:iam::123456789012:policy/acme-lambda-deployer"
 	fake := &d3PolicyFake{docs: map[string]string{
@@ -373,9 +370,8 @@ func TestD3DrilledRoleCarriesTheSameFindingsAsTheListedOne(t *testing.T) {
 	if len(listed.Resources) != 1 {
 		t.Fatalf("listed %d roles, want 1", len(listed.Resources))
 	}
-	// Inverted for spec row "phrase": the first matched combo was the phrase,
-	// which left every other combo on the inline policy unsayable. The combos
-	// are Combo rows now. Do not restore the old phrase.
+	// The combos are Combo rows, so no combo on the inline policy is left
+	// unsayable behind a phrase that names only the first match.
 	w4AssertFinding(t, listed.Resources[0].Findings, d3CodeRoleInline,
 		catalog.Phrase(d3CodeRoleInline), domain.SevBroken, "wave1")
 

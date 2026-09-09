@@ -103,13 +103,11 @@ func TestEnsureViewsDir_CreatesFiles(t *testing.T) {
 	}
 }
 
-// TestEnsureViewsDir_SkipsExisting used to assert that an existing file is
-// returned byte for byte, which is why a column added after an operator's first
-// launch never reached them. The sort task's stamp row replaced "never touch it"
-// with "add only what is missing": an existing file is still never replaced by
-// the built-in default, and what it says about a column it already has still
-// wins. Do not restore the byte-equality assertion — see
-// TestEnsureViewsDir_LeavesACurrentFileAlone for the half that is still exact.
+// TestEnsureViewsDir_SkipsExisting: an existing file is never replaced by the
+// built-in default, and what it says about a column it already has wins; the
+// merge adds only what is missing, so a column added after an operator's
+// first launch still reaches them. See
+// TestEnsureViewsDir_LeavesACurrentFileAlone for the half that is exact.
 func TestEnsureViewsDir_SkipsExisting(t *testing.T) {
 	dir := t.TempDir()
 

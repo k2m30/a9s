@@ -51,20 +51,6 @@ func previewEC2Resource() resource.Resource {
 	}
 }
 
-// TestPreview_RightColumnFilter_HidesNonMatchingRows (DetailModel.View()) and
-// TestPreview_DetailCopyContent_CopiesCurrentFieldValue (DetailModel.
-// CopyContent()) deleted (round 4, specs/022-codebase-cleanup, MIXED verdict:
-// delete Detail .View()/.CopyContent halves). Live equivalents:
-// TestBug_Root_RightColumnFilter_TypingFiltersRows (rightcolumn_root_filter_
-// regression_test.go — same right-column filter narrows/hides contract, on
-// the live tui.New() root path) and TestQA_Copy_Detail_CopiesFieldValue
-// (qa_copy_test.go — same "c copies the active field's value" contract, on
-// the live tui.New() root path).
-//
-// TestPreview_RightColumnTabFocus_SkipsDimRowsOnEnter below still drives
-// DetailModel.Update() directly (not .View()/.CopyContent) — out of this
-// item's literal scope; kept as-is and flagged as a residual gap.
-
 // TestPreview_RightColumnTabFocus_SkipsDimRowsOnEnter is the live-seam
 // replacement for the retired views.NewDetail(...).Update(RelatedCheckResult)
 // .Update(KeyTab).Update(KeyEnter) chain (DetailModel.Update is dead; see

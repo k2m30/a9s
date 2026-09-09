@@ -3,7 +3,7 @@
 // views7_status_declared_test.go — every type declares its status column.
 //
 // The cascade reads the status cell from the column's own key and from
-// nothing else (w197 row 11). That makes a mistyped key a blank cell rather
+// nothing else. That makes a mistyped key a blank cell rather
 // than a value arriving from another spelling, so the declaration itself is
 // what has to be pinned: exactly one column carries the type's lifecycle key,
 // and no column that reads as the status column to an operator is left out of

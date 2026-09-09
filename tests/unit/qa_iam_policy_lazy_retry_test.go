@@ -91,9 +91,8 @@ func (f *iamPolicyRetryFake) ListGroupPolicies(
 // first call fails inline fetch → store.InlineBuilt() stays false;
 // second call succeeds → inline policy found in result.
 //
-// Fails pre-fix: InlineBuilt was set true on error, so the second
-// call skipped inline fetch and never found the inline policy by name.
-// Passes post-fix: InlineBuilt remains false → second call retries.
+// InlineBuilt must stay false on error, or the second call skips the inline
+// fetch and never finds the inline policy by name.
 func TestFetchIAMPoliciesByIDsFull_InlineRetryOnError(t *testing.T) {
 	store := session.NewPolicyStore()
 
@@ -168,8 +167,8 @@ func TestFetchIAMPoliciesByIDsFull_InlineRetryOnError(t *testing.T) {
 		}
 	}
 	if !foundInline {
-		// CONTRACT ASSERTION: this fails pre-fix (InlineBuilt=true meant
-		// inline fetch never retried, so inlinePolicyName was never added to cache).
+		// InlineBuilt stayed false, so the inline fetch retried and added
+		// inlinePolicyName to the cache.
 		t.Errorf("call 2: inline policy %q not found — "+
 			"PRE-FIX BUG: InlineBuilt was set true on error, preventing retry; "+
 			"InlineBuilt must stay false on inline error so next call retries",

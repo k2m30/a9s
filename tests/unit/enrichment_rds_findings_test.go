@@ -1,21 +1,17 @@
 package unit
 
 // enrichment_rds_findings_test.go — Behavioral tests for EnrichDBIMaintenance
-// plus the AS-140 stacked wave-1+wave-2 case for EnrichDBIMaintenance.
+// plus the stacked wave-1+wave-2 case for EnrichDBIMaintenance.
 //
-// The generic-invariant tests below were originally pinned against the dead
-// EnrichRDSDocDBMaintenance (deleted: wired to no catalog Wave2 field — dbi
-// and dbc each have their own live maintenance enrichers). EnrichDBIMaintenance
-// is the drop-in sibling exercising the same maintenance-window mechanics per
-// docs/resources/dbi.md §3.2, so the contract assertions below still apply:
+// EnrichDBIMaintenance exercises the maintenance-window mechanics per
+// docs/resources/dbi.md §3.2:
 //
 //   - Returns IssueEnricherResult.Findings keyed by Resource.ID (ARN-suffix match).
 //   - Severity "~" for all findings (informational, excluded from menu badge).
 //   - Summary format: "maintenance scheduled" (dbi's S4 phrase, see dbi.md §4).
 //   - IssueCount always 0 (severity "~" rule).
 //   - Empty result → non-nil empty Findings map.
-//   - Off-input-slice ARNs must not leak into Findings (unlike the dead
-//     enricher's account-wide arnSuffix fallback, EnrichDBIMaintenance only
+//   - Off-input-slice ARNs must not leak into Findings (EnrichDBIMaintenance only
 //     emits for probeIDs present in the input resources slice).
 
 import (
@@ -227,7 +223,7 @@ func TestEnrichDBIMaintenance_NilRDSClientReturnsEmptyFindings(t *testing.T) {
 	}
 }
 
-// dbiStackedFake satisfies awsclient.RDSAPI for the AS-140 stacked-finding test.
+// dbiStackedFake satisfies awsclient.RDSAPI for the stacked-finding test.
 type dbiStackedFake struct {
 	awsclient.RDSAPI
 	actions []rdstypes.ResourcePendingMaintenanceActions
@@ -243,7 +239,7 @@ func (f *dbiStackedFake) DescribePendingMaintenanceActions(
 	}, nil
 }
 
-// TestEnrichDBI_Wave1StoppedPlusWave2_StackedFindings_AS140 pins AS-140 for the
+// TestEnrichDBI_Wave1StoppedPlusWave2_StackedFindings_AS140 pins the
 // stacked wave-1+wave-2 case: a resource that already carries a wave-1 finding
 // "stopped" (from the fetcher) plus a wave-2 maintenance finding emitted by
 // EnrichDBIMaintenance.
@@ -255,7 +251,7 @@ func (f *dbiStackedFake) DescribePendingMaintenanceActions(
 //   - The wave-2 "pending maintenance" finding lands in result.Findings[id]
 //     and is grafted onto resource.Findings later by applyEnrichment.
 //
-// AS-140 contract for THIS enricher run:
+// Contract for THIS enricher run:
 //   - result.Findings[id] is populated with the wave-2 Finding (1 entry).
 //   - result.FieldUpdates is empty (or its [id] sub-map is empty/missing) —
 //     no status overlay, no "(+1)" suffix arithmetic from the enricher side.
@@ -326,7 +322,7 @@ func TestEnrichDBI_Wave1StoppedPlusWave2_StackedFindings_AS140(t *testing.T) {
 		t.Errorf("wave-2 Detail = %q, want %q", wave2.Detail, wantWave2Detail)
 	}
 
-	// AS-140: result.FieldUpdates must be empty — the merged "stopped (+1)"
+	// result.FieldUpdates must be empty — the merged "stopped (+1)"
 	// display is computed at render time by phraseFromFindings(r.Findings).
 	if updates, hasUpdates := result.FieldUpdates[resourceID]; hasUpdates && len(updates) != 0 {
 		t.Errorf("AS-140: expected empty FieldUpdates for %q (status overlay removed); got %v", resourceID, updates)

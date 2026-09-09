@@ -12,21 +12,20 @@ import (
 	"github.com/k2m30/a9s/v3/internal/tui"
 )
 
-// TestRoot_IdentityScreen_StaleARN_ClearedAfterProfileRotation is a Codex
-// round-3 P2 finding: ClearIdentityIntent (emitted by
-// HandleProfileSelected/HandleRegionSelected on rotation) is forwarded by the
-// TUI's applyIntent (internal/tui/runtime_adapter.go, ClearIdentityIntent
-// case) to the CONTROLLER only. The identity SCREEN's own renderer state
-// (rs.identityData/rs.identityLoading on the rendererState stack, populated
-// via runtime.SetIdentityIntent's loop over m.stack in app_dispatch.go's
-// applyIntents) is never reset — nothing clears it on a profile/region
-// switch.
+// TestRoot_IdentityScreen_StaleARN_ClearedAfterProfileRotation: the identity
+// SCREEN's own renderer state (rs.identityData/rs.identityLoading on the
+// rendererState stack, populated via runtime.SetIdentityIntent's loop over
+// m.stack in app_dispatch.go's applyIntents) is reset on a profile/region
+// switch; ClearIdentityIntent (emitted by
+// HandleProfileSelected/HandleRegionSelected on rotation) must reach it, not
+// only the CONTROLLER, through the TUI's applyIntent
+// (internal/tui/runtime_adapter.go, ClearIdentityIntent case).
 //
-// Real flow driven here (confirmed empirically — see the stack-shape
-// t.Logf below): press 'i' (pushes rsKindIdentity, loading=true, schedules a
-// fetch) -> messages.IdentityLoaded lands while that rs is still on the
-// stack (populates rs.identityData via the live SetIdentityIntent path,
-// exactly as TestRoot_IdentityLoaded_UpdatesHeader/text_ports_test.go's
+// Real flow driven here (see the stack-shape t.Logf below): press 'i'
+// (pushes rsKindIdentity, loading=true, schedules a fetch) ->
+// messages.IdentityLoaded lands while that rs is still on the stack
+// (populates rs.identityData via the live SetIdentityIntent path, exactly
+// as TestRoot_IdentityLoaded_UpdatesHeader/text_ports_test.go's
 // TestPort_IdentityCopy_CopiesExactARN do) -> the ':' key is a GLOBAL key in
 // app_input.go's key router (no rs.kind guard, unlike Identity/Help/ErrorLog
 // which only special-case their OWN key), so colon-command mode works from
@@ -36,11 +35,11 @@ import (
 // identity rs -> messages.ProfileSelected{Profile: ...} is exactly what the
 // selector's Enter-confirm emits (core/runtime/messages/cmd.go), routed to
 // Model.handleProfileSelected -> Core.HandleProfileSelected ->
-// dispatchHandlerResult -> applyIntent per intent, including the buggy
+// dispatchHandlerResult -> applyIntent per intent, including the
 // ClearIdentityIntent forward -> PopSelectorIntent (also emitted) pops the
 // selector screen (it only pops a profile/region/theme selector — core/app/
-// intents.go), REVEALING the identity screen again, still carrying the
-// stale, pre-switch ARN.
+// intents.go), REVEALING the identity screen again, which must not carry
+// the pre-switch ARN.
 func TestRoot_IdentityScreen_StaleARN_ClearedAfterProfileRotation(t *testing.T) {
 	m := newRootSizedModel()
 
@@ -109,16 +108,15 @@ func wave5CollectCmdMsgs(cmd tea.Cmd) []tea.Msg {
 }
 
 // TestRoot_ProfileRotation_DispatchesNoIdentityFetchBeforeReconnect is a
-// Codex round-4 P2 finding, reworked into a structural contract test after
-// the coder's fix landed: internal/tui/runtime_adapter.go's
-// ClearIdentityIntent case used to return m.fetchIdentity(m.core.ConnectGen())
-// IMMEDIATELY on rotation. But Session.Rotate() (core/session/session.go)
-// deliberately keeps the OLD clients until a ClientsReady for the new
-// profile lands (core/runtime/handlers.go's ClientsReady/"Live AWS path"
-// always dispatches its OWN TaskKindFetchIdentity afterward with the NEW
-// clients) — so that premature fetch resolved the OUTGOING profile's
-// identity via the OLD clients, yet stamped it with the NEW ConnectGen,
-// getting accepted as fresh once IdentityLoaded landed.
+// structural contract test: internal/tui/runtime_adapter.go's
+// ClearIdentityIntent case must not return m.fetchIdentity(m.core.ConnectGen())
+// on rotation. Session.Rotate() (core/session/session.go) deliberately
+// keeps the OLD clients until a ClientsReady for the new profile lands
+// (core/runtime/handlers.go's ClientsReady/"Live AWS path" always dispatches
+// its OWN TaskKindFetchIdentity afterward with the NEW clients) — so a
+// premature fetch would resolve the OUTGOING profile's identity via the OLD
+// clients, yet stamp it with the NEW ConnectGen, and be accepted as fresh
+// once IdentityLoaded landed.
 //
 // A content-based "stale ARN absent" assertion cannot distinguish stale from
 // fresh here: the demo STS fake returns the SAME identity for every profile,
@@ -162,8 +160,7 @@ func TestRoot_ProfileRotation_DispatchesNoIdentityFetchBeforeReconnect(t *testin
 // rs.identityLoading is true — internal/tui/renderer.go's renderIdentity).
 const identityFetchingPlaceholder = "Fetching identity..."
 
-// TestRoot_NoCacheRotation_IdentityScreenNotStuckLoading is a Codex round-5
-// P2 finding, the last in this identity-rotation chain: core/runtime/
+// TestRoot_NoCacheRotation_IdentityScreenNotStuckLoading: core/runtime/
 // handlers.go's no-cache success branch (handleClientsReadySuccess, "Demo /
 // no-cache: synchronous prefetch instead of the async probe pipeline.
 // Identity fetch is skipped in this mode (synthetic creds).") never
@@ -171,8 +168,8 @@ const identityFetchingPlaceholder = "Fetching identity..."
 // tui/runtime_adapter.go) sets rs.identityLoading=true on rotation
 // expecting the reconnect's OWN identity fetch to resolve it — true on the
 // live path (handlers.go dispatches TaskKindFetchIdentity itself there) but
-// never true in --no-cache/demo mode, so a rotation while the identity
-// screen is open leaves it showing "Fetching identity..." forever.
+// never in --no-cache/demo mode, so a rotation while the identity screen is
+// open must not leave it showing "Fetching identity..." forever.
 //
 // Cheapest no-cache arrangement: tui.WithNoCache(true) (internal/tui/
 // app_options.go's WithNoCache calls m.core.SetNoCache, the same session.

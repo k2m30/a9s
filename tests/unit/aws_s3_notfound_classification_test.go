@@ -1,6 +1,6 @@
 package unit_test
 
-// aws_s3_notfound_classification_test.go — issue #456: the four S3
+// aws_s3_notfound_classification_test.go — the four S3
 // related-def checkers that issue a per-bucket S3 API call (checkS3CFN →
 // GetBucketTagging, checkS3KMS → GetBucketEncryption, checkS3Logs →
 // GetBucketLogging, checkS3Role → GetBucketPolicy) must classify a deleted
@@ -14,9 +14,10 @@ package unit_test
 // smithy.GenericAPIError carrying the Code plus an unrelated message.
 //
 // Reuses the s3NoopAPI / s3*ErrFake fakes and s3CheckerByTarget /
-// s3CheckerByDisplayName / emptyBucketResource helpers already defined in
+// s3CheckerByDisplayName / emptyBucketResource helpers defined in
 // qa_s3_related_cross_region_test.go and aws_s3_related_test.go (same
-// package unit_test) — no new fakes needed, only new `code` values driven
+// package unit_test), driving new `code` values through the fakes' `code`
+// field.
 // through the fakes' existing `code` field.
 
 import (

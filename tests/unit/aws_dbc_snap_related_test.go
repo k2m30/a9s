@@ -303,13 +303,11 @@ func TestRelated_DbcSnap_DBC_OrphanComplete_RDS(t *testing.T) {
 	}
 }
 
-// TestRelated_DbcSnap_DBC_OrphanTruncated_DocDB is INVERTED under row 16. The
-// original defect it caught stands: the checker used to answer 1 from the
-// snapshot's own cluster id without scanning the list at all. What it must
-// answer instead changed. The dbc list IS the target list here, so a truncated
-// page that did not carry the parent is a resolved zero carrying the truncation
-// flag, rendered "(0+)", not Unknown. Unknown is reserved for a list that was
-// never read.
+// TestRelated_DbcSnap_DBC_OrphanTruncated_DocDB: the checker scans the list
+// rather than answering 1 from the snapshot's own cluster id. The dbc list IS
+// the target list here, so a truncated page that did not carry the parent is
+// a resolved zero carrying the truncation flag, rendered "(0+)", not Unknown.
+// Unknown is reserved for a list that was never read.
 func TestRelated_DbcSnap_DBC_OrphanTruncated_DocDB(t *testing.T) {
 	const ghostCluster = "ghost-cluster-trunc"
 	res := dbcSnapDBC_SnapshotWithDocDBRaw(ghostCluster)
@@ -322,7 +320,7 @@ func TestRelated_DbcSnap_DBC_OrphanTruncated_DocDB(t *testing.T) {
 }
 
 // TestRelated_DbcSnap_DBC_OrphanTruncated_RDS is the same case for the
-// rdstypes.DBClusterSnapshot shape, inverted for the same reason.
+// rdstypes.DBClusterSnapshot shape.
 func TestRelated_DbcSnap_DBC_OrphanTruncated_RDS(t *testing.T) {
 	const ghostCluster = "ghost-rds-cluster-trunc"
 	res := dbcSnapDBC_SnapshotWithRDSRaw(ghostCluster)

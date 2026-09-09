@@ -818,7 +818,6 @@ func prodRedisSessionsSubRG() resource.Resource {
 
 // TestRelated_Redis_CtEvents_ExactIDMatch verifies that a CloudTrail event whose
 // Resources[0].ResourceName exactly equals the ReplicationGroupId is counted.
-// EXPECTED FAIL until coder changes strings.Contains to exact equality in checkRedisCtEvents.
 func TestRelated_Redis_CtEvents_ExactIDMatch(t *testing.T) {
 	ctEvent := resource.Resource{
 		ID:   "evt-exact-id",
@@ -851,7 +850,6 @@ func TestRelated_Redis_CtEvents_ExactIDMatch(t *testing.T) {
 
 // TestRelated_Redis_CtEvents_ARNMatch verifies that a CloudTrail event whose
 // Resources[0].ResourceName equals the RG ARN is counted.
-// EXPECTED FAIL until coder adds ARN equality check in checkRedisCtEvents.
 func TestRelated_Redis_CtEvents_ARNMatch(t *testing.T) {
 	const rgARN = "arn:aws:elasticache:us-east-1:123456789012:replicationgroup:prod-redis-sessions"
 	ctEvent := resource.Resource{
@@ -886,7 +884,6 @@ func TestRelated_Redis_CtEvents_ARNMatch(t *testing.T) {
 // TestRelated_Redis_CtEvents_SubstringDoesNotOvermatch is the §0b.2 bug
 // regression pin. An event naming "prod-redis-sessions-sessions" must NOT match
 // the "prod-redis-sessions" RG (substring overmatch via strings.Contains).
-// EXPECTED FAIL until coder replaces strings.Contains with exact equality.
 func TestRelated_Redis_CtEvents_SubstringDoesNotOvermatch(t *testing.T) {
 	// Event names "prod-redis-sessions-sessions" — the longer RG.
 	ctEvent := resource.Resource{
@@ -928,7 +925,6 @@ func TestRelated_Redis_CtEvents_SubstringDoesNotOvermatch(t *testing.T) {
 // TestRelated_Redis_CtEvents_ElastiCacheSourceAloneDoesNotMatch verifies that
 // an event with EventSource=elasticache.amazonaws.com but no matching ResourceName
 // does NOT count for this RG. The EventSource-only fallback is the §0b.2 bug.
-// EXPECTED FAIL until coder deletes the EventSource fallback block.
 func TestRelated_Redis_CtEvents_ElastiCacheSourceAloneDoesNotMatch(t *testing.T) {
 	// Event with the right EventSource but Resources[] naming a DIFFERENT RG.
 	ctEvent := resource.Resource{
@@ -969,8 +965,6 @@ func TestRelated_Redis_CtEvents_ElastiCacheSourceAloneDoesNotMatch(t *testing.T)
 // vpc RelatedDefs are registered with NeedsTargetCache==false (they are
 // field-only checkers that do not scan any target type's resource cache).
 // All other entries must have NeedsTargetCache==true.
-// EXPECTED FAIL until coder sets NeedsTargetCache: false for kms and vpc in
-// redis_related.go's SetRelatedForTest call.
 func TestRelated_Redis_Registration_KMSVPCNoTargetCache(t *testing.T) {
 	// Expected NeedsTargetCache per target type.
 	// kms and vpc are field-only: no cache scan required.

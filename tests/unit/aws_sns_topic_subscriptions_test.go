@@ -410,11 +410,10 @@ func TestFetchSNSTopicSubscriptions_Pagination(t *testing.T) {
 // subscriptions get a composed ID instead of the literal
 // "PendingConfirmation" string.
 //
-// Inverted by misc4 round 2 item (c): the key gained the topic ARN. Both
-// subscription surfaces now key a stateless row through snsSubRowID, and the
-// account-wide list spans every topic — the same address unsubscribed from two
-// topics is two subscriptions, which protocol plus endpoint alone merged into
-// one row. Do not restore the topic-less shape.
+// The key carries the topic ARN: both subscription surfaces key a stateless
+// row through snsSubRowID, and the account-wide list spans every topic — the
+// same address unsubscribed from two topics is two subscriptions, which
+// protocol plus endpoint alone would merge into one row.
 func TestFetchSNSTopicSubscriptions_PendingIDFormat(t *testing.T) {
 	mock := &mockSNSListSubscriptionsByTopicClient{
 		outputs: []*sns.ListSubscriptionsByTopicOutput{
@@ -511,10 +510,6 @@ func TestSnsSubscriptionColumns(t *testing.T) {
 		}
 	})
 
-	// w197 row 6: the subtest that asserted every column's Sortable flag is
-	// gone with the field. Nothing ever refused a sort — handleActionSort
-	// sorts on whatever key the action carries — so the flag was a literal
-	// asserted back to itself. Do not restore it without the refusal.
 }
 
 // TestSnsSubscriptions_ChildTypeRegistered verifies that

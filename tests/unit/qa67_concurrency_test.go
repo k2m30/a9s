@@ -1,6 +1,6 @@
 package unit
 
-// qa67_concurrency_test.go — §F Concurrency & Timing (issue #67)
+// qa67_concurrency_test.go — §F Concurrency & Timing
 //
 // Bugs caught:
 //   - F.3: resource deleted between list and detail — app must not crash

@@ -4,11 +4,11 @@ package unit_test
 // and the words a failed probe or enrichment puts on screen.
 //
 //   - a rotation clears EVERY per-type field of MenuState, not the subset a
-//     reader happened to remember (w102);
+//     reader happened to remember;
 //   - the enrichment-failure flash carries the extracted cause, never an AWS
-//     error's raw %v (w103);
+//     error's raw %v;
 //   - a cause loses the "operation error <Svc>: <Op>," prefix for every error
-//     class, not only for API errors (w106).
+//     class, not only for API errors.
 
 import (
 	"context"
@@ -134,10 +134,9 @@ func menuEntryByShortName(t *testing.T, c *app.Controller, shortName string) app
 // wrapping the modeled API error whose code and message are fields of their
 // own. Values are synthetic.
 //
-// The modeled inner error is the correction spec row 2 of the "errors" task
-// required: the fixture used to flatten the whole chain into one fmt.Errorf
-// string, so the only way to reach the cause was to scan that string. A real
-// SDK failure never arrives that way.
+// The modeled inner error is what the cause is read from; a fixture that
+// flattened the whole chain into one fmt.Errorf string could only be scanned
+// as a string, and a real SDK failure never arrives that way.
 func bareAWSError() error {
 	return &smithy.OperationError{
 		ServiceID:     "EC2",
@@ -220,11 +219,6 @@ func TestAggregateFailures_StripsOperationPrefixForEveryClass(t *testing.T) {
 // TestAggregateFailures_AllNoisePrefixNotRestored pins that an error whose
 // only words are the SDK's own preamble and a request id still aggregates
 // without that preamble.
-//
-// INVERTED for the "skipped" spec row 1: the input was the rendered string
-// "<id>: <noise>", which the aggregate reduced back to a cause. The lane is
-// gone; the same shape is now an error the recorder reads. Do not restore the
-// string input.
 func TestAggregateFailures_AllNoisePrefixNotRestored(t *testing.T) {
 	agg := awsclient.AggregateFailures("ec2 FetchByIDs",
 		[]awsclient.Failure{awsclient.FailedCall("i-0abc", &smithy.OperationError{
@@ -260,12 +254,9 @@ func TestCauseOf_ClassWordsComeFromTheClassTable(t *testing.T) {
 	if got, want := awsclient.CauseOf(timeoutShapedErr()), "timeout"; got != want {
 		t.Errorf("CauseOf(timeout) = %q, want %q", got, want)
 	}
-	// INVERTED by the acceptance ruling on pass 1 (spec "After acceptance
-	// pass 1" (a)): a transport failure's own words are a URL and a socket
-	// address, which name the endpoint and not the failure, so the class now
-	// supplies the phrase. The old assertion required "no such host" — the
-	// hostname it arrives with is exactly what must not reach the screen. Do
-	// not restore it.
+	// A transport failure's own words are a URL and a socket address, which
+	// name the endpoint and not the failure, so the class supplies the phrase;
+	// the hostname it arrives with is exactly what must not reach the screen.
 	cause := awsclient.CauseOf(refusedTransportErr())
 	if strings.Contains(cause, "operation error") {
 		t.Errorf("CauseOf(transport) = %q keeps the SDK operation prefix", cause)

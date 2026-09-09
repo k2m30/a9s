@@ -1,14 +1,9 @@
-// generation_stamping_fetch_test.go — regression tests for AS-657 session-stamp
-// guards on ResourcesLoaded / APIError / IdentityLoaded / IdentityError / ValueRevealed.
+// generation_stamping_fetch_test.go — session-stamp guards on
+// ResourcesLoaded / APIError / IdentityLoaded / IdentityError / ValueRevealed.
 //
-// These tests FAIL TO COMPILE on main (before AS-657 lands) because the five
-// message types in core/runtime/messages/event.go do not yet carry a Gen
-// field. Once Coder adds:
-//   - Gen domain.Gen on each of the five types
-//   - GenStamp() / GenAspect() / AcceptZeroGen() methods
-//   - messages.IsStale guards at the top of each case branch in app.go
-//
-// the tests compile AND pass.
+// Each of the five message types in core/runtime/messages/event.go carries a
+// Gen domain.Gen field with GenStamp() / GenAspect() / AcceptZeroGen()
+// methods, and app.go's case branches open with a messages.IsStale guard.
 //
 // AC coverage:
 //
@@ -267,11 +262,6 @@ func TestHappyPath_MatchingGen_ValueRevealed(t *testing.T) {
 // dispatching a Gen=0 message, so the assertion exercises the IsStale
 // "stamp == 0 && AcceptZeroGen()" branch (messages/messages.go:71) rather
 // than the trivial "stamp == currentGen" path.
-//
-// Note: the prior version of this test gated on `m.Core().Session().AvailabilityGen
-// == 0` on a fresh session. The AS-659 seed `AvailabilityGen=1` in
-// `session.New()` (this same PR) makes that precondition unsatisfiable, which
-// would silently skip the entire test post-merge.
 func TestHappyPath_ZeroGen_AcceptedByAllThree(t *testing.T) {
 	t.Run("ResourcesLoaded", func(t *testing.T) {
 		m := newRootSizedModel()
@@ -470,9 +460,9 @@ func TestIdentityError_Fresh_DoesProcess(t *testing.T) {
 	}
 }
 
-// ── AC #6 (AS-659) — stale AvailabilityPrefetched is dropped ────────────────
+// ── AC #6 — stale AvailabilityPrefetched is dropped ────────────────
 
-// TestAvailabilityPrefetched_Stale_Dropped pins the AS-648-h4 / AS-659 contract:
+// TestAvailabilityPrefetched_Stale_Dropped pins the contract:
 // an AvailabilityPrefetched whose Gen no longer matches the live
 // Session.AvailabilityGen (because Rotate() has bumped the counter past it) must
 // be discarded. Without the guard, the demoPrefetchCounts dispatch path
@@ -534,7 +524,7 @@ func TestAvailabilityPrefetched_Stale_Dropped(t *testing.T) {
 func TestAvailabilityPrefetched_ZeroGen_Dropped(t *testing.T) {
 	m := newRootSizedModel()
 
-	// Fresh session: AvailabilityGen is seeded at 1 (AS-648-h4 / AS-659).
+	// Fresh session: AvailabilityGen is seeded at 1.
 	if got := m.Core().Session().AvailabilityGen; got != 1 {
 		t.Fatalf("precondition failed: fresh AvailabilityGen = %d, want 1 (session.New seed)", got)
 	}

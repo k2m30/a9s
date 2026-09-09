@@ -63,10 +63,9 @@ func TestProjectorCoverageAllTypes(t *testing.T) {
 				r = minimalResource(td.ShortName)
 			}
 
-			// Mirrors the deleted projection.Generic's own fallback chain
-			// (config.Load(), falling back to config.DefaultConfig() when
-			// absent) — DefaultConfig() reproduces that fallback
-			// deterministically in a hermetic test.
+			// Mirrors projection.Generic's own fallback chain (config.Load(),
+			// falling back to config.DefaultConfig() when absent) — DefaultConfig()
+			// reproduces that fallback deterministically in a hermetic test.
 			proj := projection.GenericWithConfig(config.DefaultConfig())
 			if td.Project != nil {
 				proj = td.Project
@@ -84,10 +83,8 @@ func TestProjectorCoverageAllTypes(t *testing.T) {
 // nil-config code path that projection.Generic falls back to when config.Load
 // fails (e.g. missing config file, wrong permissions, malformed YAML).
 //
-// The nil-config path is the graceful degradation branch at generic.go:59 that
-// CodeRabbit flagged as untested. It produces flat alphabetical Fields
-// rendering with no per-type ordering — equivalent to the legacy nil-viewConfig
-// path in detail_fields.go.
+// The nil-config path is the graceful degradation branch in generic.go. It
+// produces flat alphabetical Fields rendering with no per-type ordering.
 //
 // The test is intentionally hermetic: no disk config is read, no AWS
 // credentials are required, no global state is modified.

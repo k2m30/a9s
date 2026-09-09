@@ -124,10 +124,10 @@ func TestQA_TransitGateways_TypeDef(t *testing.T) {
 	}{
 		{"name", "Name"},
 		{"tgw_id", "TGW ID"},
-		// w197: the built-in view's list, folded into the type's own, is what
-		// the operator sees: a Status column resolving through its title, and
-		// the attachment-issue count beside it. "State" was never rendered.
-		// w197 row 11: the status column names the key its cell reads.
+		// The built-in view's list, folded into the type's own, is what the
+		// operator sees: a Status column resolving through its title, and the
+		// attachment-issue count beside it; the status column names the key its
+		// cell reads.
 		{"state", "Status"},
 		{"att_status", "Att Issues"},
 		{"owner_id", "Owner"},

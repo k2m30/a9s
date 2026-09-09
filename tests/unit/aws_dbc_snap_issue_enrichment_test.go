@@ -87,7 +87,7 @@ func TestDBCSnap_Orphan_DocDB(t *testing.T) {
 	if finding.Phrase != "orphan: source cluster deleted" {
 		t.Errorf("Phrase = %q, want %q", finding.Phrase, "orphan: source cluster deleted")
 	}
-	// AS-140: FieldUpdates must be empty — the merged display phrase is
+	// FieldUpdates must be empty — the merged display phrase is
 	// computed at render time by phraseFromFindings(r.Findings).
 	if updates, ok := result.FieldUpdates["orphan-dbc-snap"]; ok && len(updates) != 0 {
 		t.Errorf("AS-140: expected empty FieldUpdates for orphan-dbc-snap (status overlay removed); got %v", updates)
@@ -139,7 +139,7 @@ func TestDBCSnap_Orphan_Aurora(t *testing.T) {
 	} else if finding := findings[0]; finding.Phrase != "orphan: source cluster deleted" {
 		t.Errorf("Phrase = %q, want %q", finding.Phrase, "orphan: source cluster deleted")
 	}
-	// AS-140: FieldUpdates must be empty — the merged display phrase is
+	// FieldUpdates must be empty — the merged display phrase is
 	// computed at render time by phraseFromFindings(r.Findings).
 	if updates, ok := result.FieldUpdates["orphan-aurora-snap"]; ok && len(updates) != 0 {
 		t.Errorf("AS-140: expected empty FieldUpdates for orphan-aurora-snap (status overlay removed); got %v", updates)

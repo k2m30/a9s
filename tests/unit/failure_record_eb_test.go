@@ -1,10 +1,10 @@
 package unit_test
 
-// failure_record_eb_test.go — spec row 3: one aggregate covering two different
-// calls says which call failed.
+// failure_record_eb_test.go — one aggregate covering two different calls
+// says which call failed.
 //
 // Lives beside the Elastic Beanstalk related fakes, which are in this
-// package; the rest of the "skipped" pins are in failure_record_test.go.
+// package; the other failure-record pins are in failure_record_test.go.
 
 import (
 	"context"
@@ -21,11 +21,11 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// TestRelated_Eb_TG_TimeoutOnListeners_NamesTheCall pins spec row 3: one
-// aggregate covers two different calls (resolving the load balancer's name,
-// then reading its listeners), so a failure whose cause does not already name
-// what it was doing says which call refused. A denial names its action itself
-// and is not decorated twice.
+// TestRelated_Eb_TG_TimeoutOnListeners_NamesTheCall: one aggregate covers
+// two different calls (resolving the load balancer's name, then reading its
+// listeners), so a failure whose cause does not already name what it was
+// doing says which call refused. A denial names its action itself and is
+// not decorated twice.
 func TestRelated_Eb_TG_TimeoutOnListeners_NamesTheCall(t *testing.T) {
 	const envName = "acme-web-env"
 	const lbName = "awseb-AWSEBLB-ABCDEF123456"

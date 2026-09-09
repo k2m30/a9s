@@ -113,7 +113,7 @@ func (f *sfnTypeAwareFake) ListExecutions(
 // the same batch is enriched normally (finding produced when its latest
 // execution is FAILED). The EXPRESS machine still gets the configuration
 // findings, which are derived from DescribeStateMachine and apply to every
-// state machine type — see the inverted assertion below.
+// state machine type.
 func TestEnrichStepFunctionsStatus_ExpressMachineSkipsListExecutions(t *testing.T) {
 	standardName := "standard-sm"
 	standardARN := "arn:aws:states:us-east-1:111111111111:stateMachine:standard-sm"
@@ -149,12 +149,10 @@ func TestEnrichStepFunctionsStatus_ExpressMachineSkipsListExecutions(t *testing.
 		t.Errorf("ListExecutions must still be called for the STANDARD state machine (arn=%s)", standardARN)
 	}
 
-	// Inverted deliberately. This used to assert the EXPRESS machine carried
-	// no finding at all, which conflated two different facts: it has no
-	// EXECUTION finding, because ListExecutions is never called for it, but
-	// its logging, encryption and definition are all readable and all three
-	// checks apply to it. The old assertion made exempting every EXPRESS
-	// workflow in an account look like the intended behaviour.
+	// The EXPRESS machine has no EXECUTION finding, because ListExecutions is
+	// never called for it, but its logging, encryption and definition are all
+	// readable and all three checks apply to it; asserting no finding at all
+	// would make exempting every EXPRESS workflow look intended.
 	for _, f := range result.Findings[expressName] {
 		if f.Code == "sfn.latest-execution-failed" {
 			t.Errorf("EXPRESS state machine %q carries %q; ListExecutions is never called for it, so there is nothing to derive that from", expressName, f.Code)
@@ -300,7 +298,7 @@ func (f *kmsPageFake) DescribeKey(
 }
 
 // kmsAccessDeniedErr mirrors the real DescribeKey AccessDeniedException shape
-// from the owner's acme-dev logs ("kms:DescribeKey").
+// ("kms:DescribeKey").
 func kmsAccessDeniedErr() error {
 	return &smithy.GenericAPIError{
 		Code:    "AccessDeniedException",
@@ -311,8 +309,8 @@ func kmsAccessDeniedErr() error {
 
 // TestFetchKMSKeysPage_PerKeyAccessDeniedDoesNotContributeToCompositeError
 // pins: when the only DescribeKey failures across a batch are
-// AccessDeniedException, the composite fetch error is nil (28/29 succeeding
-// pattern from the owner logs, modeled here at smaller scale).
+// AccessDeniedException, the composite fetch error is nil (a 28-of-29
+// succeeding live pattern, modeled here at smaller scale).
 func TestFetchKMSKeysPage_PerKeyAccessDeniedDoesNotContributeToCompositeError(t *testing.T) {
 	fake := &kmsPageFake{
 		keyIDs: []string{"key-ok-1", "key-denied", "key-ok-2"},

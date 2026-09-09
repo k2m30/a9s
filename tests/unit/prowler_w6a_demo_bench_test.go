@@ -27,19 +27,14 @@ var w6aBatchTypes = []string{"trail", "logs", "alarm", "r53", "cf", "acm", "apig
 // warn-then-broken probe catches a classifier that stops at the first finding
 // rather than the worst.
 //
-// The findings-free probe that stood beside it is gone. It asserted that a row
-// with unhealthy-looking fields and no findings must be Healthy, which was the
-// right reading while cf, logs, r53 and acm interpreted those fields themselves
-// and returned a colour no finding backed. w29 converted all four: the fields
-// now reach the type's own predicate, which produces the finding, so the row is
-// coloured for a reason the detail view names and the badge counts. Asserting
-// Healthy there would pin a fallback that under-reports by design, which the
-// late-group ruling calls a second truth.
-//
-// What the probe was really guarding — that no classifier reads a raw field on
-// its own — is now said directly and for every type in the repo by
-// TestClassifiersDecideThroughTheSharedFallback, and the colour a converted
-// fallback reaches is pinned against the findings path by
+// A row with unhealthy-looking fields and no findings is not asserted
+// Healthy: cf, logs, r53 and acm feed those fields to the type's own
+// predicate, which produces the finding, so the row is coloured for a reason
+// the detail view names and the badge counts, and asserting Healthy would
+// pin a fallback that under-reports by design. That no classifier reads a
+// raw field on its own is said directly and for every type in the repo by
+// TestClassifiersDecideThroughTheSharedFallback, and the colour a fallback
+// reaches is pinned against the findings path by
 // TestW29_StrippedRowFallsBackToTheSameColour.
 func TestW6AColorDerivesFromFindings(t *testing.T) {
 	for _, short := range w6aBatchTypes {
@@ -164,12 +159,11 @@ func TestW6AEveryFindingFiresOnItsNamedWitnessOnly(t *testing.T) {
 					if string(f.Code) != code {
 						continue
 					}
-					// The witness usually names the row itself. r53's dangling
-					// record is the exception the acceptance round accepted: the
-					// finding lands on the zone that holds the record, which is
-					// the only shape a per-zone row allows, so the record name
-					// is matched where it actually renders — the finding's own
-					// supporting rows.
+					// The witness usually names the row itself. r53's dangling record
+					// is the exception: the finding lands on the zone that holds the
+					// record, which is the only shape a per-zone row allows, so the
+					// record name is matched where it actually renders — the finding's
+					// own supporting rows.
 					named := res.ID + " / " + res.Name
 					for _, row := range res.AttentionDetails[f.Code].Rows {
 						named += " / " + row.Value

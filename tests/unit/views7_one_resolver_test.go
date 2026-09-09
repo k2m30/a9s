@@ -34,9 +34,9 @@ var views7LookupSurface = map[string]bool{
 	"ChildOnly":    true,
 }
 
-// TestCatalogLookupSurfaceIsTheThree pins row 25. Naming the two lookups that
-// used to be exported made the gate green the day they were renamed; the shape
-// is the surface, so it is the surface that is asserted.
+// TestCatalogLookupSurfaceIsTheThree: naming two exported lookups would make
+// the gate green the day they were renamed; the shape is the surface, so it
+// is the surface that is asserted.
 func TestCatalogLookupSurfaceIsTheThree(t *testing.T) {
 	_, files := views7GoFilesUnder(t, filepath.Join("core", "catalog"))
 

@@ -1,26 +1,15 @@
 package unit_test
 
-// related_navigate_count_spec008_test.go — Spec-008: handleRelatedNavigate behavior.
+// related_navigate_count_spec008_test.go — Spec-008: handleRelatedNavigate
+// behavior: the TargetID case opens detail, not a list, and RelatedIDs>1
+// creates a filtered list.
 //
-// Tests for handleRelatedNavigate() bug fixes.
-// Bug 1: TargetID case opens list instead of detail.
-// Bug 2: RelatedIDs>1 creates unfiltered list.
-//
-// Types RelatedCheckResultMsg, RelatedNavigateMsg, and resource.RelatedCheckResult
-// already exist on this branch (006 infrastructure).
-//
-// TestApp_008_RelatedNavigate_* tests FAIL AT RUNTIME until handleRelatedNavigate
-// is fixed in app_handlers.go.
-// TestApp_008_RelatedCheckResult_Count0_NoNavigation PASSES NOW (regression guard).
-//
-// Rule (owner, 2026-07-06 — supersedes the 2026-04-24 "mirror manual Enter"
-// rule): a related pivot that narrows to exactly ONE resource must open that
+// A related pivot that narrows to exactly ONE resource must open that
 // resource's DETAIL view (fields + related), for EVERY target type, in both
-// lanes (TUI and web) — never the target's enter-keyed child view. The old
-// rule made the web lane diverge from the TUI lane, since the web lane
-// always rendered detail. Child views stay reachable exactly as before by
-// pressing Enter inside the target's own list.
-// TestApp_008_RelatedNavigate_SingleID_OpensDrillTarget (tg) and
+// lanes (TUI and web) — never the target's enter-keyed child view, which
+// would make the two lanes diverge since the web lane always renders
+// detail. Child views stay reachable by pressing Enter inside the target's
+// own list. TestApp_008_RelatedNavigate_SingleID_OpensDrillTarget (tg) and
 // TestApp_008_RelatedNavigate_SingleRelatedIDs_CacheMiss_AutoOpensDrillTarget
 // (asg) pin this rule.
 
@@ -128,10 +117,10 @@ func applyRelatedFollowUp(m tui.Model, cmd tea.Cmd) tui.Model {
 
 // TestApp_008_RelatedNavigate_SingleID_OpensDrillTarget verifies that when a
 // RelatedNavigateMsg arrives with a single TargetID (count=1 path), the model
-// opens the target resource's DETAIL view — per the 2026-07-06 rule
-// (supersedes "mirror manual Enter"), a related-panel Count=1 pivot always
-// lands on detail, even for types like tg that register Children[Key="enter"]
-// (tg_health). Child views stay reachable by pressing Enter in tg's own list.
+// opens the target resource's DETAIL view: a related-panel Count=1 pivot
+// always lands on detail, even for types like tg that register
+// Children[Key="enter"] (tg_health). Child views stay reachable by pressing
+// Enter in tg's own list.
 func TestApp_008_RelatedNavigate_SingleID_OpensDrillTarget(t *testing.T) {
 	m := newRelatedDemoModel(t)
 
@@ -220,9 +209,9 @@ func TestApp_008_RelatedNavigate_SingleID_CacheMiss_AutoOpensDetail(t *testing.T
 // TestApp_008_RelatedNavigate_SingleRelatedIDs_CacheMiss_AutoOpensDrillTarget verifies
 // the right-column path: RelatedIDs with one element must auto-open the target's
 // DETAIL view — NOT leave the operator stranded on a 1-row filtered list, and NOT
-// the enter-keyed child view even when one is registered (2026-07-06 rule
-// supersedes "mirror manual Enter"). asg registers Children[Key="enter"]=
-// asg_activities but the Count=1 pivot must still land on asg's own detail.
+// the enter-keyed child view even when one is registered. asg registers
+// Children[Key="enter"]=asg_activities but the Count=1 pivot must still land
+// on asg's own detail.
 func TestApp_008_RelatedNavigate_SingleRelatedIDs_CacheMiss_AutoOpensDrillTarget(t *testing.T) {
 	m := newRelatedDemoModel(t)
 
@@ -325,12 +314,11 @@ func TestApp_008_RelatedNavigate_SingleID_CacheMiss_LoadsMoreUntilTargetFound(t 
 	m = applyRelatedFollowUp(m, cmd)
 
 	view := stripAnsi(relatedViewContent(m))
-	// alarm has Children[Key="enter"]=alarm_history, but the 2026-07-06 rule
-	// (supersedes the 2026-04-24 "mirror manual Enter" rule) means a related
-	// pivot that narrows to exactly ONE resource always opens that
-	// resource's detail view. The load-more mechanics under test are
-	// unchanged: once the later page yields the target, the user must not
-	// be left on a dead-end 1-row list.
+	// alarm has Children[Key="enter"]=alarm_history, but a related pivot that
+	// narrows to exactly ONE resource always opens that resource's detail
+	// view. The load-more mechanics under test are unchanged: once the later
+	// page yields the target, the user must not be left on a dead-end 1-row
+	// list.
 	if strings.Contains(view, "alarm_history") {
 		t.Fatalf("exact-ID related navigation must NOT auto-open alarm_history (2026-07-06 rule: Count=1 pivot always opens detail); got:\n%s", view)
 	}
@@ -496,11 +484,10 @@ func TestApp_008_RelatedCheckResult_Count0_NoNavigation(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// Count=1 drill rule (2026-07-06): detail for every target type, including
-// childless ones. Parameterized over three enter-child types (s3, tg, asg)
-// plus one childless type (kms) so the childless case proves no regression:
-// with no Children[Key="enter"] to redirect through, kms already landed on
-// detail before this rule change, and must continue to do so.
+// Count=1 drill rule: detail for every target type, including childless
+// ones. Parameterized over three enter-child types (s3, tg, asg) plus one
+// childless type (kms): with no Children[Key="enter"] to redirect through,
+// kms lands on detail without the rule and must continue to do so.
 // ---------------------------------------------------------------------------
 
 func TestApp_008_RelatedNavigate_CountOne_AlwaysOpensDetail(t *testing.T) {
@@ -559,8 +546,7 @@ func TestApp_008_RelatedNavigate_CountOne_AlwaysOpensDetail(t *testing.T) {
 			m = navigateToEC2DetailRelated(t, m, ec2Res)
 
 			// Prime the target-type cache so RelatedNavigate takes the
-			// NavigationKindDetail cache-hit branch (the branch that used to
-			// redirect into the enter-keyed child view).
+			// NavigationKindDetail cache-hit branch.
 			m = applyRelatedResourcesLoaded(m, tc.targetType, []resource.Resource{tc.res})
 
 			m, cmd := relatedApplyMsg(m, messages.RelatedNavigate{

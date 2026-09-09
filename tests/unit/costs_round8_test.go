@@ -1,6 +1,4 @@
-// costs_round8_test.go — Cost Explorer: external reviewer's sixth pass (5
-// findings, all independently verified against current code with zero
-// disproofs during scoring).
+// costs_round8_test.go — Cost Explorer: five contract pins.
 //
 // package unit_test (not unit): every finding here is reachable via the
 // headless app.Controller / pure core/costs package surface — no TUI
@@ -402,11 +400,6 @@ func TestCostsRound8_Item5_ControllerActionCommand_CostsAndCE_NavigateToCostsScr
 		})
 	}
 }
-
-// ===========================================================================
-// Closure-wave new pins (5 findings, appended to round 8's own file per the
-// same dispatch).
-// ===========================================================================
 
 // (a) Demo fixture service labels must carry REAL Cost Explorer names, not
 // AWS-console shorthands: CE's SERVICE dimension always returns the full

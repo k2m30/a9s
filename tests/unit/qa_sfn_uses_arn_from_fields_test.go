@@ -1,21 +1,14 @@
 package unit
 
-// qa_sfn_uses_arn_from_fields_test.go — Regression: EnrichStepFunctionsStatus must
-// call ListExecutions with the state-machine ARN from r.Fields["arn"], NOT the
+// qa_sfn_uses_arn_from_fields_test.go — EnrichStepFunctionsStatus must call
+// ListExecutions with the state-machine ARN from r.Fields["arn"], NOT the
 // bare name in r.ID.
 //
-// Reported 2026-04-25 from a live profile:
-//   [HH:MM:SS] enrich sfn: sfn-enrich: ListExecutions failed for 3 of 3 IDs:
-//     example-state-machine: ... InvalidArn: Invalid Arn:
-//     'Invalid ARN prefix: example-state-machine'
+// The sfn.go fetcher sets `ID: name` (bare state-machine name) and stores the
+// full ARN in Fields["arn"]; ListExecutions rejects the bare name with
+// InvalidArn ("Invalid ARN prefix: <name>").
 //
-// Root cause (mirrors the tg bug fixed earlier the same day):
-//   sfn.go fetcher sets `ID: name` (bare state-machine name) and stores the
-//   full ARN in Fields["arn"].
-//   sfn_issue_enrichment.go currently does `StateMachineArn: aws.String(r.ID)`
-//   — that passes the bare name where AWS requires an ARN.
-//
-// Contract (post-fix):
+// Contract:
 //   - The enricher must call ListExecutions with r.Fields["arn"], not r.ID.
 //   - A strict fake that rejects non-ARN inputs proves it.
 

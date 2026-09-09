@@ -3,13 +3,12 @@ package unit
 // enrichment_cap_ownership_test.go — every cap has one owner, and a row past a
 // cap says so.
 //
-// Three caps live in core/aws and each one used to be written out by hand at
-// every site that needed it: the per-item work-list cap (capAtEnrichmentCap,
-// already owned), the account-wide page cap, and the supporting-row cap
-// (capRows, already owned). A cap written by hand is a cap that forgets the
-// half nobody sees: the rows it dropped. A row whose answer sat on a page
-// nobody read must render "not inspected", never inspected-and-healthy.
-//
+// Three caps live in core/aws, each with one owner: the per-item work-list
+// cap (capAtEnrichmentCap), the account-wide page cap, and the
+// supporting-row cap (capRows). A cap written by hand at each site is a cap
+// that forgets the half nobody sees: the rows it dropped. A row whose answer
+// sat on a page nobody read must render "not inspected", never
+// inspected-and-healthy.
 // The pins here hold the page cap to one owner, hold IssueEnricherResult's
 // Truncated flag to one writer that cannot lower a flag another pass raised,
 // and hold capRows' stored-count parse to the exact shape it writes.

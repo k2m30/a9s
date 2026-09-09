@@ -245,8 +245,8 @@ func TestBug191_LoadFromDirs_ThreeLayerMerge(t *testing.T) {
 // Bug #192: Availability probes must not declare "done" while probes in-flight
 // ════════════════════════════════════════════════════════════════════════════
 
-// The initial availability probe generation is 1 (seeded in session.New per
-// AS-648-h4 / AS-659 so AvailabilityPrefetched/Checked cannot smuggle a
+// The initial availability probe generation is 1 (seeded in session.New so
+// AvailabilityPrefetched/Checked cannot smuggle a
 // zero-stamped pre-rotation result past the staleness guard).
 // AvailabilityCacheLoadedMsg does NOT increment the generation — only
 // profile/region switches do. So all probe results must use Gen=1 to match
@@ -663,7 +663,7 @@ func executeConnectCmd(t *testing.T, m tui.Model) *messages.ClientsReady {
 
 // TestBug194_ConnectAWS_RespectsAWSRegionEnvVar verifies that when AWS_REGION
 // is set, connectAWS resolves the region from the env var and carries it in
-// ClientsReadyMsg.Region (new field added by the coder fix).
+// ClientsReadyMsg.Region.
 func TestBug194_ConnectAWS_RespectsAWSRegionEnvVar(t *testing.T) {
 	t.Setenv("AWS_REGION", "eu-central-1")
 	t.Setenv("AWS_DEFAULT_REGION", "")
@@ -687,8 +687,7 @@ func TestBug194_ConnectAWS_RespectsAWSRegionEnvVar(t *testing.T) {
 		t.Logf("Non-region error (acceptable in isolated env): %v", cr.Err)
 	}
 
-	// After the fix: ClientsReadyMsg.Region should carry the resolved region.
-	// This field is added by the coder; the test is intentionally forward-looking.
+	// ClientsReadyMsg.Region carries the resolved region.
 	if cr.Region != "" && cr.Region != "eu-central-1" {
 		t.Errorf("ClientsReadyMsg.Region: want %q, got %q", "eu-central-1", cr.Region)
 	}
@@ -729,7 +728,7 @@ func TestBug194_ConnectAWS_RespectsAWSDefaultRegionEnvVar(t *testing.T) {
 // TestBug194_ConnectAWS_FallsBackToConfigFileWhenNoEnvVar verifies that when
 // no env vars are set and no config file exists, connectAWS falls back to
 // us-east-1 (the GetDefaultRegion fallback) and does NOT produce a "Missing Region"
-// error. This is the regression check for issue #82.
+// error.
 func TestBug194_ConnectAWS_FallsBackToConfigFileWhenNoEnvVar(t *testing.T) {
 	t.Setenv("AWS_REGION", "")
 	t.Setenv("AWS_DEFAULT_REGION", "")
@@ -755,10 +754,9 @@ func TestBug194_ConnectAWS_FallsBackToConfigFileWhenNoEnvVar(t *testing.T) {
 	}
 }
 
-// TestBug194_ClientsReadyMsg_CarriesResolvedRegion verifies that after the
-// coder adds the Region field to ClientsReadyMsg, the field is non-empty
-// regardless of whether an error occurred. This documents the expected contract
-// after the fix is applied.
+// TestBug194_ClientsReadyMsg_CarriesResolvedRegion verifies that
+// ClientsReadyMsg.Region is non-empty regardless of whether an error
+// occurred.
 func TestBug194_ClientsReadyMsg_CarriesResolvedRegion(t *testing.T) {
 	t.Setenv("AWS_REGION", "")
 	t.Setenv("AWS_DEFAULT_REGION", "")
@@ -774,9 +772,7 @@ func TestBug194_ClientsReadyMsg_CarriesResolvedRegion(t *testing.T) {
 		t.Fatal("InitConnectMsg should produce a ClientsReadyMsg")
 	}
 
-	// After the fix: Region is always populated in ClientsReadyMsg.
-	// Before the fix: Region is always "" (field doesn't exist).
-	// This test fails until the coder adds the Region field and populates it.
+	// Region is always populated in ClientsReadyMsg.
 	if cr.Region == "" {
 		t.Error("ClientsReadyMsg.Region must be non-empty after the fix — connectAWS must report the resolved region")
 	}

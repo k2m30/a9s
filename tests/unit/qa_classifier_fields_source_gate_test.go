@@ -24,10 +24,8 @@ import (
 	"testing"
 )
 
-// classifiersOffTheSharedFallback is the burn-down list: every catalog
-// classifier that still picks a colour of its own after the findings lookup,
-// with the reason "not yet on the shared fallback". Task w29 empties it and
-// deletes this gate.
+// classifiersOffTheSharedFallback lists catalog classifiers that pick a
+// colour of their own after the findings lookup; it is empty.
 // sharedFallbackCalls are the two helpers a classifier is allowed to hand a
 // raw field to. They take the type's own findings predicate, so the field is
 // read once, by the predicate, and the classifier never interprets it. It also
@@ -173,9 +171,7 @@ func scanClassifiers(t *testing.T) (violates map[string]bool, where map[string]s
 }
 
 // TestClassifiersDecideThroughTheSharedFallback is the gate: no catalog
-// classifier picks a colour of its own after the findings lookup. It carried a
-// burn-down list while w29 converted the twenty-one that did; the list reached
-// zero, so the gate now simply says no.
+// classifier picks a colour of its own after the findings lookup.
 func TestClassifiersDecideThroughTheSharedFallback(t *testing.T) {
 	decides, where := scanClassifiers(t)
 	if len(decides) < 40 {

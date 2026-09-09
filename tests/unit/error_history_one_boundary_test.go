@@ -2,12 +2,9 @@
 
 // error_history_one_boundary_test.go — whether a failure reaches the "!" log
 // must not depend on which host is rendering. The terminal adapter re-emits
-// every error flash through Core.HandleFlash, which used to be where the
-// history entry was made; the headless/web host applies the same FlashIntent
-// straight to the controller and got no entry at all. Same failure, same
-// event, two different logs.
-//
-// One rule now: the controller records the entry for every error flash it
+// every error flash through Core.HandleFlash; the headless/web host applies
+// the same FlashIntent straight to the controller. Same failure, same event,
+// one log: the controller records the entry for every error flash it
 // applies. These pins drive the same probe failure through both hosts and
 // read the surface each one shows the operator.
 package unit

@@ -2,23 +2,16 @@
 // " !N" issue-suffix contract on the CONTROLLER path (Snapshot().FrameTitle /
 // Controller.ListFrameTitle()), independent of any TUI adapter call.
 //
-// Prior to this contract, the " !N" suffix was gated behind ListState.ShowIssueBadge,
-// a flag set ONLY by internal/tui/runtime_adapter_navigate.go (the TUI adapter)
-// via ResourceListModel.SetShowIssueBadge(true) — never by the web/controller
-// path (controller actions never call SetShowIssueBadge or PatchListShowIssueBadge).
-// Result: the TUI rendered " !N" while the web UI never did, for the exact same
-// underlying issue count — a renderer-owned-presentation bug.
-//
-// New contract: the " !N"/" !N+" suffix is UNCONDITIONAL for any list (top-level
-// or child), on any renderer, whenever the aggregated issue count N > 0 and the
-// list is not in attention-only (ctrl+z) mode. No flag, patch, or adapter call
-// gates it.
+// The " !N"/" !N+" suffix is UNCONDITIONAL for any list (top-level or
+// child), on any renderer, whenever the aggregated issue count N > 0 and the
+// list is not in attention-only (ctrl+z) mode. No flag, patch, or adapter
+// call gates it; a suffix gated behind a TUI-only flag would render on the
+// TUI and never on the web UI for the same count.
 //
 // This test drives the controller directly (app.New + Apply + the
-// ApplyResourcesLoaded test seam — no ResourceListModel, no
-// SetShowIssueBadge/PatchListShowIssueBadge/GetListShowIssueBadge call anywhere)
-// and asserts the suffix is present on Snapshot().FrameTitle, which is the exact
-// field the web/headless renderer consumes.
+// ApplyResourcesLoaded test seam — no ResourceListModel, no adapter call
+// anywhere) and asserts the suffix is present on Snapshot().FrameTitle,
+// which is the exact field the web/headless renderer consumes.
 package unit_test
 
 import (

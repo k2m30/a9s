@@ -2,7 +2,7 @@
 
 // firstscreen_test.go — the first screen says what it is doing and why.
 //
-// Four contracts, one per spec row of the "firstscreen" task:
+// Four contracts:
 //
 //  1. While the Wave-1 availability sweep runs, the menu frame title carries
 //     its progress ("[verifying 12/71]") in the same slot and shape as the
@@ -284,7 +284,7 @@ func TestAggregateFailures_DistinctCauses_OneLineEach(t *testing.T) {
 	}
 	msg := err.Error()
 	// "timeout" is the class's own word for a deadline; the Go error's text is
-	// no longer read by anything ("skipped" spec row 1).
+	// not read by anything.
 	for _, want := range []string{"3 of 9", "timeout", "no metadata"} {
 		if !strings.Contains(msg, want) {
 			t.Errorf("aggregated failure missing %q; got: %s", want, msg)
@@ -329,12 +329,8 @@ func TestMenuOrigin_FailedListFetch_DoesNotVerify(t *testing.T) {
 // TestAggregateFailures_NothingToSay_StillSaysSomething pins that a failure
 // whose error carries neither a code nor a message does not aggregate into an
 // empty phrase.
-//
-// INVERTED for the "skipped" spec row 1: this was
-// TestAggregateFailures_NoiseOnlyReason_StillSaysSomething and fed a rendered
-// "<id>: <noise>" string. There is no string lane left to feed — a failure is
-// recorded from the error's fields — so the same hole is probed with an error
-// that has no fields. Do not restore the string input.
+// A failure is recorded from the error's fields — there is no string lane —
+// so the hole is probed with an error that has no fields.
 func TestAggregateFailures_NothingToSay_StillSaysSomething(t *testing.T) {
 	err := awsclient.AggregateFailures("op",
 		[]awsclient.Failure{awsclient.FailedCall("id-1", &smithy.GenericAPIError{})}, 3)

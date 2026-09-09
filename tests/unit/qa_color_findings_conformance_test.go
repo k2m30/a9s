@@ -1,4 +1,4 @@
-// qa_color_findings_conformance_test.go — the standing OWNER RULE gate for the
+// qa_color_findings_conformance_test.go — the gate for the
 // "color derives from findings" architectural invariant: for every registered
 // type × demo fixture row, td.ResolveColor(merged) must equal the color
 // implied by the resource's own Findings (Wave-1 seeded, Wave-2 merged) via
@@ -14,7 +14,7 @@
 // the only addition here is the "pick the worst finding" reduction, which
 // ColorFromWave1 does NOT do (it only inspects Source=="wave1" findings, first
 // match wins) — this gate deliberately looks at ALL findings regardless of
-// Source, because the owner's invariant is "color derives from findings",
+// Source, because the invariant is "color derives from findings",
 // full stop, not "color derives from wave1 findings only".
 //
 // A mismatch means one of:
@@ -37,7 +37,7 @@
 // Finding present) returns (ColorHealthy, false), not Dim. A classifier that
 // reads a raw status word, such as colorFallback in
 // core/catalog/color_helpers.go, is exactly what this gate is designed to
-// catch — it is not one of "the shared severity functions" the owner's
+// catch — it is not one of "the shared severity functions" the rule's
 // exemption clause refers to.
 //
 // RATCHET semantics (identical contract to knownVisibilityGaps /
@@ -61,24 +61,14 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// knownColorDivergence pins the exact inventory of (type, resource-key) rows
-// where td.ResolveColor(merged) disagrees with findingsDerivedColor(merged) —
-// today's full census of classifier branches still coloring from raw fields
-// instead of Findings. Key shape: "<shortName>:<resourceID>", matching
-// knownVisibilityGaps' convention so per-type resource IDs never collide
-// across types.
+// knownColorDivergence is the inventory of (type, resource-key) rows where
+// td.ResolveColor(merged) may disagree with findingsDerivedColor(merged). Key
+// shape: "<shortName>:<resourceID>", matching knownVisibilityGaps' convention
+// so per-type resource IDs never collide across types.
 //
-// Burn-down semantics: an entry present here AND still mismatched today is
-// pre-existing debt (skipped). An entry present here but NOW matching is a
-// completed conversion — fails until removed from this map. An entry not
-// present here that mismatches is a brand-new regression — always fails.
-//
-// EMPTIED 2026-07-07: wave #42 converted every classifier to derive color via
-// colorFromAnyFinding — all 160 divergent (type, resource) subtests seeded at
-// gate introduction now conform (READY-FOR-BURN-DOWN INVENTORY (160), zero
-// STILL-GAPPED, zero NEW DIVERGENCE). From this point on, "color derives from
-// findings" is a hard, unconditional invariant: any divergence anywhere is a
-// regression, not debt to allowlist.
+// It is empty: "color derives from findings" is a hard, unconditional
+// invariant, and any divergence anywhere is a regression. An entry present
+// here but matching fails until removed, so the map cannot quietly grow.
 var knownColorDivergence = map[string]bool{}
 
 // findingsDerivedColor computes the "worst finding wins" color implied by
@@ -86,7 +76,7 @@ var knownColorDivergence = map[string]bool{}
 // SevBroken > SevWarn > SevDim > (no findings, or only SevOK/other) ->
 // ColorHealthy. Unlike resource.ColorFromWave1, this does NOT filter by
 // Source=="wave1" — it considers every Finding on the resource (Wave-1
-// seeded or Wave-2 merged), because the owner's invariant is "color derives
+// seeded or Wave-2 merged), because the invariant is "color derives
 // from findings" in general, not "from wave1 findings only".
 func findingsDerivedColor(findings []domain.Finding) resource.Color {
 	worst := domain.SevOK
@@ -122,7 +112,7 @@ func severityRank(s domain.Severity) int {
 }
 
 // TestColorFindingsConformanceGate_ColorAlwaysDerivesFromFindings is the
-// standing OWNER RULE gate: for every registered type with a Wave-1 Fetcher,
+// gate: for every registered type with a Wave-1 Fetcher,
 // every fixture resource's td.ResolveColor(merged) must equal
 // findingsDerivedColor(merged.Findings) — UNLESS the (type, resourceID) pair
 // is pinned in knownColorDivergence as pre-existing debt, in which case it is

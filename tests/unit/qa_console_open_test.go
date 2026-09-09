@@ -287,21 +287,19 @@ func TestConsoleOpen_DetailView_UppercaseO_CopiesConsoleURL(t *testing.T) {
 
 // ─── Overlay fall-through: "o"/"O" must never be silently consumed ──────────
 //
-// The fixed contract (Codex re-review finding): OpenConsole/CopyConsoleURL
-// are only intercepted on resource list (incl. child list) and detail
-// screens. On every other screen kind — help, identity, selectors, costs,
-// etc. — "o"/"O" must reach that screen's own key handling exactly like any
-// other unbound key, per the "any key closes help"/"any key closes identity"
-// precedent (app_stack.go's updateActiveRS: "Any key on the help overlay
-// closes it." / "Any key on the identity overlay closes it.", already
-// regression-pinned for an arbitrary key via
-// qa_mainmenu_nav_test.go's TestQA_MainMenu_AnyKeyClosesHelp). Before the
-// fix, handleOpenConsole's consoleTarget() ran unconditionally ahead of any
-// screen-kind guard: on rsKindHelp/rsKindIdentity it resolved ok=false and
-// returned a silent (m, nil) no-op — the overlay never dismissed and no
-// console action ran either. These pins use "o"/"O" in place of
-// TestQA_MainMenu_AnyKeyClosesHelp's arbitrary "a" and assert the identical
-// outcome: back to the main menu.
+// OpenConsole/CopyConsoleURL are only intercepted on resource list (incl.
+// child list) and detail screens. On every other screen kind — help,
+// identity, selectors, costs, etc. — "o"/"O" must reach that screen's own
+// key handling exactly like any other unbound key, per the "any key closes
+// help"/"any key closes identity" precedent (app_stack.go's updateActiveRS:
+// "Any key on the help overlay closes it." / "Any key on the identity
+// overlay closes it.", pinned for an arbitrary key via
+// qa_mainmenu_nav_test.go's TestQA_MainMenu_AnyKeyClosesHelp). A
+// consoleTarget() that ran ahead of the screen-kind guard would resolve
+// ok=false on rsKindHelp/rsKindIdentity and return a silent (m, nil) no-op —
+// the overlay never dismissed and no console action run. These pins use
+// "o"/"O" in place of TestQA_MainMenu_AnyKeyClosesHelp's arbitrary "a" and
+// assert the identical outcome: back to the main menu.
 
 func assertOverlayDismissedByConsoleOpenKey(t *testing.T, openKey, dismissKey, label string) {
 	t.Helper()

@@ -1,11 +1,8 @@
 package unit
 
-// Tests for GitHub issue #221: Lambda paginated fetcher issues N+1 API calls
-// (ListEventSourceMappings per function) when it should call none.
-//
-// These tests FAIL against the current implementation and PASS once the fix
-// (use FetchLambdaFunctionsPage instead of FetchLambdaFunctionsPageWithEventSources)
-// lands.
+// The Lambda paginated fetcher makes no ListEventSourceMappings call per
+// function: it uses FetchLambdaFunctionsPage, not
+// FetchLambdaFunctionsPageWithEventSources.
 
 import (
 	"context"
@@ -65,11 +62,6 @@ func newLambdaClientWithCountingTransport(transport *countingLambdaRoundTripper)
 // TestLambdaPaginatedFetcher_DoesNotCallEventSourceAPI verifies that the
 // registered paginated fetcher for "lambda" makes zero ListEventSourceMappings
 // calls regardless of how many functions are returned.
-//
-// BUG (issue #221): the current implementation calls
-// FetchLambdaFunctionsPageWithEventSources which issues one
-// ListEventSourceMappings call per function, turning a single-page list into
-// 1+N API calls.
 func TestLambdaPaginatedFetcher_DoesNotCallEventSourceAPI(t *testing.T) {
 	fetcher := resource.GetPaginatedFetcher("lambda")
 	if fetcher == nil {

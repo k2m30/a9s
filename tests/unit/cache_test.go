@@ -28,10 +28,9 @@ func TestCache_DirForTest(t *testing.T) {
 	}
 }
 
-// INVERTED (cachegen row 2, the injective pair-directory encoding): the
-// separator is now percent-escaped, not folded to "_". The old expectation
-// was the defect — "my/profile" and "my_profile" resolved to one directory
-// and overwrote each other's cache. Do not restore it.
+// The separator is percent-escaped, not folded to "_": "my/profile" and
+// "my_profile" would otherwise resolve to one directory and overwrite each
+// other's cache.
 func TestCache_DirForTest_EscapesSlashesInjectively(t *testing.T) {
 	tmpDir := t.TempDir()
 	t.Setenv("A9S_CONFIG_FOLDER", tmpDir)
@@ -46,7 +45,7 @@ func TestCache_DirForTest_EscapesSlashesInjectively(t *testing.T) {
 	}
 }
 
-// INVERTED (cachegen row 2): spaces are percent-escaped, not folded to "_".
+// Spaces are percent-escaped, not folded to "_".
 func TestCache_DirForTest_EscapesSpacesInjectively(t *testing.T) {
 	tmpDir := t.TempDir()
 	t.Setenv("A9S_CONFIG_FOLDER", tmpDir)
@@ -58,7 +57,7 @@ func TestCache_DirForTest_EscapesSpacesInjectively(t *testing.T) {
 	}
 }
 
-// INVERTED (cachegen row 2): backslashes are percent-escaped, not folded.
+// Backslashes are percent-escaped, not folded.
 func TestCache_DirForTest_EscapesBackslashInjectively(t *testing.T) {
 	tmpDir := t.TempDir()
 	t.Setenv("A9S_CONFIG_FOLDER", tmpDir)

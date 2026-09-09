@@ -115,11 +115,10 @@ func TestQA_SNSSubscriptions_TypeDef(t *testing.T) {
 		title string
 	}{
 		{"topic_arn", "Topic ARN"},
-		// w197: Status and Confirmed come from the built-in view's list, folded
-		// into the type's own, and the order is that list's.
-		// w197 row 8: the status cell is the finding phrase, stored under the
-		// lifecycle key; the column names that key rather than guessing it
-		// from the title.
+		// Status and Confirmed come from the built-in view's list, folded into
+		// the type's own, and the order is that list's. The status cell is the
+		// finding phrase, stored under the lifecycle key; the column names that
+		// key rather than guessing it from the title.
 		{"state", "Status"},
 		{"protocol", "Protocol"},
 		{"endpoint", "Endpoint"},

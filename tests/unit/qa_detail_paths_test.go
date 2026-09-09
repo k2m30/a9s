@@ -20,10 +20,9 @@ import (
 // This catches: wrong field names in views.yaml, nil fields being skipped,
 // and wrong ViewDef being selected.
 //
-// Retargeted (wave3 detail-family cleanup round 4, specs/022-codebase-cleanup)
-// off views.NewDetail(...).View() (dead: DetailModel.View/SetSize) onto the
-// live Controller.Snapshot().Body.Detail + NewTransientDetail.RenderDetail
-// seam — same golden infrastructure as detail_ports_test.go.
+// Drives the live Controller.Snapshot().Body.Detail +
+// NewTransientDetail.RenderDetail seam — same golden infrastructure as
+// detail_ports_test.go.
 func TestDetailPaths_AllConfiguredFieldsRendered(t *testing.T) {
 	styles.ReinitForTest() // ensure styles are initialized
 

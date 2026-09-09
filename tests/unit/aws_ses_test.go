@@ -74,8 +74,8 @@ func TestFetchSESIdentitiesPage_DomainIdentityFieldMapping(t *testing.T) {
 	if r.Fields["identity_name"] != "acme-corp.com" {
 		t.Errorf("Fields[identity_name] = %q, want %q", r.Fields["identity_name"], "acme-corp.com")
 	}
-	// Inverted with the two below it: the Type column renders this field
-	// verbatim and an operator reads a column, not an SDK enum constant.
+	// The Type column renders this field verbatim and an operator reads a
+	// column, not an SDK enum constant.
 	if r.Fields["identity_type"] != "domain" {
 		t.Errorf("Fields[identity_type] = %q, want %q", r.Fields["identity_type"], "domain")
 	}
@@ -120,9 +120,8 @@ func TestFetchSESIdentitiesPage_EmailAddressIdentityFieldMapping(t *testing.T) {
 	if r.ID != "noreply@acme-corp.com" {
 		t.Errorf("ID = %q, want %q", r.ID, "noreply@acme-corp.com")
 	}
-	// Inverted deliberately: the Type column renders this field verbatim and
-	// an operator reads a column, not an SDK enum constant. See the same
-	// inversion in qa_ses_test.go.
+	// The Type column renders this field verbatim and an operator reads a
+	// column, not an SDK enum constant (qa_ses_test.go pins the same).
 	if r.Fields["identity_type"] != "email address" {
 		t.Errorf("Fields[identity_type] = %q, want %q", r.Fields["identity_type"], "email address")
 	}
@@ -202,8 +201,7 @@ func TestFetchSESIdentitiesPage_StatusPhraseMapping(t *testing.T) {
 
 // TestFetchSESIdentitiesPage_MultipleIssuesSuffixBumped verifies that an identity
 // with FAILED verification AND sending disabled produces a Status phrase with the
-// "(+N)" suffix. The suffix is built by sesTopPhrase in the fetcher — not by
-// resource.BumpFindingSuffix (which W1.2 of AS-1390 removed from all enrichers).
+// "(+N)" suffix. The suffix is built by sesTopPhrase in the fetcher.
 func TestFetchSESIdentitiesPage_MultipleIssuesSuffixBumped(t *testing.T) {
 	mock := &mockSESv2Client{
 		output: &sesv2.ListEmailIdentitiesOutput{

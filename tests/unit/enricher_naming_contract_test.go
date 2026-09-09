@@ -1,11 +1,8 @@
 package unit
 
-// enricher_naming_contract_test.go — Pins the disambiguated names introduced in
-// issue #276. Detail enrichment and Wave 2 issue enrichment are two distinct
-// subsystems and must have disjoint, unambiguous type names.
-//
-// If this file ever needs to change its names back to bare "Enricher", revisit
-// issue #276 first — reintroducing the ambiguity is a regression.
+// enricher_naming_contract_test.go — Detail enrichment and Wave 2 issue
+// enrichment are two distinct subsystems and must have disjoint, unambiguous
+// type names; a bare "Enricher" name cannot say which one it means.
 
 import (
 	"context"
@@ -50,7 +47,7 @@ func TestNamingContract_IssueEnricher_IsStructWithFnAndPriority(t *testing.T) {
 	}
 }
 
-// TestNamingContract_Wave2Accessors_Shape pins the post-AS-795n Wave 2
+// TestNamingContract_Wave2Accessors_Shape pins the Wave 2
 // accessor API on awsclient. Wave2EnricherFor returns the enricher value
 // plus a found bool; AllWave2 returns ordered Wave2Entry pairs.
 func TestNamingContract_Wave2Accessors_Shape(t *testing.T) {

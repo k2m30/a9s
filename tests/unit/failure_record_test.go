@@ -3,17 +3,14 @@ package unit
 // failure_record_test.go — a failed call is recorded once, as a class and a
 // cause, never as a string.
 //
-// Pins the "skipped" spec:
-//
-//   - row 1: the recorder stores the id, the class and the cause read off the
+//   - the recorder stores the id, the class and the cause read off the
 //     error's own fields; the aggregate groups on them. A denial carrying a
 //     request id reaches the log as the action, the count and one example id,
 //     and the class survives the aggregate instead of reclassifying as
 //     Unknown downstream.
-//   - row 2: one classifier. Every site that used to reach for
-//     smithy.APIError to read a code asks the named predicate instead, and
-//     the predicate answers for a modeled SDK error, a generic one, and a
-//     wrapped chain alike.
+//   - one classifier. Every site that reads a code asks the named predicate
+//     rather than smithy.APIError, and the predicate answers for a modeled
+//     SDK error, a generic one, and a wrapped chain alike.
 
 import (
 	"context"
@@ -343,10 +340,9 @@ func (f *iamDeniedKeysFake) ListAttachedUserPolicies(
 	return &iam.ListAttachedUserPoliciesOutput{}, nil
 }
 
-// TestEnricher_UninspectedUser_SaysWhy pins spec row 5 through one of the
-// sampled census sites: a user whose access keys could not be read renders "?"
-// AND says what refused. Marking the row without recording the error is the
-// silent-skip shape the census was holding open.
+// TestEnricher_UninspectedUser_SaysWhy: a user whose access keys could not
+// be read renders "?" AND says what refused. Marking the row without
+// recording the error is the silent-skip shape.
 func TestEnricher_UninspectedUser_SaysWhy(t *testing.T) {
 	clients := &awsclient.ServiceClients{IAM: &iamDeniedKeysFake{}, Region: "us-east-1"}
 	resources := []resource.Resource{

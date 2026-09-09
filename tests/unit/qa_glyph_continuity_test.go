@@ -1,7 +1,5 @@
-// qa_glyph_continuity_test.go — RED pins for the remaining temporary glyph
-// vanish reported by a live user on branch feat/cache (HEAD 81ef61a4).
-// Regions are already fixed; `!`/`~` row glyphs still vanish temporarily and
-// come back. Two candidate mechanisms, pinned separately:
+// qa_glyph_continuity_test.go — `!`/`~` row glyphs must not vanish
+// temporarily and come back.
 //
 //  1. RerunStart_KeepsVisibleFindingsUntilReplaced: internal/tui's
 //     handleRefresh (runtime_adapter_navigate.go) deliberately does NOT
@@ -10,32 +8,23 @@
 //     screen for the rerun's AWS round-trip and are reconciled per resource
 //     ID when the fresh EnrichmentChecked lands (ApplyWave2ToRow strips-
 //     then-conditionally-reappends against the full fresh findings map).
-//     Pre-clearing via ClearRowFindings used to blank every glyph for that
+//     Pre-clearing via ClearRowFindings would blank every glyph for that
 //     whole round-trip — a real, user-visible flicker (see the handleRefresh
 //     comment). TestCtrlR_RetainsActiveListFindingsUntilFreshEnrichment in
 //     qa_enrichment_review_fixes_test.go pins this retain-until-replaced
 //     contract; this pin documents the same intentional behavior.
 //
 //  2. Swap_MergesWave2ForWave1CarryingRows: applyResourcesLoaded's carry-
-//     forward (core/app/list_body.go:80-89) only re-applies a prior
-//     row's findings onto the incoming replacement when the incoming row
-//     itself carries ZERO findings (`if len(resources[i].Findings) > 0 {
-//     continue }`). A row that already has a fresh Wave-1 finding on the
-//     incoming side (non-zero len) is skipped entirely — so a
-//     previously-attached Wave-2 finding on the SAME row is dropped on this
-//     swap, even though nothing invalidated it. RED at HEAD.
+//     forward (core/app/list_body.go) re-applies a prior row's Wave-2
+//     findings onto the incoming replacement whether or not the incoming
+//     row itself carries a fresh Wave-1 finding; nothing invalidated the
+//     Wave-2 finding on that swap.
 //
-//  3. ProfileSwitch_StillClearsFindings (C9 guard): confirms
-//     Controller.enrichmentStore for a resource type is NOT wiped by
-//     anything reachable from a profile/region rotation
-//     (MenuClearAvailabilityIntent only clears MenuState fields — see
-//     core/app/intents.go's MenuClearAvailabilityIntent case; Session.
-//     Rotate in core/session/session.go bumps gens but never touches
-//     Controller.enrichmentStore). A stale enrichmentStore entry surviving
-//     a rotation would let a same-ID collision (or a reopened list of the
-//     same type) resurrect a dead profile's glyphs. RED at HEAD: nothing in
-//     this package clears it, so the pin documents the gap by asserting the
-//     clear that SHOULD happen around a rotation-shaped sequence.
+//  3. ProfileSwitch_StillClearsFindings (C9 guard): Controller.enrichmentStore
+//     for a resource type is cleared by a profile/region rotation; a stale
+//     enrichmentStore entry surviving a rotation would let a same-ID
+//     collision (or a reopened list of the same type) resurrect a dead
+//     profile's glyphs.
 package unit
 
 import (
@@ -77,12 +66,10 @@ func findingsForID(ctrl *app.Controller, id string) []domain.Finding {
 
 // hasStorePhraseForID reports whether the currently-built list body shows the
 // given Wave-2 finding phrase in the Status cell of the row with the given
-// ResourceID. This replaces an earlier decorator probe: a list row's colour is
-// the worst finding over both waves, so a row carrying a finding is never
-// green for a glyph to annotate, and resolveListDecoratorFull's glyph branch
-// was deleted with the spec row that proved it unreachable. The rendered
-// Status cell is the surface the enrichment store still drives on its own,
-// which is what these rotation pins need to observe.
+// ResourceID. A list row's colour is the worst finding over both waves, so a
+// row carrying a finding is never green for a glyph to annotate; the
+// rendered Status cell is the surface the enrichment store drives on its
+// own, which is what these rotation pins need to observe.
 func hasStorePhraseForID(ctrl *app.Controller, id, phrase string) bool {
 	snap := ctrl.Snapshot()
 	if snap.Body.List == nil {
@@ -106,33 +93,24 @@ func hasStorePhraseForID(ctrl *app.Controller, id, phrase string) bool {
 // ─────────────────────────────────────────────────────────────────────────
 
 // TestRerunStart_KeepsVisibleFindingsUntilReplaced pins the STALE-UNTIL-
-// REPLACED contract at the layer where mechanism 1 actually lives:
-// internal/tui's handleRefresh (runtime_adapter_navigate.go). A Controller-
-// level pin cannot observe this — the eager clear (m.ctrl.ClearRowFindings +
-// m.ctrl.ApplyEnrichmentState(rt, 0, false, nil)) ran one layer up, in the
-// TUI Update() path, before the coder's fix removed it.
+// REPLACED contract at the layer where mechanism 1 lives: internal/tui's
+// handleRefresh (runtime_adapter_navigate.go). A Controller-level pin cannot
+// observe this — an eager clear (m.ctrl.ClearRowFindings +
+// m.ctrl.ApplyEnrichmentState(rt, 0, false, nil)) would run one layer up,
+// in the TUI Update() path.
 //
-// Two halves, matching the coordinator's corrected invariant:
-//  1. No blank window: pressing Ctrl+R must NOT make the "! " marker vanish
+// Two halves:
+//  1. No blank window: pressing Ctrl+R must NOT make the finding vanish
 //     from View() before the fresh EnrichmentCheckedMsg lands.
 //  2. Real removal still works: once a fresh EnrichmentCheckedMsg lands and
 //     the finding is genuinely gone from the fresh map, the marker MUST
 //     disappear — this is not "never clear", it's "never blank between".
 //
-// RED at HEAD (pre-fix): half 1 fails — the marker was gone immediately
-// after Ctrl+R, before any fetch/enrichment response was processed (this is
-// exactly what the old TestCtrlR_ClearsActiveListFindingsImmediately in
-// qa_enrichment_review_fixes_test.go asserted as correct — that test now
-// pins the superseded contract and needs updating alongside this one).
-// TestRerunStart_KeepsVisibleFindingsUntilReplaced uses ctrl+z survival as
-// the "is this finding applied" check, not the literal "! " glyph text.
-// Since the color-findings-conformance wave, colorEC2 is
-// colorFromAnyFinding-only (core/aws/catalog_compute.go) — once a
-// SevBroken Finding is applied the row is ColorBroken, and no glyph is
-// produced at all: the branch that used to fire when
-// ResolveColor()==ColorHealthy was deleted as unreachable.
-// isVisibleUnderCtrlZ (qa_enrichment_review_fixes_test.go) is the
-// renderer-agnostic, stronger replacement.
+// The test uses ctrl+z survival as the "is this finding applied" check, not
+// a literal "! " glyph: colorEC2 is colorFromAnyFinding-only
+// (core/aws/catalog_compute.go), so once a SevBroken Finding is applied the
+// row is ColorBroken and no glyph is produced at all. isVisibleUnderCtrlZ
+// (qa_enrichment_review_fixes_test.go) is the renderer-agnostic check.
 func TestRerunStart_KeepsVisibleFindingsUntilReplaced(t *testing.T) {
 	withTuiVersion(t, "test")
 	m := newRootSizedModel()
@@ -185,20 +163,17 @@ func TestRerunStart_KeepsVisibleFindingsUntilReplaced(t *testing.T) {
 // Pin 2 — carry-forward drops Wave-2 for a Wave-1-carrying incoming row
 // ─────────────────────────────────────────────────────────────────────────
 
-// TestSwap_MergesWave2ForWave1CarryingRows pins the narrow gap in
-// applyResourcesLoaded's carry-forward (core/app/list_body.go:80-89):
-// the guard `if len(resources[i].Findings) > 0 { continue }` treats ANY
-// non-zero incoming Findings as "already fresh, do not touch" — but a row
+// TestSwap_MergesWave2ForWave1CarryingRows pins applyResourcesLoaded's
+// carry-forward (core/app/list_body.go): a guard that treats ANY non-zero
+// incoming Findings as "already fresh, do not touch" is too coarse — a row
 // that legitimately carries a Wave-1 finding on the incoming side (e.g. a
 // fetcher-level health check) still needs its previously-known Wave-2
 // finding folded in, since Wave-2 enrichment has not rerun yet and nothing
 // else will re-attach it.
 //
-// RED at HEAD: rowB below has an outgoing Wave-1 + Wave-2 pair; the incoming
-// replacement carries ONLY the Wave-1 finding (simulating "list re-fetched,
-// Wave-2 hasn't rerun"). The current guard sees len(incoming.Findings) > 0
-// (the Wave-1 entry) and skips the carry-forward entirely, so the Wave-2
-// entry is lost. rowA (incoming already has ITS OWN fresh Wave-2 finding) is
+// rowB below has an outgoing Wave-1 + Wave-2 pair; the incoming replacement
+// carries ONLY the Wave-1 finding (simulating "list re-fetched, Wave-2
+// hasn't rerun") and must end up with both. rowA (incoming already has ITS OWN fresh Wave-2 finding) is
 // the control case: the incoming, fresher finding must win, not be
 // overwritten by the stale one.
 func TestSwap_MergesWave2ForWave1CarryingRows(t *testing.T) {
@@ -264,10 +239,10 @@ func TestSwap_MergesWave2ForWave1CarryingRows(t *testing.T) {
 // (internal/tui constructs exactly one Controller for the process
 // lifetime — internal/tui/app.go's New() calls app.New(core) once).
 // MenuClearAvailabilityIntent (fired by both HandleProfileSelected and
-// HandleRegionSelected in core/runtime/handlers.go) only clears
-// MenuState fields (core/app/intents.go); nothing clears
-// Controller.enrichmentStore. Session.Rotate (core/session/session.go)
-// bumps generation counters but never reaches into the Controller.
+// HandleRegionSelected in core/runtime/handlers.go) clears MenuState
+// fields (core/app/intents.go); Session.Rotate (core/session/session.go)
+// bumps generation counters but never reaches into the Controller, so the
+// rotation handler itself must clear Controller.enrichmentStore.
 //
 // This test drives the closest Controller-observable analogue of a
 // rotation: findings populated under one profile/region pair must be gone
@@ -275,8 +250,7 @@ func TestSwap_MergesWave2ForWave1CarryingRows(t *testing.T) {
 // by asserting that whatever handles a rotation clears the type's
 // enrichmentStore entry before the next ApplyResourcesLoaded lands, so a
 // same-ID collision across profiles cannot resurrect a dead profile's
-// glyphs. RED at HEAD: nothing in this package clears enrichmentStore on
-// rotation at all, so a stale entry survives untouched.
+// glyphs.
 func TestProfileSwitch_StillClearsFindings(t *testing.T) {
 	ctrl := glyphContinuityPair(t, "glyph-rotate-prof-a", "us-east-1")
 	ctrl.Apply(app.Action{Kind: app.ActionCommand, Arg: "ec2"})

@@ -1,17 +1,16 @@
-// costs_quality_test.go — Cost Explorer: quality batch from a self-audit of
-// the rendered surfaces against specs/021-cost-explorer/wireframe.md (items
-// 1, 2, 5) plus a web/TUI drill-parity pass (items 3, 4).
+// costs_quality_test.go — Cost Explorer: rendered surfaces against
+// specs/021-cost-explorer/wireframe.md (items 1, 2, 5) plus web/TUI drill
+// parity (items 3, 4).
 //
 // package unit (not unit_test): item 3's TUI-vs-Snapshot convergence check
 // needs the TUI key-routing/render helpers (rootApplyMsg/rootViewContent/
 // newRootSizedModel, tui_root_test.go) which only live in package unit —
 // every other item reuses only EXPORTED app/costs/runtime surface via local
-// round8-prefixed helpers (mirroring round6/round7's identical choice).
+// round8-prefixed helpers.
 //
 // Item 1 (P2) — DeltaTag gains a 4-tier color scale. wireframe.md only says
 // "growth red shades, drop green shades, |Δ| < threshold neutral" — no
-// exact percentages, so the thresholds below are a QA-CHOSEN CONTRACT,
-// FLAGGED for the coordinator to confirm or adjust:
+// exact percentages, so the thresholds are:
 //
 //	|Δ| <  5%        -> "neutral"
 //	5% <= |Δ| < 25%  -> "growth-soft"  / "drop-soft"
@@ -21,31 +20,15 @@
 // into a second Intensity field — mirrors CostCell's own existing contract
 // ("one pre-resolved string drives color, same as ListRow.Color").
 //
-// Reconciliation performed for item 1 (swept every costs_*_test.go file
-// asserting DeltaTag): costs_body_test.go (+23.45% EC2 / -6.25% RDS, both
-// now "-soft"), costs_round3_test.go (zero-cell must be exactly "neutral"
-// not merely != growth/drop; ELB's +100% is unambiguously "-strong").
-// costs_view_test.go's two literal DeltaTag:"growth"/"drop" values were
-// checked and need NO reconciliation — grepped the whole file for any
-// assertion that depends on them (color/ANSI styling); none exists, they
-// are inert filler in a body literal no test in that file inspects.
+// Item 5 (P2) — Cost Explorer rejects year zoom beyond its history horizon
+// with ValidationException ("You haven't enabled historical data beyond 14
+// months."). costsHistoryHorizonMonths (core/app/costs_state.go) is
+// unexported and unreachable from tests/unit — mirrored here as a literal
+// (13) with a comment tying it back explicitly.
 //
-// Item 5 (P2) — a live ValidationException on a real account
-// ("You haven't enabled historical data beyond 14 months.") on year zoom.
-// costsHistoryHorizonMonths (core/app/costs_state.go) is unexported and
-// unreachable from tests/unit — mirrored here as a literal (13, matching
-// the constant read directly off disk during scoring) rather than
-// re-derived, with a comment tying it back explicitly.
-//
-// Item 4 (P2) — CostsBody has no Currency field today. Referencing a
-// field that doesn't exist would be a COMPILE error for the entire
-// tests/unit package (Go compiles per-package, not per-file) — unlike a
-// runtime t.Errorf, that would silently prevent every OTHER test in this
-// dispatch (and every pre-existing test) from running at all, defeating
-// "run the runnable set." The struct-gains-a-field half of this finding is
-// therefore pinned via reflection (compile-safe: reports a real RED result
-// today, and remains checkable once the field lands) instead of a direct
-// field reference.
+// Item 4 (P2) — CostsBody's Currency field is pinned via reflection rather
+// than a direct field reference, so a missing field fails this one test
+// instead of the whole tests/unit package's compilation.
 package unit
 
 import (
@@ -213,20 +196,14 @@ func TestCostsQuality_Item2_AnomalyFooter_Humanized_NoRawDimensionDump(t *testin
 }
 
 // ===========================================================================
-// Item 3 (narrowed to 3a only per the coordinator's own disproof
-// correction — 3b is already implemented, costs.html's cursor cell already
-// carries a "costs-cursor" class; 3c's substantive gap is round7's item 4,
-// not a new finding here) — the web costs view's title must carry the same
-// state line the TUI already computes, from ONE shared source exposed via
-// Controller.Snapshot().FrameTitle.
-//
-// Confirmed via direct trace: core/app/snapshot.go:71 hardcodes
-// `vs.FrameTitle = string(runtime.ScreenCosts)` (the bare "costs" string)
-// for the costs screen kind, while internal/tui/app_view.go's frameTitle()
-// computes a RICH state line via its own package-private costsFrameTitle()
-// function — bypassing vs.FrameTitle entirely. Every OTHER screen kind
-// (menu/list/selector/detail) instead feeds vs.FrameTitle from ONE shared
-// builder consumed by both renderers; costs is the outlier.
+// Item 3 — the web costs view's title must carry the same state line the
+// TUI computes, from ONE shared source exposed via
+// Controller.Snapshot().FrameTitle: core/app/snapshot.go feeds vs.FrameTitle
+// for the costs screen kind from the same builder both renderers consume,
+// as every OTHER screen kind (menu/list/selector/detail) does — never a bare
+// "costs" string with internal/tui/app_view.go's frameTitle() computing a
+// RICH state line via a package-private costsFrameTitle() that bypasses
+// vs.FrameTitle.
 // ===========================================================================
 
 func TestCostsQuality_Item3a_Snapshot_FrameTitle_IsStateLine_NotBareScreenID(t *testing.T) {
@@ -264,9 +241,7 @@ func TestCostsQuality_Item3a_TUI_RenderedFrame_ContainsSharedSnapshotFrameTitle(
 }
 
 // ===========================================================================
-// Item 3c (trivial remnant only — arrows/Enter/Escape already wired,
-// b/+/-/0-9 landed in round 7) — app.js's keyMap carries j/k/h/l as
-// aliases for the movement actions.
+// app.js's keyMap carries j/k/h/l as aliases for the movement actions.
 // ===========================================================================
 
 func TestCostsQuality_Item3c_WebAppJS_KeyMap_HasVimMovementAliases(t *testing.T) {

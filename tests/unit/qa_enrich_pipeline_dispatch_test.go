@@ -1,22 +1,16 @@
 package unit
 
-// qa_enrich_pipeline_dispatch_test.go — Regression test for the CodePipeline
-// enrichment dispatch bug (issue #017-issue-counts-attention-filter).
+// qa_enrich_pipeline_dispatch_test.go — CodePipeline enrichment dispatch.
 //
-// Root cause: Wave 1 stores CodePipeline probe resources under ShortName
-// "pipeline" (core/resource/types_cicd.go:51), but buildEnrichQueue's
-// order slice and the EnricherRegistry both use key "pipe". Result: buildEnrichQueue
-// never sees "pipeline" in probeResources and the enricher is never dispatched.
-//
-// Fix: rename both "pipe" → "pipeline" in buildEnrichQueue's order slice
-// (internal/tui/app_fetchers.go:537) and in EnricherRegistry
-// (core/aws/pipeline_issue_enrichment.go).
+// Wave 1 stores CodePipeline probe resources under ShortName "pipeline"
+// (core/resource/types_cicd.go), and buildEnrichQueue's order slice and the
+// enricher registration must use the same key, or buildEnrichQueue never
+// sees "pipeline" in probeResources and the enricher is never dispatched.
 //
 // This test seeds probeResources["pipeline"] via AvailabilityCheckedMsg (the
-// same path that Wave 1 uses at the end of the availability-probe cycle), then
-// checks whether the returned cmd contains an EnrichmentCheckedMsg for "pipeline".
-// It FAILS today because buildEnrichQueue returns an empty queue (key mismatch).
-// It PASSES after the coder renames the key.
+// same path that Wave 1 uses at the end of the availability-probe cycle),
+// then checks that the returned cmd contains an EnrichmentCheckedMsg for
+// "pipeline".
 
 import (
 	"testing"
@@ -134,7 +128,7 @@ func TestBuildEnrichQueue_DispatchesCodePipeline(t *testing.T) {
 	// Deliver AvailabilityCheckedMsg to seed probeResources["pipeline"] and
 	// trigger the availability-probe finalization path that calls startEnrichment.
 	// availTotal starts at 0; after incrementing availChecked to 1, 1 >= 0 → finalize.
-	// session.New seeds AvailabilityGen=1 (AS-659) — stamp the live value so
+	// session.New seeds AvailabilityGen=1 — stamp the live value so
 	// the AvailabilityChecked stale guard (AcceptZeroGen=false) accepts it.
 	m, cmd := rootApplyMsg(m, messages.AvailabilityChecked{
 		ResourceType: "pipeline",

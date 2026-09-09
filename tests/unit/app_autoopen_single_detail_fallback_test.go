@@ -143,12 +143,11 @@ func TestApply_AutoOpenSingleDetail_ZeroRowsNoPaginationNoStubCreator_Placeholde
 }
 
 // TestApply_AutoOpenSingleDetail_NonEmptyPageMissingTarget_StillChasesViaFetchMore
-// pins #261's Codex-flagged gap: a page that HAS rows but does not contain
-// the target must still chase via KindFetchMore when pagination remains —
-// keying the decision on "was the target found" (matched == nil) rather than
-// len(ls.Rows) == 0. Before the fix, a non-empty page silently stopped the
-// chase, stranding a target that never lands on the first page of a large
-// listing.
+// pins: a page that HAS rows but does not contain the target must still
+// chase via KindFetchMore when pagination remains — keying the decision on
+// "was the target found" (matched == nil) rather than len(ls.Rows) == 0, so
+// a target that never lands on the first page of a large listing is not
+// stranded.
 func TestApply_AutoOpenSingleDetail_NonEmptyPageMissingTarget_StillChasesViaFetchMore(t *testing.T) {
 	const targetID = "i-0target00000002"
 	c := newTestController(t)
@@ -234,8 +233,8 @@ func TestApply_AutoOpenSingleDetail_LoadingMoreAlreadyTrue_NoPrematureStubCreati
 }
 
 // ---------------------------------------------------------------------------
-// Codex-flagged regression: the stub fallback must not fire while the
-// placeholder's OWN fetch is still outstanding (its very first response has
+// The stub fallback must not fire while the placeholder's OWN fetch is
+// still outstanding (its very first response has
 // not landed at all yet — LoadingMore is still false, HasPagination is still
 // false, exactly the zero-value shape "fetched, empty, exhausted" also has).
 // An unrelated ResourcesLoaded arriving in that window must be a pure no-op

@@ -509,21 +509,13 @@ func TestFetchRevealValue_NoRevealFetcher(t *testing.T) {
 // probeResourceAvailability — nil clients
 // ────────────────────────────────────────────────────────────────────────────
 
-// TestProbeResourceAvailability_NilClients pins the CURRENT (correct)
-// contract from commit 89f0f69d ("availability sweep waits for client
-// readiness — no probes against a nil transport"): with nil clients, an
+// TestProbeResourceAvailability_NilClients pins: with nil clients, an
 // AvailabilityCacheLoadedMsg must NOT dispatch any probe cmds at all —
 // dispatching them would run every probe against a nil transport and fail
 // hard, permanently losing that probe for the session. Instead,
 // Session.AvailSweepPending is latched, and the next successful ClientsReady
 // drains the first batch (fireNextAvailabilityProbes(4)) once a real
 // transport exists.
-//
-// RETIRED the old "dispatches probe cmds, each erroring for nil clients"
-// invariant this test used to pin: that was the pre-89f0f69d contract, which
-// this same test's own race this commit fixes (the four resource types first
-// in resource.AllShortNames() were observed permanently losing their first
-// probe this way).
 func TestProbeResourceAvailability_NilClients(t *testing.T) {
 	withTuiVersion(t, "test")
 	m := newRootSizedModel() // clients == nil
@@ -561,7 +553,7 @@ func TestSaveAvailabilityCache_NoCacheMode(t *testing.T) {
 	// Deliver AvailabilityCheckedMsg that simulates the all-done state.
 	// This triggers the "all checks done" branch in handleAvailabilityChecked
 	// which calls saveAvailabilityCache. With noCache=true it's a no-op (nil cmd).
-	// Stamp the live AvailabilityGen so the AS-657/AS-659 stale guard accepts
+	// Stamp the live AvailabilityGen so the stale guard accepts
 	// the message (AcceptZeroGen=false; session.New seeds AvailabilityGen=1).
 	_, cmd := rootApplyMsg(m, messages.AvailabilityChecked{
 		ResourceType: "ec2",
@@ -639,9 +631,8 @@ func TestDemoPrefetchCounts_AvailabilityPrefetchedHandler(t *testing.T) {
 	withTuiVersion(t, "test")
 	m := newRootSizedModel()
 
-	// Stamp the live AvailabilityGen so the AS-657/AS-659 staleness guard
-	// accepts the message (AcceptZeroGen=false after AS-659; session.New seeds
-	// AvailabilityGen=1).
+	// Stamp the live AvailabilityGen so the staleness guard accepts the
+	// message (AcceptZeroGen=false; session.New seeds AvailabilityGen=1).
 	_, cmd := rootApplyMsg(m, messages.AvailabilityPrefetched{
 		Entries:     map[string]int{"ec2": 7, "s3": 3},
 		Truncated:   map[string]bool{},
@@ -750,8 +741,7 @@ func TestRefreshResourceListWithEnrichmentRerun_PassthroughAPIError(t *testing.T
 //  5. Assert that the returned message carries Gen == dispatchGen, not the
 //     post-rotate gen.
 //
-// These tests FAIL TO COMPILE until Coder adds three exported test accessors
-// to internal/tui/app_accessors.go:
+// Test accessors (internal/tui/app_accessors.go):
 //   - FetchResourcesCmdForTest(resourceType string, gen domain.Gen) tea.Cmd
 //   - FetchIdentityCmdForTest(gen domain.Gen) tea.Cmd
 //   - FetchRevealValueCmdForTest(resourceType, resourceID string, gen domain.Gen) tea.Cmd

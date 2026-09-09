@@ -242,9 +242,8 @@ func TestD3ECSRecentEventFoundOutOfOrder(t *testing.T) {
 			Fields: map[string]string{"cluster": "acme-prod", "service_name": svc},
 		}}, nil)
 
-	// Inverted for spec row "phrase": the event text was the phrase, which made
-	// the wording a property of whichever event came first; it is a supporting
-	// row now and the phrase is the code's. Do not restore the old expectation.
+	// The event text is a supporting row and the phrase is the code's, so the
+	// wording is not a property of whichever event came first.
 	w4AssertFinding(t, res.Findings[svc], d3CodeECSDeployFailed,
 		catalog.Phrase(d3CodeECSDeployFailed), domain.SevBroken, "wave2")
 
@@ -434,7 +433,7 @@ func TestD3EveryKeyFailingMarksTheUserOnce(t *testing.T) {
 	}
 	res, err := d3EnrichUsersErr(t, fake, []resource.Resource{d3UserResource("acme-batch-user")})
 
-	// INVERTED for the "skipped" spec row 5: see d3EnrichUsersErr.
+	// See d3EnrichUsersErr.
 	if err == nil {
 		t.Error("every key failing returned no error")
 	}

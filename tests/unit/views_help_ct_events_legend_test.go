@@ -1,14 +1,10 @@
 package unit
 
-// Tests for the CloudTrail Events legend in the help view (T050Q).
+// Tests for the CloudTrail Events legend in the help view.
 //
-// These tests are written BEFORE implementation exists (TDD).
-// They will fail to compile until the coder:
-//   - Adds a ResourceShortName field (or equivalent) to HelpModel so the
-//     legend can be gated on "ct-events"
-//   - Adds a NewHelpWithResource(k, ctx, shortName) constructor (or extends
-//     NewHelp) so callers can pass the resource short name
-//   - Implements the CloudTrail Events legend block in help.go per §8a
+// HelpModel carries a ResourceShortName so the legend is gated on
+// "ct-events"; NewHelpWithResource(k, ctx, shortName) lets callers pass the
+// resource short name; the legend block itself lives in help.go per §8a.
 //
 // Bug vectors covered:
 //   - Legend shown on ALL resource lists (not gated on ct-events short name)
@@ -16,8 +12,8 @@ package unit
 //   - Legend missing required verb glyphs (R/W/D/S/I/N)
 //   - Legend missing severity-tier labels (ct-info / ct-attention / ct-danger)
 //   - "CloudTrail" section header absent from legend
-//   - Obsolete CELL COLORS section still present (ROOT/OK/FAILED per-cell colors
-//     were removed in the P3 tear-down; the block must NOT appear)
+//   - CELL COLORS section present (ROOT/OK/FAILED per-cell colors do not
+//     exist; the block must NOT appear)
 
 import (
 	"strings"
@@ -102,9 +98,8 @@ func TestHelpCTEventsLegend_ContainsSeverityTierLabels(t *testing.T) {
 }
 
 func TestHelpCTEventsLegend_NoCellColorsSection(t *testing.T) {
-	// The CELL COLORS block (ROOT actor / OK / FAILED outcome per-cell colors)
-	// was removed in the P3 redesign tear-down. The coder deletes lines 485–505
-	// from help.go. This test asserts those labels are ABSENT so a future
+	// There is no CELL COLORS block (ROOT actor / OK / FAILED outcome per-cell
+	// colors) in help.go; this test asserts those labels are ABSENT so an
 	// accidental re-addition is caught.
 	h := helpWithCTEvents(views.HelpFromResourceList)
 	out := renderHelp(h)
@@ -114,10 +109,10 @@ func TestHelpCTEventsLegend_NoCellColorsSection(t *testing.T) {
 	if strings.Contains(plain, "CELL COLORS") {
 		t.Error("help legend must NOT contain 'CELL COLORS' section — obsolete block deleted in P3 tear-down")
 	}
-	// Per-cell color labels that lived only in the CELL COLORS block must be absent.
-	// NOTE: "ROOT" may appear in other contexts (ACTOR column description), so we
-	// specifically check the section-header guard above. "cross-acct" is unique to
-	// the deleted block.
+	// Per-cell color labels that live only in the CELL COLORS block must be
+	// absent. "ROOT" may appear in other contexts (ACTOR column description),
+	// so the section-header guard above is the specific check; "cross-acct" is
+	// unique to that block.
 	if strings.Contains(plain, "cross-acct") {
 		t.Error("help legend must NOT contain 'cross-acct' — obsolete CELL COLORS entry")
 	}

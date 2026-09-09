@@ -7,8 +7,7 @@ package unit_test
 // therefore a key the account does not have, and the only truthful answer is
 // the service's not-found error. Answering an empty result instead turns a
 // fixture gap into a confident zero: a pivot to a resource nobody modelled
-// renders "none", which is the exact class of lie demo mode exists to disprove
-// and the reason the IAM fake grew the rule first.
+// renders "none", which is the exact class of lie demo mode exists to disprove.
 //
 // Each pin drives ONE by-id lookup per fake with a key no fixture registers,
 // and asserts two things: the service's own error code, and that
@@ -19,7 +18,7 @@ package unit_test
 // The registered half of the contract is pinned by
 // TestDemoFakesStillAnswerEveryRegisteredKey below, which drains every type's
 // real fetcher over these same fakes: if a refusal is too eager, a bench that
-// used to produce rows stops producing them.
+// produces rows stops producing them.
 
 import (
 	"context"

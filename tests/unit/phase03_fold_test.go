@@ -1,36 +1,21 @@
-// phase03_fold_test.go — TDD red-light tests for PR-03a-fold.
+// phase03_fold_test.go — enrichment folds into the cached rows.
 //
-// PR-03a-fold replaces the parallel m.EnrichmentFindings map with direct
-// mutation of cached row Findings/AttentionDetails via a new applyEnrichment
-// method on Model. These tests define the behavior the fold PR must satisfy.
+// After EnrichmentCheckedMsg is handled, every cached row of the given
+// resource type must have its r.Findings and r.AttentionDetails updated
+// in-place by applyEnrichment; there is no parallel
+// Session.EnrichmentFindings map.
 //
-// ── What is being tested ────────────────────────────────────────────────────
+//	Test 1/RowStore: applyEnrichment folds RowStore's retained rows via
+//	    AmendRows; RowStore's rows for this type survive past
+//	    EnrichChecked >= EnrichTotal with no special seeding needed to keep
+//	    them inspectable.
 //
-//	After EnrichmentCheckedMsg is handled, every cached row of the given
-//	resource type must have its r.Findings and r.AttentionDetails updated
-//	in-place. The parallel Session.EnrichmentFindings map is deleted entirely.
+//	Test 4: Session.EnrichmentFindings does not exist (reflection check).
 //
-// ── Red-light expectations (before PR-03a-fold) ─────────────────────────────
-//
-//	Test 1/RowStore: pins that applyEnrichment folds RowStore's retained rows
-//	    via AmendRows (task #17 wave 1 stage 2 removed the old
-//	    session.ProbeResources/ProbeTruncated "all-enrichment-done" free, so
-//	    RowStore's rows for this type survive past EnrichChecked >= EnrichTotal
-//	    with no special seeding needed to keep them inspectable).
-//
-//	Test 4: Session.EnrichmentFindings still exists — the reflection check
-//	    fails with "EnrichmentFindings field still exists".
-//
-//	Tests 2, 3, 5: currently PASS with the shim (DeriveFindings is deterministic).
-//	    They serve as regression pins: if fold incorrectly appends wave2 instead
-//	    of replacing, test 2 catches it (len==3 instead of 2). If fold forgets to
-//	    clear wave2 on empty input, test 3 catches it. If fold wipes wave1 when
-//	    writing wave2, test 5 catches it.
-//
-// ── Green-light (after PR-03a-fold) ─────────────────────────────────────────
-//
-//	applyEnrichment directly mutates r.Findings/r.AttentionDetails, the
-//	parallel map is deleted, and all five tests pass.
+//	Tests 2, 3, 5: if fold appends wave2 instead of replacing, test 2
+//	    catches it (len==3 instead of 2). If fold forgets to clear wave2 on
+//	    empty input, test 3 catches it. If fold wipes wave1 when writing
+//	    wave2, test 5 catches it.
 //
 // Run:
 //
@@ -69,7 +54,6 @@ func slugForTest(phrase string) string {
 }
 
 // applyMsg applies a message to the TUI model and returns the updated model.
-// Relocated from the deleted phase03_shim_wireups_test.go (renamed from applyMsg).
 func applyMsg(m tui.Model, msg tea.Msg) tui.Model {
 	return tuitest.StepModel(m, msg)
 }
@@ -77,7 +61,6 @@ func applyMsg(m tui.Model, msg tea.Msg) tui.Model {
 // newRootModel builds a minimal root model suitable for the fold tests.
 // It applies a WindowSizeMsg and a ClientsReadyMsg with nil clients, which is
 // enough to advance the model past the initial state without triggering live AWS calls.
-// Relocated from the deleted phase03_shim_wireups_test.go (renamed from newRootModel).
 func newRootModel(t testing.TB) tui.Model {
 	m := newBlessedModel(t, "test-profile", "us-east-1",
 		tui.WithNoCache(true),
@@ -107,15 +90,10 @@ func newRootModel(t testing.TB) tui.Model {
 //   - r.AttentionDetails[code].Rows must contain the EnrichmentFinding's Rows.
 //   - The same row mutation must occur for LazyResourceCache and RowStore.
 //
-// Red-light today:
-//   - ResourceCache and LazyResourceCache subtests PASS with the current shim
-//     (DeriveFindings correctly filters "running" and emits only wave2).
-//   - RowStore subtest pins that applyEnrichment's AmendRows fold reaches
-//     RowStore's retained rows the same way it reaches the other two caches
-//     (task #17 wave 1 stage 2 replaced the removed session.ProbeResources/
-//     ProbeTruncated all-enrichment-done free with a no-op — RowStore rows
-//     are never cleared on completion, so no special seeding is needed to
-//     keep them inspectable).
+// The RowStore subtest pins that applyEnrichment's AmendRows fold reaches
+// RowStore's retained rows the same way it reaches the other two caches;
+// RowStore rows are never cleared on completion, so no special seeding is
+// needed to keep them inspectable.
 func TestFold_EnrichmentCheckedMutatesRowsDirectly(t *testing.T) {
 	// alias == "" means use canonShort as the message ResourceType (canonical-only).
 	// alias != "" means use alias as the message ResourceType, assert cache under canonShort.
@@ -242,12 +220,10 @@ func TestFold_EnrichmentCheckedMutatesRowsDirectly(t *testing.T) {
 		t.Run(tc.name+"/RowStore", func(t *testing.T) {
 			m := newRootModel(t)
 
-			// task #17 wave 1 stage 2: the "all enrichment done" cleanup that
-			// used to nil out session.ProbeResources is gone — RowStore
-			// retains its rows for the session even after
-			// EnrichChecked >= EnrichTotal (see handlers_availability.go's
-			// doc comment on that branch). EnrichTotal is left at its
-			// session.New() default; there is no cleanup left to avoid.
+			// RowStore retains its rows for the session even after
+			// EnrichChecked >= EnrichTotal (see handlers_availability.go's doc
+			// comment on that branch). EnrichTotal is left at its session.New()
+			// default.
 
 			// RowStore is populated via AvailabilityCheckedMsg in real usage,
 			// but for the fold test we seed it directly (OriginProbe) — the
@@ -349,8 +325,8 @@ func TestFold_RepeatedEnrichmentReplacesWave2(t *testing.T) {
 				{
 					ID:   rid,
 					Name: "test-" + tc.canonShort,
-					// W1.4a: fetchers populate Findings directly; mirror what the
-					// removed derive shim produced from Status: "impaired".
+					// Fetchers populate Findings directly; this mirrors a fetcher\'s
+					// "impaired" finding.
 					Findings: []domain.Finding{{
 						Code:     domain.FindingCode(tc.canonShort + ".impaired"),
 						Phrase:   "impaired",
@@ -473,8 +449,8 @@ func TestFold_EmptyEnrichmentClearsWave2(t *testing.T) {
 				{
 					ID:   rid,
 					Name: "test-" + tc.canonShort,
-					// W1.4a: fetchers populate Findings directly; mirror what the
-					// removed derive shim produced from Status: "impaired".
+					// Fetchers populate Findings directly; this mirrors a fetcher\'s
+					// "impaired" finding.
 					Findings: []domain.Finding{{
 						Code:     domain.FindingCode(tc.canonShort + ".impaired"),
 						Phrase:   "impaired",
@@ -557,14 +533,9 @@ func TestFold_EmptyEnrichmentClearsWave2(t *testing.T) {
 // ── Test 4: Session.EnrichmentFindings field is deleted ────────────────────
 
 // TestFold_EnrichmentFindingsFieldDeleted verifies at compile+runtime that
-// session.Session does NOT have an EnrichmentFindings field.
-//
-// This test FAILS before PR-03a-fold (the field still exists in Session) and
-// PASSES after (the field is deleted from the struct).
-//
-// The reflection approach is used per the spec: it avoids a compilation
-// dependency on the deleted field while still catching regressions if the
-// field is re-added.
+// session.Session does NOT have an EnrichmentFindings field. The reflection
+// approach avoids a compilation dependency on the field while still
+// catching it if it is added.
 func TestFold_EnrichmentFindingsFieldDeleted(t *testing.T) {
 	s := session.New()
 	v := reflect.ValueOf(s).Elem()
@@ -573,7 +544,7 @@ func TestFold_EnrichmentFindingsFieldDeleted(t *testing.T) {
 	}
 }
 
-// ── CodeRabbit PR #310 finding A: Ctrl+R on resource list leaves stale wave2 ──
+// ── Ctrl+R on resource list clears stale wave2 ──
 
 // TestFold_CtrlROnList_ClearsActiveRowFindings verified that pressing Ctrl+R
 // while viewing a resource list cleared stale wave2 findings from the rows
@@ -697,19 +668,17 @@ func TestFold_CtrlROnList_ClearsActiveRowFindings(t *testing.T) {
 	}
 }
 
-// ── CodeRabbit PR #310 finding B: main-menu Ctrl+R leaves stale wave2 in cache ──
+// ── main-menu Ctrl+R clears stale wave2 in cache ──
 
 // TestFold_MainMenuCtrlR_ClearsAllCachedWave2 verifies that pressing Ctrl+R
 // while on the main menu clears wave2 findings from ALL cached resource rows
 // across all types.
 //
-// The pre-fix bug (PR #310 CodeRabbit finding B):
-//
-//	handleRefresh on the main-menu path resets side maps (ProbeResources,
-//	EnrichmentRan, etc.) but never touches m.Core().Session().ResourceCache. Rows in ResourceCache
-//	retain stale r.Findings from the previous enrichment wave. When the user
-//	navigates back to a list, they see stale wave2 markers until a fresh
-//	EnrichmentCheckedMsg arrives and overwrites them.
+// handleRefresh on the main-menu path resets side maps (ProbeResources,
+// EnrichmentRan, etc.) and must also clear the rows in
+// m.Core().Session().ResourceCache, or they retain stale r.Findings from the
+// previous enrichment wave and the user sees stale wave2 markers on the next
+// list until a fresh EnrichmentCheckedMsg overwrites them.
 //
 // Note: this model is built WITHOUT WithNoCache so handleRefresh does not
 // return early on the main-menu path (noCache=true short-circuits at line 349).
@@ -904,8 +873,8 @@ func TestFold_AttentionDetailsCarryAcrossEntryPoints(t *testing.T) {
 							{
 								ID:   rid,
 								Name: "site4-" + tc.canonShort,
-								// W1.4a: fetchers populate Findings directly; mirror what the
-								// removed derive shim produced from Status: "impaired".
+								// Fetchers populate Findings directly; this mirrors a fetcher\'s
+								// "impaired" finding.
 								Findings: []domain.Finding{{
 									Code:     domain.FindingCode(tc.canonShort + ".impaired"),
 									Phrase:   "impaired",

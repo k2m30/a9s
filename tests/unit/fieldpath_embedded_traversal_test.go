@@ -1,23 +1,16 @@
 package unit
 
-// fieldpath_embedded_traversal_test.go — regression coverage for defect (A)
-// from the independent Codex + CodeRabbit review: core/fieldpath's path
-// walkers (ExtractValue, ExtractFirstListScalar) did not traverse anonymous
+// fieldpath_embedded_traversal_test.go — core/fieldpath's path walkers
+// (ExtractValue, ExtractFirstListScalar) traverse exported anonymous
 // embedded struct fields, so a detail enricher's wrapper RawStruct (e.g.
 // awsclient.FunctionEnriched embedding lambdatypes.FunctionConfiguration)
-// collapsed the entire detail field list post-enrichment — reproduced as
-// ExtractValue(FunctionEnriched{...}, "FunctionName") -> "no field matching".
-//
-// The fix (core/fieldpath — FROZEN, written by the coder, not this agent)
-// makes the walkers traverse exported anonymous embedded struct fields:
-// direct fields win over promoted ones, pointer embeds are deref'd, and
-// json:"-" / non-struct anonymous fields are not promoted. This file pins
-// that contract against every wrapper type introduced by #261 plus the
-// pre-existing PolicyEnriched, and a locally-defined multi-level embed for
-// the depth/shadowing axes no real wrapper happens to exercise.
-//
-// May be RED until the parallel fieldpath fix lands — that is the expected
-// TDD state, not a bug in this test.
+// keeps its detail field list post-enrichment:
+// ExtractValue(FunctionEnriched{...}, "FunctionName") resolves. Direct fields
+// win over promoted ones, pointer embeds are deref'd, and json:"-" /
+// non-struct anonymous fields are not promoted. This file pins that contract
+// against every wrapper type plus PolicyEnriched, and a locally-defined
+// multi-level embed for the depth/shadowing axes no real wrapper happens to
+// exercise.
 
 import (
 	"reflect"
@@ -219,16 +212,14 @@ func TestFieldpathEmbeddedTraversal_UnknownPath_StillErrors(t *testing.T) {
 	}
 }
 
-// TestFieldpathExtractSubtree_BigIntInJSONStringField_RoundTripsLosslessly
-// pins the already-landed half of F2 (the independent Codex + CodeRabbit
-// review's big-integer finding): tryParseJSON (extract.go) decodes with
-// json.Decoder.UseNumber, so ExtractSubtree's JSON-string-field YAML
-// rendering keeps an integer above 2^53 at full precision instead of
-// silently rounding it the way a plain json.Unmarshal-into-any would
-// (9007199254740993 -> 9007199254740992, tryParseJSON's own doc comment).
-// Unlike the rest of this file, this axis is expected GREEN already — no
-// real wrapper type has a plain string field holding raw JSON, so a minimal
-// local type stands in, mirroring embedInner/embedMiddle/embedOuter above.
+// TestFieldpathExtractSubtree_BigIntInJSONStringField_RoundTripsLosslessly:
+// tryParseJSON (extract.go) decodes with json.Decoder.UseNumber, so
+// ExtractSubtree's JSON-string-field YAML rendering keeps an integer above
+// 2^53 at full precision instead of rounding it the way a plain
+// json.Unmarshal-into-any would (9007199254740993 -> 9007199254740992,
+// tryParseJSON's own doc comment). No real wrapper type has a plain string
+// field holding raw JSON, so a minimal local type stands in, mirroring
+// embedInner/embedMiddle/embedOuter above.
 func TestFieldpathExtractSubtree_BigIntInJSONStringField_RoundTripsLosslessly(t *testing.T) {
 	const bigInt = "9007199254740993"
 	type withJSONStringField struct {

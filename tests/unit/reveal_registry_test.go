@@ -1,10 +1,9 @@
 package unit
 
-// reveal_registry_test.go tests the reveal registry functions that will be
-// added to core/resource/registry.go as part of issue #104.
-// These tests will FAIL until the coder adds SetRevealFetcherForTest,
-// GetRevealFetcher, CleanupRevealFetcherForTest, HasRevealFetcher to registry.go
-// and updates secrets.go and ssm.go to register reveal fetchers in init().
+// reveal_registry_test.go tests the reveal registry functions in
+// core/resource/registry.go (SetRevealFetcherForTest, GetRevealFetcher,
+// CleanupRevealFetcherForTest, HasRevealFetcher) and the reveal fetchers
+// secrets.go and ssm.go register in init().
 
 import (
 	"context"

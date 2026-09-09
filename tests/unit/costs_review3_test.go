@@ -1,71 +1,47 @@
-// costs_review3_test.go — Cost Explorer external review round 3: five
-// findings (R1-R5) traced against current source before writing, same
-// convention as costs_review2_test.go/costs_selfreview_test.go.
-//
-// package unit_test: every finding here is reachable via the exported
+// costs_review3_test.go — Cost Explorer pins reachable via the exported
 // core/aws.FetchEC2InstancesByIDs surface, the pure core/costs.Store/
-// screen.BuildViewModel surface, or the headless app.Controller surface —
-// no TUI helper needed. Reuses newCostsController/topDrill/fixedCostsNow/
+// screen.BuildViewModel surface, or the headless app.Controller surface — no
+// TUI helper needed. Reuses newCostsController/topDrill/fixedCostsNow/
 // fullMetricRecord/findFetchCostsTask (costs_state_test.go/
 // costs_interaction_test.go) and selfReviewAPIError/strPtrSelfReview
 // (costs_selfreview_test.go), all defined in this same package.
 //
-// R1 (P1, core/aws/ec2_by_ids.go:~68): confirmed in source — when EVERY
-// requested ID is named bad, `retry` ends up empty (len 0), and the guard
-// `len(bad) == 0 || len(retry) == len(requested)` does not fire (bad is
-// non-empty, retry is empty and not equal to requested), so the code falls
-// through and calls fetchEC2InstancesByIDsOnce with an EMPTY id slice —
-// DescribeInstances with no InstanceIds is an ACCOUNT-WIDE describe.
+// R1 (core/aws/ec2_by_ids.go): when EVERY requested ID is named bad, the
+// retry slice is empty and the fetch must stop — DescribeInstances with no
+// InstanceIds is an ACCOUNT-WIDE describe.
 //
 // R2 (core/costs/screen/screen.go PlanFetch + core/costs/store.go
-// Store.Anomalies): confirmed in source — Store.Anomalies(now) is TTL-only
-// (anomalyBucket carries FetchedAt/Marks, no covered-range field), and
-// PlanFetch's Anomalies half derives purely from that TTL check regardless
-// of what range the CURRENT frame actually needs, even though the anomaly
-// fetch itself (FetchCostAnomaliesCounted) IS range-scoped via
-// GetAnomalies's DateInterval. A fresh snapshot cached under the default
-// trailing-12-months range is wrongly treated as covering a materially
-// wider (e.g. year-zoom) range too.
+// Store.Anomalies): the anomaly fetch (FetchCostAnomaliesCounted) is
+// range-scoped via GetAnomalies's DateInterval, so a fresh snapshot cached
+// under the default trailing-12-months range does not cover a materially
+// wider (e.g. year-zoom) range; PlanFetch's Anomalies half must consider the
+// range the CURRENT frame needs, not only the TTL.
 //
-// R3 (core/costs/store.go:~309, MergeCoverage): confirmed in source and
-// DISTINCT from the existing TestCostsReview2_R2_ZeroRecordPeriod_
-// MergeCoverage_NotReportedMissing (costs_review2_test.go) coverage — that
-// test only covers a period NEVER before seen (no bucket exists yet, so
-// MergeCoverage's own `if _, exists := entry.Periods[pk]; exists {
-// continue }` guard doesn't apply). This finding targets a bucket that
-// ALREADY exists but is TTL-stale (a still-open period, fetched once,
-// now expired): a refetch that authoritatively returns zero groups this
-// round leaves Merge with nothing to key off (no records for that period),
-// and MergeCoverage's `exists` guard then skips it too — so FetchedAt is
-// NEVER advanced and Lookup reports it missing forever, looping the
-// refetch. The MergeCoverage doc comment's own stated worry ("would
-// wrongly promote a still-unsettled record to look... permanently
-// fetched") does not actually apply here: refreshing FetchedAt alone
-// (never touching Records, never forcing immutableAt) only resets the 24h
-// TTL clock — it does not promote the bucket past its own settlementLag
-// closure check. The anti-promotion rule (a period ABSENT from the fetched
-// range must never be re-stamped) is pinned separately below and stays
-// exactly as-is.
+// R3 (core/costs/store.go MergeCoverage): a bucket that ALREADY exists but is
+// TTL-stale (a still-open period, fetched once, now expired) whose refetch
+// authoritatively returns zero groups must have its FetchedAt advanced, or
+// Lookup reports it missing forever and loops the refetch. Refreshing
+// FetchedAt alone (never touching Records, never forcing immutableAt) only
+// resets the 24h TTL clock; it does not promote the bucket past its own
+// settlementLag closure check. The anti-promotion rule (a period ABSENT from
+// the fetched range must never be re-stamped) is pinned separately below.
+// TestCostsReview2_R2_ZeroRecordPeriod_MergeCoverage_NotReportedMissing
+// (costs_review2_test.go) covers only a period NEVER before seen.
 //
-// R4 (core/app/costs_state.go:~159, ensureCostsState): confirmed in
-// source — costs.LoadStore(profile) is called unconditionally, with no
-// c.core.NoCache() check anywhere in ensureCostsState or in Handle's
-// dirtyStore.Save() flush, unlike every OTHER cache in the codebase
-// (core/session/session.go's own NoCache-gated EnsureCacheStore family,
-// core/runtime/handlers.go, core/runtime/probes.go). Demo mode
-// (--demo sets NoCache=true) silently reads and writes a real
-// ~/.a9s/cache/<profile>--costs.yaml file.
+// R4 (core/app/costs_state.go ensureCostsState): costs.LoadStore(profile)
+// and Handle's dirtyStore.Save() flush are gated on c.core.NoCache(), like
+// every OTHER cache in the codebase (core/session/session.go's NoCache-gated
+// EnsureCacheStore family, core/runtime/handlers.go,
+// core/runtime/probes.go); demo mode (--demo sets NoCache=true) must not
+// read or write a real ~/.a9s/cache/<profile>--costs.yaml file.
 //
 // R5 (core/costs/grid.go BuildGrid + core/costs/screen/screen.go
-// BuildViewModel): confirmed as an explicit spec violation —
-// specs/021-cost-explorer/data-model.md:91 ("sorted desc by row total over
-// VISIBLE window") and spec.md:83/90 ("Row sort is descending by row total
-// over the visible window... documented in the help screen") both name the
-// VISIBLE window explicitly. BuildGrid sorts by the FULL window total (its
-// own doc: "sorts rows desc by absolute row total", no viewport
-// parameter — correctly, a pure grid-level concern). BuildViewModel
-// (screen.go) slices columns and drops all-zero VISIBLE rows but never
-// re-sorts — Rows keeps BuildGrid's full-window order verbatim.
+// BuildViewModel): specs/021-cost-explorer/data-model.md ("sorted desc by row
+// total over VISIBLE window") and spec.md ("Row sort is descending by row
+// total over the visible window... documented in the help screen") both name
+// the VISIBLE window. BuildGrid sorts by the FULL window total (a pure
+// grid-level concern, no viewport parameter); BuildViewModel slices columns,
+// drops all-zero VISIBLE rows and re-sorts by the visible-window total.
 package unit_test
 
 import (
@@ -206,7 +182,7 @@ func TestCostsReview3_R3_ExpiredOpenBucket_AuthoritativeZeroRefetch_ClearsStaleA
 	}
 
 	// The refetch is authoritative: CE genuinely returned zero groups for
-	// openMonth this round. Merge alone has nothing to key off (no records
+	// openMonth in this refetch. Merge alone has nothing to key off (no records
 	// for this period), so it leaves the stale bucket's old FetchedAt
 	// untouched — MergeCoverage must be the one to clear/re-stamp it.
 	store.Merge(q, nil, expiredNow)
@@ -416,8 +392,8 @@ func TestCostsReview3_P1_AnomalyOnlyDelivery_NeverClearsWarmGridCoverage(t *test
 	// An anomaly-only (SkipGrid) refresh for the SAME shape/window
 	// completes — exactly ensureCostsShapeFetched's own X3 dispatch once
 	// the grid is already covered but the anomaly TTL has expired. Its
-	// Records is nil because the grid was never re-fetched this round, NOT
-	// because CE authoritatively confirmed zero.
+	// Records is nil because the grid was not re-fetched in this delivery,
+	// NOT because CE authoritatively confirmed zero.
 	c.Handle(messages.CostsLoaded{
 		Query:     q,
 		Grid:      costs.GridResult{Fetched: false},
@@ -470,7 +446,7 @@ func TestCostsReview3_P1_AnomalyOnlyDelivery_NeverFiresGranularityFallback(t *te
 	// An UNRELATED anomaly-only (SkipGrid) delivery happens to match the
 	// freshly-pushed child frame's own query shape (e.g. that shape's
 	// anomaly slot separately expiring) — Records is nil because the grid
-	// was never fetched this round, NOT because CE confirmed zero.
+	// was not fetched in this delivery, NOT because CE confirmed zero.
 	_, fallbackTasks := c.Handle(messages.CostsLoaded{
 		Query:     childPayload.Query,
 		Grid:      costs.GridResult{Fetched: false},

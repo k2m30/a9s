@@ -853,7 +853,7 @@ func TestRoot_EnterChildView_NilParentContext(t *testing.T) {
 // ── Bug #84: Multi-line error messages in header push content off-screen ─────
 
 // longAWSError is a realistic AWS AccessDeniedException message (~250 chars)
-// that reproduces the header overflow bug described in issue #84.
+// that overflows the header.
 const longAWSError = "User: arn:aws:iam::123456789012:user/test-user@example.com is not authorized to perform: kms:DescribeKey on resource: arn:aws:kms:eu-central-1:123456789012:key/abcdef01-2345-6789-abcd-ef0123456789 because no resource-based policy allows the kms:DescribeKey action"
 
 func TestRoot_View_LongErrorNoLineExceedsWidth(t *testing.T) {

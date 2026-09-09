@@ -1,10 +1,10 @@
 package unit
 
 // aws_foreach_parallel_test.go — pins the contract for aws.ForEachParallel,
-// the shared bounded-concurrency helper Wave-2 issue enrichers will use to
-// replace their current sequential per-resource AWS calls.
+// the shared bounded-concurrency helper behind Wave-2 issue enrichers'
+// per-resource AWS calls.
 //
-// Contract under test (core/aws/parallel.go, not yet implemented):
+// Contract under test (core/aws/parallel.go):
 //
 //	func ForEachParallel(ctx context.Context, n, limit int, fn func(i int)) error
 //

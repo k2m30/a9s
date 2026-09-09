@@ -284,17 +284,16 @@ func TestRelated_R53_APIGW_CacheNilList(t *testing.T) {
 	}
 	clients := &awsclient.ServiceClients{Route53: fakeR53}
 
-	// Cache entry PRESENT but holding nothing. INVERTED for row 2: this used
-	// to assert the checker fell back to the API id parsed out of the alias
-	// hostname and reported it as a resolved related resource. That is the
-	// defect — an alias DNS name is not an apigw ID, so the panel offered a
-	// row that navigated to nothing, and an account with zero APIs rendered a
-	// resolved count equal to its alias records. Do not restore it.
+	// Cache entry PRESENT but holding nothing. The checker does not fall back
+	// to the API id parsed out of the alias hostname: an alias DNS name is not
+	// an apigw ID, so that would offer a row that navigates to nothing, and an
+	// account with zero APIs would render a resolved count equal to its alias
+	// records.
 	//
-	// A present entry is a complete answer even when empty (row 1,
-	// FetchRelatedTarget's cache-hit path), so the answer here is a resolved
-	// zero, not Unknown. Unknown is for a cache MISS with no fetcher, pinned
-	// separately in r53_related_nil_cache_test.go.
+	// A present entry is a complete answer even when empty (FetchRelatedTarget's
+	// cache-hit path), so the answer here is a resolved zero, not Unknown.
+	// Unknown is for a cache MISS with no fetcher, pinned separately in
+	// r53_related_nil_cache_test.go.
 	cache := resource.ResourceCache{
 		"apigw": resource.ResourceCacheEntry{Resources: nil},
 	}

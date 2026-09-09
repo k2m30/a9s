@@ -182,23 +182,20 @@ var replayShadowedCells = []replayShadowedCell{
 	{"acm", "arn:aws:acm:us-east-1:123456789012:certificate/c9d0e1f2-3456-78ab-cdef-999999999999", "In Use", "No"},
 	{"cf", "E1A2B3C4D5E6F7", "Enabled", "Yes"},
 	{"cf", "E3C4D5E6F7G8H9", "Enabled", "No"},
-	// float64. Inverted by misc4 round 2: the defaults now read the fetcher's
-	// own value for this column, so both frames show the precision CloudWatch
-	// reports the threshold at rather than the %g the reflect formatter left.
+	// float64: the defaults read the fetcher's own value for this column, so
+	// both frames show the precision CloudWatch reports the threshold at
+	// rather than the %g the reflect formatter leaves.
 	{"alarm", "cf-e1a2b3c4d5e6f7-error-rate", "Threshold", "5.00"},
 	// int over a phrase: the fetcher's Fields value is not a retention at all.
-	// The retention policy is one field carrying words (aws5 row 1): "30 days"
-	// where the number-only key used to render "30".
+	// The retention policy is one field carrying words: "30 days".
 	{"logs", "/aws/lambda/process-orders", "Retention", "30 days"},
 	// timestamp: the fetcher writes a date and no time of day, and the cell
-	// says exactly that. Inverted for tui5 row "one humanizer" — both rows
-	// expected a "00:00" the fetcher never reported. Do not restore it.
+	// says exactly that, with no "00:00" the fetcher never reported.
 	{"secrets", "prod/app/long-lived-signing-key", "Last Changed", "2024-12-01"},
 	{"secrets", "prod/payments/stripe-webhook-secret", "Last Accessed", "2026-04-28"},
-	// The identifier column. Inverted by misc4 round 2: the fetch-side column
-	// change this row's earlier comment anticipated is the one that landed —
-	// the defaults read the fetcher's task_id, so a column headed "Task ID"
-	// and 38 wide shows the ID rather than a 78-character ARN cut in half.
+	// The identifier column: the defaults read the fetcher's task_id, so a
+	// column headed "Task ID" and 38 wide shows the ID rather than a
+	// 78-character ARN cut in half.
 	{"ecs-task", "a1b2c3d4e5f6a1b2c3d4e5f6", "Task ID", "a1b2c3d4e5f6a1b2c3d4e5f6"},
 	// The status column, which the save lane excludes outright: the fetcher
 	// left no lifecycle key behind, so the replayed cell is empty.
@@ -440,10 +437,8 @@ func TestReplay_CacheFileWrittenByThePreviousVersionStillRendersItsWord(t *testi
 	if idx < 0 {
 		t.Fatal("no column titled \"Last Accessed\" in the rendered list")
 	}
-	// The subject is which of the two keys wins, and the fetcher's own still
-	// does. The expected string is inverted for tui5 row "one humanizer": that
-	// build's screen showed a midnight its fetcher never reported, and matching
-	// it forever would keep the defect. Do not restore the "00:00".
+	// The subject is which of the two keys wins, and the fetcher's own does.
+	// The expected string carries no midnight the fetcher never reported.
 	if got := body.Rows[0].Cells[idx]; got != "2026-04-28" {
 		t.Errorf("a row from the previous build's cache renders Last Accessed as %q, want %q — the fetcher's own key still wins",
 			got, "2026-04-28")

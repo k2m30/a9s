@@ -2,8 +2,8 @@ package unit
 
 // aws_dbc_issue_enrichment_test.go — Wave 2 enricher tests for dbc.
 //
-// AS-140 (Wave-2 enricher migration): FieldUpdates["status"] is no longer
-// written by EnrichDBCMaintenance. The merged §4 status phrase is computed
+// EnrichDBCMaintenance never writes FieldUpdates["status"]. The merged §4
+// status phrase is computed
 // at render time by phraseFromFindings(r.Findings) in extractCellValue.
 //
 // Tests drive aws.EnrichDBCMaintenance (the dbc-specific enricher) and assert:
@@ -11,7 +11,7 @@ package unit
 //   - Severity "!" (S1-badge-bumping — different from dbi's "~").
 //   - IssueCount increments for each overdue finding.
 //   - Summary is "maintenance overdue" (short phrase; rows carry concrete detail).
-//   - FieldUpdates is nil or empty in every case (AS-140: no status overlay,
+//   - FieldUpdates is nil or empty in every case (no status overlay,
 //     no "(+N)" suffix arithmetic on the enricher side).
 //   - Future-dated actions (not yet overdue) are NOT emitted.
 //   - nil DocDB client returns empty result gracefully.
@@ -172,7 +172,7 @@ func TestDBC_Enrich_MaintenanceOverdue_HealthyRow(t *testing.T) {
 		t.Errorf("Phrase = %q, want %q", finding.Phrase, "maintenance overdue")
 	}
 
-	// AS-140: FieldUpdates must be nil/empty — the merged display phrase is
+	// FieldUpdates must be nil/empty — the merged display phrase is
 	// computed by phraseFromFindings(r.Findings) at render time.
 	if updates, ok := result.FieldUpdates[fixtures.MaintDbcOverdueID]; ok && len(updates) != 0 {
 		t.Errorf("AS-140: expected empty FieldUpdates for %q (status overlay removed); got %v", fixtures.MaintDbcOverdueID, updates)
@@ -275,7 +275,7 @@ func TestDBC_Enrich_NilDocDBClient(t *testing.T) {
 	}
 }
 
-// TestDBC_Enrich_Wave1PlusWave2_NoFieldUpdates verifies AS-140: when the
+// TestDBC_Enrich_Wave1PlusWave2_NoFieldUpdates verifies that when the
 // fetcher already populated Status (Wave 1 warning), the Wave-2 maintenance
 // Finding is still emitted with severity "!" but FieldUpdates is left empty.
 // The merged "no automated backups (+1)" display is computed at render time
@@ -321,7 +321,7 @@ func TestDBC_Enrich_Wave1PlusWave2_NoFieldUpdates(t *testing.T) {
 		t.Errorf("Severity = %v, want SevBroken", finding.Severity)
 	}
 
-	// AS-140: FieldUpdates must be empty.
+	// FieldUpdates must be empty.
 	if updates, ok := result.FieldUpdates[clusterID]; ok && len(updates) != 0 {
 		t.Errorf("AS-140: expected empty FieldUpdates for %q (status overlay removed); got %v", clusterID, updates)
 	}

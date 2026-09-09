@@ -5,11 +5,9 @@
 // A list opened over the disk cache renders rows with no SDK struct: every
 // cell is the text the save lane left behind. The same list a second later,
 // once the fetch lands, renders rows that still carry the struct. The
-// comparator used to read the struct on the live frame and the text on the
-// cached one, so the same column could order the same rows two ways and the
-// list re-ordered under the operator when the fetch arrived.
-//
-// One representation now: the cell text, on both frames.
+// comparator reads one representation on both frames — the cell text — so
+// the same column orders the same rows one way and the list does not
+// re-order under the operator when the fetch arrives.
 package unit_test
 
 import (

@@ -77,9 +77,6 @@ func TestCatalogAndDefaultColumnsAgreeTitleByTitle(t *testing.T) {
 			}
 
 			// The two arms of the cascade, built exactly as it builds them.
-			// INVERTED for aws6 rows 4-6: Humanize is the TYPE's declaration
-			// now, so both arms read the same one and the old per-arm
-			// `lc.Humanize` read is not to be restored.
 			// The humanize flag is the TYPE's, and both arms resolve to the
 			// same merged column, so it is computed once from the key that
 			// merge produces (the catalog's where it declares one).

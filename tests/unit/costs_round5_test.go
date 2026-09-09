@@ -1,7 +1,6 @@
-// costs_round5_test.go — Cost Explorer: external reviewer's third pass (7
-// findings, none already covered by rounds 3/4's red tests — fold, the
-// zero-value neutral-color pin, and -c startup are all already pinned
-// elsewhere and are NOT repeated here).
+// costs_round5_test.go — Cost Explorer: seven contract pins (fold, the
+// zero-value neutral-color pin, and -c startup are pinned elsewhere and are
+// NOT repeated here).
 //
 // package unit_test (not unit): every finding here is reachable via the
 // headless app.Controller / pure core/costs package — no TUI-level
@@ -9,18 +8,12 @@
 // newCostsController/topDrill/fixedCostsNow/monthRecord and
 // costs_interaction_test.go's findFetchCostsTask directly (same package).
 //
-// *** New/pinned observable surface (finding E only — flagged per the
-// *** dispatch): no navigation mechanism exists yet for Enter on a
-// *** RESOURCE_ID row (applyCostsSelect is a hard no-op there today —
-// *** NextDim returns "" at the bottom of the chain). Rather than invent a
-// *** full TaskKindEmitNavigate-shaped round trip (a much larger surface
-// *** than this file should pin blind), E asserts against CostsBody's
-// *** EXISTING FooterNote seam (the same field DrillRefusedReason already
-// *** uses for "Enter did something observable, not a silent no-op") —
-// *** loosely: non-empty and resource-ID-bearing for a supported service,
-// *** non-empty for an unsupported one. The coder is free to choose the
-// *** exact wording and the exact supported-service table; this only pins
-// *** that Enter on a RESOURCE_ID row must never again be silent.
+// Finding E asserts against CostsBody's FooterNote seam (the same field
+// DrillRefusedReason uses for "Enter did something observable, not a silent
+// no-op") — loosely: non-empty and resource-ID-bearing for a supported
+// service, non-empty for an unsupported one. It pins only that Enter on a
+// RESOURCE_ID row is never silent, not the exact wording or the exact
+// supported-service table.
 package unit_test
 
 import (
@@ -65,11 +58,10 @@ func round5FullDailyRecords(t *testing.T, window []costs.Period, rowKey string, 
 }
 
 // ===========================================================================
-// A (P1) — ApplyCostsLoaded must not stamp week/year DISPLAY buckets as
-// covered via MergeCoverage when ev.Records are native DAILY/MONTHLY: this
-// is the traced root cause of round 4's "empty week grid" live bug (a
-// full CostsLoaded round-trip through the real apply path, not a synthetic
-// Store seed — round 4's dead end).
+// A — ApplyCostsLoaded must not stamp week/year DISPLAY buckets as covered
+// via MergeCoverage when ev.Records are native DAILY/MONTHLY (a full
+// CostsLoaded round-trip through the real apply path, not a synthetic Store
+// seed), or the week grid renders empty.
 // ===========================================================================
 
 func TestCostsRound5_A_WeekViewCoverageStamp_DoesNotShadowNativeDailyRecords(t *testing.T) {
@@ -187,11 +179,11 @@ func TestCostsRound5_B_CostsLoadedWhileOverlayStacked_StillMergesIntoScreenBenea
 }
 
 // ===========================================================================
-// C (P1) — in-flight matching must include the requested RANGE, not just
-// CacheKey (extends round 2's shape-only R4 pin to same-shape different-
-// range deliveries): fetch May (week-granularity), zoom to June (same
-// CacheKey, different Range) before May's result lands, deliver May's
-// result -> June must stay Loading; deliver June's -> renders.
+// C — in-flight matching must include the requested RANGE, not just
+// CacheKey (same-shape different-range deliveries): fetch May
+// (week-granularity), zoom to June (same CacheKey, different Range) before
+// May's result lands, deliver May's result -> June must stay Loading;
+// deliver June's -> renders.
 // ===========================================================================
 
 func TestCostsRound5_C_InFlightMatch_IncludesRange_NotJustCacheKey(t *testing.T) {

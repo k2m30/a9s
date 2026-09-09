@@ -842,9 +842,9 @@ func wave3AttentionRowsForCode(body *app.DetailBody, phraseSubstr string) []app.
 // (detail_body.go:330) emits further Attention sub-rows carrying the full S5
 // operator sentence, in addition to the S4 Phrase row.
 func Test_DetailAttention_RendersFullDetailSentence_AlongsidePhrase(t *testing.T) {
-	// Read the definition rather than build the sentence here: task w27 made
-	// catalog.Detail the one owner, and a literal copy in this test would
-	// silently document a retired shape the moment the definition changes.
+	// Read the definition rather than build the sentence here: catalog.Detail
+	// is the one owner, and a literal copy in this test would silently
+	// document a retired shape the moment the definition changes.
 	const code domain.FindingCode = "dbi.pending-maintenance"
 	wantDetail := catalog.Detail(code)
 	if wantDetail == "" {
@@ -872,12 +872,10 @@ func Test_DetailAttention_RendersFullDetailSentence_AlongsidePhrase(t *testing.T
 	if !strings.Contains(strings.ToLower(rows[0].Value), "maintenance scheduled") {
 		t.Errorf("first Attention row must carry the short Phrase; got %+v", rows[0])
 	}
-	// Inverted for spec row 5 (the Attention sentence wraps to the panel):
-	// the sentence now arrives as successive rows, so "rows[1] equals the
-	// sentence verbatim" is the assertion a one-row sentence made and is not
-	// to be restored — a single row wide enough to hold this sentence is the
-	// row the acceptance capture found cut at the panel edge. What must hold
-	// is that every word survives, in order, across the rows.
+	// The Attention sentence wraps to the panel and arrives as successive
+	// rows; a single row wide enough to hold this sentence is a row cut at the
+	// panel edge. What must hold is that every word survives, in order, across
+	// the rows.
 	var sentence []string
 	for _, r := range rows[1:] {
 		sentence = append(sentence, r.Value)
@@ -1040,13 +1038,11 @@ func Test_RenderDetail_RelatedPanel_ScrollExceedsRowCount(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// 19. Detail footer-hint exact shape — ported from qa_bottom_hints_test.go
-// (Scope 4/round 4, specs/022-codebase-cleanup): DetailModel.BottomHints() is
-// DEAD; the live replacement is Controller.buildDetailFooterHints, surfaced
-// via Snapshot().Footer. Unlike TestWave3_FooterHints_Detail_* above (which
-// only assert a single hint's presence), these two pin the FULL exact-order
-// hint list for a plain unregistered type with/without related defs — the
-// same shape the legacy test pinned.
+// 19. Detail footer-hint exact shape: Controller.buildDetailFooterHints,
+// surfaced via Snapshot().Footer. Unlike TestWave3_FooterHints_Detail_* above
+// (which only assert a single hint's presence), these two pin the FULL
+// exact-order hint list for a plain unregistered type with/without related
+// defs.
 // ---------------------------------------------------------------------------
 
 func Test_DetailFooterHints_PlainField_NoRelated(t *testing.T) {
@@ -1103,32 +1099,16 @@ func Test_DetailFooterHints_PlainField_WithRelated(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// 20. Detail cursor identity on finding CLEAR — ported from internal/tui/
-// views/detail_cursor_stable_test.go's TestDetail_ClearEnrichmentFinding_
-// PreservesCursorIdentity (round 4, specs/022-codebase-cleanup, item 7):
-// DetailModel.SetEnrichmentFinding/.fieldCursor/.fieldList are dead white-box
-// internals. The live equivalent mechanism is Controller.applyFindingToState's
-// FieldCursor delta-adjustment (core/app/detail_state.go), already pinned
-// for the ADD direction by app_detail_attention_cursor_test.go's
+// 20. Detail cursor identity on finding CLEAR: Controller.applyFindingToState's
+// FieldCursor delta-adjustment (core/app/detail_state.go) is pinned for the
+// ADD direction by app_detail_attention_cursor_test.go's
 // TestApplyDetailFinding_CursorStaysOnSameFieldAcrossMixedSeverityAttentionSort
-// (same package — reuses its fieldRowAt helper). This ports the CLEAR/shrink
-// direction, which that file does not cover: when a finding is removed and
-// the Attention block shrinks, FieldCursor must stay on the same logical
-// field, not shift onto a different row.
-//
-// TestDetail_SetEnrichmentFinding_PreservesCursorIdentity (the ADD direction)
-// is not ported separately — it's the identical invariant to the mixed-
-// severity test above, just without the sort-order edge case, so it would be
-// a strictly weaker duplicate.
-//
-// TestDetail_SetEnrichmentFinding_RenderedSelectionFollowsCursor (the "stale
-// paint" ordering hazard between cursor relocation and viewport repaint) is
-// not ported: it pins a bug class specific to the legacy DetailModel's
-// mutable m.fieldCursor + m.viewport.content pair, which could be updated out
-// of order. RenderDetail(body) is a pure function of one immutable DetailBody
-// snapshot (FieldCursor already final by construction) — there is no second
-// mutable paint step that can race with cursor relocation, so this hazard is
-// structurally impossible on the live path. Live-by-contract obsolete.
+// (same package — reuses its fieldRowAt helper). This pins the CLEAR/shrink
+// direction: when a finding is removed and the Attention block shrinks,
+// FieldCursor must stay on the same logical field, not shift onto a
+// different row. RenderDetail(body) is a pure function of one immutable
+// DetailBody snapshot (FieldCursor already final by construction), so there
+// is no second mutable paint step that can race with cursor relocation.
 func Test_DetailCursor_ClearFinding_PreservesCursorIdentity(t *testing.T) {
 	res := resource.Resource{
 		ID:   "db-2",
@@ -1193,9 +1173,7 @@ func Test_DetailCursor_ClearFinding_PreservesCursorIdentity(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 // minimalCTJSON is the minimum valid CloudTrail event JSON for a Management
-// AwsApiCall. Uses synthetic account ID 111111111111 (no real data). Moved
-// here from the deleted views_detail_ct_events_test.go — still needed by
-// Test_CTEvents_LiveProjector_SectionHeadersPresentInOrder/DataRowsBetweenSections.
+// AwsApiCall. Uses synthetic account ID 111111111111 (no real data).
 const minimalCTJSON = `{
 	"eventVersion":"1.08",
 	"eventTime":"2026-04-07T14:02:11Z",
@@ -1217,7 +1195,6 @@ const minimalCTJSON = `{
 // buildCTEventsResource builds a resource.Resource whose RawStruct is a
 // cloudtrailtypes.Event (the AWS SDK type), exactly as buildCTResource does in
 // core/aws/ct_events.go. The CloudTrailEvent field holds the raw JSON blob.
-// Moved here from the deleted views_detail_ct_events_test.go.
 func buildCTEventsResource(id, eventName, status, rawJSON string) resource.Resource {
 	ct := cloudtrailtypes.Event{
 		EventId:         new(id),
@@ -1341,20 +1318,17 @@ func Test_CTEvents_FrameBorderPresent(t *testing.T) {
 	}
 }
 
-// Test_CTEvents_RelatedRightColumnVisibleOnWideTerminal is the live-seam
-// replacement for TestDetailViewCTEvents_Regression_RelatedRightColumn: the
-// RELATED right-column panel must be composed into the render for a
-// ct-events detail on a wide terminal, relying on production's real
+// Test_CTEvents_RelatedRightColumnVisibleOnWideTerminal: the RELATED
+// right-column panel must be composed into the render for a ct-events detail
+// on a wide terminal, relying on production's real
 // resource.GetRelated("ct-events") registration (no test-only defs).
 // ---------------------------------------------------------------------------
-// 21. Scalar NavID extraction — ported from internal/tui/views/
-// detail_scalar_navid_test.go (round 5, specs/022-codebase-cleanup, DetailModel
-// core cleanup): the TUI's own field-list builder is gone; the live path is
-// projection.buildItems via buildDetailFieldItems (detail_body.go), which populates the same
-// NavID-from-value post-processing on app.FieldRow. Regression pin: NavID was
-// only applied to YAML sub-fields (IsSubField=true), not top-level scalar
-// navigable fields, so a Lambda Role ARN's NavID stayed "" and navigation used
-// the full ARN as the target ID instead of the bare role name.
+// 21. Scalar NavID extraction: the live path is projection.buildItems via
+// buildDetailFieldItems (detail_body.go), which populates the NavID-from-value
+// post-processing on app.FieldRow for top-level scalar navigable fields as
+// well as YAML sub-fields (IsSubField=true), so a Lambda Role ARN's NavID is
+// the bare role name and navigation does not use the full ARN as the target
+// ID.
 // ---------------------------------------------------------------------------
 
 func wave3LambdaViewConfig() *config.ViewsConfig {
@@ -1489,15 +1463,13 @@ func Test_DetailFieldItems_ScalarNavigableField_NoExtractor_NavIDEmpty(t *testin
 }
 
 // ---------------------------------------------------------------------------
-// 22. Attention color-cap rule — ported from internal/tui/views/
-// attention_color_cap_test.go (round 5, specs/022-codebase-cleanup, DetailModel
-// core cleanup): the cap is capTierToRowBucketDetail +
+// 22. Attention color-cap rule: capTierToRowBucketDetail +
 // ResourceTypeDef.ResolveColor (core/app/detail_body.go), unexported so not
 // directly callable from tests/unit — exercised end-to-end instead via the
-// public
-// ApplyDetailFinding + Snapshot().Body.Detail seam. Pins the universal rule: a
-// `!` severity tier caps to `~` unless the row's own S2 color bucket is
-// Broken, so the detail view never contradicts the list row's severity.
+// public ApplyDetailFinding + Snapshot().Body.Detail seam. Pins the
+// universal rule: a `!` severity tier caps to `~` unless the row's own S2
+// color bucket is Broken, so the detail view never contradicts the list
+// row's severity.
 // ---------------------------------------------------------------------------
 
 func wave3AttentionPhraseRowColorTier(t *testing.T, body *app.DetailBody, phraseSubstr string) string {

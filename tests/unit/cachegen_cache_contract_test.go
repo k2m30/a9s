@@ -1,8 +1,6 @@
-// cachegen_cache_contract_test.go — pins for the cache review of 2026-09-08
-// (task cachegen). One test (or small group) per reviewed claim: the cache
-// may neither attribute one profile/region pair's answer to another, nor
-// lose a live answer to a late disk seed, a failed probe, or an
-// out-of-order commit.
+// cachegen_cache_contract_test.go — the cache may neither attribute one
+// profile/region pair's answer to another, nor lose a live answer to a late
+// disk seed, a failed probe, or an out-of-order commit.
 //
 // Every pin drives the real controller/runtime event path or the real cache
 // package; nothing here reaches AWS and every identifier is synthetic.

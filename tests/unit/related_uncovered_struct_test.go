@@ -419,10 +419,9 @@ func TestRelated_DbcSnap_DBC_ExtractsCluster(t *testing.T) {
 		},
 	}
 	got := checker(context.Background(), nil, res, nil)
-	// INVERTED under row 18. This asserted Count 1 built from the snapshot's own
-	// DBClusterIdentifier with no cluster list read at all. The id in the
-	// snapshot says which cluster it CAME from, not that the cluster is still
-	// there, so with nothing read the row is Unknown.
+	// The id in the snapshot says which cluster it CAME from, not that the
+	// cluster is still there, so with no cluster list read the row is Unknown,
+	// not Count 1.
 	if got.State() != domain.RelatedUnknown {
 		t.Errorf("state = %v with no dbc list read, want Unknown; IDs=%v", got.State(), got.ResourceIDs())
 	}

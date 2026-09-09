@@ -3,12 +3,11 @@ package unit
 // Tests for §1.4 cross-account actor format.
 //
 // §1.4: When accountId != recipientAccountId, the ACTOR cell text is prefixed
-// with the counterparty account ID using slash separator: <accountID>/<actor>.
-// The legacy "[cross] " literal prefix is removed.
+// with the counterparty account ID using slash separator: <accountID>/<actor>,
+// never a "[cross] " literal prefix.
 //
-// These tests assert Resource.Fields["_ct.actor"] values after FetchCloudTrailEventsPage.
-// They are expected to FAIL until the P1 coder updates computeCTActor in
-// core/aws/ct_events.go (currently uses "[cross] " prefix at line ~369).
+// These tests assert Resource.Fields["_ct.actor"] values after
+// FetchCloudTrailEventsPage (computeCTActor in core/aws/ct_events.go).
 
 import (
 	"context"

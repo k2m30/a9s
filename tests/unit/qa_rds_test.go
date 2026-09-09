@@ -65,8 +65,8 @@ func TestQA_RDS_ListColumns_ColumnWidths(t *testing.T) {
 		"db_identifier":  28,
 		"engine":         12,
 		"engine_version": 10,
-		// w197: the width the built-in view has always rendered this column at,
-		// now that the view's list and the type's are one.
+		// The width the built-in view renders this column at; the view's list
+		// and the type's are one.
 		"status":   28,
 		"class":    16,
 		"endpoint": 40,
@@ -476,12 +476,6 @@ func TestQA_RDS_Detail_CreatingInstanceNoEndpoint(t *testing.T) {
 		t.Error("Detail for creating instance should show 'creating-db'")
 	}
 }
-
-// TestQA_RDS_Detail_SwitchToYAML deleted (round 5, specs/022-codebase-cleanup,
-// DetailModel core cleanup): drove the retired views.NewDetail(...).Update("y")
-// call (DetailModel.Update is dead). The "y navigates to YAML" behavior is
-// type-agnostic and already pinned on the live seam by
-// coverage_live_gaps_test.go's TestLiveGap_HandleDetailKeyMsg_YAMLKey_NavigatesToYAMLTarget.
 
 // ===========================================================================
 // C. RDS YAML View

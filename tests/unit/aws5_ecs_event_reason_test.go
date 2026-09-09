@@ -79,15 +79,12 @@ func TestECSSvc_PlacementEventKeepsAWSReason(t *testing.T) {
 	}
 }
 
-// TestECSSvc_ELBEventKeepsAWSReason is the sibling in the same loop: the load
-// balancer branch threw its message away the same way, and AWS puts the
-// failing health check codes in it.
+// TestECSSvc_ELBEventKeepsAWSReason is the sibling: the load balancer branch
+// keeps its message too, and AWS puts the failing health check codes in it.
 //
-// The phrase reads "load balancer" rather than "ELB", which this test pinned
-// one round ago: the demo witness added below put the row on a rendered
-// surface for the first time and the machine-style gate reported the bare
-// acronym. Reworded rather than exempted, because the words on the row are
-// a9s's to choose. Do not restore the acronym.
+// The phrase reads "load balancer" rather than "ELB": the words on the row
+// are a9s's to choose, and the bare acronym fails the machine-style gate on a
+// rendered surface.
 func TestECSSvc_ELBEventKeepsAWSReason(t *testing.T) {
 	rows := aws5ECSEventRows(t, "(service acme-checkout-svc) (instance i-0a1b2c3d4e5f60001) (port 8080) "+
 		"is unhealthy in (target-group acme-web) due to (reason Health checks failed with these codes: [502]).")

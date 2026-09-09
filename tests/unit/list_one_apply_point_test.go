@@ -1,13 +1,11 @@
-// list_one_apply_point_test.go — round 2 of listgen: one apply point, one
-// stale decision, one population decision.
+// list_one_apply_point_test.go — one apply point, one stale decision, one
+// population decision.
 //
-//  4. The list view does not apply list results. It used to, in its own
-//     Update, unstamped and unreachable — a second apply point is exactly what
-//     the request sequence forbids.
-//  5. A superseded result is rejected once, by its sequence, on every lane. On
-//     the headless lane the runtime's row-store write ran before the
-//     controller's guard, so a superseded page still reached the shared store
-//     and only a content heuristic partly caught it.
+//  4. The list view does not apply list results; a second apply point is
+//     exactly what the request sequence forbids.
+//  5. A superseded result is rejected once, by its sequence, on every lane,
+//     before the runtime's row-store write, so a superseded page never
+//     reaches the shared store.
 //  6. A seed never reports itself complete while holding fewer rows than the
 //     population its source knows.
 package unit

@@ -1,35 +1,21 @@
 package unit
 
-// qa_coderabbit_pr273_test.go — regression pins for CodeRabbit PR #273 review findings.
+// qa_coderabbit_pr273_test.go — enrichment and attention-filter pins.
 //
-// Covered items still pinned here (skipped items were already fixed in prior
-// commits, and Items 1/2/3/4/5/14's dedicated pins were retired once the
-// per-type qa_<type>_color_test.go files and the qa_coderabbit_pr273_all_types_test.go
-// typeContracts table converged on the same coverage):
+//   - Gen==0 bypass in handleEnrichmentChecked — Gen=0 test-injection
+//     messages are dropped when enrichmentGen>0 after a profile/region
+//     switch.
+//   - CodeBuild STOPPED state generates no finding — intentionally cancelled
+//     builds are not issues.
+//   - Main-menu ctrl+z false-positive/false-negative coverage, and the
+//     TrivialColor gate below.
 //
-//   Item 6:  Missing Gen==0 bypass in handleEnrichmentChecked — Gen=0 test-injection
-//            messages are dropped when enrichmentGen>0 after a profile/region switch.
-//   Item 12/13: CodeBuild STOPPED state generates an unwanted finding — intentionally
-//            cancelled builds should not be flagged as issues.
-//   Item 18: Main-menu ctrl+z false-positive/false-negative coverage, and the
-//            TrivialColor gate below.
-//
-// Skipped items (already fixed in prior commits):
-//   Items 1/4:   ng/vpce/tgw stateful-lifecycle Color coverage — now pinned by
-//                qa_ng_color_test.go, TestColorRefactor_AllTypes_NonNilColorFunc
-//                (qa_resource_color_test.go), and the typeContracts table.
-//   Items 2/3:   RDS/DocDB/DynamoDB/CloudWatch alarm Color — fixed in 35a54d4,
-//                now pinned by qa_dbi_color_test.go, qa_dbc_color_test.go,
-//                qa_alarm_color_test.go, and the typeContracts table (dbi/dbc/ddb/alarm rows).
-//   Item 5:      CloudFormation IMPORT_ROLLBACK_COMPLETE — now pinned by the
-//                typeContracts table's cfn row (both IMPORT_COMPLETE and
-//                IMPORT_ROLLBACK_COMPLETE cases).
-//   Items 7/8:   handleRegionSelected / handleProfileSelected — fixed in 2f9a808, aae6860
-//   Items 9/10:  isVisibleUnderIssueFilter truncation guard — fixed in aae6860..2e831e1
-//   Item 11:     AlwaysHealthy invariant test — already exists in qa_ctrlz_truncated_zero_health_state_test.go
-//   Item 14:     Staging EC2 instance SG fixture-data check — retired as a fixture
-//                lint concern now covered by the demo-graph gates
-//                (qa_demo_pivot_coverage_test.go, qa_demo_related_ids_resolve_test.go).
+// Per-type Color coverage lives in qa_<type>_color_test.go,
+// TestColorRefactor_AllTypes_NonNilColorFunc (qa_resource_color_test.go) and
+// qa_coderabbit_pr273_all_types_test.go's typeContracts table; the
+// AlwaysHealthy invariant in qa_ctrlz_truncated_zero_health_state_test.go;
+// fixture-graph checks in qa_demo_pivot_coverage_test.go and
+// qa_demo_related_ids_resolve_test.go.
 
 import (
 	"context"
@@ -511,29 +497,6 @@ func TestCR273_Item13_CodeBuild_STOPPED_WithFailed_OnlyFailedCounted(t *testing.
 		t.Errorf("len(Findings) = %d, want 1 (only the FAILED build); STOPPED builds must not inflate the count", len(result.Findings))
 	}
 }
-
-// Items 7, 8, 9, 10, 11, 15 — all marked "Addressed in commits aae6860..2e831e1"
-// in the CodeRabbit review. Code inspection confirms:
-//
-//   Item 7:  probeResources cleared on refresh — app_handlers_navigate.go:333
-//            m.ProbeResources = make(map[string][]resource.Resource)
-//
-//   Item 8:  Per-type Ctrl+R sets menu badge via handleEnrichmentChecked →
-//            menu.SetIssues(unified, ...) with no only-increase guard (fixed).
-//
-//   Item 9:  Title truncation uses m.enrichmentTruncated, not pagination.IsTruncated
-//            — resourcelist_helpers.go:357.
-//
-//   Item 10: applyFilter recalculates m.issueCount from row colors but
-//            m.enrichmentIssueCount is kept separate and takes priority in title
-//            display — resourcelist_helpers.go:351-352.
-//
-//   Item 11: isVisibleUnderIssueFilter returns true when m.issueTruncated[shortName]
-//            and !td.AlwaysHealthy — mainmenu.go:570-573.
-//
-//   Item 15: Per-resource API errors set truncated=true in per-resource enrichers.
-//
-// Tests for these items would PASS today; no failing pins written.
 
 // Items 16, 17 — refactor-only (typed constants replacing string literals).
 // Behavior is already correct; no failing tests possible without production-code

@@ -1,7 +1,4 @@
-// runtime_savecache_regressions_test.go — regression pins for the
-// Codex+CodeRabbit fix wave on core/runtime (branch feat/cache).
-//
-// Covers, in order:
+// runtime_savecache_regressions_test.go — core/runtime save-path pins:
 //
 //  1. Depth-loop zero-progress guard (executor.go KindFetchResources): a
 //     fetcher whose follow-up page never advances (0 new resources,

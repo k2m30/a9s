@@ -295,10 +295,9 @@ func TestRegisteredNGFetcher_ImageIDEmptyWhenLaunchTemplateResolveFails(t *testi
 	sc := newNGTestClients(eksFake, ec2Fake)
 
 	result, err := pf(context.Background(), sc, "")
-	// INVERTED for runtime8 row 15, with its sibling in
-	// aws_nodegroups_image_id_test.go: a refused DescribeLaunchTemplateVersions
-	// is recorded rather than swallowed. The fetch is still non-fatal — the
-	// node group is emitted, asserted below.
+	// A refused DescribeLaunchTemplateVersions is recorded rather than
+	// swallowed (its sibling is in aws_nodegroups_image_id_test.go). The fetch
+	// is still non-fatal — the node group is emitted, asserted below.
 	if err == nil {
 		t.Fatal("the refused launch-template read is not carried out of the fetcher, so the blank " +
 			"image_id below reads as a node group whose template declares no image")

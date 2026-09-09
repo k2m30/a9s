@@ -68,14 +68,14 @@ func provenancePinEC2Rows(n int, prefix string) []resource.Resource {
 
 // provenancePinReadTypeFile re-reads the on-disk TypeFile for shortName,
 // failing the test if missing — the disk-reached half of every assertion
-// here, since the original defect specifically persisted the corrupted
-// count/rows to disk and survived restart.
-// The per-type save no longer runs on the goroutine that triggered it: a
-// 6000-row type file's marshal used to sit in the latency of the fetch that
-// produced it, so the cache writer owns it now. A test that reads the file a
+// here, since a corrupted count/rows persisted to disk survives restart.
+// The per-type save does not run on the goroutine that triggered it: a
+// 6000-row type file's marshal would sit in the latency of the fetch that
+// produced it, so the cache writer owns it. A test that reads the file a
 // call it just made produces therefore waits for that writer first —
-// re-reading the directory without the barrier returns whatever the PREVIOUS
-// save left, which reads as a passing assertion against stale bytes.
+// re-reading the directory without the barrier returns whatever the
+// PREVIOUS save left, which reads as a passing assertion against stale
+// bytes.
 func provenancePinReadTypeFile(t *testing.T, ctrl *app.Controller, profile, region, shortName string) cache.TypeFile {
 	t.Helper()
 	ctrl.WaitForCacheWrites()
@@ -304,14 +304,13 @@ func TestObserveResourcesLoadedRows_FilteredScreenBuriedUnderFreshCanonical_Stil
 // ────────────────────────────────────────────────────────────────────────────
 // The SYMMETRIC direction: a genuine CanonicalList result must not overwrite
 // a topmost filtered/child screen, and must fall through to the canonical
-// screen beneath it instead. Before handle.go's gate was made symmetric
-// (topLevelCanonical != msg.Provenance.CanonicalList(), rather than a
-// one-directional "reject non-canonical on a canonical screen" check), a
-// late canonical refresh landing while the user sat in a related-panel drill
-// would have matched the topmost (filtered) screen — the first same-type
-// screen the top-down scan finds — and overwritten the drill the user was
-// actively looking at with the unrelated canonical population. This is the
-// defect CodeRabbit flagged and c6a6755f fixed.
+// screen beneath it instead. handle.go's gate is symmetric
+// (topLevelCanonical != msg.Provenance.CanonicalList()), not a
+// one-directional "reject non-canonical on a canonical screen" check; a late
+// canonical refresh landing while the user sits in a related-panel drill
+// must not match the topmost (filtered) screen — the first same-type screen
+// the top-down scan finds — and overwrite the drill with the unrelated
+// canonical population.
 // ────────────────────────────────────────────────────────────────────────────
 
 // TestObserveResourcesLoadedRows_CanonicalResult_TopmostFilteredScreen_FallsThroughToCanonicalBeneath
@@ -556,7 +555,7 @@ func TestObserveResourcesLoadedRows_UnknownProvenance_FailSafe_DoesNotReplaceCan
 // ────────────────────────────────────────────────────────────────────────────
 // Web/headless lane: a filtered-drill push sets EscPops so
 // isTopLevelCanonicalList is false, AND FilteredRowsSet (the C6 seed) fires
-// for real — the coder verified this by static trace only; this drives it.
+// for real.
 // ────────────────────────────────────────────────────────────────────────────
 
 // TestWebLane_FilteredDrill_SetsEscPops_AndFiltersRowsSetFires drives a

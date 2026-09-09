@@ -231,21 +231,11 @@ func TestPort_JSON_ColorizeGolden_LiveContentLines(t *testing.T) {
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Item 5 — YAML text-screen 't' key -> ct-events RelatedNavigate on the LIVE
-// path. ct_events_t_key_test.go's TestYAML_TKey_EmitsRelatedNavigateMsg
-// drives the dead views.NewYAML()+Update() directly. The live text-screen
-// handler was uncovered. PORTED. (The Detail 't'-key case belongs to a
-// different agent's scope; this pins ONLY the YAML/text case.)
-//
-// CONFIRMED REGRESSION, intentionally left RED: internal/tui/app_stack.go's
-// handleTextKeyMsg (the rsKindText key router) has no case for m.keys.
-// CloudTrail at all — only Search/SearchNext/SearchPrev/Escape/ToggleWrap/
-// Up/Down/Top/Bottom/PageUp/PageDown are handled; unmatched keys fall
-// through to the stored viewport. Pressing 't' while already on a live
-// YAML/JSON screen is therefore currently a no-op, contradicting
-// docs/shared/keybindings.md ("t: Jump to CloudTrail Events for the
-// selected resource (all resource types)") and the legacy pin this ports.
-// This is a genuine gap for a coder to wire, not a test defect — do not
-// weaken this assertion to match the current no-op behavior.
+// path (internal/tui/app_stack.go's handleTextKeyMsg, the rsKindText key
+// router, must route m.keys.CloudTrail), per docs/shared/keybindings.md
+// ("t: Jump to CloudTrail Events for the selected resource (all resource
+// types)"). This pins ONLY the YAML/text case. Do not weaken this assertion
+// to a no-op.
 // ═══════════════════════════════════════════════════════════════════════════
 
 func TestPort_YAML_TKey_LiveCTEventsNavigate(t *testing.T) {
@@ -365,14 +355,10 @@ func TestPort_ScrollState_VisibleWindow_ExactFit(t *testing.T) {
 // Item 10 — YAML<->JSON 'y'/'J' toggle on the LIVE path. qa_view_switching_test.go
 // drives the dead JSONModel/YAMLModel.Update() directly (jsonModel() ->
 // views.NewJSON()). No existing test presses 'J' at all on the live path.
-// PORTED.
-//
-// CONFIRMED REGRESSION, intentionally left RED: same root cause as the
-// TestPort_YAML_TKey_LiveCTEventsNavigate note above — handleTextKeyMsg
-// has no case for m.keys.YAML or m.keys.JSON either, so pressing 'J' while
-// on YAML (or 'y' while on JSON) is currently a no-op instead of toggling,
-// contradicting docs/shared/keybindings.md's unscoped "y"/"J" actions and
-// the legacy toggle pins these tests port. Do not weaken these assertions.
+// handleTextKeyMsg routes m.keys.YAML and m.keys.JSON, so pressing 'J'
+// while on YAML (or 'y' while on JSON) toggles, per
+// docs/shared/keybindings.md's unscoped "y"/"J" actions. Do not weaken
+// these assertions to a no-op.
 // ═══════════════════════════════════════════════════════════════════════════
 
 func TestPort_YAMLToJSON_LiveToggle(t *testing.T) {
@@ -691,13 +677,8 @@ func TestPort_RevealCopy_EmptyValue(t *testing.T) {
 // ═══════════════════════════════════════════════════════════════════════════
 // qa_view_switching_test.go's TestJSONView_PressD_EmitsNavigateToDetail /
 // TestYAMLView_PressD_EmitsNavigateToDetail ('d' from JSON/YAML -> Detail)
-// ported onto the live path.
-//
-// CONFIRMED REGRESSION, intentionally left RED: unlike keys.YAML/JSON/
-// CloudTrail (wired into handleTextKeyMsg, app_stack.go), there is NO
-// keys.Detail case in handleTextKeyMsg at all — pressing 'd' on a live
-// YAML/JSON text screen is currently a no-op instead of navigating to
-// Detail, contradicting the legacy pin these tests port and
+// on the live path: handleTextKeyMsg (app_stack.go) routes keys.Detail, so
+// pressing 'd' on a live YAML/JSON text screen navigates to Detail per
 // docs/shared/keybindings.md's unscoped "d: Detail view". Do not weaken.
 // ═══════════════════════════════════════════════════════════════════════════
 
@@ -1139,27 +1120,22 @@ func TestPort_YAML_Scroll_LiveKeyPath(t *testing.T) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// CONFIRMED REGRESSION, intentionally left RED: colorizeYAML (internal/tui/
-// views/yaml.go) corrupts a quoted map key that itself contains a colon.
+// colorizeYAML (internal/tui/views/yaml.go) must preserve a quoted map key
+// that itself contains a colon.
 //
-// yaml.Marshal correctly quotes a map key like "aws:autoscaling:groupName"
-// (found via a real EC2 tag key while migrating qa_yaml_all_test.go this
-// round — verified NOT a marshal bug: reverting to the dead RawContent(),
-// which never colorizes, parses fine). colorizeYAML's line-coloring pass
-// then mangles that quoted "key: value"-shaped key, and the stripped
-// (ANSI-free) result is no longer valid YAML:
-//
-//	aws: autoscaling:groupName: acme-web-prod-asg
-//
-// instead of the marshaled:
+// yaml.Marshal quotes a map key like "aws:autoscaling:groupName" (a real EC2
+// tag key). colorizeYAML's line-coloring pass must not mangle that quoted
+// "key: value"-shaped key; the stripped (ANSI-free) result stays valid YAML:
 //
 //	"aws:autoscaling:groupName": acme-web-prod-asg
 //
-// This is exactly what a user sees on the live YAML screen (ContentLines()
-// is the same colorizeYAML output View() renders) — cosmetic (the value
-// isn't lost) but genuinely broken syntax highlighting/copy-paste fidelity.
-// A coder fixes colorizeYAML's key-detection regex next; do not weaken this
-// assertion to match the current corrupted output.
+// never
+//
+//	aws: autoscaling:groupName: acme-web-prod-asg
+//
+// ContentLines() is the same colorizeYAML output View() renders, so this is
+// exactly what a user sees on the live YAML screen and copies from it. Do
+// not weaken this assertion to corrupted output.
 // ═══════════════════════════════════════════════════════════════════════════
 
 func TestPort_ColorizeYAML_ColonInQuotedKey_Regression(t *testing.T) {

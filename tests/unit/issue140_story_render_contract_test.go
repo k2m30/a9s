@@ -17,15 +17,11 @@ import (
 	"github.com/k2m30/a9s/v3/tests/unit/tuitest"
 )
 
-// Issue #140 / docs/qa/ec2-related-navigation-stories.md
-// Render-contract style coverage for key EC2 QA stories.
-//
-// TestIssue140_Story_EC2_001_InitialDetailRenderContract and
-// TestIssue140_Story_EC2_020_CountsRenderAsResultsArrive deleted (round 5,
-// specs/022-codebase-cleanup, DetailModel core cleanup): both duplicate
-// issue140_scenarios_golden_test.go's CI-verified golden scenarios
+// docs/qa/ec2-related-navigation-stories.md — render-contract style coverage
+// for key EC2 QA stories. The initial-detail and counts-arrive stories are
+// covered by issue140_scenarios_golden_test.go's golden scenarios
 // ec2_001_initial_detail / ec2_020_counts_arrived on the live tui.New() root
-// path — same fixture, same assertions, same resource IDs/counts.
+// path.
 
 func TestIssue140_Story_EC2_017_UnderlineVisibilityOnNavigableRow(t *testing.T) {
 	tuitest.ForceColor(t)

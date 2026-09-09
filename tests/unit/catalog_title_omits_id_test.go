@@ -1,38 +1,16 @@
 package unit
 
-// catalog_title_omits_id_test.go — TDD-red skeleton for the TitleOmitsID
-// catalog flag (bug fix: log-event detail frame title must not show the
-// giant synthetic event ID, e.g.
+// catalog_title_omits_id_test.go — the TitleOmitsID catalog flag: a
+// log-event detail frame title must not show the giant synthetic event ID,
+// e.g.
 //   detail -- 39760596764200534672029196979118035848442573100344082434 ({"level":"INFO",...)
 //
-// TODO(coder): this test currently FAILS TO COMPILE because
-// catalog.ResourceTypeDef has no TitleOmitsID field yet. Add:
-//
-//	type ResourceTypeDef struct {
-//	    ...
-//	    // TitleOmitsID, when true, renders the detail frame title as
-//	    // "detail -- <Name>" instead of "detail -- <ID> (<Name>)".
-//	    TitleOmitsID bool
-//	}
-//
-// and set TitleOmitsID: true on the "log_events" and
-// "lambda_invocation_logs" child-type catalog entries (core/aws install
-// site — wherever those ChildViewDef/ResourceTypeDef entries are built).
-//
-// There is no clean, already-exported unit seam for the actual
-// "detail -- <ID> (<Name>)" string composition: that logic lives in the
-// unexported internal/tui/app_view.go:(Model).frameTitle, which reads
-// unexported rendererState/app.ViewState fields and cannot be driven from
-// tests/unit without further production plumbing (e.g. exposing a
-// Controller-level DetailFrameTitle that consults catalog.TitleOmitsID,
-// analogous to the existing (unrelated) Controller.DetailFrameTitle at
-// core/app/detail_state.go:412, which today returns bare Name/ID with no
-// "detail -- " prefix and no ID-suppression logic at all).
-//
-// This skeleton pins the catalog-level contract (the part of the fix that
-// IS unit-testable without new plumbing) so the coder has a red test driving
-// the field addition. A follow-up test (or an extension of this one) should
-// assert the actual frame-title string once the coder exposes a seam.
+// TitleOmitsID renders the detail frame title as "detail -- <Name>" instead
+// of "detail -- <ID> (<Name>)", and is set on the "log_events" and
+// "lambda_invocation_logs" child-type catalog entries. This file pins the
+// catalog-level contract; the frame-title string itself is composed in the
+// unexported internal/tui/app_view.go:(Model).frameTitle and is not
+// reachable from tests/unit.
 
 import (
 	"testing"

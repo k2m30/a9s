@@ -1,81 +1,54 @@
 // qa_controller_close_discipline_test.go — Close-discipline gate.
 //
-// Root cause: tui.New/app.New start a background availability-save goroutine
-// on first cache write (queueAvailabilitySave -> runAvailabilitySaveLoop, see
-// app_availsave_tempdir_cleanup_race_test.go's header for the full mechanism
-// this mirrors). A test function that constructs a root model/controller via
-// tui.New(...) or app.New(...) but never closes it (CloseController /
-// Close) leaks that goroutine, which can still be mid-SaveType (MkdirAll +
-// CreateTemp + Rename) when the SAME test's own t.TempDir() cleanup runs
-// RemoveAll on that directory — "TempDir RemoveAll cleanup: ... The
-// directory is not empty", observed on Windows CI.
+// tui.New/app.New start a background availability-save goroutine on first
+// cache write (queueAvailabilitySave -> runAvailabilitySaveLoop, see
+// app_availsave_tempdir_cleanup_race_test.go's header for the mechanism). A
+// test function that constructs a root model/controller via tui.New(...) or
+// app.New(...) but never closes it (CloseController / Close) leaks that
+// goroutine, which can still be mid-SaveType (MkdirAll + CreateTemp +
+// Rename) when the SAME test's own t.TempDir() cleanup runs RemoveAll on
+// that directory — "TempDir RemoveAll cleanup: ... The directory is not
+// empty".
 //
-// NARROWED SCOPE — the physics, stated explicitly: this gate only flags a
-// function that BOTH constructs (tui.New/app.New) AND owns a temp-dir-backed
-// config folder (t.TempDir() or a t.Setenv/os.Setenv of A9S_CONFIG_FOLDER)
-// in that SAME body. A bare constructor call with neither cannot reproduce
-// either observed CI failure:
+// Scope: this gate only flags a function that BOTH constructs
+// (tui.New/app.New) AND owns a temp-dir-backed config folder (t.TempDir()
+// or a t.Setenv/os.Setenv of A9S_CONFIG_FOLDER) in that SAME body. A bare
+// constructor call with neither cannot race:
 //
 //   - Cross-test contamination (a leaked writer landing in a LATER test's
-//     directory because it re-read A9S_CONFIG_FOLDER live at first-use time)
-//     is closed by the session cacheRoot pin (see
-//     cache_root_pin_and_path_safety_test.go) — once a Session's cache root
-//     is captured at construction, a leaked writer's SaveType targets
+//     directory) is closed by the session cacheRoot pin (see
+//     cache_root_pin_and_path_safety_test.go) — a Session's cache root is
+//     captured at construction, so a leaked writer's SaveType targets
 //     whatever directory was live WHEN ITS OWN SESSION WAS BUILT, never a
 //     later, unrelated test's directory.
 //   - That leaves only a SAME-body race: a leaked writer bound to a
 //     directory this exact test function created (t.TempDir()) and will
 //     remove (t.Cleanup(RemoveAll), registered by testing.T itself) when the
 //     function returns. A construct call whose body never establishes such
-//     a directory — no t.TempDir(), no A9S_CONFIG_FOLDER override — has its
-//     writer (if any) bound to whatever directory was live for the whole
-//     test binary's run (a package-level TestMain default, or the real
-//     ~/.a9s/cache), which outlives the test and is never RemoveAll'd by it;
-//     there is no directory for that leaked writer to race.
+//     a directory has its writer (if any) bound to whatever directory was
+//     live for the whole test binary's run (a package-level TestMain
+//     default, or the real ~/.a9s/cache), which outlives the test and is
+//     never RemoveAll'd by it.
 //
-// This was verified empirically, not assumed: an earlier, unnarrowed version
-// of this gate matched 247 functions across 90 files; cross-checking each
-// for an in-body TempDir/A9S_CONFIG_FOLDER signal found only 8 with one —
-// the narrowed rule below reproduces exactly that 8, and a hand-checked
-// sample of the excluded 239 (e.g. TestModel_HasAppContext, which calls
-// tui.New("", "") and touches no directory at all) confirmed each is
-// structurally incapable of the race this gate exists to prevent.
+// No allowlist: every run does a fresh AST scan and fails via t.Errorf,
+// listing every violating function. The violation set must be, and stay,
+// zero; the fix is always "add t.Cleanup(...Close...) in the same function
+// body".
 //
-// DESIGN CHOICE (mirrors qa_multifinding_no_legacy_gate_test.go): no
-// allowlist. Every run does a fresh AST scan and unconditionally fails via
-// t.Errorf, listing every violating function. This is a purge gate, not a
-// slow ratchet — the narrowed violation set must be, and stay, zero; the fix
-// is always "add t.Cleanup(...Close...) in the same function body", never a
-// test-file-shape change that would need an allowlist entry to stay green.
-//
-// Detection is intentionally per-function and lexical, not interprocedural:
-// a FuncDecl's body is flagged only if IT directly calls tui.New(...)/
-// app.New(...) AND establishes a TempDir/A9S_CONFIG_FOLDER signal somewhere
-// in its own body (including nested closures, e.g. a t.Run subtest literal)
-// AND that same body never references any selector named "CloseController"
-// or "Close" (e.g. m.CloseController(), c.Close, t.Cleanup(c.Close)). A
-// helper like newEC2ListModel that already closes correctly is never
-// flagged; every direct caller of such a helper is also never flagged,
-// because IT does not itself call tui.New/app.New.
+// Detection is per-function and lexical, not interprocedural: a FuncDecl's
+// body is flagged only if IT directly calls tui.New(...)/app.New(...) AND
+// establishes a TempDir/A9S_CONFIG_FOLDER signal somewhere in its own body
+// (including nested closures, e.g. a t.Run subtest literal) AND that same
+// body never references any selector named "CloseController" or "Close"
+// (e.g. m.CloseController(), c.Close, t.Cleanup(c.Close)). A helper like
+// newEC2ListModel that already closes correctly is never flagged; every
+// direct caller of such a helper is also never flagged, because IT does not
+// itself call tui.New/app.New.
 //
 // Scope: every ../../tests/unit/*.go file (this package's own directory,
-// non-recursive) plus every top-level ../../tests/integration/*.go file
-// (its scenario/*.go subdirectories, e.g. tests/integration/web/, are out of
-// scope — not "trivially includable" as a single flat glob).
-//
-// VERIFIED CENSUS (2026-07-15, narrowed scanner run by hand against HEAD
-// after the 8 Close fixes below landed): 0 violations. The 8 sites the
-// narrowed rule matches (qa_ec2_test.go: TestQA_EC2_A4_StatusColoring_
-// StoppedRowHasANSI, TestQA_EC2_A12_1_EmptyInstanceList,
-// TestQA_EC2_A13_1_LoadingState, TestQA_EC2_A14_1_TerminalTooNarrow,
-// TestQA_EC2_A14_5_TerminalTooShort, TestQA_EC2_D1_FullNavigationStack;
-// qa_load_more_dedup_test.go: TestLoadMore_TUI_ColdOpen_NoDuplicates;
-// detail_ports_test.go:
-// Test_Detail_EnterOnNavigableField_TUIKeyRoute_NavigatesToTarget) all
-// already carry a t.Cleanup(func() { m.CloseController() }) placed
-// immediately after construction, after their existing t.TempDir()/t.Setenv
-// line, so LIFO cleanup order closes the controller before testing.T's own
-// TempDir RemoveAll runs.
+// non-recursive) plus every top-level ../../tests/integration/*.go file (its
+// scenario/*.go subdirectories, e.g. tests/integration/web/, are out of
+// scope).
 package unit_test
 
 import (

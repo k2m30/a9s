@@ -250,10 +250,10 @@ func buildStampedUnknownOnPurpose() messages.ResourcesLoaded {
 // proves the scanner resolves the real import path rather than matching the
 // literal local package name "messages": an aliased import
 // (`rl "github.com/k2m30/a9s/v3/core/runtime/messages"`) referencing the
-// type as `rl.ResourcesLoaded{...}` must still be caught. Before
-// rlpgResolveMessagesAlias existed, the scanner matched pkgIdent.Name ==
-// "messages" literally and this exact site would have slipped through
-// silently — the gap CodeRabbit flagged.
+// type as `rl.ResourcesLoaded{...}` must still be caught;
+// rlpgResolveMessagesAlias resolves the alias, so a scanner matching
+// pkgIdent.Name == "messages" literally would let this site slip through
+// silently.
 func TestResourcesLoadedProvenanceGuard_ScannerDetectsUnstampedSite_ThroughImportAlias(t *testing.T) {
 	dir := t.TempDir()
 	src := `package canary

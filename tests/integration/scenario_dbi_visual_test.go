@@ -251,10 +251,8 @@ func TestScenario_DBIVisual_DetailSurfacesAllIssues(t *testing.T) {
 		// Wave-2 only on Healthy row — Attention section present, Wave-2 Summary visible.
 		{demofixtures.MaintDbiScheduledID, []string{"system-update"}},
 		// Legacy fixture: all 4 Wave-1 warnings.
-		// d4 row 1 took "Deletion protection off" off this row: the bulk pool
-		// now sets DeletionProtection, leaving warn-dbi-unprotected as the one
-		// witness. Do not restore it — TestD4_DeletionProtectionHasOneWitness
-		// fails on it.
+		// The bulk pool sets DeletionProtection, so warn-dbi-unprotected is the
+		// one witness for that finding (TestD4_DeletionProtectionHasOneWitness).
 		{"db-public-no-encryption", []string{"No automated backups", "Public endpoint", "Unencrypted storage"}},
 	}
 

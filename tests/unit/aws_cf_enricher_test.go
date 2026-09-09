@@ -220,8 +220,6 @@ func TestEnrichCloudFrontDistribution_AllowAllViewerProtocolProducesFindingSevTi
 	if f.Severity != domain.SevWarn {
 		t.Errorf("severity = %v, want %v", f.Severity, "~")
 	}
-	// Inverted for spec row "phrase": the wording belongs to the code and the
-	// offending item is a supporting row. Do not restore the old assertion.
 	if want := catalog.Phrase("cf.insecure-protocol"); f.Phrase != want {
 		t.Errorf("Phrase = %q, want the catalog's %q", f.Phrase, want)
 	}
@@ -280,8 +278,6 @@ func TestEnrichCloudFrontDistribution_HTTPOnlyOriginProducesFindingSevTilde(t *t
 	if f.Severity != domain.SevWarn {
 		t.Errorf("severity = %v, want %v", f.Severity, "~")
 	}
-	// Inverted for spec row "phrase": the wording belongs to the code and the
-	// offending item is a supporting row. Do not restore the old assertion.
 	if want := catalog.Phrase("cf.insecure-protocol"); f.Phrase != want {
 		t.Errorf("Phrase = %q, want the catalog's %q", f.Phrase, want)
 	}
@@ -330,9 +326,8 @@ func TestEnrichCloudFrontDistribution_APIErrorMarksRowTruncatedIDNotBadge(t *tes
 	resources := cfDistroResources(cfDistroID1, cfDistroID2)
 
 	result, err := awsclient.EnrichCloudFrontDistribution(context.Background(), clients, resources, nil)
-	// INVERTED for the "skipped" spec row 5: this required err == nil, which
-	// meant the row could render "?" with nothing in the error log to say what
-	// refused. The call that failed is recorded now. Do not restore.
+	// The call that failed is recorded, so the row never renders "?" with
+	// nothing in the error log to say what refused.
 	if err == nil {
 		t.Fatal("a failed per-resource call returned no error — the reason never reaches the log")
 	}

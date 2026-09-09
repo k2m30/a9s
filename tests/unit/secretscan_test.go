@@ -150,12 +150,10 @@ func TestScanText_JWTHit(t *testing.T) {
 	}
 }
 
-// INVERTED, and deliberately so: this pin used to require BOTH a keyword and
-// a high-entropy hit on one line. A generated credential under a credential
-// name satisfies both rules, but it is one credential, and the entropy hit
-// was only ever appended behind a keyword hit, so it named nothing the
-// keyword hit had not already named. One line, one hit, by the reason that
-// identifies it.
+// One line, one hit, by the reason that identifies it: a generated
+// credential under a credential name satisfies both the keyword and the
+// high-entropy rule, but it is one credential, and an entropy hit appended
+// behind a keyword hit names nothing the keyword hit had not already named.
 func TestScanText_GeneratedValueUnderCredentialKey_IsOneHit(t *testing.T) {
 	text := "SECRET_KEY=OhbVrpoiVgRV5IfLBcbfnoGMbJmTPS\n"
 	hits := secretscan.ScanText(text)

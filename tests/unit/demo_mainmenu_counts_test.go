@@ -20,8 +20,7 @@ var countSuffixRE = regexp.MustCompile(`\(\d+\+?\)`)
 // 3 distinct resource types without requiring the user to navigate to each list
 // first. This is the "warm menu" behavior that demo mode must provide.
 //
-// Expected to FAIL until the coder implements a demo-mode prefetch path that
-// calls SetAvailability on the main menu for all registered types.
+// The demo-mode prefetch path calls SetAvailability on the main menu for all registered types.
 func TestDemoMainMenu_ShowsResourceCounts(t *testing.T) {
 	m := newDemoColdCacheApp(t)
 
@@ -35,8 +34,8 @@ func TestDemoMainMenu_ShowsResourceCounts(t *testing.T) {
 	*m, initCmd = rootApplyMsg(*m, messages.ClientsReady{Clients: clients, Gen: 1})
 
 	// Drain any commands returned by handleClientsReady (identity probe, avail
-	// cache load). In demo mode with noCache=true these are expected to be nil
-	// or return empty results — but a coder-added demo prefetch would appear here.
+	// cache load). In demo mode with noCache=true these are nil or return
+	// empty results — the demo prefetch appears here.
 	if initCmd != nil {
 		msg := initCmd()
 		if msg != nil {
@@ -74,8 +73,6 @@ func TestDemoMainMenu_ShowsResourceCounts(t *testing.T) {
 
 // TestDemoMainMenu_EC2CountNonZero asserts that the EC2 count shown on the
 // main menu after ClientsReadyMsg is greater than zero (fixture has instances).
-//
-// Expected to FAIL until the coder implements demo-mode prefetch.
 func TestDemoMainMenu_EC2CountNonZero(t *testing.T) {
 	m := newDemoColdCacheApp(t)
 	*m, _ = rootApplyMsg(*m, tea.WindowSizeMsg{Width: 120, Height: 40})

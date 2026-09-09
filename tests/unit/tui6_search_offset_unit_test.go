@@ -9,16 +9,12 @@
 // costs three bytes and paints two columns, so the byte offset, the rune
 // offset and the column offset are three different numbers on the same line.
 //
-// INVERTED for tui6 row 20. These pins used to say the published offsets were
-// display COLUMNS, on the reasoning that the field is named ColStart and
-// crosses to a lane with no painter of its own. That unit cannot be mapped
-// back. A combining mark occupies no column, so two different positions in the
-// text share one column, and the painter asked to highlight column 1 of "éx"
-// covers the mark as well as the x — while a search for the mark itself
-// highlights nothing at all. The painter needs the exact position, so the
-// published offset is a BYTE offset into the line as it is painted, with its
-// styling stripped. Do not restore the column assertions: they encode a unit
-// that loses information the painter needs.
+// The published offset is a BYTE offset into the line as it is painted, with
+// its styling stripped: a display-column unit cannot be mapped back — a
+// combining mark occupies no column, so two different positions in the text
+// share one column, and a painter asked to highlight column 1 of "éx" covers
+// the mark as well as the x, while a search for the mark itself highlights
+// nothing at all. The painter needs the exact position.
 package unit
 
 import (

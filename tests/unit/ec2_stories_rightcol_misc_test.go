@@ -1,12 +1,10 @@
 package unit_test
 
 // ec2_stories_rightcol_misc_test.go — shared EC2 resource fixture for the
-// EC2 QA stories (Issue #119/#140) that still need a hand-built EC2 resource
-// (rather than a demo fixture). The former DetailModel-backed helpers
-// (ec2StoryDetail/deliverRelatedResult/pressDetailKey) were retired
-// (round 5, specs/022-codebase-cleanup): all callers now drive the live
-// Controller/RenderDetail seam via makePreviewEC2Detail/previewDetailView
-// (left_column_preview_regressions_test.go) instead.
+// EC2 QA stories that still need a hand-built EC2 resource (rather than a
+// demo fixture). Callers drive the live Controller/RenderDetail seam via
+// makePreviewEC2Detail/previewDetailView
+// (left_column_preview_regressions_test.go).
 
 import (
 	"github.com/k2m30/a9s/v3/core/resource"

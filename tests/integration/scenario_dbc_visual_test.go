@@ -90,10 +90,8 @@ func TestScenario_DBCVisual(t *testing.T) {
 	// Glyph rules.
 	// -----------------------------------------------------------------
 	// Rule 3 — non-green rows must NOT carry a glyph regardless of finding.
-	// Every dbc Wave-2/Wave-1 finding here now resolves a non-Healthy row
-	// color via colorFromAnyFinding, so none of these rows carry a glyph —
-	// including MaintDbcOverdueID, which used to be the one Healthy+glyph
-	// exception before its finding severity promoted the row to Broken.
+	// Every dbc finding here resolves a non-Healthy row colour via
+	// colorFromAnyFinding, so none of these rows carry a glyph.
 	for _, id := range []string{
 		"warn-dbc-modifying",
 		"broken-dbc-failed",

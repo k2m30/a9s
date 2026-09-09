@@ -78,8 +78,8 @@ func TestScenario_VpcPeerVisual(t *testing.T) {
 	scenario.ExpectRowStatusEquals(demofixtures.WarnPeerOverlapID, vpcPeerPhraseOverlap)
 
 	// The two `~`-class route background checks: Warning-colored rows
-	// carrying the phrase (owner ruling 2026-07-15 — color derives from
-	// findings uniformly; the `~` class only keeps them out of the S1 badge).
+	// carrying the phrase (colour derives from findings uniformly; the `~`
+	// class only keeps them out of the S1 badge).
 	scenario.ExpectRowStatusEquals(demofixtures.WarnPeerNoRouteID, vpcPeerPhraseNoRoute)
 	scenario.ExpectRowStatusEquals(demofixtures.WarnPeerBlackholeID, vpcPeerPhraseBlackhole)
 

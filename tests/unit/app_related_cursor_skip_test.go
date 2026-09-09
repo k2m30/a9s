@@ -1,7 +1,7 @@
-// app_related_cursor_skip_test.go — pins the user-visible defect that the
-// detail view's related-panel cursor lands on dimmed (non-actionable) rows,
-// while the main menu's cursor skips over dimmed (confirmed-empty) entries.
-// The two surfaces must behave identically.
+// app_related_cursor_skip_test.go — the detail view's related-panel cursor
+// must skip dimmed (non-actionable) rows the way the main menu's cursor
+// skips over dimmed (confirmed-empty) entries. The two surfaces behave
+// identically.
 //
 // Menu-skip semantics (read from core/app/menu.go:113-143,
 // menuSkipUnavailable, and core/app/actions_nav.go's callers):
@@ -33,10 +33,8 @@
 // or State is RelatedResolved with Count>0 (or Truncated with Count>0).
 //
 // detail_cursor.go's ActionMoveUp/Down/Top/Bottom for the related-focused
-// branch (RelatedFocus==true) currently have NO skip logic at all — they
-// simply clamp RelatedCursor to [0, relatedCount-1]. This file's tests are
-// RED at HEAD for that reason: they assert menu-parity skip behavior that
-// does not yet exist in the related-panel cursor path.
+// branch (RelatedFocus==true) apply the same skip after clamping
+// RelatedCursor to [0, relatedCount-1].
 package unit_test
 
 import (

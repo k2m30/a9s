@@ -1,22 +1,15 @@
 package unit_test
 
-// related_error_actionable_test.go — regression pin for the P2 the RelatedRowState
-// migration introduced: an errored related-resource result must not be navigable.
+// related_error_actionable_test.go — an errored related-resource result must
+// not be navigable.
 //
-// This test used to hand-construct a RelatedCheckResult with State left at its
-// zero value (RelatedResolved), a positive Count, AND a non-nil Err
-// simultaneously — the shape core/aws/lambda_related.go's eb-rule checker
-// produced on a partial ListTargetsByRule failure. RelatedCheckResult's fields
-// are now unexported, buildable only via KnownRelated/UnknownRelated/
-// ErrorRelated/DeferredRelated, and none of those can express Count>0 together
-// with Err!=nil — so that exact literal is no longer constructible from
-// tests/unit (or from core/aws itself: the real eb-rule checker was migrated
-// alongside this change to return KnownRelated(ids, truncated=true) on a
-// partial ListTargetsByRule failure instead of a Count+Err combination,
-// retiring the scenario this test existed to catch). The remaining two
-// sub-cases below (a clean resolved result, and an explicit ErrorRelated
-// result) are still constructible and still pin real EffectiveState()
-// behavior.
+// RelatedCheckResult's fields are unexported, buildable only via
+// KnownRelated/UnknownRelated/ErrorRelated/DeferredRelated, and none of
+// those can express Count>0 together with Err!=nil; the eb-rule checker
+// (core/aws/lambda_related.go) returns KnownRelated(ids, truncated=true) on
+// a partial ListTargetsByRule failure. The two sub-cases below (a clean
+// resolved result, and an explicit ErrorRelated result) pin
+// EffectiveState() behavior.
 
 import (
 	"errors"

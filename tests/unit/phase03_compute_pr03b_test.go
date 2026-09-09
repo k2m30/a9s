@@ -217,11 +217,10 @@ func TestPR03b_EKSFetcher_ActiveEmitsNoFinding(t *testing.T) {
 	}
 	r := resources[0]
 
-	// Inverted deliberately: this counted Findings and expected 0. Posture
-	// signals now share the slice, and this fixture declares no control-plane
-	// logging and no encryption configuration, so it legitimately carries those
-	// two. The lifecycle contract this test is about is that an ACTIVE cluster
-	// gets no state finding, which is what it now asserts.
+	// Posture signals share the slice, and this fixture declares no
+	// control-plane logging and no encryption configuration, so it
+	// legitimately carries those two. The lifecycle contract is that an
+	// ACTIVE cluster gets no state finding.
 	for _, f := range r.Findings {
 		if f.Code == awsclient.CodeEKSStateCreating || f.Code == awsclient.CodeEKSStateUpdating ||
 			f.Code == awsclient.CodeEKSStateFailed {
@@ -254,11 +253,10 @@ func TestPR03b_EKSFetcher_FailedEmitsBrokenFinding(t *testing.T) {
 	}
 	r := resources[0]
 
-	// Inverted deliberately: this took Findings[0] after asserting a length of
-	// 1. Posture signals now share the slice and this fixture declares neither
-	// logging nor encryption, so the lifecycle finding is no longer alone or
-	// necessarily first. The contract is that it is present and Broken, which
-	// is what this now looks up by code.
+	// Posture signals share the slice and this fixture declares neither
+	// logging nor encryption, so the lifecycle finding is not alone or
+	// necessarily first. The contract is that it is present and Broken,
+	// looked up by code.
 	var f domain.Finding
 	var found bool
 	for _, candidate := range r.Findings {
@@ -955,7 +953,7 @@ func (m *pr03bEBSSnapMock) DescribeSnapshots(
 }
 
 // =============================================================================
-// CR P2 FINDINGS — additional tests for CodeRabbit review issues
+// Additional pins
 // =============================================================================
 
 // TestPR03b_LambdaColor_BrokenOverridesWave1 verifies that the structural broken
@@ -1090,19 +1088,13 @@ func TestPR03b_ENIFetcher_AvailableNonRequesterEmitsFinding(t *testing.T) {
 	}
 }
 
-// TestPR03b_EBFetcher_EmitsHealthAsWave1Finding pins the CURRENT (correct)
-// contract: the EB fetcher DOES emit a wave1 Finding for Yellow/Red/Grey
-// health, because colorEB is now colorFromAnyFinding-first
-// (core/aws/catalog_compute.go) — it needs a Finding to color from, not
-// a bare Fields["health"] read.
-//
-// RETIRED the old "must not emit health as wave1 Finding" invariant this
-// test used to pin (TestPR03b_EBFetcher_DoesNotEmitHealthAsWave1Finding):
-// that was the pre-color-findings-conformance contract (structural-only
-// Color classification). Since ebEnvironmentFindings (core/aws/eb_codes.go)
-// was added to mirror colorEB's own precedence, emitting the health Finding
-// is the correct, current behavior — see
-// qa_color_findings_conformance_test.go for the standing architectural gate.
+// TestPR03b_EBFetcher_EmitsHealthAsWave1Finding: the EB fetcher emits a
+// wave1 Finding for Yellow/Red/Grey health, because colorEB is
+// colorFromAnyFinding-first (core/aws/catalog_compute.go) — it needs a
+// Finding to color from, not a bare Fields["health"] read;
+// ebEnvironmentFindings (core/aws/eb_codes.go) mirrors colorEB's own
+// precedence. See qa_color_findings_conformance_test.go for the standing
+// architectural gate.
 func TestPR03b_EBFetcher_EmitsHealthAsWave1Finding(t *testing.T) {
 	cases := []struct {
 		name         string
@@ -1160,12 +1152,6 @@ func TestPR03b_EBFetcher_EmitsHealthAsWave1Finding(t *testing.T) {
 		})
 	}
 }
-
-// Per-type single-method mock adapters (pr03bLambdaMock, pr03bEKSListMock,
-// pr03bASGMock, etc.) are candidates for consolidation into shared helpers in
-// tests/unit/helpers_*.go. Each satisfies a one-method interface and the
-// boilerplate is repetitive, but consolidation was deferred to avoid disrupting
-// the coder → QA diff cycle.
 
 // =============================================================================
 // A1 — Lambda Inactive emits NO Finding

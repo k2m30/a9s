@@ -20,7 +20,7 @@
 // delta bucket: growth red shades, drop green shades, |Δ| < threshold
 // neutral" rule; every seeded delta here is far outside any plausible
 // neutral threshold so the growth/drop assertions hold regardless of the
-// exact threshold value the coder picks.
+// exact neutral threshold in production.
 package unit_test
 
 import (

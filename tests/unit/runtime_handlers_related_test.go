@@ -1,16 +1,13 @@
 // runtime_handlers_related_test.go — public-seam coverage for
-// (*runtime.Core).HandleRelatedNavigate after the AS-150 migration moved the
-// handler out of internal/tui into core/runtime.
+// (*runtime.Core).HandleRelatedNavigate.
 //
-// Cases A–K mirror the Stage 2 scope on AS-201. The runtime seam is exactly
-// what AS-150 exposed — these tests stand up *runtime.Core directly through
+// Cases A–K stand up *runtime.Core directly through
 // runtime.New(session.New(), catalog.All()) and assert the
 // NavigationResult + []TaskRequest pair returned for each branch.
 //
-// HARD CONSTRAINT (per AS-203 acceptance): this file MUST NOT import
-// charm.land/bubbletea/v2, lipgloss, or bubbles. The migration's whole point
-// was decoupling the handler from Bubble Tea; bringing the framework back in
-// here would defeat the test.
+// HARD CONSTRAINT: this file MUST NOT import charm.land/bubbletea/v2,
+// lipgloss, or bubbles. The handler is decoupled from Bubble Tea; bringing
+// the framework back in here would defeat the test.
 package unit
 
 import (
@@ -221,7 +218,7 @@ func TestHandleRelatedNavigate_MultipleRelatedIDs_CacheMiss_FetchResources(t *te
 }
 
 // Case H — multiple RelatedIDs, partial coverage + truncated cache →
-// FilteredList with a single KindFetchMore task (continuation). AS-270:
+// FilteredList with a single KindFetchMore task (continuation):
 // the continuation token rides on the TaskRequest as a FetchMorePayload.
 func TestHandleRelatedNavigate_MultipleRelatedIDs_PartialCoverage_Truncated_FetchMore(t *testing.T) {
 	c, s := newRuntimeCore(t)

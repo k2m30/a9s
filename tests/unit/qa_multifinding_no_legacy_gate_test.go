@@ -1,89 +1,28 @@
-// qa_multifinding_no_legacy_gate_test.go — owner directive: the v3.47.0
-// multi-finding work (setWave2Finding as an append-only builder,
-// IssueEnricherResult.Findings as map[string][]domain.Finding, per
-// .claude/agent-memory/a9s-qa/project_framework_limit_52_carry_layer_already_multifinding_safe.md)
-// must not coexist indefinitely with the single-finding compat layer
-// Reshape A/B deliberately preserved as an interim bridge (see
-// .claude/agent-memory/a9s-qa/reference_attentiondetails_nested_map_test_migration.md).
-// These four gates enforce the "no legacy" end state: each is RED today
-// against the shim-laden code and must go GREEN once the coder purges every
-// violation this file lists.
+// qa_multifinding_no_legacy_gate_test.go — no single-finding compat layer
+// beside the multi-finding work (setWave2Finding as an append-only builder,
+// IssueEnricherResult.Findings as map[string][]domain.Finding).
 //
-// DESIGN CHOICE (stated once — applies to all four gates below): no
-// allowlist. Each gate does a fresh scan every run and unconditionally
+// No allowlist: each gate does a fresh scan every run and unconditionally
 // fails when it finds ANY matching violation, listing every one in the
 // failure message. This is deliberately different from this package's
-// other ratchet-style gates (qa_controller_construction_discipline_test.go,
+// ratchet-style gates (qa_controller_construction_discipline_test.go,
 // qa_enricher_finding_builder_discipline_test.go), which allowlist known
-// debt with t.Skipf and stay green around it — those track slow multi-PR
-// burn-down of pre-existing debt. These four gates instead pin a hard purge
-// deadline on NEW, deliberately-scoped debt: the coder's very next change
-// either removes every violation below or the gate stays red. Zero
-// allowlist also means zero test-file edits are needed for the fix to turn
-// these green (see
-// .claude/agent-memory/a9s-qa/feedback_compile_red_shared_package_blast_radius.md
-// on why that property is worth choosing deliberately) — and, since none of
-// the four gates requires a new production symbol to exist, this file
-// compiles clean against HEAD today; "RED" here means "runs and fails via
-// t.Errorf", never a compile break, so it carries zero blast radius for any
-// concurrent sibling work in this package.
+// debt with t.Skipf and stay green around it. None of the four gates
+// requires a new production symbol to exist, so a violation is a t.Errorf,
+// never a compile break.
 //
-// VERIFIED CENSUS (2026-07-07, this exact file's scanners run against HEAD
-// by hand before this file was written; corrections to the originating
-// dispatch's claims are called out inline per gate):
+//	GATE 1: no single-Finding-typed Findings field on a runtime/app/messages
+//	struct.
 //
-//	GATE 1 (4 violations): core/runtime/intent.go:36
-//	(ListEnrichmentPatch.Findings), core/runtime/state.go:18
-//	(RuntimeState.EnrichmentFindings), core/app/viewstate.go:148
-//	(ListBody.EnrichmentFindings), core/runtime/messages/event.go:244
-//	(EnrichmentChecked.Findings). Dispatch cited intent.go:31 and
-//	state.go:16 — both are the doc-comment lines directly above the real
-//	field declarations (31 is ListEnrichmentPatch's struct-level doc start;
-//	16 is EnrichmentFindings' own leading comment); the field declarations
-//	themselves are at 36 and 18 respectively, verified by direct read
-//	(mirrors the same dispatch-cites-the-comment-not-the-code pattern noted
-//	in qa_enricher_finding_builder_discipline_test.go's own header).
+//	GATE 2: no single-value AttentionDetails field on those structs.
 //
-//	GATE 2 (2 violations): core/runtime/intent.go:37
-//	(ListEnrichmentPatch.AttentionDetails), core/runtime/state.go:22
-//	(RuntimeState.EnrichmentAttentionDetails).
+//	GATE 3: no direct per-resource result.Findings[id] = ... /
+//	result.AttentionDetails[id] = ... write outside the builder.
 //
-//	GATE 3 (2 violations): core/aws/snapshot_cross_ref.go:217
-//	(result.Findings[res.ID] = ...) and
-//	core/aws/snapshot_cross_ref.go:224
-//	(result.AttentionDetails[res.ID] = ...) — both inside
-//	EnrichSnapshotCrossRef. Zero violations found in any
-//	core/aws/*_issue_enrichment.go file — the append-only builder
-//	discipline is already clean there (matches
-//	qa_enricher_finding_builder_discipline_test.go's own green census after
-//	the MSK fix landed), verified by grep before writing this gate rather
-//	than assumed.
-//
-//	GATE 4 (3 violations, of 4 candidate patterns): internal/tui/
-//	app_enrich_fold.go:3 (go/ast merges the file's two leading
-//	package-level comment blocks — lines 3-4 and 6-8, despite the blank
-//	line 5 between them — into one CommentGroup anchored at line 3; its
-//	merged text contains "applyEnrichment is the canonical write path for
-//	Wave 2 results.", matching the "canonical ... wave 2 ... path"
-//	unordered pattern; verified against the actual t.Errorf output, not
-//	assumed from source line numbers alone), and internal/tui/
-//	app_enrich_fold.go:131 and :155 (each "break // at most one wave2
-//	finding per resource", in findingsFromRows and attentionDetailsFromRows
-//	respectively).
-//	CORRECTION to the originating dispatch: it also named
-//	core/aws/issue_enrichment.go and "others" as carrying these
-//	phrases, and named two more literal patterns — "worse-severity wins the
-//	slot" and "attach to first finding". A case-insensitive scan of the
-//	whole internal/ tree (non-test files) at HEAD found ZERO occurrences of
-//	either phrase anywhere, and ZERO occurrences of any of the four
-//	patterns in issue_enrichment.go specifically — its setWave2Finding doc
-//	comment already describes the CURRENT append-style multi-finding
-//	contract ("every independently-evaluated condition survives as its own
-//	Finding"), not a stale single-finding one. Both patterns remain
-//	implemented in mfnlDocPatterns below — they will catch a real future
-//	regression — but neither seeds a violation today, and this file does
-//	not invent one to force a match (see
-//	.claude/agent-memory/a9s-qa/feedback_verify_dispatch_claims_against_code.md).
+//	GATE 4: no doc comment describing a single-finding contract ("canonical
+//	... wave 2 ... path", "at most one wave2 finding per resource",
+//	"worse-severity wins the slot", "attach to first finding"); the patterns
+//	are mfnlDocPatterns below.
 package unit_test
 
 import (
@@ -384,9 +323,8 @@ func mfnlScanFileForDirectWrite(fset *token.FileSet, path string) ([]mfnlWriteVi
 // core/aws/snapshot_cross_ref.go cross-ref enricher, may assign
 // directly into a "*.Findings[id]" or "*.AttentionDetails[id]" index
 // expression. setWave2Finding is today's sole append-only builder for both
-// fields; this gate does not require a specific replacement name (the
-// coder may introduce a new builder, e.g. an AddFinding method) — it only
-// bans a NEW/remaining file writing the index expression directly.
+// fields; this gate does not require a specific builder name — it only
+// bans a file writing the index expression directly.
 //
 // Glob scope deliberately mirrors
 // qa_enricher_finding_builder_discipline_test.go's: "*_issue_enrichment.go"
@@ -395,13 +333,8 @@ func mfnlScanFileForDirectWrite(fset *token.FileSet, path string) ([]mfnlWriteVi
 // own legitimate r.Findings[resourceID]/r.AttentionDetails[resourceID]
 // writes (issue_enrichment.go:144/153) are never in this gate's scan scope
 // either. This gate additionally scans snapshot_cross_ref.go explicitly
-// because its filename does not match that glob and, unlike every
-// *_issue_enrichment.go file, it has real violations today — the sibling
+// because its filename does not match that glob — the sibling
 // read/range-access gate does not scan it at all.
-//
-// Verified 2-violation census (see this file's header comment): zero
-// violations exist in any *_issue_enrichment.go file today — the
-// append-only discipline is already clean there.
 func TestMultiFindingNoLegacyGate3_NoDirectResultFieldWriteOutsideBuilder(t *testing.T) {
 	root, err := filepath.Abs("../../core/aws")
 	if err != nil {
@@ -524,16 +457,8 @@ func (v mfnlDocViolation) String() string {
 // second apply" failure message, which asserts the OLD behavior does NOT
 // happen) can never trip this gate.
 //
-// Verified 3-violation census (see this file's header comment for the full
-// correction against the originating dispatch's broader claim): all three
-// live in internal/tui/app_enrich_fold.go — line 6 (the file's own
-// "canonical write path" package-level note) and lines 131/155 (matching
-// "break // at most one wave2 finding per resource" trailing comments in
-// findingsFromRows/attentionDetailsFromRows respectively). The other two
-// patterns ("worse-severity wins the slot", "attach to first finding") are
-// implemented but currently match nothing anywhere in internal/ — kept
-// active to catch a future regression, not to force today's count higher
-// than what a direct scan actually finds.
+// All four patterns stay active whether or not they currently match: the
+// gate exists to catch a regression, not to report today's count.
 func TestMultiFindingNoLegacyGate4_NoStaleSingleFindingDocComments(t *testing.T) {
 	fset := token.NewFileSet()
 	var violations []mfnlDocViolation

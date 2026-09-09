@@ -211,10 +211,9 @@ func TestEnrichTGWAttachments_APIErrorSetsTruncatedAndSurfacesError(t *testing.T
 	if err == nil {
 		t.Fatal("enricher must surface a composite error when an API call fails")
 	}
-	// INVERTED for the "skipped" spec row 6: the label was "tgw-enrich:", which
-	// made the rendered line say the type twice ("enrich tgw: DescribeTransitGatewayAttachments ..."). The
-	// type comes from the registry key at the surface; the aggregate names
-	// the call. Do not restore the type in the label.
+	// The aggregate names the call, not the type: the type comes from the
+	// registry key at the surface, and a type in the label would render it
+	// twice ("enrich tgw: tgw: DescribeTransitGatewayAttachments ...").
 	if errStr := err.Error(); !strings.Contains(errStr, "DescribeTransitGatewayAttachments") {
 		t.Errorf("composite error must name the call, %q, got: %q", "DescribeTransitGatewayAttachments", errStr)
 	}

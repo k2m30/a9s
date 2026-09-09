@@ -4,11 +4,11 @@
 //
 // A view file is the one thing in a9s a person is invited to change, and the
 // two ways they change a status column are renaming it and writing a key by
-// hand. Both used to work by accident: the cell was a status cell if its title
-// said Status, or if its key said "status" whatever the type calls its
-// lifecycle key. Neither is true now, so a file that says either of those
-// things silently stops having a status column — no phrase, no colour, and a
-// blank cell where the key matches nothing.
+// hand. The cell is a status cell only by carrying the type's lifecycle key —
+// not because its title says Status, nor because its key says "status"
+// whatever the type calls its lifecycle key — so a file that says either of
+// those things silently stops having a status column — no phrase, no colour,
+// and a blank cell where the key matches nothing.
 //
 // The migration owns the first case: a key this build moved is a key the build
 // moves for the operator. Nothing owns the second, so the load says it.

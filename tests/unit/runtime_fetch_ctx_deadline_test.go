@@ -1,51 +1,35 @@
-// runtime_fetch_ctx_deadline_test.go — RED pins for the upcoming centralized
-// ctx-deadline wrap on Core's interactive fetch entry points.
+// runtime_fetch_ctx_deadline_test.go — the centralized ctx-deadline wrap on
+// Core's interactive fetch entry points.
 //
-// Current behavior (RED today): internal/tui/fetch_adapter.go forwards a
-// single cancel-only appCtx (context.WithCancel, captured once at
-// internal/tui/app.go:116 for the entire app run) to every interactive fetch
-// lane. core/runtime/fetchers.go (~:38-160) forwards that ctx verbatim to the
-// registered fetcher/AWS SDK call with no context.WithTimeout anywhere
-// (grep -rl WithTimeout core/aws/ is empty) — a stalled network call spins
-// the caller forever.
-//
-// Upcoming behavior pinned here: each of Core's six interactive fetch entry
-// points wraps the incoming ctx in a bounded context.WithTimeout before
-// forwarding it to the registered fetcher / AWS SDK call, so both the TUI and
-// web adapters inherit a deadline regardless of what (if anything) the caller
-// itself set up.
+// internal/tui/fetch_adapter.go forwards a single cancel-only appCtx
+// (context.WithCancel, captured once in internal/tui/app.go for the entire
+// app run) to every interactive fetch lane, and core/aws has no
+// context.WithTimeout of its own, so each of Core's interactive fetch entry
+// points (core/runtime/fetchers.go) wraps the incoming ctx in a bounded
+// context.WithTimeout before forwarding it to the registered fetcher / AWS
+// SDK call. Both the TUI and web adapters inherit the deadline regardless of
+// what the caller itself set up; a stalled network call cannot spin the
+// caller forever.
 //
 // Capture strategy per lane:
 //   - FetchResources / FetchResourcesFiltered / FetchChildResources /
 //     FetchMoreResources / FetchRevealValue: a test-only fetcher registered
 //     via resource.SetPaginatedForTest / SetFilteredPaginatedForTest /
 //     SetPaginatedChildForTest / SetRevealFetcherForTest (the established
-//     fake-fetcher seam, see
-//     reference in tests/unit/aws_related_fetch_empty_test.go and friends)
-//     captures the ctx it actually receives.
+//     fake-fetcher seam, see tests/unit/aws_related_fetch_empty_test.go and
+//     friends) captures the ctx it actually receives.
 //   - FetchIdentity: Core.FetchIdentity forwards ctx to
 //     awsclient.FetchCallerIdentity(ctx, clients.STS, clients.IAM), and
-//     clients.STS is a concrete *sts.Client (core/aws/client.go:149) — not an
+//     clients.STS is a concrete *sts.Client (core/aws/client.go) — not an
 //     injectable interface. A real *sts.Client is built with a custom
 //     aws.HTTPClient transport that captures the *http.Request's ctx and
 //     returns a synthetic error before any real network I/O, so the pin
 //     verifies the deadline reaches all the way to the AWS SDK call
 //     boundary, not just a registry seam.
-//   - ConnectAWS: NOT pinned here. ConnectAWS's only work
-//     (awsclient.NewAWSSessionContext -> config.LoadDefaultConfig ->
-//     CreateServiceClients) performs no observable network I/O in the
-//     hermetic case this suite must stay in (no AWS config file, static/no
-//     credentials, explicit region) — there is no existing seam through
-//     which a test can capture the ctx a WithTimeout wrap would produce
-//     without a coder-added test hook. See the QA deliverable notes for this
-//     gap; do not add a fabricated timing-based test here (a real hang-vs-
-//     bounded-return timing probe would need to wait out the actual timeout
-//     to prove the RED case, which is unacceptably slow for this suite).
 //
 // The upper bound (120s) is pinned as "existence + sane bound", not an exact
-// value — the dispatch's contract is "the implementation will pick a
-// specific value", so these pins only fail if a deadline is missing entirely
-// or absurdly large, never on the coder's exact chosen duration.
+// value: these pins only fail if a deadline is missing entirely or absurdly
+// large, never on the exact chosen duration.
 package unit
 
 import (

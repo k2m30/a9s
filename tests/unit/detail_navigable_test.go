@@ -1,15 +1,10 @@
 package unit_test
 
 // detail_navigable_test.go — tests for resource.IsFieldNavigableForTest, the
-// resource-package predicate shared verbatim by both the legacy
-// views.DetailModel field-rendering path (deleted, wave3) and the live
-// buildDetailFieldItems/RenderDetail path — see
-// tests/unit/detail_ports_test.go's header comment item 7. The
-// legacy-DetailModel-driven rendering/Enter-key tests that used to live here
-// were removed once RenderDetail's live equivalents (detail_ports_test.go)
-// and detail_livepath_migration_test.go proved coverage; a controller-path
-// pin for "Enter on a navigable detail field dispatches RelatedNavigate" is a
-// known residual gap (actions_nav.go:573 handles it but has no dedicated test).
+// resource-package predicate the live buildDetailFieldItems/RenderDetail
+// path uses — see tests/unit/detail_ports_test.go's header comment item 7.
+// RenderDetail's rendering/Enter-key coverage is in detail_ports_test.go and
+// detail_livepath_migration_test.go.
 
 import (
 	"testing"

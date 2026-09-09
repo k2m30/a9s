@@ -1,29 +1,21 @@
-// runtime_enrich_dispatch_window_test.go — RED pins for the upcoming
-// bounded-window Wave-2 enrichment dispatch.
+// runtime_enrich_dispatch_window_test.go — the bounded-window Wave-2
+// enrichment dispatch.
 //
-// Current behavior (RED today): startEnrichment (core/runtime/handlers_availability.go
-// ~:429-465) drains the ENTIRE session.EnrichQueue into one task batch — with
-// ~49 registered Wave2 enrichers (core/aws/catalog_*.go) that is ~49
-// concurrent AWS probe chains when the adapter executes the batch. The
-// pre-existing queue-refill branch in handleEnrichmentChecked
-// (core/runtime/handlers_availability.go ~:653-657, "if queue has more items,
-// fire next probe") is DEAD because the queue is always empty by the time any
-// EnrichmentChecked result arrives.
-//
-// Upcoming behavior pinned here: startEnrichment dispatches an initial window
-// of AT MOST 4 TaskKindProbeEnrich tasks (mirroring Wave-1's
-// runtime.MaxConcurrentProbes=4, core/runtime/related.go:12-13), leaving the
+// startEnrichment (core/runtime/handlers_availability.go) dispatches an
+// initial window of AT MOST 4 TaskKindProbeEnrich tasks (mirroring Wave-1's
+// runtime.MaxConcurrentProbes=4, core/runtime/related.go), leaving the
 // remainder queued in session.EnrichQueue; each EnrichmentChecked completion
-// pops exactly one next queued type (the existing refill branch goes live);
-// the full queue still drains to completion over successive completions with
-// no type lost and no type dispatched twice.
+// pops exactly one next queued type (handleEnrichmentChecked's refill
+// branch); the full queue drains to completion over successive completions
+// with no type lost and no type dispatched twice. Draining the ENTIRE queue
+// into one batch would mean ~49 concurrent AWS probe chains (one per
+// registered Wave2 enricher, core/aws/catalog_*.go).
 //
 // The window size (4) is pinned as a literal here rather than referenced via
 // runtime.MaxConcurrentProbes: that constant is documented as scoped to the
-// related-checker fan-out (core/runtime/related.go), and the dispatch's
-// explicit contract for this Wave-2 window is the number 4, not "whatever
-// MaxConcurrentProbes happens to equal" — the two are allowed to diverge
-// without silently breaking these pins.
+// related-checker fan-out (core/runtime/related.go), and the Wave-2 window
+// is the number 4, not "whatever MaxConcurrentProbes happens to equal" — the
+// two are allowed to diverge without silently breaking these pins.
 //
 // Harness: Core built via runtime.New(session.New(), catalog.All()) (the
 // package-level style already used by runtime_list_open_enrich_dispatch_test.go
@@ -279,21 +271,16 @@ func TestStartEnrichment_SmallQueue_AllDispatchedImmediately(t *testing.T) {
 	}
 }
 
-// TestHandleEnrichmentChecked_StaleTypeGenCompletion_StillRefillsQueueByOne
-// pins defect #1 (external review, 2026-07-19): a completion for a windowed
-// (in-flight) type whose per-type generation was bumped while its sweep
-// probe was still outstanding — the rerun/refresh path, e.g. Ctrl+R on the
-// open list or a second sweep re-queuing the same type — must still refill
-// the queue by one. The stale result itself is correctly discarded, but the
-// sweep's forward progress must not stall because of it.
-//
-// RED today: handleEnrichmentChecked's TypeGen staleness guard
-// (core/runtime/handlers_availability.go ~:484) returns (nil, nil)
-// immediately on a TypeGen mismatch, before ever reaching the refill branch
-// (~:658-665). With more than enrichDispatchWindow queued types, a stale
-// completion for any one of the four in-flight types drops its refill on
-// the floor — zero additional tasks dispatched, not one — and every type
-// still queued behind it never gets a turn.
+// TestHandleEnrichmentChecked_StaleTypeGenCompletion_StillRefillsQueueByOne:
+// a completion for a windowed (in-flight) type whose per-type generation
+// was bumped while its sweep probe was still outstanding — the
+// rerun/refresh path, e.g. Ctrl+R on the open list or a second sweep
+// re-queuing the same type — must still refill the queue by one. The stale
+// result itself is correctly discarded, but the sweep's forward progress
+// must not stall because of it: with more than enrichDispatchWindow queued
+// types, a TypeGen staleness guard that returned before the refill branch
+// would drop the refill on the floor for any one of the four in-flight
+// types, and every type still queued behind it would never get a turn.
 func TestHandleEnrichmentChecked_StaleTypeGenCompletion_StillRefillsQueueByOne(t *testing.T) {
 	sess := session.New()
 	core := runtime.New(sess, catalog.All())
@@ -334,20 +321,19 @@ func TestHandleEnrichmentChecked_StaleTypeGenCompletion_StillRefillsQueueByOne(t
 	}
 }
 
-// TestHandleEnrichmentChecked_NonSweepCompletion_DoesNotStealQueueRefill pins
-// defect #2a (external review, 2026-07-19): the refill branch
-// (core/runtime/handlers_availability.go ~:658-665) fires for ANY
-// current-gen TaskKindProbeEnrich completion, not just a completion for a
-// type that is actually part of the active sweep. A list-open enrichment probe
-// for a type that is not in the active sweep at all
-// (HandleResourcesLoaded's list-open dispatch, handlers_resources.go
-// ~:130-147) completing while a sweep still has queued types must not pop one
-// off the queue — those queued types' eventual sweep dispatch is unrelated to
-// this list-open probe's lifecycle.
+// TestHandleEnrichmentChecked_NonSweepCompletion_DoesNotStealQueueRefill:
+// the refill branch (core/runtime/handlers_availability.go) fires only for
+// a completion of a type that is actually part of the active sweep, not for
+// ANY current-gen TaskKindProbeEnrich completion. A list-open enrichment
+// probe for a type that is not in the active sweep at all
+// (HandleResourcesLoaded's list-open dispatch, handlers_resources.go)
+// completing while a sweep still has queued types must not pop one off the
+// queue — those queued types' eventual sweep dispatch is unrelated to this
+// list-open probe's lifecycle.
 //
 // Regression shape: session.EnrichQueue must not lose its head entry or
-// dispatch a follow-up TaskKindProbeEnrich when listOpenType was never part of
-// the sweep.
+// dispatch a follow-up TaskKindProbeEnrich when listOpenType was never part
+// of the sweep.
 func TestHandleEnrichmentChecked_NonSweepCompletion_DoesNotStealQueueRefill(t *testing.T) {
 	sess := session.New()
 	core := runtime.New(sess, catalog.All())
@@ -397,18 +383,12 @@ func TestHandleEnrichmentChecked_NonSweepCompletion_DoesNotStealQueueRefill(t *t
 }
 
 // TestHandleEnrichmentChecked_ListOpenDuringSweep_NoDoubleDispatchNoCounterOvercounts
-// pins defect #2b (external review, 2026-07-19): the full interleaving
-// defect #2a's setup enables. An unrelated list-open completion stealing a
-// sweep refill can cause the stolen type to be dispatched twice — once via
-// its own list-open probe, once via the steal-refill treating it as "next in
-// the sweep queue" — and inflates session.EnrichChecked past
-// session.EnrichTotal, the counters that back the menu's Enriching X/Y
-// progress badge.
-//
-// RED today: driving the full interleaving to exhaustion dispatches the
-// type sitting at the queue head (when the list-open probe completes) a
-// second time, and session.EnrichChecked overshoots EnrichTotal by the
-// number of such double dispatches.
+// pins the full interleaving the previous test's setup enables. An
+// unrelated list-open completion stealing a sweep refill would cause the
+// stolen type to be dispatched twice — once via its own list-open probe,
+// once via the steal-refill treating it as "next in the sweep queue" — and
+// inflate session.EnrichChecked past session.EnrichTotal, the counters that
+// back the menu's Enriching X/Y progress badge.
 func TestHandleEnrichmentChecked_ListOpenDuringSweep_NoDoubleDispatchNoCounterOvercounts(t *testing.T) {
 	sess := session.New()
 	core := runtime.New(sess, catalog.All())

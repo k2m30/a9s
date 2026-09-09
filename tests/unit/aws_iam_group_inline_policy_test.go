@@ -1,20 +1,11 @@
 package unit
 
 // Tests for the IAM group related checker covering both managed (attached) and
-// inline group policies. See core/aws/iam_groups_related.go:48.
+// inline group policies (core/aws/iam_groups_related.go).
 //
-// Bug: checkGroupPolicy only calls ListAttachedGroupPolicies (managed policies).
-// Groups with only inline policies (ListGroupPolicies) show "IAM Policies (0)".
-//
-// TestIAMGroup_ManagedPolicies_RelatedCount — verifies existing managed-policy
-// path works. Should PASS immediately.
-//
-// TestIAMGroup_InlinePoliciesOnly_RelatedCount — reveals the bug. WILL FAIL
-// until the coder:
-//  1. Adds ListGroupPolicies call to checkGroupPolicy (iam_groups_related.go:48)
-//  2. Adds InlineGroupPolicies map to IAMFixtures (core/demo/fixtures/iam.go)
-//  3. Adds ListGroupPolicies method to IAMFake (core/demo/fakes/iam.go)
-//  4. Populates inline policies for "readonly" group in buildIAMRelations
+// checkGroupPolicy counts both ListAttachedGroupPolicies and
+// ListGroupPolicies results: a group carrying only inline policies is not
+// "IAM Policies (0)".
 
 import (
 	"context"
@@ -127,16 +118,9 @@ func TestIAMGroup_ManagedPolicies_RelatedCount(t *testing.T) {
 	}
 }
 
-// TestIAMGroup_InlinePoliciesOnly_RelatedCount reveals the missing ListGroupPolicies
-// call in checkGroupPolicy (core/aws/iam_groups_related.go:48).
-//
-// The "readonly" fixture group has no attached managed policies. After the coder
-// adds InlineGroupPolicies support to fixtures/fakes and populates inline policies
-// for "readonly", the checker MUST count them via ListGroupPolicies.
-//
-// This test WILL FAIL (Count=0) until the bug is fixed:
-//   - checkGroupPolicy must call ListGroupPolicies in addition to ListAttachedGroupPolicies
-//   - InlineGroupPolicies["readonly"] must be non-empty in demo fixtures
+// TestIAMGroup_InlinePoliciesOnly_RelatedCount: the "readonly" fixture group
+// has no attached managed policies, so its count comes entirely from
+// ListGroupPolicies via InlineGroupPolicies["readonly"].
 func TestIAMGroup_InlinePoliciesOnly_RelatedCount(t *testing.T) {
 	result := runIAMGroupRelatedCheck(t, "readonly")
 

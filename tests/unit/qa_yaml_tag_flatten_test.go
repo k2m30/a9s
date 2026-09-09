@@ -1,15 +1,10 @@
-// qa_yaml_tag_flatten_test.go — Tests for YAML tag flattening in ToSafeValue.
+// qa_yaml_tag_flatten_test.go — YAML tag flattening in ToSafeValue.
 //
-// Bug: commit e3765de (#210) added tag flattening ONLY in the detail view
-// (internal/tui/views/detail_fields.go). The YAML view (via fieldpath.ToSafeValue)
-// still emits tag slices as [{Key:X, Value:Y}] structs instead of {X:Y} maps.
-//
-// Fix target: fieldpath.ToSafeValue — detect slice-of-structs where every element
-// has exactly Key(*string) + Value(*string) fields (two string-pointer fields),
-// and emit map[string]any instead of []any.
-//
-// Tests in this file FAIL against current main because ToSafeValue does not yet
-// flatten tag slices. They will PASS once the fix is applied.
+// fieldpath.ToSafeValue detects a slice-of-structs where every element has
+// exactly Key(*string) + Value(*string) fields (two string-pointer fields)
+// and emits map[string]any instead of []any, so the YAML view renders tags
+// as {X:Y} maps, the same as the detail view, not [{Key:X, Value:Y}]
+// structs.
 package unit
 
 import (

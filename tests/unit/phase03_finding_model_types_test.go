@@ -104,10 +104,9 @@ func TestPhase03_ResourceFindingsField(t *testing.T) {
 	}
 }
 
-// TestPhase03_ResourceCoreFieldsPresent verifies the post-W1.4b.3 surface of
-// domain.Resource — Status and Issues were removed in AS-1428 W1.4b.3; the
-// remaining fields (ID, Name, Type, Fields, RawStruct, Findings,
-// AttentionDetails) must continue to round-trip.
+// TestPhase03_ResourceCoreFieldsPresent verifies the surface of
+// domain.Resource: ID, Name, Type, Fields, RawStruct, Findings and
+// AttentionDetails round-trip.
 func TestPhase03_ResourceCoreFieldsPresent(t *testing.T) {
 	r := domain.Resource{
 		ID:        "i-abc123",

@@ -61,10 +61,8 @@ import (
 //
 // KnownRelated always allocates its internal ID slice via make([]string, 0,
 // len(ids)), so ResourceIDs() is never a literal nil for a KnownRelated
-// result — only empty. The "nil" pin this test used to check was an
-// implementation detail of the pre-encapsulation zero-value struct literal,
-// not a documented contract (ValidateRelatedResult/EffectiveState/
-// IsRelatedActionable treat nil and empty ResourceIDs identically).
+// result — only empty; ValidateRelatedResult/EffectiveState/
+// IsRelatedActionable treat nil and empty ResourceIDs identically.
 func TestTruncatedResult_ReturnsTruncatedResult(t *testing.T) {
 	result := resource.KnownRelated("vpc", nil, true)
 
@@ -144,10 +142,8 @@ func TestTruncatedResult_PassesValidation(t *testing.T) {
 // zero resources. The vpc resource has ID "vpc-12345678" which will not match
 // any subnet in the empty (truncated) list.
 //
-// EXPECTED: {Count: 0, Truncated: true}  (honest lower bound)
-// ACTUAL (BUG): {Count: -1}                (discards lower bound)
-//
-// This test stays RED until the coder fixes the anti-pattern in vpc_related.go.
+// Expected: {Count: 0, Truncated: true} (honest lower bound), never
+// {Count: -1} (discards the lower bound).
 func TestCheckVPC_TruncatedCacheReturnsTruncatedResult(t *testing.T) {
 	vpcResource := resource.Resource{
 		ID:   "vpc-12345678",
@@ -322,10 +318,6 @@ func TestCheckAMI_NG_TruncatedCacheReturnsTruncatedResult(t *testing.T) {
 // constructs a ResourceCache where ALL target entries are {IsTruncated: true,
 // Resources: []}, calls the checker with a minimal parent resource, and asserts
 // the result is {Count: 0, Truncated: true} — NEVER {Count: -1}.
-//
-// This is the regression pin: after the coder sweeps all 225 anti-pattern sites,
-// every reverse-scan checker must pass this test. The test stays RED (many
-// Count=-1 failures) until the sweep is complete.
 func TestAllReverseScanCheckers_TruncatedEmptyCacheReturnsTruncated(t *testing.T) {
 	// Minimal parent resources keyed by source type. These are shaped to avoid
 	// the early-exit "no ID / no key field → Count=0 definitively" guard, so

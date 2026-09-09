@@ -1,13 +1,13 @@
 package unit
 
-// issue230_ctrl_r_cache_clear_test.go — regression tests for issue #230:
-// Ctrl+R from a detail view must clear the RelatedCache entry for the
-// current resource (not just re-dispatch checkers on top of stale cached
-// state) and reset the right column to loading state before any fresh
-// checker result arrives, so stale counts are never visible during a
-// refresh. All three tests use the actual Ctrl+R key press (via ctrlR(),
-// defined in bug_detail_refresh_resets_rightcol_test.go) so they exercise
-// the real handler path (core/app/actions_list.go's handleActionRefresh).
+// issue230_ctrl_r_cache_clear_test.go — Ctrl+R from a detail view must clear
+// the RelatedCache entry for the current resource (not just re-dispatch
+// checkers on top of stale cached state) and reset the right column to
+// loading state before any fresh checker result arrives, so stale counts are
+// never visible during a refresh. All three tests use the actual Ctrl+R key
+// press (via ctrlR(), defined in bug_detail_refresh_resets_rightcol_test.go)
+// so they exercise the real handler path (core/app/actions_list.go's
+// handleActionRefresh).
 
 import (
 	"fmt"
@@ -19,8 +19,8 @@ import (
 	"github.com/k2m30/a9s/v3/core/runtime/messages"
 )
 
-// TestContract_CtrlR_ClearsRelatedCache_ThenRechecks is the full integration test
-// for issue #230. It verifies that Ctrl+R:
+// TestContract_CtrlR_ClearsRelatedCache_ThenRechecks is the full integration
+// test. It verifies that Ctrl+R:
 //
 //	(a) clears the stale cached data so the right column shows loading state, and
 //	(b) re-dispatches related checkers (a RelatedCheckResult appears in the chain).
@@ -110,10 +110,10 @@ func TestContract_CtrlR_FromDetail_ProducesRelatedCheckStarted(t *testing.T) {
 	}
 }
 
-// TestContract_CtrlR_RightColumnResets_BeforeRecheck is the key regression guard
-// for the stale-data bug described in issue #230: after Ctrl+R, before any
-// new RelatedCheckResult is delivered, the right column MUST NOT show the
-// previously-loaded count values.
+// TestContract_CtrlR_RightColumnResets_BeforeRecheck is the key regression
+// guard against stale data: after Ctrl+R, before any new RelatedCheckResult
+// is delivered, the right column MUST NOT show the previously-loaded count
+// values.
 func TestContract_CtrlR_RightColumnResets_BeforeRecheck(t *testing.T) {
 	m := setupEC2DetailWithResults(t)
 

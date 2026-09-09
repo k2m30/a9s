@@ -4,18 +4,16 @@ package unit
 // pivot always opens the target's DETAIL view" invariant on the CACHE-HIT
 // fast path.
 //
-// Rule (owner, 2026-07-06 — supersedes the 2026-04-24 rule): a related pivot
-// that narrows to exactly ONE resource must open that resource's DETAIL view
-// (fields + related), for EVERY target type, in both lanes (TUI and web) —
-// never the target's enter-keyed child view. The old rule ("do exactly what
-// Enter would do" — child view for ~19 types with Children[Key="enter"])
-// made the web lane diverge from the TUI lane, since the web lane always
-// rendered detail. Child views stay reachable exactly as before by pressing
-// Enter inside the target's own list.
+// A related pivot that narrows to exactly ONE resource must open that
+// resource's DETAIL view (fields + related), for EVERY target type, in both
+// lanes (TUI and web) — never the target's enter-keyed child view, which
+// would make the two lanes diverge since the web lane always renders
+// detail. Child views stay reachable by pressing Enter inside the target's
+// own list.
 //
-// This test pins the fast-path fix using s3 (Children[Key="enter"] →
-// s3_objects, ContextKeys={"bucket":"ID"}): a cache-hit pivot to s3 must land
-// on the s3 bucket's DETAIL view, not s3_objects.
+// This test uses s3 (Children[Key="enter"] → s3_objects,
+// ContextKeys={"bucket":"ID"}): a cache-hit pivot to s3 must land on the s3
+// bucket's DETAIL view, not s3_objects.
 
 import (
 	"context"

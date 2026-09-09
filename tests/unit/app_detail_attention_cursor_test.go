@@ -1,17 +1,15 @@
 // app_detail_attention_cursor_test.go — the cursor must stay on the same
 // logical field when the Attention block changes size under it.
 //
-// Both pins here are regressions of the same class: the FieldCursor delta in
+// Both pins here are the same class: the FieldCursor delta in
 // applyFindingToState (core/app/detail_state.go) needs the size of the block
-// the user is actually looking at. It used to walk the entries a second time
-// to derive that size, and a second walk can disagree with the render —
-// Finding A because it walked them UNSORTED while the renderer sorts "!"
-// before "~" (so it picked the wrong "last entry" and dropped the trailing
-// spacer from its count), Finding B because it read session state the runtime
-// had already moved. buildAttentionSectionDetail now reports the size it
-// emitted, snapshot() records it with the identity of the row under the
-// cursor, and the relocation reads that record — so the class is closed by
-// construction: there is no second walk left to disagree.
+// the user is actually looking at, and a second walk of the entries can
+// disagree with the render — an unsorted walk while the renderer sorts "!"
+// before "~" picks the wrong "last entry" and drops the trailing spacer from
+// its count, and session state may already have moved under it.
+// buildAttentionSectionDetail reports the size it emitted, snapshot() records
+// it with the identity of the row under the cursor, and the relocation reads
+// that record, so there is no second walk left to disagree.
 package unit_test
 
 import (
@@ -309,10 +307,9 @@ func deliverEnrichment(t *testing.T, c *app.Controller, core *runtime.Core, id s
 }
 
 // TestApplyDetailFinding_CursorFollowsItsAttentionEntry: a cursor INSIDE the
-// Attention block used to be sent back to the section header whenever the
-// block changed, so an operator reading the second finding lost their place
-// the moment an enrichment result arrived. The entry the cursor is on is the
-// thing to keep, and it is still there — it has only moved down to make room
+// Attention block stays on its entry when the block changes, so an operator
+// reading the second finding keeps their place when an enrichment result
+// arrives. The entry is still there — it has only moved down to make room
 // for a more severe one.
 func TestApplyDetailFinding_CursorFollowsItsAttentionEntry(t *testing.T) {
 	const secondPhrase = "public ingress on port 22 from 0.0.0.0/0"

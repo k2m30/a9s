@@ -16,8 +16,8 @@ package unit
 // CloudWatch method is invoked.
 //
 // Rationale: CloudWatch calls add non-trivial latency (one call per row × 4
-// metrics = O(4N) API calls). If a future coder accidentally adds CW calls they
-// will be caught here before the feature ships.
+// metrics = O(4N) API calls); an accidental CW call is caught here before
+// the feature ships.
 
 import (
 	"context"

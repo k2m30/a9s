@@ -278,12 +278,11 @@ func TestListBodyMemoSeq_EnrichmentLandsAfterFirstRender_DecoratorFlipsOnNextRen
 	if len(render1.Rows) != 1 {
 		t.Fatalf("render1: Rows count: got %d want 1", len(render1.Rows))
 	}
-	// The probe is the rendered Status cell, not the row decorator: the glyph
-	// branch that used to answer here was deleted (a list row's colour is the
-	// worst finding over both waves, so buildListBody produces no glyph). The
-	// S4 status-cell override still reads the enrichment store directly, so it
-	// is the surface this memo-invalidation pin can observe. Do not restore a
-	// decorator assertion.
+	// The probe is the rendered Status cell, not the row decorator: a list
+	// row's colour is the worst finding over both waves, so buildListBody
+	// produces no glyph. The S4 status-cell override reads the enrichment
+	// store directly, so it is the surface this memo-invalidation pin can
+	// observe.
 	if got := render1.Rows[0].Cells[render1.StatusCol]; got == "system check failed" {
 		t.Fatalf("render1 (before enrichment): Status cell already carries the Wave-2 phrase")
 	}

@@ -112,8 +112,8 @@ func w4EnrichPolicies(t *testing.T, fake *w4PolicyFake, rs []resource.Resource) 
 }
 
 // w4EnrichPoliciesErr is w4EnrichPolicies for the cases that expect a failure:
-// a policy the account may not read is a recorded failure now, not a silent
-// skip ("skipped" spec row 5).
+// a policy the account may not read is a recorded failure, not a silent
+// skip.
 func w4EnrichPoliciesErr(t *testing.T, fake *w4PolicyFake, rs []resource.Resource) (awsclient.IssueEnricherResult, error) {
 	t.Helper()
 	clients := &awsclient.ServiceClients{IAM: fake, Region: "us-east-1"}
@@ -136,9 +136,8 @@ func TestW4PolicyPrivilegeEscalation(t *testing.T) {
 		w4PolicyResource("acme-reports-reader", benignARN),
 	})
 
-	// Inverted for spec row "phrase": the first matched combo was the phrase,
-	// which left every other combo on the policy unsayable. The combos are the
-	// rows and the phrase is the code's. Do not restore the old phrase.
+	// The combos are the rows and the phrase is the code's, so no combo on the
+	// policy is left unsayable.
 	w4AssertFinding(t, res.Findings[escARN], w4CodePolicyPrivEsc,
 		catalog.Phrase(w4CodePolicyPrivEsc), domain.SevBroken, w4SourcePolicyWave2)
 	w4AssertRows(t, res.AttentionDetails[escARN], w4CodePolicyPrivEsc,
@@ -195,10 +194,9 @@ func TestW4PolicyPrivEscComboRowsAreCapped(t *testing.T) {
 	for _, combo := range combos[:10] {
 		want = append(want, domain.DetailRow{Label: "Combo", Value: combo})
 	}
-	// Inverted for the cap batch's spec row 9: the closing row carried the
-	// "Combo" label of the row above it, which painted "Combo: … +12 more" —
-	// a combination named by the count of the ones not shown. The closing row
-	// is that count, not a combination, so it has no label. Do not restore.
+	// The closing row is the count of the combinations not shown, not a
+	// combination, so it has no label; a "Combo" label would paint
+	// "Combo: … +12 more".
 	want = append(want, domain.DetailRow{
 		Value: fmt.Sprintf("… +%d more", len(combos)-10),
 	})
@@ -223,9 +221,8 @@ func TestW4PolicyPrivEscDocumentFetchFailureIsUnknown(t *testing.T) {
 	if _, marked := res.TruncatedIDs[deniedARN]; !marked {
 		t.Errorf("TruncatedIDs[%s] = false, want true", deniedARN)
 	}
-	// INVERTED for the "skipped" spec row 5: the helper used to fail the test
-	// on any error, which is what made the silent skip look correct. A policy
-	// nobody could read says so. Do not restore the error-free helper here.
+	// A helper that fails the test on any error would make a silent skip look
+	// correct. A policy nobody could read says so.
 	if err == nil || !strings.Contains(err.Error(), deniedARN) {
 		t.Errorf("EnrichIAMPolicy err = %v, want it to name the policy it could not read", err)
 	}
@@ -275,8 +272,8 @@ func TestW4PolicyPrivEscNilClient(t *testing.T) {
 // TestW4PolicyFindingDef pins the registry row for the new policy code.
 func TestW4PolicyFindingDef(t *testing.T) {
 	def := w4FindingDef(t, "policy", w4CodePolicyPrivEsc)
-	// Inverted for spec row "phrase": the combo moved into the rows, so the
-	// declaration carries no placeholder for it any more.
+	// The combo is in the rows, so the declaration carries no placeholder for
+	// it.
 	if strings.Contains(def.Phrase, "<") {
 		t.Errorf("Phrase = %q; the combo is a supporting row, so the declaration needs no placeholder", def.Phrase)
 	}

@@ -129,15 +129,11 @@ func TestViewUpgrade_EditedFileKeepsItsOrder(t *testing.T) {
 // later build adds — so a correction reaches an installation that already
 // exists rather than only a fresh one.
 //
-// INVERTED for aws6 rows 4-6 (one humanize owner). These two tests used to
-// demonstrate the carry on ecs-task's Stop Code column, whose correction WAS
-// the humanize flag. That flag is no longer a column field at all — it is the
-// type's own declaration (ResourceTypeDef.HumanizeFields) — so there is
-// nothing left on that column for the carry to deliver, and the assertions
-// naming it are not to be restored. The rule they pin is unchanged and is now
-// demonstrated on logs' Retention column, whose correction is live: an older
-// build sourced it from the RawStruct path RetentionInDays at width 10, and
-// this build reads Fields["retention"] at width 12.
+// The rule is demonstrated on logs' Retention column, whose correction is
+// live: an older build sourced it from the RawStruct path RetentionInDays
+// at width 10, and this build reads Fields["retention"] at width 12. The
+// humanize flag is the type's own declaration (ResourceTypeDef.HumanizeFields),
+// not a column field, so it is not something the carry delivers.
 // ---------------------------------------------------------------------------
 
 // tui5ColumnTitled returns the on-disk column with the given title.

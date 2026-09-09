@@ -1,9 +1,6 @@
 package unit
 
-// aws_apigw_v2_pagination_test.go — Failing tests for EnrichAPIGatewayStage pagination.
-//
-// These tests document the REQUIRED behavior after the coder implements
-// pagination for GetStages (API Gateway V2).
+// aws_apigw_v2_pagination_test.go — EnrichAPIGatewayStage pagination.
 //
 // GetStages V2 returns up to 100 stages per page and a NextToken when more
 // exist. After full pagination, counts are exact. If pagination exceeds

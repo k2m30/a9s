@@ -5,12 +5,12 @@
 // are still two rows.
 //
 // The pins in app_detail_attention_cursor_test.go cover a cursor INSIDE the
-// Attention block. These are the same rule for the two cases that block left
-// open: a cursor on a content field below the block (which used to be moved
-// by the change in the block's size alone, so a rebuild that also changed the
-// content list carried it onto a different field), and a cursor on a wrapped
-// Detail sentence (which used to be named by its own prose, so two findings
-// whose sentences wrap identically gave that name two matches).
+// Attention block. These are the same rule for the two cases that block
+// leaves open: a cursor on a content field below the block (a rebuild that
+// changes the block's size and the content list must carry it to the same
+// field), and a cursor on a wrapped Detail sentence (named by its row
+// identity, not its prose, so two findings whose sentences wrap identically
+// stay two rows).
 package unit_test
 
 import (
@@ -226,7 +226,7 @@ func TestDetailCursor_DetailLineKeepsItsOwnFindingWhenTwoSentencesMatch(t *testi
 // TestDetailCursor_BottomOfAFindingsOnlyDetailIsNotABlankLine: the Attention
 // block ends in a spacer, and a resource whose projection yields no content
 // rows has that spacer as its last row. Sending the cursor to the bottom of
-// such a detail used to park it on a blank line.
+// such a detail must not park it on that blank line.
 func TestDetailCursor_BottomOfAFindingsOnlyDetailIsNotABlankLine(t *testing.T) {
 	res := resource.Resource{
 		ID: "witness-1", Type: "unregistered-type",

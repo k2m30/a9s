@@ -53,7 +53,7 @@ func scanStatusFor(c *runtime.Core, shortName string) (runtime.ProbeStatus, bool
 }
 
 // ────────────────────────────────────────────────────────────────────────────
-// 1 — demo sweep acceptance test
+// 1 — demo sweep
 // ────────────────────────────────────────────────────────────────────────────
 
 // TestScanStatus_DemoSweep_OneEntryPerTypeWithDuration drives a real

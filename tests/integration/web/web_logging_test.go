@@ -2,27 +2,9 @@
 
 // web_logging_test.go — pins CONTRACT 3(a) of the observability slice: a
 // request-logging middleware wraps core/web's mux, active only when the
-// logging facility (core/logging, new package) is enabled, logging a JSON
-// line (msg "web request", attrs method/path/status/duration_ms) per
-// handled request through it.
-//
-// CONTRACT 3(b) — the discarded render error at core/web/handlers.go:156
-// (`if err := renderPage(w, vs, s.token); err != nil { http.Error(w,
-// "render error", ...) }`) — is intentionally NOT pinned here.
-//
-// Feasibility note (per this contract's own skip clause): forcing
-// renderPage's html/template.ExecuteTemplate call to return an error needs
-// either (a) a writer that fails on Write() — handleIndex takes the real
-// http.ResponseWriter directly; no injectable writer seam exists at that
-// call site for an HTTP-driven integration test to reach — or (b) a
-// Kind/nil-mismatched app.ViewState (e.g. Body.Kind claiming "list" while
-// Body.List is nil), which the real demo Controller's Snapshot() does not
-// produce through any public HTTP action sequence this harness can drive
-// (it is an internal invariant the Controller maintains, not something the
-// public /action API can violate). Both routes require a change to
-// production code (an injectable writer, or a test-only Controller seam)
-// that is out of this file's scope — flagged back rather than worked
-// around. 3(b) is left to the coder's line-level care, not test-pinned.
+// logging facility (core/logging) is enabled, logging a JSON line (msg "web
+// request", attrs method/path/status/duration_ms) per handled request
+// through it.
 package webintegration
 
 import (

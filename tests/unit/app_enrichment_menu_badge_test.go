@@ -112,13 +112,11 @@ func TestApplyEnrichmentState_SyncsMenuIssueBadge_S3(t *testing.T) {
 	}
 }
 
-// INVERTED (cachegen row 7, the authoritative issue observation assigns): a
-// Wave-2 result IS the type's issue count as of now, so it lowers the badge
-// as readily as it raises it. The old expectation — 7 surviving a fresh
-// Wave-2 answer of 5 — was the defect: five cached issues healed and
-// re-verified kept showing, and kept being persisted, forever. Monotonicity
-// still applies to the rows-derived lane, which cannot prove an issue gone;
-// that half is pinned by
+// A Wave-2 result IS the type's issue count as of now, so it lowers the badge
+// as readily as it raises it; otherwise five cached issues healed and
+// re-verified would keep showing, and keep being persisted, forever.
+// Monotonicity applies only to the rows-derived lane, which cannot prove an
+// issue gone; that half is pinned by
 // TestApplyEnrichmentState_MenuBadge_RowsDerivedResultNeverLowersCount below.
 func TestApplyEnrichmentState_MenuBadge_AuthoritativeResultLowersCount(t *testing.T) {
 	c := newEnrichmentMenuBadgeController(t)
@@ -212,9 +210,8 @@ func TestApplyEnrichmentState_MenuBadge_CanonicalizesAlias(t *testing.T) {
 // authoritative-zero case: a type whose Wave-2 enrichment reports ZERO
 // issues must still flip IssueKnown to true (a genuinely clean type must not
 // stay stuck "unknown" forever just because its confirmed result happens to
-// be zero). Before the authoritative-flag fix, syncMenuIssueCount's guard
-// only fires on newIssues > curIssues, so a fresh 0-vs-0 comparison never
-// sets IssueKnown — this is RED at HEAD (Known stays false).
+// be zero). syncMenuIssueCount's newIssues > curIssues guard alone never
+// fires on a 0-vs-0 comparison; the authoritative flag is what sets Known.
 func TestApplyEnrichmentState_ZeroIssues_StillBecomesKnown(t *testing.T) {
 	c := newEnrichmentMenuBadgeController(t)
 

@@ -129,11 +129,11 @@ func TestCache2_SaveForLeftPair_RefusedAtChokepoint(t *testing.T) {
 // Row 3 — one producer of the availability file.
 // ---------------------------------------------------------------------------
 
-// TestCache2_MenuAvailabilityPersist_DerivesFromRowStore pins the second
-// producer out of existence. The menu-badge persistence lane used to freeze a
-// clone of MenuState's five maps and write EVERY type's count from that
-// snapshot; the sweep lane derives the same counts from RowStore, the session's
-// single source of truth for observed rows. The two disagree whenever RowStore
+// TestCache2_MenuAvailabilityPersist_DerivesFromRowStore: the menu-badge
+// persistence lane derives every type's count from RowStore, the session's
+// single source of truth for observed rows, not from a frozen clone of
+// MenuState's five maps; the two disagree whenever RowStore has learned
+// something the menu snapshot predates.
 // has learned something the menu snapshot predates.
 //
 // Here s3 is seeded from disk at a truncated 50, then observed live as an exact

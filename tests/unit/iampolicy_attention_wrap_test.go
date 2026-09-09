@@ -140,9 +140,8 @@ func TestDetailAttention_SentenceWrapsToThePanelWithWrapOff(t *testing.T) {
 	}
 }
 
-// The same sentence through the renderer that actually paints the screen. The
-// headless body and this must agree, which is what the deleted TUI-side
-// injector used to be asked to guarantee by hand.
+// The same sentence through the renderer that actually paints the screen;
+// the headless body and this must agree.
 func TestDetailAttention_SentenceRendersInFullInTheTUIAtNormalWidth(t *testing.T) {
 	f := catalogFinding(t, "role", "role.trust.confused-deputy")
 	for _, width := range wrapPanelWidths {

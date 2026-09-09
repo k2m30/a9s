@@ -1,24 +1,9 @@
-// rowstore_stage2_pins_test.go — behavior pins for Stage 2 of the row-store
-// unification plan (rowstore-unification-plan.md, Stage 2: "ProbeResources/
-// ProbeTruncated die. Reads/writes re-point... Save = SnapshotAll. Delete...
-// SyncProbeResourcesForType"). Pinned mechanisms: docs/design/
-// cache-requirements.md D12 and D16, the dispatch-time payload freeze (the
-// requirements doc calls this defect class out under the
-// snapshotProbeResourcesForSave doc comment, not a numbered D-entry of its
-// own), the observed-empty guard on the disk-store fallback, and the
-// sweep-vs-list-lane save depth (the SyncProbeResourcesForType rationale,
-// also undocumented as a numbered D-entry in cache-requirements.md — pinned
-// here directly against the mechanism instead).
-//
-// Each pin below states, in its own doc comment, whether it was RED or GREEN
-// against commit 84a425c8 (Stage 1 complete: RowStore introduced behind the
-// existing session.ProbeResources/ProbeTruncated maps as dual-write
-// scaffolding — nothing yet reads from it). A pin can be GREEN at that
-// baseline and still be a real Stage-2 regression guard: Stage 1's dual-write
-// makes the OUTCOME converge before the READ PATH is ever repointed, so a
-// green pin here still fails the instant a future change breaks the
-// store-as-source-of-truth invariant even though the legacy maps happen to
-// agree with it today.
+// rowstore_stage2_pins_test.go — RowStore is the source of truth for a
+// type's rows: docs/design/cache-requirements.md D12 and D16, the
+// dispatch-time payload freeze (the requirements doc calls this defect
+// class out under the snapshotProbeResourcesForSave doc comment), the
+// observed-empty guard on the disk-store fallback, and the
+// sweep-vs-list-lane save depth.
 package unit_test
 
 import (
@@ -84,34 +69,15 @@ func stage2PinReadTypeFile(t *testing.T, profile, region, shortName string) cach
 const stage2PinType = "ec2"
 
 // TestStage2Pin_D12_PostSweepListOpen_SeedsTitleRowsAndEnrichedField drives
-// the full flow the D12 defect narrative describes: probe → enrichment
-// completes ("all done", legacy ProbeResources freed to nil) → HandleNavigate
-// (via Controller.Apply, the same precedented seam app_cache_first_seeding_
-// test.go uses) opens the list. Asserts the seed comes through with BOTH the
-// row set (title-driving count) AND the enriched field — sourced from
-// RowStore surviving the legacy free, not from a disk-store fallback (this
-// test's isolated A9S_CONFIG_FOLDER has no on-disk file for this type at
-// all, so a passing assertion cannot be explained by the disk fallback
-// branch in HandleNavigate).
-//
-// At commit 84a425c8 (Stage 1): RED — confirmed by actually running the
-// test, not assumed. handleEnrichmentChecked's "all done" branch
-// (handlers_availability.go) snapshots ProbeResources for the save THEN nils
-// session.ProbeResources/ProbeTruncated to nil, synchronously, within the
-// SAME c.Handle(EnrichmentChecked{...}) call this test drives — strictly
-// BEFORE the later, separate c.Apply(ActionCommand) call that opens the
-// list. So by the time HandleNavigate's `if rows, observed :=
-// c.session.ProbeResources[canon]; observed` branch runs (handlers_navigate.
-// go:205), the map key is already absent, the disk-fallback branch runs
-// instead, finds no on-disk file (this test's isolated A9S_CONFIG_FOLDER has
-// none), and the list opens with Loading=true/zero rows — exactly the D12
-// defect narrative ("every warm list open AFTER the enrichment sweep
-// completed rendered a bare Loading… shell"), still present at Stage 1
-// because Stage 1 only dual-writes RowStore, nothing reads it yet. This is
-// the pin Stage 2 must turn GREEN: HandleNavigate's seed re-pointed at
-// RowStore.Snapshot(canon), which — per AmendRows' doc comment — survives
-// the legacy free untouched (RowStore has no equivalent free at
-// enrichment-completion; only the legacy map is nilled).
+// the full flow D12 describes: probe → enrichment completes → HandleNavigate
+// (via Controller.Apply, the same seam app_cache_first_seeding_test.go uses)
+// opens the list. Asserts the seed comes through with BOTH the row set
+// (title-driving count) AND the enriched field — sourced from RowStore, not
+// from a disk-store fallback (this test's isolated A9S_CONFIG_FOLDER has no
+// on-disk file for this type at all, so a passing assertion cannot be
+// explained by the disk fallback branch in HandleNavigate). RowStore has no
+// free at enrichment-completion, so a warm list open AFTER the enrichment
+// sweep completed never renders a bare Loading… shell.
 func TestStage2Pin_D12_PostSweepListOpen_SeedsTitleRowsAndEnrichedField(t *testing.T) {
 	s, _, c := newStage2PinTestController(t)
 
@@ -191,21 +157,11 @@ func TestStage2Pin_D12_PostSweepListOpen_SeedsTitleRowsAndEnrichedField(t *testi
 // field values, simulating a rerun's FieldUpdates fold arriving after the
 // save was already dispatched) and asserts the ALREADY-DISPATCHED payload's
 // rows still carry the ORIGINAL field value, not the later Amend's — the
-// "snapshot BEFORE any subsequent same-call OR later-call mutation" contract,
-// restated at the RowStore level instead of the legacy map-copy level.
-//
-// At commit 84a425c8 (Stage 1): GREEN. snapshotProbeResourcesForSave
-// (probes.go:613) still deep-copies legacy ProbeResources — including a
-// fresh Fields map per row — before the free, so the dispatched
-// SaveCachePayload is already immune to a later in-place mutation of the
-// legacy map. This pin is a Stage-2 regression guard because Stage 2 deletes
-// snapshotProbeResourcesForSave's ProbeResources source entirely and must
-// substitute a RowStore-sourced equivalent (the plan's "Save = SnapshotAll");
-// RowStore.SnapshotAll already documents the same by-construction immunity
-// (cloneRows: fresh slice + fresh Fields map per row) — this test would go
-// RED if a Stage-2 re-implementation ever snapshotted lazily (e.g. captured
-// a reference into the live store instead of calling SnapshotAll) instead of
-// eagerly at dispatch time.
+// "snapshot BEFORE any subsequent same-call OR later-call mutation"
+// contract. RowStore.SnapshotAll documents the by-construction immunity
+// (cloneRows: fresh slice + fresh Fields map per row); a save that
+// snapshotted lazily (a reference into the live store instead of
+// SnapshotAll at dispatch time) fails this.
 func TestStage2Pin_SavePayloadFrozenAtDispatch_SurvivesLaterAmend(t *testing.T) {
 	s, core, c := newStage2PinTestController(t)
 
@@ -290,26 +246,10 @@ func TestStage2Pin_SavePayloadFrozenAtDispatch_SurvivesLaterAmend(t *testing.T) 
 // first-page-only probe result would otherwise stomp the list lane's deeper
 // accumulated rows) must persist the list lane's FULL accumulated depth, not
 // the sweep's shallower snapshot — using the readTypeFile byte-compare
-// pattern from qa_cache_lifecycle_test.go:219. Also asserts (via source grep)
-// that no production caller of SyncProbeResourcesForType remains — the test
-// asserts FILE equivalence, not the function's existence, per the dispatch.
-//
-// At commit 84a425c8 (Stage 1): GREEN for the file-equivalence assertion —
-// handle.go:329's SyncProbeResourcesForType call keeps legacy ProbeResources
-// in lockstep with the list lane's accumulated rows on every list-lane save,
-// so a later sweep-completion save (snapshotProbeResourcesForSave reading
-// that same kept-in-lockstep map) persists the identical accumulated rows,
-// and reconcileTypeFile's own guards additionally prevent a shallower write
-// from clobbering a deeper one. RED for the "no caller left" sub-assertion —
-// handle.go:329 still calls SyncProbeResourcesForType at Stage 1 (the plan
-// explicitly schedules ITS DELETION for Stage 2, alongside the function
-// itself, probes.go:485-517). This pin is the Stage-2 regression guard for
-// BOTH halves: it must still be GREEN on file-equivalence once
-// SyncProbeResourcesForType is deleted (RowStore's own lockstep, e.g. via
-// SyncProbeResourcesForType's dual-write already routing through ObserveRows/
-// AmendRows today, must carry the depth-2 accumulation without that specific
-// function existing) AND must flip from RED to GREEN on the "no caller left"
-// sub-assertion.
+// pattern from qa_cache_lifecycle_test.go. Also asserts (via source grep)
+// that no production caller of SyncProbeResourcesForType exists: RowStore's
+// own lockstep through ObserveRows/AmendRows carries the depth-2
+// accumulation without a sync function.
 func TestStage2Pin_SweepSaveMatchesListLaneDepth_NoSyncCallerLeft(t *testing.T) {
 	t.Run("no_production_caller_of_SyncProbeResourcesForType_remains", func(t *testing.T) {
 		out, err := caseInsensitiveGrepSyncProbeResourcesForTypeCallers(t)
@@ -407,18 +347,15 @@ func TestStage2Pin_SweepSaveMatchesListLaneDepth_NoSyncCallerLeft(t *testing.T) 
 
 // caseInsensitiveGrepSyncProbeResourcesForTypeCallers scans core/runtime
 // and core/app production Go source (*.go, excluding *_test.go) for any
-// remaining CODE reference to the identifier "SyncProbeResourcesForType" —
-// its own declaration, per the plan, must be deleted alongside every call
-// site. Returns a "path:line: text" report of every match found (empty when
-// none), or an error if the source tree could not be walked.
+// CODE reference to the identifier "SyncProbeResourcesForType", declaration
+// or call. Returns a "path:line: text" report of every match found (empty
+// when none), or an error if the source tree could not be walked.
 //
-// Pure comment lines (first non-whitespace characters "//") are skipped: the
-// migration itself leaves explanatory comments naming the deleted function
-// (e.g. core/app/handle.go's doc comment on the ObserveRows call that
-// replaced it) so future readers can find what a call site used to do — that
-// is explanatory prose, not a surviving caller or declaration, and asserting
-// against it would make this pin permanently unsatisfiable rather than
-// tracking the actual "is the function still called/declared" invariant.
+// Pure comment lines (first non-whitespace characters "//") are skipped: a
+// comment naming the identifier is explanatory prose, not a caller or
+// declaration, and asserting against it would make this pin permanently
+// unsatisfiable rather than tracking the actual "is the function
+// called/declared" invariant.
 func caseInsensitiveGrepSyncProbeResourcesForTypeCallers(t *testing.T) (string, error) {
 	t.Helper()
 	const needle = "SyncProbeResourcesForType"
@@ -472,24 +409,15 @@ func caseInsensitiveGrepSyncProbeResourcesForTypeCallers(t *testing.T) (string, 
 
 // TestStage2Pin_ObservedEmptyProbe_BeatsStaleDiskRows pins the
 // "observed-empty is fresher than any disk row" rule the handlers_navigate.go
-// doc comment states explicitly: a live Wave-1 probe confirming
-// a type is genuinely empty this session (map key present, zero-length
-// slice) must seed a BARE list on navigation — even when a populated,
-// stale on-disk per-type cache file exists for the same pair. The disk
-// fallback must never resurrect rows a live probe has already superseded.
-//
-// At commit 84a425c8 (Stage 1): GREEN. handlers_navigate.go:205's
-// `if rows, observed := c.session.ProbeResources[canon]; observed` branch
-// already implements exactly this precedence — an observed (key-present)
-// empty slice takes the `if len(rows) > 0` false branch and skips the disk
-// fallback entirely, regardless of what the disk store holds. This pin is a
-// Stage-2 regression guard because Stage 2 re-points this read at
-// RowStore — a store keyed only by "has any TypeRows entry ever been
-// written" without preserving the disk-vs-probe ORIGIN distinction (Origin
-// field) could conflate "never observed" with "observed empty" and
-// wrongly fall through to a stale disk seed; RowStore.Observe's own
-// Origin field (OriginProbe vs OriginDisk) and the Disk-never-overwrites-
-// Fetch/Probe rule are exactly what must carry this precedence forward.
+// doc comment states explicitly: a live Wave-1 probe confirming a type is
+// genuinely empty this session must seed a BARE list on navigation — even
+// when a populated, stale on-disk per-type cache file exists for the same
+// pair. The disk fallback must never resurrect rows a live probe has already
+// superseded. RowStore.Observe's Origin field (OriginProbe vs OriginDisk)
+// and the Disk-never-overwrites-Fetch/Probe rule carry this precedence; a
+// store keyed only by "has any TypeRows entry ever been written" would
+// conflate "never observed" with "observed empty" and fall through to a
+// stale disk seed.
 func TestStage2Pin_ObservedEmptyProbe_BeatsStaleDiskRows(t *testing.T) {
 	s, core, c := newStage2PinTestController(t)
 
@@ -565,20 +493,10 @@ func handCountDistinctIssueRows(rows []resource.Resource) int {
 // (Controller.GetMenuIssueCounts) equals a hand-count performed directly over
 // RowStore's own retained rows for the type — the two aggregations (the
 // production unifiedIssueCount path feeding the menu badge, and a
-// store-rows-first-principles count) must agree.
-//
-// At commit 84a425c8 (Stage 1): GREEN. unifiedIssueCount is called against
-// c.session.ProbeResources[msg.ResourceType] (handlers_availability.go:498)
-// which — post Stage-1 dual-write — has already been mirrored into RowStore
-// via the same AvailabilityChecked/EnrichmentChecked handlers this test
-// drives, so at the moment this assertion runs the two row sets (legacy map
-// vs RowStore snapshot) are identical and the two counts necessarily agree.
-// This pin is a Stage-2 regression guard because Stage 2 deletes the
-// legacy-map read entirely and must re-point unifiedIssueCount's input at
-// RowStore.Snapshot(canon).Rows — a re-point that read a DIFFERENT rows view
-// (e.g. a partial-included snapshot, or a stale pre-Amend snapshot) would
-// desync the menu badge from the store's own canonical row set even though
-// both nominally derive from "the current rows for this type."
+// store-rows-first-principles count) must agree. unifiedIssueCount reads
+// RowStore.Snapshot(canon).Rows; a read of a DIFFERENT rows view (a
+// partial-included snapshot, or a stale pre-Amend snapshot) would desync the
+// menu badge from the store's own canonical row set.
 func TestStage2Pin_IssueCountParity_MenuBadgeMatchesStoreRowAggregation(t *testing.T) {
 	s, _, c := newStage2PinTestController(t)
 

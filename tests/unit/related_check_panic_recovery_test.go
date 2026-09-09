@@ -1,20 +1,13 @@
-// related_check_panic_recovery_test.go — pins the upcoming fix to
-// relatedCheckCmd's panic-recovery closure
-// (internal/tui/runtime_adapter_related.go:396-406).
+// related_check_panic_recovery_test.go — pins relatedCheckCmd's
+// panic-recovery closure (internal/tui/runtime_adapter_related.go).
 //
-// Today, when a related checker panics, the recover() branch discards the
-// panic value entirely and returns a bare
-// messages.RelatedCheckResult{..., Result: resource.UnknownRelated(def.TargetType)}
-// with no error anywhere on the message — a checker crash is completely
-// silent to the operator. The fix must surface the panic as an error on
-// LazyAddError, the message's only error-carrying field today
+// When a related checker panics, the recover() branch must surface the panic
+// as an error on LazyAddError, the message's only error-carrying field
 // (core/runtime/messages/event.go), which Core.HandleRelatedCheckResult
-// already converts into a FlashIntent{IsError:true}
-// (core/runtime/handlers_resources.go:285-289) — an existing, wired
-// surfacing path a coder can reuse rather than adding a new field. Result
-// itself must stay resource.UnknownRelated so the existing blank,
-// navigable-row rendering fallback (core/resource/related.go:232-240) is
-// unaffected.
+// converts into a FlashIntent{IsError:true}
+// (core/runtime/handlers_resources.go) — a checker crash is never silent to
+// the operator. Result itself stays resource.UnknownRelated so the blank,
+// navigable-row rendering fallback (core/resource/related.go) is unaffected.
 package unit
 
 import (

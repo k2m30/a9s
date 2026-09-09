@@ -10,13 +10,10 @@ package unit_test
 //   zero (truncated==false) is a non-actionable dead end. RelatedDeferred
 //   pivots (server-side FetchFilter navigation) remain actionable regardless.
 //
-// The indirect isActionableRow-via-DetailModel probes formerly here (Enter-key
-// dispatch, HasActionableRows via "l", cursor-skip, "(0+)"/"(0)" view-shape)
-// drove the dead DetailModel.Update()/View() (022-codebase-cleanup wave 3,
-// DetailModel cluster) and are removed with no port needed: cursor-skip and
-// Tab-focus-entry mechanics are covered live by app_related_cursor_skip_test.go
-// and app_related_focus_entry_test.go; the "(0+)"/"(0)" render contract by
-// related_unknown_badge_test.go and tui_related_dim_parity_test.go.
+// Cursor-skip and Tab-focus-entry mechanics are covered live by
+// app_related_cursor_skip_test.go and app_related_focus_entry_test.go; the
+// "(0+)"/"(0)" render contract by related_unknown_badge_test.go and
+// tui_related_dim_parity_test.go.
 //
 // Design spec: docs/design/related-resources.md
 

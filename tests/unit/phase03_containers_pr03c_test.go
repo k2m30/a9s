@@ -659,19 +659,14 @@ func TestPR03c_ECSTaskFetcher_RunningEmitsNoFinding(t *testing.T) {
 	}
 }
 
-// TestPR03c_ECSTaskFetcher_StoppedUserInitiatedEmitsDimFinding pins the
-// CURRENT (correct) contract: a STOPPED ECS task with a normal
-// (UserInitiated) stop code emits exactly one SevDim Finding
-// (CodeECSTaskStateStopped), because colorECSTask is now
+// TestPR03c_ECSTaskFetcher_StoppedUserInitiatedEmitsDimFinding: a STOPPED
+// ECS task with a normal (UserInitiated) stop code emits exactly one SevDim
+// Finding (CodeECSTaskStateStopped), because colorECSTask is
 // colorFromAnyFinding-first (core/aws/catalog_compute.go) — it needs a
-// Finding to color from, not a bare stop_code Fields read.
-//
-// RETIRED the old "STOPPED emits no Finding" invariant this test used to pin
-// (TestPR03c_ECSTaskFetcher_StoppedEmitsNoFinding): that was the
-// pre-color-findings-conformance contract. ecsTaskStructuralFindings
-// (core/aws/ecs_task_codes.go) now emits the Dim Finding for this
-// branch. See qa_color_findings_conformance_test.go for the standing
-// architectural gate.
+// Finding to color from, not a bare stop_code Fields read;
+// ecsTaskStructuralFindings (core/aws/ecs_task_codes.go) emits the Dim
+// Finding for this branch. See qa_color_findings_conformance_test.go for the
+// standing architectural gate.
 func TestPR03c_ECSTaskFetcher_StoppedUserInitiatedEmitsDimFinding(t *testing.T) {
 	taskARN := "arn:aws:ecs:us-east-1:000000000000:task/prod-cluster/b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5"
 	clusterARN := "arn:aws:ecs:us-east-1:000000000000:cluster/prod-cluster"

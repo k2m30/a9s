@@ -1,43 +1,37 @@
-// qa_cache_field_completeness_test.go — RED pins for three live-verified
-// defects surfaced by a real user's cache file + session on branch
-// feat/cache (see the architect dispatch for the field report):
+// qa_cache_field_completeness_test.go — three cache-file contracts:
 //
-//  1. PersistedRows_CarryEveryRenderableColumn: a persisted s3 Row lacked the
-//     "region" field even though the list renders a Region column — the cells
-//     stayed empty until a later fetch replaced the seeded rows.
+//  1. PersistedRows_CarryEveryRenderableColumn: a persisted s3 Row must carry
+//     the "region" field whenever the list renders a Region column.
 //     MaterializeListFields (core/app/list_columns.go) only fires when
 //     r.RawStruct != nil (its very first line: "if r.RawStruct == nil {
 //     return r }"). A fresh live fetch always carries a real RawStruct
-//     (Scenario A below, which already passes at HEAD for every type). A
-//     gap-carrying on-disk row (RawStruct == nil, so the missing field is not
-//     locally reconstructable) is not expected to self-heal with NO fetch at
-//     all — C1 (every screen entry re-verifies immediately) instead promises
-//     the gap heals within ONE verify cycle: the seeded render tolerates the
-//     empty cell (stale-marked, no crash), the verify-refetch lands fresh
-//     rows carrying a real RawStruct, and the save the coder's materialize
-//     seam performs on that result must persist the now-complete Fields.
+//     (Scenario A below). A gap-carrying on-disk row (RawStruct == nil, so
+//     the missing field is not locally reconstructable) heals within ONE
+//     verify cycle per C1 (every screen entry re-verifies immediately): the
+//     seeded render tolerates the empty cell (stale-marked, no crash), the
+//     verify-refetch lands fresh rows carrying a real RawStruct, and the
+//     save performed on that result persists the now-complete Fields.
 //     Scenario B pins that one-cycle healing contract.
 //
-//  2. PoisonedExact_HealsOnContradiction: the user's on-disk file carried
-//     count:50/exact:true from an old build. Once a genuine fetch reaches the
-//     SAME 50 rows but is STILL truncated (a real next-page token exists),
-//     C5's one-way ratchet ("exactness only ever advances", probes.go
-//     SaveResourceListCache) has no path back down — Exact never re-derives
-//     from a later contradicting observation, so the list keeps rendering a
-//     bare "50" (no "+", no "m" load-more hint) forever even though the
-//     fetcher is telling it there is more.
+//  2. PoisonedExact_HealsOnContradiction: an on-disk file carrying
+//     count:50/exact:true must heal once a genuine fetch reaches the SAME
+//     50 rows but is STILL truncated (a real next-page token exists). C5's
+//     one-way ratchet ("exactness only ever advances", probes.go
+//     SaveResourceListCache) yields to a contradicting observation;
+//     otherwise the list keeps rendering a bare "50" (no "+", no "m"
+//     load-more hint) forever even though the fetcher is telling it there
+//     is more.
 //
 //  3. SilentSwap_NeverDropsKnownFindings: applyResourcesLoaded
 //     (core/app/list_body.go) re-applies Wave-2 findings onto a freshly
-//     swapped-in page ONLY from c.enrichmentStore (the session-scoped Wave-2
-//     map) — see its "known := c.listEnrichmentFindings(typeName)" tail. It
-//     never consults the OUTGOING rows' own persisted r.Findings. A cold-boot
-//     reseed populates ls.Rows with findings straight from cache.Row.Findings
-//     (no enrichment probe has run yet this session), so the enrichment store
-//     is empty — the very first silent swap (case default: ls.Rows =
-//     resources, list_body.go line ~76) throws every persisted finding away
-//     with no re-derivation opportunity, and the row's glyph vanishes until
-//     the NEXT independent enrichment sweep completes.
+//     swapped-in page from c.enrichmentStore (the session-scoped Wave-2 map,
+//     "known := c.listEnrichmentFindings(typeName)") AND from the OUTGOING
+//     rows' own persisted r.Findings. A cold-boot reseed populates ls.Rows
+//     with findings straight from cache.Row.Findings (no enrichment probe
+//     has run yet this session), so the enrichment store is empty — the
+//     very first silent swap would otherwise throw every persisted finding
+//     away, and the row's glyph would vanish until the NEXT independent
+//     enrichment sweep completes.
 package unit
 
 import (
@@ -192,24 +186,18 @@ func pathBackedKeylessColumns(cols []app.ColumnDef, lifecycleKey string) []app.C
 // Scenario A (fresh live fetch): a resource carrying a real RawStruct
 // satisfying every target column's Path is run through
 // ApplyResourcesLoaded and must persist every column via
-// MaterializeListFields. This passes at HEAD for every type — pinned here
-// as a completeness guard, not the regression itself.
+// MaterializeListFields. Pinned as a completeness guard.
 //
-// Scenario B (cold-boot cache reseed, the live defect's actual mechanism):
+// Scenario B (cold-boot cache reseed):
 // an old-format on-disk Row that is MISSING a target column's Fields key
 // (e.g. an s3 Row saved by a build that predates that column, or any
 // partial-write gap) is loaded back via rowsFromCacheRows
 // (core/runtime/handlers_availability.go) into a resource.Resource with
-// RawStruct == nil (disk never carries RawStruct, C6). RED at HEAD: once
-// reseeded this way, MaterializeListFields's very first line ("if
-// r.RawStruct == nil { return r }") makes the missing column PERMANENTLY
-// unrecoverable by any subsequent save of that same seeded state — a
-// re-list-open + re-save round trip (exactly what a user re-opening a9s and
-// letting the list re-persist would do without a genuine live re-fetch
-// replacing the row) still writes the SAME gap back to disk. This is the
-// live bug's actual shape: "seeded rows show empty cells until the swap" —
-// only a genuine live fetch (fresh RawStruct) heals it, never a cache
-// round-trip.
+// RawStruct == nil (disk never carries RawStruct, C6). MaterializeListFields's
+// very first line ("if r.RawStruct == nil { return r }") cannot rebuild the
+// missing column from a seeded row, so a re-list-open + re-save round trip
+// (a user re-opening a9s and letting the list re-persist) writes the SAME
+// gap back to disk; only a genuine live fetch (fresh RawStruct) heals it.
 func TestPersistedRows_CarryEveryRenderableColumn(t *testing.T) {
 	types := resource.AllResourceTypes()
 	tested := 0
@@ -340,7 +328,7 @@ func TestPersistedRows_CarryEveryRenderableColumn(t *testing.T) {
 				}
 				ctrl.ApplyResourcesLoaded(td.ShortName, verified, nil, false)
 
-				// Step 4: drive the save (the coder's save-seam
+				// Step 4: drive the save (the save-seam
 				// materialization guarantee applies to this fetch-result
 				// save the same way it does for Scenario A).
 				ctrl.WaitForCacheWrites()
@@ -437,11 +425,10 @@ func buildMultiColumnRawStruct(cols []app.ColumnDef) (any, map[string]string) {
 // reconciled file must heal: Exact must drop to false (truncated), and the
 // resulting list title must show "50+" with load-more (m) enabled.
 //
-// RED at HEAD: probes.go's SaveResourceListCache applies "exactness only
-// ever advances" unconditionally — `if !exact && existing.Exact { incoming.
-// Exact = true; incoming.Count = existing.Count }` — with no contradiction
-// check against the incoming pagination signal, so a stale exact:true poison
-// can never be un-stuck by a later, truthful truncated observation.
+// probes.go's SaveResourceListCache must check "exactness only ever
+// advances" against the incoming pagination signal; an unconditional
+// `if !exact && existing.Exact { incoming.Exact = true; incoming.Count =
+// existing.Count }` leaves a stale exact:true poison stuck forever.
 func TestPoisonedExact_HealsOnContradiction(t *testing.T) {
 	tmp := t.TempDir()
 	t.Setenv("A9S_CONFIG_FOLDER", tmp)
@@ -548,13 +535,9 @@ func TestSilentSwap_NeverDropsKnownFindings(t *testing.T) {
 	}
 	ctrl.ApplyResourcesLoaded("s3", seeded, nil, false)
 
-	// Since the color-findings-conformance wave, colorS3 is
-	// colorFromAnyFinding-only (core/aws/catalog_databases.go) — a
-	// SevBroken Finding resolves the row's whole-row color to "broken"
-	// directly (the glyph branch that used to fire when
-	// ResolveColor()==ColorHealthy was deleted as unreachable).
-	// The stronger, correct check is ListRow.Color=="broken", not the glyph
-	// Decorator.
+	// colorS3 is colorFromAnyFinding-only (core/aws/catalog_databases.go), so
+	// a SevBroken Finding resolves the row\'s whole-row color to "broken".
+	// ListRow.Color=="broken" is the check.
 	preSwap := ctrl.Snapshot()
 	preRows := preSwap.Body.List.Rows
 	foundBrokenBeforeSwap := false
@@ -637,13 +620,9 @@ func TestSilentSwap_Wave1FindingNotCarriedOnResolve(t *testing.T) {
 	}
 	ctrl.ApplyResourcesLoaded("s3", seeded, nil, false)
 
-	// Since the color-findings-conformance wave, colorS3 is
-	// colorFromAnyFinding-only (core/aws/catalog_databases.go) — a
-	// SevBroken Finding resolves the row's whole-row color to "broken"
-	// directly (the glyph branch that used to fire when
-	// ResolveColor()==ColorHealthy was deleted as unreachable).
-	// The stronger, correct check is ListRow.Color=="broken", not the glyph
-	// Decorator.
+	// colorS3 is colorFromAnyFinding-only (core/aws/catalog_databases.go), so
+	// a SevBroken Finding resolves the row\'s whole-row color to "broken".
+	// ListRow.Color=="broken" is the check.
 	preSwap := ctrl.Snapshot()
 	foundBrokenBeforeSwap := false
 	for _, r := range preSwap.Body.List.Rows {

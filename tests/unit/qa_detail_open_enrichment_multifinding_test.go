@@ -1,17 +1,15 @@
-// qa_detail_open_enrichment_multifinding_test.go — regression pin for a P2 bug
-// found by Codex in the v3.47.0 landing (core/runtime/handlers_availability.go
-// around the PatchDetail construction in handleEnrichmentChecked).
+// qa_detail_open_enrichment_multifinding_test.go — an already-open detail
+// view receives every Wave-2 finding for its resource.
 //
-// handleEnrichmentChecked folds allFindings (map[string][]domain.Finding — every
-// independently-evaluated Wave-2 condition per resource) onto cached rows via
-// applyEnrichment/AmendRows. The bug (now fixed) was that the PatchDetail
-// intent emitted for ALREADY-OPEN detail views used to be built from a single
-// worst-severity representative Finding per resource instead of the full
-// per-resource slice:
+// handleEnrichmentChecked (core/runtime/handlers_availability.go) folds
+// allFindings (map[string][]domain.Finding — every independently-evaluated
+// Wave-2 condition per resource) onto cached rows via
+// applyEnrichment/AmendRows, and the PatchDetail intent emitted for
+// ALREADY-OPEN detail views carries the full per-resource slice:
 //
 //	intents = append(intents, PatchDetail{
 //	    ResourceType:               msg.ResourceType,
-//	    EnrichmentFindings:         allFindings,           // now: every finding, not one
+//	    EnrichmentFindings:         allFindings,
 //	    EnrichmentAttentionDetails: msg.AttentionDetails,
 //	})
 //
@@ -26,12 +24,7 @@
 // (PushScreen{ScreenDetail} + EnsureDetailState + read Body.Detail.Fields for
 // Path=="Attention" rows) but drives the REAL handleEnrichmentChecked path via
 // the public Controller.Handle seam instead of hand-folding through
-// runtime.ApplyWave2ToRow, so it pins the PatchDetail plumbing specifically
-// (a different seam than #52's enricher-level fold, which this file assumes
-// already fixed — the per-resource slice is what a real post-#52 enricher now
-// populates on messages.EnrichmentChecked.Findings, the sole plural
-// representation since the legacy-purge rename retired the single-Finding
-// compat field of the same name).
+// runtime.ApplyWave2ToRow, so it pins the PatchDetail plumbing specifically.
 package unit_test
 
 import (

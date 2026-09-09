@@ -1,23 +1,13 @@
 package unit
 
-// qa_cf_color_test.go — Behavioral tests for the CloudFront Distributions Color function.
+// qa_cf_color_test.go — the CloudFront Distributions Color function reads
+// findings only.
 //
-// CodeRabbit PR-273 finding: core/resource/types_dns_cdn.go:50-58 ignores the
-// "enabled" field entirely. docs/attention-signals.md specifies: Enabled==false → Dim,
-// regardless of status. The current colorer returns ColorHealthy for "Deployed" whether
-// or not enabled is set, and does not return ColorDim at all.
-//
-// These tests will FAIL until the production colorer is fixed to check enabled first.
-
-// INVERTED for batch w6a. This table used to assert the colours colorCF
-// picked by reading Fields directly. That branch is gone: colour now derives
-// from findings only, so a resource carrying no findings is Healthy whatever
-// its fields say, and the state each row names is reported by the finding the
-// fetcher emits for it (see prowler_w6a_*_test.go).
-//
-// The table is kept as the enumeration of states that must no longer colour a
-// row on their own. Do not "restore" the old wants — a raw-field branch coming
-// back is exactly what this now catches.
+// Colour derives from findings, so a resource carrying no findings is
+// Healthy whatever its fields say, and the state each row names is reported
+// by the finding the fetcher emits for it (see prowler_w6a_*_test.go). The
+// table enumerates the states that must not colour a row on their own, so a
+// raw-field branch is what it catches.
 
 import (
 	"testing"
@@ -74,12 +64,9 @@ func TestCloudFrontColor(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			// Each case asserts its own want again. w6a made the driver demand
-			// Healthy for all of them, on the reading that a colour with no
-			// finding behind it is a colour nobody can explain. w29 converted
-			// this classifier: the fields reach the type's own predicate, which
-			// produces the finding, so the colour the table always named is the
-			// one the row now carries for a reason the detail view shows.
+			// The fields reach the type\'s own predicate, which produces the
+			// finding, so the colour the table names is one the row carries for a
+			// reason the detail view shows.
 			got := td.Color(resource.Resource{Fields: tc.fields})
 			if got != tc.want {
 				t.Errorf("Color(fields=%v) = %v, want %v", tc.fields, got, tc.want)

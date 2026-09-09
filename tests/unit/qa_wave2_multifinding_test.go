@@ -101,15 +101,10 @@ var (
 )
 
 // buildFoldedMultiFindingRow constructs the IssueEnricherResult.Findings
-// entry the way a hypothetical two-finding ecs-svc enricher WOULD under the
-// #52 contract — both findings held in a single []domain.Finding slice value
-// under the shared resource-ID key, bang (SevBroken, the worse of the two)
-// ordered first — then folds it through the REAL runtime.ApplyWave2ToRow.
-//
-// COMPILE-RED (intended, see file header): findings here is
-// map[string][]domain.Finding; ApplyWave2ToRow at HEAD still declares its
-// findings parameter as map[string]domain.Finding. This mismatch is #52's
-// exact fix boundary, not a bug in this helper.
+// entry the way a two-finding ecs-svc enricher does — both findings held in
+// a single []domain.Finding slice value under the shared resource-ID key,
+// bang (SevBroken, the worse of the two) ordered first — then folds it
+// through the REAL runtime.ApplyWave2ToRow.
 func buildFoldedMultiFindingRow(t *testing.T) (*resource.ResourceTypeDef, domain.Resource) {
 	t.Helper()
 	td := resource.FindResourceType("ecs-svc")
@@ -244,12 +239,9 @@ func TestFold_TwoWave2FindingsSameResource_ListStatusCellShowsWorstPhrase(t *tes
 // domain.Resource.Findings are plain []domain.Finding slices — UNCHANGED by
 // #52 (only IssueEnricherResult.Findings, the enricher-result type, changes
 // shape) — so these tests seed the multi-finding row directly, never
-// touching IssueEnricherResult or ApplyWave2ToRow, and stay GREEN
-// characterization tests, not RED framework-limit pins. They scope the
-// coder's fix to the enricher-result type + fold (Section 1) and act as a
-// regression guard so a future fix there does not regress the carry layer.
-// (Both are nonetheless swept into this file's package-level compile
-// failure by Section 1/3's intentional seam errors — see file header.)
+// touching IssueEnricherResult or ApplyWave2ToRow: characterization tests
+// of the carry layer, independent of the enricher-result type + fold
+// (Section 1).
 // ────────────────────────────────────────────────────────────────────────────
 
 const (

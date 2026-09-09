@@ -56,10 +56,10 @@ func TestSort_ColumnKeyRoundTripsForEveryRegisteredType(t *testing.T) {
 	}
 }
 
-// TestSort_SavedSortSurvivesReEntry sorts a list on a path-only column (the
-// shape the round trip used to drop), writes the column index the way leaving
-// the list does, and rebuilds the list from the cache entry the way re-entering
-// does. The sort the operator set must still be there.
+// TestSort_SavedSortSurvivesReEntry sorts a list on a path-only column,
+// writes the column index the way leaving the list does, and rebuilds the
+// list from the cache entry the way re-entering does. The sort the operator
+// set must still be there.
 func TestSort_SavedSortSurvivesReEntry(t *testing.T) {
 	loaded := colsLoadedViewConfig(t)
 	ctrl := newTestController(t)
@@ -104,9 +104,8 @@ func TestSort_SavedSortSurvivesReEntry(t *testing.T) {
 	}
 }
 
-// sortFirstPathOnlyColumn returns a registered type and the index of one of its
-// resolved columns that carries a Path and no Key — the shape whose saved sort
-// used to be dropped on re-entry.
+// sortFirstPathOnlyColumn returns a registered type and the index of one of
+// its resolved columns that carries a Path and no Key.
 func sortFirstPathOnlyColumn(t *testing.T, ctrl *app.Controller) (string, int) {
 	t.Helper()
 	for _, name := range colsAllShortNames() {

@@ -5,12 +5,9 @@ package unit
 // the paginated S3 fetcher to call GetBucketNotificationConfiguration per
 // bucket and populate Fields["notification_*"].
 //
-// Prior revision (linked to GitHub issue #220) avoided the notification call
-// as an N+1-avoidance measure. That tradeoff was explicitly reversed
-// 2026-04-23 per user guidance — "related resources MUST work. if they don't
-// it's a bug. simple." — because the quiet alternative was three registered
-// pivots (lambda/sns/sqs) that always returned 0. A registered pivot that
-// never resolves is a contract bug, not a performance optimization.
+// A registered pivot that never resolves is a contract bug, not a
+// performance optimization: avoiding the notification call would leave three
+// registered pivots (lambda/sns/sqs) that always return 0.
 //
 // The N+1 is bounded: S3 list pages cap at 1000 buckets and most accounts
 // hold ≤50 buckets total; GetBucketNotificationConfiguration is a cheap

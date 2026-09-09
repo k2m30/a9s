@@ -937,9 +937,9 @@ func (s *fullIntegrationScenario) observe(msg tea.Msg) {
 // non-nil Err was observed during the scenario. This is the harness-level
 // guard that catches the "fetcher emits ID=name, enricher passes r.ID as ARN"
 // bug class — and any other wave-2 wiring bug that real AWS would reject with
-// a ValidationError / InvalidArn. Permissive demo fakes used to swallow these
-// silently; with strict fakes + this assertion, every scenario test that
-// drains wave-2 becomes a real guard.
+// a ValidationError / InvalidArn. Strict fakes reject these like real AWS,
+// so every scenario test that drains wave-2 and calls this helper is a real
+// guard.
 //
 // Scenario tests that intentionally exercise an error path (e.g. an enricher
 // given a nil client) should NOT call this helper; otherwise all scenarios

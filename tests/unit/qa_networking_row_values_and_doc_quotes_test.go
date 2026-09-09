@@ -1,6 +1,6 @@
 package unit_test
 
-// qa_networking_row_values_and_doc_quotes_test.go — acceptance round 2, rulings J, K and L.
+// qa_networking_row_values_and_doc_quotes_test.go — three rendering rules.
 //
 // J. A rendered row value is a word an operator reads, not a Go bool literal
 //    and not an SDK enum spelling. A setting is enabled/disabled, a property
@@ -259,8 +259,8 @@ func docQuoteMatches(quote, constant string) bool {
 }
 
 // declaredDetails is every Detail sentence the installed catalog declares —
-// the one owner of the S5 sentence since task w27, and therefore the oracle a
-// hand-written §4 quote is checked against.
+// the one owner of the S5 sentence, and therefore the oracle a hand-written
+// §4 quote is checked against.
 func declaredDetails() map[string]bool {
 	out := map[string]bool{}
 	for _, td := range catalog.All() {

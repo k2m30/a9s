@@ -1,27 +1,22 @@
-// costs_review4_test.go — Cost Explorer external review round 3, TUI-layer
-// half (P2, P4): package unit (not unit_test), same reason as
-// costs_review_findings_test.go's own file-level doc — these findings need
-// the full TUI Model (newRootSizedModel/rootApplyMsg/assertStackInSync),
-// unreachable from the headless-only package unit_test. Reuses
+// costs_review4_test.go — Cost Explorer TUI-layer pins: package unit (not
+// unit_test), same reason as costs_review_findings_test.go's own file-level
+// doc — these need the full TUI Model
+// (newRootSizedModel/rootApplyMsg/assertStackInSync), unreachable from the
+// headless-only package unit_test. Reuses
 // reviewBaseServiceQuery/reviewFullMetricRecord (costs_review_findings_test.go,
 // same package).
 //
-// P2 (internal/tui/app.go:343-345): confirmed in source — `case
-// messages.CostsLoaded: m.ctrl.Handle(msg); return m, nil` discards BOTH of
-// Handle's return values. Handle (core/app/handle.go:153) DOES capture
-// and return ApplyCostsLoaded's TaskRequest now (the N3 fallback re-fetch);
-// the TUI just throws it away, so the fallback is dead in the terminal app.
+// P2 (internal/tui/app.go): `case messages.CostsLoaded` must dispatch the
+// TaskRequest Handle returns from ApplyCostsLoaded (the N3 fallback
+// re-fetch), or the fallback is dead in the terminal app.
 //
-// P4 (internal/tui/app_costs.go:84-102): confirmed in source —
-// dispatchCostsByIDTask pushes a placeholder rendererState (line 88) but its
-// wrapped cmd only pops it on the messages.Navigate (success) branch; a
-// Flash (failure) falls through `return msg` unchanged, leaving the
-// placeholder stranded on the TUI's own m.stack. Verified this is NOT
-// reachable via any generic Flash handling: handleFlash (app_flash.go) only
-// calls m.core.HandleFlash (session-level runtime.Core), never
-// app.Controller.Handle — X10's own popAutoOpenSinglePlaceholderOnNotFound
-// mechanism lives in Controller.Handle and is simply never reached from
-// this TUI path at all.
+// P4 (internal/tui/app_costs.go): dispatchCostsByIDTask pushes a placeholder
+// rendererState; its wrapped cmd must pop it on the Flash (failure) branch
+// as well as on messages.Navigate (success), or the placeholder is stranded
+// on the TUI's own m.stack. Generic Flash handling does not reach it:
+// handleFlash (app_flash.go) only calls m.core.HandleFlash (session-level
+// runtime.Core), never app.Controller.Handle, so the Controller's
+// popAutoOpenSinglePlaceholderOnNotFound is never reached from this path.
 package unit
 
 import (

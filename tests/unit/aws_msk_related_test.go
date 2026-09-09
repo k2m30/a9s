@@ -179,9 +179,8 @@ func TestRelated_MSK_Lambda_Found(t *testing.T) {
 // lambdaEventSourceMappingLambdaCheck): a ListEventSourceMappings-confirmed
 // FunctionArn that is NOT the one resolved in a non-truncated lambda
 // ResourceCache is not dropped — it is still counted via the bare function
-// name parsed from its own ARN. Renamed from TestRelated_MSK_Lambda_NotFound
-// (pre-fix behavior asserted a definitive Count=0 here; the API result is
-// authoritative regardless of cache membership).
+// name parsed from its own ARN: the API result is authoritative regardless
+// of cache membership.
 func TestRelated_MSK_Lambda_MappedFnNotInCache_FallsBackToARNBareName(t *testing.T) {
 	const clusterARN = "arn:aws:kafka:us-east-1:123456789012:cluster/analytics-kafka-cluster/abc-123"
 	const mappedFnArn = "arn:aws:lambda:us-east-1:123456789012:function:kafka-consumer"

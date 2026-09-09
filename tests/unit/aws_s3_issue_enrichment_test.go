@@ -51,8 +51,8 @@ type s3PABFake struct {
 	// codedErrors maps bucket name → smithy error code (e.g. "NoSuchBucket",
 	// "NotFound", "AccessDenied"); GetPublicAccessBlock returns
 	// &smithy.GenericAPIError{Code: code} for that bucket. Takes priority over
-	// errorBuckets/configs — lets a single fake pin the full 404-taxonomy
-	// (issue #456) alongside the pre-existing hardcoded-AccessDenied path.
+	// errorBuckets/configs, so a single fake pins the full 404 taxonomy
+	// alongside the hardcoded-AccessDenied path.
 	codedErrors map[string]string
 	// rawErrors maps bucket name → a caller-supplied error returned verbatim,
 	// bypassing smithy.APIError entirely (e.g. a plain network error). Takes
@@ -282,10 +282,8 @@ func TestS3_Enrich_PartialPAB_SingleFlagFalse(t *testing.T) {
 	rows := rowMap(result.AttentionDetails["a9s-demo-partial-pab"][finding.Code].Rows)
 	// The row is labelled in plain words; the SDK flag name rides in the value,
 	// where an identifier is allowed and is what the operator greps the console for.
-	// d4 row 20 replaced the "false" in front of that aside with "off": a Go
-	// bool literal describes the SDK field, not the account. Do not restore
-	// "false (BlockPublicAcls)" — TestNetworkingRowValues_AreWordsNotLiterals
-	// fails on it.
+	// The value reads "off", not "false": a Go bool literal describes the SDK
+	// field, not the account (TestNetworkingRowValues_AreWordsNotLiterals).
 	if rows["Block public access control lists"] != "off (BlockPublicAcls)" {
 		t.Errorf("Rows[Block public access control lists] = %q, want %q",
 			rows["Block public access control lists"], "off (BlockPublicAcls)")
@@ -342,10 +340,8 @@ func TestS3_Enrich_PartialPAB_MultipleFlagsFalse(t *testing.T) {
 	rows := rowMap(result.AttentionDetails["a9s-demo-multifail-pab"][finding.Code].Rows)
 	// The row is labelled in plain words; the SDK flag name rides in the value,
 	// where an identifier is allowed and is what the operator greps the console for.
-	// d4 row 20 replaced the "false" in front of that aside with "off": a Go
-	// bool literal describes the SDK field, not the account. Do not restore
-	// "false (BlockPublicAcls)" — TestNetworkingRowValues_AreWordsNotLiterals
-	// fails on it.
+	// The value reads "off", not "false": a Go bool literal describes the SDK
+	// field, not the account (TestNetworkingRowValues_AreWordsNotLiterals).
 	if rows["Block public access control lists"] != "off (BlockPublicAcls)" {
 		t.Errorf("Rows[Block public access control lists] = %q, want %q",
 			rows["Block public access control lists"], "off (BlockPublicAcls)")
@@ -412,10 +408,9 @@ func TestS3_Enrich_UnknownAPIError_NoFinding(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected non-nil composite error when GetPublicAccessBlock returns generic error; got nil")
 	}
-	// INVERTED for the "skipped" spec row 6: the label carried the type, so
-	// the rendered line said it twice ("enrich s3: s3-enrich: ..."). The type
-	// comes from the registry key at the surface; the aggregate names the
-	// call. Do not restore the type in the label.
+	// The aggregate names the call, not the type: the type comes from the
+	// registry key at the surface, and a type in the label would render it
+	// twice ("enrich s3: s3-enrich: ...").
 	if !strings.Contains(err.Error(), "bucket posture") {
 		t.Errorf("err must name the pass, \"bucket posture\"; got %q", err.Error())
 	}

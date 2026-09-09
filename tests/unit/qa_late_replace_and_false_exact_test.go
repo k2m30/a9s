@@ -1,22 +1,18 @@
-// qa_late_replace_and_false_exact_test.go — RED pins for the late-replace and
-// false-exact defect pair (D14).
+// qa_late_replace_and_false_exact_test.go — the late-replace and false-exact
+// pair (D14).
 //
-// Defect (observed live; coder root-causing in parallel — coordinate via
-// the mechanisms below):
-//
-//	A) A staler page-1 REPLACE landing after a deeper load-more append
-//	   stomps the 55-row list back to 50+ (C2: older results must be
+//	A) A staler page-1 REPLACE landing after a deeper load-more append must
+//	   not stomp the 55-row list back to 50+ (C2: older results are
 //	   discarded).
 //
-//	B) The persisted file got count:50, exact:true, rows:0 on a 55-bucket
-//	   account: a page-1 session.ResourceCache entry stored WITHOUT its
-//	   Pagination (HandleResourcesLoaded's PatchResourceCache at
-//	   core/runtime/handlers_resources.go builds
-//	   Entry{Resources: ev.Resources} — no Pagination) makes
+//	B) A page-1 session.ResourceCache entry must carry its Pagination
+//	   (HandleResourcesLoaded's PatchResourceCache at
+//	   core/runtime/handlers_resources.go): an entry without it lets
 //	   availabilityFromResourceCache derive truncated=false for a page-1-
 //	   shaped entry, producing a false-exact 50 that SaveAvailabilityCache
-//	   (core/runtime/probes.go) then accepts as a downgrade of the
-//	   previously-stored true-exact 55, dropping the fuller Rows.
+//	   (core/runtime/probes.go) would accept as a downgrade of the
+//	   previously-stored true-exact 55, persisting count:50, exact:true,
+//	   rows:0 on a 55-bucket account.
 //
 // Pins (harnesses: qa_load_more_dedup_test.go's poisoning-sequence shape +
 // runtime_executor_depth_refetch_test.go's seedCachedRows/bucketID/
@@ -83,13 +79,12 @@ func TestFalseExact_PageOneEntryWithoutPagination_NeverDowngradesExact(t *testin
 
 	// Drive the real handler: a page-1 fetch result for "s3", truncated,
 	// with no existing session.ResourceCache entry (!alreadyCached) — the
-	// exact condition that builds Entry{Resources: ev.Resources} at
-	// handlers_resources.go:74-82. Provenance must be CanonicalList — the
-	// symmetric provenance gate added alongside ResourcesLoadedEvent.Provenance
-	// only lets a canonical-list result seed PatchResourceCache (a
-	// filtered/by-ID/child result sharing this ResourceType is never the
-	// type's global population); the zero value (FetchProvenanceUnknown)
-	// used to be accepted implicitly before this field existed.
+	// condition that builds Entry{Resources: ev.Resources} in
+	// handlers_resources.go. Provenance must be CanonicalList — the symmetric
+	// provenance gate only lets a canonical-list result seed
+	// PatchResourceCache (a filtered/by-ID/child result sharing this
+	// ResourceType is never the type's global population); the zero value
+	// (FetchProvenanceUnknown) is not accepted.
 	intents, _ := core.HandleResourcesLoaded(runtime.ResourcesLoadedEvent{
 		ResourceType: "s3",
 		Resources:    page1Resources(50),
@@ -213,7 +208,7 @@ func TestNilPaginationEntry_IsNotExact(t *testing.T) {
 // fires and the menu-availability/title-derived count is also exercised:
 // page 1 (50, truncated, token) lands with Append=false, then page 2 (5,
 // exact) with Append=true — landing the list at 55 exact, matching the
-// pre-existing append-dedup contract (D13).
+// append-dedup contract (D13).
 //
 // Then a LATE page-1 replace arrives (Append=false) carrying the SAME 50
 // page-1 IDs, still truncated — the exact shape a straggling background
@@ -222,14 +217,11 @@ func TestNilPaginationEntry_IsNotExact(t *testing.T) {
 // list must REMAIN at 55 rows/exact — the late replace must be rejected,
 // not silently accepted as a fresher truth.
 //
-// ADAPTED (listgen row 5): the guarantee is unchanged, the mechanism under it
-// is not. This used to be enforced by a content heuristic — a smaller,
-// still-truncated, strict-ID-subset replace was guessed to be a straggler —
-// which could recognise only that one shape and got a legitimate Ctrl+R reset
-// wrong. Each result now carries the per-type request sequence it was
-// dispatched at, so the test stamps its three results in dispatch order the
-// way every production fetch does. Do not restore the unstamped form: it
-// asserts a guess the code no longer makes.
+// Each result carries the per-type request sequence it was dispatched at,
+// so the test stamps its three results in dispatch order the way every
+// production fetch does; a content heuristic (a smaller, still-truncated,
+// strict-ID-subset replace guessed to be a straggler) could recognise only
+// that one shape and would get a legitimate Ctrl+R reset wrong.
 func TestLateReplace_DoesNotStompDeeperList(t *testing.T) {
 	tmp := t.TempDir()
 	t.Setenv("A9S_CONFIG_FOLDER", tmp)

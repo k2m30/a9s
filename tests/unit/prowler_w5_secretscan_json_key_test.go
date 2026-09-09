@@ -64,12 +64,10 @@ func TestW5SecretScan_JSONObjectKeyIsAHit(t *testing.T) {
 	}
 }
 
-// The regression the widening caused. Both of these were silent under the
-// previous pattern and report a keyword hit under the new one, verified by
-// running the two patterns side by side rather than inferred: the keyword
-// used to have to be followed immediately by the separator, so a quote
-// between them ended the match, and now the quote is consumed and the scan
-// runs on to the next plausible value.
+// Both of these report a keyword hit: the keyword need not be followed
+// immediately by the separator, so a quote between them does not end the
+// match — the quote is consumed and the scan runs on to the next plausible
+// value.
 //
 // Both RESOLVE a secret from somewhere else or are not a value at all, which
 // is exactly the practice the scanner exists to encourage.

@@ -22,7 +22,7 @@ import (
 	"github.com/k2m30/a9s/v3/internal/tui"
 )
 
-// originalIssue196Enrichers lists the foundational enrichers from issue #196.
+// originalIssue196Enrichers lists the foundational enrichers.
 // These must remain registered (real, not noop). Broader Wave 2 alignment
 // with docs/attention-signals.md is guarded by `make check-catalogen` and
 // tests/unit/docs_attention_signals_sync_test.go (both track FindingDef
@@ -43,8 +43,8 @@ var originalIssue196Enrichers = []string{
 }
 
 // TestIssueEnricherRegistry_OriginalSetStillRegistered pins the original 8
-// enrichers from issue #196 — they must remain discoverable via the
-// Wave 2 accessor regardless of which catalog category file owns them.
+// enrichers — they must remain discoverable via the Wave 2 accessor
+// regardless of which catalog category file owns them.
 func TestIssueEnricherRegistry_OriginalSetStillRegistered(t *testing.T) {
 	for _, shortName := range originalIssue196Enrichers {
 		e, ok := awsclient.Wave2EnricherFor(shortName)
@@ -60,9 +60,9 @@ func TestIssueEnricherRegistry_OriginalSetStillRegistered(t *testing.T) {
 
 // TestIssueEnricherRegistry_NoEntriesForUnregisteredTypes verifies every
 // Wave 2 entry exposed by AllWave2 maps back to a registered ResourceTypeDef.
-// After AS-795n the catalog literal IS the registration, so this is trivially
-// true — but the test stays as a regression guard for stub test injections
-// that forget to clean up.
+// The catalog literal IS the registration, so this is trivially true — the
+// test stays as a regression guard for stub test injections that forget to
+// clean up.
 //
 // Registry-shape guard only — proves registration, not feature completeness.
 // Keep behavioral tests for any feature that is claimed as implemented.

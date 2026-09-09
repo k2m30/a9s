@@ -313,11 +313,10 @@ func TestQA_PaginationRoot_EscAndReenter_PreservesCachedResources(t *testing.T) 
 		ResourceType: "ct-events",
 	})
 
-	// INVERTED (listgen row 2, cache review finding 11): a warm re-entry now
-	// re-verifies. HandleNavigate returns the KindFetchResources task for the
-	// row-store hit, so both adapters seed the retained rows AND fetch. The
-	// old "cmd == nil" assertion encoded a list that was fresh forever; do not
-	// restore it. The rows-rendered-instantly half below is unchanged.
+	// A warm re-entry re-verifies: HandleNavigate returns the KindFetchResources
+	// task for the row-store hit, so both adapters seed the retained rows AND
+	// fetch; a list is never fresh forever. The rows-rendered-instantly half
+	// below is unchanged.
 	if cmd == nil {
 		t.Errorf("re-entering ct-events after Esc should seed the retained rows and re-verify them, but issued no command")
 	}
@@ -452,11 +451,10 @@ func TestQA_PaginationRoot_CachePerResourceType(t *testing.T) {
 		ResourceType: "ct-events",
 	})
 
-	// INVERTED (listgen row 2, cache review finding 11): a warm re-entry now
-	// re-verifies. HandleNavigate returns the KindFetchResources task for the
-	// row-store hit, so both adapters seed the retained rows AND fetch. The
-	// old "cmd == nil" assertion encoded a list that was fresh forever; do not
-	// restore it. The rows-rendered-instantly half below is unchanged.
+	// A warm re-entry re-verifies: HandleNavigate returns the KindFetchResources
+	// task for the row-store hit, so both adapters seed the retained rows AND
+	// fetch; a list is never fresh forever. The rows-rendered-instantly half
+	// below is unchanged.
 	if ctCmd == nil {
 		t.Errorf("re-entering ct-events should seed the retained rows and re-verify them, but issued no command")
 	}
@@ -473,11 +471,10 @@ func TestQA_PaginationRoot_CachePerResourceType(t *testing.T) {
 		ResourceType: "ec2",
 	})
 
-	// INVERTED (listgen row 2, cache review finding 11): a warm re-entry now
-	// re-verifies. HandleNavigate returns the KindFetchResources task for the
-	// row-store hit, so both adapters seed the retained rows AND fetch. The
-	// old "cmd == nil" assertion encoded a list that was fresh forever; do not
-	// restore it. The rows-rendered-instantly half below is unchanged.
+	// A warm re-entry re-verifies: HandleNavigate returns the KindFetchResources
+	// task for the row-store hit, so both adapters seed the retained rows AND
+	// fetch; a list is never fresh forever. The rows-rendered-instantly half
+	// below is unchanged.
 	if ec2Cmd == nil {
 		t.Errorf("re-entering ec2 should seed the retained rows and re-verify them, but issued no command")
 	}
@@ -500,25 +497,20 @@ func TestQA_PaginationRoot_CachePerResourceType(t *testing.T) {
 // MainMenuModel.RenderBody(app.MenuBody{...}) — the live render entry point.
 
 // ---------------------------------------------------------------------------
-// Tests 8–10: loadingMore error transitions (CONCERNS.md #16)
+// Tests 8–10: loadingMore error transitions
 //
-// EXPECTED FAILURE STATUS (as of 2026-04-07):
+// TestPagination_ErrorClearsLoadingMore — handleAPIError calls
+//   ClearLoading(), which sets loadingMore=false. If the active view is NOT
+//   a *ResourceListModel at the time of the error (e.g., a spinner-only view
+//   before resources arrive), loadingMore is never cleared.
 //
-// TestPagination_ErrorClearsLoadingMore — EXPECTED TO PASS on current main.
-//   handleAPIError calls ClearLoading() which sets loadingMore=false. This test
-//   documents the contract and will FAIL if someone removes the ClearLoading call.
-//   NOTE: If the active view is NOT a *ResourceListModel at the time of the error
-//   (e.g., a spinner-only view before resources arrive), loadingMore is never
-//   cleared — that race is the deadlock described in CONCERNS.md #16.
+// TestPagination_DoubleLoadIgnored — the `!m.loadingMore` guard in
+//   resourcelist.go prevents a second fetch.
 //
-// TestPagination_DoubleLoadIgnored — EXPECTED TO PASS on current main.
-//   The guard `!m.loadingMore` on line 346 of resourcelist.go already prevents a
-//   second fetch. This test documents that contract.
-//
-// TestPagination_PopViewClearsLoadingMore — EXPECTED TO PASS on current main.
-//   When the user presses Esc and re-enters the resource list, a new
-//   ResourceListModel is created via NewResourceList (loadingMore defaults to
-//   false). This test documents that re-entry produces a clean state.
+// TestPagination_PopViewClearsLoadingMore — when the user presses Esc and
+//   re-enters the resource list, a new ResourceListModel is created via
+//   NewResourceList (loadingMore defaults to false), so re-entry produces a
+//   clean state.
 // ---------------------------------------------------------------------------
 
 // TestPagination_ErrorClearsLoadingMore verifies that delivering an APIErrorMsg

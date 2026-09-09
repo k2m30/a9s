@@ -1,97 +1,56 @@
-// app_web_live_cold_boot_test.go — RED/pin tests reconciled against the FINAL
-// cache contract at docs/design/cache-requirements.md, ROUND 2 (commit
-// 671e88c5: per-type files, load-before-save invariant, scope and privacy
-// rules). This file started as a pre-contract draft, was reconciled once
-// against round-1 (single-file C7), and is now reconciled again against
-// round-2 (per-type-file C7, new C7b). The header below records the final
-// disposition of every original test plus the extended coverage added on
-// top of it, across BOTH reconciliation passes.
+// app_web_live_cold_boot_test.go — pins against the cache contract at
+// docs/design/cache-requirements.md (per-type files, load-before-save
+// invariant, scope and privacy rules).
 //
-// ROUND-1 DISPOSITION (unchanged by round-2, restated for continuity):
-//
-//   - Contract A (menu counts from disk cache) -> KEPT AS-IS, unrenamed.
-//     TestWebBoot_AvailabilityCacheLoaded_AppliesCountsAndIssuesToMenu pins
-//     C1 ("show what you know"): the disk-cache counts/issue-badges DO reach
-//     the menu once the real messages.AvailabilityCacheLoaded event is
-//     processed. Round-2 does not change this outcome (only the on-disk
-//     SHAPE feeding it changes), so it is left as a GREEN precondition,
-//     unchanged.
-//
-//   - Contract B (menu Refreshing during a cache-seeded sweep) -> KEPT
-//     AS-IS, unrenamed. TestWebBoot_Refreshing_TrueDuringCacheSeededSweep_
-//     FalseOnComplete pins the "one global updating flag" half of round-2's
-//     C3 (per-entry origin flags are a NEW, separate round-2 requirement —
-//     see the round-2 section below for why it is NOT pinned here).
-//
-//   - Contract C (cold list-open Loading-shell controller-level precondition)
-//     -> KEPT AS-IS, unrenamed. Untouched by round-2 (C4 is unchanged).
-//
-//   - Contract D (disk-rows never seeded into ProbeResources by
-//     handleAvailabilityCacheLoaded) -> KEPT, single-page fixture retained
-//     verbatim as a still-valid (if narrower) red pin of the same handler
-//     gap; TestColdBoot_SeedsAllLoadedPages_PerTypeFile_InstantlySeedsBefore
-//     FetchCompletes below (round-2) extends it to the per-type-file, all-
-//     pages scope.
-//
-// ROUND-2 REWRITE (this pass) — the old cache.File/cache.Entry/cache.Load/
-// cache.Save/cache.CachedRow/cache.Path/cache.DefaultTTL surface is being
-// DELETED by the coder and replaced with a directory-per-pair,
-// file-per-type surface (cache.DirForTest, cache.Row, cache.TypeFile, cache.Store,
-// cache.LoadDirForTest, (*Store).Type/Types/Put/SaveType — exact signatures per the
-// architect's round-2 handoff). Every test in this file that touched the old
-// surface is REWRITTEN below against the new one; none of the old surface
-// is referenced anywhere in this file anymore. This is deliberately a
-// COMPILE-RED pass: the new cache package symbols do not exist in
-// production code yet, so this entire file will fail to build until the
-// coder implements core/cache's round-2 surface — exactly like any
-// other TDD red phase, just at package-compile granularity instead of a
-// single assertion.
-//
-//   - Old Contract E / round-1 "Contract F" (whole-state save) ->
-//     SUPERSEDED. Round-1's C7 ("no merge logic, save writes the entire
-//     file back") is now round-2's DIFFERENT no-merge story: per-type files
-//     make merge-avoidance structural (a save physically only ever touches
-//     one type's file, so there is no "other types" data in scope to
-//     clobber). TestPerTypeSave_TouchingOneType_LeavesSiblingFilesByteExact
-//     replaces the whole-state-save test with the per-type-isolation
-//     equivalent.
-//   - Item 3 (C6 all-loaded-pages) -> re-pinned against per-type files:
-//     TestAllLoadedPages_PersistBeyondFirstPage_InTypeFile and
+//   - C1 ("show what you know"):
+//     TestWebBoot_AvailabilityCacheLoaded_AppliesCountsAndIssuesToMenu — the
+//     disk-cache counts/issue-badges reach the menu once the real
+//     messages.AvailabilityCacheLoaded event is processed.
+//   - C3 (one global updating flag):
+//     TestWebBoot_Refreshing_TrueDuringCacheSeededSweep_FalseOnComplete.
+//   - C4: the cold list-open Loading-shell controller-level precondition.
+//   - handleAvailabilityCacheLoaded never seeds disk rows into
+//     ProbeResources (single-page fixture);
 //     TestColdBoot_SeedsAllLoadedPages_PerTypeFile_InstantlySeedsBefore
+//     FetchCompletes extends it to the per-type-file, all-pages scope.
+//   - C7 (no merge logic): per-type files make merge-avoidance structural —
+//     a save physically only ever touches one type's file, so there is no
+//     "other types" data in scope to clobber.
+//     TestPerTypeSave_TouchingOneType_LeavesSiblingFilesByteExact.
+//   - C6 all-loaded-pages: TestAllLoadedPages_PersistBeyondFirstPage_InTypeFile
+//     and TestColdBoot_SeedsAllLoadedPages_PerTypeFile_InstantlySeedsBefore
 //     FetchCompletes.
-//   - Item 4 (C6 detail/related session-only) -> re-pinned:
+//   - C6 detail/related session-only:
 //     TestDetailAndRelatedState_NeverPersistedToDisk (structural, against
-//     TypeFile's schema) and TestColdBoot_SecondVisit_RelatedFanOutRerunsAf
-//     terRestart (FIXED per the coordinator's note: the original
-//     "RelatedRows/Related is empty" assertion was wrong — Related blocks
-//     auto-populate as Loading placeholders on every detail-open regardless
-//     of history. The correct pin is on CACHE state: a restarted controller
-//     dispatches the related fan-out task again for a resource visited in a
-//     prior process, proving nothing related-panel-shaped survived restart
-//     to short-circuit it).
-//   - Item 5 (C1 no TTL) -> re-pinned: TestAncientTypeFile_SeedsNormally_No
-//     AgeDiscard, using TypeFile.SavedAt instead of cache.File.CheckedAt.
-//   - NEW (round-2 C6 scope boundary): TestChildAndFilteredLists_NeverWritten
-//     ToTypeFile pins "only the canonical top-level, unfiltered list... is
-//     persisted — child lists, related-navigation lists, and filtered views
-//     ... are never written to disk".
-//   - NEW (round-2 C6 render-time derivation): TestColorsGlyphsStatus_NotPer
-//     sisted_DerivedAtRenderFromFieldsAndFindings pins "Colors, glyphs and
-//     status texts are NOT persisted... derived at render time".
-//   - NEW (round-2 C7 hard invariant): TestLoadBeforeSave_PairSwitch_NeverSa
-//     vesBeforeLoad pins the structural load-before-save invariant at the
-//     runtime/controller level via a pair-switch scenario, per the
-//     coordinator's guidance (Store is the only way to save — no Store, no
-//     save — so this is pinned as "the runtime never calls a save-shaped
-//     path for a pair whose Store it has not obtained via LoadDir first").
-//   - NEW (round-2 C7b): TestNoCache_NeverLoadsPopulatedDir_NeverWritesFiles
-//     pins "--no-cache disables persisted load AND save entirely" at the
-//     controller level using the existing session.NoCache flag.
-//   - C7a chokepoint audit -> UPDATED (not rewritten from scratch): now
-//     scans for cache.DirForTest(...) references and os.* primitives fed a
-//     cache.DirForTest(...)-derived path, outside core/cache.
-//   - C7a format-marker pin -> UPDATED: TypeFile.Version (not
-//     cache.File.Version) is the pinned first field.
+//     TypeFile's schema) and
+//     TestColdBoot_SecondVisit_RelatedFanOutRerunsAfterRestart. Related
+//     blocks auto-populate as Loading placeholders on every detail-open
+//     regardless of history, so the pin is on CACHE state: a restarted
+//     controller dispatches the related fan-out task again for a resource
+//     visited in a prior process, proving nothing related-panel-shaped
+//     survived restart to short-circuit it.
+//   - C1 no TTL: TestAncientTypeFile_SeedsNormally_NoAgeDiscard, on
+//     TypeFile.SavedAt.
+//   - C6 scope boundary: TestChildAndFilteredLists_NeverWrittenToTypeFile
+//     pins "only the canonical top-level, unfiltered list... is persisted —
+//     child lists, related-navigation lists, and filtered views ... are
+//     never written to disk".
+//   - C6 render-time derivation:
+//     TestColorsGlyphsStatus_NotPersisted_DerivedAtRenderFromFieldsAndFindings
+//     pins "Colors, glyphs and status texts are NOT persisted... derived at
+//     render time".
+//   - C7 hard invariant: TestLoadBeforeSave_PairSwitch_NeverSavesBeforeLoad
+//     pins load-before-save at the runtime/controller level via a
+//     pair-switch scenario (Store is the only way to save — no Store, no
+//     save — so the runtime never calls a save-shaped path for a pair whose
+//     Store it has not obtained via LoadDir first).
+//   - C7b: TestNoCache_NeverLoadsPopulatedDir_NeverWritesFiles pins
+//     "--no-cache disables persisted load AND save entirely" at the
+//     controller level using session.NoCache.
+//   - C7a chokepoint audit: scans for cache.DirForTest(...) references and
+//     os.* primitives fed a cache.DirForTest(...)-derived path, outside
+//     core/cache.
+//   - C7a format-marker pin: TypeFile.Version is the pinned first field.
 //
 // All tests are hermetic: A9S_CONFIG_FOLDER redirected to t.TempDir(), no AWS
 // credentials, no network.
@@ -192,17 +151,14 @@ func TestWebBoot_AvailabilityCacheLoaded_AppliesCountsAndIssuesToMenu(t *testing
 // ExecuteTask(TaskKindLoadAvailCache) produces) through Controller.Handle,
 // exactly as DrainSyncProgress does for BootstrapLive's returned tasks.
 //
-// core/app/menu.go's menuRefreshing() (task #17 wave 1 stage 2 re-point,
-// per its own doc comment — "Flagged for Stage 3 to fold into whatever
-// core/app's own RowStore migration does") reports true only for a type
+// core/app/menu.go's menuRefreshing() reports true only for a type
 // RowStore.ProbeOriginTypeNames() names, which itself requires
 // len(Rows) > 0 for that type's OriginProbe/OriginDisk entry. A counts-only
 // AvailabilityCacheLoaded entry with no real per-type disk file (C6a: never
 // fabricates Rows) therefore does NOT make menuRefreshing() see it — this
 // fixture seeds a REAL on-disk s3 file so RowStore genuinely retains
 // OriginDisk rows for at least one queued type, exercising the sweep-in-
-// flight signal Contract B actually describes rather than the now-provably-
-// unreachable (post-C6a) placeholder-count path.
+// flight signal Contract B describes.
 func TestWebBoot_Refreshing_TrueDuringCacheSeededSweep_FalseOnComplete(t *testing.T) {
 	t.Setenv("A9S_CONFIG_FOLDER", t.TempDir())
 	core, ctrl := newLiveWebStyleController(t, "webboot-refreshing-prof", "us-east-1")
@@ -232,13 +188,12 @@ func TestWebBoot_Refreshing_TrueDuringCacheSeededSweep_FalseOnComplete(t *testin
 		t.Fatal("Handle(AvailabilityCacheLoaded) returned nil Body.Menu")
 	}
 
-	// Since commit 89f0f69d ("availability sweep waits for client
-	// readiness"), a disk-cache load against nil clients (this controller's
-	// state — newLiveWebStyleController never sets Clients) dispatches NO
-	// probe tasks; it only latches Session.AvailSweepPending. ClientsReady is
-	// what drains the first batch (fireNextAvailabilityProbes(4)) — mirror
-	// that real sequence here so the sweep this test's Refreshing assertion
-	// depends on is actually queued.
+	// A disk-cache load against nil clients (this controller's state —
+	// newLiveWebStyleController never sets Clients) dispatches NO probe tasks;
+	// it only latches Session.AvailSweepPending. ClientsReady is what drains
+	// the first batch (fireNextAvailabilityProbes(4)) — mirror that real
+	// sequence here so the sweep this test's Refreshing assertion depends on
+	// is actually queued.
 	// Gen:1 — ConnectGen seeds at 1 (session.New()); this controller's session
 	// is never rotated.
 	vs, readyTasks := ctrl.Handle(messages.ClientsReady{Gen: 1})
@@ -346,13 +301,8 @@ func TestWebBoot_ColdListOpen_ControllerLevel_ReturnsLoadingShellAndFetchTask(t 
 // persisted rows file), handleAvailabilityCacheLoaded feeds RowStore's
 // counts-only observation (ObserveCountRows, C6a) and must NEVER fabricate
 // placeholder Rows — so a list opened immediately after shows Loading=true
-// with zero rows, not a seeded-but-fake page. Renamed from
-// TestWebBoot_AvailabilityCacheLoaded_DoesNotSeedProbeResourcesRows: the old
-// name's assertions were inverted relative to its own doc comment (which
-// already stated this Loading=true/zero-rows outcome as the correct
-// contract) — task #17 wave 1 stage 2 confirms C6a is authoritative here
-// (docs/design/cache-requirements.md C6a: "a counts-only observation...
-// never touches a type's persisted Rows"), not a placeholder-row fallback.
+// with zero rows, not a seeded-but-fake page (docs/design/cache-requirements.md
+// C6a: "a counts-only observation... never touches a type's persisted Rows").
 //
 // See TestColdBoot_SeedsAllLoadedPages_PerTypeFile_InstantlySeedsBeforeFetch
 // Completes below for the REAL-disk-row seeding contract (Loading=false),
@@ -390,8 +340,7 @@ func TestWebBoot_AvailabilityCacheLoaded_CountsOnlyFallback_KeepsLoadingTrue(t *
 // perTypeCacheDir mirrors what cache.DirForTest(profile, region) will resolve to
 // under an A9S_CONFIG_FOLDER-redirected temp dir, for tests that need to
 // assert directly on directory/file existence without going through
-// cache.LoadDirForTest. Kept minimal and local to this file (no dependency on the
-// coder's eventual Dir() implementation beyond calling it directly).
+// cache.LoadDirForTest. Kept minimal and local to this file.
 func perTypeCacheDir(t *testing.T, profile, region string) string {
 	t.Helper()
 	return cache.DirForTest(profile, region)
@@ -681,14 +630,12 @@ func TestDetailAndRelatedState_NeverPersistedToDisk(t *testing.T) {
 	}
 }
 
-// TestColdBoot_SecondVisit_RelatedFanOutRerunsAfterRestart replaces the
-// original (incorrect) "Related is empty after restart" assertion per the
-// coordinator's fix: EnsureDetailState auto-populates Related blocks as
-// Loading placeholders on every detail-open regardless of history, so
-// asserting on panel emptiness is vacuous. The correct, meaningful pin is on
-// CACHE state: a related-check result cached in-session (via
-// Core.RelatedCacheSet, the same seam handleRelatedCheckBatch writes
-// through) for a given resource must NOT be visible to a brand-new
+// TestColdBoot_SecondVisit_RelatedFanOutRerunsAfterRestart pins CACHE state
+// rather than panel emptiness (EnsureDetailState auto-populates Related
+// blocks as Loading placeholders on every detail-open regardless of history,
+// so asserting on panel emptiness is vacuous): a related-check result cached
+// in-session (via Core.RelatedCacheSet, the same seam handleRelatedCheckBatch
+// writes through) for a given resource must NOT be visible to a brand-new
 // controller for the same profile+region — proving nothing related-panel-
 // shaped survives a restart, so the SAME resource's detail re-open on the
 // new controller has no cache hit to short-circuit the fan-out with (i.e.
@@ -922,7 +869,6 @@ func TestAncientTypeFile_SeedsNormally_NoAgeDiscard(t *testing.T) {
 
 // -----------------------------------------------------------------------
 // Contract C7a — at-rest security seam: single chokepoint + format marker
-// (round-2: scans for cache.DirForTest(...) instead of the deleted cache.Path/Dir)
 // -----------------------------------------------------------------------
 
 // cacheDiskAccessAllowlist lists "<repo-relative-path>:<os.*-func-name>" keys
@@ -1085,7 +1031,7 @@ func TestTypeFile_FirstFieldIsFormatVersion(t *testing.T) {
 
 // TestCacheSchemaVersion_Exported pins that cache.SchemaVersion (the
 // current format marker value new saves must stamp) is exported and equals
-// 2 (issue #463: per-finding FirstSeen bumped the on-disk schema).
+// 2 (per-finding FirstSeen is part of the on-disk schema).
 func TestCacheSchemaVersion_Exported(t *testing.T) {
 	if cache.SchemaVersion != 2 {
 		t.Errorf("cache.SchemaVersion = %d, want 2", cache.SchemaVersion)

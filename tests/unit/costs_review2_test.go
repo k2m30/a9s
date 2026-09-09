@@ -1,48 +1,28 @@
-// costs_review2_test.go — Cost Explorer external review round 2: findings
-// R2-R9 (R1, the visible-window-missing-period gap, was independently
-// verified fixed on HEAD by the F4-tightening commit — see
-// TestCostsReview_F4_VisibleWindow_MissingClosedPeriod_TriggersRefetch_NeverRenderedAsSilentZero
-// in costs_review_findings_test.go, which now passes; no test for it here).
+// costs_review2_test.go — Cost Explorer coverage and grid-label pins.
 //
 // package unit (not unit_test): R7 needs the full TUI Model
 // (newRootSizedModel/rootApplyMsg/ctrlR/drainCmds, package-unit-only)
-// alongside the seven headless-Controller/Store/aws-layer findings, and Go
-// permits only one package per file. Every review*-prefixed helper reused
-// below (reviewNow, reviewCostsController, reviewCostsControllerNoIsolation,
-// reviewTopDrill, reviewBaseServiceQuery, reviewFullMetricRecord,
-// reviewFindFetchCostsTask) already lives in this package, defined in
-// costs_review_findings_test.go.
-//
-// *** New API surface this file pins (does NOT exist on disk yet — these
-// *** two tests are compile-red until the coder adds the symbols below).
-// *** Every other test in this file compiles clean today and is a genuine
-// *** runtime red/green against EXISTING production surface only.
+// alongside the headless-Controller/Store/aws-layer pins, and Go permits
+// only one package per file. The review*-prefixed helpers (reviewNow,
+// reviewCostsController, reviewCostsControllerNoIsolation, reviewTopDrill,
+// reviewBaseServiceQuery, reviewFullMetricRecord, reviewFindFetchCostsTask)
+// are defined in costs_review_findings_test.go.
 //
 //  1. core/costs/store.go: Store.MergeCoverage(q Query, covered []Period,
-//     now time.Time) — R2. ADDITIVE (existing 3-arg Merge is untouched, so
-//     every current Merge call site keeps compiling unchanged): stamps every
-//     period in `covered` as fetched-at-now, including periods with zero
-//     matching records — Merge alone can only learn a period exists from its
-//     own records' Period field, so a CE result with zero groups for a
-//     period (a young account, or spend fully filtered out) is invisible to
-//     it today and Lookup reports that period missing forever. Follows
-//     Merge's own closed-immutable/open-always-refreshes rule.
+//     now time.Time) stamps every period in `covered` as fetched-at-now,
+//     including periods with zero matching records — Merge alone can only
+//     learn a period exists from its own records' Period field, so a CE
+//     result with zero groups for a period (a young account, or spend fully
+//     filtered out) would otherwise be invisible to it and Lookup would
+//     report that period missing forever. Follows Merge's own
+//     closed-immutable/open-always-refreshes rule.
 //  2. core/costs/grid.go: ApplyRowAttrs(g Grid, attrs map[string]string)
-//     Grid — R8. A NEW package-level function operating on an
-//     already-built Grid (relabels Rows[i].Label to "name (id)" when attrs
-//     has an entry for Rows[i].Key, leaving unmatched keys as the raw ID) —
-//     deliberately NOT a new BuildGrid parameter, since BuildGrid has many
-//     existing call sites (production liveCostGrid plus several tests) that
-//     a required-signature-widening would break; a separate post-processing
-//     step is additive and keeps that blast radius at zero.
+//     Grid relabels Rows[i].Label to "name (id)" when attrs has an entry for
+//     Rows[i].Key, leaving unmatched keys as the raw ID, as a post-processing
+//     step over an already-built Grid rather than a BuildGrid parameter.
 //
 // Contract: specs/021-cost-explorer/data-model.md, spec.md FR-007/FR-012/
-// FR-014/FR-017, and the current production code in
-// core/app/costs_state.go, core/app/costs_body.go,
-// core/runtime/handlers_navigate.go, core/app/navigate.go,
-// core/runtime/executor.go, internal/tui/runtime_adapter_navigate.go,
-// core/costs/{store,grid,drill}.go — each finding below was
-// independently re-verified against current code before being scoped here.
+// FR-014/FR-017.
 package unit
 
 import (
@@ -552,8 +532,7 @@ func TestCostsReview2_R9_ResourceDrillGate_NearBoundary_ClampsExpandedWindow_Not
 
 	weekTop := reviewTopDrill(t, c)
 	// weekTop.Window[0] is CLIPPED to the month boundary ("2026-07-01"),
-	// which is exactly AT the 14-day cutoff — the coarse check the current
-	// gate performs passes. The finer (day) window BuildWindow builds for
+	// which is exactly AT the 14-day cutoff, so the coarse check passes. The finer (day) window BuildWindow builds for
 	// the next drill is anchored on this SAME clipped Start, but expands to
 	// the full Mon-Sun ISO week containing it, which starts on 2026-06-29 —
 	// two days BEFORE the retention cutoff.

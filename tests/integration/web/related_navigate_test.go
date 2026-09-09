@@ -112,8 +112,8 @@ func TestWebRelatedNavigate_SingleTarget_SeedsDetailFromCache(t *testing.T) {
 
 	// --- Regression assertions ---
 
-	// The stack must have navigated to a detail screen (not stayed on the same
-	// detail with related focused, which is the broken pre-fix state).
+	// The stack must have navigated to a detail screen, not stayed on the
+	// same detail with related focused.
 	if vs.Body.Kind != app.BodyKindDetail {
 		t.Fatalf("related-navigate single-target: Body.Kind=%q, want %q — "+
 			"NavigationKindDetail cache-hit path must push a detail screen",

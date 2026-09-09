@@ -1,7 +1,6 @@
 package unit_test
 
-// aws_related_def_fragility_test.go — AS-1243 regression coverage for three
-// pre-existing related-def fragilities surfaced by AS-1242 Stage 6.5:
+// aws_related_def_fragility_test.go — three related-def rules:
 //
 //  1. checkEKSAMI must soft-skip nodegroups whose launch template has been
 //     deleted upstream (InvalidLaunchTemplateId.NotFound) instead of hard
@@ -12,7 +11,7 @@ package unit_test
 //     load balancers (NLB / GWLB), because AWS WAFv2 only supports ALBs and
 //     would return WAFInvalidParameterException.
 //
-// The fixes live in:
+// The checkers:
 //   - core/aws/eks_related_extra.go (checkEKSAMI)
 //   - core/aws/ng_related.go (checkNGAMI)
 //   - core/aws/elb_related.go (checkELBWAF)

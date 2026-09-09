@@ -3,11 +3,10 @@
 // detail_unlabelled_attention_row_test.go — an Attention supporting row with
 // no label is a whole line, and it is the renderer that knows so.
 //
-// The projection used to copy the value into the empty key so that the
-// renderer's "key equals value" test would catch it, because an empty key
-// otherwise painted a bare ":" in front of the line. That put the knowledge
-// of how a line is painted a layer above the painter, and left the body
-// carrying a label no operator asked for.
+// The projection leaves the key empty rather than copying the value into it
+// so the renderer's "key equals value" test would catch it: that would put
+// the knowledge of how a line is painted a layer above the painter, and
+// leave the body carrying a label no operator asked for.
 package unit
 
 import (

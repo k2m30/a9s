@@ -3,12 +3,8 @@ package unit
 // qa_related_panel_contract_test.go — per-resource-type related-panel
 // contract enforced against the GOLDEN DOC.
 //
-// This file is NOT a PR #273 regression pin. It surfaced accidentally
-// during PR #273 review as a huge, fundamental coverage gap in the
-// detail-view RELATED panel: the registry had drifted away from the
-// AWS API cross-references and DevOps workflows that should drive it.
-// The test suite below is the ongoing enforcement layer for the
-// contract, independent of any single PR.
+// The test suite below is the enforcement layer for the contract,
+// independent of any single change.
 //
 // The single source of truth for this contract is:
 //

@@ -1,17 +1,16 @@
 package unit
 
-// Tests for the redesigned CloudTrail Events fetcher (T020Q, T024Q, T030Q).
+// Tests for the CloudTrail Events fetcher.
 //
-// These tests are written BEFORE implementation exists (TDD).
-// They will fail to compile until the coder exports:
+// Surface:
 //   - aws.ClassifyCTVerb(eventName, eventCategory, eventType string) string
 //   - aws.ExtractCTTarget(parsed map[string]any) string
-//   - (implicitly) FetchCloudTrailEventsPage writes _ct.* keys into Resource.Fields
+//   - FetchCloudTrailEventsPage writes _ct.* keys into Resource.Fields
 //     and sets Resource.Status to "ct-write" or "ct-read"
 //
 // Bug vectors covered:
 //   - Verb classifier maps wrong prefix (e.g. "StopInstances" → "?" instead of "W")
-//   - Resource.Status set to old "true"/"false" instead of "ct-write"/"ct-read"
+//   - Resource.Status set to "true"/"false" instead of "ct-write"/"ct-read"
 //   - Verb → Status mapping wrong (e.g. "D" classified as ct-read)
 //   - _ct.* keys absent from Resource.Fields after fetch
 //   - _ct.is_root = "true" for non-Root identity

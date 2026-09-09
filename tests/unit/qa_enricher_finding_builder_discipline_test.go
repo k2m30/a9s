@@ -1,73 +1,31 @@
-// qa_enricher_finding_builder_discipline_test.go — Codex build-contract gate
-// for the v3.47.0 multi-finding work: setWave2Finding is documented as the
-// append-only builder for IssueEnricherResult.Findings (core/aws/
-// issue_enrichment.go, func at line 129 — its "Append-style:" doc paragraph
-// starts at line 105, which is what the originating dispatch cited; the
-// dispatch's line 105 points at that paragraph, not the func signature,
-// verified by direct read), but nothing stops an enricher from reaching past
-// the builder and reading r.Findings back directly. That is exactly what
-// dropped a finding in production:
-//
-//	core/aws/msk_issue_enrichment.go:85
-//	    if _, alreadyFound := result.Findings[r.ID]; !alreadyFound {
-//
-// (the dispatch cited line 84 for this guard — that is the comment line
-// directly above it, "// Check encryption in transit (only set finding if
-// not already set)."; the executable guard is line 85, verified by direct
-// read). Reading result.Findings[r.ID] back to decide whether to call
-// setWave2Finding a second time defeats the append contract: if broker
-// software happens to already have set a finding, MSK's encryption-in-transit
-// check is skipped even when TLS enforcement is independently off — the two
-// conditions are independently evaluated per setWave2Finding's own contract,
-// but the guard collapses them into "at most one finding, whichever fires
-// first."
+// qa_enricher_finding_builder_discipline_test.go — build-contract gate:
+// setWave2Finding is the append-only builder for
+// IssueEnricherResult.Findings (core/aws/issue_enrichment.go, its
+// "Append-style:" doc paragraph), and no enricher reaches past the builder
+// to read r.Findings back directly. Reading result.Findings[r.ID] back to
+// decide whether to call setWave2Finding a second time defeats the append
+// contract: if one check has already set a finding, a second independently
+// evaluated condition is skipped — the guard collapses two conditions into
+// "at most one finding, whichever fires first."
 //
 // SCAN SHAPE: this gate parses every core/aws/*_issue_enrichment.go file
 // with go/ast (the glob deliberately does not match core/aws/
 // issue_enrichment.go itself — "issue_enrichment.go" is shorter than the
 // "_issue_enrichment.go" suffix the pattern requires, so setWave2Finding's
-// own legitimate r.Findings[resourceID] index-write at issue_enrichment.go:
-// 146/152 is never in scan scope) and flags any *ast.IndexExpr or
-// *ast.RangeStmt whose operand is a "<expr>.Findings" selector — the two
-// syntactic shapes that give an enricher visibility into a specific
-// resource's existing entries (a bare `len(result.Findings)` or
-// `maps.Copy(dst, result.Findings)` whole-map read cannot gate a per-resource
-// emit decision the way an index or range read can, so those are
-// deliberately NOT flagged — see the knownFindingMapInspectionDebt comment
-// below for the census that shaped this boundary).
+// own legitimate r.Findings[resourceID] index-write is never in scan scope)
+// and flags any *ast.IndexExpr or *ast.RangeStmt whose operand is a
+// "<expr>.Findings" selector — the two syntactic shapes that give an enricher
+// visibility into a specific resource's existing entries (a bare
+// `len(result.Findings)` or `maps.Copy(dst, result.Findings)` whole-map read
+// cannot gate a per-resource emit decision the way an index or range read
+// can, so those are deliberately NOT flagged).
 //
-// CENSUS AT SEEDING (2026-07-07, this exact scanner against HEAD): five
-// direct .Findings index/range sites exist under core/aws/
-// *_issue_enrichment.go:
-//
-//   - msk_issue_enrichment.go:85 (EnrichMSKCluster) — the gate-a-second-emit
-//     anti-pattern above. Deliberately NOT allowlisted.
-//   - eb_rule_issue_enrichment.go:153, ec2_issue_enrichment.go:203,
-//     ecr_issue_enrichment.go:156, elb_issue_enrichment.go:102 — all four are
-//     the SAME benign shape: `for _, fs := range result.Findings { for _, f
-//     := range fs { if f.Severity == domain.SevBroken { issueCount++; break
-//     } } }` immediately before `result.IssueCount = issueCount` and the
-//     function's `return`. Verified by direct read: in every one of the four,
-//     the range is the LAST statement, strictly after every setWave2Finding
-//     call in the function has already run — it computes a derived scalar,
-//     never influences what gets appended, and cannot reproduce MSK's bug
-//     class. These four are pre-existing debt, allowlisted below.
-//
-// KNOWN DEBT vs. TARGET — deliberate ratchet shape: the four post-append
-// IssueCount aggregation sites are SEEDED into knownFindingMapInspectionDebt
-// (found + allowlisted = skip, logged as debt). msk_issue_enrichment.go:85 is
-// DELIBERATELY LEFT OUT of the allowlist, so it is the one NEW VIOLATION
-// failing this gate today. This is the "seed the allowlist empty [for MSK]"
-// shape the dispatch offered as an alternative to "seed it with MSK and have
-// the coder's removal trip the prune path" — chosen because only THIS shape
-// makes the coder's production-only fix (removing the MSK
-// `alreadyFound`-guard, e.g. by calling setWave2Finding unconditionally for
-// both independently-evaluated MSK conditions) turn the gate green with zero
-// test-file edits. Under the "seed it with MSK" alternative, removing the
-// guard would make MSK's site disappear from the live scan while its
-// allowlist entry remained — tripping the BURN-DOWN case (t.Errorf) instead
-// of going green, requiring an ADDITIONAL test-file edit to prune the stale
-// entry. That shape was rejected for exactly that reason.
+// knownFindingMapInspectionDebt lists the benign shape: `for _, fs := range
+// result.Findings { for _, f := range fs { if f.Severity == domain.SevBroken
+// { issueCount++; break } } }` immediately before `result.IssueCount =
+// issueCount` and the function's `return` — the range is the LAST statement,
+// strictly after every setWave2Finding call has already run; it computes a
+// derived scalar and never influences what gets appended.
 package unit_test
 
 import (

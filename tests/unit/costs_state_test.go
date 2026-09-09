@@ -1,39 +1,31 @@
-// costs_state_test.go — Cost Explorer Phase 2: controller-side drill/pivot/
-// metric/zoom state machine (specs/021-cost-explorer/data-model.md
-// §"Controller & runtime additions").
-//
-// Phase-2 symbols this file assumes but which do not exist on disk yet
-// (RED until the coder lands them):
+// costs_state_test.go — Cost Explorer controller-side drill/pivot/metric/zoom
+// state machine (specs/021-cost-explorer/data-model.md §"Controller &
+// runtime additions").
 //
 //   - app.CostsState, app.ActionCostZoomIn/Out, app.ActionCostMetric,
-//     app.ActionCostPivot — given verbatim in data-model.md.
-//   - runtime.ScreenCosts — given verbatim in data-model.md.
-//   - app.Controller.EnsureCostsState(now time.Time) — signature inferred
-//     from the existing Ensure*State family (EnsureDetailState,
-//     EnsureTextState, EnsureSelectorState all take the screen's seed data;
-//     Costs' only seed data is the injected clock used to compute the
-//     default 12-month window, matching this package's "now is injected,
-//     never time.Now() internally" convention).
+//     app.ActionCostPivot and runtime.ScreenCosts are given verbatim in
+//     data-model.md.
+//   - app.Controller.EnsureCostsState(now time.Time) follows the Ensure*State
+//     family (EnsureDetailState, EnsureTextState, EnsureSelectorState all
+//     take the screen's seed data; Costs' only seed data is the injected
+//     clock used to compute the default 12-month window, matching this
+//     package's "now is injected, never time.Now() internally" convention).
 //   - messages.CostsLoaded{Query, Grid, Attrs, Anomalies, Requests, Err} —
-//     Grid costs.GridResult{Fetched, Records, Err} replaces the old bare
-//     Records/GridFetched fields (S1: symmetric with costs.AnomalyResult)
-//     and app.Controller's real Handle(runtime.Event) dispatch for it —
-//     named verbatim in data-model.md ("handled by runtime handlers");
-//     routed through Handle (not a test-only seam) so these tests exercise
-//     the same path production code will use.
+//     Grid costs.GridResult{Fetched, Records, Err} is symmetric with
+//     costs.AnomalyResult — is routed through app.Controller's real
+//     Handle(runtime.Event) dispatch (not a test-only seam) so these tests
+//     exercise the same path production code uses.
 //   - Grid-cursor movement reuses ActionMoveUp/ActionMoveDown for the row
 //     axis (row dimension) and ActionScrollLeft/ActionScrollRight for the
-//     column axis (time axis) — data-model.md states "movement reuses
-//     ActionMoveUp/Down etc."; ActionScrollLeft/Right already exist with
-//     the doc comment "move the horizontal column viewport", the natural
-//     reuse for a grid's time columns.
+//     column axis (time axis), per data-model.md ("movement reuses
+//     ActionMoveUp/Down etc.").
 //
 // Grid-seeding trick used throughout: every seeded costs.Record uses a
 // Period equal to the injected "now"'s own month. Query.CacheKey() only
-// derives from Granularity+GroupBy+Filter (Range is explicitly excluded
-// per data-model.md), so the seeded Query never needs to reproduce
-// EnsureCostsState's exact window math — and using "now"'s own month as
-// the record Period guarantees it lands inside ANY reasonable trailing-N-
+// derives from Granularity+GroupBy+Filter (Range is explicitly excluded per
+// data-model.md), so the seeded Query never needs to reproduce
+// EnsureCostsState's exact window math — and using "now"'s own month as the
+// record Period guarantees it lands inside ANY reasonable trailing-N-
 // months-ending-at-now window, regardless of N.
 package unit_test
 

@@ -1,19 +1,14 @@
-// review_wave_cache_defects_test.go pins five externally-reviewed defects
-// against HEAD (feat/related-completeness). Each test is RED until the
-// paired coder task lands the fix; assertions encode the documented/correct
-// mechanism, not today's (broken) behavior. Fictional data only (account
-// 123456789012).
+// review_wave_cache_defects_test.go pins five cache-lane contracts.
+// Fictional data only (account 123456789012).
 //
 // Pin 1 — core/session/rowstore.go Observe: a probe replace must not
 // shrink an existing Fetch-origin row set (append=false, smaller incoming).
-// Pin 2 — core/runtime/handlers_availability.go (~line 124): a disk seed
+// Pin 2 — core/runtime/handlers_availability.go: a disk seed
 // WITH real rows but a C6a-style larger Count must still land the larger
 // TotalCount, not silently drop it to len(rows).
-// Pin 3 — core/runtime/accessors.go ResourceCacheKeys / a new
-// origin-gated FetchOriginCacheKeys: the related-freshness key set must
-// exclude Disk/Probe-origin entries, matching HasResourceCache's own
-// Origin==OriginFetch gate. This pin defines the fix's contract: a
-// FetchOriginCacheKeys accessor does not exist yet (red = missing symbol).
+// Pin 3 — core/runtime/accessors.go FetchOriginCacheKeys: the
+// related-freshness key set must exclude Disk/Probe-origin entries,
+// matching HasResourceCache's own Origin==OriginFetch gate.
 // Pin 4 — core/runtime/helpers.go ApplyWave2ToRow: the in-place
 // compaction of r.Findings mutates the input row's backing array, so any
 // other domain.Resource value sharing that slice header is corrupted too.

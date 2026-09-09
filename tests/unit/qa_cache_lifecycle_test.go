@@ -1,5 +1,4 @@
-// qa_cache_lifecycle_test.go — full cache lifecycle tests requested verbatim
-// by the owner (branch feat/cache):
+// qa_cache_lifecycle_test.go — full cache lifecycle tests:
 //
 //  1. первая загрузка (кэша нет) — first load, no cache.
 //  2. загрузка с кэшем (данные и ресурсы не менялись) — cache-present load,
@@ -56,22 +55,15 @@
 //
 // No sleeps: every step is a synchronous Handle/Apply call, deterministic.
 //
-// REAL FINDING (Scenario 3, not weakened per the dispatch's instruction):
-// TestCacheLifecycle_Scenario3_CachePresent_WorldChanged's "issue resolved"
-// case is RED at HEAD. applyResourcesLoaded's silent-swap finding-carry-
-// forward (core/app/list_body.go, the `case len(resources[i].Findings)
-// == 0: resources[i].Findings = f` branch — the silent-swap findings
-// carry) treats ANY
-// incoming resource with zero Findings as "not yet re-checked" and
-// unconditionally re-attaches its FULL prior finding set — including
-// Wave-1 findings whose absence on a fresh fetch is exactly how a fetcher
+// Scenario 3's "issue resolved" case pins that applyResourcesLoaded's
+// silent-swap finding carry (core/app/list_body.go) must not re-attach a
+// Wave-1 finding whose absence on a fresh fetch is exactly how a fetcher
 // expresses "this is no longer true" (e.g. a bucket that is no longer
-// publicly readable simply stops carrying the s3-public-read finding). The
-// carry-forward has no way to distinguish "this fetch didn't check that
-// aspect" from "this fetch confirms it's fixed", so a genuinely resolved
+// publicly readable simply stops carrying the s3-public-read finding). A
+// carry that treats ANY incoming zero-Findings resource as "not yet
+// re-checked" and re-attaches its FULL prior set lets a genuinely resolved
 // Wave-1 issue's glyph, menu issue count, and persisted cache.Row.Findings
-// all incorrectly survive the swap. See the test's assertions and error
-// messages for the precise pin.
+// all survive the swap.
 package unit
 
 import (
@@ -225,12 +217,12 @@ func deliverEnrichment(ctrl *app.Controller, issues int, findings map[string][]d
 
 // readTypeFile re-reads the on-disk TypeFile for lifecycleShortName under
 // (profile, region), failing the test if it is missing.
-// The per-type save no longer runs on the goroutine that triggered it: a
-// 6000-row type file's marshal used to sit in the latency of the fetch that
-// produced it, so the cache writer owns it now. A test that reads the file it
+// The per-type save does not run on the goroutine that triggered it: a
+// 6000-row type file's marshal would sit in the latency of the fetch that
+// produced it, so the cache writer owns it. A test that reads the file it
 // just caused therefore waits for it rather than assuming it is already
-// there. The deadline is what turns "never written" into a failure instead of
-// a hang.
+// there. The deadline is what turns "never written" into a failure instead
+// of a hang.
 func readTypeFile(t *testing.T, profile, region string) cache.TypeFile {
 	t.Helper()
 	deadline := time.Now().Add(5 * time.Second)
@@ -341,12 +333,9 @@ func TestCacheLifecycle_Scenario1_FirstLoad_NoCache(t *testing.T) {
 	if !ok {
 		t.Fatal("ListBody.Rows missing bucket-s1-1 after the fetch landed")
 	}
-	// Since the color-findings-conformance wave, colorS3 is
-	// colorFromAnyFinding-only (core/aws/catalog_databases.go) — a
-	// SevBroken Finding resolves the row's whole-row color to "broken"
-	// directly (the glyph branch that used to fire when
-	// ResolveColor()==ColorHealthy was deleted as unreachable).
-	// ListRow.Color=="broken" is the stronger, correct check.
+	// colorS3 is colorFromAnyFinding-only (core/aws/catalog_databases.go), so
+	// a SevBroken Finding resolves the row\'s whole-row color to "broken".
+	// ListRow.Color=="broken" is the check.
 	if row1.Color != "broken" {
 		t.Errorf("bucket-s1-1 Color = %q, want %q (broken row for its finding)", row1.Color, "broken")
 	}
@@ -360,11 +349,10 @@ func TestCacheLifecycle_Scenario1_FirstLoad_NoCache(t *testing.T) {
 	// --- Step 5: persisted file must carry every renderable column's field,
 	// findings, and correct count/exact/issues ---
 	//
-	// The keys below are the underscored spelling on purpose. The spec's row 5
-	// leaves exactly one Fields key per column title, written under the
-	// spelling the extraction cascade reads first; the spaced spelling these
-	// assertions used to name was the second, colliding key that made a
-	// replayed cell depend on Go's map order. Do not restore it.
+	// The keys below are the underscored spelling on purpose: there is exactly
+	// one Fields key per column title, written under the spelling the
+	// extraction cascade reads first; a second, spaced spelling would make a
+	// replayed cell depend on Go's map order.
 	tf := readTypeFile(t, profile, region)
 	if !tf.HasResources {
 		t.Error("persisted TypeFile.HasResources = false, want true")
@@ -382,8 +370,8 @@ func TestCacheLifecycle_Scenario1_FirstLoad_NoCache(t *testing.T) {
 	if !ok {
 		t.Fatal("persisted Rows missing bucket-s1-1")
 	}
-	// "name" rather than "bucket_name" since misc4 round 2 item (b): the
-	// resolved Bucket Name column carries the catalog's Key, so that is the
+	// "name" rather than "bucket_name": the resolved Bucket Name column
+	// carries the catalog\'s Key, so that is the
 	// key its cell is read from and the key materialization writes. The title
 	// key nothing reads is not what a cache replay needs.
 	for _, key := range []string{"name", "region", "creation_date"} {
@@ -691,8 +679,8 @@ func TestCacheLifecycle_Scenario3_CachePresent_WorldChanged(t *testing.T) {
 	if !ok {
 		t.Fatal("persisted Rows missing bucket-s3-added")
 	}
-	// "name" rather than "bucket_name" since misc4 round 2 item (b): the
-	// resolved Bucket Name column carries the catalog's Key, so that is the
+	// "name" rather than "bucket_name": the resolved Bucket Name column
+	// carries the catalog\'s Key, so that is the
 	// key its cell is read from and the key materialization writes. The title
 	// key nothing reads is not what a cache replay needs.
 	for _, key := range []string{"name", "region", "creation_date"} {
@@ -869,10 +857,8 @@ detail:
 	if len(lbLoaded.Rows) != 1 {
 		t.Fatalf("ListBody.Rows = %d after the verify fetch, want 1", len(lbLoaded.Rows))
 	}
-	// The row-decorator pin that stood here is gone with the plumbing (tui5
-	// row 5): a list row carries no marker, so "no findings" is read off the
-	// row's colour, which the sibling assertions already cover. Do not restore
-	// a Decorator assertion — there is no such field.
+	// A list row carries no marker, so "no findings" is read off the row's
+	// colour, which the sibling assertions already cover.
 
 	// Step 3: persisted file now carries the new column's field too.
 	afterTF := readTypeFile(t, profile, region)
@@ -883,16 +869,13 @@ detail:
 	if v, present := got.Fields["bucket_owner"]; !present || v != "team-platform" {
 		t.Errorf(`persisted bucket-s4-1.Fields["bucket_owner"] = %q (present=%v), want "team-platform" — the new config column must materialize and persist once a genuine fetch supplies its source field`, v, present)
 	}
-	// "name", matching scenarios 1 and 3 above. INVERTED for aws6 row 16 (one
-	// cascade arm): this scenario's YAML declares a Key-LESS column titled
-	// "Bucket Name", and the save projection used to key such a column by its
-	// title, giving "bucket_name". A loaded view file no longer comes back
-	// without the catalog's Key — the view owns the column set and its order,
-	// the catalog owns what each cell reads, on every path — so the resolved
-	// column carries the catalog's Key and that is the key materialization
-	// writes. The title key nothing reads is not what a cache replay needs.
-	// Do not restore "bucket_name": it would mean a column resolved one way
-	// for this scenario and another for the two above.
+	// "name", matching scenarios 1 and 3 above: this scenario's YAML declares
+	// a Key-LESS column titled "Bucket Name", and a loaded view file comes
+	// back with the catalog's Key — the view owns the column set and its
+	// order, the catalog owns what each cell reads, on every path — so the
+	// resolved column carries the catalog's Key and that is the key
+	// materialization writes. "bucket_name" would mean a column resolved one
+	// way for this scenario and another for the two above.
 	if v, present := got.Fields["name"]; !present || v == "" {
 		t.Errorf(`persisted bucket-s4-1.Fields["name"] = %q (present=%v), want non-empty — surviving columns must still materialize under the new config`, v, present)
 	}

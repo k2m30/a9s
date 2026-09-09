@@ -1,6 +1,6 @@
-// runtime_reconciletypefile_test.go — pins for reconcileTypeFile (internal/
-// runtime/probes.go), the single chokepoint every type-file write goes
-// through as of task #17 wave 1 (C6a, docs/design/cache-requirements.md):
+// runtime_reconciletypefile_test.go — pins for reconcileTypeFile
+// (core/runtime/probes.go), the single chokepoint every type-file write goes
+// through (C6a, docs/design/cache-requirements.md):
 //
 //  1. TestSaveAvailabilityCache_CountsOnly_NeverDropsRows — the counts-only
 //     rows-drop shape (D16):
@@ -59,13 +59,12 @@ func reconcileRows(prefix string, n int) []cache.Row {
 	return rows
 }
 
-// TestSaveAvailabilityCache_CountsOnly_NeverDropsRows pins the counts-only rows-drop shape (D16)
+// TestSaveAvailabilityCache_CountsOnly_NeverDropsRows pins D16
 // directly against SaveAvailabilityCache (the counts-only write lane): an
 // existing TypeFile with 50 rows, followed by a counts-only exact
 // observation of count 55 (rowsProvided=false in reconcileTypeFile terms),
-// must keep the 50 existing rows verbatim and advance Count to 55 — NOT nuke
-// Rows to 0. RED at HEAD 9244f1b4: the counts-only path there drops Rows to
-// nil/0 whenever Count disagrees with len(Rows).
+// must keep the 50 existing rows verbatim and advance Count to 55 — never drop
+// Rows to nil/0 because Count disagrees with len(Rows).
 func TestSaveAvailabilityCache_CountsOnly_NeverDropsRows(t *testing.T) {
 	t.Setenv("A9S_CONFIG_FOLDER", t.TempDir())
 	const shortName = "countsonly"
@@ -306,8 +305,8 @@ func TestListPageSweepMenuSync_RowsSurviveAllThreeSaveLanes(t *testing.T) {
 		t.Fatalf("stage 1: TypeFile.Count = %d, want 55", tf.Count)
 	}
 
-	// Stage 2 — sweep lane: a rows-carrying SaveResourceListCache call with a
-	// genuine 50-row SUBSET of the 55 IDs already on disk (mirrors
+	// Sweep lane: a rows-carrying SaveResourceListCache call with a genuine
+	// 50-row SUBSET of the 55 IDs already on disk (mirrors
 	// saveProbeResourcesToTypeFiles observing fewer retained probe rows than
 	// the list screen's own fuller page-appended save).
 	sweepRows := make([]cache.Row, 50)
@@ -327,9 +326,9 @@ func TestListPageSweepMenuSync_RowsSurviveAllThreeSaveLanes(t *testing.T) {
 		t.Fatalf("stage 2: TypeFile.Rows has %d entries, want 55 — the sweep lane's shallower subset save must not regress the list screen's fuller 55-row save", len(tf.Rows))
 	}
 
-	// Stage 3 — counts-only menu-sync: SaveAvailabilityCache observes an
-	// exact count of 55 (agreeing with what's already on disk, but via the
-	// counts-only lane) — the file must still have 55 rows AND count 55.
+	// Counts-only menu-sync: SaveAvailabilityCache observes an exact count of
+	// 55 (agreeing with what's already on disk, but via the counts-only lane)
+	// — the file must still have 55 rows AND count 55.
 	if err := core.SaveAvailabilityCache(core.Pair(),
 		map[string]int{shortName: 55},
 		map[string]bool{shortName: false},

@@ -1,25 +1,14 @@
-// app_pilot_defects_test.go — RED pins for the seven root-caused defects
-// found by the live S3 pilot (docs/design/cache-requirements.md §4), which
-// FAILED 6/12 acceptance steps. Each defect below is pinned at the
-// controller/runtime seam the coordinator's handoff identified. The contract
-// doc (docs/design/cache-requirements.md) is authoritative; comments below
-// cite the specific rule (C3/C4/C5/C6/C7) each pin locks in.
+// app_pilot_defects_test.go — pins for the seven defects found by the live S3
+// pilot (docs/design/cache-requirements.md §4), each at the controller/runtime
+// seam. The contract doc is authoritative; comments below cite the rule
+// (C3/C4/C5/C6/C7) each pin locks in.
 //
-// Investigation note (persisted-findings round-trip, C6): a static trace of the current committed
-// production wiring (core/app/handle.go's maybeSaveResourceListCache,
-// core/runtime/probes.go's SaveResourceListCache, and
-// core/runtime/handlers_availability.go's rowsFromCacheRows) shows
-// Findings ARE threaded through save (resource.Resource.Findings ->
-// cache.Row.Findings) and seed-back (cache.Row.Findings ->
-// resource.Resource.Findings) on the straightforward top-level list-open
-// path — this differs from the dispatch's literal description ("production
-// save writes rows as id/name/fields only"). TestSaveResourceListCache_
-// FindingsSurviveWiredSaveAndColdBootReseed below pins the full contract
-// end-to-end (save via the real wiring seam, reload from disk, reseed a
-// fresh controller, and assert both the raw Findings AND the render-derived
-// glyph/severity survive). If this comes back green, it stands as a
-// regression guard for a already-correct contract, not a defect pin, and
-// this is reported explicitly rather than pinning a fabricated red.
+// TestSaveResourceListCache_FindingsSurviveWiredSaveAndColdBootReseed pins C6
+// end-to-end: save via the real wiring seam (core/app/handle.go's
+// maybeSaveResourceListCache, core/runtime/probes.go's
+// SaveResourceListCache), reload from disk, reseed a fresh controller
+// (core/runtime/handlers_availability.go's rowsFromCacheRows), and assert
+// both the raw Findings AND the render-derived glyph/severity survive.
 package unit_test
 
 import (
@@ -40,8 +29,8 @@ import (
 // transport when the target screen is already renderable (cached rows
 // seeded, or the Loading shell already present).
 //
-// Pinned seam: a NEW function app.IsBackgroundFetchTask(req, screenAlready
-// Renderable) — a context-aware sibling of app.IsBackgroundTaskKind, taking
+// Pinned seam: app.IsBackgroundFetchTask(req, screenAlreadyRenderable) — a
+// context-aware sibling of app.IsBackgroundTaskKind, taking
 // the full runtime.TaskRequest plus an explicit "the screen the fetch
 // targets is already showing content" bool, so a KindFetchResources task can
 // be classified background exactly when the pilot's step 7 requires it
@@ -55,11 +44,10 @@ import (
 // TestIsBackgroundTaskKind_TableAllKnownKinds pin, and DrainSyncPartition's
 // isBackground func(runtime.TaskKind) bool parameter used for the other 4
 // kinds) completely untouched — no ripple into the generic partition
-// machinery's signature. A future coder wires web's handleAction to consult
-// IsBackgroundFetchTask specifically for KindFetchResources requests (kept
-// out of the generic isBackground callback passed to DrainSyncPartition,
-// since that callback only receives a TaskKind, not screen-renderability
-// context) before/instead of the existing IsBackgroundTaskKind check.
+// machinery's signature. web's handleAction consults IsBackgroundFetchTask
+// specifically for KindFetchResources requests (kept out of the generic
+// isBackground callback passed to DrainSyncPartition, since that callback
+// only receives a TaskKind, not screen-renderability context).
 // -----------------------------------------------------------------------
 
 // TestIsBackgroundFetchTask_CachedRowsSeeded_IsBackground pins the new
@@ -126,12 +114,12 @@ func TestWebBoot_WarmListOpen_FetchTaskDeferredAsBackground(t *testing.T) {
 
 	// Seed a REAL on-disk per-type file for s3 so the cache-first list-open
 	// path (NavigateKindPushResourceList's RowStore/OriginDisk seed) has
-	// genuine row data to seed from — mirrors a warm boot per pilot step 5.
-	// task #17 wave 1 stage 2 / C6a: a counts-only AvailabilityCacheLoaded
-	// with no real disk row data never fabricates placeholder Rows (see
+	// genuine row data to seed from — a warm boot per pilot step 5. C6a: a
+	// counts-only AvailabilityCacheLoaded with no real disk row data never
+	// fabricates placeholder Rows (see
 	// TestWebBoot_AvailabilityCacheLoaded_CountsOnlyFallback_KeepsLoadingTrue
 	// in app_web_live_cold_boot_test.go), so this test needs a real store to
-	// exercise a genuinely-renderable warm open.
+	// exercise a renderable warm open.
 	store := core.EnsureCacheStore()
 	if store == nil {
 		t.Fatal("core.EnsureCacheStore() = nil — test fixture requires a live disk store to seed rows into")
@@ -372,7 +360,7 @@ func TestSaveResourceListCache_FindingsSurviveWiredSaveAndColdBootReseed(t *test
 // refetch must not shrink previously-persisted rows nor leave count/rows
 // inconsistent with the header's exact flag.
 //
-// Contract choice for (b), stated explicitly per the dispatch's instruction:
+// Contract for (b):
 // mirroring C5's exactness rule, the FULLER row set (from a prior exact
 // fetch) is kept until a new EXACT refetch replaces it — a truncated refetch
 // must not truncate previously-persisted rows, and Count/len(Rows)/Exact
@@ -635,22 +623,15 @@ func TestMenuEntry_Origin_CacheBeforeVerification_FlipsOnAvailabilityChecked(t *
 // -----------------------------------------------------------------------
 // C7/C8 — a background availability sweep's probe + Wave-2
 // enrichment completion must persist that type's per-row rows/findings to
-// disk WITHOUT any list screen ever having been opened. Today only
-// SaveAvailabilityCache (counts-only, no rows) runs from the
-// TaskKindSaveCache executor case; SaveResourceListCache (which carries
-// rows) is only ever called from maybeSaveResourceListCache, reachable
-// solely through the list-open -> applyResourcesLoaded -> syncExactTotalToMenu
-// chain in core/app/handle.go.
+// disk WITHOUT any list screen ever having been opened: the
+// TaskKindSaveCache executor case carries rows, not only the counts-only
+// SaveAvailabilityCache, so persistence does not depend on the list-open ->
+// applyResourcesLoaded -> syncExactTotalToMenu chain in core/app/handle.go.
 //
-// The sanity-gap addendum (a TypeFile whose Rows length contradicts Count)
-// is SKIPPED per the dispatch's explicit instruction: C7 describes each
-// type's file as self-contained and self-healing on the next successful
-// save (a corrupt/inconsistent file degrades to "no cache" for that type
-// only, per C7's own unreadable-file rule) — a live mismatch CHECK inside a
-// TypeFile is implementation-defensive scope the contract doc does not
-// require, and there is no existing seam (encode/decode chokepoint) this QA
-// pass is scoped to touch to add one. Noting the decision here rather than
-// silently omitting it.
+// A TypeFile whose Rows length contradicts Count is not checked here: C7
+// describes each type's file as self-contained and self-healing on the next
+// successful save (a corrupt/inconsistent file degrades to "no cache" for
+// that type only, per C7's own unreadable-file rule).
 // -----------------------------------------------------------------------
 
 // TestAvailabilitySweepAndEnrichment_PersistsRowsPerType_WithoutAnyListOpen
@@ -739,39 +720,28 @@ func TestAvailabilitySweepAndEnrichment_PersistsRowsPerType_WithoutAnyListOpen(t
 }
 
 // -----------------------------------------------------------------------
-// Open-list findings persistence (C6) — Wave-2 findings applied to an OPEN live list must reach the
-// persisted per-type cache. Verified live (last gap before the S3-pilot
-// rerun): applyEnrichment (core/runtime/helpers.go, driven from
-// Core.handleEnrichmentChecked via the real messages.EnrichmentChecked
-// event) mutates findings into session.ResourceCache / LazyResourceCache /
-// ProbeResources only. Separately, PatchResourceList's intent handler
-// (core/app/intents.go) stores the SAME findings into the controller's
-// own c.enrichmentStore map (applyEnrichmentState) — a parallel
-// id->domain.Finding lookup used only by GetListEnrichmentFindings for glyph
-// rendering. Neither of those two writes ever touches ls.Rows[i].Findings or
-// c.resourceCache[type][i].Findings, which is what
-// maybeSaveResourceListCache (core/app/handle.go) reads when persisting
-// (Findings: r.Findings, copied straight from ls.Rows). Net effect on a real
-// account: s3.yaml carries issues:5 in the header and every row with ZERO
-// findings — a cold-boot reseed then has nothing for the already-green
-// render-time classification to classify, so no glyphs render.
+// Open-list findings persistence (C6) — Wave-2 findings applied to an OPEN
+// live list must reach the persisted per-type cache. applyEnrichment
+// (core/runtime/helpers.go, driven from Core.handleEnrichmentChecked via the
+// real messages.EnrichmentChecked event) mutates findings into
+// session.ResourceCache / LazyResourceCache / ProbeResources, and
+// PatchResourceList's intent handler (core/app/intents.go) stores the SAME
+// findings into the controller's own c.enrichmentStore map
+// (applyEnrichmentState) for glyph rendering; the controller's
+// enrichment-application seam must ALSO write findings onto ls.Rows, because
+// maybeSaveResourceListCache (core/app/handle.go) reads Findings straight
+// off ls.Rows when persisting. Otherwise s3.yaml carries issues:5 in the
+// header and every row with ZERO findings, and a cold-boot reseed has
+// nothing for the render-time classification to classify, so no glyphs
+// render.
 //
 // This differs from the persisted-findings round-trip pin above, which covers
-// findings that arrive ALREADY
-// baked onto the Resource passed to ApplyResourcesLoaded (the Wave-1 initial
-// load). This section pins the Wave-2 path: rows land with NO findings, enrichment
-// is applied afterward through the production EnrichmentChecked seam, and
-// only THEN is the list-open save re-triggered — exactly the sequence a live
-// account produces (fetch, then a later enrichment probe).
-//
-// Contract note for the fix: the controller's enrichment-application seam
-// (PatchResourceList's intent case in core/app/intents.go, alongside its
-// existing applyEnrichmentState + applyListFieldUpdates calls) must ALSO
-// write findings onto the controller's own row stores (ls.Rows +
-// c.resourceCache) — the same explicit dual-store propagation pattern
-// ClearRowFindings (list_body.go) already established for the clearing
-// direction. Persisting then needs no special logic: maybeSaveResourceListCache
-// already reads Findings straight off ls.Rows.
+// findings that arrive ALREADY baked onto the Resource passed to
+// ApplyResourcesLoaded (the Wave-1 initial load). This section pins the
+// Wave-2 path: rows land with NO findings, enrichment is applied afterward
+// through the production EnrichmentChecked seam, and only THEN is the
+// list-open save re-triggered — exactly the sequence a live account produces
+// (fetch, then a later enrichment probe).
 // -----------------------------------------------------------------------
 
 // TestEnrichmentChecked_OpenList_FindingsReachPersistedCacheAndColdBootGlyph
@@ -784,7 +754,7 @@ func TestAvailabilitySweepAndEnrichment_PersistsRowsPerType_WithoutAnyListOpen(t
 // then assert the persisted TypeFile's Rows carry the finding for the
 // flagged row. A second assertion cold-boots a fresh controller from that
 // same on-disk pair and asserts the seeded row renders with a non-empty
-// Severity — the already-green render-time classification machinery, closing the loop end to end.
+// Severity — the render-time classification, closing the loop end to end.
 func TestEnrichmentChecked_OpenList_FindingsReachPersistedCacheAndColdBootGlyph(t *testing.T) {
 	tmp := t.TempDir()
 	t.Setenv("A9S_CONFIG_FOLDER", tmp)
@@ -856,7 +826,7 @@ func TestEnrichmentChecked_OpenList_FindingsReachPersistedCacheAndColdBootGlyph(
 
 	// Cold-boot half: a brand-new controller for the SAME pair must seed the
 	// list-open with the persisted row's Findings intact, closing the loop to
-	// the already-green render-time classification.
+	// the render-time classification.
 	s2 := session.New()
 	s2.Profile = "pilot-enrichchecked-prof"
 	s2.Region = "us-east-1"

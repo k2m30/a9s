@@ -1,6 +1,6 @@
 package unit
 
-// aws_r53_notfound_classification_test.go — issue #456: a hosted zone
+// aws_r53_notfound_classification_test.go — a hosted zone
 // deleted between ListHostedZones and enrichment must not spam the r53
 // failure aggregate. GetHostedZone on a deleted zone can surface either as
 // the typed *route53/types.NoSuchHostedZone error or as the generic
@@ -11,8 +11,7 @@ package unit
 // code (e.g. AccessDenied) must still aggregate exactly as before.
 //
 // Reuses r53GetHostedZoneFake / r53ZoneResources / r53ZoneID1 / r53ZoneID2
-// from aws_r53_enricher_test.go (same package unit) — no new fakes needed,
-// only new entries in the fake's pre-existing errByID map.
+// from aws_r53_enricher_test.go (same package unit).
 
 import (
 	"context"
@@ -89,10 +88,9 @@ func TestEnrichRoute53Zone_AccessDenied_StillAggregates(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected non-nil composite error for AccessDenied; NoSuchHostedZone silent-truncation must not swallow other errors")
 	}
-	// INVERTED for the "skipped" spec row 6: the label carried the type, so
-	// the rendered line said it twice ("enrich r53: r53-enrich: ..."). The type
-	// comes from the registry key at the surface; the aggregate names the
-	// call. Do not restore the type in the label.
+	// The aggregate names the call, not the type: the type comes from the
+	// registry key at the surface, and a type in the label would render it
+	// twice ("enrich r53: r53-enrich: ...").
 	if !strings.Contains(err.Error(), "GetHostedZone") {
 		t.Errorf("composite error must name the call, GetHostedZone, got: %q", err.Error())
 	}

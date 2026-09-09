@@ -58,7 +58,7 @@ func TestHandleThemeSelected_InvalidThemeName(t *testing.T) {
 // whose filename is syntactically valid but missing on disk surfaces a
 // "Cannot read theme: …" FlashMsg to the user.
 //
-// PR-05a-h4-a (AS-769) split the theme-selected flow into two round trips:
+// The theme-selected flow is two round trips:
 // ThemeSelected → TaskKindReadThemeFile dispatch → messages.ThemeFileRead →
 // HandleThemeFileRead → FlashIntent (error). The test drives both steps:
 // the first cmd produces messages.ThemeFileRead{Err: ...}; feeding that

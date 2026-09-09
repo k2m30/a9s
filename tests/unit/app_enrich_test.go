@@ -347,24 +347,20 @@ func TestEnrichResult_ErrorShowsFlashMessage(t *testing.T) {
 	})
 
 	view := stripANSI(rootViewContent(m))
-	// INVERTED by spec row 6 (task "errors"): the flash now names the type it
-	// failed to enrich, through the one formatter, instead of the bare
-	// "enrich failed". Do not restore the old literal.
+	// The flash names the type it failed to enrich, through the one formatter.
 	if !strings.Contains(view, "enrich role_policies:") {
 		t.Errorf("expected view to show the 'enrich role_policies' flash, got:\n%s", view)
 	}
 }
 
 // TestEnrichResult_ErrorFlash_AdvancesGenSoStalePendingTickCannotClearIt pins
-// #261's flash-lifecycle fix: dispatchDetailOpResultIntents
-// (internal/tui/runtime_adapter_resources.go) used to direct-mutate m.flash
-// for an enrichment-error FlashIntent, so flash.gen was never bumped — a
-// tick already pending from an EARLIER flash (stamped with the OLD gen)
-// could then clear the brand-new error almost immediately, and no
-// error-history entry was ever recorded (the entry is made where the flash is
-// applied to the controller, which only the routed path does). It now bumps m.flash.gen and
-// routes through Core.HandleFlash + dispatchHandlerResult — the same path
-// messages.Flash itself takes.
+// the flash lifecycle: dispatchDetailOpResultIntents
+// (internal/tui/runtime_adapter_resources.go) bumps m.flash.gen for an
+// enrichment-error FlashIntent and routes through Core.HandleFlash +
+// dispatchHandlerResult, the same path messages.Flash takes. A tick already
+// pending from an EARLIER flash (stamped with the old gen) must not clear the
+// new error, and the error-history entry is recorded where the flash is
+// applied to the controller.
 func TestEnrichResult_ErrorFlash_AdvancesGenSoStalePendingTickCannotClearIt(t *testing.T) {
 	m := newEnrichApp(t)
 
@@ -411,9 +407,6 @@ func TestEnrichResult_ErrorFlash_AdvancesGenSoStalePendingTickCannotClearIt(t *t
 	m, _ = rootApplyMsg(m, messages.ClearFlash{Gen: genBefore})
 
 	view := stripANSI(rootViewContent(m))
-	// INVERTED by spec row 6 (task "errors"): same wording change; what this
-	// test is about — a stale ClearFlash must not wipe the new error flash —
-	// is unchanged.
 	if !strings.Contains(view, "enrich role_policies:") {
 		t.Errorf("a stale ClearFlash stamped with the PRE-error gen (%d) cleared the new error flash (now at gen %d) — the gen bump must make them distinct. View:\n%s", genBefore, genAfter, view)
 	}
@@ -796,9 +789,7 @@ func TestDetailOperationTasks_NoEnricher_ReturnsNilEnrichTask(t *testing.T) {
 // Verifies that Core.BeginDetailOperation builds a non-nil enrich task when
 // an enricher is registered, and that executing it (Core.ExecuteTaskAt)
 // produces an EnrichDetailResult carrying the correct ResourceType and
-// ResourceID. (BeginDetailOperation folded the former separate
-// DetailOperationTasks call into its own return values — #261
-// boundary-sealing wave.)
+// ResourceID.
 // ---------------------------------------------------------------------------
 
 func TestDetailOperationTasks_WithEnricher_ExecutesToEnrichDetailResult(t *testing.T) {

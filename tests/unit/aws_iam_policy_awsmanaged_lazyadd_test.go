@@ -3,9 +3,9 @@ package unit
 // Regression pins for the AWS-managed IAM policy lazy-add path
 // (core/aws/iam_policies.go getAWSManagedPolicyByName / managedPolicyToResource):
 //   - service-linked-role policies live under arn:aws:iam::aws:policy/aws-service-role/
-//     and must be probed (Codex review #5).
+//     and must be probed.
 //   - AWS-managed policies resolved on demand must carry policy_type "aws-managed",
-//     not "managed", so callers can distinguish them from customer-managed (review #6).
+//     not "managed", so callers can distinguish them from customer-managed.
 
 import (
 	"context"

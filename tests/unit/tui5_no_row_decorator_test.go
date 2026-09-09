@@ -19,9 +19,10 @@ import (
 	"testing"
 )
 
-// rowDecoratorNames are the spellings the deleted plumbing went by. The
-// surviving CellDecorators — a per-column cell-value transform, a different
-// mechanism with live registrations — is deliberately not among them.
+// rowDecoratorNames are the spellings a row-decorator plumbing would go by.
+// The surviving CellDecorators — a per-column cell-value transform, a
+// different mechanism with live registrations — is deliberately not among
+// them.
 var rowDecoratorNames = []string{"RowDecorator", "DecoratorNormal", ".Decorator"}
 
 // TestNoRowDecoratorPlumbing walks every production file and asserts none of

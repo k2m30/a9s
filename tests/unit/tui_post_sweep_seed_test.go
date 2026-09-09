@@ -1,27 +1,19 @@
-// tui_post_sweep_seed_test.go — RED regression tests for the post-sweep
-// disk-store fallback, D12 (C1 systemic follow-on to the warm-open seed, D9).
+// tui_post_sweep_seed_test.go — the post-sweep disk-store fallback, D12 (C1
+// systemic follow-on to the warm-open seed, D9).
 //
-// Root cause: handleEnrichmentChecked (core/runtime/handlers_availability.go,
-// "All enrichment done" branch, ~L494-507) nils c.session.ProbeResources /
+// handleEnrichmentChecked (core/runtime/handlers_availability.go, "All
+// enrichment done" branch) nils c.session.ProbeResources /
 // c.session.ProbeTruncated once Wave-2 enrichment completes (EnrichChecked >=
 // EnrichTotal), AFTER snapshotting them for the cache save. HandleNavigate's
 // cache-MISS seed branch (handlers_navigate.go NavigateTargetResourceList
-// case, ~L160-167) reads ONLY session.ProbeResources[canon] to populate
-// NavigateResult.CachedEntry — it never falls back to the on-disk per-type
-// Store (session.EnsureCacheStore()/store.Type(canon)), even though that
-// Store outlives the post-sweep free and holds the exact same rows the sweep
-// itself just persisted via TaskKindSaveCache.
-//
-// Symptom: any list opened AFTER the background availability+enrichment
-// sweep has fully completed renders a bare "Loading..." shell, even though
-// the disk cache for that type is fully populated and fresh (it was written
-// by this very sweep).
-//
-// Target behavior (coder, parallel dispatch): HandleNavigate's miss-branch
-// seed falls back ProbeResources -> loaded per-type disk store rows
-// (equivalent of rowsFromCacheRows + IsTruncated: !tf.Exact) when
-// ProbeResources holds nothing for the type. All navigation entry points
-// (menu Enter, TUI colon-command, -c armed command) funnel through this same
+// case) therefore falls back ProbeResources -> loaded per-type disk store
+// rows (session.EnsureCacheStore()/store.Type(canon), the equivalent of
+// rowsFromCacheRows + IsTruncated: !tf.Exact) when ProbeResources holds
+// nothing for the type: that Store outlives the post-sweep free and holds
+// the exact same rows the sweep itself just persisted via TaskKindSaveCache,
+// so a list opened AFTER the background sweep completes renders those rows,
+// not a bare "Loading..." shell. All navigation entry points (menu Enter,
+// TUI colon-command, -c armed command) funnel through this same
 // HandleNavigate seed.
 //
 // Harness precedents:
@@ -85,8 +77,8 @@ func seedDiskStoreWithS3Rows(t *testing.T, profile, region string) *cache.Store 
 
 // ────────────────────────────────────────────────────────────────────────────
 // Test 1 — runtime level: HandleNavigate post-sweep must seed CachedEntry
-// from RowStore's retained rows (RowStore is never freed post-sweep, task
-// #17 wave 1 stage 2), which in this fixture match the disk store's rows.
+// from RowStore's retained rows (RowStore is never freed post-sweep), which
+// in this fixture match the disk store's rows.
 // ────────────────────────────────────────────────────────────────────────────
 
 // TestPostSweepWarmOpen_SeedsFromStore pins the disk-store fallback at the Core.HandleNavigate
@@ -101,12 +93,10 @@ func seedDiskStoreWithS3Rows(t *testing.T, profile, region string) *cache.Store 
 // against it in this harness) so EnrichChecked(1) >= EnrichTotal(1) fires
 // the "all enrichment done" branch on this very call.
 //
-// task #17 wave 1 stage 2 removed the legacy free that branch used to
-// perform (session.ProbeResources/ProbeTruncated no longer exist; RowStore
-// retains its rows for the session unconditionally — see RowStore.Amend's
-// doc comment). The precondition below instead confirms RowStore has
-// genuinely been observed for s3 with the AvailabilityChecked-landed rows,
-// so the seed the assertions inspect provably reflects a completed
+// RowStore retains its rows for the session unconditionally (see
+// RowStore.Amend's doc comment). The precondition below confirms RowStore
+// has genuinely been observed for s3 with the AvailabilityChecked-landed
+// rows, so the seed the assertions inspect provably reflects a completed
 // post-sweep state.
 //
 // A post-sweep list-open must seed CachedEntry from RowStore's retained
@@ -165,12 +155,10 @@ func TestPostSweepWarmOpen_SeedsFromStore(t *testing.T) {
 		_, _ = core.HandleEvent(messages.EnrichmentChecked{ResourceType: "s3"})
 	}
 
-	// Precondition: task #17 wave 1 stage 2 removed the legacy
-	// "all-enrichment-done" free this test used to prove fired here (RowStore
-	// now retains its rows for the session unconditionally — see RowStore.
-	// Amend's doc comment). Confirm instead that RowStore has genuinely been
-	// observed for s3 (Gen != 0) with the same rows the sweep landed, so the
-	// seed the assertions below inspect is demonstrably sourced from a
+	// Precondition: RowStore retains its rows for the session unconditionally
+	// (see RowStore.Amend's doc comment). Confirm that RowStore has genuinely
+	// been observed for s3 (Gen != 0) with the same rows the sweep landed, so
+	// the seed the assertions below inspect is demonstrably sourced from a
 	// completed post-sweep state, not an untouched fixture.
 	if tr := core.Session().RowStore.Snapshot("s3"); tr.Gen == 0 || len(tr.Rows) != 2 {
 		t.Fatalf("fixture assumption broken: RowStore.Snapshot(s3) = %+v, want Gen != 0 with 2 rows after driving to post-sweep completion", tr)
@@ -260,16 +248,14 @@ func driveToPostSweepState(m tui.Model, region string) tui.Model {
 // (driveToPostSweepState's own AvailabilityChecked delivery), not the bare
 // "Loading..." shell.
 //
-// task #17 wave 1 stage 2 removed the legacy free HandleNavigate's
-// disk-store fallback depended on (session.ProbeResources/ProbeTruncated no
-// longer exist; RowStore retains its rows for the session unconditionally —
-// see RowStore.Amend's doc comment). RowStore's own retained rows (the
-// AvailabilityChecked-landed "def15-tui-bucket-*" rows) are therefore always
-// what a post-sweep list-open seeds from; the on-disk store seeded here
-// carries deliberately DIFFERENT row names ("def15-store-bucket-*") so this
-// test can distinguish "rendered from RowStore" from "rendered from disk" —
-// see TestPostSweepWarmOpen_SeedsFromStore for the disk-fallback path
-// (reachable only when RowStore was never observed this session).
+// RowStore retains its rows for the session unconditionally (see
+// RowStore.Amend's doc comment), so RowStore's own retained rows (the
+// AvailabilityChecked-landed "def15-tui-bucket-*" rows) are always what a
+// post-sweep list-open seeds from; the on-disk store seeded here carries
+// deliberately DIFFERENT row names ("def15-store-bucket-*") so this test can
+// distinguish "rendered from RowStore" from "rendered from disk" — see
+// TestPostSweepWarmOpen_SeedsFromStore for the disk-fallback path (reachable
+// only when RowStore was never observed this session).
 func TestPostSweepWarmOpen_TUI_RendersRows(t *testing.T) {
 	t.Setenv("A9S_CONFIG_FOLDER", t.TempDir())
 	const profile, region = "sweep-tui-profile", "us-east-1"
@@ -489,28 +475,21 @@ func TestPairSwitch_PostSweep_NoStaleSeed(t *testing.T) {
 
 // ────────────────────────────────────────────────────────────────────────────
 // Test 6/7 — the observed-empty guard on the disk-store fallback's own seed:
-// an observed-empty probe result
-// this session must NOT fall back to stale disk-store rows.
+// an observed-empty probe result this session must NOT fall back to stale
+// disk-store rows.
 //
-// Storage-shape finding (dispatch item 3): handleAvailabilityChecked
-// (core/runtime/handlers_availability.go L233-274) stores into
-// session.ProbeResources[canonType] whenever "msg.Err == nil ||
-// len(msg.Resources) > 0" (L240). For a genuinely-empty type the live probe
-// sends Err=nil, Resources=nil/empty, HasResources=false, Count=0 — Err==nil
-// alone satisfies the guard, so the store DOES run:
-// session.ProbeResources[canon] = msg.Resources (nil/empty slice). The map
-// key is therefore PRESENT with a zero-length slice, not absent. This is the
-// exact shape HandleNavigate's fallback must distinguish via a two-value map
-// read (observed bool) rather than a bare "len(rows) > 0" truthiness check.
-// No gap: the zero-resource path is reachable through the real handler with
-// real message fields, driven below via Core.HandleEvent(AvailabilityChecked)
+// Storage shape: handleAvailabilityChecked
+// (core/runtime/handlers_availability.go) stores a type's rows whenever
+// "msg.Err == nil || len(msg.Resources) > 0". For a genuinely-empty type the
+// live probe sends Err=nil, Resources=nil/empty, HasResources=false, Count=0
+// — Err==nil alone satisfies the guard, so the store DOES run with a
+// zero-length slice: the type is observed, not absent. HandleNavigate's
+// fallback must distinguish that via the observed flag rather than a bare
+// "len(rows) > 0" truthiness check, which an observed-empty slice fails
+// identically to an absent key, falling through to the disk-store branch and
+// seeding stale rows for a type the current session just confirmed is empty.
+// The zero-resource path is driven below via Core.HandleEvent(AvailabilityChecked)
 // exactly as production code would emit it.
-//
-// P2 defect (pre-fix, working tree at time of writing): HandleNavigate read
-// "if rows := c.session.ProbeResources[canon]; len(rows) > 0" — an
-// observed-empty slice fails that truthiness check identically to an absent
-// key, so execution falls through to the disk-store branch and seeds stale
-// rows for a type the current session just confirmed is empty.
 // ────────────────────────────────────────────────────────────────────────────
 
 // TestObservedEmpty_DoesNotSeedStaleDiskRows pins the P2 fix at the

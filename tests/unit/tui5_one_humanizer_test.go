@@ -357,8 +357,7 @@ func TestOneHumanizer_DetailRowReadsTheColumnsWords(t *testing.T) {
 				if lc.Path != tc.label {
 					continue
 				}
-				// INVERTED for aws6 rows 4-6: the humanize opt-in is the
-				// type's declaration, not the column's.
+				// The humanize opt-in is the type's declaration, not the column's.
 				humanized := td.HumanizedFields()
 				cell = app.ExtractCellValue(app.ColumnDef{
 					Key: lc.Key, Title: lc.Title, Width: lc.Width, Path: lc.Path,

@@ -429,8 +429,8 @@ func TestW4RoleInlinePrivilegeEscalation(t *testing.T) {
 	}
 	r := w4FetchRole(t, fake, "acme-inline-escalate-role")
 
-	// Inverted for spec row "phrase": the combo moved from the phrase into the
-	// Combo rows, one per escalation combination. Do not restore the old phrase.
+	// The combo is in the Combo rows, one per escalation combination, not in
+	// the phrase.
 	w4AssertFinding(t, r.Findings, w4CodeRoleInlinePrivEsc,
 		catalog.Phrase(w4CodeRoleInlinePrivEsc), domain.SevBroken, "wave1")
 	w4AssertRows(t, r.AttentionDetails, w4CodeRoleInlinePrivEsc, []domain.DetailRow{
@@ -463,12 +463,8 @@ func TestW4RoleInlinePrivEscNegatives(t *testing.T) {
 	// A role whose inline policies cannot be listed is unknown, not clean and
 	// not flagged: an API failure must never read as a verdict.
 	//
-	// INVERTED by codex2 row 2 (Codex finding 3): this used to go through
-	// w4FetchRole, which fatals on any error, and so asserted that the page
-	// came back CLEAN from a refused call. That silence was the defect. The
-	// page now carries the failure on its own lane and the role's
-	// policy-derived facts read "?" — do not restore the fatal-on-error
-	// helper here.
+	// Not w4FetchRole, which fatals on any error: the page carries the failure
+	// on its own lane and the role's policy-derived facts read "?".
 	t.Run("list_inline_policies_fails", func(t *testing.T) {
 		fake := &w4RoleListFake{
 			roles:   []iamtypes.Role{w4Role("acme-denied-role", "/", w4TrustEC2Only)},
@@ -591,10 +587,8 @@ func TestW4RoleAdminAttachedAPIErrorIsUnknown(t *testing.T) {
 		w4RoleResource("acme-denied-role", "/"),
 		w4RoleResource("acme-ops-admin-role", "/"),
 	}, nil)
-	// INVERTED by codex2 round 4: EnrichIAMRoleLastUsed dropped its failure
-	// list, so this asserted nil for a DENIED call. The row is uninspected AND
-	// the denial is reported; only a vanished resource stays out of the
-	// aggregate. Do not restore the nil-error assertion.
+	// A denied call reaches the operator through the composite error AND the
+	// row is uninspected; only a vanished resource stays out of the aggregate.
 	if err == nil {
 		t.Fatal("a denied ListAttachedRolePolicies must reach the operator through the composite error")
 	}

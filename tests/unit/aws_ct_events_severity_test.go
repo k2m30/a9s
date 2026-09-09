@@ -4,10 +4,8 @@ package unit
 //
 // Each test builds a cloudtrailtypes.Event with a hand-crafted CloudTrailEvent
 // JSON string, fetches it via FetchCloudTrailEventsPage, and asserts
-// Resource.Status matches the expected value from §1.2.
-//
-// These tests are expected to FAIL until the P1 coder rewrites buildCTResource
-// in core/aws/ct_events.go to implement the three-tier severity model.
+// Resource.Status matches the expected value from §1.2 (buildCTResource in
+// core/aws/ct_events.go, the three-tier severity model).
 
 import (
 	"context"

@@ -87,8 +87,8 @@ func TestScenario_LTVisual(t *testing.T) {
 	scenario.ExpectRowStatusEquals(ltNameIMDSv1Default, ltPhraseIMDSv1)
 	scenario.ExpectRowStatusEquals(ltNameUnencrypted, ltPhraseUnencrypted)
 	// The enricher-borne background check: Warning-colored row + phrase
-	// (owner ruling 2026-07-15 — color derives from findings uniformly;
-	// the `~` class only keeps it out of the S1 badge).
+	// (colour derives from findings uniformly; the `~` class only keeps it out
+	// of the S1 badge).
 	scenario.ExpectRowStatusEquals(ltNameDeprecatedAMI, ltPhraseDeprecatedAMI)
 
 	// Listed-but-denied template: rich degraded row — list fields kept,

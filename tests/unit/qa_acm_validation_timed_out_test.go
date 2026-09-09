@@ -1,22 +1,14 @@
 package unit
 
-// qa_acm_validation_timed_out_test.go — ACM certificate status no longer
-// colours a row on its own.
+// qa_acm_validation_timed_out_test.go — ACM certificate status does not
+// colour a row on its own.
 //
-// INVERTED for batch w6a. This file used to hold six one-status tests pinning
-// the raw-field switch in acmColor: VALIDATION_TIMED_OUT, EXPIRED, REVOKED and
-// FAILED to Broken, PENDING_VALIDATION to Warning, INACTIVE to Dim. That
-// switch is gone. Colour derives from findings only, so a resource carrying no
-// findings is Healthy whatever its status field says, and each of these states
-// is reported by the finding the ACM fetcher emits for it.
-//
-// The six statuses are kept as one table because the enumeration is the point:
-// each one must stay uncoloured on the bare-Fields path. Do not "restore" the
-// old expectations — a raw-field branch coming back is what this now catches.
-//
-// The original bug this file was opened for (VALIDATION_TIMED_OUT falling
-// through to the default) is now impossible in the same way: every status
-// falls through, and the finding carries the severity.
+// Colour derives from findings only, so a resource carrying no findings is
+// Healthy whatever its status field says, and each of VALIDATION_TIMED_OUT,
+// EXPIRED, REVOKED, FAILED, PENDING_VALIDATION and INACTIVE is reported by
+// the finding the ACM fetcher emits for it. The six statuses are one table
+// because the enumeration is the point: each one must stay uncoloured on the
+// bare-Fields path.
 
 import (
 	"testing"

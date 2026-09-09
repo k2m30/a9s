@@ -346,7 +346,7 @@ func TestW3ELBPlainHTTP_ALBHTTPListenerFlagged(t *testing.T) {
 	if !ok {
 		t.Fatalf("HTTP listener forwarding to a target group produced no %s; findings=%+v", w3CodeELBPlainHTTP, res.Findings[r.ID])
 	}
-	// d4 row 26: one listener, so "port". Do not restore the plural.
+	// One listener, so "port", singular.
 	if want := "port 80 in the clear"; f.Phrase != want {
 		t.Errorf("Phrase = %q, want %q", f.Phrase, want)
 	}
@@ -387,13 +387,12 @@ func TestW3ELBPlainHTTP_RedirectToHTTPSIsHealthy(t *testing.T) {
 }
 
 // TestW3ELBPlainHTTP_NLBPortDecidesWhetherTCPIsInTheClear pins the
-// network-balancer half. Row 8 of the parse spec inverted the 443 case: a
-// network balancer forwarding TCP never reads what it forwards, so a listener
-// on 443 is TLS passthrough with the session terminating on the target, not
-// traffic in the clear. Warning about it was a false positive on every
-// passthrough balancer, and the old "443 is an exposure" assertion is not to
-// be restored. A TCP listener on a port nothing encrypts by convention is
-// still an exposure, which is what the 8080 half pins.
+// network-balancer half: a network balancer forwarding TCP never reads what
+// it forwards, so a listener on 443 is TLS passthrough with the session
+// terminating on the target, not traffic in the clear — warning about it
+// would be a false positive on every passthrough balancer. A TCP listener on
+// a port nothing encrypts by convention is still an exposure, which is what
+// the 8080 half pins.
 func TestW3ELBPlainHTTP_NLBPortDecidesWhetherTCPIsInTheClear(t *testing.T) {
 	r := w3ELBRes("acme-public-nlb", "network")
 	attrs := []elbtypes.LoadBalancerAttribute{
@@ -422,7 +421,7 @@ func TestW3ELBPlainHTTP_NLBPortDecidesWhetherTCPIsInTheClear(t *testing.T) {
 	if !ok {
 		t.Fatalf("NLB TCP listener on 8080 produced no %s; findings=%+v", w3CodeELBPlainHTTP, res.Findings[r.ID])
 	}
-	// d4 row 26: one listener, so "port". Do not restore the plural.
+	// One listener, so "port", singular.
 	if want := "port 8080 in the clear"; f.Phrase != want {
 		t.Errorf("Phrase = %q, want %q", f.Phrase, want)
 	}
@@ -476,11 +475,11 @@ func TestW3ELBWeakTLS_RetiredPoliciesFlagged(t *testing.T) {
 			if !ok {
 				t.Fatalf("SslPolicy %q produced no %s; findings=%+v", policy, w3CodeELBWeakTLS, res.Findings[r.ID])
 			}
-			// d3 row 18: the phrase names every offending port of the
-			// balancer at once, the way the cleartext phrase does, so a
-			// balancer with three weak listeners no longer reports one and
-			// hides the rest. One listener still reads as a list of one.
-			// d4 row 26: one listener, so "port". Do not restore the plural.
+			// The phrase names every offending port of the balancer at once, the
+			// way the cleartext phrase does, so a balancer with three weak
+			// listeners reports all of them. One listener still reads as a list
+			// of one.
+			// One listener, so "port", singular.
 			if want := "weak TLS policy on port 443"; f.Phrase != want {
 				t.Errorf("Phrase = %q, want %q", f.Phrase, want)
 			}
@@ -547,8 +546,7 @@ func TestW3ELBWeakTLS_AppliesToNLBTLSListener(t *testing.T) {
 	if !ok {
 		t.Fatalf("NLB TLS listener on a retired policy produced no %s; findings=%+v", w3CodeELBWeakTLS, res.Findings[r.ID])
 	}
-	// d3 row 18: ports, plural, however many there are.
-	// d4 row 26: one listener, so "port". Do not restore the plural.
+	// One listener, so "port", singular.
 	if want := "weak TLS policy on port 8443"; f.Phrase != want {
 		t.Errorf("Phrase = %q, want %q", f.Phrase, want)
 	}

@@ -84,7 +84,7 @@ func TestCostsUIPolish_RenderCosts_GridLinesExactWidth_NeverOverflow(t *testing.
 }
 
 // ===========================================================================
-// 2 — the footer never renders the removed "CE calls" element.
+// 2 — the footer renders no "CE calls" element.
 // ===========================================================================
 
 func TestCostsUIPolish_Footer_NeverContainsCECalls(t *testing.T) {

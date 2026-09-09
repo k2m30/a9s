@@ -41,8 +41,8 @@ import (
 // into (core/app/list_body.go's applyRowFindings). ListRow (the
 // Snapshot().Body.List projection) carries no AttentionDetails field, so the
 // in-memory RowStore-backed cache is the correct (and only) exported seam for
-// this assertion — chosen per the dispatch's fallback instruction after
-// confirming AttentionDetails is in-memory-only (never on cache.Row/TypeFile).
+// this assertion: AttentionDetails is in-memory-only (never on
+// cache.Row/TypeFile).
 // ────────────────────────────────────────────────────────────────────────────
 
 const (

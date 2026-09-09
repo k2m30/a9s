@@ -186,14 +186,9 @@ func TestUnifiedIssueCount_NeverExceedsUnionSize(t *testing.T) {
 		// (c.listScreenResources) and looks each one up by ID in the Wave-2
 		// findings map — a finding for an ID that was never loaded into this
 		// list can never be visited by that loop, so it can never bump the
-		// count. This is traced, deterministic production behavior (verified
-		// empirically against the real Controller), not an assumption:
-		// exact 0 is the correct oracle here, not CodeRabbit's proposed
-		// union-minus-healthy value of 5 — that number assumes
-		// GetListIssueCount aggregates across the whole account like the
-		// menu badge does, but the list-title count is bound to a single
-		// list's own row set and cannot see IDs outside it, no matter which
-		// resource type the findings claim.
+		// count. Exact 0 is the oracle: the list-title count is bound to a
+		// single list's own row set and cannot see IDs outside it, unlike the
+		// menu badge, which aggregates across the whole account.
 		resources := []resource.Resource{
 			{ID: "i-p01", Name: "page-instance-1", Fields: map[string]string{"name": "page-instance-1", "state": "running"}},
 			{ID: "i-p02", Name: "page-instance-2", Fields: map[string]string{"name": "page-instance-2", "state": "running"}},

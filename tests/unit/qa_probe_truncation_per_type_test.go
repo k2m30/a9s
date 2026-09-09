@@ -95,8 +95,8 @@ func TestBuildResourceCacheSnapshot_ProbeAuthoritative_SinglePageComplete(t *tes
 		IssueCounts:    map[string]int{targetType: 0},
 		IssueTruncated: map[string]bool{targetType: false},
 		Resources:      map[string][]resource.Resource{targetType: {probeResource}},
-		// Stamp the live AvailabilityGen so the AS-657/AS-659 staleness guard
-		// accepts the message (AcceptZeroGen=false after AS-659).
+		// Stamp the live AvailabilityGen so the staleness guard accepts the
+		// message (AcceptZeroGen=false).
 		Gen: m.Core().Session().AvailabilityGen,
 	})
 
@@ -195,8 +195,8 @@ func TestBuildResourceCacheSnapshot_ProbeTruncated_StampsTrue(t *testing.T) {
 		IssueCounts:    map[string]int{targetType: 0},
 		IssueTruncated: map[string]bool{targetType: true},
 		Resources:      map[string][]resource.Resource{targetType: {probeResource}},
-		// Stamp the live AvailabilityGen so the AS-657/AS-659 staleness guard
-		// accepts the message (AcceptZeroGen=false after AS-659).
+		// Stamp the live AvailabilityGen so the staleness guard accepts the
+		// message (AcceptZeroGen=false).
 		Gen: m.Core().Session().AvailabilityGen,
 	})
 

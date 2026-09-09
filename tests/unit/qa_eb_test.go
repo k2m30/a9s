@@ -66,10 +66,9 @@ func TestFetchEBEnvironments_ParsesMultipleEnvironments(t *testing.T) {
 	if r.ID != "e-abc123" {
 		t.Errorf("expected ID 'e-abc123', got %q", r.ID)
 	}
-	// Post-fold contract (PR-03b A2): EB fetcher must NOT write Status and must NOT
-	// emit wave1 Findings for health. Health classification stays structural via
-	// the Color func reading Fields["health"]. This is the post-fix pin — the coder
-	// fix removes health-as-wave1-finding from the fetcher.
+	// EB fetcher must NOT write Status and must NOT emit wave1 Findings for
+	// health. Health classification stays structural via the Color func
+	// reading Fields["health"].
 	if len(r.Findings) != 0 {
 		t.Errorf("expected 0 Findings for Green environment (health is structural, not wave1), got %d", len(r.Findings))
 	}

@@ -1,37 +1,21 @@
-// table_render_dead_mirror_ports_test.go — live-seam port, from the
-// 022-codebase-cleanup re-audit, for the internal/tui/views/table_render.go dead-mirror
-// foursome (phraseFromFindings, resolveIdentityColumn, lifecycleColumnKey,
-// widenLifecycleColumn): specs/022-codebase-cleanup/reaudit.md "port+delete:
-// table_render.go foursome ... Pinned only by two in-package test files
-// (resolve_identity_internal_test.go, widen_lifecycle_column_internal_test.go).
-// Port the cascade pins to app.IdentityColumnIndex tests and the widen pins
-// to renderListWidenLifecycleColumn, then delete."
+// table_render_dead_mirror_ports_test.go — pins for the two live production
+// seams behind identity-column resolution and lifecycle-column widening,
+// reachable from tests/unit/ as an external (package unit_test) black-box:
 //
-// Both dead functions are unexported (table_render.go, package views) and so
-// are their two pinning test files (internal/tui/views/*_internal_test.go) —
-// outside this agent's tests/unit/ write scope. This file re-pins their
-// behavior through the two LIVE production seams instead, both reachable
-// from tests/unit/ as an external (package unit_test) black-box:
-//
-//  1. IdentityColumnIndex (core/app/list_columns.go) — mirrors
-//     resolveIdentityColumn's 5-step cascade exactly (its own doc comment:
-//     "Cascade must match resolveIdentityColumn exactly"). Driven via a
-//     fully-controlled per-type config.ViewsConfig (GetViewDef replaces
-//     userDef.List wholesale, giving byte-for-byte control over each
-//     column's Key/Path/Title) + RegisterFallbackTypeDef (controls
-//     IdentityKey/Name), read back via Snapshot().Body.List.IdentityCol — the
-//     exported field buildListBody bakes IdentityColumnIndex's return into.
+//  1. IdentityColumnIndex (core/app/list_columns.go) — the 5-step identity
+//     cascade. Driven via a fully-controlled per-type config.ViewsConfig
+//     (GetViewDef replaces userDef.List wholesale, giving byte-for-byte
+//     control over each column's Key/Path/Title) + RegisterFallbackTypeDef
+//     (controls IdentityKey/Name), read back via
+//     Snapshot().Body.List.IdentityCol — the exported field buildListBody
+//     bakes IdentityColumnIndex's return into.
 //  2. renderListWidenLifecycleColumn (internal/tui/views/resourcelist.go) —
-//     NOT a byte-identical mirror of the dead widenLifecycleColumn (it widens
-//     from body.Rows[i].Cells verbatim, post-bake, not by re-deriving from
-//     r.Findings/r.Fields), so only the one pin with no live equivalent is
-//     ported: the AS-566 regression the dead test's own header names ("prior
-//     to this fix, widenLifecycleColumn measured only r.Findings[0].Phrase
-//     ... causing the column to truncate the displayed status"). The other
-//     three dead-test cases (single-finding, no-findings-fallback, ignores
-//     legacy Fields["status"]) are default list-render behavior already
-//     covered incidentally by every other RenderList-driven test in this
-//     package and are not re-pinned here.
+//     widens from body.Rows[i].Cells verbatim, post-bake, not by re-deriving
+//     from r.Findings/r.Fields. The one pin here is the stacked-findings
+//     width: the column is measured against the merged "<top> (+N)" phrase,
+//     not r.Findings[0].Phrase alone. Single-finding, no-findings-fallback
+//     and ignores-Fields["status"] are default list-render behavior covered
+//     by every other RenderList-driven test in this package.
 package unit_test
 
 import (
@@ -117,12 +101,10 @@ func TestResolveListIdentityCol_FallsThroughToNameKey(t *testing.T) {
 	}
 }
 
-// Inverted for w45 spec row 4, which deletes the path-substring election
-// step. "DBInstanceIdentifier" points at a name-shaped field; it does not make
-// its column the one that names the row, and electing it put the attention
-// marker on a foreign column. With the step gone the cascade reaches the
-// index-0 default. The old want of 2 asserts the deleted step and must not be
-// restored.
+// There is no path-substring election step: "DBInstanceIdentifier" points
+// at a name-shaped field; it does not make its column the one that names
+// the row, and electing it would put the attention marker on a foreign
+// column. The cascade reaches the index-0 default.
 func TestResolveListIdentityCol_PathIdentifierSubstringDoesNotElect(t *testing.T) {
 	td := resource.ResourceTypeDef{Name: "RDS Instances"}
 	cols := []config.ListColumn{
@@ -137,8 +119,7 @@ func TestResolveListIdentityCol_PathIdentifierSubstringDoesNotElect(t *testing.T
 	}
 }
 
-// Inverted for w45 spec row 4, as above: "FunctionName" in a path is a
-// substring, not a declaration. The old want of 1 asserts the deleted step.
+// As above: "FunctionName" in a path is a substring, not a declaration.
 func TestResolveListIdentityCol_PathNameSubstringDoesNotElect(t *testing.T) {
 	td := resource.ResourceTypeDef{Name: "Lambda Functions"}
 	cols := []config.ListColumn{
@@ -230,11 +211,9 @@ func TestResolveListIdentityCol_IdentityKeyNotFound_FallsToNameKey(t *testing.T)
 }
 
 // ===========================================================================
-// renderListWidenLifecycleColumn — AS-140/AS-566 regression: a narrow status
-// column must widen to fit the merged "<top> (+N)" phrase baked into
-// body.Rows[i].Cells by buildListBody, not truncate it. Port of
-// widen_lifecycle_column_internal_test.go's
-// TestWidenLifecycleColumn_StackedFindingsSizedToMergedPhrase.
+// renderListWidenLifecycleColumn — a narrow status column must widen to fit
+// the merged "<top> (+N)" phrase baked into body.Rows[i].Cells by
+// buildListBody, not truncate it.
 // ===========================================================================
 
 func TestRenderListWidenLifecycleColumn_StackedFindingsNotTruncated(t *testing.T) {
@@ -243,9 +222,7 @@ func TestRenderListWidenLifecycleColumn_StackedFindingsNotTruncated(t *testing.T
 		"ec2": {List: []config.ListColumn{
 			{Key: "@id", Title: "ID", Width: 20},
 			// Narrow on purpose: "stopped" (7 chars) fits, "stopped (+1)"
-			// (12 chars) does not — the AS-566 regression this pin guards.
-			// w197 row 11: ec2's status column names ec2's lifecycle key. It
-			// used to read "status" and be a status column by its title.
+			// (12 chars) does not. ec2's status column names ec2's lifecycle key.
 			{Key: "state", Title: "Status", Width: 8},
 		}},
 	}}

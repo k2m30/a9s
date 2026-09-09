@@ -1,22 +1,9 @@
-// rowstore_stage3_pins_test.go — pins for task #17 wave 1 Stage 3 (row-store
-// unification): session.ResourceCache + session.LazyResourceCache die;
-// PatchResourceCache/PatchLazyResourceCache intents target session.RowStore
-// (Observe/ObservePartial) instead of the two legacy maps; related lanes read
-// the store union (full-beats-partial). See
-// core/session/rowstore.go and the row-store unification plan
-// (rowstore-unification-plan.md, Stage 3 bullet).
+// rowstore_stage3_pins_test.go — session.RowStore is the one per-type row
+// store: PatchResourceCache/PatchLazyResourceCache intents target it
+// (Observe/ObservePartial), and related lanes read the store union
+// (full-beats-partial). See core/session/rowstore.go.
 //
-// Verified against HEAD 6d4ef1ce (Stage 2 landed, Stage 3 NOT yet landed):
-// session.ResourceCache/session.LazyResourceCache still exist and are still
-// the read path for core/runtime's related-navigation helpers
-// (relatedCacheSnapshot/relatedFetchTasks in handlers_related.go read those
-// two maps directly, never session.RowStore). Every pin below states its
-// honest RED/GREEN status at HEAD in its own doc comment; several are GREEN
-// today via Stage-1/Stage-2 groundwork and exist here purely as regression
-// guards against Stage 3 regressing what already works.
-//
-// Architect clarification incorporated (mid-dispatch correction): Partial is
-// a TYPE-LEVEL property on TypeRows, not a per-row tag.
+// Partial is a TYPE-LEVEL property on TypeRows, not a per-row tag.
 //   - (a) A type NEVER canonically observed (Observe/ObserveCount), whose only
 //     rows arrived via ObservePartial (the lazy-related-add lane): the whole
 //     TypeRows entry is Partial=true, and SnapshotAll(false) — the input to
@@ -72,18 +59,10 @@ func newRowStorePinsTestController(t *testing.T) (*session.Session, *runtime.Cor
 // (ObservePartialRows) for "ec2" — a real Wave-2-enricher-registered type
 // (core/aws/catalog_compute.go: Wave2: IssueEnricher{Fn:
 // EnrichEC2InstanceStatus}) — with NO prior canonical Observe/ObserveCount for
-// that type, then asserts "ec2" is absent from BuildEnrichQueue.
-//
-// HONEST STATUS AT HEAD (6d4ef1ce): RED. Core.BuildEnrichQueue
-// (core/runtime/probes.go:709-719) gates solely on
-// `c.session.RowStore.Snapshot(e.ShortName).Gen == 0` — it does NOT check
-// TypeRows.Partial. RowStore.ObservePartial (rowstore.go:272-289) always
-// bumps Gen (existing.Gen+1) even for a type that has never been Observed, so
-// a lazy-add-only type's Gen is 1, not 0, and it wrongly PASSES the
-// Gen==0 guard and enters the queue today. This is a genuine bug this pin
-// catches independent of Stage 3 landing — Stage 3's stated goal ("Partial
-// never enters BuildEnrichQueue... now enforced by one flag instead of a
-// separate map") is exactly the fix this pin expects.
+// that type, then asserts "ec2" is absent from BuildEnrichQueue: Partial
+// never enters BuildEnrichQueue, enforced by the TypeRows.Partial flag, not
+// only by Gen == 0 (RowStore.ObservePartial bumps Gen even for a type that
+// has never been Observed).
 func TestScopePoison_PartialOnlyType_NeverInEnrichQueue(t *testing.T) {
 	_, core, _ := newRowStorePinsTestController(t)
 
@@ -100,36 +79,28 @@ func TestScopePoison_PartialOnlyType_NeverInEnrichQueue(t *testing.T) {
 }
 
 // TestScopePoison_PartialOnlyType_VisibleInResourceCacheSnapshotButTruncated
-// pins the arbitrated boundary of BuildResourceCacheSnapshot, the merged view
+// pins the boundary of BuildResourceCacheSnapshot, the merged view
 // RELATED-lane checkers (NeedsTargetCache) consume: unlike BuildEnrichQueue
 // and SnapshotAll(false) (the disk-save lane), a Partial-only type MUST be
-// visible here, carrying its rows with the truncated marker set — this is
-// the load-bearing replacement for the deleted session.LazyResourceCache
-// merge that related-panel checkers relied on (see the sibling pin
+// visible here, carrying its rows with the truncated marker set — the merge
+// related-panel checkers rely on (see the sibling pin
 // TestBuildResourceCacheSnapshot_LazyOnlyTruncated in
 // tests/unit/qa_lazy_cache_snapshot_truncated_test.go, which exercises the
 // same contract end-to-end through a real NeedsTargetCache checker).
 //
-// Architect arbitration (final, this file's original HONEST STATUS was
-// wrong): BuildResourceCacheSnapshot reads
-// `s.RowStore.SnapshotAll(true)` (includePartial), not SnapshotAll(false) —
-// see probes.go's own doc comment ("Backed entirely by RowStore... a type's
-// rows live in exactly one RowStore entry regardless of which lane wrote
-// them"). It skips only Gen == 0 (never observed at all); ObservePartial
-// always bumps Gen off zero, so a Partial-only type's Gen != 0 and it is
-// NOT skipped. The scope-poison boundary that IS enforced lives at three
-// other seams, each pinned separately in this file/package: navigation
-// seeds (BuildEnrichQueue, TestScopePoison_PartialOnlyType_NeverInEnrichQueue
-// above) and disk saves
-// (SnapshotAll(false), TestScopePoison_PartialOnlyType_ExcludedFromSnapshotAllFalse
-// below).
-//
-// HONEST STATUS AT HEAD: GREEN. BuildResourceCacheSnapshot's Gen-only skip
-// and its own IsTruncated derivation (`tr.Partial || ...Pagination.IsTruncated`,
-// probes.go:806) already produce exactly this shape at HEAD; kept as a
-// regression guard against a future change narrowing the Gen==0 skip into a
-// Partial-aware skip, which would silently break every NeedsTargetCache
-// related-panel checker that depends on lazy-added rows being visible here.
+// BuildResourceCacheSnapshot reads `s.RowStore.SnapshotAll(true)`
+// (includePartial), not SnapshotAll(false) — see probes.go's own doc
+// comment ("Backed entirely by RowStore... a type's rows live in exactly
+// one RowStore entry regardless of which lane wrote them"). It skips only
+// Gen == 0 (never observed at all); ObservePartial always bumps Gen off
+// zero, so a Partial-only type's Gen != 0 and it is NOT skipped, and its
+// IsTruncated derives from `tr.Partial || ...Pagination.IsTruncated`. The
+// scope-poison boundary IS enforced at the navigation seed (BuildEnrichQueue,
+// TestScopePoison_PartialOnlyType_NeverInEnrichQueue above) and the disk save
+// (SnapshotAll(false),
+// TestScopePoison_PartialOnlyType_ExcludedFromSnapshotAllFalse below); a
+// Partial-aware skip here would silently break every NeedsTargetCache
+// related-panel checker that depends on lazy-added rows being visible.
 func TestScopePoison_PartialOnlyType_VisibleInResourceCacheSnapshotButTruncated(t *testing.T) {
 	_, core, _ := newRowStorePinsTestController(t)
 
@@ -157,7 +128,7 @@ func TestScopePoison_PartialOnlyType_VisibleInResourceCacheSnapshotButTruncated(
 // never surfaces a Partial-only type, so no disk save can ever be seeded from
 // lazy-add-only rows.
 //
-// HONEST STATUS AT HEAD: GREEN already (regression guard). Documents the
+// Documents the
 // disk-save leg of the scope-poison triad (enrich-queue / cache-snapshot /
 // disk-save) that pins 1a-1c together cover; snapshotRowStoreForSave itself
 // is unexported and untestable directly from tests/unit, so this asserts its
@@ -202,20 +173,11 @@ func TestScopePoison_PartialOnlyType_ExcludedFromSnapshotAllFalse(t *testing.T) 
 // a colliding ID has been observed by BOTH ObservePartial (first) and Observe
 // (second, richer, full-beats-partial), the store's retained row for that ID
 // is the FULL observation's version (Name/Fields intact), not the earlier
-// partial's zero-value stand-in — mirroring
-// TestRelatedCacheSnapshot_MergePrecedence's "ResourceCache must win on
-// collision" assertion (got["i-shared"] != "from-cache" fails there).
-//
-// HONEST STATUS AT HEAD: GREEN at the RowStore level (RowStore.Observe already
-// implements full-beats-partial — Observe unconditionally accepts and always
-// clears Partial per its own doc comment). RED at the runtime-helper level:
+// partial's zero-value stand-in — RowStore.Observe unconditionally accepts
+// and always clears Partial per its own doc comment — and that
 // core/runtime/handlers_related.go's relatedCacheSnapshot/relatedFetchTasks
-// still read session.ResourceCache/session.LazyResourceCache directly (not
-// RowStore) at HEAD, so seeding ONLY via core.ObservePartialRows +
-// core.ObserveRows produces no observable change in
-// Core.RelatedCachedResource/Core.HandleRelatedNavigate until Stage 3
-// re-points those helpers onto the store union — this is the porting target
-// the dispatch calls out ("port the expectations... onto the store union").
+// read that union, so seeding via core.ObservePartialRows + core.ObserveRows
+// is what Core.RelatedCachedResource/Core.HandleRelatedNavigate see.
 func TestPrecedence_FullObserveWinsOverPriorPartial_OnIDCollision(t *testing.T) {
 	_, core, _ := newRowStorePinsTestController(t)
 
@@ -249,11 +211,7 @@ func TestPrecedence_FullObserveWinsOverPriorPartial_OnIDCollision(t *testing.T) 
 
 	// Related-drill parity: Core.RelatedCachedResource (the exported lookup
 	// HandleRelatedNavigate's cache-hit path consults) must resolve the FULL
-	// row, not the earlier partial's bare-ID stand-in. At HEAD this reads
-	// session.ResourceCache/LazyResourceCache, neither of which was touched by
-	// this test's ObservePartialRows/ObserveRows calls — so this assertion is
-	// RED at HEAD (found=false) until Stage 3 re-points the lookup onto
-	// RowStore's union.
+	// row, not the earlier partial's bare-ID stand-in, from RowStore's union.
 	cached, found := core.RelatedCachedResource("s3", "shared-bucket")
 	if !found {
 		t.Fatalf("RelatedCachedResource(s3, shared-bucket) found=false — RED at HEAD: the related lookup still reads session.ResourceCache/LazyResourceCache, not RowStore's union (Stage 3 not yet landed)")
@@ -275,21 +233,12 @@ func TestPrecedence_FullObserveWinsOverPriorPartial_OnIDCollision(t *testing.T) 
 
 // TestRelatedDrillParity_PartialOnlyRows_ResolvesSameAsLazyResourceCacheToday
 // drives HandleRelatedNavigate with a single RelatedIDs entry that exists ONLY
-// as a store-side Partial row (never in session.ResourceCache, and — the
-// Stage-3 point — no longer expected to require session.LazyResourceCache
-// either). Asserts the navigation resolves to NavigationKindDetail (a cache
-// hit) with no fetch task, exactly like TestHandleRelatedNavigate_
-// DetailCacheHit_NoTask's shape when the same row is seeded via
-// session.ResourceCache today.
-//
-// HONEST STATUS AT HEAD: RED. handlers_related.go's ResolveRelatedNavigate
-// resolves a single-RelatedIDs cache hit via relatedCacheHit(cache, ...),
-// fed by relatedCacheSnapshot(s), which unions session.LazyResourceCache +
-// session.ResourceCache only — RowStore is never consulted. Seeding solely
-// via core.ObservePartialRows (no session.LazyResourceCache write) therefore
-// produces a MISS (NavigationKindFilteredList, not NavigationKindDetail) at
-// HEAD. Stage 3's "related lanes read the store union (full-beats-partial)"
-// is exactly what flips this green.
+// as a store-side Partial row. Asserts the navigation resolves to
+// NavigationKindDetail (a cache hit) with no fetch task, exactly like
+// TestHandleRelatedNavigate_DetailCacheHit_NoTask's shape for a fully
+// observed row: ResolveRelatedNavigate resolves a single-RelatedIDs cache
+// hit via relatedCacheHit(cache, ...), fed by relatedCacheSnapshot(s), which
+// reads the store union (full-beats-partial).
 func TestRelatedDrillParity_PartialOnlyRows_ResolvesSameAsLazyResourceCacheToday(t *testing.T) {
 	_, core, _ := newRowStorePinsTestController(t)
 
@@ -317,12 +266,10 @@ func TestRelatedDrillParity_PartialOnlyRows_ResolvesSameAsLazyResourceCacheToday
 // handlers_related_test.go:82-92, which seeds full coverage via
 // session.LazyResourceCache alone).
 //
-// HONEST STATUS AT HEAD: RED for the same reason as the single-ID pin above —
-// relatedFetchTasks (core/runtime/handlers_related.go:184-226) reads
-// s.ResourceCache[targetType] and s.LazyResourceCache[targetType] directly;
-// neither is touched by ObservePartialRows, so "missing" is computed as 2 (both
-// IDs uncovered) at HEAD and a KindFetchResources task is wrongly emitted for
-// IDs the store already fully covers as Partial rows.
+// relatedFetchTasks (core/runtime/handlers_related.go) must count Partial
+// rows the store already holds as covered: reading s.ResourceCache and
+// s.LazyResourceCache alone (neither touched by ObservePartialRows) computes
+// "missing" as 2 and wrongly emits a KindFetchResources task.
 func TestRelatedDrillParity_PartialOnlyRows_MultiIDCoverage_NoFetchTask(t *testing.T) {
 	_, core, _ := newRowStorePinsTestController(t)
 
@@ -345,10 +292,10 @@ func TestRelatedDrillParity_PartialOnlyRows_MultiIDCoverage_NoFetchTask(t *testi
 }
 
 // =============================================================================
-// Pin 4 — menuRefreshing counts-only pin (Stage-2 deferred gap, closed in
-// Stage 3 per the coordinator's mandate): a counts-only AvailabilityCacheLoaded
-// seed (no per-type disk row data) must still show the menu's
-// refreshing/updating indicator until the sweep completes for that type.
+// Pin 4 — menuRefreshing counts-only pin: a counts-only
+// AvailabilityCacheLoaded seed (no per-type disk row data) must still show
+// the menu's refreshing/updating indicator until the sweep completes for
+// that type.
 // =============================================================================
 
 // TestMenuRefreshing_CountsOnlySeed_StaysRefreshingUntilSweepCompletes drives
@@ -357,23 +304,15 @@ func TestRelatedDrillParity_PartialOnlyRows_MultiIDCoverage_NoFetchTask(t *testi
 // (newRowStorePinsTestController's t.TempDir()-isolated A9S_CONFIG_FOLDER
 // guarantees the disk store is empty), forcing
 // handleAvailabilityCacheLoaded's counts-only fallback
-// (c.ObserveCountRows(shortName, count), handlers_availability.go:126) rather
+// (c.ObserveCountRows(shortName, count), handlers_availability.go) rather
 // than the rows-carrying c.ObserveRows branch. Asserts
 // ViewState.Body.Menu.Refreshing is true immediately after the seed (sweep
 // still in flight), then flips false once the matching AvailabilityChecked
 // result lands (Gen=1, matching session.New()'s AvailabilityGen seed).
-//
-// HONEST STATUS AT HEAD (6d4ef1ce): RED for the "stays true" half.
-// Controller.menuRefreshing() (core/app/menu.go:196-207) reports true iff
-// core.ProbeOriginTypeNames() contains an un-acked type.
-// RowStore.ProbeOriginTypeNames() (session/rowstore.go:384-395) filters on
-// `len(tr.Rows) > 0` — but ObserveCountRows/ObserveCount (rowstore.go:248-258)
-// deliberately never touches Rows (C6a). A counts-only-seeded type therefore
-// NEVER appears in ProbeOriginTypeNames(), so menuRefreshing() returns false
-// immediately even while that type's own Wave-1 sweep result has not yet
-// landed — exactly the "Stage-2 deferred gap" the plan/coordinator flagged for
-// Stage 3 to close (menuRefreshing must track counts-only-seeded types too,
-// not just rows-carrying ones).
+// menuRefreshing must track counts-only-seeded types too, not just
+// rows-carrying ones: ObserveCountRows/ObserveCount deliberately never
+// touches Rows (C6a), so a filter on `len(tr.Rows) > 0` alone would report
+// false while that type's own Wave-1 sweep result has not yet landed.
 func TestMenuRefreshing_CountsOnlySeed_StaysRefreshingUntilSweepCompletes(t *testing.T) {
 	s, _, c := newRowStorePinsTestController(t)
 
@@ -418,15 +357,9 @@ func TestMenuRefreshing_CountsOnlySeed_StaysRefreshingUntilSweepCompletes(t *tes
 // ObservePartial (never a full Observe/ObserveCount) is gone from RowStore
 // after Session.Rotate — Gen resets to 0 (never observed this new session)
 // and Rows is empty, exactly like the existing pair-switch pin's assertion
-// shape for a fully-Observed row.
-//
-// HONEST STATUS AT HEAD: GREEN already (regression guard). RowStore.Clear()
-// (rowstore.go:354-359, called from Session.Rotate at session.go:413)
-// unconditionally replaces the whole `types` map — it has no Partial-aware
-// carve-out, so a Partial-only entry is cleared exactly like any other. Kept
-// here because Stage 3 deletes session.LazyResourceCache (whose own Rotate
-// clear at session.go:415 is Partial's legacy counterpart) — this guards that
-// RowStore.Clear() alone remains sufficient once that map is gone.
+// shape for a fully-Observed row. RowStore.Clear() (called from
+// Session.Rotate) unconditionally replaces the whole `types` map — it has no
+// Partial-aware carve-out — and RowStore.Clear() alone must stay sufficient.
 func TestRotate_ClearsPartialOnlyRows(t *testing.T) {
 	s, core, _ := newRowStorePinsTestController(t)
 

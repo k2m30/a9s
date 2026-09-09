@@ -1,31 +1,21 @@
-// tui_warm_open_seed_test.go — RED pin for the warm-open seed, D9 (C1 + Goal 4 of
+// tui_warm_open_seed_test.go — the warm-open seed, D9 (C1 + Goal 4 of
 // docs/design/cache-requirements.md).
 //
-// Root cause: on a cache-MISS (no session.ResourceCache entry for the type
-// yet, but session.RowStore DOES hold retained first-page rows from a
-// prior Wave-1 probe / disk-cache replay), the two renderer adapters diverge:
-//
-//   - core/app/navigate.go's applyNavResult, NavigateKindPushResourceList
-//     branch (controller/headless/web lane) seeds the pushed list straight
-//     from c.core.Session().RowStore.Snapshot(res.ResolvedType) (Rows +
-//     Pagination.IsTruncated → synthetic PaginationMeta), so the list renders
-//     instantly with Refreshing=true instead of Loading=true.
-//   - internal/tui/runtime_adapter_navigate.go's NavigateKindPushResourceList
-//     case (live TUI lane) does no such seeding — it only calls
-//     views.NewResourceList(...).Init() and dispatches the fetch, so the
-//     screen renders the bare "Loading..." shell (resourcelist.go View(),
-//     "snap.Body.List == nil") until the live fetch round-trip lands, even
-//     though the exact same probe rows are sitting in session state.
-//
-// The fix (coder, parallel dispatch) moves the seeding decision up to
+// On a cache-MISS (no session.ResourceCache entry for the type yet, but
+// session.RowStore DOES hold retained first-page rows from a prior Wave-1
+// probe / disk-cache replay), the seeding decision lives in
 // runtime.Core.HandleNavigate: on the NavigateTargetResourceList cache-MISS
 // branch, when session.RowStore.Snapshot(canon) is non-empty, the runtime
-// attaches a synthetic session.ResourceCacheEntry on NavigateResult.CachedEntry
-// (reusing the same field the cache-HIT branch already populates) while STILL
-// returning the KindFetchResources task (C1 "show what you know, then verify
-// on sight" — the seed never substitutes for the live fetch). Both adapters
-// then consume CachedEntry uniformly instead of the TUI adapter doing nothing
-// and the controller re-deriving its own local seed.
+// attaches a synthetic session.ResourceCacheEntry on
+// NavigateResult.CachedEntry (the same field the cache-HIT branch populates)
+// while STILL returning the KindFetchResources task (C1 "show what you know,
+// then verify on sight" — the seed never substitutes for the live fetch).
+// Both renderer adapters (core/app/navigate.go's applyNavResult
+// NavigateKindPushResourceList branch and
+// internal/tui/runtime_adapter_navigate.go's NavigateKindPushResourceList
+// case) consume CachedEntry uniformly, so the list renders instantly with
+// Refreshing=true instead of the bare "Loading..." shell (resourcelist.go
+// View(), "snap.Body.List == nil") while the live fetch round-trip lands.
 //
 // Test 1 (HandleNavigate_MissWithProbeRows_AttachesSeedAndFetchTask) pins the
 // runtime-level contract directly against Core.HandleNavigate.
@@ -37,8 +27,7 @@
 //
 // Test 8 in app_cache_wave_regressions_test.go
 // (TestWarmListOpen_TruncatedDiskSeed_ShowsNPlus_BeforeRefetch) is the
-// existing, already-green parity anchor for the controller/headless lane —
-// it is NOT duplicated here.
+// parity anchor for the controller/headless lane.
 package unit
 
 import (

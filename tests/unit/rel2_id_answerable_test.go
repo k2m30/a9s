@@ -113,12 +113,13 @@ func TestRel2IDAnswerableCheckersDoNotDiscardTheirCount(t *testing.T) {
 	}
 }
 
-// TestRel2AnswerableCheckersProveTheirZero is the other half of the pair above.
-// Dropping the nil guard is only right if the zero it used to hide is itself
-// honest, so each of the six is handed a warm row and a target list that was
-// read and holds nothing. The filter came from the row's own ID or Fields, the
-// list was read, nothing matched — that is a zero the row backs, and turning it
-// into "?" would be the same information loss one return lower down.
+// TestRel2AnswerableCheckersProveTheirZero is the other half of the pair
+// above. Answering without a nil guard is only right if the zero it would
+// hide is itself honest, so each of the six is handed a warm row and a
+// target list that was read and holds nothing. The filter came from the
+// row's own ID or Fields, the list was read, nothing matched — that is a
+// zero the row backs, and turning it into "?" would be the same information
+// loss one return lower down.
 func TestRel2AnswerableCheckersProveTheirZero(t *testing.T) {
 	clients := demo.NewServiceClients()
 	pairs := []struct{ source, target, rowID string }{

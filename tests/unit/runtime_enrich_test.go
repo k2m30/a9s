@@ -12,9 +12,7 @@ import (
 // Core.BeginDetailOperation returns a nil enrich task for a resource type
 // with no registered detail enricher. This pins the SSOT contract: the
 // runtime is the single decision-maker for the dispatch gate, so the
-// adapter does not need to re-check enricher existence. (BeginDetailOperation
-// folded the former separate DetailOperationTasks call into its own return
-// values — #261 boundary-sealing wave.)
+// adapter does not need to re-check enricher existence.
 func TestCoreDetailOperationTasks_NoEnricher_ReturnsNilEnrichTask(t *testing.T) {
 	if resource.HasDetailEnricher("ec2") {
 		t.Skip("ec2 now has a detail enricher — pick a different no-enricher type")

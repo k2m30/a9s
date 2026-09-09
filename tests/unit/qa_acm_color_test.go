@@ -1,32 +1,13 @@
 package unit
 
-// qa_acm_color_test.go — Behavioral tests for the ACM Certificates Color function.
+// qa_acm_color_test.go — the ACM Certificates Color function reads findings
+// only.
 //
-// CodeRabbit PR-273 finding: core/resource/types_dns_cdn.go:73-85 returns
-// ColorHealthy for all ISSUED certs, ignoring days_left and in_use fields that
-// the fetcher at core/aws/acm.go:113 already writes.
-//
-// Expected behavior per docs/attention-signals.md:
-//   - ISSUED, in_use=false → ColorWarning (orphan cert).
-//   - ISSUED, days_left<=30d → ColorWarning (expiring soon).
-//   - ISSUED, days_left<=7d → ColorBroken (critically expiring).
-//   - ISSUED, days_left="expired" → ColorBroken.
-//   - PENDING_VALIDATION → ColorWarning.
-//   - EXPIRED / REVOKED / FAILED / VALIDATION_TIMED_OUT → ColorBroken.
-//   - INACTIVE → ColorDim.
-//   - Empty fields → ColorHealthy.
-//
-// All ISSUED cases will FAIL until the production colorer is updated.
-
-// INVERTED for batch w6a. This table used to assert the colours acmColor
-// picked by reading Fields directly. That branch is gone: colour now derives
-// from findings only, so a resource carrying no findings is Healthy whatever
-// its fields say, and the state each row names is reported by the finding the
-// fetcher emits for it (see prowler_w6a_*_test.go).
-//
-// The table is kept as the enumeration of states that must no longer colour a
-// row on their own. Do not "restore" the old wants — a raw-field branch coming
-// back is exactly what this now catches.
+// Colour derives from findings, so a resource carrying no findings is
+// Healthy whatever its fields say; the state each row names is reported by
+// the finding the fetcher emits for it (see prowler_w6a_*_test.go). The
+// table enumerates the states that must not colour a row on their own, so a
+// raw-field branch is what it catches.
 
 import (
 	"testing"

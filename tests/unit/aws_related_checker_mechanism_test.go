@@ -1,9 +1,6 @@
-// aws_related_checker_mechanism_test.go pins the CORRECT related-panel
-// checker mechanism (quoted from the golden per-type specs in
-// docs/resources/*.md) for pivots that today return zero or garbage on
-// realistic data. Each test is expected to be RED at HEAD until the paired
-// coder task lands the fix; the mechanism it asserts is the documented one,
-// not the current (broken) implementation.
+// aws_related_checker_mechanism_test.go pins the related-panel checker
+// mechanism quoted from the golden per-type specs in docs/resources/*.md,
+// driven on realistic data.
 package unit_test
 
 import (
@@ -592,19 +589,15 @@ func mechanismEC2CheckerByTarget(t *testing.T, target string) resource.RelatedCh
 }
 
 // ---------------------------------------------------------------------------
-// 8. Fakes gap — demo mode returns empty/garbage for three checkers that are
-// otherwise correctly implemented, so the panel silently shows zero even
-// with a coder fix landed:
+// 8. Fakes — demo mode must serve real data for three checkers, or the panel
+// silently shows zero:
 //
 //   - checkLambdaCFN (lambda.md aws:cloudformation:stack-name tag) needs
-//     LambdaFake.ListTags to serve per-function tags. At HEAD ListTags
-//     always returns an empty map.
+//     LambdaFake.ListTags to serve per-function tags.
 //   - checkEC2SSM (ec2 SSM-managed instance check) needs
-//     SSMFake.DescribeInstanceInformation to serve enrolled instance IDs. At
-//     HEAD it is a permanent no-op stub returning an empty list.
+//     SSMFake.DescribeInstanceInformation to serve enrolled instance IDs.
 //   - checkECSSvcSFN (ecs:runTask state-machine cross-ref) needs
-//     SFNFake.DescribeStateMachine to return a Definition. At HEAD the fake
-//     returns only StateMachineArn, Definition is always nil.
+//     SFNFake.DescribeStateMachine to return a Definition.
 // ---------------------------------------------------------------------------
 
 func TestFakes_LambdaListTags_ServesCloudFormationStackNameTag(t *testing.T) {
@@ -657,13 +650,10 @@ func TestFakes_SSMDescribeInstanceInformation_ServesEnrolledInstance(t *testing.
 	}
 }
 
-// INVERTED for aws6 row 7 (every fake refuses an unregistered key): this used
-// to call DescribeStateMachine with a nil input, which the fake answered with
-// the placeholder definition "{}" — non-empty, so the assertion passed without
-// ever reaching a fixture. The fake now refuses a state machine ARN it does
-// not hold, so the call has to name one, and naming one is what makes the
-// assertion say what its message always claimed. The nil-input call is not to
-// be restored.
+// The call names a state machine ARN the fake holds: the fake refuses an
+// unregistered ARN, and a nil input would be answered with the placeholder
+// definition "{}" — non-empty, so the assertion would pass without ever
+// reaching a fixture.
 func TestFakes_SFNDescribeStateMachine_ServesECSRunTaskDefinition(t *testing.T) {
 	fake := fakes.NewSFN()
 	listed, err := fake.ListStateMachines(context.Background(), nil)

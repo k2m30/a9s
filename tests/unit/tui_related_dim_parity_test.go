@@ -44,9 +44,9 @@ import (
 // ---------------------------------------------------------------------------
 
 // relatedDimParityTypes returns representative resource types for the sweep.
-// "s3" matches the dispatch's real-world case (trail/glue/backup checkers on
-// a bucket resolving TruncatedResult); "ec2" is a non-S3 control to prove the
-// bug (and its fix) is renderer-generic, not S3-specific.
+// "s3" is the real-world case (trail/glue/backup checkers on a bucket
+// resolving TruncatedResult); "ec2" is a non-S3 control to prove the
+// contract is renderer-generic, not S3-specific.
 func relatedDimParityTypes() []struct {
 	shortName string
 	res       resource.Resource
@@ -301,10 +301,9 @@ func expectedRelatedRowText(c relatedDimParityCase) string {
 // containing every block-state combination and asserts, per row, that the
 // rendered style is styles.RowNormal (bright) exactly when
 // resource.IsRelatedActionable(...) is true for that block, and
-// styles.DimText otherwise. This is RED at HEAD for the TruncatedZero and
-// PositiveTruncated cases only if the renderer's inline switch diverges from
-// blk.Actionable; it is the general contract the coder's fix must satisfy
-// for every state, not just the truncated-zero one named in the report.
+// styles.DimText otherwise — the general contract for every state, not just
+// the truncated-zero one, so a renderer switch that diverges from
+// blk.Actionable fails here.
 func TestRelatedDim_PropertySweep_BrightIffActionable(t *testing.T) {
 	for _, tc := range relatedDimParityTypes() {
 		tc := tc

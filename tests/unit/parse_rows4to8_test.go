@@ -206,11 +206,10 @@ func TestAdminAttachedPolicy_IsRecognisedInEveryPartition(t *testing.T) {
 		{name: "commercial AdministratorAccess", policyARN: "arn:aws:iam::aws:policy/AdministratorAccess", wantFinding: true},
 		{name: "China AdministratorAccess", policyARN: "arn:aws-cn:iam::aws:policy/AdministratorAccess", wantFinding: true},
 		{name: "GovCloud AdministratorAccess", policyARN: "arn:aws-us-gov:iam::aws:policy/AdministratorAccess", wantFinding: true},
-		// INVERTED by codex2 row 6 (Codex finding 8): this line asserted
-		// wantFinding: true for PowerUserAccess. AWS's PowerUserAccess allows
-		// every action EXCEPT IAM, Organizations and Account, so its holder
-		// can neither grant itself permissions nor touch the account. It is
-		// not administrator-equivalent and must not be restored to the set.
+		// PowerUserAccess is not in the set: AWS's PowerUserAccess allows every
+		// action EXCEPT IAM, Organizations and Account, so its holder can neither
+		// grant itself permissions nor touch the account. It is not
+		// administrator-equivalent.
 		{name: "PowerUserAccess is not administrator-equivalent", policyARN: "arn:aws-us-gov:iam::aws:policy/PowerUserAccess", wantFinding: false},
 		{name: "a customer policy of the same name is not the AWS one", policyARN: "arn:aws:iam::123456789012:policy/AdministratorAccess", wantFinding: false},
 		{name: "a read-only AWS policy", policyARN: "arn:aws:iam::aws:policy/ReadOnlyAccess", wantFinding: false},

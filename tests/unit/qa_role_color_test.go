@@ -10,11 +10,10 @@ package unit
 //   - A wildcard-trust finding → ColorBroken.
 //   - No finding → ColorHealthy, whatever the raw document says.
 //
-// The two "star principal" cases previously asserted ColorBroken from the raw
-// document with no finding attached. That expectation encoded a second,
-// independent trust evaluator inside the classifier, which is exactly what
-// could disagree with the Findings list; it is deliberately inverted here,
-// not broken.
+// The two "star principal" cases carry no finding and want ColorHealthy: a
+// ColorBroken from the raw document would encode a second, independent
+// trust evaluator inside the classifier, which is exactly what could
+// disagree with the Findings list.
 
 import (
 	"testing"

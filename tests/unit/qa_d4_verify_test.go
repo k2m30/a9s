@@ -200,10 +200,10 @@ func TestD4Row18_ELBBadgeCountsEachBalancerOnce(t *testing.T) {
 // TestD4Row19_DrilledRoleCarriesTheSameFindingsAsTheListedRole pins both
 // surfaces of the same role.
 //
-// The list path and the by-ID path are different fetchers, and only the list
-// path used to read inline policies. A role that shows an escalation finding
-// when listed and none when drilled into tells the operator the problem went
-// away because they clicked on it.
+// The list path and the by-ID path are different fetchers, and both read
+// inline policies. A role that showed an escalation finding when listed and
+// none when drilled into would tell the operator the problem went away
+// because they clicked on it.
 func TestD4Row19_DrilledRoleCarriesTheSameFindingsAsTheListedRole(t *testing.T) {
 	const code domain.FindingCode = "role.inline-privilege-escalation"
 	clients := demo.NewServiceClients()
@@ -358,12 +358,10 @@ func TestD4Row21_AthenaWitnessIsTheOnlyCarrier(t *testing.T) {
 	}
 }
 
-// TestD4Row22_AthenaDocQuotesTheDetailConstants pins the doc side of the same
-// change: the §4 cells quote what the two findings now say. Task w27 deleted
-// the hand-written §4 "Detail text (S5)" column this test used to parse
-// (backtick-quoted last cell); the Detail column now lives in the generated
-// findings table catalogen writes (five plain cells, no backticks), so this
-// reads that table's row for each code instead.
+// TestD4Row22_AthenaDocQuotesTheDetailConstants pins the doc side: the §4
+// cells quote what the two findings say. The Detail column lives in the
+// generated findings table catalogen writes (five plain cells, no
+// backticks), so this reads that table's row for each code.
 func TestD4Row22_AthenaDocQuotesTheDetailConstants(t *testing.T) {
 	rows, _ := d4FoldedRows(t, "athena")
 	r := d4RowByID(t, rows, fixtures.AthenaGovernanceMisconfigured)
@@ -496,11 +494,10 @@ func TestD4Row26_ListenerPhrasesAgreeInNumber(t *testing.T) {
 			t.Errorf("%s %s: phrase = %q, want it to say %q", c.id, c.code, f.Phrase, strings.TrimSpace(wantNoun))
 		}
 
-		// Task w27: Detail is now one static sentence per code, worded to
-		// cover one-or-many listeners without pluralising ("a listener...
-		// the ports are listed below"), so it no longer needs to agree in
-		// number with the phrase — the actual listener(s) live in their own
-		// rows instead.
+		// Detail is one static sentence per code, worded to cover one-or-many
+		// listeners without pluralising ("a listener... the ports are listed
+		// below"), so it need not agree in number with the phrase — the actual
+		// listener(s) live in their own rows.
 		wantDetail := map[domain.FindingCode]string{
 			"elb.plain-http-listener": "A listener on this load balancer carries traffic in the clear, so credentials and session cookies cross the network readable by anyone on the path; the ports are listed below. Terminate TLS on the listener, or redirect it to an HTTPS listener.",
 			"elb.weak-tls-policy":     "A listener's security policy still negotiates older protocol versions or ciphers without forward secrecy, so a client can be steered onto a breakable connection; the ports are listed below. Move the listener to one of the modern security policies that require version 1.2 or later.",

@@ -1,15 +1,11 @@
 package unit
 
-// w27_wave_registration_test.go — task w27 row 6: the badge paragraph on
-// every docs/resources/<short>.md page (§ S1, "N uses the same aggregation
-// as the menu badge (Wave 1 issue-colored rows + Wave 2 `!`-severity
-// findings)") is one sentence copied across every page. It is false for a
-// type that registers no Wave 2 enricher — after d1 (w25), opensearch is one:
-// docs/resources/opensearch.md:135 says outright "opensearch registers no
-// Wave 2 enricher", yet the copied §S1 paragraph still claims Wave 2 findings
-// contribute to its badge count. Pinning "no page carries a wave it does not
-// register" until row 6 picks its shape (a per-type generated paragraph, or
-// one shared doc every page links to).
+// w27_wave_registration_test.go — no docs/resources/<short>.md page claims a
+// wave it does not register: the §S1 badge paragraph ("N uses the same
+// aggregation as the menu badge (Wave 1 issue-colored rows + Wave 2
+// `!`-severity findings)") is false for a type that registers no Wave 2
+// enricher, such as opensearch (docs/resources/opensearch.md says outright
+// "opensearch registers no Wave 2 enricher").
 
 import (
 	"os"

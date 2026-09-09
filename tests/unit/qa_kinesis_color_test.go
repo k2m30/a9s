@@ -33,10 +33,10 @@ func TestKinesisColor(t *testing.T) {
 		})
 	}
 
-	// Fields["status"] holds the rendered phrase, which is lowercase, so the
-	// switch that used to read it as a raw enum could never match and is gone.
-	// The classifier follows the enum: a stream whose phrase disagrees with its
-	// stream_status is coloured by the status.
+	// Fields["status"] holds the rendered phrase, which is lowercase, so a
+	// switch reading it as a raw enum could never match. The classifier
+	// follows the enum: a stream whose phrase disagrees with its stream_status
+	// is coloured by the status.
 	t.Run("rendered_phrase_is_not_an_input", func(t *testing.T) {
 		got := td.Color(resource.Resource{Fields: map[string]string{
 			"stream_status": "ACTIVE",

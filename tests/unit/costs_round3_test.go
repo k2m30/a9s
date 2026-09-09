@@ -1,14 +1,12 @@
-// costs_round3_test.go — Cost Explorer: user feedback round 3 (live usage).
+// costs_round3_test.go — Cost Explorer live-usage pins.
 //
 // package unit (not unit_test): item 1 (CLI -c costs/ce) needs the full TUI
 // Model (tui.New/rootApplyMsg/extractMsg, package-unit-only, following
 // qa_cli_command_flag_test.go's exact convention) alongside the three
-// headless-Controller/pure-costs findings, and Go permits only one package
-// per file — everything here lives in package unit with small
-// locally-prefixed (round3*) helpers mirroring costs_state_test.go's
-// unit_test helpers, to avoid implying they are the same functions across
-// packages (same pattern as costs_review_findings_test.go/
-// costs_review2_test.go).
+// headless-Controller/pure-costs pins, and Go permits only one package per
+// file — everything here lives in package unit with small locally-prefixed
+// (round3*) helpers mirroring costs_state_test.go's unit_test helpers, to
+// avoid implying they are the same functions across packages.
 //
 // Item 1 tests only the runtime/TUI navigation half of "-c costs"/"-c ce"
 // (tui.WithCommand onward, matching qa_cli_command_flag_test.go's

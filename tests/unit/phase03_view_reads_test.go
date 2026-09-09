@@ -51,10 +51,9 @@ func minimalTypeDef(shortName string) resource.ResourceTypeDef {
 			{Key: "name", Title: "Name", Width: 24},
 			{Key: "status", Title: "Status", Width: 20},
 		},
-		// w197 row 11: a type DECLARES which column is its status column by
-		// giving it the type's lifecycle key. It used to be inferred — from
-		// the title, or from the literal key "status" — so this def needed to
-		// say nothing and got a status column anyway.
+		// A type DECLARES which column is its status column by giving it the
+		// type's lifecycle key; it is not inferred from the title or from the
+		// literal key "status".
 		LifecycleKey: "status",
 		Color: func(r resource.Resource) resource.Color {
 			switch r.Fields["status"] {
@@ -79,11 +78,10 @@ func minimalTypeDefWithLifecycleKey() resource.ResourceTypeDef {
 		ShortName: "ec2-lifecycle-test",
 		Columns: []resource.Column{
 			{Key: "name", Title: "Name", Width: 24},
-			// w197 row 11: the status column names the type's lifecycle key,
-			// which is what the cell reads. It used to be keyed "status" while
-			// the type declared "state", and the cell read the declaration
-			// past the column — the shape that showed tg "available" where its
-			// own column said "unhealthy targets: 2/5".
+			// The status column names the type's lifecycle key, which is what the
+			// cell reads; a column keyed "status" while the type declares "state"
+			// would make the cell read past the column — the shape that shows tg
+			// "available" where its own column says "unhealthy targets: 2/5".
 			{Key: "state", Title: "Status", Width: 20},
 		},
 		LifecycleKey: "state", // explicit: the cell reads Fields["state"]
@@ -209,8 +207,7 @@ func TestViews_ListStatusColumn_FallsBackToLifecycleKey(t *testing.T) {
 	r := resource.Resource{
 		ID:   "i-lifecycle",
 		Name: "my-instance",
-		// Fields["status"] is intentionally absent — pre-fix the cell is blank.
-		// Fields["state"] = "running" — post-fix the fallback returns this.
+		// Fields["status"] is absent; the fallback returns Fields["state"].
 		Fields: map[string]string{
 			"state": "running",
 		},
@@ -405,10 +402,8 @@ func TestViews_DetailAttention_ReadsAttentionDetails(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 // TestViews_DetailAttention_PrefersFindingsPhrase verifies that the detail
-// view's Attention section reads r.Findings[0].Phrase. Post-W1.4b.3 there is
-// no longer a legacy Issues fallback to compare against — this test now pins
-// the structural contract that Findings is the sole source of the rendered
-// phrase.
+// view's Attention section reads r.Findings[0].Phrase: Findings is the sole
+// source of the rendered phrase.
 func TestViews_DetailAttention_PrefersFindingsPhraseOverIssues(t *testing.T) {
 	ensureNoColor(t)
 
@@ -418,8 +413,6 @@ func TestViews_DetailAttention_PrefersFindingsPhraseOverIssues(t *testing.T) {
 		Fields: map[string]string{
 			"status": "running",
 		},
-		// Legacy field — pre-fix detail view reads this.
-		// New field — post-fix detail view reads this.
 		Findings: []domain.Finding{
 			{
 				Code:     "ec2.prefer",
@@ -694,9 +687,9 @@ func TestViews_ListStatusColumn_LifecycleKeyDefaultIsState(t *testing.T) {
 		short := short
 		t.Run(short, func(t *testing.T) {
 			// Use a unique non-registered name to avoid registry overriding columns.
-			// w197 row 11: the status column names the key the cell reads,
-			// and a type that declares no LifecycleKey names "state" — which
-			// is the default this test is about, so the column says it.
+			// The status column names the key the cell reads, and a type that
+			// declares no LifecycleKey names "state" — the default this test is
+			// about, so the column says it.
 			td := minimalTypeDef(short + "-lkdefault-test")
 			td.LifecycleKey = ""
 			td.Columns = []resource.Column{
@@ -787,8 +780,7 @@ func TestViews_IssueCount_RespectsTypeColorOverride(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 // TestViews_HasIssueFinding_ScansAllFindings pins that issue classification
-// considers EVERY finding in the slice, not just Findings[0]. Pre-fix
-// hasIssueFinding only checks index 0; post-fix it scans all entries.
+// considers EVERY finding in the slice, not just Findings[0].
 //
 // Reachable via:
 //   - ResourceListModel.IssueCount() — must count rows whose Findings has
@@ -796,22 +788,13 @@ func TestViews_IssueCount_RespectsTypeColorOverride(t *testing.T) {
 //   - Attention filter (ctrl+z) — must keep rows whose Findings has any
 //     issue-severity entry visible.
 //
-// Pre-fix: hasIssueFinding returns len>0 && Findings[0].IsIssue().
+// Row A has Findings[1].Severity=SevBroken and row B has
+// Findings[0].Severity=SevWarn, so IssueCount()=2.
 //
-//	Row A has Findings[0].Severity=SevOK → false → not counted.
-//	Only row B (SevWarn at index 0) is counted → IssueCount()=1.
-//
-// Post-fix: hasIssueFinding scans all entries.
-//
-//	Row A has Findings[1].Severity=SevBroken → true → counted.
-//	Row B has Findings[0].Severity=SevWarn → true → counted.
-//	IssueCount()=2.
-//
-// Forward-compat note: production paths post-fix filter lifecycle findings
-// before populating r.Findings, so a real resource will not carry [SevOK,
-// SevBroken] ordering in production today. This test is a defensive regression
-// pin for future per-category PRs that may emit lifecycle Findings explicitly,
-// or for any code path that appends findings without pre-sorting by severity.
+// Production paths filter lifecycle findings before populating r.Findings,
+// so a real resource will not carry [SevOK, SevBroken] ordering today. This
+// is a defensive pin for any code path that appends findings without
+// pre-sorting by severity.
 func TestViews_HasIssueFinding_ScansAllFindings(t *testing.T) {
 	ensureNoColor(t)
 
@@ -922,17 +905,12 @@ func TestViews_ListColor_ECSInactiveIsBroken(t *testing.T) {
 
 // TestViews_IssueCount_UsesTypeResolveColor pins that IssueCount() derives
 // from td.ResolveColor(r), not the coarser FallbackColor(r.Fields["status"]).
-//
-// RETIRED the old "empty-Findings fallback" framing this test used to pin
-// (TestViews_IssueCount_FallbackUsesTypeResolveColor): since the
-// color-findings-conformance wave, colorEC2 is colorFromAnyFinding-only
-// (core/aws/catalog_compute.go, no raw-field fallback at all), so
-// Findings=nil no longer "forces a Fields-reading fallback path" — it simply
-// yields ColorHealthy. The resource here instead carries the Finding the
-// real fetcher (core/aws/ec2.go) attaches for a Server.*-forced stop
+// colorEC2 is colorFromAnyFinding-only (core/aws/catalog_compute.go, no
+// raw-field fallback), so the resource here carries the Finding the real
+// fetcher (core/aws/ec2.go) attaches for a Server.*-forced stop
 // (CodeEC2StateStoppedServer, SevBroken), which is what td.ResolveColor
-// actually reads now. See qa_color_findings_conformance_test.go for the
-// standing architectural gate.
+// reads. See qa_color_findings_conformance_test.go for the standing
+// architectural gate.
 func TestViews_IssueCount_UsesTypeResolveColor(t *testing.T) {
 	ensureNoColor(t)
 

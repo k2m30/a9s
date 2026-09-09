@@ -1,7 +1,4 @@
-// aws_eb_related_test.go contains TDD Red tests for the Elastic Beanstalk
-// related-panel checkers T020–T024. Tests are written before the coder replaces
-// the stubs in stubs_related.go with real implementations — initial failures are
-// expected.
+// aws_eb_related_test.go — the Elastic Beanstalk related-panel checkers.
 package unit_test
 
 import (

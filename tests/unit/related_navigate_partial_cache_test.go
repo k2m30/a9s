@@ -13,7 +13,6 @@ package unit
 // TestRelatedNavigate_PartialCache_Truncated_FetchesMissing       — partial + truncated → fetch (KindFetchMore translation).
 // TestRelatedNavigate_AllRelatedIDs_InCache_NoFetch                — full coverage → nil cmd.
 // TestRelatedNavigate_PartialCache_NotTruncated_FetchesFullList    — partial + not truncated → fetch (KindFetchResources translation).
-//   AS-216 / AS-245 (PR #345 R2) regression guard.
 
 import (
 	"context"
@@ -197,8 +196,7 @@ func TestRelatedNavigate_AllRelatedIDs_InCache_NoFetch(t *testing.T) {
 // SSOT. The pre-populated cached row stays visible while the fetch is in
 // flight (the view is built before the fetch cmd is returned).
 //
-// This is the AS-216 / AS-245 (PR #345 R2) regression guard for
-// internal/tui/runtime_adapter_related.go's RelatedIDs branch.
+// Pins internal/tui/runtime_adapter_related.go's RelatedIDs branch.
 // ---------------------------------------------------------------------------
 
 func TestRelatedNavigate_PartialCache_NotTruncated_FetchesFullList(t *testing.T) {

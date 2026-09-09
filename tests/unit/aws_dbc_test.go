@@ -668,10 +668,10 @@ func TestDbc_Pagination_MultiPage_Success(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// AS-145: dual-SDK dedup-by-ID — DocDB-side wins.
+// dual-SDK dedup-by-ID — DocDB-side wins.
 // ---------------------------------------------------------------------------
 
-// TestDBCFetcher_DedupesAcrossDualAPIByID pins the AS-145 production fix:
+// TestDBCFetcher_DedupesAcrossDualAPIByID pins the dedup rule:
 // when DocDB and RDS DescribeDBClusters both return the same cluster ID on
 // the same fetch tick (verified live: the DocDB endpoint returns
 // aurora-postgresql clusters too), the dbc fetcher must dedup by Resource.ID
@@ -992,10 +992,8 @@ func TestComputeRDSDBClusterStatusAndFindings(t *testing.T) {
 				Status:              aws.String("cross-region-copying"),
 				DBClusterMembers:    []rdstypes.DBClusterMember{writer},
 			},
-			// Inverted for the spec row that made a phrase the catalog's: an
-			// unrecognised status is still the transitional code, and that
-			// code declares one wording with the status in its slot. Do not
-			// restore the bare-keyword assertion.
+			// An unrecognised status is still the transitional code, and that
+			// code declares one wording with the status in its slot.
 			wantPhrase:   "cross-region-copying: in progress",
 			wantFindings: []string{"cross-region-copying: in progress"},
 		},

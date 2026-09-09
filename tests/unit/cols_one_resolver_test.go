@@ -62,11 +62,9 @@ func colsAllShortNames() []string {
 // in production precisely because there must be only one resolver to map
 // from.
 //
-// INVERTED for aws6 rows 4-6 (one humanize owner): the humanize opt-in moved
-// off config.ListColumn and onto the TYPE (ResourceTypeDef.HumanizeFields),
-// so the mirror reads it from the type the way production does. The old
-// `lc.Humanize` read is not to be restored — a column-owned flag cannot reach
-// a field no column shows, which is the defect that moved it.
+// The humanize opt-in lives on the TYPE (ResourceTypeDef.HumanizeFields),
+// so the mirror reads it from the type the way production does; a
+// column-owned flag cannot reach a field no column shows.
 func colsCascade(vc *config.ViewsConfig, shortName string) []app.ColumnDef {
 	td := colsTypeDefFor(shortName)
 	lcs := resource.ResolveListColumnCascade(vc, shortName, td)

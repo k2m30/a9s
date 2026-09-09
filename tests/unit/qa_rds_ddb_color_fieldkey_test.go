@@ -1,14 +1,9 @@
 package unit
 
-// qa_rds_ddb_color_fieldkey_test.go — the status → colour table for DynamoDB.
-//
-// This file used to pin which Fields key the dbi and ddb classifiers read
-// first, canonical "status" over the legacy "db_instance_status" /
-// "table_status". No classifier reads a Fields key any more, so the key
-// precedence it guarded no longer exists and its dbi cases now live in
-// qa_dbi_color_test.go. What survives is the mapping itself, driven the way
-// production drives it: an SDK TableDescription through the ddb fetcher, and a
-// colour computed from the worst finding's severity.
+// qa_rds_ddb_color_fieldkey_test.go — the status → colour table for DynamoDB,
+// driven the way production drives it: an SDK TableDescription through the
+// ddb fetcher, and a colour computed from the worst finding's severity. No
+// classifier reads a Fields key; the dbi cases live in qa_dbi_color_test.go.
 
 import (
 	"context"

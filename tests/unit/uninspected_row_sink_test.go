@@ -230,15 +230,11 @@ func TestUninspectedRow_DetailAttentionCarriesNotInspected(t *testing.T) {
 		}
 		t.Fatalf("detail body carries no \"not inspected\" Attention entry for a row the ec2 enricher could not inspect; fields were:\n%s", strings.Join(keys, "\n"))
 	}
-	// The entry names the check that did not answer. This assertion is the
-	// INVERSE of what this pin held before: it used to require the phrase to
-	// carry no name, because the recorder threw the failing call away and the
-	// only name available was the resource type, which the operator can
-	// already read off the screen. A row whose posture is unknown is a
-	// different fact from a row whose posture is unknown BECAUSE
-	// DescribeInstanceStatus was refused — the second one the operator can act
-	// on, and the first is what the old shape could say. Do not "restore" the
-	// negative.
+	// The entry names the check that did not answer: a row whose posture is
+	// unknown is a different fact from a row whose posture is unknown BECAUSE
+	// DescribeInstanceStatus was refused — the second one the operator can
+	// act on, and the resource type alone they can already read off the
+	// screen.
 	joined := strings.Join(attention, " ")
 	want := domain.NotInspectedPhrase + ": " + uninspectedCheck
 	if !strings.Contains(joined, want) {
@@ -291,11 +287,9 @@ func TestUninspectedRow_InspectedNeighbourGetsNoNotInspectedEntry(t *testing.T) 
 	}
 }
 
-// TestFindingsOverview_IsGone is the gate for the deletion acceptance asked
-// for: Controller.FindingsOverview aggregated findings per rule for a
-// cross-type cockpit that was never built (issue #461, closed completed
-// 2026-07-17), so nothing in this repo called it. A caller-less 349-line
-// public API is not "wired", and git keeps it if a cockpit ever arrives.
+// TestFindingsOverview_IsGone: Controller.FindingsOverview aggregated
+// findings per rule for a cross-type cockpit that was never built, so
+// nothing in this repo called it. A caller-less public API is not "wired".
 func TestFindingsOverview_IsGone(t *testing.T) {
 	root, err := filepath.Abs("../../core")
 	if err != nil {
@@ -454,7 +448,7 @@ var capBypass = []struct {
 	{
 		// An account-wide walk that compares its own page counter stops at
 		// the right page and says nothing about the rows past it; only
-		// walkAccountPages marks them. Added by the cap batch's spec row 1.
+		// walkAccountPages marks them.
 		regexp.MustCompile(`pages\s*(>=|<|>|<=)\s*EnrichmentCap`),
 		"drive the walk with walkAccountPages(result, resources, idOf, next)",
 		false,
@@ -462,7 +456,7 @@ var capBypass = []struct {
 	{
 		// A bare assignment to the flag composes with none of the passes
 		// that raise it, so the last one to finish cleanly erases what an
-		// earlier one found. Added by the cap batch's spec row 3.
+		// earlier one found.
 		regexp.MustCompile(`\.Truncated\s*=[^=]`),
 		"raise the flag with SetTruncated(result, cut), or drop it with MarkInformationalOnly(result)",
 		true,
@@ -473,7 +467,7 @@ var capBypass = []struct {
 		// a plan with five failures from one with fifty. capRows is the only
 		// bound on supporting rows and it closes with "… +K more". A batch
 		// size the AWS API imposes is named, not a literal, so it does not
-		// match. Added by the cap batch's spec row 8.
+		// match.
 		regexp.MustCompile(`\b(min|max)\([^,]*,\s*\d+\)`),
 		"hand every row to setWave2Finding / addWave1Rows and let capRows bound the list",
 		false,

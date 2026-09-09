@@ -90,11 +90,9 @@ func TestEnrichCodePipelineStatus_FailedStageKeyedByResourceID(t *testing.T) {
 	}
 }
 
-// TestEnrichCodePipelineStatus_SummaryIsTheCodesPhrase inverts the former
-// TestEnrichCodePipelineStatus_SummaryContainsStageName, which required the
-// stage name inside the phrase. Spec row "phrase" deletes that behaviour: the
-// wording belongs to pipeline.stage-failed and the stage is a Failed Stage row,
-// so a second failed stage can be named too. Do not restore the old assertion.
+// TestEnrichCodePipelineStatus_SummaryIsTheCodesPhrase: the wording belongs
+// to pipeline.stage-failed and the stage is a Failed Stage row, so a second
+// failed stage can be named too; the stage name is not inside the phrase.
 func TestEnrichCodePipelineStatus_SummaryIsTheCodesPhrase(t *testing.T) {
 	fake := &pipelineStateFake{
 		states: map[string]*codepipeline.GetPipelineStateOutput{

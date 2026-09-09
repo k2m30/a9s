@@ -92,12 +92,11 @@ func TestLoadMore_OnClientSideRelatedList_AppendsToThatList(t *testing.T) {
 	if payload.Provenance.CanonicalList() {
 		t.Errorf("the continuation calls itself a canonical-list fetch — its owner is a related drill (EscPops), and handle.go's symmetric gate refuses a canonical result on a non-canonical screen")
 	}
-	// INVERTED for runtime8 row 4. It required ListSeq 0 here, because one
-	// counter served the whole type and a drill drawing from it superseded the
-	// verification of the list beneath. The counter is keyed by the issuing
-	// screen now, so the drill's sequence orders the drill's own requests and
-	// reaches no other screen. Do not "restore" the zero: without a sequence
-	// the drill cannot order its own two refreshes, which is row 4's defect.
+	// The sequence counter is keyed by the issuing screen, so the drill's
+	// sequence orders the drill's own requests and reaches no other screen;
+	// without a sequence the drill cannot order its own two refreshes, and a
+	// counter shared across the type would let a drill supersede the
+	// verification of the list beneath.
 	if task.ListSeq == 0 {
 		t.Error("the drill's continuation drew no list sequence — the drill cannot order it against " +
 			"its own next request")

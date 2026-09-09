@@ -1,21 +1,16 @@
 package unit
 
-// qa_enrichment_review_fixes_test.go — regression test for a review finding
-// landed on top of feature 018-enrichment-visibility: Ctrl+R on a top-level
-// list must NOT clear the active ResourceListModel's findings immediately —
-// they stay applied (stale-until-replaced) until the rerun's fresh
-// EnrichmentChecked result actually lands, avoiding a user-visible flicker
-// across the full AWS round-trip. See the corrected test below for both
-// halves: no blank window before the fresh result lands, and real removal
-// once it genuinely omits the finding.
+// qa_enrichment_review_fixes_test.go — Ctrl+R on a top-level list must NOT
+// clear the active ResourceListModel's findings immediately — they stay
+// applied (stale-until-replaced) until the rerun's fresh EnrichmentChecked
+// result actually lands, avoiding a user-visible flicker across the full
+// AWS round-trip. Both halves are pinned: no blank window before the fresh
+// result lands, and real removal once it genuinely omits the finding.
 //
-// A second review finding this file used to pin (resolveIdentityColumn
-// running on the full pre-hscroll column list, so the marker doesn't jump to
-// a different semantic column when scrolled) is now covered by
-// list_ports_test.go's TestWave3IdentityColParity_
-// EnrichmentFindingsWithHScroll_AllResourceTypes, which pins the live
-// RenderList seam (this file's ResourceListModel.View() harness is dead
-// code).
+// The identity-column marker under horizontal scroll (resolveIdentityColumn
+// running on the full pre-hscroll column list) is pinned by
+// list_ports_test.go's
+// TestWave3IdentityColParity_EnrichmentFindingsWithHScroll_AllResourceTypes.
 
 import (
 	"strings"

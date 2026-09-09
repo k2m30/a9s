@@ -1,11 +1,11 @@
 package unit
 
-// aws_endpoint_not_found_test.go — region-gap classification (live witness
-// 2026-07-14: CodeArtifact does not exist in eu-central-2; its endpoint DNS
-// does not resolve). The classifier must be narrow — only DNS not-found
-// qualifies — and the availability handler must render the plain-language
-// plain-language "service not available" line in the `!` error log, worded
-// once in the class table, with NO blocking banner.
+// aws_endpoint_not_found_test.go — region-gap classification (CodeArtifact
+// does not exist in eu-central-2; its endpoint DNS does not resolve). The
+// classifier must be narrow — only DNS not-found qualifies — and the
+// availability handler must render the plain-language "service not
+// available" line in the `!` error log, worded once in the class table, with
+// NO blocking banner.
 
 import (
 	"errors"
@@ -35,12 +35,10 @@ func sdkStyleDNSNotFound() error {
 	return fmt.Errorf("operation error codeartifact: ListRepositories, request send failed, %w", urlErr)
 }
 
-// INVERTED by spec row 2 (task "errors"): the region gap is decided once, by
-// ErrClass, and the separate IsEndpointNotFound predicate two branches used to
-// call alongside it is gone. The assertions now read the class the branches
-// read. Do not restore a second predicate — a branch and a class that agree
-// only by luck is the defect this row removed. A resolver failure that is not
-// a missing host is its own class now ("dns"), not a plain false.
+// The region gap is decided once, by ErrClass, and the assertions read the
+// class the branches read; a branch and a class that agree only by luck is a
+// defect, so there is no second predicate. A resolver failure that is not a
+// missing host is its own class ("dns"), not a plain false.
 func TestRegionGapClassification(t *testing.T) {
 	cases := []struct {
 		name string

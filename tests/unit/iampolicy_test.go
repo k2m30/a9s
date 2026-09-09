@@ -526,7 +526,7 @@ func TestPrivilegeEscalation_LowercaseActionsStillMatchCombo(t *testing.T) {
 	}
 }
 
-// --- verify round 3: attacking the round-2 fixes themselves ---
+// --- edge cases around the fixes above ---
 
 func TestEvaluate_NotPrincipalOnly_NoPrincipalBlock_PublicButNoCrossAccount(t *testing.T) {
 	doc := `{"Statement":{"Effect":"Allow","NotPrincipal":{"AWS":"210987654321"},"Action":"s3:GetObject","Resource":"*"}}`

@@ -3,8 +3,8 @@ package unit
 // aws_acm_enricher_test.go — Structural contract test for acm's Wave 2
 // registration.
 //
-// docs/attention-signals.md moves acm's expiry/orphan signals (NotAfter <
-// 30d/7d, InUse==false on a non-expired cert) into Wave 1: they are readable
+// docs/attention-signals.md places acm's expiry/orphan signals (NotAfter <
+// 30d/7d, InUse==false on a non-expired cert) in Wave 1: they are readable
 // straight off ListCertificates' CertificateSummary (NotAfter, InUse) with
 // zero extra API calls, so per-resource Describe* (Wave 2, by definition) is
 // the wrong place for them. acm's ONLY spec'd Wave 2 signals
@@ -12,12 +12,9 @@ package unit
 // are explicitly marked NOT IMPLEMENTED (backlog) in the golden contract.
 //
 // Consequently the acm catalog entry must carry NO Wave 2 IssueEnricher at
-// all. The behavioral expiry/orphan tests that used to live in this file now
-// live in aws_acm_test.go (Wave 1, driven off FetchACMCertificatesPage with
-// an ACMListCertificatesAPI fake only — no DescribeCertificate fake needed).
-//
-// Current code (core/aws/catalog_dns_cdn.go "acm" entry) still registers
-// Wave2: IssueEnricher{Fn: EnrichACMCertificate, Priority: 100} — RED today.
+// all. The behavioral expiry/orphan tests are in aws_acm_test.go (Wave 1,
+// driven off FetchACMCertificatesPage with an ACMListCertificatesAPI fake
+// only — no DescribeCertificate fake needed).
 
 import (
 	"testing"

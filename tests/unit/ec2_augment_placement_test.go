@@ -201,10 +201,6 @@ func TestAugmentEC2StatusChecks_NonRunningNoInjection(t *testing.T) {
 // Status Checks to land mid-block. The augmenter must advance through both
 // subfields and spacers when finding endOfState, so Status Checks still lands
 // AFTER the entire State cluster (header + spacer + subfields), not mid-block.
-//
-// This test FAILS on pre-fix code (augmenter stops at the ItemSpacer and splits
-// the State block, placing Status Checks between the spacer and the subfields)
-// and PASSES after the coder's fix to advance through ItemSpacer as well.
 func TestAugmentEC2StatusChecks_TolerateSpacerInStateBlock(t *testing.T) {
 	td := resource.FindResourceType("ec2")
 	if td == nil {

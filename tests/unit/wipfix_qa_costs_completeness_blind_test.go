@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
 
-// wipfix_qa_costs_completeness_blind_test.go reproduces the reviewer's two
-// cost-cache scenarios literally, from the screen the operator uses:
+// wipfix_qa_costs_completeness_blind_test.go drives two cost-cache
+// scenarios from the screen the operator uses:
 //
 //   - a grid whose CE walk hit its page cap is partial. Leaving the screen and
 //     coming back must not turn it into a complete answer, and a later

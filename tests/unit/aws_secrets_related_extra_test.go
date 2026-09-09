@@ -1,8 +1,6 @@
-// aws_secrets_related_extra_test.go contains TDD Red tests for the Secrets
-// Manager related-panel checkers: secrets→codeartifact, secrets→eb,
-// secrets→ecs-task, secrets→logs, secrets→role, secrets→sns.
-// Tests are written before the coder replaces the stubs in stubs_related.go
-// with real implementations — initial failures are expected.
+// aws_secrets_related_extra_test.go covers the Secrets Manager related-panel
+// checkers: secrets→codeartifact, secrets→eb, secrets→ecs-task,
+// secrets→logs, secrets→role, secrets→sns.
 package unit_test
 
 import (

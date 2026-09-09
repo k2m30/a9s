@@ -69,9 +69,8 @@ func TestScenario_OpenSearchVisual(t *testing.T) {
 	//                degradation rather than an IAM denial)
 	//   Not counted (3): staging-analytics and acme-logs are clean, and
 	//                obsolete-tenant-logs is Dim.
-	// 2 + 8 = 10. The three encryption and transport rows moved into this
-	// count when their findings became Wave 1: they used to be Wave-2 rows
-	// that showed a glyph without colouring their own row.
+	// 2 + 8 = 10. The encryption and transport rows are Wave 1 findings, so
+	// they colour their own rows and count here.
 	// -----------------------------------------------------------------
 	scenario.ExpectMenuIssueCount("opensearch", 10)
 

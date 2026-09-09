@@ -115,9 +115,8 @@ func TestDottedDeclarationHumanizesTheNestedScalar(t *testing.T) {
 		t.Fatal("no type declares a dotted humanize field, so nothing exercises the nested-scalar path")
 	}
 
-	// The kinesis witness is the one Codex names; a dotted declaration on
-	// another type is reported so it gets a witness of its own rather than
-	// riding on this one.
+	// kinesis is the witness; a dotted declaration on another type is reported
+	// so it gets a witness of its own rather than riding on this one.
 	const kinesisShortName = "kinesis"
 	for _, d := range dotted {
 		if d.shortName != kinesisShortName {

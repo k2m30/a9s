@@ -1,13 +1,10 @@
 package unit
 
-// qa_cache_invalidation_test.go — TDD tests for resource cache invalidation.
+// qa_cache_invalidation_test.go — resource cache invalidation.
 //
-// These tests verify that the resource cache is cleared on profile/region
-// switch, selectively cleared on refresh, and correctly updated when
-// additional pages are loaded after re-entering a cached list.
-//
-// All tests are EXPECTED TO FAIL until the resource cache feature is
-// implemented in the root model (issue #111).
+// The resource cache is cleared on profile/region switch, selectively
+// cleared on refresh, and correctly updated when additional pages are loaded
+// after re-entering a cached list.
 
 import (
 	"strings"
@@ -177,11 +174,10 @@ func TestQA_CacheInvalidation_RefreshClearsCurrentTypeOnly(t *testing.T) {
 		Target:       messages.TargetResourceList,
 		ResourceType: "ct-events",
 	})
-	// INVERTED (listgen row 2, cache review finding 11): a warm re-entry now
-	// re-verifies. HandleNavigate returns the KindFetchResources task for the
-	// row-store hit, so both adapters seed the retained rows AND fetch. The
-	// old "cmd == nil" assertion encoded a list that was fresh forever; do not
-	// restore it. The rows-rendered-instantly half below is unchanged.
+	// A warm re-entry re-verifies: HandleNavigate returns the KindFetchResources
+	// task for the row-store hit, so both adapters seed the retained rows AND
+	// fetch; a list is never fresh forever. The rows-rendered-instantly half
+	// below is unchanged.
 	if ctCmd == nil {
 		t.Fatalf("re-entering ct-events should seed the retained rows and re-verify them, but issued no command")
 	}
@@ -200,11 +196,10 @@ func TestQA_CacheInvalidation_RefreshClearsCurrentTypeOnly(t *testing.T) {
 		ResourceType: "ec2",
 	})
 
-	// INVERTED (listgen row 2, cache review finding 11): a warm re-entry now
-	// re-verifies. HandleNavigate returns the KindFetchResources task for the
-	// row-store hit, so both adapters seed the retained rows AND fetch. The
-	// old "cmd == nil" assertion encoded a list that was fresh forever; do not
-	// restore it. The rows-rendered-instantly half below is unchanged.
+	// A warm re-entry re-verifies: HandleNavigate returns the KindFetchResources
+	// task for the row-store hit, so both adapters seed the retained rows AND
+	// fetch; a list is never fresh forever. The rows-rendered-instantly half
+	// below is unchanged.
 	// KEY ASSERTION: ec2's retained rows are still there to seed from.
 	if ec2Cmd == nil {
 		t.Errorf("after refreshing ct-events only, re-entering ec2 should still re-verify its retained rows")
@@ -255,11 +250,10 @@ func TestQA_CacheInvalidation_CacheUpdatesOnAdditionalPage(t *testing.T) {
 		Target:       messages.TargetResourceList,
 		ResourceType: "ct-events",
 	})
-	// INVERTED (listgen row 2, cache review finding 11): a warm re-entry now
-	// re-verifies. HandleNavigate returns the KindFetchResources task for the
-	// row-store hit, so both adapters seed the retained rows AND fetch. The
-	// old "cmd == nil" assertion encoded a list that was fresh forever; do not
-	// restore it. The rows-rendered-instantly half below is unchanged.
+	// A warm re-entry re-verifies: HandleNavigate returns the KindFetchResources
+	// task for the row-store hit, so both adapters seed the retained rows AND
+	// fetch; a list is never fresh forever. The rows-rendered-instantly half
+	// below is unchanged.
 	if ctCmd1 == nil {
 		t.Fatalf("re-entering ct-events (page 1) should seed the retained rows and re-verify them, but issued no command")
 	}
@@ -298,11 +292,10 @@ func TestQA_CacheInvalidation_CacheUpdatesOnAdditionalPage(t *testing.T) {
 		ResourceType: "ct-events",
 	})
 
-	// INVERTED (listgen row 2, cache review finding 11): a warm re-entry now
-	// re-verifies. HandleNavigate returns the KindFetchResources task for the
-	// row-store hit, so both adapters seed the retained rows AND fetch. The
-	// old "cmd == nil" assertion encoded a list that was fresh forever; do not
-	// restore it. The rows-rendered-instantly half below is unchanged.
+	// A warm re-entry re-verifies: HandleNavigate returns the KindFetchResources
+	// task for the row-store hit, so both adapters seed the retained rows AND
+	// fetch; a list is never fresh forever. The rows-rendered-instantly half
+	// below is unchanged.
 	if ctCmd2 == nil {
 		t.Errorf("re-entering ct-events after loading page 2 should seed both pages and re-verify them, but issued no command")
 	}

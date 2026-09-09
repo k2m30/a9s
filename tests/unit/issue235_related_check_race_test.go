@@ -1,14 +1,10 @@
 package unit
 
-// issue235_related_check_race_test.go — regression test for issue #235.
-//
-// Bug: handleRelatedCheckStarted captured the shared outer `cache` variable by
-// reference across all closures dispatched via tea.Batch. When two closures ran
-// concurrently and both found a cold-cache miss, both wrote to the same `cache`
-// map, producing a data race detected by `go test -race`.
-//
-// Fix: each closure captures its own per-closure `localCache := cache` copy so
-// concurrent goroutines never share the same mutable variable.
+// issue235_related_check_race_test.go — handleRelatedCheckStarted's closures
+// dispatched via tea.Batch must not share the outer `cache` variable: two
+// closures that both find a cold-cache miss would otherwise write to the
+// same map, a data race under `go test -race`. Each closure captures its own
+// `localCache := cache` copy.
 //
 // Run with -race to verify concurrent safety:
 //   go test -race ./tests/unit/ -run TestIssue235
@@ -28,8 +24,8 @@ import (
 // own target type and resolves to Count=1 — not contaminated by the other
 // checkers' fetched pages.
 //
-// This test detects the pre-fix bug (shared outer cache variable) both as a
-// correctness failure (wrong Count) and as a data race under -race.
+// A shared outer cache variable would fail this both as a correctness
+// failure (wrong Count) and as a data race under -race.
 func TestIssue235_EachCheckerGetsIsolatedCacheSnapshot(t *testing.T) {
 	const (
 		srcType = "_t235_src"

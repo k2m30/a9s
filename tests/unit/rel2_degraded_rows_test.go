@@ -1,11 +1,10 @@
 package unit_test
 
-// rel2_degraded_rows_test.go — row 11: generalizes the acceptance round-4
-// defect (a fabricated, assertable struct let struct-only pivots find their
-// field empty and answer a confident zero for a row nobody could describe)
-// across every type that ships a details-denied/details-unavailable row, not
-// just ng. Row 10 fixed the fabrication at the source; this is the gate that
-// catches it coming back.
+// rel2_degraded_rows_test.go — a details-denied/details-unavailable row
+// never answers a confident zero for a struct-only pivot: a fabricated,
+// assertable struct would let such pivots find their field empty and answer
+// zero for a row nobody could describe. This gate covers every type that
+// ships such a row, not just ng.
 
 import (
 	"context"

@@ -6,7 +6,7 @@ package unit
 // (denied) and "it didn't come back" (unavailable) never collapse into one
 // phrase. This classifier feeds every N+1 fetcher's degraded row across
 // mwaa/transfer/lt/ddb/opensearch/eks/ng, so pinning it here covers all of
-// them at the source (CodeRabbit / docs-resources honest-degradation).
+// them at the source.
 
 import (
 	"errors"

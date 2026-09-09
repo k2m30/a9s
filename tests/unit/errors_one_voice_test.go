@@ -39,10 +39,10 @@ func apiErrWithMessage(code, message string) error {
 	}
 }
 
-// TestCauseOf_ReadsTheErrorsFields pins spec row 1: the cause comes from the
-// error's own fields, so per-call noise the SDK prints (the request id, the
-// host id, the service and operation preamble) is never in it — and a message
-// that legitimately spells one of those words keeps its words.
+// TestCauseOf_ReadsTheErrorsFields: the cause comes from the error's own
+// fields, so per-call noise the SDK prints (the request id, the host id, the
+// service and operation preamble) is never in it — and a message that
+// legitimately spells one of those words keeps its words.
 func TestCauseOf_ReadsTheErrorsFields(t *testing.T) {
 	t.Run("noise in the fields reaches none of the cause", func(t *testing.T) {
 		cause := awsclient.CauseOf(apiErrWithMessage("InvalidParameterValue", "Snapshot volume size is invalid"))
@@ -124,10 +124,10 @@ func dnsFailureErr() error {
 	}
 }
 
-// TestTransportClasses_SplitWhereTheActionDiffers pins spec row 5: a TLS
-// failure, a refused connection and a resolver failure are three classes,
-// because the operator does three different things about them. Each reads its
-// own word on the row, in the account-wide title and in the cause.
+// TestTransportClasses_SplitWhereTheActionDiffers: a TLS failure, a refused
+// connection and a resolver failure are three classes, because the operator
+// does three different things about them. Each reads its own word on the
+// row, in the account-wide title and in the cause.
 func TestTransportClasses_SplitWhereTheActionDiffers(t *testing.T) {
 	for _, tc := range []struct {
 		name, class, rowWord string
@@ -180,9 +180,9 @@ func TestTransportClasses_SplitWhereTheActionDiffers(t *testing.T) {
 	}
 }
 
-// TestRegionGap_BothBranchesReadTheClass pins spec row 2: the availability
-// handler's region-gap branch is the class's decision, not a second one, and
-// the line it writes carries the class's phrase and the region.
+// TestRegionGap_BothBranchesReadTheClass: the availability handler's
+// region-gap branch is the class's decision, not a second one, and the line
+// it writes carries the class's phrase and the region.
 func TestRegionGap_BothBranchesReadTheClass(t *testing.T) {
 	if got, want := awsclient.ErrClass(regionGapErr()), awsclient.ClassRegionUnavailable; got != want {
 		t.Fatalf("ErrClass(region gap) = %q, want %q", got, want)
@@ -208,10 +208,9 @@ func TestRegionGap_BothBranchesReadTheClass(t *testing.T) {
 	}
 }
 
-// TestErrorHistory_OneShapeForEveryFailedCall pins spec row 3: a partial
-// result and a region gap are the same sentence — subject, then the cause the
-// class supplies — instead of the three shapes the two branches and the flash
-// used to build.
+// TestErrorHistory_OneShapeForEveryFailedCall: a partial result and a region
+// gap are the same sentence — subject, then the cause the class supplies —
+// whichever branch or flash builds it.
 func TestErrorHistory_OneShapeForEveryFailedCall(t *testing.T) {
 	for _, tc := range []struct {
 		name string
@@ -238,12 +237,10 @@ func TestErrorHistory_OneShapeForEveryFailedCall(t *testing.T) {
 			if len(lines) == 0 {
 				t.Fatalf("%s logged nothing", tc.name)
 			}
-			// INVERTED for the "skipped" spec row 5: the wanted line was
-			// "availability ec2: " + the cause, which for a partial-batch
-			// aggregate said the type twice ("availability ec2: ec2:
-			// DescribeInstances failed for ..."). The shape is still subject
-			// then cause; the subject is now said once. Do not restore the
-			// concatenation.
+			// The shape is subject then cause, with the subject said once: for a
+			// partial-batch aggregate, "availability ec2: " + the cause would say
+			// the type twice ("availability ec2: ec2: DescribeInstances failed
+			// for ...").
 			cause := awsclient.CauseInRegion(tc.err, "us-east-1")
 			if !strings.HasPrefix(lines[0][strings.Index(lines[0], "] ")+2:], "availability ec2") {
 				t.Errorf("error-history line %q does not lead with its subject", lines[0])
@@ -258,9 +255,9 @@ func TestErrorHistory_OneShapeForEveryFailedCall(t *testing.T) {
 	}
 }
 
-// TestCostsDrillRefusalNote_ReadsTheSharedMessage pins spec row 4: the costs
-// footer note reads the API error's message through the same helper every
-// other surface uses, instead of its own errors.As extraction.
+// TestCostsDrillRefusalNote_ReadsTheSharedMessage: the costs footer note
+// reads the API error's message through the same helper every other surface
+// uses, instead of its own errors.As extraction.
 func TestCostsDrillRefusalNote_ReadsTheSharedMessage(t *testing.T) {
 	const msg = "Resource-level data granularity is an opt-in only feature"
 	err := fmt.Errorf("%w: %w", awsclient.ErrCostsAccessDenied,
@@ -277,11 +274,11 @@ func TestCostsDrillRefusalNote_ReadsTheSharedMessage(t *testing.T) {
 	}
 }
 
-// TestAPIErrorHandler_SpeaksTheCause pins the acceptance reject on spec row 3:
-// the API error handler built "[code] message" out of the classifier's raw
-// message, so a denial put the encoded authorization blob on the flash and in
-// the error log while the same denial through any other path read the cause.
-// One formatter, one sentence, both surfaces.
+// TestAPIErrorHandler_SpeaksTheCause: the API error handler reads the cause
+// through the one formatter rather than building "[code] message" out of
+// the classifier's raw message, so a denial puts the cause on the flash and
+// in the error log, not the encoded authorization blob. One formatter, one
+// sentence, both surfaces.
 func TestAPIErrorHandler_SpeaksTheCause(t *testing.T) {
 	c, core := newTestControllerAndCore(t)
 	denial := apiErrWithMessage("UnauthorizedOperation",
@@ -311,10 +308,10 @@ func TestAPIErrorHandler_SpeaksTheCause(t *testing.T) {
 	}
 }
 
-// TestProbeBanner_SpeaksTheCauseNotTheClass pins the other half of the
-// acceptance reject: a row-less probe failure banner read "probe ec2: failed:
-// transport", the internal outcome and class names, beside "availability ec2:
-// <cause>" for the same event on the soft path.
+// TestProbeBanner_SpeaksTheCauseNotTheClass: a row-less probe failure banner
+// reads "availability ec2: <cause>", the same as the soft path for the same
+// event, never "probe ec2: failed: transport", the internal outcome and
+// class names.
 func TestProbeBanner_SpeaksTheCauseNotTheClass(t *testing.T) {
 	denial := apiErrWithMessage("UnauthorizedOperation",
 		"You are not authorized to perform: ec2:DescribeSnapshotAttribute")
@@ -359,11 +356,10 @@ func TestPrefetchBanner_SpeaksTheCause(t *testing.T) {
 	}
 }
 
-// TestLastProbeFailure_BannerSurvivesTheSweepsOwnClear pins what acceptance
-// observed: the probe that completes the sweep raises its failure banner and,
-// three intents later in the same batch, the completion appends a ClearFlash
-// meant for the progress message. The last type to fail was the one type whose
-// failure never reached the screen.
+// TestLastProbeFailure_BannerSurvivesTheSweepsOwnClear: the probe that
+// completes the sweep raises its failure banner and, three intents later in
+// the same batch, the completion appends a ClearFlash meant for the progress
+// message. The last type to fail must still reach the screen.
 func TestLastProbeFailure_BannerSurvivesTheSweepsOwnClear(t *testing.T) {
 	denial := apiErrWithMessage("UnauthorizedOperation",
 		"You are not authorized to perform: ec2:DescribeInstances")
@@ -382,11 +378,10 @@ func TestLastProbeFailure_BannerSurvivesTheSweepsOwnClear(t *testing.T) {
 	}
 }
 
-// TestResourceHandlers_SpeakThroughTheOneFormatter pins spec row 6: the four
-// remaining sites in handlers_resources.go. Two put the raw SDK chain on the
-// status bar — the same class acceptance rejected on the API error handler —
-// and two build the formatter's sentence by hand, so neither could ever name
-// the region a region gap is about.
+// TestResourceHandlers_SpeakThroughTheOneFormatter pins the four sites in
+// handlers_resources.go: none puts the raw SDK chain on the status bar, and
+// none builds the formatter's sentence by hand, so each can name the region
+// a region gap is about.
 func TestResourceHandlers_SpeakThroughTheOneFormatter(t *testing.T) {
 	denial := apiErrWithMessage("UnauthorizedOperation",
 		"You are not authorized to perform: ec2:DescribeInstances. Encoded authorization failure message: bV9lbmNvZGVkX21lc3NhZ2VfYmxvYg")
@@ -464,10 +459,9 @@ func TestResourceHandlers_SpeakThroughTheOneFormatter(t *testing.T) {
 	})
 }
 
-// TestRevealFailure_SpeaksTheCause pins the site my own round 2 sweep
-// misverdicted: handlers.go:547 sits among the theme-error flashes and is not
-// one — a failed reveal is a failed AWS call, and it put the raw chain on the
-// status bar.
+// TestRevealFailure_SpeaksTheCause: handlers.go's reveal failure sits among
+// the theme-error flashes and is not one — a failed reveal is a failed AWS
+// call, and its cause, not the raw chain, goes on the status bar.
 func TestRevealFailure_SpeaksTheCause(t *testing.T) {
 	denial := apiErrWithMessage("AccessDeniedException",
 		"User: arn:aws:iam::123456789012:role/example-readonly is not authorized to perform: secretsmanager:GetSecretValue on resource: acme-db-password")
@@ -539,10 +533,10 @@ func enrichDDBError(t *testing.T) error {
 	return err
 }
 
-// TestStatusBar_SubjectSaidOnce_BothLanes pins the "skipped" spec row 6 on the
-// rendered surface: the status bar names the lane and the type once, then the
-// cause. The type comes from the event's registry key; nothing the enricher or
-// the fetcher writes into its aggregate's label repeats it.
+// TestStatusBar_SubjectSaidOnce_BothLanes pins the rendered surface: the
+// status bar names the lane and the type once, then the cause. The type
+// comes from the event's registry key; nothing the enricher or the fetcher
+// writes into its aggregate's label repeats it.
 func TestStatusBar_SubjectSaidOnce_BothLanes(t *testing.T) {
 	for _, tc := range []struct {
 		name  string

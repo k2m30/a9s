@@ -90,10 +90,10 @@ func w2OSRun(t *testing.T, domains ...ostypes.DomainStatus) (map[string]resource
 	if err != nil {
 		t.Fatalf("FetchOpenSearchDomainsAt: %v", err)
 	}
-	// Inverted in d1: the three network-posture checks read the DescribeDomains
-	// response the fetcher already holds and made no AWS call, so they are wave-1
-	// findings on the row and opensearch registers no wave 2 at all. The result
-	// is rebuilt from the fetched rows so the assertions below are unchanged.
+	// The three network-posture checks read the DescribeDomains response the
+	// fetcher already holds and make no AWS call, so they are wave-1 findings
+	// on the row and opensearch registers no wave 2 at all. The result is
+	// rebuilt from the fetched rows so the assertions below read them.
 	res := awsclient.IssueEnricherResult{
 		Findings:         map[string][]domain.Finding{},
 		AttentionDetails: map[string]map[domain.FindingCode]domain.AttentionDetail{},

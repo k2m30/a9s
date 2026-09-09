@@ -1,31 +1,19 @@
-// costs_demo_test.go — Cost Explorer Phase 2: demo transport serves CE data
-// (specs/021-cost-explorer/spec.md SC-001, FR-003).
-//
-// Phase-1 production code (already landed, used as-is): core/costs,
-// core/aws.FetchCostAndUsage/FetchCostAnomalies, and
-// core/demo.NewDemoAWSConfig (routes any *costexplorer.Client through
-// the demo transport, exactly like tests/unit/demo_app_test.go's pattern
-// for other services via core/aws.CreateServiceClients).
-//
-// Phase-2, not yet landed (RED until the coder registers "ce:GetCostAndUsage"
-// / "ce:GetAnomalies" handlers backed by core/demo/fixtures/costs.go):
-// every assertion below currently fails with a 501 "no handler for ce:*"
-// transport error, not a compile error — this file compiles clean today
-// against Phase-1 symbols alone.
+// costs_demo_test.go — the demo transport serves Cost Explorer data
+// (specs/021-cost-explorer/spec.md SC-001, FR-003): core/demo.NewDemoAWSConfig
+// routes any *costexplorer.Client through the demo transport, exactly like
+// tests/unit/demo_app_test.go's pattern for other services via
+// core/aws.CreateServiceClients, and the "ce:GetCostAndUsage" /
+// "ce:GetAnomalies" handlers are backed by core/demo/fixtures/costs.go.
 //
 // The growth-story numbers asserted here (service/usage-type pinned via
 // fixtures.CostsGrowthService/CostsGrowthUsageType, a sharp single-month
-// jump) are lifted verbatim from wireframe.md's default-view example row,
-// which is explicitly the coordinator-cited source for the planted story —
-// so this is not a guess at fixture values, it is the documented visual
-// truth the fixture is built to match. The exact jump magnitude is asserted
-// as a ratio threshold ("roughly doubling", per the coordinator's own
-// wording), not an exact float, since the fixture's precise numbers are the
-// coder's to choose. Pinned via the constants, not literals (Codex X1): the
-// story must re-plant under a service with a registered a9s detail-view
-// mapping (CostsResourceRowsByService) so SC-001's spike -> usage type ->
-// resource chain can actually resolve a resource; whichever service the
-// coder re-plants it under, this file needs no edit.
+// jump) come from wireframe.md's default-view example row, the documented
+// visual truth the fixture is built to match. The jump magnitude is asserted
+// as a ratio threshold ("roughly doubling"), not an exact float. Pinned via
+// the constants, not literals: the story must live under a service with a
+// registered a9s detail-view mapping (CostsResourceRowsByService) so SC-001's
+// spike -> usage type -> resource chain can resolve a resource, and a
+// re-plant needs no edit here.
 package unit_test
 
 import (
@@ -119,10 +107,10 @@ func TestCostsDemo_InvoiceTotals_IncludeTaxRow(t *testing.T) {
 // ---------------------------------------------------------------------------
 // Planted growth story: fixtures.CostsGrowthService, driven by
 // fixtures.CostsGrowthUsageType — pinned via the constants (not literals) so
-// a re-plant under a different service/usage type (Codex X1: the story must
-// live under a service with a registered resource-row mapping, e.g. "Amazon
-// Elastic Compute Cloud - Compute") only requires editing the fixture, never
-// this test.
+// a re-plant under a different service/usage type (the story must live under
+// a service with a registered resource-row mapping, e.g. "Amazon Elastic
+// Compute Cloud - Compute") only requires editing the fixture, never this
+// test.
 // ---------------------------------------------------------------------------
 
 func TestCostsDemo_GrowthStory_Doubling(t *testing.T) {
@@ -148,7 +136,7 @@ func TestCostsDemo_GrowthStory_Doubling(t *testing.T) {
 	}
 	sort.Slice(growthRecs, func(i, j int) bool { return growthRecs[i].Period.Start < growthRecs[j].Period.Start })
 
-	const doublingThreshold = 1.5 // "roughly doubling" per the coordinator's own wording
+	const doublingThreshold = 1.5 // "roughly doubling"
 	maxRatio := 0.0
 	for i := 1; i < len(growthRecs); i++ {
 		prev := growthRecs[i-1].Metrics[costs.MetricInvoice].Value
