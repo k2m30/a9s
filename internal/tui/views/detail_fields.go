@@ -47,22 +47,17 @@ func plainDetailLine(rawLine string) string {
 	return parseYAMLLine(rawLine).plain()
 }
 
-// renderFromFieldList renders the structured field list to a string.
+// renderFromFieldList renders the structured field list to a string, laying
+// every key/value row out against keyW — the key-column width the body build
+// decided. The renderer does not arrive at a width of its own: the same body
+// is painted by the web lane, which has no renderer to ask.
 // Each FieldItem is rendered according to its type: header, sub-field, navigable, or normal.
 // Bug3 fix: applies styles.RowSelected to the cursor row when left column is focused.
 // Bug4 fix: suppresses NavigableField underline on the cursor row (RowSelected takes over).
-func (m DetailModel) renderFromFieldList() string {
+func (m DetailModel) renderFromFieldList(keyW int) string {
 	if len(m.fieldList) == 0 {
 		return styles.DimText.Render("  No detail data available")
 	}
-	// Collect top-level field paths for key width calculation.
-	var topPaths []string
-	for _, item := range m.fieldList {
-		if !item.IsHeader && !item.IsSubField {
-			topPaths = append(topPaths, item.Key)
-		}
-	}
-	keyW := computeKeyWidth(topPaths, m.width)
 
 	leftFocused := !m.rightCol.IsFocused()
 

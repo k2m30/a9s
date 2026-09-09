@@ -47,6 +47,9 @@ func (c *Controller) ensureDetailState(res resource.Resource, resourceType strin
 	if top.ID != runtime.ScreenDetail {
 		return
 	}
+	// The detail lane's own crossing of the boundary: a resource can reach a
+	// detail screen without a list page ever holding it.
+	res = res.Sanitized()
 	if top.State.Detail == nil {
 		ds := &DetailState{
 			Resource:     res,
@@ -387,6 +390,9 @@ func (c *Controller) applyFindingToState(ds *DetailState, findings []domain.Find
 	// session truncated-ID set has already moved and no reconstruction of the
 	// old block can be trusted.
 	was := ds.cursorLayout
+
+	findings = domain.SanitizedFindings(findings)
+	attentionDetails = domain.SanitizedAttentionDetails(attentionDetails)
 
 	// Strip prior wave-2 findings: a second result for this resource replaces
 	// the first rather than accumulating beside it.

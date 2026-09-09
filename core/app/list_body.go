@@ -302,6 +302,26 @@ func (c *Controller) materializeListFieldsForType(typeName string, resources []r
 	return out
 }
 
+// SanitizedRows is the boundary AWS-supplied text crosses to become something
+// a9s paints: a tag value, a description or a name is written by whoever can
+// tag the resource, and it arrives carrying whatever they put in it, escape
+// sequences included. Every lane that hands a page of rows to the controller
+// calls this on its way in.
+//
+// It is called BEFORE the controller lock, never under it: a page is twelve
+// thousand rows on a large account, and a per-row pass held against every
+// reader is the shape the absorb latency pin exists to forbid. Nothing is
+// written in place for the same reason it runs there — the page is still the
+// fetch lane's, and the cache writer may already be copying an earlier one
+// that shares its rows.
+func SanitizedRows(resources []resource.Resource) []resource.Resource {
+	out := make([]resource.Resource, len(resources))
+	for i := range resources {
+		out[i] = resources[i].Sanitized()
+	}
+	return out
+}
+
 // listBodyMemo caches the expensive part of buildListBody's output — the
 // resolved columns, the filtered+sorted+decorated row set, and the two
 // column-index lookups derived from that column set — keyed on every input

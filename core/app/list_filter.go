@@ -234,6 +234,20 @@ func (c *Controller) ApplyEnrichmentState(typeName string, issueCount int, trunc
 // fabricated 0/false does not falsely mark the type's issue badge Known).
 // Callers must hold c.mu (write).
 func (c *Controller) applyEnrichmentState(typeName string, issueCount int, truncated bool, findings map[string][]domain.Finding, details map[string]map[domain.FindingCode]domain.AttentionDetail, authoritative bool) {
+	// The enricher's wording is built from AWS-supplied text too — the same
+	// boundary the loaded page crosses, one lane over. The result maps belong
+	// to the lane that built them, so the cleaned copies go into maps of this
+	// function's own.
+	cleanFindings := make(map[string][]domain.Finding, len(findings))
+	for id, fs := range findings {
+		cleanFindings[id] = domain.SanitizedFindings(fs)
+	}
+	findings = cleanFindings
+	cleanDetails := make(map[string]map[domain.FindingCode]domain.AttentionDetail, len(details))
+	for id, m := range details {
+		cleanDetails[id] = domain.SanitizedAttentionDetails(m)
+	}
+	details = cleanDetails
 	if c.enrichmentStore == nil {
 		c.enrichmentStore = make(map[string]map[string][]domain.Finding)
 	}

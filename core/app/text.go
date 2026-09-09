@@ -5,6 +5,9 @@ package app
 import (
 	"strings"
 
+	lipgloss "charm.land/lipgloss/v2"
+	"github.com/charmbracelet/x/ansi"
+
 	"github.com/k2m30/a9s/v3/core/resource"
 	"github.com/k2m30/a9s/v3/core/runtime"
 )
@@ -116,27 +119,41 @@ func (c *Controller) GetTextScreenContext() (runtime.ScreenID, runtime.ScreenCon
 	return top.ID, top.Ctx
 }
 
-// buildTextSearchMatches scans lines for all case-insensitive occurrences of
-// query and returns a SearchMatch slice matching the SearchModel.recomputeMatches
-// semantics used by the YAML/JSON views.
-func buildTextSearchMatches(lines []string, query string) []SearchMatch {
+// TextSearchMatches scans lines for every case-insensitive occurrence of query
+// and returns them as SearchMatch values whose ColStart/ColEnd are what they
+// are called: display columns of the line as the terminal paints it.
+//
+// This is the one place a text screen's match set is computed. The offsets
+// cross to the web lane and back into the terminal's painter, and the three
+// candidate numbers for "where the match starts" — the byte offset, the rune
+// offset and the column — are three different numbers the moment a line holds
+// a CJK name, so the published offset carries the unit its name claims and
+// every reader converts from that one.
+//
+// Each line is measured with its own styling stripped: the lines a text screen
+// carries are already syntax-coloured, and a column is a thing the operator
+// sees, not a byte of an escape sequence.
+func TextSearchMatches(lines []string, query string) []SearchMatch {
 	if query == "" {
 		return nil
 	}
 	q := strings.ToLower(query)
 	var matches []SearchMatch
 	for lineIdx, line := range lines {
-		lower := strings.ToLower(line)
+		plain := ansi.Strip(line)
+		lower := strings.ToLower(plain)
 		start := 0
 		for {
 			idx := strings.Index(lower[start:], q)
 			if idx < 0 {
 				break
 			}
+			at := min(start+idx, len(plain))
+			end := min(at+len(q), len(plain))
 			matches = append(matches, SearchMatch{
 				Line:     lineIdx,
-				ColStart: start + idx,
-				ColEnd:   start + idx + len(q),
+				ColStart: lipgloss.Width(plain[:at]),
+				ColEnd:   lipgloss.Width(plain[:end]),
 			})
 			start += idx + len(q)
 		}
@@ -147,7 +164,7 @@ func buildTextSearchMatches(lines []string, query string) []SearchMatch {
 // buildTextBody constructs a TextBody from TextState, mirroring the data that
 // YAMLModel.View() / JSONModel.View() consume via their viewport content.
 func buildTextBody(ts *TextState) *TextBody {
-	matches := buildTextSearchMatches(ts.Lines, ts.Search)
+	matches := TextSearchMatches(ts.Lines, ts.Search)
 
 	// Clamp SearchCursor to valid range.
 	cursor := ts.SearchCursor

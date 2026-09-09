@@ -339,6 +339,10 @@ type DetailBody struct {
 	// FieldCursor is the index of the highlighted field row (for cursor-selection
 	// rendering in RenderDetail).
 	FieldCursor int `json:"field_cursor,omitempty"`
+	// KeyWidth is the column width reserved for the key column of every kv row,
+	// decided at build time from the viewport the body was built for so both the
+	// terminal and the web lane lay the rows out identically.
+	KeyWidth int `json:"key_width,omitempty"`
 }
 
 // SearchMatch is one highlighted match in a text screen.

@@ -52,6 +52,12 @@ func (c *Controller) traceFoldAcceptance(eventType string, operationID domain.Ge
 // controller stack, so a late async result for type X lands on X's screen even
 // when it is not currently on top.
 func (c *Controller) Handle(ev runtime.Event) (ViewState, []runtime.TaskRequest) {
+	// Before the lock, because it walks every row of the page: the fetch
+	// lane's crossing of the text boundary (SanitizedRows).
+	if msg, ok := ev.(messages.ResourcesLoaded); ok {
+		msg.Resources = SanitizedRows(msg.Resources)
+		ev = msg
+	}
 	c.mu.Lock()
 
 	intents, tasks := c.core.HandleEvent(ev)

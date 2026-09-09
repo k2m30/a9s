@@ -30,6 +30,8 @@ func (c *Controller) ApplyResourcesLoaded(typeName string, resources []resource.
 	// do and the file not yet written. Same writes, same order, same
 	// function; only the return is later.
 	defer c.WaitForCacheWrites()
+	// Off the lock, exactly where the real lane does it (Handle).
+	resources = SanitizedRows(resources)
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	// Resolve canonical short name (handles aliases like "rds" → "dbi"),

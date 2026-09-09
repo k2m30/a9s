@@ -133,7 +133,11 @@ func (c *Controller) applyNavResult(res runtime.NavigateResult) []runtime.TaskRe
 		// HandleNavigate returned for both kinds is still on its way, and
 		// cache-first seeding never skips it.
 		if res.CachedEntry != nil {
-			c.applyResourcesLoaded(top.State.List, res.ResolvedType, res.CachedEntry.Resources, res.CachedEntry.Pagination, false, false, isTopLevelCanonicalList(intent.ID, top.State.List), nil, 0)
+			// A cache entry written by an older build carries whatever the
+			// fetcher of the day stored, so the replay crosses the boundary
+			// too.
+			seeded := SanitizedRows(res.CachedEntry.Resources)
+			c.applyResourcesLoaded(top.State.List, res.ResolvedType, seeded, res.CachedEntry.Pagination, false, false, isTopLevelCanonicalList(intent.ID, top.State.List), nil, 0)
 			top.State.List.Refreshing = true
 			// Set after the seeding call, per SetListTotalCount's ordering note;
 			// lock-free here because applyNavResult already runs under c.mu.

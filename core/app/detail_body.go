@@ -10,6 +10,7 @@ import (
 	"strings"
 	"unicode"
 
+	lipgloss "charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
 
 	"github.com/k2m30/a9s/v3/core/catalog"
@@ -106,6 +107,7 @@ func (c *Controller) buildDetailBody(ds *DetailState) (*DetailBody, detailLayout
 		Wrap:                ds.Wrap,
 		ScrollY:             ds.ScrollY,
 		FieldCursor:         fc,
+		KeyWidth:            DetailKeyWidth(fields, ds.ViewportWidth),
 	}, layout
 }
 
@@ -671,4 +673,39 @@ func buildDetailRelatedBlocks(ds *DetailState) []RelatedBlock {
 		})
 	}
 	return blocks
+}
+
+// detailKeyFloor is the narrowest the detail key column gets. A resource whose
+// longest field name is two characters would otherwise crowd its values
+// against the left edge, and they would sit in a different place on every
+// screen.
+const detailKeyFloor = 22
+
+// DetailKeyWidth returns the width the key column of a detail body reserves:
+// the widest top-level key plus its colon, never under detailKeyFloor and
+// never over two fifths of the viewport. The bound is what keeps a field name
+// wider than the terminal from reserving the whole line and leaving the value
+// — the thing the reader opened the detail view for — off the right edge. A
+// viewport of zero is a body built before anything was sized and bounds
+// nothing.
+//
+// It is measured in terminal columns, because that is what the padding under
+// it fills: a key counted in bytes reserves three times the room a CJK field
+// name paints. lipgloss.Width is the same measure the painter's PadOrTrunc
+// pads to, and it is a package both this lane and the terminal may import —
+// the layout is decided here, once per build, and every renderer reads
+// DetailBody.KeyWidth rather than arriving at its own answer from its own
+// width.
+func DetailKeyWidth(fields []FieldRow, viewport int) int {
+	w := detailKeyFloor
+	for _, f := range fields {
+		if f.IsHeader || f.IsSubField {
+			continue
+		}
+		w = max(w, lipgloss.Width(f.Key)+1)
+	}
+	if viewport > 0 {
+		return min(w, viewport*2/5)
+	}
+	return w
 }

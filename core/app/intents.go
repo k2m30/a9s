@@ -3,6 +3,7 @@
 package app
 
 import (
+	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/runtime"
 )
 
@@ -237,6 +238,10 @@ func (c *Controller) applyIntentsLocked(intents []runtime.UIIntent) {
 			c.identityErrMsg = ""
 
 		case runtime.FlashIntent:
+			// An AWS error message quotes the input it rejected — a bucket
+			// name, a tag value — so the text of a failure is one more lane
+			// AWS-supplied characters reach a surface by.
+			v.Text = domain.Sanitize(v.Text)
 			// The one place a failure becomes a session record. Every host
 			// applies its flashes here, so which host is rendering cannot
 			// decide whether the operator can still read the failure after the

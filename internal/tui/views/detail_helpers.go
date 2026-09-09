@@ -355,5 +355,12 @@ func renderDetailFieldsFromBody(m *DetailModel, body app.DetailBody) string {
 	tmp.fieldCursor = body.FieldCursor
 	// rightCol focus drives leftFocused in renderFromFieldList; set a consistent state.
 	tmp.rightCol.SetFocused(!leftFocused)
-	return tmp.renderFromFieldList()
+	// A body the controller built carries the key width it laid the rows out
+	// against. A body assembled by hand carries none, and the same rule is
+	// applied here to the width this model was sized to.
+	keyW := body.KeyWidth
+	if keyW <= 0 {
+		keyW = app.DetailKeyWidth(body.Fields, m.width)
+	}
+	return tmp.renderFromFieldList(keyW)
 }

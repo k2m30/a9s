@@ -121,11 +121,15 @@ func (m *JSONModel) RenderText(body app.TextBody) string {
 	content := strings.Join(body.Lines, "\n")
 
 	if body.Search != "" {
+		// The body already carries the match set the controller computed, in
+		// display columns. Painting from it is what keeps the highlight on the
+		// screen and the offsets the web lane reads describing one thing.
 		plain := ansi.Strip(content)
 		var sm SearchModel
 		sm.active = true
-		sm.SetQuery(body.Search)
-		sm.SetContent(plain)
+		sm.query = body.Search
+		sm.content = plain
+		sm.setMatches(body.SearchMatches)
 		if body.SearchCursor >= 0 && body.SearchCursor < len(sm.matches) {
 			sm.currentIdx = body.SearchCursor
 		}

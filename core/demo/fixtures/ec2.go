@@ -98,6 +98,15 @@ const (
 	// sg-0public0all000003); every other public instance is behind a group
 	// that names its ports.
 	EC2InstanceInternetExposedAll = "i-0a1b2c3d4e5f60050"
+	// EC2InstanceHostileTag is the only demo instance carrying a tag written
+	// by someone who wanted the terminal, not the operator, to read it: the
+	// value of its "Owner" tag opens an SGR sequence that recolours the rest
+	// of the screen and rings the bell. AWS accepts such a value and hands it
+	// straight back, so the demo carries one too and every surface that shows
+	// it must show it inert.
+	EC2InstanceHostileTag = "i-0a1b2c3d4e5f60031"
+	// EC2HostileTagValue is that value.
+	EC2HostileTagValue = "platform\x1b[31m-team\x07"
 	// EBSSnapPublic is the only demo snapshot restorable by every AWS
 	// account; every other snapshot is private to this account.
 	EBSSnapPublic = "snap-0a1b2c3d4e5f60002"
@@ -554,6 +563,12 @@ func makeInstance(
 			HttpPutResponseHopLimit: aws.Int32(2),
 		},
 		PrivateDnsName: aws.String(privateDNS(privateIP)),
+	}
+	if instanceID == EC2InstanceHostileTag {
+		inst.Tags = append(inst.Tags, ec2types.Tag{
+			Key:   aws.String("Owner"),
+			Value: aws.String(EC2HostileTagValue),
+		})
 	}
 	if instanceID == "i-0a1b2c3d4e5f60001" {
 		inst.Platform = ec2types.PlatformValuesWindows

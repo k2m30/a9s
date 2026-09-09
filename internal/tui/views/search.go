@@ -11,19 +11,24 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
+	"github.com/k2m30/a9s/v3/core/app"
 	"github.com/k2m30/a9s/v3/internal/tui/styles"
+	"github.com/k2m30/a9s/v3/internal/tui/text"
 )
 
-// matchPos records the position of a single query match in plain-text content.
+// matchPos records the position of a single query match in plain-text
+// content, in the unit the painter walks the line in: rune offsets. The
+// published unit is display columns (app.SearchMatch), and setMatches is the
+// one conversion between them.
 type matchPos struct {
-	line     int // 0-based line index in plain text
-	startCol int // starting byte column in plain line
-	endCol   int // ending byte column in plain line
+	line      int // 0-based line index in plain text
+	startRune int // starting rune offset in the plain line
+	endRune   int // ending rune offset in the plain line
 }
 
 // highlightEvent is used internally by highlightLine to track open/close positions.
 type highlightEvent struct {
-	visCol   int
+	visRune  int
 	matchIdx int
 	isOpen   bool
 }
@@ -255,11 +260,9 @@ func highlightLine(styledLine string, entries []searchLineEntry, currentIdx int)
 	// Build sorted event list (open/close per match).
 	events := make([]highlightEvent, 0, len(entries)*2)
 	for _, e := range entries {
-		startRune := byteOffsetToRuneOffset(plainLine, e.mp.startCol)
-		endRune := byteOffsetToRuneOffset(plainLine, e.mp.endCol)
 		events = append(events,
-			highlightEvent{startRune, e.matchIdx, true},
-			highlightEvent{endRune, e.matchIdx, false},
+			highlightEvent{e.mp.startRune, e.matchIdx, true},
+			highlightEvent{e.mp.endRune, e.matchIdx, false},
 		)
 	}
 	sortHighlightEvents(events)
@@ -273,14 +276,14 @@ func highlightLine(styledLine string, entries []searchLineEntry, currentIdx int)
 
 	for {
 		// Fire events at the current visible position.
-		for eIdx < len(events) && events[eIdx].visCol == visPos {
+		for eIdx < len(events) && events[eIdx].visRune == visPos {
 			ev := events[eIdx]
 			if ev.isOpen {
 				// Find the matching close to know the span length.
 				endRune := visPos
 				for k := eIdx + 1; k < len(events); k++ {
 					if events[k].matchIdx == ev.matchIdx && !events[k].isOpen {
-						endRune = events[k].visCol
+						endRune = events[k].visRune
 						break
 					}
 				}
@@ -332,14 +335,6 @@ func highlightLine(styledLine string, entries []searchLineEntry, currentIdx int)
 	return out.String()
 }
 
-// byteOffsetToRuneOffset converts a byte offset in s to a rune count.
-func byteOffsetToRuneOffset(s string, byteOff int) int {
-	if byteOff >= len(s) {
-		return len([]rune(s))
-	}
-	return len([]rune(s[:byteOff]))
-}
-
 // advanceStyledBytes advances bytePos in styledLine past n visible rune positions,
 // skipping ANSI escapes transparently.
 func advanceStyledBytes(styledLine string, bytePos, count int) int {
@@ -375,14 +370,14 @@ func skipCloseEvent(events []highlightEvent, openIdx int) int {
 	return openIdx + 1
 }
 
-// sortHighlightEvents sorts events by visCol; at same col, closes before opens.
+// sortHighlightEvents sorts events by rune offset; at the same offset, closes before opens.
 func sortHighlightEvents(events []highlightEvent) {
 	// Insertion sort — event counts are tiny (single-digit per line typically).
 	for i := 1; i < len(events); i++ {
 		for j := i; j > 0; j-- {
 			a, b := events[j-1], events[j]
-			// a < b if a.visCol > b.visCol (swap), or same col and a is open but b is close.
-			if a.visCol > b.visCol || (a.visCol == b.visCol && a.isOpen && !b.isOpen) {
+			// a < b if a.visRune > b.visRune (swap), or same offset and a is open but b is close.
+			if a.visRune > b.visRune || (a.visRune == b.visRune && a.isOpen && !b.isOpen) {
 				events[j-1], events[j] = events[j], events[j-1]
 			} else {
 				break
@@ -426,24 +421,7 @@ func (s *SearchModel) recomputeMatches() {
 		s.currentIdx = 0
 		return
 	}
-	q := strings.ToLower(s.query)
-	lines := strings.Split(s.content, "\n")
-	for lineIdx, line := range lines {
-		lower := strings.ToLower(line)
-		start := 0
-		for {
-			idx := strings.Index(lower[start:], q)
-			if idx < 0 {
-				break
-			}
-			s.matches = append(s.matches, matchPos{
-				line:     lineIdx,
-				startCol: start + idx,
-				endCol:   start + idx + len(q),
-			})
-			start += idx + len(q)
-		}
-	}
+	s.setMatches(app.TextSearchMatches(strings.Split(s.content, "\n"), s.query))
 	// Preserve the match index across recomputation (e.g. after NextMatch
 	// triggers a re-render which calls SetContent → recomputeMatches).
 	switch {
@@ -454,4 +432,46 @@ func (s *SearchModel) recomputeMatches() {
 	default:
 		s.currentIdx = len(s.matches) - 1
 	}
+}
+
+// setMatches records the published match set — display columns, the unit
+// app.SearchMatch is named for — as the rune offsets the painter walks in.
+// The published set is the one the controller computed, so a text screen and
+// its body cannot disagree about where a match is; a screen that has no
+// published set (the detail view, whose content is rendered rows rather than
+// carried lines) computes one from the same function first.
+func (s *SearchModel) setMatches(published []app.SearchMatch) {
+	if len(published) == 0 {
+		s.matches = nil
+		return
+	}
+	lines := strings.Split(s.content, "\n")
+	s.matches = make([]matchPos, 0, len(published))
+	for _, m := range published {
+		if m.Line < 0 || m.Line >= len(lines) {
+			continue
+		}
+		plain := ansi.Strip(lines[m.Line])
+		s.matches = append(s.matches, matchPos{
+			line:      m.Line,
+			startRune: runeOffsetAtColumn(plain, m.ColStart),
+			endRune:   runeOffsetAtColumn(plain, m.ColEnd),
+		})
+	}
+}
+
+// runeOffsetAtColumn returns the rune offset in plain at display column col.
+// A column past the end of the line is the end of the line.
+func runeOffsetAtColumn(plain string, col int) int {
+	if col <= 0 {
+		return 0
+	}
+	w := 0
+	for i, r := range []rune(plain) {
+		if w >= col {
+			return i
+		}
+		w += text.Width(string(r))
+	}
+	return len([]rune(plain))
 }
