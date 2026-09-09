@@ -34,3 +34,7 @@
 - The status column is as wide as the list body says it is. It was declared in
   one place and widened again in the terminal renderer, so a second lane
   reading the same body laid the column out differently.
+
+- A Cost Explorer refusal and an identity failure read as text, not as
+  terminal commands. Both quote what they refused — a dimension value, a tag
+  key, a profile name — and both were painted verbatim.

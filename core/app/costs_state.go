@@ -11,6 +11,7 @@ import (
 	awsclient "github.com/k2m30/a9s/v3/core/aws"
 	"github.com/k2m30/a9s/v3/core/costs"
 	"github.com/k2m30/a9s/v3/core/costs/screen"
+	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 	"github.com/k2m30/a9s/v3/core/runtime"
 	"github.com/k2m30/a9s/v3/core/runtime/messages"
@@ -932,7 +933,9 @@ func isClassifiedResourceDrillRefusal(err error) bool {
 // wrapper prefixes consume the footer line and truncate that text away
 // before it is ever seen.
 func costsResourceDrillRefusalNote(err error) string {
-	return fmt.Sprintf("resource-level cost data unavailable for this account: %s", awsclient.MessageOf(err))
+	// A refusal quotes what it refused — a dimension value, a tag key — so
+	// the message crosses the text boundary before it becomes a footer note.
+	return fmt.Sprintf("resource-level cost data unavailable for this account: %s", domain.Sanitize(awsclient.MessageOf(err)))
 }
 
 // ApplyCostsLoaded merges one Cost Explorer fetch result into the costs
@@ -1035,7 +1038,9 @@ func (c *Controller) ApplyCostsLoaded(ev messages.CostsLoaded) *runtime.TaskRequ
 				// prints the SDK's "operation error <service>: <op>" preamble,
 				// which repeats what the screen already says and pushes the
 				// sentence the operator can act on off the end of the line.
-				cs.ErrorMsg = awsclient.CauseOf(ev.Err)
+				// The same boundary the list's error marker crosses: Cost
+				// Explorer's refusals quote the input they refused.
+				cs.ErrorMsg = domain.Sanitize(awsclient.CauseOf(ev.Err))
 			}
 		}
 		return nil

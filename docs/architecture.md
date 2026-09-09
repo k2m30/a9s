@@ -157,11 +157,28 @@ These are **current-state invariants**. The 020-architecture-refactor that produ
    `applyDetailEnrichmentForResourceLocked` for one the detail enricher
    re-read, `SetTextResource` for the one a text screen titles itself with,
    `applyFindingToState` and `applyEnrichmentState` for enricher wording, the
-   `FlashIntent` case for an error banner, and `ListState.setFetchError` for
-   the marker a failed refresh leaves over a list. That list is enforced by
-   test, not by prose: a door added without the call is a hole nothing else
-   reports, which is how the TUI's own door went uncovered while the demo
-   still rendered a raw escape sequence. Nothing downstream re-checks, and nothing in a renderer strips: the
+   `FlashIntent` case for an error banner, `ListState.setFetchError` for the
+   marker a failed refresh leaves over a list, and `ApplyCostsLoaded` for a
+   Cost Explorer refusal, which quotes the dimension or tag key it refused
+   both in the screen's error state and in the footer note a refused
+   resource drill leaves.
+   `ReplayRelatedCache`, `PatchListReapplyChecker`,
+   `ApplyReapplyCheckerAgainst` and `BeginDetailWorkload` take a carrier and
+   write no painted text of their own; each is exempt by name, with its
+   reason, in the gate.
+   That list is enforced by test, not by prose:
+   `tests/unit/tui6_boundary_doors_gate_test.go` reads the doors out of
+   `core/app` and follows each carrying argument into the calls it is passed
+   to, so a door added without the call fails rather than going unreported —
+   which is how the TUI's own door went uncovered while the demo still
+   rendered a raw escape sequence.
+   The gate's ceiling is `Controller.Handle`: its parameter is the
+   `runtime.Event` interface, so no enumeration can say which payloads reach
+   it, and the boundary call for the one payload that carries a page
+   (`messages.ResourcesLoaded`) sits in the method by inspection rather than
+   by proof. A second event type that carries AWS text into controller state
+   through `Handle` would satisfy the gate while bypassing the boundary; the
+   behavioural pins per lane are what cover that gap today. Nothing downstream re-checks, and nothing in a renderer strips: the
    painter's own C0-to-space mapping in `text.PadOrTrunc` stays, because a
    control character occupying no column is a fact about painting, and a9s's
    own SGR sequences must survive the painter or colour never reaches the

@@ -220,7 +220,10 @@ func (c *Controller) Handle(ev runtime.Event) (ViewState, []runtime.TaskRequest)
 	// can build IdentityBody.ErrorMsg. IsStale uses AspectConnect + Gen.
 	if msg, ok := ev.(messages.IdentityError); ok && !messages.IsStale(msg, c.core) {
 		c.identityLoading = false
-		c.identityErrMsg = msg.Err
+		// An STS refusal names the profile or role it refused, and the
+		// identity screen paints this string: the same boundary as the list's
+		// error marker and the costs screen's.
+		c.identityErrMsg = domain.Sanitize(msg.Err)
 	}
 
 	// messages.CostsLoaded is not wired into runtime.Core.HandleEvent: the
