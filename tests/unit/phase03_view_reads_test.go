@@ -708,9 +708,14 @@ func TestViews_ListStatusColumn_LifecycleKeyDefaultIsState(t *testing.T) {
 				ID:   short + "-lk-default",
 				Name: short + "-lk-default",
 				Fields: map[string]string{
-					// "status" is absent — pre-fix extractCellValue reads this, gets blank.
-					// "state" is present — post-fix fallback reads this.
-					"state": "running",
+					// Stored as AWS spells it. A status column reads the
+					// lifecycle key and words the value; a column that is not
+					// one reads its key and shows what is stored. The type
+					// declares no lifecycle key, so "state" is a status column
+					// only because that is the default — which is the whole
+					// subject here, and the reason the raw spelling is what
+					// this row carries.
+					"state": "RUNNING",
 				},
 				Findings: nil,
 			}
@@ -718,8 +723,8 @@ func TestViews_ListStatusColumn_LifecycleKeyDefaultIsState(t *testing.T) {
 			c := loadListController(t, td, []resource.Resource{r})
 			out := renderListBody(t, c, td)
 
-			if !strings.Contains(out, "running") {
-				t.Errorf("[%s] Status column must show Fields[\"state\"]=\"running\" when Findings=nil and LifecycleKey is empty (default=\"state\"); got:\n%s",
+			if strings.Contains(out, "RUNNING") || !strings.Contains(out, "running") {
+				t.Errorf("[%s] the Status column must read Fields[\"state\"] and word it — a type that declares no LifecycleKey has the default \"state\", and a column keyed by it is the status column; got:\n%s",
 					short, out)
 			}
 		})
