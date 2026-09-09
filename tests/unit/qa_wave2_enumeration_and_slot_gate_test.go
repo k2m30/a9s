@@ -74,7 +74,7 @@ func TestAChildTypesWave2EnricherIsEnumeratedAndDispatched(t *testing.T) {
 		return awsclient.IssueEnricherResult{
 			Findings:         map[string][]domain.Finding{},
 			AttentionDetails: map[string]map[domain.FindingCode]domain.AttentionDetail{},
-			TruncatedIDs:     map[string]bool{},
+			TruncatedIDs:     map[string]string{},
 			FieldUpdates:     map[string]map[string]string{},
 		}, nil
 	}
