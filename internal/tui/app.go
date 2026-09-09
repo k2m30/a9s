@@ -4,7 +4,6 @@ package tui
 
 import (
 	"context"
-	"fmt"
 
 	"charm.land/bubbles/v2/textinput"
 	tea "charm.land/bubbletea/v2"
@@ -91,10 +90,10 @@ type Model struct {
 	tabMatches []string
 	tabIndex   int
 
-	keys        keys.Map
-	viewConfig  *config.ViewsConfig
-	configErr   error  // non-nil if views config was found but corrupt
-	activeTheme string // current theme filename (for selector "(current)" indicator)
+	keys         keys.Map
+	viewConfig   *config.ViewsConfig
+	configReport string // the sentence to flash when the views config did not load cleanly, "" when it did
+	activeTheme  string // current theme filename (for selector "(current)" indicator)
 
 	// headerCache avoids re-computing the header string every render when
 	// profile, region, version, and right-side content haven't changed.
@@ -122,6 +121,9 @@ func New(profile, region string, opts ...Option) Model {
 
 	// Load view config synchronously (fast local file read).
 	cfg, cfgErr := config.Load()
+	// Worded before the fallback below, because whether the operator's file is
+	// in use is exactly what the sentence says.
+	configReport := config.ReportText(cfg, cfgErr)
 	if cfg == nil {
 		// Use the shared read-only default — tui.Model never mutates viewConfig.
 		cfg = config.SharedDefaultConfig()
@@ -144,18 +146,18 @@ func New(profile, region string, opts ...Option) Model {
 	ctrl.SetViewConfig(cfg)
 
 	m := Model{
-		core:        core,
-		ctrl:        ctrl,
-		keys:        k,
-		stack:       []*rendererState{newMenuRS()},
-		cmdInput:    ti,
-		viewConfig:  cfg,
-		configErr:   cfgErr,
-		activeTheme: "tokyo-night.yaml",
-		appCtx:      ctx,
-		appCancel:   cancel,
-		pairCtx:     pairCtx,
-		pairCancel:  pairCancel,
+		core:         core,
+		ctrl:         ctrl,
+		keys:         k,
+		stack:        []*rendererState{newMenuRS()},
+		cmdInput:     ti,
+		viewConfig:   cfg,
+		configReport: configReport,
+		activeTheme:  "tokyo-night.yaml",
+		appCtx:       ctx,
+		appCancel:    cancel,
+		pairCtx:      pairCtx,
+		pairCancel:   pairCancel,
 	}
 	m.screens = defaultBuilders()
 	for _, opt := range opts {
@@ -208,12 +210,9 @@ func (m Model) Init() tea.Cmd {
 		preCmd := func() tea.Msg {
 			return messages.ClientsReady{Clients: m.core.PreSuppliedClients(), Gen: gen}
 		}
-		if m.configErr != nil {
+		if m.configReport != "" {
 			return tea.Batch(preCmd, func() tea.Msg {
-				return messages.Flash{
-					Text:    fmt.Sprintf("Config error: %v (using defaults)", m.configErr),
-					IsError: true,
-				}
+				return messages.Flash{Text: m.configReport, IsError: true}
 			})
 		}
 		return preCmd
@@ -228,12 +227,9 @@ func (m Model) Init() tea.Cmd {
 	// seed it synchronously alongside the connect kickoff rather than
 	// waiting for ClientsReady to dispatch TaskKindLoadAvailCache.
 	seedCmd := m.loadAvailabilityCache()
-	if m.configErr != nil {
+	if m.configReport != "" {
 		return tea.Batch(connectCmd, seedCmd, func() tea.Msg {
-			return messages.Flash{
-				Text:    fmt.Sprintf("Config error: %v (using defaults)", m.configErr),
-				IsError: true,
-			}
+			return messages.Flash{Text: m.configReport, IsError: true}
 		})
 	}
 	return tea.Batch(connectCmd, seedCmd)

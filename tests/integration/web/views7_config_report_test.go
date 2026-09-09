@@ -85,7 +85,7 @@ detail:
 		t.Fatal("the load returned no config — the operator's file is in use, not replaced")
 	}
 
-	c, cleanup := startServerWithConfig(t, viewCfg)
+	c, cleanup := startServerWithConfig(t, viewCfg, config.ReportText(viewCfg, cfgErr))
 	defer cleanup()
 
 	flash := views7Flash(t, c)
@@ -122,7 +122,7 @@ detail:
 		t.Fatalf("loading a file whose every key names a field reported %v", cfgErr)
 	}
 
-	c, cleanup := startServerWithConfig(t, viewCfg)
+	c, cleanup := startServerWithConfig(t, viewCfg, config.ReportText(viewCfg, cfgErr))
 	defer cleanup()
 
 	if f := c.state(t).Header.Flash; f.IsError {

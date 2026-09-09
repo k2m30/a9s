@@ -376,19 +376,22 @@ func runWebServer(profile, region, command, addr string, allowReveal, demoMode, 
 		return fmt.Errorf("generating token: %w", err)
 	}
 
-	// One behaviour, both lanes: the TUI keeps the operator's file and shows
-	// the error (internal/tui/app.go), so the web lane does too. It used to
-	// replace the whole config with the defaults, which threw away every
-	// column they had written over one line this build could not fill.
+	// One behaviour, both lanes: the operator's file is kept and the report is
+	// shown, in the same words the terminal uses (internal/tui/app.go). It
+	// used to replace the whole config with the defaults and write to stderr,
+	// which threw away every column they had written and told nobody who had
+	// started the server in the background.
 	viewCfg, cfgErr := config.Load()
+	configReport := config.ReportText(viewCfg, cfgErr)
 	if viewCfg == nil {
 		viewCfg = config.SharedDefaultConfig()
 	}
-	if cfgErr != nil {
-		fmt.Fprintf(os.Stderr, "config error: %v (the rest of the file is in use)\n", cfgErr)
+	if configReport != "" {
+		// The page carries it; stderr keeps the copy a log scrape can find.
+		fmt.Fprintln(os.Stderr, configReport)
 	}
 
-	srv := web.NewServer(profile, region, command, addr, token, demoMode, noCache, allowReveal, viewCfg)
+	srv := web.NewServer(profile, region, command, addr, token, demoMode, noCache, allowReveal, viewCfg, configReport)
 
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()

@@ -18,7 +18,7 @@ import (
 // Controller.BootstrapLive so the GET / handler never blocks on AWS. The
 // startup command is likewise applied synchronously for demo and in the
 // background bootstrap for live.
-func newSession(profile, region, command string, demoMode, noCache bool, viewCfg *config.ViewsConfig) *app.Controller {
+func newSession(profile, region, command string, demoMode, noCache bool, viewCfg *config.ViewsConfig, configReport string) *app.Controller {
 	core := runtime.Bootstrap(profile, region, resource.AllResourceTypes())
 	if demoMode {
 		core.SetPreSuppliedClients(demo.NewServiceClients())
@@ -71,6 +71,13 @@ func newSession(profile, region, command string, demoMode, noCache bool, viewCfg
 			core.SetCommand(command)
 		}
 	}
+	// The config report goes on last: Controller.Apply clears the flash at the
+	// start of every action, so a report set before the startup command would
+	// be gone before the first render.
+	if configReport != "" {
+		ctrl.ApplyIntents([]runtime.UIIntent{runtime.FlashIntent{Text: configReport, IsError: true}})
+	}
+
 	// Live path: ctrl is returned on the menu; getOrCreateSession connects to AWS
 	// in the background (BootstrapLive) which drives the armed -c navigation
 	// once ClientsReady + the availability seed land.

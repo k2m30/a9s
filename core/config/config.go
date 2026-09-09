@@ -375,6 +375,29 @@ func unfillableColumnKeys(cfg *ViewsConfig) error {
 	return errors.New(strings.Join(reports, "; "))
 }
 
+// ReportText is the one sentence both lanes show for a config that did not
+// load cleanly: the terminal flashes it, the web page carries it in the same
+// flash, and the web server logs a copy.
+//
+// Whether the operator's file is in use is what changes the sentence, and the
+// caller holds that fact at load time: a nil config means nothing loaded and
+// the built-in defaults are in use, while a config with a report beside it is
+// the operator's file, minus the one column that named nothing. "(using
+// defaults)" used to be said in both cases, which was false in the second and
+// the more alarming of the two to read.
+//
+// Returns "" when err is nil, so a caller can hand the result on unconditionally.
+func ReportText(cfg *ViewsConfig, err error) string {
+	switch {
+	case err == nil:
+		return ""
+	case cfg == nil:
+		return fmt.Sprintf("Config error: %v (using defaults)", err)
+	default:
+		return fmt.Sprintf("Config error: %v (the rest of your config is in use)", err)
+	}
+}
+
 // Load discovers and loads per-resource YAML files from the standard
 // lookup chain:
 //  1. ConfigDir()/views/ (global defaults — env var or ~/.a9s/)

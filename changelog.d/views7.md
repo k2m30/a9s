@@ -25,8 +25,10 @@
   key that type actually uses, so the column still shows the finding phrase and
   still colours the row. A key that names nothing at all is now reported when
   a9s starts, once, naming the file and the key — and the rest of your file is
-  used as written. The web server used to discard the whole file over one such
-  line; it keeps it now, like the terminal app always did.
+  used as written. The web UI shows that report on the page, where the terminal
+  shows its own; it used to discard your whole file over one such line and
+  write a message only to the log. The message no longer claims defaults are in
+  use when your file is.
 
 - A resource whose status the list computes now shows that status, not another
   value stored beside it. A target group whose own column said `unhealthy

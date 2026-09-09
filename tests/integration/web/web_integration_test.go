@@ -63,12 +63,12 @@ type client struct {
 // client is immediately usable — no sleep or poll needed.
 func startServer(t *testing.T) (*client, func()) {
 	t.Helper()
-	return startServerWithConfig(t, config.SharedDefaultConfig())
+	return startServerWithConfig(t, config.SharedDefaultConfig(), "")
 }
 
 // startServerWithConfig is startServer for a test whose subject is the view
 // config the server was given.
-func startServerWithConfig(t *testing.T, viewCfg *config.ViewsConfig) (*client, func()) {
+func startServerWithConfig(t *testing.T, viewCfg *config.ViewsConfig, configReport string) (*client, func()) {
 	t.Helper()
 
 	token, err := web.GenerateToken()
@@ -86,6 +86,7 @@ func startServerWithConfig(t *testing.T, viewCfg *config.ViewsConfig) (*client, 
 		true,  // noCache
 		false, // allowReveal — keep reveal blocked
 		viewCfg,
+		configReport,
 	)
 
 	ctx, cancel := context.WithCancel(context.Background())
