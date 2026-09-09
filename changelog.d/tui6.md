@@ -38,3 +38,9 @@
 - A Cost Explorer refusal and an identity failure read as text, not as
   terminal commands. Both quote what they refused — a dimension value, a tag
   key, a profile name — and both were painted verbatim.
+
+- A revealed secret is painted inert while the clipboard still yields it
+  exactly as stored, and the screen says so when the two differ. A secret is
+  the one value taken away to be used verbatim, so it is not cleaned on its
+  way to the clipboard — but painting its control characters would let it
+  drive the terminal.

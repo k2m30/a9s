@@ -178,7 +178,15 @@ These are **current-state invariants**. The 020-architecture-refactor that produ
    (`messages.ResourcesLoaded`) sits in the method by inspection rather than
    by proof. A second event type that carries AWS text into controller state
    through `Handle` would satisfy the gate while bypassing the boundary; the
-   behavioural pins per lane are what cover that gap today. Nothing downstream re-checks, and nothing in a renderer strips: the
+   behavioural pins per lane are what cover that gap today.
+   Nothing downstream re-checks, and nothing in a renderer strips — with one
+   exception, and it is one because the screen and the clipboard want
+   different things. A revealed secret (`views.RevealModel`) is the one value
+   an operator takes away to use verbatim, so the clipboard hands back the
+   bytes AWS stored while the screen paints the inert form, with a note
+   whenever the two differ. That fact cannot live at a controller door: the
+   reveal screen is renderer-local and no door carries the value.
+   Everywhere else the
    painter's own C0-to-space mapping in `text.PadOrTrunc` stays, because a
    control character occupying no column is a fact about painting, and a9s's
    own SGR sequences must survive the painter or colour never reaches the

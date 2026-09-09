@@ -8,7 +8,9 @@ import (
 
 	"charm.land/bubbles/v2/viewport"
 
+	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/internal/tui/keys"
+	"github.com/k2m30/a9s/v3/internal/tui/styles"
 )
 
 // RevealModel displays a secret value with a persistent red header warning.
@@ -58,18 +60,37 @@ func (m *RevealModel) SetSize(w, h int) {
 // JSON values are pretty-printed with indentation; non-JSON values are returned as-is.
 // Uses JSON (not YAML) because secret keys often contain colons, which are
 // visually ambiguous in YAML's key: value syntax.
+//
+// What is PAINTED crosses the text boundary; what is COPIED does not. A secret
+// is the one value on any screen the operator takes away to use verbatim, so
+// the clipboard hands back the bytes AWS stored (handleCopy reads the raw
+// value). Painting those same bytes would let a secret's own escape sequence
+// drive the terminal, so the screen shows the inert form — and says so, since
+// the two now differ and a reader comparing screen to clipboard deserves to
+// know which one they are looking at.
 func (m RevealModel) displayValue() string {
-	s := strings.TrimSpace(m.value)
+	value := domain.Sanitize(m.value)
+	out := revealFormat(value)
+	if value != m.value {
+		out = styles.FlashError.Render("Control characters not shown here; copy (c) yields the value as stored.") + "\n\n" + out
+	}
+	return out
+}
+
+// revealFormat pretty-prints and colorises a JSON secret, and returns anything
+// else unchanged.
+func revealFormat(value string) string {
+	s := strings.TrimSpace(value)
 	if len(s) == 0 || (s[0] != '{' && s[0] != '[') {
-		return m.value
+		return value
 	}
 	var parsed any
 	if err := json.Unmarshal([]byte(s), &parsed); err != nil {
-		return m.value
+		return value
 	}
 	pretty, err := json.MarshalIndent(parsed, "", "  ")
 	if err != nil {
-		return m.value
+		return value
 	}
 	return colorizeJSON(string(pretty))
 }
