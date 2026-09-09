@@ -187,12 +187,12 @@ func issue119Scenarios() []issue119Scenario {
 }
 
 func scenario119MainMenuDefault(t *testing.T) string {
-	m := issue119RootModel(120, 30, true)
+	m := issue119RootModel(t, 120, 30, true)
 	return m.View().Content
 }
 
 func scenario119MainMenuFilterEC2(t *testing.T) string {
-	m := issue119RootModel(120, 30, true)
+	m := issue119RootModel(t, 120, 30, true)
 	m = issue119ApplyMsg(m, tea.KeyPressMsg{Code: '/', Text: "/"})
 	for _, ch := range []string{"e", "c", "2"} {
 		m = issue119ApplyMsg(m, tea.KeyPressMsg{Code: -1, Text: ch})
@@ -202,7 +202,7 @@ func scenario119MainMenuFilterEC2(t *testing.T) string {
 }
 
 func scenario119MainMenuCommandEC2(t *testing.T) string {
-	m := issue119RootModel(120, 30, true)
+	m := issue119RootModel(t, 120, 30, true)
 	m = issue119ApplyMsg(m, tea.KeyPressMsg{Code: -1, Text: ":"})
 	for _, ch := range []string{"e", "c", "2"} {
 		m = issue119ApplyMsg(m, tea.KeyPressMsg{Code: -1, Text: ch})
@@ -211,13 +211,13 @@ func scenario119MainMenuCommandEC2(t *testing.T) string {
 }
 
 func scenario119MainMenuHelp(t *testing.T) string {
-	m := issue119RootModel(120, 30, true)
+	m := issue119RootModel(t, 120, 30, true)
 	m = issue119ApplyMsg(m, messages.Navigate{Target: messages.TargetHelp})
 	return m.View().Content
 }
 
 func scenario119EC2ListLoading(t *testing.T) string {
-	m := issue119RootModel(140, 30, true)
+	m := issue119RootModel(t, 140, 30, true)
 	m = issue119ApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "ec2",
@@ -226,13 +226,13 @@ func scenario119EC2ListLoading(t *testing.T) string {
 }
 
 func scenario119EC2ListWideDefault(t *testing.T) string {
-	m := issue119RootModel(140, 30, true)
+	m := issue119RootModel(t, 140, 30, true)
 	m = issue119LoadEC2List(t, m)
 	return m.View().Content
 }
 
 func scenario119EC2ListFilterWeb(t *testing.T) string {
-	m := issue119RootModel(140, 30, true)
+	m := issue119RootModel(t, 140, 30, true)
 	m = issue119LoadEC2List(t, m)
 	m = issue119ApplyMsg(m, tea.KeyPressMsg{Code: '/', Text: "/"})
 	for _, ch := range []string{"w", "e", "b"} {
@@ -243,28 +243,28 @@ func scenario119EC2ListFilterWeb(t *testing.T) string {
 }
 
 func scenario119EC2ListHelp(t *testing.T) string {
-	m := issue119RootModel(140, 30, true)
+	m := issue119RootModel(t, 140, 30, true)
 	m = issue119LoadEC2List(t, m)
 	m = issue119ApplyMsg(m, messages.Navigate{Target: messages.TargetHelp})
 	return m.View().Content
 }
 
 func scenario119EC2ListSuccessFlash(t *testing.T) string {
-	m := issue119RootModel(140, 30, true)
+	m := issue119RootModel(t, 140, 30, true)
 	m = issue119LoadEC2List(t, m)
 	m = issue119ApplyMsg(m, messages.Flash{Text: "Copied ec2 id", IsError: false})
 	return m.View().Content
 }
 
 func scenario119EC2ListErrorFlash(t *testing.T) string {
-	m := issue119RootModel(140, 30, true)
+	m := issue119RootModel(t, 140, 30, true)
 	m = issue119LoadEC2List(t, m)
 	m = issue119ApplyMsg(m, messages.Flash{Text: "Error: load failed", IsError: true})
 	return m.View().Content
 }
 
 func scenario119EC2ListEmpty(t *testing.T) string {
-	m := issue119RootModel(140, 30, true)
+	m := issue119RootModel(t, 140, 30, true)
 	m = issue119ApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "ec2",
@@ -277,7 +277,7 @@ func scenario119EC2ListEmpty(t *testing.T) string {
 }
 
 func scenario119EC2YAMLView(t *testing.T) string {
-	m := issue119RootModel(120, 30, true)
+	m := issue119RootModel(t, 120, 30, true)
 	ec2 := mustDemoEC2(t)
 	m = issue119ApplyMsg(m, messages.Navigate{
 		Target:   messages.TargetYAML,
@@ -287,18 +287,18 @@ func scenario119EC2YAMLView(t *testing.T) string {
 }
 
 func scenario119RegionSelector(t *testing.T) string {
-	m := issue119RootModel(120, 30, false)
+	m := issue119RootModel(t, 120, 30, false)
 	m = issue119ApplyMsg(m, messages.Navigate{Target: messages.TargetRegion})
 	return m.View().Content
 }
 
 func scenario119TooNarrowWarning(t *testing.T) string {
-	m := issue119RootModel(59, 20, true)
+	m := issue119RootModel(t, 59, 20, true)
 	return m.View().Content
 }
 
 func scenario119TooShortWarning(t *testing.T) string {
-	m := issue119RootModel(120, 6, true)
+	m := issue119RootModel(t, 120, 6, true)
 	return m.View().Content
 }
 
@@ -343,15 +343,15 @@ func scenario119WideRightFilterCloud(t *testing.T) string {
 
 func issue119ModelToEC2Detail(t *testing.T, w, h int) tui.Model {
 	t.Helper()
-	m := issue119RootModel(w, h, true)
+	m := issue119RootModel(t, w, h, true)
 	ec2 := mustDemoEC2(t)
 	m = issue119ApplyMsg(m, messages.Navigate{Target: messages.TargetDetail, ResourceType: "ec2", Resource: &ec2[0]})
 	return m
 }
 
-func issue119RootModel(w, h int, demoMode bool) tui.Model {
+func issue119RootModel(t testing.TB, w, h int, demoMode bool) tui.Model {
 	if demoMode {
-		m := tui.New("demo", "us-east-1",
+		m := newBlessedModel(t, "demo", "us-east-1",
 			tui.WithClients(demo.NewServiceClients()),
 			tui.WithIsDemo(true),
 			tui.WithNoCache(true),
@@ -359,7 +359,7 @@ func issue119RootModel(w, h int, demoMode bool) tui.Model {
 			tui.WithRegionForTest(demo.DemoRegion))
 		return issue119ApplyMsg(m, tea.WindowSizeMsg{Width: w, Height: h})
 	}
-	m := tui.New("testprofile", "us-east-1")
+	m := newBlessedModel(t, "testprofile", "us-east-1")
 	return issue119ApplyMsg(m, tea.WindowSizeMsg{Width: w, Height: h})
 }
 

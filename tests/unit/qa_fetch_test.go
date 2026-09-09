@@ -465,7 +465,7 @@ func buildMockClients(t *testing.T) *awsclient.ServiceClients {
 func buildModelWithMockClients(t *testing.T) tui.Model {
 	t.Helper()
 	tui.Version = "0.6.0"
-	m := tui.New("testprofile", "us-east-1")
+	m := newBlessedModel(t, "testprofile", "us-east-1")
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 40})
 
 	clients := buildMockClients(t)
@@ -821,7 +821,7 @@ func TestQA_FetchResources_NilClients(t *testing.T) {
 			// One model per subtest: the controller's setters and column
 			// resolver expect the single update loop, and a model shared
 			// across parallel subtests races them.
-			m := tui.New("testprofile", "us-east-1")
+			m := newBlessedModel(t, "testprofile", "us-east-1")
 			m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 40})
 			_, cmd := rootApplyMsg(m, messages.Navigate{
 				Target:       messages.TargetResourceList,

@@ -78,7 +78,7 @@ func TestFalseExact_PageOneEntryWithoutPagination_NeverDowngradesExact(t *testin
 	s.Profile = depthTestProfile
 	s.Region = depthTestRegion
 	core := runtime.New(s, resource.AllResourceTypes())
-	ctrl := app.New(core)
+	ctrl := newBlessedController(t, core)
 	t.Cleanup(ctrl.Close)
 
 	// Drive the real handler: a page-1 fetch result for "s3", truncated,
@@ -239,7 +239,7 @@ func TestLateReplace_DoesNotStompDeeperList(t *testing.T) {
 	s.Profile = profile
 	s.Region = region
 	core := runtime.New(s, resource.AllResourceTypes())
-	ctrl := app.New(core)
+	ctrl := newBlessedController(t, core)
 	t.Cleanup(ctrl.Close)
 
 	ctrl.Apply(app.Action{Kind: app.ActionCommand, Arg: "s3"})
@@ -359,7 +359,7 @@ func TestFreshReplace_StillWins(t *testing.T) {
 	s.Profile = profile
 	s.Region = region
 	core := runtime.New(s, resource.AllResourceTypes())
-	ctrl := app.New(core)
+	ctrl := newBlessedController(t, core)
 	t.Cleanup(ctrl.Close)
 
 	ctrl.Apply(app.Action{Kind: app.ActionCommand, Arg: "s3"})

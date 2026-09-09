@@ -104,7 +104,7 @@ func TestErrorHistoryAccumulation_NonErrorFlashesNotAdded(t *testing.T) {
 func TestErrorFlashWidth_MessageIsCutToTheSlotLeftByTheIdentity(t *testing.T) {
 	tui.Version = "test"
 
-	m := tui.New("testprofile", "us-east-1")
+	m := newBlessedModel(t, "testprofile", "us-east-1")
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 24})
 
 	longMsg := strings.Repeat("x", 100)
@@ -129,7 +129,7 @@ func TestErrorFlashWidth_MessageIsCutToTheSlotLeftByTheIdentity(t *testing.T) {
 func TestErrorFlashFullWidth_ExceedsWidthMinus4IsTruncated(t *testing.T) {
 	tui.Version = "test"
 
-	m := tui.New("testprofile", "us-east-1")
+	m := newBlessedModel(t, "testprofile", "us-east-1")
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 80, Height: 24})
 
 	// 200-char message — vastly exceeds width-6=76, must be truncated.

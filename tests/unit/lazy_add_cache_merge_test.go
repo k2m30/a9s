@@ -104,7 +104,7 @@ func execRelatedCheckerResult(t *testing.T, m tui.Model, resourceType string, so
 func setupLiveModeEFSDetail(t *testing.T) (tui.Model, resource.Resource) {
 	t.Helper()
 
-	m := tui.New("test-profile", "us-east-1")
+	m := newBlessedModel(t, "test-profile", "us-east-1")
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 36})
 
 	// We need an ECS task resource in the model to seed EFS cache. But for

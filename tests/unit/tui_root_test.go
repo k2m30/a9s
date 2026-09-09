@@ -169,7 +169,7 @@ func TestRootView_ContainsFrameBorders(t *testing.T) {
 }
 
 func TestRootView_EmptyWhenWidthZero(t *testing.T) {
-	m := tui.New("default", "us-east-1")
+	m := newBlessedModel(t, "default", "us-east-1")
 	// Don't send WindowSizeMsg — width stays 0
 
 	rendered := rootViewContent(m)
@@ -556,7 +556,7 @@ func TestRoot_View_AltScreenEnabled(t *testing.T) {
 }
 
 func TestRoot_View_AltScreenOnMinWidth(t *testing.T) {
-	m := tui.New("test", "us-east-1")
+	m := newBlessedModel(t, "test", "us-east-1")
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 40, Height: 24})
 	v := m.View()
 	if !v.AltScreen {
@@ -565,7 +565,7 @@ func TestRoot_View_AltScreenOnMinWidth(t *testing.T) {
 }
 
 func TestRoot_View_AltScreenOnMinHeight(t *testing.T) {
-	m := tui.New("test", "us-east-1")
+	m := newBlessedModel(t, "test", "us-east-1")
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 80, Height: 5})
 	v := m.View()
 	if !v.AltScreen {
@@ -574,7 +574,7 @@ func TestRoot_View_AltScreenOnMinHeight(t *testing.T) {
 }
 
 func TestRoot_View_AltScreenOnZeroWidth(t *testing.T) {
-	m := tui.New("test", "us-east-1")
+	m := newBlessedModel(t, "test", "us-east-1")
 	// No WindowSizeMsg sent, width is 0
 	v := m.View()
 	if !v.AltScreen {
@@ -823,7 +823,7 @@ func TestRoot_EnterChildView_NilParentContext(t *testing.T) {
 	defer resource.CleanupPaginatedChildForTest(testChildType)
 
 	// Create model in demo mode so we don't need real AWS clients
-	m := tui.New("demo", "us-east-1",
+	m := newBlessedModel(t, "demo", "us-east-1",
 		tui.WithClients(demo.NewServiceClients()),
 		tui.WithIsDemo(true),
 		tui.WithNoCache(true),

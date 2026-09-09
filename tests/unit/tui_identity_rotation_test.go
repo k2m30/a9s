@@ -133,7 +133,7 @@ func wave5CollectCmdMsgs(cmd tea.Cmd) []tea.Msg {
 func TestRoot_ProfileRotation_DispatchesNoIdentityFetchBeforeReconnect(t *testing.T) {
 	clients := demo.NewServiceClients()
 	tui.Version = "test"
-	m := tui.New("test-profile", "us-east-1", tui.WithClients(clients), tui.WithNoCache(true))
+	m := newBlessedModel(t, "test-profile", "us-east-1", tui.WithClients(clients), tui.WithNoCache(true))
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 40})
 	m, _ = rootApplyMsg(m, messages.ClientsReady{Clients: clients, Region: "us-east-1", Gen: 1})
 
@@ -191,7 +191,7 @@ const identityFetchingPlaceholder = "Fetching identity..."
 func TestRoot_NoCacheRotation_IdentityScreenNotStuckLoading(t *testing.T) {
 	clients := demo.NewServiceClients()
 	tui.Version = "test"
-	m := tui.New("test-profile", "us-east-1", tui.WithClients(clients), tui.WithNoCache(true))
+	m := newBlessedModel(t, "test-profile", "us-east-1", tui.WithClients(clients), tui.WithNoCache(true))
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 40})
 	m, _ = rootApplyMsg(m, messages.ClientsReady{Clients: clients, Region: "us-east-1", Gen: 1})
 

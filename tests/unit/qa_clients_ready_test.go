@@ -43,7 +43,7 @@ func TestQA_ClientsReady_CorrectType_Assigns(t *testing.T) {
 // to construct a model that already has a pre-supplied client set.
 func TestQA_ClientsReady_NilClients_DemoFallback(t *testing.T) {
 	preSupplied := &awsclient.ServiceClients{}
-	m := tui.New("testprofile", "us-east-1", tui.WithClients(preSupplied))
+	m := newBlessedModel(t, "testprofile", "us-east-1", tui.WithClients(preSupplied))
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 80, Height: 40})
 
 	// Send ClientsReadyMsg with nil Clients — should trigger demo fallback.

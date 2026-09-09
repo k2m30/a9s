@@ -160,7 +160,7 @@ func TestScreenIDGuard_TopLevelCommandVsPushChildListScreen(t *testing.T) {
 		s.Profile = profile
 		s.Region = "us-east-1"
 		core := runtime.New(s, nil)
-		c := app.New(core)
+		c := newBlessedController(t, core)
 		t.Cleanup(c.Close)
 		return c
 	}

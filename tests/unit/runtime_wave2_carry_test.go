@@ -218,7 +218,7 @@ func TestReconcileTypeFile_Wave2SourcedObservation_ClearsCarriedData(t *testing.
 	s.Profile = wave2ClearProfile
 	s.Region = wave2ClearRegion
 	core := runtime.New(s, resource.AllResourceTypes())
-	ctrl := app.New(core)
+	ctrl := newBlessedController(t, core)
 	t.Cleanup(ctrl.Close)
 
 	// Seed RowStore with the CURRENT session's bare Wave-1-observed row (no
@@ -392,7 +392,7 @@ func TestRestartSeed_S3_Wave2FindingAndStatusVisibleOnFirstRender(t *testing.T) 
 		t.Fatalf("seed fixture SaveType(s3): %v", err)
 	}
 
-	ctrl := app.New(core)
+	ctrl := newBlessedController(t, core)
 	t.Cleanup(ctrl.Close)
 	_, _ = ctrl.Apply(app.Action{Kind: app.ActionCommand, Arg: "s3"})
 	snap := ctrl.Snapshot()

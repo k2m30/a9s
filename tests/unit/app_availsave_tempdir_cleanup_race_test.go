@@ -58,12 +58,12 @@ type availSaveRaceFixture struct {
 // delivers one ResourcesLoaded event through the real menu-sync seam so a
 // save is queued (queueAvailabilitySave starts runAvailabilitySaveLoop on
 // first use). Returns the Controller so the caller controls Close timing.
-func buildAvailSaveRaceController(profile, region string) *app.Controller {
+func buildAvailSaveRaceController(t testing.TB, profile, region string) *app.Controller {
 	s := session.New()
 	s.Profile = profile
 	s.Region = region
 	core := runtime.New(s, resource.AllResourceTypes())
-	c := app.New(core)
+	c := newBlessedController(t, core)
 
 	c.Apply(app.Action{Kind: app.ActionCommand, Arg: availSaveRaceShortName})
 
@@ -120,7 +120,7 @@ func TestAvailSaveTempDirRace_WithoutClose_DirectoryNotEmptyOnRemoval(t *testing
 		}
 		os.Setenv("A9S_CONFIG_FOLDER", dir) //nolint:errcheck // test-owned env, single-threaded here
 
-		buildAvailSaveRaceController("race-profile", "us-east-1")
+		buildAvailSaveRaceController(t, "race-profile", "us-east-1")
 		// Deliberately NOT calling c.Close() — this is the bug class under
 		// test: the writer goroutine spawned by queueAvailabilitySave may
 		// still be running SaveType (MkdirAll/CreateTemp/Rename under dir)
@@ -173,7 +173,7 @@ func TestAvailSaveTempDirRace_WithClose_NeverFails(t *testing.T) {
 		}
 		os.Setenv("A9S_CONFIG_FOLDER", dir) //nolint:errcheck // test-owned env, single-threaded here
 
-		c := buildAvailSaveRaceController("race-profile", "us-east-1")
+		c := buildAvailSaveRaceController(t, "race-profile", "us-east-1")
 		c.Close()
 
 		if err := os.RemoveAll(dir); err != nil {
@@ -203,7 +203,7 @@ func TestAvailSaveTempDirRace_HelperOrdering_MirrorsTTempDirLIFO(t *testing.T) {
 	s.Profile = "lifo-order-profile"
 	s.Region = "us-east-1"
 	core := runtime.New(s, resource.AllResourceTypes())
-	c := app.New(core)
+	c := newBlessedController(t, core)
 	t.Cleanup(c.Close)
 
 	c.Apply(app.Action{Kind: app.ActionCommand, Arg: availSaveRaceShortName})

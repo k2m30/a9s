@@ -51,7 +51,7 @@ func setupLiveModeEC2Detail(t *testing.T) (tui.Model, []resource.Resource) {
 
 	// Non-demo model: no WithIsDemo option.
 	// This makes the related-check dispatch use the real checker path (not demo fixtures).
-	m := tui.New("test-profile", "us-east-1")
+	m := newBlessedModel(t, "test-profile", "us-east-1")
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 36})
 
 	ec2Client := fakes.NewEC2()

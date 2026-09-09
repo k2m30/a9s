@@ -37,7 +37,7 @@ const costsReview5BogusInstanceID = "i-doesnotexist00000001"
 func costsReview5DrillToStrandedByIDPlaceholder(t *testing.T, profile string) (tui.Model, tea.Cmd) {
 	t.Helper()
 	tui.Version = "1.0.2"
-	m := tui.New(profile, "us-east-1", tui.WithClients(demo.NewServiceClients()), tui.WithNoCache(true))
+	m := newBlessedModel(t, profile, "us-east-1", tui.WithClients(demo.NewServiceClients()), tui.WithNoCache(true))
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 80, Height: 40})
 
 	m, _ = rootApplyMsg(m, messages.Navigate{Target: messages.TargetCosts})

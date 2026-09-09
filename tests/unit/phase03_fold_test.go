@@ -78,8 +78,8 @@ func applyMsg(m tui.Model, msg tea.Msg) tui.Model {
 // It applies a WindowSizeMsg and a ClientsReadyMsg with nil clients, which is
 // enough to advance the model past the initial state without triggering live AWS calls.
 // Relocated from the deleted phase03_shim_wireups_test.go (renamed from newRootModel).
-func newRootModel() tui.Model {
-	m := tui.New("test-profile", "us-east-1",
+func newRootModel(t testing.TB) tui.Model {
+	m := newBlessedModel(t, "test-profile", "us-east-1",
 		tui.WithNoCache(true),
 	)
 	m = applyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 40})
@@ -158,7 +158,7 @@ func TestFold_EnrichmentCheckedMutatesRowsDirectly(t *testing.T) {
 		}
 
 		t.Run(tc.name+"/ResourceCache", func(t *testing.T) {
-			m := newRootModel()
+			m := newRootModel(t)
 
 			m.Core().Session().RowStore.Observe(tc.canonShort, []resource.Resource{
 				{ID: rid, Name: "test-" + tc.canonShort, Fields: map[string]string{"status": "running"}},
@@ -210,7 +210,7 @@ func TestFold_EnrichmentCheckedMutatesRowsDirectly(t *testing.T) {
 		})
 
 		t.Run(tc.name+"/LazyResourceCache", func(t *testing.T) {
-			m := newRootModel()
+			m := newRootModel(t)
 
 			m.Core().Session().RowStore.ObservePartial(tc.canonShort, []resource.Resource{
 				{ID: rid, Name: "lazy-" + tc.canonShort, Fields: map[string]string{"status": "running"}},
@@ -240,7 +240,7 @@ func TestFold_EnrichmentCheckedMutatesRowsDirectly(t *testing.T) {
 		})
 
 		t.Run(tc.name+"/RowStore", func(t *testing.T) {
-			m := newRootModel()
+			m := newRootModel(t)
 
 			// task #17 wave 1 stage 2: the "all enrichment done" cleanup that
 			// used to nil out session.ProbeResources is gone — RowStore
@@ -344,7 +344,7 @@ func TestFold_RepeatedEnrichmentReplacesWave2(t *testing.T) {
 				Source:   wantSource,
 			}
 
-			m := newRootModel()
+			m := newRootModel(t)
 			m.Core().Session().RowStore.Observe(tc.canonShort, []resource.Resource{
 				{
 					ID:   rid,
@@ -468,7 +468,7 @@ func TestFold_EmptyEnrichmentClearsWave2(t *testing.T) {
 				Rows: []domain.DetailRow{{Label: "Action", Value: "test-retirement"}},
 			}
 
-			m := newRootModel()
+			m := newRootModel(t)
 			m.Core().Session().RowStore.Observe(tc.canonShort, []resource.Resource{
 				{
 					ID:   rid,
@@ -607,7 +607,7 @@ func TestFold_CtrlROnList_ClearsActiveRowFindings(t *testing.T) {
 		},
 	}
 
-	m := newRootModel()
+	m := newRootModel(t)
 
 	// Step 1: seed RowStore so NavigateMsg gets a cache hit and creates
 	// a ResourceListModel holding this slice.
@@ -742,7 +742,7 @@ func TestFold_MainMenuCtrlR_ClearsAllCachedWave2(t *testing.T) {
 
 	// Build a model WITHOUT WithNoCache so main-menu Ctrl+R is not a no-op.
 	// ClientsReadyMsg with nil clients is enough to advance past init state.
-	m := tui.New("test-profile", "us-east-1")
+	m := newBlessedModel(t, "test-profile", "us-east-1")
 	m = applyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 40})
 	m = applyMsg(m, messages.ClientsReady{Clients: nil})
 
@@ -889,7 +889,7 @@ func TestFold_AttentionDetailsCarryAcrossEntryPoints(t *testing.T) {
 				Rows: []domain.DetailRow{{Label: "Action", Value: "test-retirement"}},
 			}
 
-			m := newRootModel()
+			m := newRootModel(t)
 
 			// Step 1: resource enters via Site 4 (CachedPages).
 			m = applyMsg(m, messages.RelatedCheckResult{

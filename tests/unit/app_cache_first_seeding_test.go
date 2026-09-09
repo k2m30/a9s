@@ -66,7 +66,7 @@ func newSeededTestController(t *testing.T) (*runtime.Core, *app.Controller) {
 	s.Profile = "demo"
 	s.Region = "us-east-1"
 	core := runtime.New(s, nil)
-	c := app.New(core)
+	c := newBlessedController(t, core)
 	t.Cleanup(c.Close)
 	return core, c
 }

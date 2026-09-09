@@ -17,7 +17,7 @@ import (
 // Reveals bug: detail opened when terminal is narrow, then widened.
 // RELATED column must appear automatically once width is sufficient.
 func TestBugReveal_EC2Detail_AutoShowsRelatedAfterResizeToWide(t *testing.T) {
-	m := tui.New("demo", "us-east-1",
+	m := newBlessedModel(t, "demo", "us-east-1",
 		tui.WithClients(demo.NewServiceClients()),
 		tui.WithIsDemo(true),
 		tui.WithNoCache(true),
@@ -65,7 +65,7 @@ func TestBugReveal_EC2Detail_AutoShowsRelatedAfterResizeToWide(t *testing.T) {
 // User choice guard: once RELATED is explicitly hidden with 'r', resizing should
 // not auto-show it again.
 func TestBugReveal_EC2Detail_ResizeDoesNotOverrideExplicitHide(t *testing.T) {
-	m := tui.New("demo", "us-east-1",
+	m := newBlessedModel(t, "demo", "us-east-1",
 		tui.WithClients(demo.NewServiceClients()),
 		tui.WithIsDemo(true),
 		tui.WithNoCache(true),

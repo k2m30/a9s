@@ -317,7 +317,7 @@ func TestListOpen_ColdStart_SeedsFromDiskCache_WithRefreshing(t *testing.T) {
 	s.Profile = "demo"
 	s.Region = "us-east-1"
 	core := runtime.New(s, nil)
-	c := app.New(core)
+	c := newBlessedController(t, core)
 	t.Cleanup(c.Close)
 
 	// Simulate the startup cache-load path seeding session state from the

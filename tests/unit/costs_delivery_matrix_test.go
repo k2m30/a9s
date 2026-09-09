@@ -223,7 +223,7 @@ func TestCostsDeliveryMatrix_GridEmpty_AnomaliesSkipped_WarmBucket_StampsCoverag
 	s.Profile = profile
 	s.Region = "us-east-1"
 	core := runtime.New(s, nil)
-	c := app.New(core)
+	c := newBlessedController(t, core)
 	t.Cleanup(c.Close)
 	c.ApplyIntents([]runtime.UIIntent{runtime.PushScreen{ID: runtime.ScreenCosts}})
 	c.EnsureCostsState(fixedCostsNow) // LATER "now" than the seed

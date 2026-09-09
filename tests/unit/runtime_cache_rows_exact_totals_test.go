@@ -68,7 +68,7 @@ func TestLoadMoreExhausted_UpdatesMenuAvailability_ExactNoTUI(t *testing.T) {
 	s.Profile = "demo"
 	s.Region = "us-east-1"
 	core := runtime.New(s, nil)
-	c := app.New(core)
+	c := newBlessedController(t, core)
 
 	// Seed the menu with a truncated lower-bound count, as if an earlier
 	// availability probe reported "200+" before the user drilled into the
@@ -121,7 +121,7 @@ func TestLoadMoreExhausted_SurvivesReturnToMenu(t *testing.T) {
 	s.Profile = "demo"
 	s.Region = "us-east-1"
 	core := runtime.New(s, nil)
-	c := app.New(core)
+	c := newBlessedController(t, core)
 
 	c.ApplyIntents([]runtime.UIIntent{
 		runtime.PatchMenuAvailability{ResourceType: "s3", Count: 10, Truncated: true},
@@ -176,7 +176,7 @@ func TestLoadMoreExhausted_OnlyIncreaseGuard(t *testing.T) {
 		s.Profile = "demo"
 		s.Region = "us-east-1"
 		core := runtime.New(s, nil)
-		c := app.New(core)
+		c := newBlessedController(t, core)
 		c.ApplyIntents([]runtime.UIIntent{
 			runtime.PatchMenuAvailability{ResourceType: "ec2", Count: seedCount, Truncated: seedTruncated},
 		})
@@ -281,7 +281,7 @@ func TestLoadMoreExhausted_PersistsToDiskCache(t *testing.T) {
 	s.Profile = "demo"
 	s.Region = "us-east-1"
 	core := runtime.New(s, nil)
-	c := app.New(core)
+	c := newBlessedController(t, core)
 	t.Cleanup(c.Close)
 
 	c.ApplyIntents([]runtime.UIIntent{

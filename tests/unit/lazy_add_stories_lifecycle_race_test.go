@@ -26,7 +26,6 @@ import (
 
 	"github.com/k2m30/a9s/v3/core/resource"
 	"github.com/k2m30/a9s/v3/core/runtime/messages"
-	"github.com/k2m30/a9s/v3/internal/tui"
 )
 
 // ---------------------------------------------------------------------------
@@ -72,7 +71,7 @@ func Test_LA_030_ProfileSwitch_ClearsLazyAddedTargets(t *testing.T) {
 	})
 
 	// Phase 1: seed cache on a pre-switch model.
-	m := tui.New("profile-A", "us-east-1")
+	m := newBlessedModel(t, "profile-A", "us-east-1")
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 36})
 
 	src := resource.Resource{ID: "la030-src-001"}
@@ -100,7 +99,7 @@ func Test_LA_030_ProfileSwitch_ClearsLazyAddedTargets(t *testing.T) {
 	// is cleared.  A new check must produce LazyAddedResources again (not a
 	// cache hit), and must NOT contain the pre-switch stale ID from the old
 	// model's cache.
-	m2 := tui.New("profile-B", "us-east-1")
+	m2 := newBlessedModel(t, "profile-B", "us-east-1")
 	m2, _ = rootApplyMsg(m2, tea.WindowSizeMsg{Width: 120, Height: 36})
 
 	src2 := resource.Resource{ID: "la030-src-002"}
@@ -155,7 +154,7 @@ func Test_LA_031_RegionSwitch_ClearsLazyAddedTargets(t *testing.T) {
 	})
 
 	// Phase 1: seed cache on pre-switch model.
-	m := tui.New("test-profile", "us-east-1")
+	m := newBlessedModel(t, "test-profile", "us-east-1")
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 36})
 
 	src := resource.Resource{ID: "la031-src-001"}
@@ -177,7 +176,7 @@ func Test_LA_031_RegionSwitch_ClearsLazyAddedTargets(t *testing.T) {
 	_, _ = rootApplyMsg(m, messages.RegionSelected{Region: "eu-west-1"}) //nolint:ineffassign // m not used after this; m2 is the post-switch model
 
 	// Phase 3: fresh model representing eu-west-1 session.
-	m2 := tui.New("test-profile", "eu-west-1")
+	m2 := newBlessedModel(t, "test-profile", "eu-west-1")
 	m2, _ = rootApplyMsg(m2, tea.WindowSizeMsg{Width: 120, Height: 36})
 
 	src2 := resource.Resource{ID: "la031-src-002"}
@@ -242,7 +241,7 @@ func Test_LA_033_SourceDetailRefresh_RerunsChecker(t *testing.T) {
 		resource.CleanupFetchByIDsForTest(targetType)
 	})
 
-	m := tui.New("test-profile", "us-east-1")
+	m := newBlessedModel(t, "test-profile", "us-east-1")
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 36})
 
 	src := resource.Resource{ID: "la033-src-001"}
@@ -343,7 +342,7 @@ func Test_LA_034_MainMenuRoundtrip_LazyAddEntryMarkedTruncated(t *testing.T) {
 		resource.CleanupPaginatedForTest(targetType)
 	})
 
-	m := tui.New("test-profile", "us-east-1")
+	m := newBlessedModel(t, "test-profile", "us-east-1")
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 36})
 
 	src := resource.Resource{ID: "la034-src-001"}
@@ -435,7 +434,7 @@ func Test_LA_040_RepeatDrill_Idempotent(t *testing.T) {
 		resource.CleanupFetchByIDsForTest(targetType)
 	})
 
-	m := tui.New("test-profile", "us-east-1")
+	m := newBlessedModel(t, "test-profile", "us-east-1")
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 36})
 
 	src := resource.Resource{ID: "la040-src-001"}
@@ -520,7 +519,7 @@ func Test_LA_041_RepeatDrill_DifferentSource_SameTarget_SingleEntry(t *testing.T
 		resource.CleanupFetchByIDsForTest(targetType)
 	})
 
-	m := tui.New("test-profile", "us-east-1")
+	m := newBlessedModel(t, "test-profile", "us-east-1")
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 36})
 
 	// Alpha drill.
@@ -617,7 +616,7 @@ func Test_LA_042_EscUnrelatedNav_ReDrill_Stable(t *testing.T) {
 		resource.CleanupFetchByIDsForTest(targetY)
 	})
 
-	m := tui.New("test-profile", "us-east-1")
+	m := newBlessedModel(t, "test-profile", "us-east-1")
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 36})
 
 	src := resource.Resource{ID: "la042-src-001"}
@@ -733,7 +732,7 @@ func Test_LA_043_SourceDetailReEntry_UsesCachedResult(t *testing.T) {
 		resource.CleanupFetchByIDsForTest(targetType)
 	})
 
-	m := tui.New("test-profile", "us-east-1")
+	m := newBlessedModel(t, "test-profile", "us-east-1")
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 36})
 
 	src := resource.Resource{ID: "la043-src-001"}
@@ -789,7 +788,7 @@ func Test_LA_044_NoRelatedPivots_ReturnsNilCmd(t *testing.T) {
 	const srcType = "test-la044-source-no-defs"
 	// Deliberately do NOT register any RelatedDefs for srcType.
 
-	m := tui.New("test-profile", "us-east-1")
+	m := newBlessedModel(t, "test-profile", "us-east-1")
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 36})
 
 	_, cmd := rootApplyMsg(m, messages.Navigate{
@@ -844,7 +843,7 @@ func Test_LA_050_DrillDuringEnrichment_ResultLandsWithoutDrop(t *testing.T) {
 		resource.CleanupFetchByIDsForTest(targetType)
 	})
 
-	m := tui.New("test-profile", "us-east-1")
+	m := newBlessedModel(t, "test-profile", "us-east-1")
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 36})
 
 	_, batchCmd := rootApplyMsg(m, messages.Navigate{
@@ -918,7 +917,7 @@ func Test_LA_051_EscDuringResolution_StaleResultDropped(t *testing.T) {
 		resource.CleanupFetchByIDsForTest(targetType)
 	})
 
-	m := tui.New("test-profile", "us-east-1")
+	m := newBlessedModel(t, "test-profile", "us-east-1")
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 36})
 
 	// Open detail — begins a DetailOperation; collect the result cmd but do
@@ -993,7 +992,7 @@ func Test_LA_052_RapidConsecutiveDispatches_CheckerRunsEachTime(t *testing.T) {
 		resource.CleanupFetchByIDsForTest(targetType)
 	})
 
-	m := tui.New("test-profile", "us-east-1")
+	m := newBlessedModel(t, "test-profile", "us-east-1")
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 36})
 
 	src := resource.Resource{ID: "la052-src-001"}
@@ -1072,7 +1071,7 @@ func Test_LA_053_ProfileSwitchMidResolution_StaleResultDiscarded(t *testing.T) {
 		resource.CleanupFetchByIDsForTest(targetType)
 	})
 
-	m := tui.New("profile-A", "us-east-1")
+	m := newBlessedModel(t, "profile-A", "us-east-1")
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 36})
 
 	// Open detail (begins a DetailOperation) and collect the in-flight
@@ -1149,7 +1148,7 @@ func Test_LA_054_RegionSwitchMidResolution_StaleResultDiscarded(t *testing.T) {
 		resource.CleanupFetchByIDsForTest(targetType)
 	})
 
-	m := tui.New("test-profile", "us-east-1")
+	m := newBlessedModel(t, "test-profile", "us-east-1")
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 36})
 
 	// Open detail (begins a DetailOperation) and collect the in-flight result.

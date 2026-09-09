@@ -61,7 +61,7 @@ func livegapSpecialKey(code rune) tea.KeyPressMsg {
 func livegapModel(t *testing.T) tui.Model {
 	t.Helper()
 	t.Setenv("A9S_CONFIG_FOLDER", t.TempDir())
-	m := tui.New(demo.DemoProfile, demo.DemoRegion,
+	m := newBlessedModel(t, demo.DemoProfile, demo.DemoRegion,
 		tui.WithClients(demo.NewServiceClients()),
 		tui.WithIsDemo(true),
 		tui.WithNoCache(true),
@@ -95,7 +95,7 @@ func livegapThemesModel(t *testing.T, activeTheme string, themeFiles ...string) 
 	}
 	var m tui.Model
 	if activeTheme != "" {
-		m = tui.New(demo.DemoProfile, demo.DemoRegion,
+		m = newBlessedModel(t, demo.DemoProfile, demo.DemoRegion,
 			tui.WithClients(demo.NewServiceClients()),
 			tui.WithIsDemo(true),
 			tui.WithActiveTheme(activeTheme),
@@ -103,7 +103,7 @@ func livegapThemesModel(t *testing.T, activeTheme string, themeFiles ...string) 
 			tui.WithProfileForTest(demo.DemoProfile),
 			tui.WithRegionForTest(demo.DemoRegion))
 	} else {
-		m = tui.New(demo.DemoProfile, demo.DemoRegion,
+		m = newBlessedModel(t, demo.DemoProfile, demo.DemoRegion,
 			tui.WithClients(demo.NewServiceClients()),
 			tui.WithIsDemo(true),
 			tui.WithNoCache(true),

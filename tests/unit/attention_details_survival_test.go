@@ -61,7 +61,7 @@ type attnRawFixture struct {
 func newAttnController(t *testing.T, profile, region string) (*runtime.Core, *app.Controller) {
 	t.Helper()
 	core := runtime.Bootstrap(profile, region, resource.AllResourceTypes())
-	ctrl := app.New(core)
+	ctrl := newBlessedController(t, core)
 	t.Cleanup(ctrl.Close)
 	ctrl.SetUIMode("web")
 	return core, ctrl

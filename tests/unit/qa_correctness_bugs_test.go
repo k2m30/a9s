@@ -257,7 +257,7 @@ const bug192InitialGen = 1
 func bug192Model(t *testing.T) tui.Model {
 	t.Helper()
 	tui.Version = "test"
-	m := tui.New("testprofile", "us-east-1", tui.WithNoCache(false))
+	m := newBlessedModel(t, "testprofile", "us-east-1", tui.WithNoCache(false))
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 80, Height: 40})
 	return m
 }
@@ -321,7 +321,7 @@ func TestBug192_AvailabilityProbes_NotDoneUntilAllReturn(t *testing.T) {
 // fire on the Nth result (not earlier).
 func TestBug192_AvailabilityProbes_SaveCacheOnlyAfterAllDone(t *testing.T) {
 	tui.Version = "test"
-	m := tui.New("testprofile", "us-east-1", tui.WithNoCache(false))
+	m := newBlessedModel(t, "testprofile", "us-east-1", tui.WithNoCache(false))
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 80, Height: 40})
 
 	allNames := resource.AllShortNames()
@@ -387,7 +387,7 @@ func TestBug192_AvailabilityProbes_SaveCacheOnlyAfterAllDone(t *testing.T) {
 // ClientsReadyMsg carries an error, the header still shows the original profile.
 func TestBug193_ProfileSwitch_FailedConnect_RollsBackProfile(t *testing.T) {
 	tui.Version = "test"
-	m := tui.New("original-profile", "us-west-2")
+	m := newBlessedModel(t, "original-profile", "us-west-2")
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 80, Height: 40})
 
 	// Verify initial profile visible
@@ -420,7 +420,7 @@ func TestBug193_ProfileSwitch_FailedConnect_RollsBackProfile(t *testing.T) {
 // ClientsReadyMsg carries an error, the header still shows the original region.
 func TestBug193_RegionSwitch_FailedConnect_RollsBackRegion(t *testing.T) {
 	tui.Version = "test"
-	m := tui.New("myprofile", "us-west-2")
+	m := newBlessedModel(t, "myprofile", "us-west-2")
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 80, Height: 40})
 
 	plain := stripANSI(rootViewContent(m))
@@ -452,7 +452,7 @@ func TestBug193_RegionSwitch_FailedConnect_RollsBackRegion(t *testing.T) {
 // successful ClientsReadyMsg causes the new profile to appear in the header.
 func TestBug193_ProfileSwitch_SuccessfulConnect_CommitsProfile(t *testing.T) {
 	tui.Version = "test"
-	m := tui.New("original-profile", "us-east-1")
+	m := newBlessedModel(t, "original-profile", "us-east-1")
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 80, Height: 40})
 
 	m, _ = rootApplyMsg(m, messages.ProfileSelected{Profile: "new-profile"})
@@ -471,7 +471,7 @@ func TestBug193_ProfileSwitch_SuccessfulConnect_CommitsProfile(t *testing.T) {
 // successful ClientsReadyMsg causes the new region to appear in the header.
 func TestBug193_RegionSwitch_SuccessfulConnect_CommitsRegion(t *testing.T) {
 	tui.Version = "test"
-	m := tui.New("myprofile", "us-west-2")
+	m := newBlessedModel(t, "myprofile", "us-west-2")
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 80, Height: 40})
 
 	m, _ = rootApplyMsg(m, messages.RegionSelected{Region: "eu-west-1"})
@@ -491,7 +491,7 @@ func TestBug193_RegionSwitch_SuccessfulConnect_CommitsRegion(t *testing.T) {
 // guard must not use prevProfile != "" since empty is a valid original profile.
 func TestBug193_EmptyProfile_FailedConnect_RollsBack(t *testing.T) {
 	tui.Version = "test"
-	m := tui.New("", "us-west-2") // empty profile = default credentials
+	m := newBlessedModel(t, "", "us-west-2") // empty profile = default credentials
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 80, Height: 40})
 
 	// Attempt switch to a broken profile
@@ -518,7 +518,7 @@ func TestBug193_EmptyProfile_FailedConnect_RollsBack(t *testing.T) {
 // connect (ClientsReadyMsg with Err) shows an error message in the header.
 func TestBug193_ProfileSwitch_FailedConnect_ShowsErrorFlash(t *testing.T) {
 	tui.Version = "test"
-	m := tui.New("original-profile", "us-east-1")
+	m := newBlessedModel(t, "original-profile", "us-east-1")
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 80, Height: 40})
 
 	m, _ = rootApplyMsg(m, messages.ProfileSelected{Profile: "broken-profile"})
@@ -541,7 +541,7 @@ func TestBug193_ProfileSwitch_FailedConnect_ShowsErrorFlash(t *testing.T) {
 // connect is discarded — it must not install B's clients or roll back to B.
 func TestBug193_RapidSwitch_StaleResponseIgnored(t *testing.T) {
 	tui.Version = "test"
-	m := tui.New("profile-A", "us-east-1")
+	m := newBlessedModel(t, "profile-A", "us-east-1")
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 80, Height: 40})
 
 	// First switch: A → B (ConnectGen seeds at 1, becomes 2)
@@ -572,7 +572,7 @@ func TestBug193_RapidSwitch_StaleResponseIgnored(t *testing.T) {
 // that when A→B→C all fail, rollback goes to A (not B).
 func TestBug193_RapidSwitch_FailedFinalConnect_RollsBackToOriginal(t *testing.T) {
 	tui.Version = "test"
-	m := tui.New("profile-A", "us-east-1")
+	m := newBlessedModel(t, "profile-A", "us-east-1")
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 80, Height: 40})
 
 	// Rapid switches: A → B → C (ConnectGen seeds at 1, becomes 3)
@@ -605,7 +605,7 @@ func TestBug193_RapidSwitch_FailedFinalConnect_RollsBackToOriginal(t *testing.T)
 // must trigger commands to recover them.
 func TestBug193_FailedSwitch_RestoresIdentityAndAvailability(t *testing.T) {
 	tui.Version = "test"
-	m := tui.New("original", "us-east-1")
+	m := newBlessedModel(t, "original", "us-east-1")
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 80, Height: 40})
 
 	// Attempt switch and fail. Gen:2 — ConnectGen seeds at 1 (session.New());
@@ -671,7 +671,7 @@ func TestBug194_ConnectAWS_RespectsAWSRegionEnvVar(t *testing.T) {
 	t.Setenv("AWS_SHARED_CREDENTIALS_FILE", "/nonexistent")
 
 	tui.Version = "test"
-	m := tui.New("", "")
+	m := newBlessedModel(t, "", "")
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 80, Height: 40})
 
 	cr := executeConnectCmd(t, m)
@@ -704,7 +704,7 @@ func TestBug194_ConnectAWS_RespectsAWSDefaultRegionEnvVar(t *testing.T) {
 	t.Setenv("AWS_SHARED_CREDENTIALS_FILE", "/nonexistent")
 
 	tui.Version = "test"
-	m := tui.New("", "")
+	m := newBlessedModel(t, "", "")
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 80, Height: 40})
 
 	cr := executeConnectCmd(t, m)
@@ -737,7 +737,7 @@ func TestBug194_ConnectAWS_FallsBackToConfigFileWhenNoEnvVar(t *testing.T) {
 	t.Setenv("AWS_SHARED_CREDENTIALS_FILE", "/nonexistent")
 
 	tui.Version = "test"
-	m := tui.New("", "")
+	m := newBlessedModel(t, "", "")
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 80, Height: 40})
 
 	cr := executeConnectCmd(t, m)
@@ -766,7 +766,7 @@ func TestBug194_ClientsReadyMsg_CarriesResolvedRegion(t *testing.T) {
 	t.Setenv("AWS_SHARED_CREDENTIALS_FILE", "/nonexistent")
 
 	tui.Version = "test"
-	m := tui.New("", "")
+	m := newBlessedModel(t, "", "")
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 80, Height: 40})
 
 	cr := executeConnectCmd(t, m)

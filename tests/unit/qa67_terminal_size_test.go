@@ -28,7 +28,7 @@ import (
 // H.1 — Terminal exactly 60 columns wide: renders normally (no "too narrow").
 func TestQa67_H1_MinimumWidth60_RendersNormally(t *testing.T) {
 	tui.Version = "test"
-	m := tui.New("testprofile", "us-east-1")
+	m := newBlessedModel(t, "testprofile", "us-east-1")
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 60, Height: 24})
 
 	plain := stripANSI(rootViewContent(m))
@@ -43,7 +43,7 @@ func TestQa67_H1_MinimumWidth60_RendersNormally(t *testing.T) {
 // H.2 — Terminal exactly 7 lines tall: renders normally (not "too short").
 func TestQa67_H2_MinimumHeight7_RendersNormally(t *testing.T) {
 	tui.Version = "test"
-	m := tui.New("testprofile", "us-east-1")
+	m := newBlessedModel(t, "testprofile", "us-east-1")
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 80, Height: 7})
 
 	plain := stripANSI(rootViewContent(m))
@@ -58,7 +58,7 @@ func TestQa67_H2_MinimumHeight7_RendersNormally(t *testing.T) {
 // H.3 — Terminal 59 columns: shows "too narrow" error.
 func TestQa67_H3_Width59_ShowsTooNarrow(t *testing.T) {
 	tui.Version = "test"
-	m := tui.New("testprofile", "us-east-1")
+	m := newBlessedModel(t, "testprofile", "us-east-1")
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 59, Height: 24})
 
 	plain := stripANSI(rootViewContent(m))
@@ -70,7 +70,7 @@ func TestQa67_H3_Width59_ShowsTooNarrow(t *testing.T) {
 // H.4 — Terminal 6 lines: shows "too short" error.
 func TestQa67_H4_Height6_ShowsTooShort(t *testing.T) {
 	tui.Version = "test"
-	m := tui.New("testprofile", "us-east-1")
+	m := newBlessedModel(t, "testprofile", "us-east-1")
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 80, Height: 6})
 
 	plain := stripANSI(rootViewContent(m))
@@ -82,7 +82,7 @@ func TestQa67_H4_Height6_ShowsTooShort(t *testing.T) {
 // H.5 — Resize from below minimum to above minimum restores full UI.
 func TestQa67_H5_ResizeFromBelowToAboveMinimum_RestoresUI(t *testing.T) {
 	tui.Version = "test"
-	m := tui.New("testprofile", "us-east-1")
+	m := newBlessedModel(t, "testprofile", "us-east-1")
 
 	// Start too narrow
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 50, Height: 24})
@@ -105,7 +105,7 @@ func TestQa67_H5_ResizeFromBelowToAboveMinimum_RestoresUI(t *testing.T) {
 // H.6 — Resize from above minimum to below minimum shows error message.
 func TestQa67_H6_ResizeFromAboveToBelowMinimum_ShowsError(t *testing.T) {
 	tui.Version = "test"
-	m := tui.New("testprofile", "us-east-1")
+	m := newBlessedModel(t, "testprofile", "us-east-1")
 
 	// Start normal
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 30})
@@ -259,7 +259,7 @@ func TestQa67_H10_ResizeDuringChildView_NoCrash(t *testing.T) {
 // H.11 — Extremely wide terminal (300 columns) renders without overflow or crash.
 func TestQa67_H11_ExtremelyWide_NoCrash(t *testing.T) {
 	tui.Version = "test"
-	m := tui.New("testprofile", "us-east-1")
+	m := newBlessedModel(t, "testprofile", "us-east-1")
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 300, Height: 40})
 
 	out := rootViewContent(m)
@@ -275,7 +275,7 @@ func TestQa67_H11_ExtremelyWide_NoCrash(t *testing.T) {
 // H.12 — Extremely tall terminal (200 lines) renders without crash.
 func TestQa67_H12_ExtremelyTall_NoCrash(t *testing.T) {
 	tui.Version = "test"
-	m := tui.New("testprofile", "us-east-1")
+	m := newBlessedModel(t, "testprofile", "us-east-1")
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 80, Height: 200})
 
 	out := rootViewContent(m)
@@ -302,7 +302,7 @@ func TestQa67_H11_H12_ExtremeSizes_WithResourceList_NoCrash(t *testing.T) {
 	for _, sz := range sizes {
 		t.Run(sz.name, func(t *testing.T) {
 			tui.Version = "test"
-			m := tui.New("testprofile", "us-east-1")
+			m := newBlessedModel(t, "testprofile", "us-east-1")
 			m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: sz.width, Height: sz.height})
 			m, _ = rootApplyMsg(m, messages.Navigate{
 				Target:       messages.TargetResourceList,

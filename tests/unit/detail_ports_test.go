@@ -211,7 +211,7 @@ func Test_Detail_EnterOnNavigableField_TUIKeyRoute_NavigatesToTarget(t *testing.
 		{FieldPath: "VpcId", TargetType: "vpc"},
 	})
 
-	m := tui.New("test", "us-east-1", tui.WithNoCache(true))
+	m := newBlessedModel(t, "test", "us-east-1", tui.WithNoCache(true))
 	t.Cleanup(func() { m.CloseController() })
 	m, _ = tuitest.Step(m, tea.WindowSizeMsg{Width: 120, Height: 40})
 	m, _ = tuitest.Step(m, messages.Navigate{Target: messages.TargetResourceList, ResourceType: "ec2"})
@@ -383,7 +383,7 @@ func wave3HasHint(hints []app.KeyHint, key string) bool {
 // pattern, without requiring the demo backend or a list-then-Enter chain.
 func wave3OpenEC2Detail(t *testing.T, res resource.Resource) tui.Model {
 	t.Helper()
-	m := tui.New("wave3-detail-search", "us-east-1", tui.WithNoCache(true))
+	m := newBlessedModel(t, "wave3-detail-search", "us-east-1", tui.WithNoCache(true))
 	m, _ = tuitest.Step(m, tea.WindowSizeMsg{Width: 140, Height: 40})
 	m, _ = tuitest.Step(m, messages.Navigate{
 		Target:       messages.TargetDetail,
@@ -937,7 +937,7 @@ func newDetailController(t *testing.T, res resource.Resource, resourceType strin
 	s.Profile = "test-profile"
 	s.Region = "us-east-1"
 	core := runtime.New(s, nil)
-	c := app.New(core)
+	c := newBlessedController(t, core)
 	t.Cleanup(c.Close)
 	c.ApplyIntents([]runtime.UIIntent{
 		runtime.PushScreen{ID: runtime.ScreenDetail},

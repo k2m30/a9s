@@ -30,7 +30,6 @@ package unit
 import (
 	"testing"
 
-	"github.com/k2m30/a9s/v3/core/app"
 	"github.com/k2m30/a9s/v3/core/catalog"
 	"github.com/k2m30/a9s/v3/core/resource"
 	"github.com/k2m30/a9s/v3/core/runtime"
@@ -145,7 +144,7 @@ func TestControllerHandle_AliasOpenedList_ProbeEnrichScopedToCanonical(t *testin
 	sess := session.New()
 	core := runtime.New(sess, resource.AllResourceTypes())
 	aliasEnrichScopeSanityCheck(t, core)
-	ctrl := app.New(core)
+	ctrl := newBlessedController(t, core)
 	ctrl.SetUIMode("web")
 
 	_, tasks := ctrl.Handle(messages.ResourcesLoaded{Provenance: messages.FetchProvenanceCanonicalList,

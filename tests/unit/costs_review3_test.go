@@ -269,7 +269,7 @@ func TestCostsReview3_R4_NoCache_MemoryOnlyStore_NoDiskReadOrWrite(t *testing.T)
 	s.Region = "us-east-1"
 	s.NoCache = true
 	core := runtime.New(s, nil)
-	c := app.New(core)
+	c := newBlessedController(t, core)
 	t.Cleanup(c.Close)
 	c.ApplyIntents([]runtime.UIIntent{runtime.PushScreen{ID: runtime.ScreenCosts}})
 	c.EnsureCostsState(seedNow)
@@ -403,7 +403,7 @@ func TestCostsReview3_P1_AnomalyOnlyDelivery_NeverClearsWarmGridCoverage(t *test
 	s.Profile = profile
 	s.Region = "us-east-1"
 	core := runtime.New(s, nil)
-	c := app.New(core)
+	c := newBlessedController(t, core)
 	t.Cleanup(c.Close)
 	c.ApplyIntents([]runtime.UIIntent{runtime.PushScreen{ID: runtime.ScreenCosts}})
 	c.EnsureCostsState(fixedCostsNow) // LATER "now" than the seed
@@ -595,7 +595,7 @@ func TestCostsReview3_P5_ClientsReady_RecoversPreConnectCostsError(t *testing.T)
 	s.Profile = "review3-p5"
 	s.Region = "us-east-1"
 	core := runtime.New(s, nil) // nil clients — pre-connect
-	c := app.New(core)
+	c := newBlessedController(t, core)
 	t.Cleanup(c.Close)
 	c.ApplyIntents([]runtime.UIIntent{runtime.PushScreen{ID: runtime.ScreenCosts}})
 	c.EnsureCostsState(fixedCostsNow)

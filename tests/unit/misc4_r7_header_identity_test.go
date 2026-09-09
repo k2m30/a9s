@@ -21,7 +21,7 @@ import (
 // length and returns the header row.
 func misc4HeaderLine(t *testing.T, width int, msg string) string {
 	t.Helper()
-	m := issue119RootModel(width, 30, true)
+	m := issue119RootModel(t, width, 30, true)
 	m = issue119LoadEC2List(t, m)
 	m = issue119ApplyMsg(m, messages.Flash{Text: msg, IsError: true})
 	return strings.SplitN(m.View().Content, "\n", 2)[0]

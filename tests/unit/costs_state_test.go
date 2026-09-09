@@ -62,7 +62,7 @@ func newCostsController(t *testing.T, now time.Time) *app.Controller {
 	s.Profile = "test-profile"
 	s.Region = "us-east-1"
 	core := runtime.New(s, nil)
-	c := app.New(core)
+	c := newBlessedController(t, core)
 	t.Cleanup(c.Close)
 	c.ApplyIntents([]runtime.UIIntent{
 		runtime.PushScreen{ID: runtime.ScreenCosts},

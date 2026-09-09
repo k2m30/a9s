@@ -144,7 +144,7 @@ func TestLoadMore_TUI_ColdOpen_NoDuplicates(t *testing.T) {
 	registerDef17S3Fetcher(t)
 	const profile, region = "tui-profile", "us-east-1"
 
-	m := tui.New(profile, region,
+	m := newBlessedModel(t, profile, region,
 		tui.WithClients(demo.NewServiceClients()),
 		tui.WithIsDemo(true),
 		tui.WithProfileForTest(profile),
@@ -298,7 +298,7 @@ func TestLoadMore_TokenPresent_AfterColdOpen(t *testing.T) {
 	s.Profile = "cursor-profile"
 	s.Region = "us-east-1"
 	core := runtime.New(s, resource.AllResourceTypes())
-	ctrl := app.New(core)
+	ctrl := newBlessedController(t, core)
 	t.Cleanup(ctrl.Close)
 
 	// Cold open via the -c/ActionCommand lane (same handler as the
@@ -342,7 +342,7 @@ func TestLoadMore_AppendDedup_Backstop(t *testing.T) {
 	s.Profile = "dedup-profile"
 	s.Region = "us-east-1"
 	core := runtime.New(s, resource.AllResourceTypes())
-	ctrl := app.New(core)
+	ctrl := newBlessedController(t, core)
 	t.Cleanup(ctrl.Close)
 
 	_, _ = ctrl.Apply(app.Action{Kind: app.ActionCommand, Arg: "s3"})
@@ -412,7 +412,7 @@ func TestLoadMore_PersistedPair_NeverMismatched(t *testing.T) {
 	s.Profile = profile
 	s.Region = region
 	core := runtime.New(s, resource.AllResourceTypes())
-	ctrl := app.New(core)
+	ctrl := newBlessedController(t, core)
 	t.Cleanup(ctrl.Close)
 
 	_, _ = ctrl.Apply(app.Action{Kind: app.ActionCommand, Arg: "s3"})

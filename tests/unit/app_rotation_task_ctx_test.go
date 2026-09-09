@@ -218,7 +218,7 @@ func TestExecuteTaskCmd_ProbeAvailabilityCtx_CancelledByProfileSwitch(t *testing
 	// either way; session.Clients still gets installed unconditionally
 	// before that branch, and handleAvailabilityCacheLoaded never reads
 	// NoCache at all, so the probe-dispatch flow below is unaffected.
-	m := tui.New("profile-a", "us-east-1", tui.WithNoCache(true))
+	m := newBlessedModel(t, "profile-a", "us-east-1", tui.WithNoCache(true))
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 80, Height: 40})
 	// Gen:1 — ConnectGen seeds at 1 (session.New()); this model is never rotated.
 	_, batchCmd := dispatchProbeWindow(t, m, "us-east-1", 1)
@@ -268,7 +268,7 @@ func TestExecuteTaskCmd_ProbeAvailabilityCtx_LiveAfterProfileSwitch(t *testing.T
 	capture := newCtxCaptureAvailFetcher()
 	registerProbeWindow(t, capture.fetch)
 
-	m := tui.New("profile-a", "us-east-1", tui.WithNoCache(true))
+	m := newBlessedModel(t, "profile-a", "us-east-1", tui.WithNoCache(true))
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 80, Height: 40})
 
 	// Rotate to a new pair before ever dispatching a probe for the first —

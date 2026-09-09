@@ -54,7 +54,7 @@ func newCostsScreenController(t *testing.T, now time.Time) *app.Controller {
 	s.Profile = "test-profile"
 	s.Region = "us-east-1"
 	core := runtime.New(s, nil)
-	c := app.New(core)
+	c := newBlessedController(t, core)
 	t.Cleanup(c.Close)
 	c.ApplyIntents([]runtime.UIIntent{runtime.PushScreen{ID: runtime.ScreenCosts}})
 	c.EnsureCostsState(now)
@@ -81,7 +81,7 @@ func round3MonthRecord(now time.Time, rowKey string, amount float64) costs.Recor
 func TestCostsRound3_CLICommand_EmitsNavigateTargetCosts(t *testing.T) {
 	for _, cliCmd := range []string{"costs", "ce"} {
 		t.Run(cliCmd, func(t *testing.T) {
-			m := tui.New(
+			m := newBlessedModel(t,
 				"demo", "us-east-1",
 				tui.WithClients(demo.NewServiceClients()),
 				tui.WithNoCache(true),

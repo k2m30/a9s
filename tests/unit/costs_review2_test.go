@@ -161,7 +161,7 @@ func TestCostsReview2_R3_MainMenuNavigateToCosts_WarmCache_ZeroFetches(t *testin
 	s.Profile = "test-profile"
 	s.Region = "us-east-1"
 	core := runtime.New(s, nil)
-	c := app.New(core)
+	c := newBlessedController(t, core)
 	t.Cleanup(c.Close)
 
 	// Navigate to Costs via the real headless menu-select path (the same
@@ -328,7 +328,7 @@ func TestCostsReview2_R6_DemoTransport_AnomalyFlowsToCellMarkAndFooter(t *testin
 	s.Region = "us-east-1"
 	s.Clients = &awsclient.ServiceClients{CostExplorer: review2NewDemoCostsClient()}
 	core := runtime.New(s, nil)
-	c := app.New(core)
+	c := newBlessedController(t, core)
 	t.Cleanup(c.Close)
 	c.ApplyIntents([]runtime.UIIntent{runtime.PushScreen{ID: runtime.ScreenCosts}})
 	// The controller's `now` is taken from the demo fixture's OWN anchor

@@ -39,8 +39,8 @@ const consoleDemoDisabledFlashText = "demo mode — console link disabled (O sti
 // consoleDemoDisabledFlashText is 50 runes and would otherwise be clipped
 // with a trailing "..." at the default 80-column width, making an exact
 // Contains() assertion width-dependent instead of contract-dependent.
-func newDemoConsoleModel() tui.Model {
-	m := tui.New(demo.DemoProfile, demo.DemoRegion,
+func newDemoConsoleModel(t testing.TB) tui.Model {
+	m := newBlessedModel(t, demo.DemoProfile, demo.DemoRegion,
 		tui.WithClients(demo.NewServiceClients()),
 		tui.WithIsDemo(true),
 		tui.WithNoCache(true),
@@ -69,7 +69,7 @@ func loadDemoEC2List(m tui.Model) tui.Model {
 // ─── "o" on a resource list, demo mode ───────────────────────────────────────
 
 func TestConsoleOpen_ResourceList_DemoMode_FlashesDisabledMessage(t *testing.T) {
-	m := newDemoConsoleModel()
+	m := newDemoConsoleModel(t)
 	m = loadDemoEC2List(m)
 
 	newM, cmd := rootApplyMsg(m, rootKeyPress("o"))
@@ -101,7 +101,7 @@ func TestConsoleOpen_ResourceList_DemoMode_FlashesDisabledMessage(t *testing.T) 
 // messages.Copied case that copyToClipboard never actually produces — that
 // branch was dead code and never executed.
 func TestConsoleOpen_ResourceList_UppercaseO_CopiesConsoleURL(t *testing.T) {
-	m := newDemoConsoleModel()
+	m := newDemoConsoleModel(t)
 	m = loadDemoEC2List(m)
 
 	got := ReadClipboardAfter(t, func() {
@@ -129,7 +129,7 @@ func TestConsoleOpen_ResourceList_UppercaseO_CopiesConsoleURL(t *testing.T) {
 // ─── filter mode suppresses "o" / "O" — they type into the filter ──────────
 
 func TestConsoleOpen_FilterModeActive_OTypesIntoFilterInsteadOfTriggering(t *testing.T) {
-	m := newDemoConsoleModel()
+	m := newDemoConsoleModel(t)
 	m = loadDemoEC2List(m)
 
 	m = typeFilter(m, "o")
@@ -144,7 +144,7 @@ func TestConsoleOpen_FilterModeActive_OTypesIntoFilterInsteadOfTriggering(t *tes
 }
 
 func TestConsoleOpen_FilterModeActive_UppercaseOTypesIntoFilterInsteadOfTriggering(t *testing.T) {
-	m := newDemoConsoleModel()
+	m := newDemoConsoleModel(t)
 	m = loadDemoEC2List(m)
 
 	m = typeFilter(m, "O")
@@ -158,7 +158,7 @@ func TestConsoleOpen_FilterModeActive_UppercaseOTypesIntoFilterInsteadOfTriggeri
 // ─── command mode suppresses "o" / "O" — they type into the command bar ────
 
 func TestConsoleOpen_CommandModeActive_OTypesIntoCommandBarInsteadOfTriggering(t *testing.T) {
-	m := newDemoConsoleModel()
+	m := newDemoConsoleModel(t)
 	m = loadDemoEC2List(m)
 
 	m, _ = rootApplyMsg(m, rootKeyPress(":"))
@@ -174,7 +174,7 @@ func TestConsoleOpen_CommandModeActive_OTypesIntoCommandBarInsteadOfTriggering(t
 }
 
 func TestConsoleOpen_CommandModeActive_UppercaseOTypesIntoCommandBarInsteadOfTriggering(t *testing.T) {
-	m := newDemoConsoleModel()
+	m := newDemoConsoleModel(t)
 	m = loadDemoEC2List(m)
 
 	m, _ = rootApplyMsg(m, rootKeyPress(":"))
@@ -189,7 +189,7 @@ func TestConsoleOpen_CommandModeActive_UppercaseOTypesIntoCommandBarInsteadOfTri
 // ─── main menu: no-op, no crash ─────────────────────────────────────────────
 
 func TestConsoleOpen_MainMenu_NoOpNoCrash(t *testing.T) {
-	m := newDemoConsoleModel()
+	m := newDemoConsoleModel(t)
 
 	before := stripANSI(rootViewContent(m))
 
@@ -208,7 +208,7 @@ func TestConsoleOpen_MainMenu_NoOpNoCrash(t *testing.T) {
 }
 
 func TestConsoleOpen_MainMenu_UppercaseO_NoOpNoCrash(t *testing.T) {
-	m := newDemoConsoleModel()
+	m := newDemoConsoleModel(t)
 
 	before := stripANSI(rootViewContent(m))
 	newM, _ := rootApplyMsg(m, rootKeyPress("O"))
@@ -222,7 +222,7 @@ func TestConsoleOpen_MainMenu_UppercaseO_NoOpNoCrash(t *testing.T) {
 // ─── detail view: "o"/"O" resolve the detailed resource ────────────────────
 
 func TestConsoleOpen_DetailView_DemoMode_FlashesDisabledMessage(t *testing.T) {
-	m := newDemoConsoleModel()
+	m := newDemoConsoleModel(t)
 	res := &resource.Resource{
 		ID:     "i-0abc123",
 		Name:   "web-server",
@@ -251,7 +251,7 @@ func TestConsoleOpen_DetailView_DemoMode_FlashesDisabledMessage(t *testing.T) {
 // the real clipboard back rather than matching a messages.Copied case that
 // production code never produces.
 func TestConsoleOpen_DetailView_UppercaseO_CopiesConsoleURL(t *testing.T) {
-	m := newDemoConsoleModel()
+	m := newDemoConsoleModel(t)
 	res := &resource.Resource{
 		ID:     "i-0abc123",
 		Name:   "web-server",
@@ -372,7 +372,7 @@ func TestConsoleOpen_TUIPathAndHeadlessSnapshot_AgreeOnSameConsoleURL(t *testing
 	}
 
 	// TUI side: press 'O' on the same resource in a real Bubble Tea Update loop.
-	m := newDemoConsoleModel()
+	m := newDemoConsoleModel(t)
 	m, _ = rootApplyMsg(m, messages.Navigate{Target: messages.TargetResourceList, ResourceType: "ec2"})
 	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{Provenance: messages.FetchProvenanceCanonicalList, ResourceType: "ec2", Resources: []resource.Resource{ec2Row}})
 

@@ -298,7 +298,7 @@ func TestSaveResourceListCache_FindingsSurviveWiredSaveAndColdBootReseed(t *test
 	s.Profile = "pilot-coldreseed-prof"
 	s.Region = "us-east-1"
 	core := runtime.New(s, resource.AllResourceTypes())
-	ctrl := app.New(core)
+	ctrl := newBlessedController(t, core)
 	t.Cleanup(ctrl.Close)
 
 	finding := domain.Finding{
@@ -334,7 +334,7 @@ func TestSaveResourceListCache_FindingsSurviveWiredSaveAndColdBootReseed(t *test
 	s2.Profile = "pilot-coldreseed-prof"
 	s2.Region = "us-east-1"
 	core2 := runtime.New(s2, resource.AllResourceTypes())
-	ctrl2 := app.New(core2)
+	ctrl2 := newBlessedController(t, core2)
 	t.Cleanup(ctrl2.Close)
 
 	ctrl2.Handle(messages.AvailabilityCacheLoaded{
@@ -415,7 +415,7 @@ func TestProductionRefresh_OneType_LeavesSiblingTypeFilesByteIdentical(t *testin
 	s.Profile = "pilot-siblingrefresh-prof"
 	s.Region = "us-east-1"
 	core := runtime.New(s, resource.AllResourceTypes())
-	ctrl := app.New(core)
+	ctrl := newBlessedController(t, core)
 	t.Cleanup(ctrl.Close)
 
 	_, _ = ctrl.Apply(app.Action{Kind: app.ActionCommand, Arg: "s3"})
@@ -458,7 +458,7 @@ func TestProductionRefresh_TruncatedRefetch_NeverShrinksPersistedRows_HeaderStay
 	s.Profile = "pilot-truncrefetch-prof"
 	s.Region = "us-east-1"
 	core := runtime.New(s, resource.AllResourceTypes())
-	ctrl := app.New(core)
+	ctrl := newBlessedController(t, core)
 	t.Cleanup(ctrl.Close)
 
 	// A truncated 50-row refetch landing on the SAME type — mirrors the
@@ -668,7 +668,7 @@ func TestAvailabilitySweepAndEnrichment_PersistsRowsPerType_WithoutAnyListOpen(t
 	s.Profile = "pilot-sweepenrich-prof"
 	s.Region = "us-east-1"
 	core := runtime.New(s, resource.AllResourceTypes())
-	ctrl := app.New(core)
+	ctrl := newBlessedController(t, core)
 	t.Cleanup(ctrl.Close)
 
 	finding := domain.Finding{Code: "s3-public-read", Phrase: "publicly readable", Severity: domain.SevBroken, Source: "wave2:s3"}
@@ -793,7 +793,7 @@ func TestEnrichmentChecked_OpenList_FindingsReachPersistedCacheAndColdBootGlyph(
 	s.Profile = "pilot-enrichchecked-prof"
 	s.Region = "us-east-1"
 	core := runtime.New(s, resource.AllResourceTypes())
-	ctrl := app.New(core)
+	ctrl := newBlessedController(t, core)
 	t.Cleanup(ctrl.Close)
 
 	finding := domain.Finding{
@@ -861,7 +861,7 @@ func TestEnrichmentChecked_OpenList_FindingsReachPersistedCacheAndColdBootGlyph(
 	s2.Profile = "pilot-enrichchecked-prof"
 	s2.Region = "us-east-1"
 	core2 := runtime.New(s2, resource.AllResourceTypes())
-	ctrl2 := app.New(core2)
+	ctrl2 := newBlessedController(t, core2)
 	t.Cleanup(ctrl2.Close)
 
 	ctrl2.Handle(messages.AvailabilityCacheLoaded{

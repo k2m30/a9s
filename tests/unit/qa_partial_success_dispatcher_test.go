@@ -27,7 +27,6 @@ import (
 
 	"github.com/k2m30/a9s/v3/core/resource"
 	"github.com/k2m30/a9s/v3/core/runtime/messages"
-	"github.com/k2m30/a9s/v3/internal/tui"
 )
 
 // drainAllMessages recursively walks a tea.Cmd's emitted message tree and
@@ -67,7 +66,7 @@ func drainAllMessages(cmd tea.Cmd) []tea.Msg {
 // (filtered/child/top) all funnel into ResourcesLoadedMsg{Err:...} when
 // resources are non-empty, so this single test exercises the join point.
 func TestDispatcher_PartialSuccess_HandlerEmitsFlashMsg(t *testing.T) {
-	m := tui.New("test-profile", "us-east-1")
+	m := newBlessedModel(t, "test-profile", "us-east-1")
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 36})
 
 	partialErr := errors.New("partial: 1 of 3 IDs failed: throttled")

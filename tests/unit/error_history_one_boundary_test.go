@@ -75,7 +75,7 @@ func TestErrorFlash_HeadlessHostRecordsTheEntry(t *testing.T) {
 // through Core.HandleFlash, so a rule that fires on both would log it twice.
 func TestErrorFlash_TerminalHostRecordsTheSameOneEntry(t *testing.T) {
 	target := resource.AllShortNames()[0]
-	m := tui.New("profile-a", "us-east-1", tui.WithNoCache(true))
+	m := newBlessedModel(t, "profile-a", "us-east-1", tui.WithNoCache(true))
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 100, Height: 40})
 
 	m, cmd := rootApplyMsg(m, boundaryProbeFailure(target))

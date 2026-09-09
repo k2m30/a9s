@@ -71,7 +71,7 @@ import (
 func fieldCompletenessPair(t *testing.T, profile, region string) *app.Controller {
 	t.Helper()
 	core := runtime.Bootstrap(profile, region, resource.AllResourceTypes())
-	ctrl := app.New(core)
+	ctrl := newBlessedController(t, core)
 	t.Cleanup(ctrl.Close)
 	ctrl.SetUIMode("web")
 	return ctrl
@@ -459,7 +459,7 @@ func TestPoisonedExact_HealsOnContradiction(t *testing.T) {
 	}
 
 	core := runtime.Bootstrap(profile, region, resource.AllResourceTypes())
-	ctrl := app.New(core)
+	ctrl := newBlessedController(t, core)
 	t.Cleanup(ctrl.Close)
 	ctrl.SetUIMode("web")
 	openTopLevelList(ctrl, "s3")
@@ -531,7 +531,7 @@ func TestSilentSwap_NeverDropsKnownFindings(t *testing.T) {
 	const profile, region = "silentswap-findings-prof", "us-east-1"
 
 	core := runtime.Bootstrap(profile, region, resource.AllResourceTypes())
-	ctrl := app.New(core)
+	ctrl := newBlessedController(t, core)
 	t.Cleanup(ctrl.Close)
 	ctrl.SetUIMode("web")
 	openTopLevelList(ctrl, "s3")
@@ -620,7 +620,7 @@ func TestSilentSwap_Wave1FindingNotCarriedOnResolve(t *testing.T) {
 	const profile, region = "silentswap-wave1-resolve-prof", "us-east-1"
 
 	core := runtime.Bootstrap(profile, region, resource.AllResourceTypes())
-	ctrl := app.New(core)
+	ctrl := newBlessedController(t, core)
 	t.Cleanup(ctrl.Close)
 	ctrl.SetUIMode("web")
 	openTopLevelList(ctrl, "s3")

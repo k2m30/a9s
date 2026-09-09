@@ -38,7 +38,7 @@ import (
 // real AWS clients we can only verify cmd != nil; the Append check is best
 // verified in integration tests.
 func TestHandleRelatedNavigate_TruncatedCache_InitiatesFetch(t *testing.T) {
-	m := tui.New("demo", "us-east-1",
+	m := newBlessedModel(t, "demo", "us-east-1",
 		tui.WithClients(demo.NewServiceClients()),
 		tui.WithIsDemo(true),
 		tui.WithNoCache(true),
@@ -102,7 +102,7 @@ func TestHandleRelatedNavigate_TruncatedCache_InitiatesFetch(t *testing.T) {
 // TestHandleRelatedNavigate_CompleteCache_NoFetch verifies that when all
 // requested IDs are in a non-truncated cache, no fetch is dispatched.
 func TestHandleRelatedNavigate_CompleteCache_NoFetch(t *testing.T) {
-	m := tui.New("demo", "us-east-1",
+	m := newBlessedModel(t, "demo", "us-east-1",
 		tui.WithClients(demo.NewServiceClients()),
 		tui.WithIsDemo(true),
 		tui.WithNoCache(true),

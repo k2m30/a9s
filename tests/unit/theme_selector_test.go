@@ -71,7 +71,7 @@ func TestNewTheme_SelectionReturnsThemeSelectedMsg(t *testing.T) {
 	themeFiles := []string{"tokyo-night.yaml", "dracula.yaml"}
 
 	// Cursor starts at index 0 (tokyo-night.yaml). Move down to dracula.yaml.
-	m := newLiveSelector(themeFiles, "tokyo-night.yaml", "themes", func(s string) tea.Msg {
+	m := newLiveSelector(t, themeFiles, "tokyo-night.yaml", "themes", func(s string) tea.Msg {
 		return messages.ThemeSelected{Theme: s}
 	}, k)
 

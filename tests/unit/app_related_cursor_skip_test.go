@@ -60,7 +60,7 @@ func newRelatedSkipController(t *testing.T, rows []app.DetailRelatedRow) *app.Co
 	s.Profile = "test-profile"
 	s.Region = "us-east-1"
 	core := runtime.New(s, nil)
-	c := app.New(core)
+	c := newBlessedController(t, core)
 	t.Cleanup(c.Close)
 	c.ApplyIntents([]runtime.UIIntent{
 		runtime.PushScreen{ID: runtime.ScreenDetail},
@@ -283,7 +283,7 @@ func TestRelatedCursor_MenuParity_SameDimNonDimPatternSameLandingSequence(t *tes
 	s.Profile = "test-profile"
 	s.Region = "us-east-1"
 	core := runtime.New(s, nil)
-	menuCtrl := app.New(core)
+	menuCtrl := newBlessedController(t, core)
 
 	all := resource.AllResourceTypes()
 	if len(all) < 5 {

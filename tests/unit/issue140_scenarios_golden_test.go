@@ -275,7 +275,7 @@ func scenarioEC2034CloudTrailLast(t *testing.T) string {
 
 func issue140DemoModel(t *testing.T, w, h int) tui.Model {
 	t.Helper()
-	m := tui.New("demo", "us-east-1",
+	m := newBlessedModel(t, "demo", "us-east-1",
 		tui.WithClients(demo.NewServiceClients()),
 		tui.WithIsDemo(true),
 		tui.WithNoCache(true),

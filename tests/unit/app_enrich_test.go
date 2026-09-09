@@ -51,8 +51,8 @@ func withDocument(res resource.Resource, doc map[string]any) resource.Resource {
 	return enriched
 }
 
-func newEnrichApp() tui.Model {
-	m := tui.New("demo", "us-east-1",
+func newEnrichApp(t testing.TB) tui.Model {
+	m := newBlessedModel(t, "demo", "us-east-1",
 		tui.WithClients(demo.NewServiceClients()),
 		tui.WithIsDemo(true),
 		tui.WithNoCache(true),
@@ -165,7 +165,7 @@ func TestDetailView_EnrichResult_JSONViewShowsDocument(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestDetailView_EnrichResult_IgnoresMismatchedResourceID(t *testing.T) {
-	m := newEnrichApp()
+	m := newEnrichApp(t)
 
 	res := rolePolicyRes("arn:aws:iam::123456789012:policy/my-policy", "my-policy", "Managed")
 
@@ -201,7 +201,7 @@ func TestDetailView_EnrichResult_IgnoresMismatchedResourceID(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestApp_NavigateToRolePoliciesDetail_DispatchesEnrichment(t *testing.T) {
-	m := newEnrichApp()
+	m := newEnrichApp(t)
 
 	// Verify role_policies has a detail enricher registered
 	if !resource.HasDetailEnricher("role_policies") {
@@ -256,7 +256,7 @@ func TestDetailView_EnrichResult_InlinePolicy_YAMLShowsDocument(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestDetailView_EnrichResult_AcceptsMatchingID(t *testing.T) {
-	m := newEnrichApp()
+	m := newEnrichApp(t)
 
 	res := rolePolicyRes("arn:aws:iam::123456789012:policy/my-policy", "my-policy", "Managed")
 
@@ -286,7 +286,7 @@ func TestDetailView_EnrichResult_AcceptsMatchingID(t *testing.T) {
 }
 
 func TestEnrichResult_WrongResourceType_IsIgnored(t *testing.T) {
-	app := tui.New("demo", "us-east-1",
+	app := newBlessedModel(t, "demo", "us-east-1",
 		tui.WithClients(demo.NewServiceClients()),
 		tui.WithIsDemo(true),
 		tui.WithNoCache(true),
@@ -316,7 +316,7 @@ func TestEnrichResult_WrongResourceType_IsIgnored(t *testing.T) {
 }
 
 func TestEnrichResult_ErrorShowsFlashMessage(t *testing.T) {
-	app := tui.New("demo", "us-east-1",
+	app := newBlessedModel(t, "demo", "us-east-1",
 		tui.WithClients(demo.NewServiceClients()),
 		tui.WithIsDemo(true),
 		tui.WithNoCache(true),
@@ -366,7 +366,7 @@ func TestEnrichResult_ErrorShowsFlashMessage(t *testing.T) {
 // routes through Core.HandleFlash + dispatchHandlerResult — the same path
 // messages.Flash itself takes.
 func TestEnrichResult_ErrorFlash_AdvancesGenSoStalePendingTickCannotClearIt(t *testing.T) {
-	m := newEnrichApp()
+	m := newEnrichApp(t)
 
 	// Establish a baseline flash (simulating the EARLIER flash whose
 	// auto-clear tick — stamped with genBefore — is the "stale pending
@@ -435,7 +435,7 @@ func TestEnrichResult_ErrorFlash_AdvancesGenSoStalePendingTickCannotClearIt(t *t
 }
 
 func TestEnrichResult_StaleGeneration_IsDiscarded(t *testing.T) {
-	app := tui.New("demo", "us-east-1",
+	app := newBlessedModel(t, "demo", "us-east-1",
 		tui.WithClients(demo.NewServiceClients()),
 		tui.WithIsDemo(true),
 		tui.WithNoCache(true),
@@ -473,7 +473,7 @@ func TestEnrichResult_StaleGeneration_IsDiscarded(t *testing.T) {
 }
 
 func TestYAMLView_DirectFromList_EnrichmentUpdatesContent(t *testing.T) {
-	app := tui.New("demo", "us-east-1",
+	app := newBlessedModel(t, "demo", "us-east-1",
 		tui.WithClients(demo.NewServiceClients()),
 		tui.WithIsDemo(true),
 		tui.WithNoCache(true),
@@ -513,7 +513,7 @@ func TestYAMLView_DirectFromList_EnrichmentUpdatesContent(t *testing.T) {
 }
 
 func TestJSONView_DirectFromList_EnrichmentUpdatesContent(t *testing.T) {
-	app := tui.New("demo", "us-east-1",
+	app := newBlessedModel(t, "demo", "us-east-1",
 		tui.WithClients(demo.NewServiceClients()),
 		tui.WithIsDemo(true),
 		tui.WithNoCache(true),
@@ -553,7 +553,7 @@ func TestJSONView_DirectFromList_EnrichmentUpdatesContent(t *testing.T) {
 }
 
 func TestYAMLView_WrongResourceType_EnrichmentIgnored(t *testing.T) {
-	app := tui.New("demo", "us-east-1",
+	app := newBlessedModel(t, "demo", "us-east-1",
 		tui.WithClients(demo.NewServiceClients()),
 		tui.WithIsDemo(true),
 		tui.WithNoCache(true),
@@ -730,7 +730,7 @@ func TestPolicyDocCache_SetIfNewer_NoEviction_UnrelatedKeysNeverInterfere(t *tes
 }
 
 func TestRefresh_OnDetailView_DispatchesEnrichment(t *testing.T) {
-	app := tui.New("demo", "us-east-1",
+	app := newBlessedModel(t, "demo", "us-east-1",
 		tui.WithClients(demo.NewServiceClients()),
 		tui.WithIsDemo(true),
 		tui.WithNoCache(true),
@@ -762,7 +762,7 @@ func TestRefresh_OnDetailView_DispatchesEnrichment(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestDetailOperationTasks_NoEnricher_ReturnsNilEnrichTask(t *testing.T) {
-	app := tui.New("demo", "us-east-1",
+	app := newBlessedModel(t, "demo", "us-east-1",
 		tui.WithClients(demo.NewServiceClients()),
 		tui.WithIsDemo(true),
 		tui.WithNoCache(true),
@@ -806,7 +806,7 @@ func TestDetailOperationTasks_WithEnricher_ExecutesToEnrichDetailResult(t *testi
 		t.Fatal("expected role_policies detail enricher to be registered")
 	}
 
-	app := tui.New("demo", "us-east-1",
+	app := newBlessedModel(t, "demo", "us-east-1",
 		tui.WithClients(demo.NewServiceClients()),
 		tui.WithIsDemo(true),
 		tui.WithNoCache(true),

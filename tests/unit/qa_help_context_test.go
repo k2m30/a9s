@@ -543,7 +543,7 @@ func TestQA_HelpContext_AnyKeyCloses(t *testing.T) {
 
 func TestQA_HelpContext_NarrowTerminal(t *testing.T) {
 	tui.Version = "0.6.0"
-	m := tui.New("testprofile", "us-east-1")
+	m := newBlessedModel(t, "testprofile", "us-east-1")
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 60, Height: 24})
 
 	m, _ = rootApplyMsg(m, rootKeyPress("?"))

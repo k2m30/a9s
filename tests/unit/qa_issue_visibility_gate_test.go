@@ -171,7 +171,7 @@ func newVisibilityListController(t *testing.T, shortName string) *app.Controller
 	s.Profile = "test-profile"
 	s.Region = "us-east-1"
 	core := runtime.New(s, nil)
-	c := app.New(core)
+	c := newBlessedController(t, core)
 	t.Cleanup(c.Close)
 	c.Apply(app.Action{Kind: app.ActionCommand, Arg: shortName})
 	return c
@@ -213,7 +213,7 @@ func newVisibilityDetailController(t *testing.T) *app.Controller {
 	s.Profile = "test-profile"
 	s.Region = "us-east-1"
 	core := runtime.New(s, nil)
-	c := app.New(core)
+	c := newBlessedController(t, core)
 	t.Cleanup(c.Close)
 	// Production always sets one — internal/tui/app.go:144 and
 	// core/web/construct.go:31 — and without it the detail projection falls

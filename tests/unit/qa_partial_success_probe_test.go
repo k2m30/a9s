@@ -162,7 +162,7 @@ func TestProbeEnrichment_PartialSuccess(t *testing.T) {
 	// triggering fetchIdentity (STS). probeEnrichment guards on m.clients != nil;
 	// without this, it returns an early "clients not initialized" error instead of
 	// calling our enricher.
-	m := tui.New("test", "us-east-1", tui.WithNoCache(true))
+	m := newBlessedModel(t, "test", "us-east-1", tui.WithNoCache(true))
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 36})
 	// Pre-supply clients so probeEnrichment's nil-clients guard passes.
 	// noCache=true means handleClientsReady skips fetchIdentity and goes through

@@ -54,7 +54,7 @@ func chainStrip(s string) string {
 // newChainDemoModel creates a demo-mode tui.Model sized at 120×30.
 func newChainDemoModel(t *testing.T) tui.Model {
 	t.Helper()
-	m := tui.New("demo", "us-east-1",
+	m := newBlessedModel(t, "demo", "us-east-1",
 		tui.WithClients(demo.NewServiceClients()),
 		tui.WithIsDemo(true),
 		tui.WithNoCache(true),

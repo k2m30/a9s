@@ -28,7 +28,7 @@ func demoClientsReadyMsg() messages.ClientsReady {
 
 func TestDemoMode_Init_NoAWSConnection(t *testing.T) {
 	t.Parallel()
-	model := tui.New("demo", "us-east-1",
+	model := newBlessedModel(t, "demo", "us-east-1",
 		tui.WithClients(demo.NewServiceClients()),
 		tui.WithIsDemo(true),
 		tui.WithNoCache(true),
@@ -57,7 +57,7 @@ func TestDemoMode_Init_NoAWSConnection(t *testing.T) {
 
 func TestDemoMode_FetchResources_EC2(t *testing.T) {
 	t.Parallel()
-	model := tui.New("demo", "us-east-1",
+	model := newBlessedModel(t, "demo", "us-east-1",
 		tui.WithClients(demo.NewServiceClients()),
 		tui.WithIsDemo(true),
 		tui.WithNoCache(true),
@@ -98,7 +98,7 @@ func TestDemoMode_FetchResources_EC2(t *testing.T) {
 
 func TestDemoMode_FetchResources_Unknown(t *testing.T) {
 	t.Parallel()
-	model := tui.New("demo", "us-east-1",
+	model := newBlessedModel(t, "demo", "us-east-1",
 		tui.WithClients(demo.NewServiceClients()),
 		tui.WithIsDemo(true),
 		tui.WithNoCache(true),
@@ -147,7 +147,7 @@ func TestDemoMode_FetchResources_Unknown(t *testing.T) {
 
 func TestDemoMode_BlockedCommand_Ctx(t *testing.T) {
 	t.Parallel()
-	model := tui.New("demo", "us-east-1",
+	model := newBlessedModel(t, "demo", "us-east-1",
 		tui.WithClients(demo.NewServiceClients()),
 		tui.WithIsDemo(true),
 		tui.WithNoCache(true),
@@ -181,7 +181,7 @@ func TestDemoMode_BlockedCommand_Ctx(t *testing.T) {
 
 func TestDemoMode_BlockedCommand_Region(t *testing.T) {
 	t.Parallel()
-	model := tui.New("demo", "us-east-1",
+	model := newBlessedModel(t, "demo", "us-east-1",
 		tui.WithClients(demo.NewServiceClients()),
 		tui.WithIsDemo(true),
 		tui.WithNoCache(true),
@@ -215,7 +215,7 @@ func TestDemoMode_BlockedCommand_Region(t *testing.T) {
 
 func TestDemoMode_RevealWorks(t *testing.T) {
 	t.Parallel()
-	model := tui.New("demo", "us-east-1",
+	model := newBlessedModel(t, "demo", "us-east-1",
 		tui.WithClients(demo.NewServiceClients()),
 		tui.WithIsDemo(true),
 		tui.WithNoCache(true),
@@ -278,7 +278,7 @@ func TestDemoMode_RevealWorks(t *testing.T) {
 
 func TestDemoMode_SSMRevealWorks(t *testing.T) {
 	t.Parallel()
-	model := tui.New("demo", "us-east-1",
+	model := newBlessedModel(t, "demo", "us-east-1",
 		tui.WithClients(demo.NewServiceClients()),
 		tui.WithIsDemo(true),
 		tui.WithNoCache(true),
@@ -338,7 +338,7 @@ func TestDemoMode_SSMRevealWorks(t *testing.T) {
 
 func TestDemoMode_RefreshReturnsSameData(t *testing.T) {
 	t.Parallel()
-	model := tui.New("demo", "us-east-1",
+	model := newBlessedModel(t, "demo", "us-east-1",
 		tui.WithClients(demo.NewServiceClients()),
 		tui.WithIsDemo(true),
 		tui.WithNoCache(true),
@@ -394,7 +394,7 @@ func TestDemoMode_RefreshReturnsSameData(t *testing.T) {
 // rather than asserting cmd() produces InitConnect directly.
 func TestNonDemoMode_Unchanged(t *testing.T) {
 	t.Parallel()
-	model := tui.New("", "")
+	model := newBlessedModel(t, "", "")
 	cmd := model.Init()
 	if cmd == nil {
 		t.Fatal("Init() returned nil cmd; expected a cmd tree containing InitConnectMsg")

@@ -675,7 +675,7 @@ func leakPinCostsController(t *testing.T, now time.Time) (*session.Session, *app
 	s.Profile = "leak-pin-costs"
 	s.Region = "us-east-1"
 	core := runtime.New(s, nil)
-	c := app.New(core)
+	c := newBlessedController(t, core)
 	t.Cleanup(c.Close)
 	c.ApplyIntents([]runtime.UIIntent{runtime.PushScreen{ID: runtime.ScreenCosts}})
 	c.EnsureCostsState(now)

@@ -117,7 +117,7 @@ func openErrorLog(m tui.Model) tui.Model {
 
 func newProbeWindowModel(t *testing.T) tui.Model {
 	t.Helper()
-	m := tui.New("profile-a", "us-east-1", tui.WithNoCache(true))
+	m := newBlessedModel(t, "profile-a", "us-east-1", tui.WithNoCache(true))
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 80, Height: 40})
 	return m
 }

@@ -22,7 +22,7 @@ func TestBugReveal_EC2Detail_RelatedVisibleAcrossWidths(t *testing.T) {
 	ec2 := mustDemoEC2(t)
 	for _, w := range []int{60, 76, 95, 120, 160} {
 		t.Run(fmt.Sprintf("width=%d", w), func(t *testing.T) {
-			m := tui.New("demo", "us-east-1",
+			m := newBlessedModel(t, "demo", "us-east-1",
 				tui.WithClients(demo.NewServiceClients()),
 				tui.WithIsDemo(true),
 				tui.WithNoCache(true),

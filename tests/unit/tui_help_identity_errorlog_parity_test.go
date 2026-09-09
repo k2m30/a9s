@@ -92,7 +92,7 @@ func newParityHeadlessController(t *testing.T, profile, region string) *app.Cont
 	s.Profile = profile
 	s.Region = region
 	core := runtime.New(s, nil)
-	c := app.New(core)
+	c := newBlessedController(t, core)
 	t.Cleanup(c.Close)
 	return c
 }

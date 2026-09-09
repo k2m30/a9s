@@ -44,7 +44,7 @@ const tui6WideQuery = "production"
 // returns the published matches.
 func tui6TextMatches(t *testing.T, lines []string, query string) []app.SearchMatch {
 	t.Helper()
-	c := newTextScreenController(runtime.ScreenYAML, lines)
+	c := newTextScreenController(t, runtime.ScreenYAML, lines)
 	c.Apply(app.Action{Kind: app.ActionSearch, Arg: query})
 	body := c.Snapshot().Body.Text
 	if body == nil {
@@ -121,7 +121,7 @@ func TestSearchOffsets_EveryMatchOnALineIsPublished(t *testing.T) {
 // lane: whatever unit the published offsets end up in, the painted highlight
 // still covers exactly the matched text.
 func TestSearchHighlight_LandsOnTheMatchAfterADoubleWidthRune(t *testing.T) {
-	c := newTextScreenController(runtime.ScreenYAML, []string{tui6WideLine, "State: running"})
+	c := newTextScreenController(t, runtime.ScreenYAML, []string{tui6WideLine, "State: running"})
 	c.Apply(app.Action{Kind: app.ActionSearch, Arg: tui6WideQuery})
 	body := c.Snapshot().Body.Text
 	if body == nil {
@@ -165,7 +165,7 @@ func TestSearchHighlight_PaintsTheBodysMatchSetAndComputesNone(t *testing.T) {
 		}},
 	} {
 		t.Run(lane.name, func(t *testing.T) {
-			c := newTextScreenController(lane.screen, []string{line})
+			c := newTextScreenController(t, lane.screen, []string{line})
 			c.Apply(app.Action{Kind: app.ActionSearch, Arg: tui6WideQuery})
 			body := c.Snapshot().Body.Text
 			if body == nil {
@@ -223,7 +223,7 @@ func TestSearchOffsets_UnshiftedByALengthChangingFold(t *testing.T) {
 // the painted surface: the highlight covers the word, not the word shifted by
 // the fold's byte difference.
 func TestSearchHighlight_LandsOnTheMatchAfterALengthChangingFold(t *testing.T) {
-	c := newTextScreenController(runtime.ScreenYAML, []string{tui6FoldLine})
+	c := newTextScreenController(t, runtime.ScreenYAML, []string{tui6FoldLine})
 	c.Apply(app.Action{Kind: app.ActionSearch, Arg: tui6WideQuery})
 	body := c.Snapshot().Body.Text
 	if body == nil {
@@ -293,7 +293,7 @@ func TestSearchHighlight_CoversExactlyTheMatchedBytes(t *testing.T) {
 		{"a fold that changes byte length", tui6FoldLine, tui6WideQuery, []string{"-productio", "roduction"}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			c := newTextScreenController(runtime.ScreenYAML, []string{tc.line})
+			c := newTextScreenController(t, runtime.ScreenYAML, []string{tc.line})
 			c.Apply(app.Action{Kind: app.ActionSearch, Arg: tc.query})
 			body := c.Snapshot().Body.Text
 			if body == nil || len(body.SearchMatches) == 0 {
@@ -329,7 +329,7 @@ func TestSearchMatches_ComputedOncePerContentAndQuery(t *testing.T) {
 	for i := range 64 {
 		lines = append(lines, "Name: web-0"+string(rune('0'+i%10))+"-production")
 	}
-	c := newTextScreenController(runtime.ScreenYAML, lines)
+	c := newTextScreenController(t, runtime.ScreenYAML, lines)
 	c.Apply(app.Action{Kind: app.ActionSearch, Arg: tui6WideQuery})
 
 	first := c.Snapshot().Body.Text.SearchMatches

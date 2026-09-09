@@ -67,7 +67,7 @@ func TestCostsClockSeam_BothLanesOpenOnThePinnedMonth(t *testing.T) {
 
 	// --- TUI lane: the Navigate message ---
 	tui.Version = "test"
-	m := tui.New("costs-clock-seam", "us-east-1", tui.WithNoCache(true))
+	m := newBlessedModel(t, "costs-clock-seam", "us-east-1", tui.WithNoCache(true))
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 40})
 	m, _ = rootApplyMsg(m, messages.Navigate{Target: messages.TargetCosts})
 	rendered := stripANSI(rootViewContent(m))

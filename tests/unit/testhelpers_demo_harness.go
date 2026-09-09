@@ -37,7 +37,7 @@ func replaceEC2Related(t *testing.T, defs []resource.RelatedDef) {
 func newDemoColdCacheApp(t *testing.T) *tui.Model {
 	t.Helper()
 	clients := demo.NewServiceClients()
-	m := tui.New(
+	m := newBlessedModel(t,
 		demo.DemoProfile,
 		demo.DemoRegion,
 		tui.WithClients(clients),

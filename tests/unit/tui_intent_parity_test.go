@@ -63,7 +63,7 @@ func newIntentParityHeadlessController(t *testing.T) (*app.Controller, *runtime.
 	s.Profile = "intent-parity-prof"
 	s.Region = "us-east-1"
 	core := runtime.New(s, nil)
-	return app.New(core), core
+	return newBlessedController(t, core), core
 }
 
 // newIntentParityTUIModel builds a sized, demo-independent tui.Model exactly
@@ -72,7 +72,7 @@ func newIntentParityHeadlessController(t *testing.T) (*app.Controller, *runtime.
 // is driven here).
 func newIntentParityTUIModel(t *testing.T) tui.Model {
 	t.Helper()
-	m := tui.New("intent-parity-prof", "us-east-1", tui.WithNoCache(true))
+	m := newBlessedModel(t, "intent-parity-prof", "us-east-1", tui.WithNoCache(true))
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 100, Height: 40})
 	return m
 }

@@ -17,7 +17,7 @@ import (
 func TestBugReveal_MainMenuToEC2Detail_MustShowRelatedColumn(t *testing.T) {
 	for _, profile := range []string{"demo", "test-profile"} {
 		t.Run("profile="+profile, func(t *testing.T) {
-			m := tui.New(profile, "us-east-1",
+			m := newBlessedModel(t, profile, "us-east-1",
 				tui.WithClients(demo.NewServiceClients()),
 				tui.WithIsDemo(true),
 				tui.WithNoCache(true),

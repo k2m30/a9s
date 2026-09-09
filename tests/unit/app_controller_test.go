@@ -59,7 +59,7 @@ func newTestController(t *testing.T) *app.Controller {
 	s.Profile = "demo"
 	s.Region = "us-east-1"
 	core := runtime.New(s, nil)
-	c := app.New(core)
+	c := newBlessedController(t, core)
 	t.Cleanup(c.Close)
 	return c
 }
@@ -75,7 +75,7 @@ func newTestController(t *testing.T) *app.Controller {
 func newTestControllerForProfile(t *testing.T, profile, region string) *app.Controller {
 	t.Helper()
 	t.Setenv("A9S_CONFIG_FOLDER", t.TempDir())
-	c := app.New(runtime.Bootstrap(profile, region, resource.AllResourceTypes()))
+	c := newBlessedController(t, runtime.Bootstrap(profile, region, resource.AllResourceTypes()))
 	t.Cleanup(c.Close)
 	return c
 }

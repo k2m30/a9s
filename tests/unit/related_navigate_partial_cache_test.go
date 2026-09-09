@@ -35,7 +35,7 @@ import (
 func setupEC2ListWithTruncatedCache(t *testing.T) (tui.Model, []resource.Resource) {
 	t.Helper()
 
-	m := tui.New("demo", "us-east-1",
+	m := newBlessedModel(t, "demo", "us-east-1",
 		tui.WithClients(demo.NewServiceClients()),
 		tui.WithIsDemo(true),
 		tui.WithNoCache(true),
@@ -71,7 +71,7 @@ func setupEC2ListWithTruncatedCache(t *testing.T) (tui.Model, []resource.Resourc
 func setupEC2ListWithCompleteCache(t *testing.T) (tui.Model, []resource.Resource) {
 	t.Helper()
 
-	m := tui.New("demo", "us-east-1",
+	m := newBlessedModel(t, "demo", "us-east-1",
 		tui.WithClients(demo.NewServiceClients()),
 		tui.WithIsDemo(true),
 		tui.WithNoCache(true),

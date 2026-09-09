@@ -50,7 +50,7 @@ func newStage4PinController(t *testing.T) *app.Controller {
 	t.Helper()
 	t.Setenv("A9S_CONFIG_FOLDER", t.TempDir())
 	core := runtime.Bootstrap("stage4-pin-profile", "us-east-1", resource.AllResourceTypes())
-	ctrl := app.New(core)
+	ctrl := newBlessedController(t, core)
 	t.Cleanup(ctrl.Close)
 	ctrl.SetUIMode("web")
 	return ctrl

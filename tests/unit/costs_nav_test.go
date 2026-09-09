@@ -35,7 +35,7 @@ func newCostsNavController(t *testing.T) *app.Controller {
 	s.Profile = "test-profile"
 	s.Region = "us-east-1"
 	core := runtime.New(s, nil)
-	c := app.New(core)
+	c := newBlessedController(t, core)
 	t.Cleanup(c.Close)
 	return c
 }
@@ -152,7 +152,7 @@ func TestQA_Costs_MainMenu_Enter_EmitsNavigateTargetCosts(t *testing.T) {
 	s.Profile = "test-profile"
 	s.Region = "us-east-1"
 	core := runtime.New(s, nil)
-	c := app.New(core)
+	c := newBlessedController(t, core)
 	t.Cleanup(c.Close)
 
 	// "costs" does not collide with any real resource ShortName/Alias/

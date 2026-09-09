@@ -58,7 +58,7 @@ func newSaveCacheApp(t *testing.T, profile, region string) tui.Model {
 	tmp := t.TempDir()
 	t.Setenv("A9S_CONFIG_FOLDER", tmp)
 
-	m := tui.New(profile, region,
+	m := newBlessedModel(t, profile, region,
 		tui.WithClients(demo.NewServiceClients()),
 		tui.WithIsDemo(true),
 		tui.WithProfileForTest(profile),

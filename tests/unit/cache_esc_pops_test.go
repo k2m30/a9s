@@ -51,7 +51,7 @@ import (
 func TestCachePoison_RelatedNavigate_DoesNotOverwriteTopLevelCache(t *testing.T) {
 	// ── Step 1: Set up model and load full EC2 list ──────────────────────────
 
-	m := tui.New("demo", "us-east-1",
+	m := newBlessedModel(t, "demo", "us-east-1",
 		tui.WithClients(demo.NewServiceClients()),
 		tui.WithIsDemo(true),
 		tui.WithNoCache(true),

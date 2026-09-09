@@ -18,7 +18,7 @@ import (
 func TestQA_MainMenu_AllSevenResourceTypesVisible(t *testing.T) {
 	tui.Version = "1.0.2"
 	// Use a tall terminal so all resource types are visible without scrolling
-	m := tui.New("testprofile", "us-east-1")
+	m := newBlessedModel(t, "testprofile", "us-east-1")
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 90})
 	plain := stripANSI(rootViewContent(m))
 	lines := strings.Split(plain, "\n")
@@ -47,7 +47,7 @@ func TestQA_MainMenu_AllSevenResourceTypesVisible(t *testing.T) {
 func TestQA_MainMenu_EachRowShowsAlias(t *testing.T) {
 	tui.Version = "1.0.2"
 	// Use a tall terminal so all resource types are visible without scrolling
-	m := tui.New("testprofile", "us-east-1")
+	m := newBlessedModel(t, "testprofile", "us-east-1")
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 90})
 	plain := stripANSI(rootViewContent(m))
 
@@ -131,7 +131,7 @@ func TestQA_MainMenu_FirstRowSelectedByDefault(t *testing.T) {
 func TestQA_MainMenu_ExactlySevenResourceRows(t *testing.T) {
 	tui.Version = "1.0.2"
 	// Use a tall terminal so all resource types are visible without scrolling
-	m := tui.New("testprofile", "us-east-1")
+	m := newBlessedModel(t, "testprofile", "us-east-1")
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 90})
 	plain := stripANSI(rootViewContent(m))
 	lines := strings.Split(plain, "\n")
@@ -272,7 +272,7 @@ func TestQA_MainMenu_CursorStopsAtBottom(t *testing.T) {
 
 func TestQA_MainMenu_PageDownMovesMultipleItems(t *testing.T) {
 	tui.Version = "test"
-	m := tui.New("testprofile", "us-east-1")
+	m := newBlessedModel(t, "testprofile", "us-east-1")
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 80, Height: 10})
 
 	// Press PageDown — cursor should jump past the first few items
@@ -292,7 +292,7 @@ func TestQA_MainMenu_PageDownMovesMultipleItems(t *testing.T) {
 
 func TestQA_MainMenu_PageUpMovesMultipleItems(t *testing.T) {
 	tui.Version = "test"
-	m := tui.New("testprofile", "us-east-1")
+	m := newBlessedModel(t, "testprofile", "us-east-1")
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 80, Height: 10})
 
 	// Go to bottom, then PageUp — cursor should NOT be on the last item
@@ -312,7 +312,7 @@ func TestQA_MainMenu_PageUpMovesMultipleItems(t *testing.T) {
 
 func TestQA_MainMenu_PageDownClampsAtBottom(t *testing.T) {
 	tui.Version = "test"
-	m := tui.New("testprofile", "us-east-1")
+	m := newBlessedModel(t, "testprofile", "us-east-1")
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 80, Height: 10})
 
 	// Press PageDown many times — should clamp at last item
@@ -333,7 +333,7 @@ func TestQA_MainMenu_PageDownClampsAtBottom(t *testing.T) {
 
 func TestQA_MainMenu_PageUpClampsAtTop(t *testing.T) {
 	tui.Version = "test"
-	m := tui.New("testprofile", "us-east-1")
+	m := newBlessedModel(t, "testprofile", "us-east-1")
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 80, Height: 10})
 
 	// Move down a bit, then PageUp many times — should clamp at first item
@@ -357,7 +357,7 @@ func TestQA_MainMenu_PageUpClampsAtTop(t *testing.T) {
 
 func TestQA_MainMenu_CtrlD_PageDown(t *testing.T) {
 	tui.Version = "test"
-	m := tui.New("testprofile", "us-east-1")
+	m := newBlessedModel(t, "testprofile", "us-east-1")
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 80, Height: 10})
 
 	// Ctrl+D should work as PageDown
@@ -376,7 +376,7 @@ func TestQA_MainMenu_CtrlD_PageDown(t *testing.T) {
 
 func TestQA_MainMenu_CtrlU_PageUp(t *testing.T) {
 	tui.Version = "test"
-	m := tui.New("testprofile", "us-east-1")
+	m := newBlessedModel(t, "testprofile", "us-east-1")
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 80, Height: 10})
 
 	// Go to bottom, then Ctrl+U should work as PageUp
@@ -600,7 +600,7 @@ func TestQA_MainMenu_MultipleJThenGReturnsToTop(t *testing.T) {
 func TestMainMenu_Viewport_CursorVisibleWhenScrolledDown(t *testing.T) {
 	tui.Version = "test"
 	// Height 10: innerSize.h = 7, so only 7 render lines visible
-	m := tui.New("testprofile", "us-east-1")
+	m := newBlessedModel(t, "testprofile", "us-east-1")
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 80, Height: 10})
 
 	// Move cursor to item index 11 (EKS Node Groups, 0-indexed)
@@ -616,7 +616,7 @@ func TestMainMenu_Viewport_CursorVisibleWhenScrolledDown(t *testing.T) {
 
 func TestMainMenu_Viewport_BottomKey_LastItemVisible(t *testing.T) {
 	tui.Version = "test"
-	m := tui.New("testprofile", "us-east-1")
+	m := newBlessedModel(t, "testprofile", "us-east-1")
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 80, Height: 10})
 
 	// Press G to go to bottom
@@ -632,7 +632,7 @@ func TestMainMenu_Viewport_BottomKey_LastItemVisible(t *testing.T) {
 
 func TestMainMenu_Viewport_TopAfterScroll_FirstItemVisible(t *testing.T) {
 	tui.Version = "test"
-	m := tui.New("testprofile", "us-east-1")
+	m := newBlessedModel(t, "testprofile", "us-east-1")
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 80, Height: 10})
 
 	// Scroll to bottom, then back to top
@@ -648,7 +648,7 @@ func TestMainMenu_Viewport_TopAfterScroll_FirstItemVisible(t *testing.T) {
 
 func TestMainMenu_Viewport_ScrolledDown_EnterSelectsCorrectItem(t *testing.T) {
 	tui.Version = "test"
-	m := tui.New("testprofile", "us-east-1")
+	m := newBlessedModel(t, "testprofile", "us-east-1")
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 80, Height: 10})
 
 	// Move to last item
@@ -674,7 +674,7 @@ func TestMainMenu_Viewport_OnlyVisibleRowsRendered(t *testing.T) {
 	// With category headers, the first 7 lines are:
 	//   COMPUTE (header), EC2, ECS Services, ECS Clusters, ECS Tasks, Lambda, ASG
 	// So items 0-5 (6 items) are visible, item 6+ not visible.
-	m := tui.New("testprofile", "us-east-1")
+	m := newBlessedModel(t, "testprofile", "us-east-1")
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 80, Height: 10})
 
 	plain := stripANSI(rootViewContent(m))
@@ -702,7 +702,7 @@ func TestMainMenu_Viewport_OnlyVisibleRowsRendered(t *testing.T) {
 func TestQA_MainMenu_CategoryHeadersVisible(t *testing.T) {
 	tui.Version = "1.0.2"
 	// Use a tall terminal so all items are visible
-	m := tui.New("testprofile", "us-east-1")
+	m := newBlessedModel(t, "testprofile", "us-east-1")
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 90})
 	plain := stripANSI(rootViewContent(m))
 
@@ -748,7 +748,7 @@ func TestQA_MainMenu_CategoryHeadersNotSelectable(t *testing.T) {
 
 func TestQA_MainMenu_CategoryHeaderAppearsBeforeFirstItem(t *testing.T) {
 	tui.Version = "1.0.2"
-	m := tui.New("testprofile", "us-east-1")
+	m := newBlessedModel(t, "testprofile", "us-east-1")
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 90})
 	plain := stripANSI(rootViewContent(m))
 	lines := strings.Split(plain, "\n")
@@ -843,7 +843,7 @@ func TestQA_MainMenu_LastItemIsBackup(t *testing.T) {
 
 func TestQA_MainMenu_FilterHidesCategoriesWithNoMatches(t *testing.T) {
 	tui.Version = "1.0.2"
-	m := tui.New("testprofile", "us-east-1")
+	m := newBlessedModel(t, "testprofile", "us-east-1")
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 90})
 
 	// Enter filter mode and type "ec2" (matches only EC2 Instances)
@@ -866,7 +866,7 @@ func TestQA_MainMenu_FilterHidesCategoriesWithNoMatches(t *testing.T) {
 func TestQA_MainMenu_FirstHeaderVisibleAfterScrollDownAndBackUp(t *testing.T) {
 	tui.Version = "test"
 	// Small viewport so scrolling is required
-	m := tui.New("testprofile", "us-east-1")
+	m := newBlessedModel(t, "testprofile", "us-east-1")
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 80, Height: 10})
 
 	// Scroll down past the first header
@@ -890,7 +890,7 @@ func TestQA_MainMenu_FirstHeaderVisibleAfterScrollDownAndBackUp(t *testing.T) {
 func TestQA_MainMenu_ScrollAccountsForHeaders(t *testing.T) {
 	tui.Version = "test"
 	// Small viewport: only 5 content lines
-	m := tui.New("testprofile", "us-east-1")
+	m := newBlessedModel(t, "testprofile", "us-east-1")
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 80, Height: 8})
 
 	// Navigate to item index 10 (EKS Clusters, first CONTAINERS item)

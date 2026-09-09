@@ -53,7 +53,7 @@ func findFlashInWalk(msg tea.Msg) (messages.Flash, bool) {
 // result with Err != nil surfaces as a FlashMsg{IsError:true} — before the
 // fix the error branch silently dropped through to nil cmd.
 func TestEnrichmentCheckedMsg_ErrorEmitsFlash(t *testing.T) {
-	m := newTestModel()
+	m := newTestModel(t)
 	errMsg := messages.EnrichmentChecked{
 		ResourceType: "ddb",
 		Err:          errors.New("access denied on ddb-enrich"),
@@ -79,7 +79,7 @@ func TestEnrichmentCheckedMsg_ErrorEmitsFlash(t *testing.T) {
 // availability prefetch with PrefetchErr != nil surfaces as FlashMsg. Before
 // the fix, per-type fetcher errors silently vanished from the menu state.
 func TestAvailabilityPrefetchedMsg_PrefetchErrEmitsFlash(t *testing.T) {
-	m := newTestModel()
+	m := newTestModel(t)
 	errMsg := messages.AvailabilityPrefetched{
 		Entries:        map[string]int{},
 		Truncated:      map[string]bool{},
@@ -110,7 +110,7 @@ func TestAvailabilityPrefetchedMsg_PrefetchErrEmitsFlash(t *testing.T) {
 // TestAvailabilityPrefetchedMsg_NilPrefetchErrNoFlash pins the symmetric case:
 // a clean prefetch (PrefetchErr == nil) must NOT emit an error FlashMsg.
 func TestAvailabilityPrefetchedMsg_NilPrefetchErrNoFlash(t *testing.T) {
-	m := newTestModel()
+	m := newTestModel(t)
 	cleanMsg := messages.AvailabilityPrefetched{
 		Entries:        map[string]int{},
 		Truncated:      map[string]bool{},
@@ -132,7 +132,7 @@ func TestAvailabilityPrefetchedMsg_NilPrefetchErrNoFlash(t *testing.T) {
 // TestEnrichmentCheckedMsg_NilErrNoFlash is the symmetric happy-path pin for
 // the enrichment handler.
 func TestEnrichmentCheckedMsg_NilErrNoFlash(t *testing.T) {
-	m := newTestModel()
+	m := newTestModel(t)
 	okMsg := messages.EnrichmentChecked{
 		ResourceType: "sfn",
 		Findings:     map[string][]domain.Finding{},

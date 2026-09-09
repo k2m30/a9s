@@ -15,7 +15,7 @@ import (
 
 func TestQA_Copy_ResourceList_CopiesID(t *testing.T) {
 	tui.Version = "test"
-	m := tui.New("test", "us-east-1")
+	m := newBlessedModel(t, "test", "us-east-1")
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 40})
 	m, _ = rootApplyMsg(m, messages.Navigate{Target: messages.TargetResourceList, ResourceType: "ec2"})
 	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{Provenance: messages.FetchProvenanceCanonicalList, ResourceType: "ec2", Resources: []resource.Resource{
@@ -44,7 +44,7 @@ func TestQA_Copy_ResourceList_CopiesID(t *testing.T) {
 
 func TestQA_Copy_Detail_CopiesFieldValue(t *testing.T) {
 	tui.Version = "test"
-	m := tui.New("test", "us-east-1")
+	m := newBlessedModel(t, "test", "us-east-1")
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 40})
 	m, _ = rootApplyMsg(m, messages.Navigate{Target: messages.TargetResourceList, ResourceType: "ec2"})
 	res := resource.Resource{
@@ -85,7 +85,7 @@ func TestQA_Copy_Detail_CopiesFieldValue(t *testing.T) {
 
 func TestQA_Copy_YAML_CopiesFullYAML(t *testing.T) {
 	tui.Version = "test"
-	m := tui.New("test", "us-east-1")
+	m := newBlessedModel(t, "test", "us-east-1")
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 40})
 	m, _ = rootApplyMsg(m, messages.Navigate{Target: messages.TargetResourceList, ResourceType: "ec2"})
 	res := resource.Resource{
@@ -144,7 +144,7 @@ func TestQA_Copy_AllResourceTypes(t *testing.T) {
 	for _, tt := range types {
 		t.Run(tt.name, func(t *testing.T) {
 			tui.Version = "test"
-			m := tui.New("test", "us-east-1")
+			m := newBlessedModel(t, "test", "us-east-1")
 			m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 40})
 			m, _ = rootApplyMsg(m, messages.Navigate{Target: messages.TargetResourceList, ResourceType: tt.name})
 			m, _ = rootApplyMsg(m, messages.ResourcesLoaded{Provenance: messages.FetchProvenanceCanonicalList,

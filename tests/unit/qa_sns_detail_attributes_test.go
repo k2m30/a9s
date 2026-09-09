@@ -32,7 +32,7 @@ import (
 // result arrives (messages.EnrichDetailResult carrying a TopicEnriched
 // RawStruct), the detail body renders the Attributes map's contents.
 func TestSNSDetail_AttributesPath_RendersAfterEnrichment(t *testing.T) {
-	m := tui.New("demo", "us-east-1",
+	m := newBlessedModel(t, "demo", "us-east-1",
 		tui.WithClients(demo.NewServiceClients()),
 		tui.WithIsDemo(true),
 		tui.WithNoCache(true),

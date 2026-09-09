@@ -18,7 +18,7 @@ import (
 // Regression guard for related navigation UX:
 // from related-filtered list, Esc should return to source detail (not clear filter first).
 func TestRelatedNavigate_FilteredList_EscReturnsToDetail(t *testing.T) {
-	m := tui.New("demo", "us-east-1",
+	m := newBlessedModel(t, "demo", "us-east-1",
 		tui.WithClients(demo.NewServiceClients()),
 		tui.WithIsDemo(true),
 		tui.WithNoCache(true),

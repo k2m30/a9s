@@ -222,7 +222,7 @@ func TestLazyFastPath_RequiresAllIDs(t *testing.T) {
 	// Pass non-nil clients so fetchResources doesn't short-circuit on the
 	// nil-clients guard. The registered paginated fetcher above ignores the
 	// clients value, so an empty struct suffices.
-	m := tui.New("testprofile", "us-east-1", tui.WithClients(&awsclient.ServiceClients{}))
+	m := newBlessedModel(t, "testprofile", "us-east-1", tui.WithClients(&awsclient.ServiceClients{}))
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 36})
 
 	srcRes := resource.Resource{ID: "gg-src-001", Name: "gg-src-001"}

@@ -135,7 +135,7 @@ var stubRelatedIDs = []string{
 func setupEC2DetailWithResults(t *testing.T) tui.Model {
 	t.Helper()
 
-	m := tui.New("demo", "us-east-1",
+	m := newBlessedModel(t, "demo", "us-east-1",
 		tui.WithClients(demo.NewServiceClients()),
 		tui.WithIsDemo(true),
 		tui.WithNoCache(true),

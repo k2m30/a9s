@@ -60,7 +60,7 @@ func TestFailedProfileRead_ReadsTheSameOnBothLanes(t *testing.T) {
 			// WithNoCache: the construction-discipline gate's own remedy. A
 			// bare tui.New reads and writes the developer's real cache
 			// directory, which this test has no business touching.
-			m := tui.New("", "", tui.WithNoCache(true))
+			m := newBlessedModel(t, "", "", tui.WithNoCache(true))
 			_, cmd := m.Update(messages.Navigate{Target: messages.TargetProfile})
 			flash, ok := walkForFlash(cmd)
 			if !ok {

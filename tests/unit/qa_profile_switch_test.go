@@ -136,7 +136,7 @@ func TestBug_ProfileList_MatchesAWSCLI(t *testing.T) {
 
 func TestBug_RegionShownInHeader(t *testing.T) {
 	tui.Version = "test"
-	m := tui.New("test-dev", "")
+	m := newBlessedModel(t, "test-dev", "")
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 80, Height: 24})
 
 	// When region is empty, header should still show a resolved region (not empty)
@@ -157,7 +157,7 @@ func TestBug_RegionShownInHeader(t *testing.T) {
 
 func TestBug_RegionShownInHeader_AfterConnect(t *testing.T) {
 	tui.Version = "test"
-	m := tui.New("test-dev", "")
+	m := newBlessedModel(t, "test-dev", "")
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 80, Height: 24})
 
 	// After ClientsReadyMsg, region should be populated in header. Gen:1 —
@@ -245,7 +245,7 @@ func TestBug_ProfileSwitch_FlashClears(t *testing.T) {
 func TestBug_ProfileSwitch_ClearsRegion(t *testing.T) {
 	tui.Version = "test"
 	// Start with explicit region
-	m := tui.New("dev-profile", "us-west-2")
+	m := newBlessedModel(t, "dev-profile", "us-west-2")
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 80, Height: 24})
 
 	// Verify the region is us-west-2 initially

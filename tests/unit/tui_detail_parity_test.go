@@ -64,7 +64,7 @@ func newDetailParityHeadlessController(t *testing.T) (*app.Controller, *runtime.
 	s.Profile = "detail-parity-prof"
 	s.Region = "us-east-1"
 	core := runtime.New(s, nil)
-	c := app.New(core)
+	c := newBlessedController(t, core)
 	t.Cleanup(c.Close)
 	return c, core
 }
@@ -74,7 +74,7 @@ func newDetailParityHeadlessController(t *testing.T) (*app.Controller, *runtime.
 // right column auto-shows on a pushed detail screen.
 func newDetailParityTUIModel(t *testing.T) tui.Model {
 	t.Helper()
-	m := tui.New("detail-parity-prof", "us-east-1", tui.WithNoCache(true))
+	m := newBlessedModel(t, "detail-parity-prof", "us-east-1", tui.WithNoCache(true))
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 40})
 	return m
 }

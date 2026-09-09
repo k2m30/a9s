@@ -277,7 +277,7 @@ func TestQA_YAML_WrapToggle_KnownLongValue(t *testing.T) {
 	s.Profile = "demo"
 	s.Region = "us-east-1"
 	core := runtime.New(s, nil)
-	ctrl := app.New(core)
+	ctrl := newBlessedController(t, core)
 	ctrl.ApplyIntents([]runtime.UIIntent{runtime.PushScreen{ID: runtime.ScreenYAML}})
 	ctrl.EnsureTextState(lines)
 

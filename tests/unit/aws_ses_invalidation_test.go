@@ -218,7 +218,7 @@ func TestHandleRefresh_SESDetailViewInvalidatesRuleSetCache(t *testing.T) {
 		Fields: map[string]string{"identity_type": "email address"},
 	}
 
-	m := tui.New("demo", "us-east-1",
+	m := newBlessedModel(t, "demo", "us-east-1",
 		tui.WithClients(clients),
 		tui.WithNoCache(true),
 	)

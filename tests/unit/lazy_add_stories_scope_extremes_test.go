@@ -19,7 +19,6 @@ import (
 
 	"github.com/k2m30/a9s/v3/core/resource"
 	"github.com/k2m30/a9s/v3/core/runtime/messages"
-	"github.com/k2m30/a9s/v3/internal/tui"
 )
 
 // ---------------------------------------------------------------------------
@@ -66,7 +65,7 @@ func Test_LA_010_MixedInScopeAndOutOfScope(t *testing.T) {
 		resource.CleanupFetchByIDsForTest(targetType)
 	})
 
-	m := tui.New("testprofile", "us-east-1")
+	m := newBlessedModel(t, "testprofile", "us-east-1")
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 36})
 
 	// Pre-seed the target cache with the in-scope resource via CachedPages.
@@ -170,7 +169,7 @@ func Test_LA_011_AllOutOfScopePopulatesDrill(t *testing.T) {
 		resource.CleanupFetchByIDsForTest(targetType)
 	})
 
-	m := tui.New("testprofile", "us-east-1")
+	m := newBlessedModel(t, "testprofile", "us-east-1")
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 36})
 
 	srcRes := resource.Resource{ID: "src-la011-001"}
@@ -232,7 +231,7 @@ func Test_LA_012_AllInScopeNoLazyAdd(t *testing.T) {
 		resource.CleanupFetchByIDsForTest(targetType)
 	})
 
-	m := tui.New("testprofile", "us-east-1")
+	m := newBlessedModel(t, "testprofile", "us-east-1")
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 36})
 
 	// Pre-seed cache with both resources so they are "in-scope" / already loaded.
@@ -332,7 +331,7 @@ func Test_LA_015_ARNvsBareNameTolerance(t *testing.T) {
 		resource.CleanupFetchByIDsForTest(targetType)
 	})
 
-	m := tui.New("testprofile", "us-east-1")
+	m := newBlessedModel(t, "testprofile", "us-east-1")
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 36})
 
 	srcRes := resource.Resource{ID: "src-la015-001"}
@@ -412,7 +411,7 @@ func Test_LA_016_UUIDvsAliasDisplay(t *testing.T) {
 		resource.CleanupFetchByIDsForTest(targetType)
 	})
 
-	m := tui.New("testprofile", "us-east-1")
+	m := newBlessedModel(t, "testprofile", "us-east-1")
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 36})
 
 	srcRes := resource.Resource{ID: "src-la016-001"}
@@ -497,7 +496,7 @@ func Test_LA_070_100IDsDrillWithoutTimeout(t *testing.T) {
 		resource.CleanupFetchByIDsForTest(targetType)
 	})
 
-	m := tui.New("testprofile", "us-east-1")
+	m := newBlessedModel(t, "testprofile", "us-east-1")
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 36})
 
 	srcRes := resource.Resource{ID: "src-la070-001"}
@@ -602,7 +601,7 @@ func Test_LA_071_MalformedIDsFiltered(t *testing.T) {
 		resource.CleanupFetchByIDsForTest(targetType)
 	})
 
-	m := tui.New("testprofile", "us-east-1")
+	m := newBlessedModel(t, "testprofile", "us-east-1")
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 36})
 
 	srcRes := resource.Resource{ID: "src-la071-001"}
@@ -683,7 +682,7 @@ func Test_LA_072_IDSetGrowsAcrossRedrill(t *testing.T) {
 		resource.CleanupFetchByIDsForTest(targetType)
 	})
 
-	m := tui.New("testprofile", "us-east-1")
+	m := newBlessedModel(t, "testprofile", "us-east-1")
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 36})
 
 	srcRes := resource.Resource{ID: "src-la072-001"}

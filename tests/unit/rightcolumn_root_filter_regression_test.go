@@ -23,7 +23,7 @@ func openFocusedRelatedDetailForRootFilterTest(t *testing.T) tui.Model {
 	})
 	t.Cleanup(func() { resource.SetRelatedForTest("ec2", oldDefs) })
 
-	m := tui.New("demo", "us-east-1",
+	m := newBlessedModel(t, "demo", "us-east-1",
 		tui.WithClients(demo.NewServiceClients()),
 		tui.WithIsDemo(true),
 		tui.WithNoCache(true),

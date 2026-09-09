@@ -33,7 +33,6 @@ import (
 
 	"github.com/k2m30/a9s/v3/core/resource"
 	"github.com/k2m30/a9s/v3/core/runtime/messages"
-	"github.com/k2m30/a9s/v3/internal/tui"
 )
 
 // ---------------------------------------------------------------------------
@@ -106,7 +105,7 @@ func TestIssue237_ColdMissWriteBack_PreservesNextToken(t *testing.T) {
 		resource.CleanupPaginatedForTest(targetType)
 	})
 
-	m := tui.New("testprofile", "us-east-1")
+	m := newBlessedModel(t, "testprofile", "us-east-1")
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 36})
 
 	srcRes := resource.Resource{ID: "src-237-instance"}
@@ -296,7 +295,7 @@ func TestIssue240_FieldOnlyChecker_NoPrefetch(t *testing.T) {
 		resource.CleanupPaginatedForTest(targetType)
 	})
 
-	m := tui.New("testprofile", "us-east-1")
+	m := newBlessedModel(t, "testprofile", "us-east-1")
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 36})
 
 	srcRes := resource.Resource{
@@ -389,7 +388,7 @@ func TestIssue240_CacheDependentChecker_DoesPrefetch(t *testing.T) {
 		resource.CleanupPaginatedForTest(targetType)
 	})
 
-	m := tui.New("testprofile", "us-east-1")
+	m := newBlessedModel(t, "testprofile", "us-east-1")
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 36})
 
 	srcRes := resource.Resource{ID: "src-240-cache"}
@@ -501,7 +500,7 @@ func TestIssue241_ConcurrentProbesCappedAt4(t *testing.T) {
 	resource.SetRelatedForTest(srcType, defs)
 	t.Cleanup(func() { resource.CleanupRelatedForTest(srcType) })
 
-	m := tui.New("testprofile", "us-east-1")
+	m := newBlessedModel(t, "testprofile", "us-east-1")
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 36})
 
 	srcRes := resource.Resource{ID: "src-241"}

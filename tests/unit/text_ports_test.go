@@ -68,7 +68,7 @@ func wave3CopyAndReadClipboard(t *testing.T, m tui.Model) string {
 
 func TestPort_JSONCopy_UncoloredContent(t *testing.T) {
 	tui.Version = "test"
-	m := tui.New("test", "us-east-1", tui.WithNoCache(true))
+	m := newBlessedModel(t, "test", "us-east-1", tui.WithNoCache(true))
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 40})
 	m, _ = rootApplyMsg(m, messages.Navigate{Target: messages.TargetResourceList, ResourceType: "ec2"})
 	res := resource.Resource{
@@ -103,7 +103,7 @@ func TestPort_JSONCopy_UncoloredContent(t *testing.T) {
 
 func TestPort_YAMLCopy_UncoloredContent(t *testing.T) {
 	tui.Version = "test"
-	m := tui.New("test", "us-east-1", tui.WithNoCache(true))
+	m := newBlessedModel(t, "test", "us-east-1", tui.WithNoCache(true))
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 40})
 	m, _ = rootApplyMsg(m, messages.Navigate{Target: messages.TargetResourceList, ResourceType: "ec2"})
 	res := resource.Resource{
@@ -138,7 +138,7 @@ func TestPort_YAMLCopy_UncoloredContent(t *testing.T) {
 
 func TestPort_ErrorLogCopy_UncoloredContent(t *testing.T) {
 	tui.Version = "test"
-	m := tui.New("test", "us-east-1", tui.WithNoCache(true))
+	m := newBlessedModel(t, "test", "us-east-1", tui.WithNoCache(true))
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 40})
 
 	// Seed error history via a real APIError flow (mirrors qa_error_log_test.go).
@@ -250,7 +250,7 @@ func TestPort_JSON_ColorizeGolden_LiveContentLines(t *testing.T) {
 
 func TestPort_YAML_TKey_LiveCTEventsNavigate(t *testing.T) {
 	tui.Version = "test"
-	m := tui.New("test", "us-east-1", tui.WithNoCache(true))
+	m := newBlessedModel(t, "test", "us-east-1", tui.WithNoCache(true))
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 40})
 	m, _ = rootApplyMsg(m, messages.Navigate{Target: messages.TargetResourceList, ResourceType: "ec2"})
 	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{Provenance: messages.FetchProvenanceCanonicalList,
@@ -377,7 +377,7 @@ func TestPort_ScrollState_VisibleWindow_ExactFit(t *testing.T) {
 
 func TestPort_YAMLToJSON_LiveToggle(t *testing.T) {
 	tui.Version = "test"
-	m := tui.New("test", "us-east-1", tui.WithNoCache(true))
+	m := newBlessedModel(t, "test", "us-east-1", tui.WithNoCache(true))
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 40})
 	m, _ = rootApplyMsg(m, messages.Navigate{Target: messages.TargetResourceList, ResourceType: "ec2"})
 	res := resource.Resource{ID: "i-toggle1", Name: "toggle-server", Fields: map[string]string{"state": "running"}}
@@ -403,7 +403,7 @@ func TestPort_YAMLToJSON_LiveToggle(t *testing.T) {
 
 func TestPort_JSONToYAML_LiveToggle(t *testing.T) {
 	tui.Version = "test"
-	m := tui.New("test", "us-east-1", tui.WithNoCache(true))
+	m := newBlessedModel(t, "test", "us-east-1", tui.WithNoCache(true))
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 40})
 	m, _ = rootApplyMsg(m, messages.Navigate{Target: messages.TargetResourceList, ResourceType: "ec2"})
 	res := resource.Resource{ID: "i-toggle2", Name: "toggle-server-2", Fields: map[string]string{"state": "stopped"}}
@@ -440,7 +440,7 @@ func TestPort_JSONToYAML_LiveToggle(t *testing.T) {
 // pre-enrichment row and silently drops the field.
 func TestPort_YAMLToggle_SurvivesAsyncEnrichment(t *testing.T) {
 	tui.Version = "test"
-	m := tui.New("test", "us-east-1", tui.WithNoCache(true))
+	m := newBlessedModel(t, "test", "us-east-1", tui.WithNoCache(true))
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 40})
 	m, _ = rootApplyMsg(m, messages.Navigate{Target: messages.TargetResourceList, ResourceType: "ec2"})
 	res := resource.Resource{ID: "i-enrichtoggle1", Name: "enrich-toggle-server", Fields: map[string]string{"state": "running"}}
@@ -523,7 +523,7 @@ func TestPort_HelpCopy_IsNoOp(t *testing.T) {
 // No prior test drove handleCopy's rsKindIdentity branch. PORTED.
 func TestPort_IdentityCopy_CopiesExactARN(t *testing.T) {
 	tui.Version = "test"
-	m := tui.New("test", "us-east-1", tui.WithNoCache(true))
+	m := newBlessedModel(t, "test", "us-east-1", tui.WithNoCache(true))
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 40})
 
 	wantARN := "arn:aws:iam::123456789012:user/wave3-port-identity"
@@ -555,7 +555,7 @@ func TestPort_IdentityCopy_CopiesExactARN(t *testing.T) {
 // live seam.
 func TestPort_IdentityCopy_NoOpWhileLoading(t *testing.T) {
 	tui.Version = "test"
-	m := tui.New("test", "us-east-1", tui.WithNoCache(true))
+	m := newBlessedModel(t, "test", "us-east-1", tui.WithNoCache(true))
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 40})
 
 	// 'i' pushes the identity screen; with no prior IdentityLoaded event,
@@ -583,7 +583,7 @@ func TestPort_RevealCopy_CopiesExactValue(t *testing.T) {
 
 	tui.Version = "test"
 	clients := demo.NewServiceClients()
-	m := tui.New("test", "us-east-1", tui.WithClients(clients), tui.WithNoCache(true))
+	m := newBlessedModel(t, "test", "us-east-1", tui.WithClients(clients), tui.WithNoCache(true))
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 40})
 	// WithClients only pre-supplies the session's PreSuppliedClients; the
 	// fetch path reads session.Clients, populated by a live ClientsReady.
@@ -624,7 +624,7 @@ func TestPort_RevealCopy_JSONValueStaysRaw(t *testing.T) {
 
 	tui.Version = "test"
 	clients := demo.NewServiceClients()
-	m := tui.New("test", "us-east-1", tui.WithClients(clients), tui.WithNoCache(true))
+	m := newBlessedModel(t, "test", "us-east-1", tui.WithClients(clients), tui.WithNoCache(true))
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 40})
 	m, _ = rootApplyMsg(m, messages.ClientsReady{Clients: clients, Region: "us-east-1", Gen: 1})
 	m, _ = rootApplyMsg(m, messages.Navigate{Target: messages.TargetResourceList, ResourceType: shortName})
@@ -665,7 +665,7 @@ func TestPort_RevealCopy_EmptyValue(t *testing.T) {
 
 	tui.Version = "test"
 	clients := demo.NewServiceClients()
-	m := tui.New("test", "us-east-1", tui.WithClients(clients), tui.WithNoCache(true))
+	m := newBlessedModel(t, "test", "us-east-1", tui.WithClients(clients), tui.WithNoCache(true))
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 40})
 	m, _ = rootApplyMsg(m, messages.ClientsReady{Clients: clients, Region: "us-east-1", Gen: 1})
 	m, _ = rootApplyMsg(m, messages.Navigate{Target: messages.TargetResourceList, ResourceType: shortName})
@@ -703,7 +703,7 @@ func TestPort_RevealCopy_EmptyValue(t *testing.T) {
 
 func TestPort_YAML_DKey_LiveNavigateToDetail(t *testing.T) {
 	tui.Version = "test"
-	m := tui.New("test", "us-east-1", tui.WithNoCache(true))
+	m := newBlessedModel(t, "test", "us-east-1", tui.WithNoCache(true))
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 40})
 	m, _ = rootApplyMsg(m, messages.Navigate{Target: messages.TargetResourceList, ResourceType: "ec2"})
 	res := resource.Resource{ID: "i-dkey1", Name: "dkey-server", Fields: map[string]string{"state": "running"}}
@@ -734,7 +734,7 @@ func TestPort_YAML_DKey_LiveNavigateToDetail(t *testing.T) {
 
 func TestPort_JSON_DKey_LiveNavigateToDetail(t *testing.T) {
 	tui.Version = "test"
-	m := tui.New("test", "us-east-1", tui.WithNoCache(true))
+	m := newBlessedModel(t, "test", "us-east-1", tui.WithNoCache(true))
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 40})
 	m, _ = rootApplyMsg(m, messages.Navigate{Target: messages.TargetResourceList, ResourceType: "ec2"})
 	res := resource.Resource{ID: "i-dkey2", Name: "dkey-server-2", Fields: map[string]string{"state": "stopped"}}
@@ -801,12 +801,12 @@ func TestPort_JSON_DKey_LiveNavigateToDetail(t *testing.T) {
 // newTextController. Blessed via knownConstructionDebt in
 // qa_controller_construction_discipline_test.go (no ResourcesLoaded/
 // EnrichmentChecked/AvailabilityChecked event is ever driven through it).
-func newTextScreenController(screenID runtime.ScreenID, lines []string) *app.Controller {
+func newTextScreenController(t testing.TB, screenID runtime.ScreenID, lines []string) *app.Controller {
 	s := session.New()
 	s.Profile = "demo"
 	s.Region = "us-east-1"
 	core := runtime.New(s, nil)
-	ctrl := app.New(core)
+	ctrl := newBlessedController(t, core)
 	ctrl.ApplyIntents([]runtime.UIIntent{runtime.PushScreen{ID: screenID}})
 	ctrl.EnsureTextState(lines)
 	return ctrl
@@ -850,7 +850,7 @@ func wave3TextInteractionLines(t *testing.T) []string {
 func TestPort_YAML_ToggleWrap_CtrlPrecision(t *testing.T) {
 	tuitest.NoColor(t)
 	lines := wave3TextInteractionLines(t)
-	ctrl := newTextScreenController(runtime.ScreenYAML, lines)
+	ctrl := newTextScreenController(t, runtime.ScreenYAML, lines)
 
 	before := textSnapshotHelper(t, ctrl)
 	if before.Wrap {
@@ -871,7 +871,7 @@ func TestPort_YAML_ToggleWrap_CtrlPrecision(t *testing.T) {
 func TestPort_YAML_Search_CtrlPrecision(t *testing.T) {
 	tuitest.NoColor(t)
 	lines := wave3TextInteractionLines(t)
-	ctrl := newTextScreenController(runtime.ScreenYAML, lines)
+	ctrl := newTextScreenController(t, runtime.ScreenYAML, lines)
 
 	before := textSnapshotHelper(t, ctrl)
 	if before.Search != "" {
@@ -898,7 +898,7 @@ func TestPort_YAML_Search_CtrlPrecision(t *testing.T) {
 func TestPort_YAML_SearchNextPrev_CtrlPrecision(t *testing.T) {
 	tuitest.NoColor(t)
 	lines := wave3TextInteractionLines(t)
-	ctrl := newTextScreenController(runtime.ScreenYAML, lines)
+	ctrl := newTextScreenController(t, runtime.ScreenYAML, lines)
 
 	ctrl.Apply(app.Action{Kind: app.ActionSearch, Arg: "e"})
 	snap0 := textSnapshotHelper(t, ctrl)
@@ -927,7 +927,7 @@ func TestPort_YAML_Scroll_CtrlPrecision(t *testing.T) {
 	m := views.NewYAMLWithCtrl(wave3CtrlInteractionResource(), "ec2", keys.Default(), nil)
 	m.SetSize(80, 5)
 	lines := m.ContentLines()
-	ctrl := newTextScreenController(runtime.ScreenYAML, lines)
+	ctrl := newTextScreenController(t, runtime.ScreenYAML, lines)
 
 	before := textSnapshotHelper(t, ctrl)
 	if before.ScrollY != 0 {
@@ -972,7 +972,7 @@ func TestPort_JSON_Search_CtrlPrecision(t *testing.T) {
 	m := views.NewJSONWithCtrl(wave3CtrlInteractionResource(), "ec2", keys.Default(), nil)
 	m.SetSize(80, 24)
 	lines := m.ContentLines()
-	ctrl := newTextScreenController(runtime.ScreenJSON, lines)
+	ctrl := newTextScreenController(t, runtime.ScreenJSON, lines)
 
 	ctrl.Apply(app.Action{Kind: app.ActionSearch, Arg: "instance"})
 	snap := textSnapshotHelper(t, ctrl)
@@ -1009,7 +1009,7 @@ func textSnapshotHelper(t *testing.T, ctrl *app.Controller) *app.TextBody {
 func wave3EnterYAML(t *testing.T, w, h int) tui.Model {
 	t.Helper()
 	tui.Version = "test"
-	m := tui.New("test", "us-east-1", tui.WithNoCache(true))
+	m := newBlessedModel(t, "test", "us-east-1", tui.WithNoCache(true))
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: w, Height: h})
 	m, _ = rootApplyMsg(m, messages.Navigate{Target: messages.TargetResourceList, ResourceType: "ec2"})
 	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{Provenance: messages.FetchProvenanceCanonicalList, ResourceType: "ec2", Resources: []resource.Resource{wave3CtrlInteractionResource()}})
@@ -1025,7 +1025,7 @@ func wave3EnterYAML(t *testing.T, w, h int) tui.Model {
 func wave3EnterJSON(t *testing.T, w, h int) tui.Model {
 	t.Helper()
 	tui.Version = "test"
-	m := tui.New("test", "us-east-1", tui.WithNoCache(true))
+	m := newBlessedModel(t, "test", "us-east-1", tui.WithNoCache(true))
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: w, Height: h})
 	m, _ = rootApplyMsg(m, messages.Navigate{Target: messages.TargetResourceList, ResourceType: "ec2"})
 	m, _ = rootApplyMsg(m, messages.ResourcesLoaded{Provenance: messages.FetchProvenanceCanonicalList, ResourceType: "ec2", Resources: []resource.Resource{wave3CtrlInteractionResource()}})

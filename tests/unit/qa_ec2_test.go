@@ -34,7 +34,7 @@ func newEC2ListModel(t *testing.T) tui.Model {
 	// test's loaded EC2 rows leak into a later test's "fresh list" precondition.
 	t.Setenv("A9S_CONFIG_FOLDER", t.TempDir())
 	tui.Version = "0.6.0"
-	m := tui.New("testprofile", "us-east-1")
+	m := newBlessedModel(t, "testprofile", "us-east-1")
 	t.Cleanup(func() { m.CloseController() })
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 160, Height: 40})
 	m, _ = rootApplyMsg(m, messages.Navigate{
@@ -203,7 +203,7 @@ func TestQA_EC2_A4_StatusColoring_RunningRowHasANSI(t *testing.T) {
 func TestQA_EC2_A4_StatusColoring_StoppedRowHasANSI(t *testing.T) {
 	t.Setenv("A9S_CONFIG_FOLDER", t.TempDir()) // #17 wave 2 isolation
 	tui.Version = "0.6.0"
-	m := tui.New("testprofile", "us-east-1")
+	m := newBlessedModel(t, "testprofile", "us-east-1")
 	t.Cleanup(func() { m.CloseController() })
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 160, Height: 40})
 	m, _ = rootApplyMsg(m, messages.Navigate{
@@ -706,7 +706,7 @@ func TestQA_EC2_A11_3_TerminatedInstancesAppearInList(t *testing.T) {
 func TestQA_EC2_A12_1_EmptyInstanceList(t *testing.T) {
 	t.Setenv("A9S_CONFIG_FOLDER", t.TempDir()) // #17 wave 2 isolation
 	tui.Version = "0.6.0"
-	m := tui.New("testprofile", "us-east-1")
+	m := newBlessedModel(t, "testprofile", "us-east-1")
 	t.Cleanup(func() { m.CloseController() })
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 160, Height: 40})
 	m, _ = rootApplyMsg(m, messages.Navigate{
@@ -730,7 +730,7 @@ func TestQA_EC2_A12_1_EmptyInstanceList(t *testing.T) {
 func TestQA_EC2_A13_1_LoadingState(t *testing.T) {
 	t.Setenv("A9S_CONFIG_FOLDER", t.TempDir()) // #17 wave 2 isolation
 	tui.Version = "0.6.0"
-	m := tui.New("testprofile", "us-east-1")
+	m := newBlessedModel(t, "testprofile", "us-east-1")
 	t.Cleanup(func() { m.CloseController() })
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 160, Height: 40})
 	m, _ = rootApplyMsg(m, messages.Navigate{
@@ -750,7 +750,7 @@ func TestQA_EC2_A13_1_LoadingState(t *testing.T) {
 func TestQA_EC2_A14_1_TerminalTooNarrow(t *testing.T) {
 	t.Setenv("A9S_CONFIG_FOLDER", t.TempDir()) // #17 wave 2 isolation
 	tui.Version = "0.6.0"
-	m := tui.New("testprofile", "us-east-1")
+	m := newBlessedModel(t, "testprofile", "us-east-1")
 	t.Cleanup(func() { m.CloseController() })
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 50, Height: 40})
 
@@ -763,7 +763,7 @@ func TestQA_EC2_A14_1_TerminalTooNarrow(t *testing.T) {
 func TestQA_EC2_A14_5_TerminalTooShort(t *testing.T) {
 	t.Setenv("A9S_CONFIG_FOLDER", t.TempDir()) // #17 wave 2 isolation
 	tui.Version = "0.6.0"
-	m := tui.New("testprofile", "us-east-1")
+	m := newBlessedModel(t, "testprofile", "us-east-1")
 	t.Cleanup(func() { m.CloseController() })
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 160, Height: 5})
 
@@ -782,7 +782,7 @@ func newEC2DetailModel(t *testing.T, r resource.Resource) tui.Model {
 	// #17 wave 2 isolation: see newEC2ListModel's comment above.
 	t.Setenv("A9S_CONFIG_FOLDER", t.TempDir())
 	tui.Version = "0.6.0"
-	m := tui.New("testprofile", "us-east-1")
+	m := newBlessedModel(t, "testprofile", "us-east-1")
 	t.Cleanup(func() { m.CloseController() })
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 160, Height: 40})
 	m, _ = rootApplyMsg(m, messages.Navigate{
@@ -930,7 +930,7 @@ func newEC2YAMLModel(t *testing.T, r resource.Resource) tui.Model {
 	// #17 wave 2 isolation: see newEC2ListModel's comment above.
 	t.Setenv("A9S_CONFIG_FOLDER", t.TempDir())
 	tui.Version = "0.6.0"
-	m := tui.New("testprofile", "us-east-1")
+	m := newBlessedModel(t, "testprofile", "us-east-1")
 	t.Cleanup(func() { m.CloseController() })
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 160, Height: 40})
 	m, _ = rootApplyMsg(m, messages.Navigate{
@@ -1120,7 +1120,7 @@ func TestQA_EC2_YAML_FieldsMapRendersCorrectly(t *testing.T) {
 func TestQA_EC2_D1_FullNavigationStack(t *testing.T) {
 	t.Setenv("A9S_CONFIG_FOLDER", t.TempDir()) // #17 wave 2 isolation
 	tui.Version = "0.6.0"
-	m := tui.New("testprofile", "us-east-1")
+	m := newBlessedModel(t, "testprofile", "us-east-1")
 	t.Cleanup(func() { m.CloseController() })
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 160, Height: 40})
 

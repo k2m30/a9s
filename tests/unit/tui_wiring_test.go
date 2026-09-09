@@ -256,7 +256,7 @@ func TestWiring_RefreshOnMainMenu_TriggersAvailabilityCheck(t *testing.T) {
 }
 
 func TestWiring_RefreshOnMainMenu_NoCacheMode_NoOp(t *testing.T) {
-	m := tui.New("testprofile", "us-east-1", tui.WithNoCache(true))
+	m := newBlessedModel(t, "testprofile", "us-east-1", tui.WithNoCache(true))
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 80, Height: 40})
 
 	// Press ctrl+r on the main menu in no-cache mode — should be a no-op
@@ -275,7 +275,7 @@ func TestWiring_RefreshOnMainMenu_NoCacheMode_NoOp(t *testing.T) {
 // loadAvailabilityCache), not skip them.
 
 func TestWiring_ClientsReady_DemoMode_TriggersAvailabilityProbes(t *testing.T) {
-	m := tui.New("demo", "us-east-1",
+	m := newBlessedModel(t, "demo", "us-east-1",
 		tui.WithClients(demo.NewServiceClients()),
 		tui.WithIsDemo(true),
 		tui.WithProfileForTest(demo.DemoProfile),
@@ -301,7 +301,7 @@ func TestWiring_ClientsReady_DemoMode_TriggersAvailabilityProbes(t *testing.T) {
 }
 
 func TestWiring_ClientsReady_DemoMode_NoCache_SkipsAvailability(t *testing.T) {
-	m := tui.New("demo", "us-east-1",
+	m := newBlessedModel(t, "demo", "us-east-1",
 		tui.WithClients(demo.NewServiceClients()),
 		tui.WithIsDemo(true),
 		tui.WithNoCache(true),
@@ -421,7 +421,7 @@ func TestWiring_AvailabilityComplete_ClearsFlash(t *testing.T) {
 // trigger availability probes.
 
 func TestWiring_RefreshOnMainMenu_DemoMode_TriggersProbes(t *testing.T) {
-	m := tui.New("demo", "us-east-1",
+	m := newBlessedModel(t, "demo", "us-east-1",
 		tui.WithClients(demo.NewServiceClients()),
 		tui.WithIsDemo(true),
 		tui.WithProfileForTest(demo.DemoProfile),
@@ -461,7 +461,7 @@ func TestWiring_DemoMode_ProbeCount_MatchesPaginatedPageSize(t *testing.T) {
 	// Step 2: Create a demo-mode model with real clients backed by the typed fakes.
 	// Using demo.NewServiceClients() so the probe uses the same typed-fake data
 	// that FetchEC2Instances returned above.
-	m := tui.New("demo", "us-east-1",
+	m := newBlessedModel(t, "demo", "us-east-1",
 		tui.WithClients(demo.NewServiceClients()),
 		tui.WithIsDemo(true),
 		tui.WithNoCache(true),
@@ -594,7 +594,7 @@ func TestWiring_RevealNotForNonSecrets(t *testing.T) {
 
 func TestWiring_EmptyProfileShowsDefaultInHeader(t *testing.T) {
 	// When no profile is specified (empty string), the header should show "default"
-	m := tui.New("", "us-east-1")
+	m := newBlessedModel(t, "", "us-east-1")
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 80, Height: 40})
 
 	// Simulate AWS connection completing. Gen:1 — ConnectGen seeds at 1

@@ -171,7 +171,7 @@ func transientUnknownSetup(t *testing.T) (tui.Model, resource.Resource, resource
 	def := scopeNGToEBSOnly(t)
 	ngRes := transientUnknownNGResource()
 
-	m := tui.New("demo", "us-east-1",
+	m := newBlessedModel(t, "demo", "us-east-1",
 		tui.WithClients(demo.NewServiceClients()),
 		tui.WithIsDemo(true),
 		tui.WithNoCache(true),

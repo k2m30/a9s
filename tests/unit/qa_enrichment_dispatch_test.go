@@ -75,8 +75,8 @@ func TestIssueEnricherRegistry_NoEntriesForUnregisteredTypes(t *testing.T) {
 }
 
 // newTestModel creates a fresh tui.Model sized for testing.
-func newTestModel() tui.Model {
-	m := tui.New("", "")
+func newTestModel(t testing.TB) tui.Model {
+	m := newBlessedModel(t, "", "")
 	// Propagate a size so views are initialized.
 	m2, _ := m.Update(tea.WindowSizeMsg{Width: 80, Height: 24})
 	if tm, ok := m2.(tui.Model); ok {
@@ -91,7 +91,7 @@ func newTestModel() tui.Model {
 //
 // A fresh tui.Model has enrichmentGen=0; sending Gen=999 is always stale.
 func TestEnrichmentCheckedMsg_StaleSessionGenDropped(t *testing.T) {
-	m := newTestModel()
+	m := newTestModel(t)
 
 	staleMsg := messages.EnrichmentChecked{
 		ResourceType: "ec2",
@@ -115,7 +115,7 @@ func TestEnrichmentCheckedMsg_StaleSessionGenDropped(t *testing.T) {
 // A fresh model has enrichmentGen=0 and enrichmentTypeGen["ec2"]=0.
 // We send Gen=0, TypeGen=99 — the TypeGen doesn't match, so it's stale.
 func TestEnrichmentCheckedMsg_StaleTypeGenDropped(t *testing.T) {
-	m := newTestModel()
+	m := newTestModel(t)
 
 	staleMsg := messages.EnrichmentChecked{
 		ResourceType: "ec2",
@@ -134,7 +134,7 @@ func TestEnrichmentCheckedMsg_StaleTypeGenDropped(t *testing.T) {
 // TestEnrichmentCheckedMsg_ErrorDoesNotCrash verifies that a valid-gen message
 // carrying Err != nil is handled gracefully (no panic, no spurious cmd).
 func TestEnrichmentCheckedMsg_ErrorDoesNotCrash(t *testing.T) {
-	m := newTestModel()
+	m := newTestModel(t)
 
 	errMsg := messages.EnrichmentChecked{
 		ResourceType: "ddb",
@@ -152,7 +152,7 @@ func TestEnrichmentCheckedMsg_ErrorDoesNotCrash(t *testing.T) {
 // not required to be non-nil when Err != nil — the contract says Findings
 // may be nil/empty on error and the handler must tolerate it.
 func TestEnrichmentCheckedMsg_NilFindingsOnError(t *testing.T) {
-	m := newTestModel()
+	m := newTestModel(t)
 
 	errMsg := messages.EnrichmentChecked{
 		ResourceType: "sfn",
@@ -170,7 +170,7 @@ func TestEnrichmentCheckedMsg_NilFindingsOnError(t *testing.T) {
 // TestEnrichmentCheckedMsg_ValidSuccessDoesNotCrash verifies that a well-formed
 // success message (Gen=0, TypeGen=0, Err=nil) does not panic.
 func TestEnrichmentCheckedMsg_ValidSuccessDoesNotCrash(t *testing.T) {
-	m := newTestModel()
+	m := newTestModel(t)
 
 	successMsg := messages.EnrichmentChecked{
 		ResourceType: "glue",

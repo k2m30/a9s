@@ -889,7 +889,7 @@ func TestQA_MainMenu_ContentRowsBoundedByVerticalBars(t *testing.T) {
 
 func TestQA_MainMenu_NarrowTerminalShowsError(t *testing.T) {
 	tui.Version = "1.0.2"
-	m := tui.New("testprofile", "us-east-1")
+	m := newBlessedModel(t, "testprofile", "us-east-1")
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 50, Height: 24})
 
 	plain := stripANSI(rootViewContent(m))
@@ -900,7 +900,7 @@ func TestQA_MainMenu_NarrowTerminalShowsError(t *testing.T) {
 
 func TestQA_MainMenu_ShortTerminalShowsError(t *testing.T) {
 	tui.Version = "1.0.2"
-	m := tui.New("testprofile", "us-east-1")
+	m := newBlessedModel(t, "testprofile", "us-east-1")
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 80, Height: 5})
 
 	plain := stripANSI(rootViewContent(m))
@@ -911,7 +911,7 @@ func TestQA_MainMenu_ShortTerminalShowsError(t *testing.T) {
 
 func TestQA_MainMenu_ExactMinWidthRendersCorrectly(t *testing.T) {
 	tui.Version = "1.0.2"
-	m := tui.New("testprofile", "us-east-1")
+	m := newBlessedModel(t, "testprofile", "us-east-1")
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 60, Height: 24})
 
 	plain := stripANSI(rootViewContent(m))
@@ -925,7 +925,7 @@ func TestQA_MainMenu_ExactMinWidthRendersCorrectly(t *testing.T) {
 
 func TestQA_MainMenu_ExactMinHeightRendersCorrectly(t *testing.T) {
 	tui.Version = "1.0.2"
-	m := tui.New("testprofile", "us-east-1")
+	m := newBlessedModel(t, "testprofile", "us-east-1")
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 80, Height: 7})
 
 	plain := stripANSI(rootViewContent(m))

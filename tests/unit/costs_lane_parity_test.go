@@ -58,7 +58,7 @@ func m2NewHeadlessController(t *testing.T, profile string, now time.Time) *app.C
 	s.Profile = profile
 	s.Region = "us-east-1"
 	core := runtime.New(s, nil)
-	c := app.New(core)
+	c := newBlessedController(t, core)
 	t.Cleanup(c.Close)
 	c.ApplyIntents([]runtime.UIIntent{runtime.PushScreen{ID: runtime.ScreenCosts}})
 	c.EnsureCostsState(now)
@@ -189,7 +189,7 @@ func TestCostsLaneParity_A_DrillToResourceJump_Success(t *testing.T) {
 
 	// --- TUI lane: the SAME drill chain, driven via key presses. ---
 	tui.Version = "1.0.2"
-	m := tui.New("matrix-a-tui", "us-east-1", tui.WithClients(demo.NewServiceClients()), tui.WithNoCache(true))
+	m := newBlessedModel(t, "matrix-a-tui", "us-east-1", tui.WithClients(demo.NewServiceClients()), tui.WithNoCache(true))
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 80, Height: 40})
 	m, _ = rootApplyMsg(m, messages.Navigate{Target: messages.TargetCosts})
 	assertStackInSync(t, m, "after navigating to costs")
@@ -500,7 +500,7 @@ func TestCostsLaneParity_E_PreConnectThenClientsReady(t *testing.T) {
 	// --- TUI lane: tui.New with no WithClients option — Clients() is nil
 	// until Init()/ClientsReady installs it, same pre-connect state.
 	tui.Version = "1.0.2"
-	m := tui.New("matrix-e-tui", "us-east-1", tui.WithNoCache(true))
+	m := newBlessedModel(t, "matrix-e-tui", "us-east-1", tui.WithNoCache(true))
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 80, Height: 40})
 	m, _ = rootApplyMsg(m, messages.Navigate{Target: messages.TargetCosts})
 	m, _ = rootApplyMsg(m, messages.CostsLoaded{Query: q, Err: fmt.Errorf("%s", preConnectErr)})

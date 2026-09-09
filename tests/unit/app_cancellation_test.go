@@ -41,7 +41,7 @@ import (
 
 func TestModel_HasAppContext(t *testing.T) {
 	t.Parallel()
-	m := tui.New("", "")
+	m := newBlessedModel(t, "", "")
 	ctx := m.AppContext()
 	if ctx == nil {
 		t.Fatal("AppContext() returned nil — Model must own an app-level context")
@@ -62,7 +62,7 @@ func TestModel_HasAppContext(t *testing.T) {
 
 func TestModel_QuitCancelsAppContext(t *testing.T) {
 	t.Parallel()
-	m := tui.New("", "")
+	m := newBlessedModel(t, "", "")
 
 	// Capture AppContext before the Update so we can observe the same context object.
 	ctx := m.AppContext()
@@ -399,7 +399,7 @@ func TestModel_Cancel_ZeroValue_DoesNotPanic(t *testing.T) {
 
 func TestModel_Cancel_CancelsAppContext(t *testing.T) {
 	t.Parallel()
-	m := tui.New("", "")
+	m := newBlessedModel(t, "", "")
 
 	ctx := m.AppContext()
 	if ctx == nil {

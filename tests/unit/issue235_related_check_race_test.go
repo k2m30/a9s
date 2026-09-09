@@ -21,7 +21,6 @@ import (
 
 	"github.com/k2m30/a9s/v3/core/resource"
 	"github.com/k2m30/a9s/v3/core/runtime/messages"
-	"github.com/k2m30/a9s/v3/internal/tui"
 )
 
 // TestIssue235_EachCheckerGetsIsolatedCacheSnapshot verifies that when three
@@ -117,7 +116,7 @@ func TestIssue235_EachCheckerGetsIsolatedCacheSnapshot(t *testing.T) {
 
 	// Non-demo model so the related-check dispatch hits the live-mode path
 	// (demo mode returns early before touching localCache).
-	m := tui.New("testprofile", "us-east-1")
+	m := newBlessedModel(t, "testprofile", "us-east-1")
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 36})
 
 	srcRes := resource.Resource{ID: "src-235-instance"}

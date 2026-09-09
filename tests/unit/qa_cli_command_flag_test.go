@@ -55,7 +55,7 @@ func findNavigateMsg(cmd tea.Cmd) *messages.Navigate {
 // Uses demo clients + WithNoCache to route handleClientsReady through the
 // demo branch, which skips fetchIdentity (safe to walk with extractMsg).
 func TestQA_CLICommand_ClientsReady_EmitsNavigateMsg(t *testing.T) {
-	m := tui.New(
+	m := newBlessedModel(t,
 		"testprofile",
 		"us-east-1",
 		tui.WithClients(demo.NewServiceClients()),
@@ -91,7 +91,7 @@ func TestQA_CLICommand_ClientsReady_EmitsNavigateMsg(t *testing.T) {
 // model is constructed WITHOUT WithCommand, receiving ClientsReadyMsg does NOT
 // produce a NavigateMsg in the returned batch.
 func TestQA_CLICommand_ClientsReady_NoNavigateMsg_WhenUnset(t *testing.T) {
-	m := tui.New(
+	m := newBlessedModel(t,
 		"testprofile",
 		"us-east-1",
 		tui.WithClients(demo.NewServiceClients()),
@@ -116,7 +116,7 @@ func TestQA_CLICommand_ClientsReady_NoNavigateMsg_WhenUnset(t *testing.T) {
 // a subsequent ClientsReadyMsg (e.g. profile/region switch) does NOT re-emit
 // a NavigateMsg.
 func TestQA_CLICommand_ClientsReady_ClearedAfterFirstUse(t *testing.T) {
-	m := tui.New(
+	m := newBlessedModel(t,
 		"testprofile",
 		"us-east-1",
 		tui.WithClients(demo.NewServiceClients()),
@@ -153,7 +153,7 @@ func TestQA_CLICommand_ClientsReady_ClearedAfterFirstUse(t *testing.T) {
 // option also triggers a NavigateMsg on the demo/no-cache path in
 // handleClientsReady (the `if m.noCache` branch).
 func TestQA_CLICommand_DemoMode_EmitsNavigateMsg(t *testing.T) {
-	m := tui.New(
+	m := newBlessedModel(t,
 		"demo",
 		"us-east-1",
 		tui.WithClients(demo.NewServiceClients()),
@@ -197,7 +197,7 @@ func TestQA_CLICommand_DemoMode_EmitsNavigateMsg(t *testing.T) {
 // still correct and unchanged.
 func TestQA_CLICommand_LivePath_ClientsReady_ArmsButDoesNotEmitNavigateYet(t *testing.T) {
 	t.Setenv("A9S_CONFIG_FOLDER", t.TempDir())
-	m := tui.New(
+	m := newBlessedModel(t,
 		"testprofile",
 		"us-east-1",
 		tui.WithClients(demo.NewServiceClients()),
@@ -226,7 +226,7 @@ func TestQA_CLICommand_LivePath_ClientsReady_ArmsButDoesNotEmitNavigateYet(t *te
 // returns the right TaskRequest in isolation.
 func TestQA_CLICommand_LivePath_AvailabilityCacheLoaded_EmitsNavigateMsg(t *testing.T) {
 	t.Setenv("A9S_CONFIG_FOLDER", t.TempDir())
-	m := tui.New(
+	m := newBlessedModel(t,
 		"testprofile",
 		"us-east-1",
 		tui.WithClients(demo.NewServiceClients()),
@@ -267,7 +267,7 @@ func TestQA_CLICommand_LivePath_AvailabilityCacheLoaded_EmitsNavigateMsg(t *test
 // ClientsReadyMsg arrives, the -c auto-navigation is suppressed to avoid
 // pushing a view on top of whatever the user is doing.
 func TestQA_CLICommand_SkippedWhenUserNavigatedAway(t *testing.T) {
-	m := tui.New(
+	m := newBlessedModel(t,
 		"testprofile",
 		"us-east-1",
 		tui.WithClients(demo.NewServiceClients()),

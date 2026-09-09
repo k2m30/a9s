@@ -17,7 +17,7 @@ import (
 // detail rendering against the approved design contract in
 // docs/design/related-resources-preview/ (mock #1: EC2 left-focused).
 func TestEC2Detail_Render_MatchesApprovedDesignContract(t *testing.T) {
-	m := tui.New("demo", "us-east-1",
+	m := newBlessedModel(t, "demo", "us-east-1",
 		tui.WithClients(demo.NewServiceClients()),
 		tui.WithIsDemo(true),
 		tui.WithNoCache(true),

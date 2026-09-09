@@ -128,7 +128,7 @@ func TestBug_Detail_UsesCorrectViewDefForResourceType(t *testing.T) {
 	}
 
 	tui.Version = "test"
-	m := tui.New("test", "us-east-1")
+	m := newBlessedModel(t, "test", "us-east-1")
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 40})
 
 	// Navigate to EC2, load resources, then open detail

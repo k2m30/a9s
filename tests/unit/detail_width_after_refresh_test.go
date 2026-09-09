@@ -47,7 +47,7 @@ const narrowTerminalWidth = 80
 func setupEC2DetailWithResultsNarrow(t *testing.T) (tui.Model, resource.Resource) {
 	t.Helper()
 
-	m := tui.New("demo", "us-east-1",
+	m := newBlessedModel(t, "demo", "us-east-1",
 		tui.WithClients(demo.NewServiceClients()),
 		tui.WithIsDemo(true),
 		tui.WithNoCache(true),

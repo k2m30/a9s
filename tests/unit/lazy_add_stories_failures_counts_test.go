@@ -25,7 +25,6 @@ import (
 
 	"github.com/k2m30/a9s/v3/core/resource"
 	"github.com/k2m30/a9s/v3/core/runtime/messages"
-	"github.com/k2m30/a9s/v3/internal/tui"
 )
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -80,7 +79,7 @@ func Test_LA_020_PartialResolution_ChecksStillDelivered(t *testing.T) {
 		resource.CleanupFetchByIDsForTest(targetType)
 	})
 
-	m := tui.New("testprofile", "us-east-1")
+	m := newBlessedModel(t, "testprofile", "us-east-1")
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 36})
 
 	_, batchCmd := rootApplyMsg(m, messages.Navigate{
@@ -198,7 +197,7 @@ func Test_LA_024_GetPolicyDenied_PartialMetadataOK(t *testing.T) {
 		resource.CleanupFetchByIDsForTest(targetType)
 	})
 
-	m := tui.New("testprofile", "us-east-1")
+	m := newBlessedModel(t, "testprofile", "us-east-1")
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 36})
 
 	_, batchCmd := rootApplyMsg(m, messages.Navigate{
@@ -316,7 +315,7 @@ func Test_LA_060_PivotCountEqualsRowCount(t *testing.T) {
 		resource.CleanupFetchByIDsForTest(targetType)
 	})
 
-	m := tui.New("testprofile", "us-east-1")
+	m := newBlessedModel(t, "testprofile", "us-east-1")
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 36})
 
 	_, batchCmd := rootApplyMsg(m, messages.Navigate{
@@ -368,7 +367,7 @@ func Test_LA_061_FooterSuppressed_WhenAllRelatedIDsResolved(t *testing.T) {
 
 	// Seed the model's cache with 3 resources and IsTruncated=true (more pages
 	// exist at the top level), then navigate with exactly those 3 IDs.
-	m := tui.New("testprofile", "us-east-1")
+	m := newBlessedModel(t, "testprofile", "us-east-1")
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 36})
 
 	ids := []string{"i-la061-001", "i-la061-002", "i-la061-003"}
@@ -421,7 +420,7 @@ func Test_LA_061_FooterSuppressed_WhenAllRelatedIDsResolved(t *testing.T) {
 func Test_LA_062_FooterSuppressed_UpstreamTruncatedDrillResolved(t *testing.T) {
 	const targetType = "kms" // real registered type
 
-	m := tui.New("testprofile", "us-east-1")
+	m := newBlessedModel(t, "testprofile", "us-east-1")
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 36})
 
 	// Simulate 2 KMS keys cached with upstream truncation (many more exist at top level).

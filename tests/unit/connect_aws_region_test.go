@@ -94,7 +94,7 @@ func TestBug82_GetDefaultRegion_EmptyProfile(t *testing.T) {
 // credentials not found) which are acceptable.
 func TestBug82_ConnectAWS_NoMissingRegionError(t *testing.T) {
 	tui.Version = "test"
-	m := tui.New("default", "")
+	m := newBlessedModel(t, "default", "")
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 80, Height: 40})
 
 	_, cmd := rootApplyMsg(m, messages.InitConnect{Profile: "default", Region: ""})
@@ -122,7 +122,7 @@ func TestBug82_ConnectAWS_NoMissingRegionError(t *testing.T) {
 // (which calls connectAWS with empty region) does not produce "Missing Region" errors.
 func TestBug82_ProfileSwitch_NoMissingRegionError(t *testing.T) {
 	tui.Version = "test"
-	m := tui.New("dev", "us-west-2")
+	m := newBlessedModel(t, "dev", "us-west-2")
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 80, Height: 40})
 	m, _ = rootApplyMsg(m, messages.Navigate{Target: messages.TargetResourceList, ResourceType: "ec2"})
 
@@ -159,7 +159,7 @@ func TestBug82_ProfileSwitch_NoMissingRegionError(t *testing.T) {
 // passes the region directly (no fallback needed).
 func TestBug82_RegionSwitch_PassesExplicitRegion(t *testing.T) {
 	tui.Version = "test"
-	m := tui.New("dev", "us-east-1")
+	m := newBlessedModel(t, "dev", "us-east-1")
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 80, Height: 40})
 
 	_, cmd := rootApplyMsg(m, messages.RegionSelected{Region: "eu-west-1"})

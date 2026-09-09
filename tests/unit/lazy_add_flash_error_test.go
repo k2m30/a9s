@@ -21,7 +21,6 @@ import (
 
 	"github.com/k2m30/a9s/v3/core/resource"
 	"github.com/k2m30/a9s/v3/core/runtime/messages"
-	"github.com/k2m30/a9s/v3/internal/tui"
 )
 
 // ---------------------------------------------------------------------------
@@ -59,7 +58,7 @@ func TestLazyAddError_EmitsFlashMsg(t *testing.T) {
 		resource.CleanupFetchByIDsForTest(targetType)
 	})
 
-	m := tui.New("testprofile", "us-east-1")
+	m := newBlessedModel(t, "testprofile", "us-east-1")
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 36})
 
 	srcRes := resource.Resource{ID: "src-flash-001"}
@@ -134,7 +133,7 @@ func TestLazyAddError_PartialSuccess_StillEmitsFlashMsg(t *testing.T) {
 		resource.CleanupFetchByIDsForTest(targetType)
 	})
 
-	m := tui.New("testprofile", "us-east-1")
+	m := newBlessedModel(t, "testprofile", "us-east-1")
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 36})
 
 	srcRes := resource.Resource{ID: "src-partial-001"}

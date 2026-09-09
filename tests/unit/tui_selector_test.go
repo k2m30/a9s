@@ -30,7 +30,6 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
-	"github.com/k2m30/a9s/v3/core/app"
 	"github.com/k2m30/a9s/v3/core/runtime"
 	"github.com/k2m30/a9s/v3/core/runtime/messages"
 	"github.com/k2m30/a9s/v3/internal/tui/keys"
@@ -48,8 +47,8 @@ func selectorSpecialKey(code rune) tea.KeyPressMsg {
 // newLiveSelector builds a SelectorModel via the live NewSelectorWithCtrl
 // seam, backed by a throwaway Controller seeded exactly like app_stack.go's
 // pushSelectorScreen seeds the real one.
-func newLiveSelector(items []string, activeItem, title string, onSelect func(string) tea.Msg, k keys.Map) views.SelectorModel {
-	c := app.New(runtime.Bootstrap("", "", nil))
+func newLiveSelector(t testing.TB, items []string, activeItem, title string, onSelect func(string) tea.Msg, k keys.Map) views.SelectorModel {
+	c := newBlessedController(t, runtime.Bootstrap("", "", nil))
 	c.ApplyIntents([]runtime.UIIntent{runtime.PushScreen{ID: runtime.ScreenProfileSelector}})
 	c.EnsureSelectorState(items, activeItem, title)
 	m := views.NewSelectorWithCtrl(c, onSelect, k)
@@ -63,7 +62,7 @@ func TestSelector_DownMovesSelection(t *testing.T) {
 	k := keys.Default()
 	items := []string{"item-1", "item-2", "item-3"}
 	var selected string
-	m := newLiveSelector(items, "item-1", "test", func(s string) tea.Msg {
+	m := newLiveSelector(t, items, "item-1", "test", func(s string) tea.Msg {
 		selected = s
 		return messages.ProfileSelected{Profile: s}
 	}, k)
@@ -83,7 +82,7 @@ func TestSelector_UpMovesSelection(t *testing.T) {
 	k := keys.Default()
 	items := []string{"item-1", "item-2", "item-3"}
 	var selected string
-	m := newLiveSelector(items, "item-1", "test", func(s string) tea.Msg {
+	m := newLiveSelector(t, items, "item-1", "test", func(s string) tea.Msg {
 		selected = s
 		return messages.ProfileSelected{Profile: s}
 	}, k)
@@ -107,7 +106,7 @@ func TestSelector_GGoesToTop(t *testing.T) {
 	k := keys.Default()
 	items := []string{"item-1", "item-2", "item-3"}
 	var selected string
-	m := newLiveSelector(items, "item-1", "test", func(s string) tea.Msg {
+	m := newLiveSelector(t, items, "item-1", "test", func(s string) tea.Msg {
 		selected = s
 		return messages.ProfileSelected{Profile: s}
 	}, k)
@@ -129,7 +128,7 @@ func TestSelector_ShiftGGoesToBottom(t *testing.T) {
 	k := keys.Default()
 	items := []string{"item-1", "item-2", "item-3"}
 	var selected string
-	m := newLiveSelector(items, "item-1", "test", func(s string) tea.Msg {
+	m := newLiveSelector(t, items, "item-1", "test", func(s string) tea.Msg {
 		selected = s
 		return messages.ProfileSelected{Profile: s}
 	}, k)
@@ -154,7 +153,7 @@ func TestSelector_PageDownMovesCursor(t *testing.T) {
 		items[i] = "item-" + string(rune('a'+i%26))
 	}
 	var selected string
-	m := newLiveSelector(items, "", "test", func(s string) tea.Msg {
+	m := newLiveSelector(t, items, "", "test", func(s string) tea.Msg {
 		selected = s
 		return messages.ProfileSelected{Profile: s}
 	}, k)
@@ -178,7 +177,7 @@ func TestSelector_PageUpMovesCursor(t *testing.T) {
 		items[i] = "item-" + string(rune('a'+i%26))
 	}
 	var selected string
-	m := newLiveSelector(items, "", "test", func(s string) tea.Msg {
+	m := newLiveSelector(t, items, "", "test", func(s string) tea.Msg {
 		selected = s
 		return messages.ProfileSelected{Profile: s}
 	}, k)
@@ -202,7 +201,7 @@ func TestSelector_CursorStopsAtTop(t *testing.T) {
 	k := keys.Default()
 	items := []string{"a", "b", "c"}
 	var selected string
-	m := newLiveSelector(items, "", "test", func(s string) tea.Msg {
+	m := newLiveSelector(t, items, "", "test", func(s string) tea.Msg {
 		selected = s
 		return messages.ProfileSelected{Profile: s}
 	}, k)
@@ -223,7 +222,7 @@ func TestSelector_CursorStopsAtBottom(t *testing.T) {
 	k := keys.Default()
 	items := []string{"a", "b", "c"}
 	var selected string
-	m := newLiveSelector(items, "", "test", func(s string) tea.Msg {
+	m := newLiveSelector(t, items, "", "test", func(s string) tea.Msg {
 		selected = s
 		return messages.ProfileSelected{Profile: s}
 	}, k)
@@ -246,7 +245,7 @@ func TestSelector_CursorStopsAtBottom(t *testing.T) {
 
 func TestSelector_UnhandledKeyReturnsNilCmd(t *testing.T) {
 	k := keys.Default()
-	m := newLiveSelector([]string{"a"}, "a", "test", func(s string) tea.Msg { return nil }, k)
+	m := newLiveSelector(t, []string{"a"}, "a", "test", func(s string) tea.Msg { return nil }, k)
 	_, cmd := m.Update(selectorKeyPress("x"))
 	if cmd != nil {
 		t.Error("unhandled key 'x' should return nil cmd")
@@ -257,7 +256,7 @@ func TestSelector_NonKeyMsgPassthrough(t *testing.T) {
 	k := keys.Default()
 	items := []string{"a", "b"}
 	var selected string
-	m := newLiveSelector(items, "a", "test", func(s string) tea.Msg {
+	m := newLiveSelector(t, items, "a", "test", func(s string) tea.Msg {
 		selected = s
 		return messages.ProfileSelected{Profile: s}
 	}, k)

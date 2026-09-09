@@ -47,7 +47,7 @@ func rdsLiveResource(id string) resource.Resource {
 func navigateToDetailWithRDS(t *testing.T, res resource.Resource) tui.Model {
 	t.Helper()
 
-	m := tui.New("", "")
+	m := newBlessedModel(t, "", "")
 	m2, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
 	m, _ = m2.(tui.Model)
 
@@ -211,7 +211,7 @@ func TestHandleEnrichmentChecked_StaleTypeGenDoesNotUpdateDetail(t *testing.T) {
 // (not a detail view), the finding is stored in enrichmentFindings but NOT applied
 // to any detail view (there is none active). The model must not panic.
 func TestHandleEnrichmentChecked_FindingNotAppliedWhenDetailInactive(t *testing.T) {
-	m := tui.New("", "")
+	m := newBlessedModel(t, "", "")
 	m2, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
 	m, _ = m2.(tui.Model)
 

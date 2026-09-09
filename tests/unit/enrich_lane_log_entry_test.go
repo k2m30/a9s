@@ -26,7 +26,7 @@ import (
 // lines that mention want.
 func logScreenLines(t *testing.T, msg tea.Msg, want string) []string {
 	t.Helper()
-	m2, cmd := newTestModel().Update(msg)
+	m2, cmd := newTestModel(t).Update(msg)
 	m := m2.(tui.Model)
 	if f, ok := walkForFlash(cmd); ok {
 		m3, _ := m.Update(f)

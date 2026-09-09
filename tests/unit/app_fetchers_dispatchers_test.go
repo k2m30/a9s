@@ -244,7 +244,7 @@ func TestFetchChildResources_UnknownChildType(t *testing.T) {
 func TestFetchChildResources_PartialSuccess_ReturnsResourcesLoadedWithErr(t *testing.T) {
 	withTuiVersion(t, "test")
 	clients := demo.NewServiceClients()
-	m := tui.New(demo.DemoProfile, demo.DemoRegion,
+	m := newBlessedModel(t, demo.DemoProfile, demo.DemoRegion,
 		tui.WithClients(clients),
 		tui.WithNoCache(true),
 	)
@@ -552,7 +552,7 @@ func TestProbeResourceAvailability_NilClients(t *testing.T) {
 func TestSaveAvailabilityCache_NoCacheMode(t *testing.T) {
 	withTuiVersion(t, "test")
 	// noCache=true: saveAvailabilityCache returns nil immediately.
-	m := tui.New(demo.DemoProfile, demo.DemoRegion,
+	m := newBlessedModel(t, demo.DemoProfile, demo.DemoRegion,
 		tui.WithClients(demo.NewServiceClients()),
 		tui.WithNoCache(true),
 	)
@@ -590,7 +590,7 @@ func TestSaveAvailabilityCache_NoCacheMode(t *testing.T) {
 func TestDemoPrefetchCounts_ViaClientReady(t *testing.T) {
 	withTuiVersion(t, "test")
 	clients := demo.NewServiceClients()
-	m := tui.New(demo.DemoProfile, demo.DemoRegion,
+	m := newBlessedModel(t, demo.DemoProfile, demo.DemoRegion,
 		tui.WithClients(clients),
 		tui.WithNoCache(true),
 	)

@@ -24,7 +24,6 @@ import (
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/k2m30/a9s/v3/core/runtime/messages"
-	"github.com/k2m30/a9s/v3/internal/tui"
 )
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -183,7 +182,7 @@ func TestHandleProfilesLoaded_PushesProfileSelectorView(t *testing.T) {
 	t.Setenv("AWS_CONFIG_FILE", cfgPath)
 
 	// Create model without demo clients so profile switching is not blocked.
-	m := tui.New("default", "us-east-1")
+	m := newBlessedModel(t, "default", "us-east-1")
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 80, Height: 40})
 
 	// Trigger fetchProfiles() — NavigateMsg{Target: TargetProfile} dispatches to

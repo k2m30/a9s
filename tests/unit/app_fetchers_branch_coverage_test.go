@@ -93,7 +93,7 @@ func TestLoadAvailabilityCache_PopulatedCacheReturnsEntries(t *testing.T) {
 	})
 
 	clients := demo.NewServiceClients()
-	m := tui.New(profile, region,
+	m := newBlessedModel(t, profile, region,
 		tui.WithClients(clients),
 		tui.WithNoCache(false),
 	)
@@ -151,7 +151,7 @@ func TestLoadAvailabilityCache_IssueFieldsMapped(t *testing.T) {
 	})
 
 	clients := demo.NewServiceClients()
-	m := tui.New(profile, region,
+	m := newBlessedModel(t, profile, region,
 		tui.WithClients(clients),
 		tui.WithNoCache(false),
 	)
@@ -226,7 +226,7 @@ func TestFetchMoreResources_FilteredFetcherErrorPropagated(t *testing.T) {
 	})
 
 	clients := demo.NewServiceClients()
-	m := tui.New(demo.DemoProfile, demo.DemoRegion,
+	m := newBlessedModel(t, demo.DemoProfile, demo.DemoRegion,
 		tui.WithClients(clients),
 		tui.WithNoCache(true),
 	)
@@ -270,7 +270,7 @@ func TestFetchResourcesFiltered_NoFetcherWithDemoClients(t *testing.T) {
 	}
 
 	clients := demo.NewServiceClients()
-	m := tui.New(demo.DemoProfile, demo.DemoRegion,
+	m := newBlessedModel(t, demo.DemoProfile, demo.DemoRegion,
 		tui.WithClients(clients),
 		tui.WithNoCache(true),
 	)

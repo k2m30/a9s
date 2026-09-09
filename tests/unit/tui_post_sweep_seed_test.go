@@ -220,7 +220,7 @@ func TestPostSweepWarmOpen_SeedsFromStore(t *testing.T) {
 // caching and would make the disk-store fallback unreachable).
 func newPostSweepApp(t *testing.T, profile, region string) tui.Model {
 	t.Helper()
-	m := tui.New(profile, region,
+	m := newBlessedModel(t, profile, region,
 		tui.WithClients(demo.NewServiceClients()),
 		tui.WithIsDemo(true),
 		tui.WithProfileForTest(profile),

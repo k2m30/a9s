@@ -127,7 +127,7 @@ import (
 func newLiveWebStyleController(t *testing.T, profile, region string) (*runtime.Core, *app.Controller) {
 	t.Helper()
 	core := runtime.Bootstrap(profile, region, resource.AllResourceTypes())
-	ctrl := app.New(core)
+	ctrl := newBlessedController(t, core)
 	t.Cleanup(ctrl.Close)
 	ctrl.SetUIMode("web")
 	return core, ctrl
@@ -551,7 +551,7 @@ func TestColdBoot_SeedsAllLoadedPages_PerTypeFile_InstantlySeedsBeforeFetchCompl
 	s.Profile = "coldboot-prof"
 	s.Region = "us-east-1"
 	core := runtime.New(s, resource.AllResourceTypes())
-	ctrl := app.New(core)
+	ctrl := newBlessedController(t, core)
 	t.Cleanup(ctrl.Close)
 
 	reloaded := cache.LoadDirForTest("coldboot-prof", "us-east-1")
@@ -634,7 +634,7 @@ func TestChildAndFilteredLists_NeverWrittenToTypeFile(t *testing.T) {
 	s.Profile = "childlist-prof"
 	s.Region = "us-east-1"
 	core := runtime.New(s, resource.AllResourceTypes())
-	ctrl := app.New(core)
+	ctrl := newBlessedController(t, core)
 	t.Cleanup(ctrl.Close)
 
 	// Push a CHILD list screen directly (ParentContext set), bypassing the
@@ -752,7 +752,7 @@ func TestLoadBeforeSave_PairSwitch_NeverSavesBeforeLoad(t *testing.T) {
 	s.Profile = "pair-a"
 	s.Region = "us-east-1"
 	core := runtime.New(s, resource.AllResourceTypes())
-	ctrl := app.New(core)
+	ctrl := newBlessedController(t, core)
 	t.Cleanup(ctrl.Close)
 
 	// Establish pair A's directory via a real load+save round trip.
@@ -809,7 +809,7 @@ func TestNoCache_NeverLoadsPopulatedDir_NeverWritesFiles(t *testing.T) {
 	s.Region = "us-east-1"
 	core := runtime.New(s, resource.AllResourceTypes())
 	core.SetNoCache(true)
-	ctrl := app.New(core)
+	ctrl := newBlessedController(t, core)
 	t.Cleanup(ctrl.Close)
 
 	snap := ctrl.Snapshot()
@@ -893,7 +893,7 @@ func TestAncientTypeFile_SeedsNormally_NoAgeDiscard(t *testing.T) {
 	s.Profile = "ancient-prof"
 	s.Region = "us-east-1"
 	core := runtime.New(s, resource.AllResourceTypes())
-	ctrl := app.New(core)
+	ctrl := newBlessedController(t, core)
 	t.Cleanup(ctrl.Close)
 
 	vs, _ := ctrl.Handle(messages.AvailabilityCacheLoaded{

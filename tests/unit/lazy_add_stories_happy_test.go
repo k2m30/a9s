@@ -17,7 +17,6 @@ import (
 
 	"github.com/k2m30/a9s/v3/core/resource"
 	"github.com/k2m30/a9s/v3/core/runtime/messages"
-	"github.com/k2m30/a9s/v3/internal/tui"
 )
 
 // ---------------------------------------------------------------------------
@@ -65,7 +64,7 @@ func Test_LA_001_KMSDrillAWSManagedKey(t *testing.T) {
 		resource.CleanupFetchByIDsForTest(targetType)
 	})
 
-	m := tui.New("testprofile", "us-east-1")
+	m := newBlessedModel(t, "testprofile", "us-east-1")
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 36})
 
 	_, batchCmd := rootApplyMsg(m, messages.Navigate{
@@ -145,7 +144,7 @@ func Test_LA_002_AMIDrillPublicAMI(t *testing.T) {
 		resource.CleanupFetchByIDsForTest(targetType)
 	})
 
-	m := tui.New("testprofile", "us-east-1")
+	m := newBlessedModel(t, "testprofile", "us-east-1")
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 36})
 
 	_, batchCmd := rootApplyMsg(m, messages.Navigate{
@@ -223,7 +222,7 @@ func Test_LA_003_EBSSnapDrillSharedSnapshot(t *testing.T) {
 		resource.CleanupFetchByIDsForTest(targetType)
 	})
 
-	m := tui.New("testprofile", "us-east-1")
+	m := newBlessedModel(t, "testprofile", "us-east-1")
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 36})
 
 	_, batchCmd := rootApplyMsg(m, messages.Navigate{
@@ -300,7 +299,7 @@ func Test_LA_004_IAMPolicyDrillAWSManaged(t *testing.T) {
 		resource.CleanupFetchByIDsForTest(targetType)
 	})
 
-	m := tui.New("testprofile", "us-east-1")
+	m := newBlessedModel(t, "testprofile", "us-east-1")
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 36})
 
 	_, batchCmd := rootApplyMsg(m, messages.Navigate{
@@ -395,7 +394,7 @@ func Test_LA_081_ColdCacheDrillTriggersPrefetch(t *testing.T) {
 		resource.CleanupPaginatedForTest(targetType)
 	})
 
-	m := tui.New("testprofile", "us-east-1")
+	m := newBlessedModel(t, "testprofile", "us-east-1")
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 36})
 
 	_, batchCmd := rootApplyMsg(m, messages.Navigate{
@@ -488,7 +487,7 @@ func Test_LA_082_WarmCacheDrillReusesCache(t *testing.T) {
 		resource.CleanupPaginatedForTest(targetType)
 	})
 
-	m := tui.New("testprofile", "us-east-1")
+	m := newBlessedModel(t, "testprofile", "us-east-1")
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 36})
 
 	// Pre-seed the cache with the warm entry, simulating "user previously

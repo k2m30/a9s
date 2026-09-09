@@ -406,7 +406,7 @@ func TestSweepOnce_RotatePreservesSweptPairs(t *testing.T) {
 func newRootSizedModel(t *testing.T) tui.Model {
 	t.Helper()
 	t.Setenv("A9S_CONFIG_FOLDER", t.TempDir())
-	m := tui.New("sweeponce-manual-refresh", "us-east-1")
+	m := newBlessedModel(t, "sweeponce-manual-refresh", "us-east-1")
 	t.Cleanup(m.CloseController)
 	newM, _ := m.Update(tea.WindowSizeMsg{Width: 80, Height: 40})
 	return newM.(tui.Model)

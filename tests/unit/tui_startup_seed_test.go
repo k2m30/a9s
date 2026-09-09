@@ -103,7 +103,7 @@ func TestTUIInit_SeedsMenuFromDisk_BeforeClientsReady(t *testing.T) {
 	const profile, region = "coldseed-prof", "us-east-1"
 	seedTypeFile(t, profile, region, "s3", 7)
 
-	m := tui.New(profile, region,
+	m := newBlessedModel(t, profile, region,
 		tui.WithProfileForTest(profile),
 		tui.WithRegionForTest(region))
 	t.Cleanup(func() { m.CloseController() })
@@ -215,7 +215,7 @@ func TestTUIInit_EmptyRegion_ResolvesConfigDefaultForSeed(t *testing.T) {
 
 	seedTypeFile(t, profile, configDefaultRegion, "ec2", 3)
 
-	m := tui.New(profile, "", tui.WithProfileForTest(profile), tui.WithRegionForTest(""))
+	m := newBlessedModel(t, profile, "", tui.WithProfileForTest(profile), tui.WithRegionForTest(""))
 	t.Cleanup(func() { m.CloseController() })
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 40})
 

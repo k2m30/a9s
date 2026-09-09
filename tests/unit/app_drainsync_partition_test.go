@@ -123,7 +123,7 @@ func TestDrainSyncPartition_BlockingFollowUp_IsBackground_ReturnedNotExecuted(t 
 	s.AvailTotal = 1
 
 	core := runtime.New(s, nil)
-	c := app.New(core)
+	c := newBlessedController(t, core)
 
 	seed := runtime.TaskRequest{Key: runtime.TaskKey{Kind: runtime.TaskKindProbeAvailability, Scope: "ec2"}}
 

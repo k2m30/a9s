@@ -119,7 +119,7 @@ func TestCostsCodex_X1_GrowthStory_ResourceChain_EndToEnd_OverDemoTransport(t *t
 	s.Region = "us-east-1"
 	s.Clients = demo.NewServiceClients()
 	core := runtime.New(s, nil)
-	c := app.New(core)
+	c := newBlessedController(t, core)
 	t.Cleanup(c.Close)
 	c.ApplyIntents([]runtime.UIIntent{runtime.PushScreen{ID: runtime.ScreenCosts}})
 	c.EnsureCostsState(time.Now())
@@ -229,7 +229,7 @@ func TestCostsCodex_X2_SkipAnomalies_PreservesMarksAndTTL(t *testing.T) {
 	s1.Profile = profile
 	s1.Region = "us-east-1"
 	core1 := runtime.New(s1, nil)
-	c1 := app.New(core1)
+	c1 := newBlessedController(t, core1)
 	c1.ApplyIntents([]runtime.UIIntent{runtime.PushScreen{ID: runtime.ScreenCosts}})
 	c1.EnsureCostsState(t0)
 	root := topDrill(t, c1)
@@ -269,7 +269,7 @@ func TestCostsCodex_X2_SkipAnomalies_PreservesMarksAndTTL(t *testing.T) {
 	s2.Profile = profile
 	s2.Region = "us-east-1"
 	core2 := runtime.New(s2, nil)
-	c2 := app.New(core2)
+	c2 := newBlessedController(t, core2)
 	c2.ApplyIntents([]runtime.UIIntent{runtime.PushScreen{ID: runtime.ScreenCosts}})
 	c2.EnsureCostsState(t1)
 
@@ -314,7 +314,7 @@ func TestCostsCodex_X2_SkipAnomalies_PreservesMarksAndTTL(t *testing.T) {
 	s3.Profile = profile
 	s3.Region = "us-east-1"
 	core3 := runtime.New(s3, nil)
-	c3 := app.New(core3)
+	c3 := newBlessedController(t, core3)
 	t.Cleanup(c3.Close)
 	c3.ApplyIntents([]runtime.UIIntent{runtime.PushScreen{ID: runtime.ScreenCosts}})
 	c3.EnsureCostsState(t2)
@@ -392,7 +392,7 @@ func TestCostsCodex_X3_WarmCostCache_AbsentAnomalies_StillEmitsFetch(t *testing.
 	s.Profile = profile
 	s.Region = "us-east-1"
 	core := runtime.New(s, nil)
-	c := app.New(core)
+	c := newBlessedController(t, core)
 	t.Cleanup(c.Close)
 	c.ApplyIntents([]runtime.UIIntent{runtime.PushScreen{ID: runtime.ScreenCosts}})
 	c.EnsureCostsState(now)
@@ -727,7 +727,7 @@ func TestCostsCodex_X9_RecoveredStore_SurfacesFlashOnInit(t *testing.T) {
 	s.Profile = profile
 	s.Region = "us-east-1"
 	core := runtime.New(s, nil)
-	c := app.New(core)
+	c := newBlessedController(t, core)
 	t.Cleanup(c.Close)
 	c.ApplyIntents([]runtime.UIIntent{runtime.PushScreen{ID: runtime.ScreenCosts}})
 	c.EnsureCostsState(fixedCostsNow)
@@ -771,7 +771,7 @@ func TestCostsCodex_X10_ResourceJump_NotFound_ReturnsToCostsWithHonestNote(t *te
 	// a real DescribeInstances call for an instance in another region/account.
 	s.Clients = demo.NewServiceClients()
 	core := runtime.New(s, nil)
-	c := app.New(core)
+	c := newBlessedController(t, core)
 	t.Cleanup(c.Close)
 	c.ApplyIntents([]runtime.UIIntent{runtime.PushScreen{ID: runtime.ScreenCosts}})
 	c.EnsureCostsState(fixedCostsNow)

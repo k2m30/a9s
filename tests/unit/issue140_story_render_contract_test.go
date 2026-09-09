@@ -277,7 +277,7 @@ func relatedNavListTitleMarker(t *testing.T, typeName string) string {
 }
 
 func TestIssue140_Story_EC2_029_FilteredAlarmListTitleAndScope(t *testing.T) {
-	m := tui.New("demo", "us-east-1",
+	m := newBlessedModel(t, "demo", "us-east-1",
 		tui.WithClients(demo.NewServiceClients()),
 		tui.WithIsDemo(true),
 		tui.WithNoCache(true),

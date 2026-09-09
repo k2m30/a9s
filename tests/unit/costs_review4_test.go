@@ -98,7 +98,7 @@ func TestCostsReview4_P2_TUI_CostsLoaded_DispatchesReturnedFallbackTask(t *testi
 
 func TestCostsReview4_P4_TUI_ByIDFetchNotFound_PopsStrandedPlaceholder(t *testing.T) {
 	tui.Version = "1.0.2"
-	m := tui.New("testprofile-p4", "us-east-1", tui.WithClients(demo.NewServiceClients()), tui.WithNoCache(true))
+	m := newBlessedModel(t, "testprofile-p4", "us-east-1", tui.WithClients(demo.NewServiceClients()), tui.WithNoCache(true))
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 80, Height: 40})
 
 	m, _ = rootApplyMsg(m, messages.Navigate{Target: messages.TargetCosts})
