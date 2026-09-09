@@ -126,10 +126,9 @@ func TestQA_DocDB_DetailFrameTitle(t *testing.T) {
 	c := newDetailControllerUnit(t, res, "dbc")
 	title := c.Snapshot().FrameTitle
 
-	// tui6 row 24 folded the controller's own Name-else-ID title into the one
-	// builder both lanes now paint from, so the expected string is that
-	// builder's — restoring the bare name here would restore the second
-	// builder with it.
+	// This pins that the snapshot's title is the one builder's output, not a
+	// second Name-else-ID answer of the controller's own; what the builder
+	// produces is pinned in tui6_detail_frame_title_test.go.
 	expected := resource.DetailFrameTitle(res.ID, res.Name, resource.DetailTitleOmitsID("dbc"))
 	if title != expected {
 		t.Errorf("DocumentDB detail FrameTitle = %q, want %q", title, expected)
