@@ -12,6 +12,7 @@ import (
 	"strings"
 
 	"github.com/k2m30/a9s/v3/core/catalog"
+	"github.com/k2m30/a9s/v3/core/logging"
 )
 
 //go:embed views_reference.yaml
@@ -99,6 +100,9 @@ func yamlKey(s string) string {
 // a column never costs them the rest of a correction.
 func EnsureViewsDir(dir string) error {
 	if err := os.MkdirAll(dir, 0700); err != nil {
+		return err
+	}
+	if err := carryRenamedViewFiles(dir); err != nil {
 		return err
 	}
 
@@ -267,6 +271,54 @@ func movedStatusKey(view string, col ListColumn, stamp int) (string, bool) {
 		return "", false
 	}
 	return statusKey, true
+}
+
+// viewFileRenames records a type this build has RENAMED, old name to new.
+// The generator wrote a file under the old name, the rename landed, and the
+// file stayed behind naming nothing: docdb-snap became dbc-snap (e7e87883)
+// and rds-snap became dbi-snap (490ffa84), so an installation that ran an
+// April build still has both on disk.
+//
+// Same shape and same bargain as viewColumnAdditions: the migration owns what
+// the generator wrote, and a file it wrote is not the operator's mistake to be
+// told about on every start. Add a row in the same change that renames a type
+// whose views file this repo carries.
+var viewFileRenames = map[string]string{ //nolint:gochecknoglobals // static migration table
+	"docdb-snap": "dbc-snap",
+	"rds-snap":   "dbi-snap",
+}
+
+// carryRenamedViewFiles moves a view file written under a name this build has
+// renamed to the name in use, and retires it when that name already has a
+// file — the one under the name in use is the one being edited, so it is
+// never written over. A retired file keeps its contents beside its old name
+// with a suffix the loader does not read, because deleting what an operator
+// may have edited to say "this build renamed the type" is not the migration's
+// call.
+func carryRenamedViewFiles(dir string) error {
+	for from, to := range viewFileRenames {
+		old := filepath.Join(dir, from+".yaml")
+		if _, err := os.Stat(old); err != nil {
+			continue
+		}
+		dest := filepath.Join(dir, to+".yaml")
+		if _, err := os.Stat(dest); err == nil {
+			retired := old + ".retired"
+			if err := os.Rename(old, retired); err != nil {
+				return err
+			}
+			logging.L().Info("retired a view file for a renamed type",
+				"file", from+".yaml", "renamed_to", to, "kept", filepath.Base(retired),
+				"reason", to+".yaml already exists and is the one in use")
+			continue
+		}
+		if err := os.Rename(old, dest); err != nil {
+			return err
+		}
+		logging.L().Info("carried a view file to the type's new name",
+			"file", from+".yaml", "renamed_to", to+".yaml")
+	}
+	return nil
 }
 
 // viewColumnAdditions names a column the built-in views GAINED, and the

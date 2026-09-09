@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Leftover view files from before two resource types were renamed no longer
+  produce a config error on every start. A file written for `docdb-snap` or
+  `rds-snap` is moved to the name in use, or set aside if you already have a
+  file under that name, and either way it is recorded in the debug log rather
+  than shown as your mistake. A file naming a type a9s has never had is still
+  reported.
+
 - The menu count for a resource type now follows a full list downward. A list
   that reached the end of the type and found five is the answer for that type,
   so a badge left at 200 by an earlier count is replaced instead of kept, even
