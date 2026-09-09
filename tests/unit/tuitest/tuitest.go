@@ -21,16 +21,6 @@ import (
 	"github.com/k2m30/a9s/v3/internal/tui/styles"
 )
 
-// listInstanceReporter is what a root model has to answer to for a
-// hand-built page message to be stamped for the screen the test is driving.
-// tui.Model does not implement it yet: the accessor is one line over
-// app.Controller.GetListInstance, and until it lands StampPage below leaves
-// model-driven messages alone. Replace this assertion with a direct call the
-// day it does.
-type listInstanceReporter interface {
-	ListInstanceForTest() domain.Gen
-}
-
 var ansiRe = regexp.MustCompile(`\x1b\[[0-9;]*[a-zA-Z]`)
 
 // StampPage fills in the screen identity a page message would have carried
@@ -74,11 +64,7 @@ func StepModel(m tui.Model, msg tea.Msg) tui.Model {
 
 // stampFor is StampPage for the screen m is currently showing.
 func stampFor(m tui.Model, msg tea.Msg) tea.Msg {
-	r, ok := any(m).(listInstanceReporter)
-	if !ok {
-		return msg
-	}
-	return StampPage(r.ListInstanceForTest(), msg)
+	return StampPage(m.ListInstanceForTest(), msg)
 }
 
 // Render returns the rendered content string from a root model's View().

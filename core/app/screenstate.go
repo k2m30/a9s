@@ -403,13 +403,3 @@ func (ls *ListState) cloneForBuild(rows []resource.Resource) ListState {
 	out.ParentContext = maps.Clone(ls.ParentContext)
 	return out
 }
-
-// canonicalScreenType is the canonical short name of the screen's own
-// resource type. A screen opened through an alias ("buckets", "workgroups")
-// keeps the alias it was opened with, so the delivery scan resolves it here
-// instead of assuming the stack already spells the type the way every
-// message does — the message's own name is canonical before it reaches the
-// controller (runtime.StampListResult).
-func canonicalScreenType(s *Screen) string {
-	return resource.CanonicalShortName(s.Ctx.ResourceType)
-}

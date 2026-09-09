@@ -9,6 +9,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- A list result now reaches the screen that asked for it. Every fetch carries
+  the identity of the screen it was dispatched from, so a drill's rows land on
+  the drill rather than on whichever screen of that type happens to be on top
+  when they arrive, and a result nothing dispatched reaches no screen at all
+  instead of overwriting one. Opening the same type twice, filtering inside it,
+  or pressing Esc while a fetch is out no longer swaps one screen's rows onto
+  another.
+
+- A refresh that was already superseded no longer clears the spinner of the
+  newer one still in flight. Pressing Ctrl+R twice used to report that loading
+  was over while the second fetch was still running; each screen now tracks
+  which request raised its own marker.
+
+- A resource a9s could not inspect now says which check it skipped rather than
+  appearing alongside the ones it did inspect with nothing to distinguish it.
+  Reaching the inspection cap and an API refusing a call are recorded
+  separately, and a call that returned an answer with the field missing is now
+  recorded as a failure instead of read as "nothing found".
+
+- The interface no longer stalls while a large type file is written to the
+  cache. Writing six thousand rows held the lock every screen reads under for
+  the length of the encode; the encode now runs outside it.
+
 - Leftover view files from before two resource types were renamed no longer
   produce a config error on every start. A file written for `docdb-snap` or
   `rds-snap` is moved to the name in use, or set aside if you already have a

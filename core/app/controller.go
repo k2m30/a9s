@@ -372,33 +372,48 @@ func (c *Controller) stampDispatchSnapshotLocked(tasks []runtime.TaskRequest) []
 		tasks[i].Snap = snap
 	}
 	top := c.topListState()
-	screen := domain.Gen(0)
-	if top != nil {
-		screen = top.instance
-	}
 	for i := range tasks {
-		// The list screen on top is the one whose action produced these tasks,
-		// so its own fetches carry its identity and their results come back to
-		// it rather than to whichever screen of that type is topmost when they
-		// land. A task no list screen owns keeps zero and is routed by type and
-		// lane as before. Stamped before the sequence, which is drawn per
-		// screen and needs the identity to draw from.
-		if tasks[i].ScreenID == 0 && runtime.TaskProducesListResult(tasks[i].Key.Kind) {
-			tasks[i].ScreenID = screen
-		}
-		c.core.StampListFetchSeq(&tasks[i])
-		// The flag this dispatch raised on the screen belongs to this request:
-		// record which, so a completion that no longer owns it leaves it up
-		// (a Ctrl+R issued while an earlier refresh is still out).
-		if top != nil && tasks[i].ListSeq != 0 && runtime.TaskProducesListResult(tasks[i].Key.Kind) {
-			if tasks[i].Key.Kind == runtime.KindFetchMore {
-				top.loadingMoreSeq = tasks[i].ListSeq
-			} else {
-				top.loadingSeq = tasks[i].ListSeq
-			}
-		}
+		c.stampListDispatchLocked(&tasks[i], top)
 	}
 	return tasks
+}
+
+// stampListDispatchLocked gives one task the identity of the list screen that
+// dispatched it and that screen's next sequence.
+//
+// The list screen on top is the one whose action produced the task, so its own
+// fetches carry its identity and their results come back to it rather than to
+// whichever screen of that type is topmost when they land. A task no list
+// screen owns keeps zero and reaches no screen. The identity is stamped before
+// the sequence, which is drawn per screen and needs the identity to draw from.
+//
+// Callers must hold c.mu.
+func (c *Controller) stampListDispatchLocked(task *runtime.TaskRequest, top *ListState) {
+	if task.ScreenID == 0 && top != nil && runtime.TaskProducesListResult(task.Key.Kind) {
+		task.ScreenID = top.instance
+	}
+	c.core.StampListFetchSeq(task)
+	// The flag this dispatch raised on the screen belongs to this request:
+	// record which, so a completion that no longer owns it leaves it up
+	// (a Ctrl+R issued while an earlier refresh is still out).
+	if top != nil && task.ListSeq != 0 && runtime.TaskProducesListResult(task.Key.Kind) {
+		if task.Key.Kind == runtime.KindFetchMore {
+			top.loadingMoreSeq = task.ListSeq
+		} else {
+			top.loadingSeq = task.ListSeq
+		}
+	}
+}
+
+// StampListDispatch stamps a task the runtime built directly, outside the
+// Controller boundary that stamps the ones it queues itself — HandleNavigate
+// returns its own fetch task for the screen the same navigation pushed, and
+// that task has to name that screen exactly as a Controller-queued one does,
+// through this one rule rather than a second copy of it.
+func (c *Controller) StampListDispatch(task *runtime.TaskRequest) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.stampListDispatchLocked(task, c.topListState())
 }
 
 // PendingDetailRefreshGet exposes Core.PendingDetailRefreshGet to callers

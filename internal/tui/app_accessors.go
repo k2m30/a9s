@@ -25,6 +25,14 @@ func (m Model) Core() *runtime.Core {
 	return m.core
 }
 
+// ListInstanceForTest returns the identity of the list screen on top, which a
+// real dispatch stamps onto the page it produces. Test-only accessor: a test
+// that hand-builds a page is standing in for the fetch command and has to
+// stamp what the command would (tuitest.StampPage).
+func (m Model) ListInstanceForTest() domain.Gen {
+	return m.ctrl.GetListInstance()
+}
+
 // EnrichmentGen returns the current session-wide enrichment generation counter.
 // Test-only accessor.
 func (m Model) EnrichmentGen() domain.Gen {

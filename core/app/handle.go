@@ -282,70 +282,38 @@ func (c *Controller) Handle(ev runtime.Event) (ViewState, []runtime.TaskRequest)
 }
 
 // findResourceListScreen returns the list screen a result belongs to: the one
-// whose instance the request named, or the single screen its type and lane
-// could mean, or none.
+// whose instance the request named, or none.
 //
 // A result carries the identity of the screen that dispatched it
 // (runtime.TaskRequest.ScreenID, stamped at both dispatch boundaries and
 // echoed back on messages.ResourcesLoaded / messages.APIError). That identity
-// is the whole answer whenever it is there: the named screen or nowhere, and a
-// result naming a screen that has since been popped strands nothing, because
-// the screen's rows went with it.
+// is the whole answer. A result naming a screen that has since been popped
+// strands nothing, because the screen's rows went with it, and a result naming
+// no screen was dispatched by no screen — nothing is waiting on it.
 //
-// A result that names no screen was not dispatched by one — a synthetic
-// construction, a cache-seed replay, a host that builds the message itself.
-// For those the type and the lane are all there is, and they are enough only
-// while they name ONE screen. Two lists of one type share their type AND their
-// lane — a filtered drill on a filtered drill, a child list on a child list —
-// so a scan that returned the topmost was guessing between them, and the guess
-// landed the deeper one's page on the newer one. When more than one screen
-// answers to the type and lane the result belongs to none of them: a page
-// nobody applies is better than a page applied to the wrong list.
-//
-// The lane must agree with what the screen IS, not merely with its type:
-// isTopLevelCanonicalList reports whether the screen is the type's canonical
-// top-level list, and provenance.CanonicalList() whether the result is a
-// canonical-list result. A canonical screen never accepts a by-ID, filtered or
-// child result sharing its type, and vice versa. provenance
-// FetchProvenanceUnknown satisfies neither side, so an unstamped lane fails
-// closed rather than matching whichever screen happens to be topmost.
+// The scan this replaced matched on resource type and lane instead. Two lists
+// of one type share both — a filtered drill on a filtered drill, a child list
+// on a child list — so it returned whichever was topmost and the deeper one's
+// page landed on the newer one. There is nothing weaker to fall back to:
+// matching by type is a guess, and a page nobody applies is better than a page
+// applied to the wrong list.
 //
 // Shared by handleResourcesLoadedEvent (the fetch-success path) and
 // clearActiveListLoadingTarget (the paired fetch-FAILURE path, via
 // ClearActiveListLoadingIntent) so a failed request is always routed to the
 // exact same screen its paired success would have landed on — one scan, so
 // the two paths cannot drift apart.
-func (c *Controller) findResourceListScreen(resourceType string, provenance messages.FetchProvenance, screenID domain.Gen) (screen *Screen, ok bool) {
-	if screenID != 0 {
-		for i := len(c.stack) - 1; i >= 0; i-- {
-			s := &c.stack[i]
-			if s.State.List != nil && s.State.List.instance == screenID {
-				return s, true
-			}
-		}
+func (c *Controller) findResourceListScreen(screenID domain.Gen) (screen *Screen, ok bool) {
+	if screenID == 0 {
 		return nil, false
 	}
-	if resourceType == "" || provenance == messages.FetchProvenanceUnknown {
-		return nil, false
-	}
-	var match *Screen
 	for i := len(c.stack) - 1; i >= 0; i-- {
 		s := &c.stack[i]
-		if s.ID != runtime.ScreenResourceList && s.ID != runtime.ScreenChildList {
-			continue
+		if s.State.List != nil && s.State.List.instance == screenID {
+			return s, true
 		}
-		if canonicalScreenType(s) != resourceType {
-			continue
-		}
-		if isTopLevelCanonicalList(s.ID, s.State.List) != provenance.CanonicalList() {
-			continue
-		}
-		if match != nil {
-			return nil, false
-		}
-		match = s
 	}
-	return match, match != nil
+	return nil, false
 }
 
 // handleResourcesLoadedEvent applies a ResourcesLoaded event to the list
@@ -354,7 +322,7 @@ func (c *Controller) findResourceListScreen(resourceType string, provenance mess
 // drops stale ResourcesLoaded via messages.IsStale before invoking this.
 func (c *Controller) handleResourcesLoadedEvent(msg messages.ResourcesLoaded) {
 	canon := msg.ResourceType
-	s, ok := c.findResourceListScreen(canon, msg.Provenance, msg.ScreenID)
+	s, ok := c.findResourceListScreen(msg.ScreenID)
 	if !ok {
 		// No screen owns this result — it arrived after its list was popped,
 		// or none was ever opened. A canonical one still speaks for the type's
@@ -437,7 +405,7 @@ func (c *Controller) handleResourcesLoadedEvent(msg messages.ResourcesLoaded) {
 // those, mirroring FetchResourcesPayload.Provenance's own zero-value grace.
 func (c *Controller) clearActiveListLoadingTarget(v runtime.ClearActiveListLoadingIntent) *ListState {
 	if v.ResourceType != "" && v.Provenance != messages.FetchProvenanceUnknown {
-		s, ok := c.findResourceListScreen(v.ResourceType, v.Provenance, v.ScreenID)
+		s, ok := c.findResourceListScreen(v.ScreenID)
 		if !ok {
 			return nil
 		}
