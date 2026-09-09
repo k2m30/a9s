@@ -63,13 +63,19 @@ type client struct {
 // client is immediately usable — no sleep or poll needed.
 func startServer(t *testing.T) (*client, func()) {
 	t.Helper()
+	return startServerWithConfig(t, config.SharedDefaultConfig())
+}
+
+// startServerWithConfig is startServer for a test whose subject is the view
+// config the server was given.
+func startServerWithConfig(t *testing.T, viewCfg *config.ViewsConfig) (*client, func()) {
+	t.Helper()
 
 	token, err := web.GenerateToken()
 	if err != nil {
 		t.Fatalf("GenerateToken: %v", err)
 	}
 
-	viewCfg := config.SharedDefaultConfig()
 	srv := web.NewServer(
 		demo.DemoProfile,
 		demo.DemoRegion,
