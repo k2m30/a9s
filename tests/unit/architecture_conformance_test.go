@@ -423,41 +423,77 @@ func uninspectedRecorderViolations(fset *token.FileSet, fileName string, file *a
 	}
 
 	// tainted names hold the set itself: a local it was assigned to, or a
-	// parameter a same-file helper received it in.
+	// parameter a helper received it in. Collected to a fixpoint, so a helper
+	// that passes the set on to a second helper is followed as far as it goes
+	// rather than one hop.
 	tainted := map[string]bool{}
-	ast.Inspect(file, func(n ast.Node) bool {
-		switch v := n.(type) {
-		case *ast.SelectorExpr:
-			if isUninspectedSet(v) {
-				reached++
-			}
-		case *ast.AssignStmt:
-			for i, rhs := range v.Rhs {
-				if !isUninspectedSet(rhs) || i >= len(v.Lhs) {
-					continue
-				}
-				if id, ok := v.Lhs[i].(*ast.Ident); ok {
-					tainted[id.Name] = true
-				}
-			}
-		case *ast.CallExpr:
-			name, ok := v.Fun.(*ast.Ident)
-			if !ok {
-				return true
-			}
-			fn, known := funcs[name.Name]
-			if !known {
-				return true
-			}
-			for i, arg := range v.Args {
-				if !isUninspectedSet(arg) {
-					continue
-				}
-				if param := paramNameAt(fn, i); param != "" {
-					tainted[param] = true
-				}
+	holdsTheSet := func(e ast.Expr) bool {
+		if isUninspectedSet(e) {
+			return true
+		}
+		id, ok := e.(*ast.Ident)
+		return ok && tainted[id.Name]
+	}
+	for grew := true; grew; {
+		grew = false
+		note := func(name string) {
+			if name != "" && !tainted[name] {
+				tainted[name] = true
+				grew = true
 			}
 		}
+		ast.Inspect(file, func(n ast.Node) bool {
+			switch v := n.(type) {
+			case *ast.AssignStmt:
+				for i, rhs := range v.Rhs {
+					if !holdsTheSet(rhs) || i >= len(v.Lhs) {
+						continue
+					}
+					if id, ok := v.Lhs[i].(*ast.Ident); ok {
+						note(id.Name)
+					}
+				}
+			case *ast.CallExpr:
+				name, ok := v.Fun.(*ast.Ident)
+				if !ok {
+					return true
+				}
+				fn, known := funcs[name.Name]
+				if !known {
+					return true
+				}
+				for i, arg := range v.Args {
+					if holdsTheSet(arg) {
+						note(paramNameAt(fn, i))
+					}
+				}
+			}
+			return true
+		})
+	}
+	ast.Inspect(file, func(n ast.Node) bool {
+		if isUninspectedSet(n) {
+			reached++
+		}
+		return true
+	})
+
+	// maps.Copy writes every key of its source into its destination, which
+	// marks rows without an element assignment anywhere.
+	ast.Inspect(file, func(n ast.Node) bool {
+		call, ok := n.(*ast.CallExpr)
+		if !ok || len(call.Args) != 2 || !holdsTheSet(call.Args[0]) {
+			return true
+		}
+		sel, ok := call.Fun.(*ast.SelectorExpr)
+		if !ok || sel.Sel.Name != "Copy" {
+			return true
+		}
+		if pkg, ok := sel.X.(*ast.Ident); !ok || pkg.Name != "maps" {
+			return true
+		}
+		violations = append(violations, fmt.Sprintf("%s:%d copies rows into %s wholesale, so every one of them is marked without passing the recorder",
+			fileName, fset.Position(call.Pos()).Line, uninspectedSetField))
 		return true
 	})
 
@@ -603,6 +639,39 @@ func enrich(result *IssueEnricherResult) {
 	set["i-1"] = ""
 }`,
 			want: 1,
+		},
+		{
+			// The two helpers name their parameter differently on purpose:
+			// the taint is keyed by name, so a shared name would carry the
+			// mark across without the hop ever being followed.
+			name: "a second hop, through a helper that hands it on",
+			src: `package aws
+func noteGone(seen map[string]string, id string) { seen[id] = "" }
+
+func pass(ids map[string]string, id string) { noteGone(ids, id) }
+
+func enrich(result *IssueEnricherResult) {
+	pass(result.TruncatedIDs, "i-1")
+}`,
+			want: 1,
+		},
+		{
+			name: "every row copied in wholesale",
+			src: `package aws
+func enrich(result *IssueEnricherResult, gone map[string]string) {
+	maps.Copy(result.TruncatedIDs, gone)
+}`,
+			want: 1,
+		},
+		{
+			name: "the set copied OUT into a merged map",
+			src: `package aws
+func merge(a, b IssueEnricherResult) map[string]string {
+	out := make(map[string]string, len(a.TruncatedIDs)+len(b.TruncatedIDs))
+	maps.Copy(out, a.TruncatedIDs)
+	maps.Copy(out, b.TruncatedIDs)
+	return out
+}`,
 		},
 	}
 

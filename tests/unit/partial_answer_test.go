@@ -510,6 +510,21 @@ func TestPartialBackup_SelectionEnumerationNeverInventsCoverage(t *testing.T) {
 		// unreadable selection list is unknown coverage, and the warning is a
 		// claim the enumeration never earned.
 		cacheEntry := partialBackupCache(t, &partialBackupFake{selectionsErr: partialAccessDenied()})
+		// The plan row itself has to carry the reason the walk stopped, not
+		// only avoid the downstream warning: the marker is what a second
+		// reader of this row learns the enumeration was cut short from, and
+		// it is the form a site that records no finding still records
+		// something in (runtime8 row 15's accepted shape for backup.go's
+		// ListBackupSelections arm).
+		plans := cacheEntry["backup"].Resources
+		if len(plans) != 1 {
+			t.Fatalf("the fetcher returned %d plan rows, want 1", len(plans))
+		}
+		if plans[0].Fields["selections_partial"] == "" {
+			t.Errorf("the plan whose selection list was denied is not marked partial (selection_tags=%q), "+
+				"so a later reader takes its empty selection list for a plan that protects nothing",
+				plans[0].Fields["selection_tags"])
+		}
 		res := w7EnrichEBS(t, []resource.Resource{volume}, cacheEntry)
 		w4AssertNoCode(t, res.Findings[w7VolumeID], awsclient.CodeEBSNotInBackupPlan)
 	})
