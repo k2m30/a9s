@@ -14,7 +14,9 @@ package unit_test
 
 import (
 	"os"
+	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -436,40 +438,128 @@ func views7SaysWhichIsActive(report, active string) bool {
 	return false
 }
 
-// TestStampedFileForAnUnknownTypeIsRetired pins row 26. The generator writes a
-// file per type it knows; when a type is renamed, the file the generator wrote
-// under the old name stays on disk and names nothing. That is the generator's
-// leftover, not the operator's mistake, and reporting it flashes an error on
-// every start of an installation that has done nothing wrong.
-//
-// The stamp is what tells them apart: a generated file carries one, a file a
-// person wrote does not.
-func TestStampedFileForAnUnknownTypeIsRetired(t *testing.T) {
-	t.Run("the generator's leftover is retired in silence", func(t *testing.T) {
-		dir := t.TempDir()
-		views7WriteViewFile(t, dir, "docdb-snap", `generated: 6
+// views7RenamedViewFiles returns every view file this repo has renamed, from
+// its own history. The migration needs one entry per rename; deriving the list
+// here rather than writing it out is what makes the next rename red instead of
+// silent.
+func views7RenamedViewFiles(t *testing.T) map[string]string {
+	t.Helper()
+	_, file, _, ok := runtime.Caller(0)
+	if !ok {
+		t.Fatal("runtime.Caller(0) failed — cannot find the repo root")
+	}
+	root := filepath.Join(filepath.Dir(file), "..", "..")
+	if _, err := os.Stat(filepath.Join(root, ".git")); err != nil {
+		t.Skipf("no .git in %s — this gate reads the repo's own rename history", root)
+	}
+	out, err := exec.CommandContext(t.Context(), "git", "-C", root, "log", "--diff-filter=R", "-M",
+		"--name-status", "--format=", "--", ".a9s/views").Output() //nolint:gosec // fixed arguments
+	if err != nil {
+		t.Fatalf("reading the rename history: %v", err)
+	}
+	renames := map[string]string{}
+	for _, line := range strings.Split(string(out), "\n") {
+		fields := strings.Fields(line)
+		if len(fields) != 3 || !strings.HasPrefix(fields[0], "R") {
+			continue
+		}
+		from := strings.TrimSuffix(filepath.Base(fields[1]), ".yaml")
+		to := strings.TrimSuffix(filepath.Base(fields[2]), ".yaml")
+		if from != to {
+			renames[from] = to
+		}
+	}
+	if len(renames) == 0 {
+		t.Fatal("the repo's history holds no view-file rename — this gate exists because it holds two")
+	}
+	return renames
+}
+
+// views7OldGeneratorFile is a view file as the generator wrote them before
+// stamping: no `generated:` line, paths and widths only. The width is what
+// identifies it after the migration has moved it.
+const views7OldGeneratorFile = `list:
+  Snapshot ID:
+    path: DBClusterSnapshotIdentifier
+    width: 77
+
+detail:
+  - DBClusterSnapshotIdentifier
+`
+
+// TestRenamedViewFilesAreMigrated pins row 26. An installation that ran an
+// April build has docdb-snap.yaml and rds-snap.yaml in its views dir: the
+// generator wrote them, then the types were renamed, and the files stayed
+// behind naming nothing. They carry no stamp — they predate stamping — so
+// nothing about the file itself says whose it is. The rename history does,
+// and it is the same shape the column migration already uses: a table of what
+// this build renamed, and a file under an old name is carried to the new one.
+func TestRenamedViewFilesAreMigrated(t *testing.T) {
+	for from, to := range views7RenamedViewFiles(t) {
+		t.Run(from+" carried to "+to, func(t *testing.T) {
+			dir := t.TempDir()
+			views7WriteViewFile(t, dir, from, views7OldGeneratorFile)
+
+			if err := config.EnsureViewsDir(dir); err != nil {
+				t.Fatalf("EnsureViewsDir: %v", err)
+			}
+			if _, statErr := os.Stat(filepath.Join(dir, from+".yaml")); statErr == nil {
+				t.Errorf("%s.yaml is still in the views dir — this build renamed that type, so the "+
+					"file it wrote under the old name is its own to carry", from)
+			}
+
+			cfg, err := config.LoadFromDirs([]string{dir})
+			if err != nil {
+				t.Errorf("the load reported %v — an installation whose only fault is having run an "+
+					"older build sees this flash on every start", err)
+			}
+			if cfg == nil {
+				t.Fatal("LoadFromDirs returned no config")
+			}
+			if view := config.GetViewDef(cfg, to); len(view.List) == 0 || view.List[0].Width != 77 {
+				t.Errorf("%s renders %d columns and does not carry the operator's width — the file was "+
+					"moved to the name in use, so what it says is what the screen shows",
+					to, len(view.List))
+			}
+		})
+
+		t.Run(from+" retired when "+to+" exists", func(t *testing.T) {
+			dir := t.TempDir()
+			views7WriteViewFile(t, dir, from, views7OldGeneratorFile)
+			views7WriteViewFile(t, dir, to, `generated: 7
 list:
   Snapshot ID:
     key: snapshot_id
-    width: 36
+    width: 33
 
 detail:
   - DBClusterSnapshotIdentifier
 `)
-		if err := config.EnsureViewsDir(dir); err != nil {
-			t.Fatalf("EnsureViewsDir: %v", err)
-		}
-		if _, statErr := os.Stat(filepath.Join(dir, "docdb-snap.yaml")); statErr == nil {
-			t.Errorf("docdb-snap.yaml is still in the views dir — a stamped file for a type this build " +
-				"does not have is the generator's own leftover from the rename, and the migration owns it")
-		}
-		if _, err := config.LoadFromDirs([]string{dir}); err != nil {
-			t.Errorf("the load reported %v — an installation whose only fault is having run an older "+
-				"build sees this flash on every start", err)
-		}
-	})
 
-	t.Run("a file a person wrote is still reported", func(t *testing.T) {
+			if err := config.EnsureViewsDir(dir); err != nil {
+				t.Fatalf("EnsureViewsDir: %v", err)
+			}
+			if _, statErr := os.Stat(filepath.Join(dir, from+".yaml")); statErr == nil {
+				t.Errorf("%s.yaml survived beside %s.yaml — the name in use has a file, so the old one "+
+					"is retired rather than carried over it", from, to)
+			}
+
+			cfg, err := config.LoadFromDirs([]string{dir})
+			if err != nil {
+				t.Errorf("the load reported %v", err)
+			}
+			if cfg == nil {
+				t.Fatal("LoadFromDirs returned no config")
+			}
+			if view := config.GetViewDef(cfg, to); len(view.List) == 0 || view.List[0].Width != 33 {
+				t.Errorf("%s carries width %v — the file already under the name in use is the one the "+
+					"operator has been editing, and the retirement must not overwrite it",
+					to, view.List)
+			}
+		})
+	}
+
+	t.Run("a name in neither the catalog nor the table is reported", func(t *testing.T) {
 		dir := t.TempDir()
 		views7WriteViewFile(t, dir, "ec22", `list:
   Instance ID:
@@ -483,13 +573,12 @@ detail:
 			t.Fatalf("EnsureViewsDir: %v", err)
 		}
 		if _, statErr := os.Stat(filepath.Join(dir, "ec22.yaml")); statErr != nil {
-			t.Errorf("ec22.yaml was retired: %v — no generator wrote it, so it is the operator's file "+
-				"and theirs to fix", statErr)
+			t.Errorf("ec22.yaml was retired: %v — this build never wrote a file under that name, so it "+
+				"is the operator's and theirs to fix", statErr)
 		}
 		_, err := config.LoadFromDirs([]string{dir})
 		if err == nil || !strings.Contains(err.Error(), "ec22.yaml") {
-			t.Errorf("the load reported %v — a file nobody generated, naming a type nothing has, is "+
-				"still the operator's typo", err)
+			t.Errorf("the load reported %v — a name this build has never had is still the operator's typo", err)
 		}
 	})
 
