@@ -245,7 +245,7 @@ One row per signal from §3:
 | `State.Name == stopping` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `stopping` |
 | `SystemStatus.Status == impaired` (or `InstanceStatus.Status == impaired`) | 2 | Broken | `!` | S1, S2, S3, S4, S5 | `impaired: system checks failing` |
 | `SystemStatus.Status == initializing` | 2 | Warning | `~` | S2, S3, S4, S5 | `initializing: checks in progress` |
-| `SystemStatus.Status == insufficient-data` | 2 | Warning | `~` | S2, S3, S4, S5 | `status unknown: AWS insufficient-data` |
+| `SystemStatus.Status == insufficient-data` | 2 | Warning | `~` | S2, S3, S4, S5 | `status unknown: checks not reporting` |
 | `Events[]` scheduled retirement/reboot within 7 days | 2 | Warning | `~` | S2, S3, S4, S5 | `scheduled event` |
 | public address behind a security group open on a sensitive port (`sg` cache cross-ref) | 2 | Broken | `!` | S1, S2, S3, S4, S5 | `<port(s) LIST> reachable from the internet` |
 | public address behind a security group admitting every protocol from `0.0.0.0/0` (`sg` cache cross-ref, `wide_open`) | 2 | Broken | `!` | S1, S2, S3, S4, S5 | `every port reachable from the internet` |
@@ -260,7 +260,7 @@ Notes on list-text construction:
 
 ## 4.1 UX review (two sentences)
 
-At 3am, glancing at the list, can the operator tell what's wrong with a problem row without opening detail? Yes for every row above — the Status column always carries either a human cause (`impaired: system checks failing`, `scheduled event`, `status unknown: AWS insufficient-data`) or the state keyword itself (`stopped`, `pending`, `terminated`). The only residual concern is the `stopping` transitional case, which is inherently short-lived and does not need a cause beyond the verb.
+At 3am, glancing at the list, can the operator tell what's wrong with a problem row without opening detail? Yes for every row above — the Status column always carries either a human cause (`impaired: system checks failing`, `scheduled event`, `status unknown: checks not reporting`) or the state keyword itself (`stopped`, `pending`, `terminated`). The only residual concern is the `stopping` transitional case, which is inherently short-lived and does not need a cause beyond the verb.
 
 ## 4.2 On-Demand Detail Enrichment
 
@@ -328,7 +328,7 @@ ec2 — COMPUTE. Status key: `state` — the key the status cell reads, and the 
 | ec2.state.terminated | terminated | dim | wave1 | — |
 | ec2.instance-status-impaired | impaired: system checks failing | broken | wave2 | AWS's own checks of the host or the instance are failing, which means the problem is below your software: the hypervisor, the network path, or the instance's ability to boot. Stop and start the instance so it moves to different hardware, and read the system log first if you need the cause on record. |
 | ec2.instance-status.initializing | initializing: checks in progress | warn | wave2 | The instance is up but its checks have not passed yet, so a load balancer will not send it traffic and an alarm on it has nothing to judge. Give it a few minutes; a check still initializing well past boot usually means the instance is not finishing its startup. |
-| ec2.instance-status.insufficient-data | status unknown: AWS insufficient-data | warn | wave2 | AWS cannot reach the instance to check it, so its health is unknown rather than good, and a monitor reading this as healthy is reading nothing. Wait for the next check, and treat a run of these as a possible host problem worth a stop and start. |
+| ec2.instance-status.insufficient-data | status unknown: checks not reporting | warn | wave2 | AWS cannot reach the instance to check it, so its health is unknown rather than good, and a monitor reading this as healthy is reading nothing. Wait for the next check, and treat a run of these as a possible host problem worth a stop and start. |
 | ec2.scheduled-event | scheduled event | warn | wave2 | AWS has scheduled work on this instance and will carry it out at the stated deadline whether or not anyone is ready. Read the event's type and window and take the action that matches it: a reboot or maintenance event can often be rescheduled, and a retirement wants a stop and start so the instance moves to healthy hardware. Stop and start only an instance backed by EBS, and copy anything on its instance-store volumes off first, because stopping discards them. |
 | ec2.imdsv1-allowed | IMDSv1 allowed | warn | wave1 | Instance metadata answers requests without a session token, so an SSRF bug on this host can read the attached IAM role's credentials. Require session tokens for instance metadata. |
 | ec2.public-ip | public address | warn | wave1 | The instance holds a routable public address, so every port its security groups leave open is reachable from the internet. Put it behind a NAT gateway or load balancer unless it must be addressed directly. |

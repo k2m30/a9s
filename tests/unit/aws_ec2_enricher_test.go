@@ -287,7 +287,7 @@ func TestEnrichEC2InstanceStatus_SystemStatusInitializingIsWarningNotImpaired(t 
 // docs/resources/ec2.md §4 row (line 227):
 //
 //	| `SystemStatus.Status == insufficient-data` | 2 | Warning | `~` | S3, S4,
-//	S5 | `status unknown: AWS insufficient-data` | `AWS cannot determine status
+//	S5 | `status unknown: checks not reporting` | `AWS cannot determine status
 //	— insufficient data from the hypervisor.` |
 //
 // Current code stamps Tier:"!" / severity="!" for this status too, which is
@@ -322,9 +322,9 @@ func TestEnrichEC2InstanceStatus_InstanceStatusInsufficientDataIsWarningNotImpai
 		t.Errorf("severity = %v, want %v (ec2.md line 227: insufficient-data -> Warning, not Broken)", f.Severity, domain.SevWarn)
 	}
 	if strings.Contains(f.Phrase, "impaired") {
-		t.Errorf("Phrase = %q must NOT contain %q — ec2.md line 227 mandates the phrase %q for insufficient-data status", f.Phrase, "impaired", "status unknown: AWS insufficient-data")
+		t.Errorf("Phrase = %q must NOT contain %q — ec2.md line 227 mandates the phrase %q for insufficient-data status", f.Phrase, "impaired", "status unknown: checks not reporting")
 	}
-	wantPhrase := "status unknown: AWS insufficient-data"
+	wantPhrase := "status unknown: checks not reporting"
 	if f.Phrase != wantPhrase {
 		t.Errorf("Phrase = %q, want %q (ec2.md line 227 List text (S4) column)", f.Phrase, wantPhrase)
 	}
