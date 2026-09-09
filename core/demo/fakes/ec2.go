@@ -71,8 +71,29 @@ func (f *EC2Fake) DescribeSecurityGroups(_ context.Context, _ *ec2.DescribeSecur
 	return &ec2.DescribeSecurityGroupsOutput{SecurityGroups: f.fix.SecurityGroups}, nil
 }
 
-func (f *EC2Fake) DescribeSubnets(_ context.Context, _ *ec2.DescribeSubnetsInput, _ ...func(*ec2.Options)) (*ec2.DescribeSubnetsOutput, error) {
-	return &ec2.DescribeSubnetsOutput{Subnets: f.fix.Subnets}, nil
+// DescribeSubnets honours the vpc-id filter the way AWS does. Answering with
+// every subnet regardless would hand each VPC the whole account's subnet ids,
+// and a check that reads them — the flow-log scope, for one — would then see
+// another VPC's coverage as its own.
+func (f *EC2Fake) DescribeSubnets(_ context.Context, input *ec2.DescribeSubnetsInput, _ ...func(*ec2.Options)) (*ec2.DescribeSubnetsOutput, error) {
+	var wanted map[string]bool
+	if input != nil {
+		for _, filter := range input.Filters {
+			if filter.Name != nil && *filter.Name == "vpc-id" {
+				wanted = toSet(filter.Values)
+			}
+		}
+	}
+	if len(wanted) == 0 {
+		return &ec2.DescribeSubnetsOutput{Subnets: f.fix.Subnets}, nil
+	}
+	var out []ec2types.Subnet
+	for _, sn := range f.fix.Subnets {
+		if sn.VpcId != nil && wanted[*sn.VpcId] {
+			out = append(out, sn)
+		}
+	}
+	return &ec2.DescribeSubnetsOutput{Subnets: out}, nil
 }
 
 func (f *EC2Fake) DescribeRouteTables(_ context.Context, _ *ec2.DescribeRouteTablesInput, _ ...func(*ec2.Options)) (*ec2.DescribeRouteTablesOutput, error) {

@@ -66,6 +66,11 @@ const (
 	// ECSTaskEnvSecret runs order-worker:3, the only definition with a
 	// plaintext credential in a container environment.
 	ECSTaskEnvSecret = "0a1b2c3d4e5f60010001000100010005"
+
+	// ECSTaskSpotReclaimed is the task Spot interrupted. It must carry NO
+	// stop-code finding: capacity being reclaimed after its warning is the
+	// platform working, not the task failing.
+	ECSTaskSpotReclaimed = "0a1b2c3d4e5f60010001000100010006"
 )
 
 // Superseded revisions the witness tasks above still run.
@@ -566,6 +571,25 @@ func buildECSTasks() []ecstypes.Task {
 			StoppedReason:     aws.String("Service draining"),
 			StopCode:          ecstypes.TaskStopCodeServiceSchedulerInitiated,
 			AvailabilityZone:  aws.String("us-east-1b"),
+		},
+		// ECSTaskSpotReclaimed: Spot took the capacity back after its two
+		// minutes' warning. Like the scheduler stop above, the platform did
+		// what it says it does, so the row greys out rather than going red.
+		{
+			TaskArn:           aws.String("arn:aws:ecs:us-east-1:123456789012:task/acme-batch/" + ECSTaskSpotReclaimed),
+			ClusterArn:        aws.String(ecsClusterArnBatch),
+			LastStatus:        aws.String("STOPPED"),
+			DesiredStatus:     aws.String("STOPPED"),
+			TaskDefinitionArn: aws.String("arn:aws:ecs:us-east-1:123456789012:task-definition/log-aggregator:7"),
+			LaunchType:        ecstypes.LaunchTypeEc2,
+			Cpu:               aws.String("512"),
+			Memory:            aws.String("1024"),
+			Group:             aws.String("service:log-aggregator"),
+			StartedAt:         aws.Time(mustTime("2026-03-19T06:00:00Z")),
+			StoppedAt:         aws.Time(mustTime("2026-03-19T11:15:00Z")),
+			StoppedReason:     aws.String("Your Spot Task was interrupted"),
+			StopCode:          ecstypes.TaskStopCodeSpotInterruption,
+			AvailabilityZone:  aws.String("us-east-1c"),
 		},
 		// Issue: lastStatus=STOPPED, StopCode=TaskFailedToStart → Broken
 		{
@@ -1113,5 +1137,5 @@ func init() {
 	// acme-svc-stalled is the witness for a service that wants tasks and runs
 	// none; it carries one of the 26 rows and one of the 7 Broken badges.
 	Register(Pin{ShortName: "ecs-svc", Rows: 26, Issues: 7, CoverageGaps: []string{"dim"}})
-	Register(Pin{ShortName: "ecs-task", Rows: 17, Issues: 9})
+	Register(Pin{ShortName: "ecs-task", Rows: 18, Issues: 8})
 }

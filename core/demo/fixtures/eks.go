@@ -291,6 +291,29 @@ func buildEKSClusters() []*ekstypes.Cluster {
 				"Environment": "prod",
 			},
 		},
+		// EKSDefaultSecretsEncryption: a current cluster with no encryption
+		// configuration at all. From 1.28 AWS envelope-encrypts Kubernetes
+		// secrets with an AWS-owned key on every cluster, so this one is
+		// encrypted and must carry no secrets finding — the 1.27 cluster
+		// above, with the same empty configuration, is the row that does.
+		{
+			Name:    aws.String(EKSDefaultSecretsEncryption),
+			Arn:     aws.String("arn:aws:eks:us-east-1:123456789012:cluster/" + EKSDefaultSecretsEncryption),
+			Version: aws.String("1.30"),
+			Status:  ekstypes.ClusterStatusActive,
+			RoleArn: aws.String(eksClusterRoleARN),
+			ResourcesVpcConfig: &ekstypes.VpcConfigResponse{
+				VpcId:                 aws.String(eksVPCID),
+				SubnetIds:             []string{eksSubnetA, eksSubnetB},
+				EndpointPrivateAccess: true,
+			},
+			Logging:         eksFullControlPlaneLogging(),
+			PlatformVersion: aws.String("eks.9"),
+			CreatedAt:       aws.Time(mustTime("2026-05-04T09:00:00Z")),
+			Tags: map[string]string{
+				"Environment": "prod",
+			},
+		},
 	}
 }
 
@@ -572,6 +595,9 @@ const (
 	// EKSSecretsNoKMS — no encryption configuration covers secrets, on the
 	// one cluster old enough for that to mean the secrets are unencrypted.
 	EKSSecretsNoKMS = "acme-degraded-prod"
+	// EKSDefaultSecretsEncryption — no encryption configuration on a version
+	// that envelope-encrypts secrets by itself, so nothing is missing.
+	EKSDefaultSecretsEncryption = "acme-modern-defaults"
 	// EKSVersionUnsupported — Kubernetes minor past standard support. The
 	// 1.27 cluster, which is the same row as EKSSecretsNoKMS: no other minor
 	// in the demo registry is out of support, and a cluster old enough to
@@ -615,6 +641,6 @@ var EKSVersionSupport = map[string]ekstypes.VersionStatus{ //nolint:gochecknoglo
 var EKSEndOfStandardSupport = time.Date(2025, 11, 26, 0, 0, 0, 0, time.UTC) //nolint:gochecknoglobals // static demo data
 
 func init() {
-	Register(Pin{ShortName: "eks", Rows: 11, Issues: 9, CoverageGaps: []string{"dim"}})
+	Register(Pin{ShortName: "eks", Rows: 12, Issues: 9, CoverageGaps: []string{"dim"}})
 	Register(Pin{ShortName: "ng", Rows: 11, Issues: 9, CoverageGaps: []string{"dim"}})
 }

@@ -54,23 +54,32 @@ type EC2Fixtures struct {
 
 // shared constants (mirrors core/demo/constants_shared.go — no import allowed)
 const (
-	fixtProdVPCID              = "vpc-0abc123def456789a"
-	fixtStagingVPCID           = "vpc-0def456789abc123d"
-	fixtProdPublicSubnetA      = "subnet-0aaa111111111111a"
-	fixtProdPublicSubnetB      = "subnet-0bbb222222222222b"
-	fixtProdPrivateSubnetA     = "subnet-0ccc333333333333c"
-	fixtProdPrivateSubnetB     = "subnet-0ddd444444444444d"
-	fixtStagingSubnetA         = "subnet-0eee555555555555e"
-	fixtStagingSubnetB         = "subnet-0fff666666666666f"
-	fixtProdWebALBSGID         = "sg-0aaa111111111111a"
-	fixtProdAPIInternalSGID    = "sg-0bbb222222222222b"
-	fixtProdRDSSGID            = "sg-0ccc333333333333c"
-	fixtProdDBProxySGID        = "sg-0ddd444444444444d"
-	fixtStagingDefaultSGID     = "sg-0fff888888888888f"
-	fixtProdAMIID1             = "ami-0a1b2c3d4e5f60001"
-	fixtProdAMIID2             = "ami-0a1b2c3d4e5f60002"
-	fixtProdAMIID3             = "ami-0a1b2c3d4e5f60003"
-	fixtProdInstanceProfileARN = "arn:aws:iam::123456789012:instance-profile/acme-ec2-instance-profile"
+	fixtProdVPCID    = "vpc-0abc123def456789a"
+	fixtStagingVPCID = "vpc-0def456789abc123d"
+	// VPCSubnetScopedFlowLog is the VPC whose only flow log is attached to a
+	// subnet rather than to the VPC itself. A subnet-scoped log writes the
+	// same records, so this VPC must carry NO missing-flow-log finding; the
+	// prod and default VPCs, which have no log at any scope, are the rows
+	// that do.
+	VPCSubnetScopedFlowLog = "vpc-0f10a1b2c3d4e5f60"
+	// vpcSubnetScopedFlowLogSubnet is that VPC's one subnet, and the resource
+	// the flow log names.
+	vpcSubnetScopedFlowLogSubnet = "subnet-0f10a1b2c3d4e5f60"
+	fixtProdPublicSubnetA        = "subnet-0aaa111111111111a"
+	fixtProdPublicSubnetB        = "subnet-0bbb222222222222b"
+	fixtProdPrivateSubnetA       = "subnet-0ccc333333333333c"
+	fixtProdPrivateSubnetB       = "subnet-0ddd444444444444d"
+	fixtStagingSubnetA           = "subnet-0eee555555555555e"
+	fixtStagingSubnetB           = "subnet-0fff666666666666f"
+	fixtProdWebALBSGID           = "sg-0aaa111111111111a"
+	fixtProdAPIInternalSGID      = "sg-0bbb222222222222b"
+	fixtProdRDSSGID              = "sg-0ccc333333333333c"
+	fixtProdDBProxySGID          = "sg-0ddd444444444444d"
+	fixtStagingDefaultSGID       = "sg-0fff888888888888f"
+	fixtProdAMIID1               = "ami-0a1b2c3d4e5f60001"
+	fixtProdAMIID2               = "ami-0a1b2c3d4e5f60002"
+	fixtProdAMIID3               = "ami-0a1b2c3d4e5f60003"
+	fixtProdInstanceProfileARN   = "arn:aws:iam::123456789012:instance-profile/acme-ec2-instance-profile"
 	// fixtProdEKSClusterName / fixtRelatedEC2NGNodeGroupID must match the real
 	// EKS cluster ("acme-prod") and nodegroup ("general-pool") fixture names in
 	// eks.go so ec2→ng (checkEC2NodeGroups) and ct-events→ec2 tag-based
@@ -231,6 +240,18 @@ export DB_PASSWORD=hunter2hunter2
 				DeliverLogsStatus:  aws.String("SUCCESS"),
 				TrafficType:        ec2types.TrafficTypeAll,
 				CreationTime:       aws.Time(time.Date(2025, 6, 15, 12, 10, 0, 0, time.UTC)),
+			},
+		},
+		vpcSubnetScopedFlowLogSubnet: {
+			{
+				FlowLogId:          aws.String("fl-0ccc333333333333c"),
+				ResourceId:         aws.String(vpcSubnetScopedFlowLogSubnet),
+				LogDestinationType: ec2types.LogDestinationTypeS3,
+				LogDestination:     aws.String("arn:aws:s3:::" + LogsBucketName + "/flowlogs/"),
+				DeliverLogsStatus:  aws.String("SUCCESS"),
+				FlowLogStatus:      aws.String("ACTIVE"),
+				TrafficType:        ec2types.TrafficTypeAll,
+				CreationTime:       aws.Time(time.Date(2026, 4, 2, 8, 0, 0, 0, time.UTC)),
 			},
 		},
 		fixtStagingVPCID: {
@@ -878,6 +899,21 @@ func buildVpcs() []ec2types.Vpc {
 			Tags: []ec2types.Tag{
 				{Key: aws.String("Name"), Value: aws.String("acme-staging")},
 				{Key: aws.String("Environment"), Value: aws.String("staging")},
+			},
+		},
+		// VPCSubnetScopedFlowLog: covered by a flow log on its subnet, which
+		// is how a team that logs one workload's traffic sets it up.
+		{
+			VpcId:           aws.String(VPCSubnetScopedFlowLog),
+			CidrBlock:       aws.String("10.30.0.0/16"),
+			State:           ec2types.VpcStateAvailable,
+			IsDefault:       aws.Bool(false),
+			InstanceTenancy: ec2types.TenancyDefault,
+			DhcpOptionsId:   aws.String("dopt-0f10a1b2c3d4e5f60"),
+			OwnerId:         aws.String("123456789012"),
+			Tags: []ec2types.Tag{
+				{Key: aws.String("Name"), Value: aws.String("acme-analytics")},
+				{Key: aws.String("Environment"), Value: aws.String("prod")},
 			},
 		},
 		{
@@ -1552,6 +1588,25 @@ func buildSecurityGroups() []ec2types.SecurityGroup {
 
 func buildSubnets() []ec2types.Subnet {
 	named := []ec2types.Subnet{
+		// The one subnet of VPCSubnetScopedFlowLog, and the resource its flow
+		// log is attached to.
+		{
+			SubnetId:                aws.String(vpcSubnetScopedFlowLogSubnet),
+			VpcId:                   aws.String(VPCSubnetScopedFlowLog),
+			CidrBlock:               aws.String("10.30.1.0/24"),
+			AvailabilityZone:        aws.String("us-east-1a"),
+			AvailabilityZoneId:      aws.String("use1-az1"),
+			State:                   ec2types.SubnetStateAvailable,
+			AvailableIpAddressCount: aws.Int32(250),
+			MapPublicIpOnLaunch:     aws.Bool(false),
+			DefaultForAz:            aws.Bool(false),
+			SubnetArn:               aws.String("arn:aws:ec2:us-east-1:123456789012:subnet/" + vpcSubnetScopedFlowLogSubnet),
+			OwnerId:                 aws.String("123456789012"),
+			Tags: []ec2types.Tag{
+				{Key: aws.String("Name"), Value: aws.String("analytics-private-1a")},
+				{Key: aws.String("Environment"), Value: aws.String("prod")},
+			},
+		},
 		{
 			SubnetId:                aws.String(fixtProdPublicSubnetA),
 			VpcId:                   aws.String(fixtProdVPCID),
@@ -3621,8 +3676,8 @@ func init() {
 	Register(Pin{ShortName: "nat", Rows: 6, Issues: 3})
 	Register(Pin{ShortName: "rtb", Rows: 6, Issues: 3, CoverageGaps: []string{"dim"}})
 	Register(Pin{ShortName: "sg", Rows: 42, Issues: 6, CoverageGaps: []string{"dim"}})
-	Register(Pin{ShortName: "subnet", Rows: 37, Issues: 5, CoverageGaps: []string{"dim"}})
+	Register(Pin{ShortName: "subnet", Rows: 38, Issues: 5, CoverageGaps: []string{"dim"}})
 	Register(Pin{ShortName: "tgw", Rows: 8, Issues: 5})
-	Register(Pin{ShortName: "vpc", Rows: 7, Issues: 1, CoverageGaps: []string{"broken", "dim"}})
+	Register(Pin{ShortName: "vpc", Rows: 8, Issues: 1, CoverageGaps: []string{"broken", "dim"}})
 	Register(Pin{ShortName: "vpce", Rows: 12, Issues: 8})
 }

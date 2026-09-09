@@ -73,3 +73,13 @@
   - A CloudFront distribution in front of an S3 static-website endpoint is no
     longer told to talk to that origin over HTTPS. The endpoint only serves
     HTTP, so there is nothing to change.
+
+- The detail row under a CloudFront distribution reaching its origin without
+  TLS is labelled in words. It read `OriginProtocolPolicy`, which is the name
+  of the API field rather than anything an operator says.
+
+- Demo mode now shows the corrected checks working. It carries a queue using
+  the encryption SQS manages, a cluster on a version that encrypts secrets by
+  itself, a VPC covered by a flow log on its subnet, a distribution in front of
+  an S3 website endpoint, and a task Spot reclaimed, none of which is flagged,
+  beside the rows that still are.

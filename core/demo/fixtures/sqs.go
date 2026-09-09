@@ -17,6 +17,14 @@ const SQSPublicPolicy = "sqs-public-policy"
 // GetQueueAttributes wants it; the row itself is keyed by queue name.
 const sqsPublicPolicyQueueURL = "https://sqs.us-east-1.amazonaws.com/123456789012/" + SQSPublicPolicy
 
+// SQSManagedSSE names the queue encrypted with the encryption SQS manages
+// itself: SqsManagedSseEnabled is true and there is no customer key, which is
+// what a queue created in the console looks like. It must carry NO encryption
+// finding — an empty KmsMasterKeyId there means no customer key, not no
+// encryption. Every other queue either names a key or has neither, and the
+// ones with neither are the finding's failing rows.
+const SQSManagedSSE = "sqs-managed-sse"
+
 // SQSFixtures holds typed fixture data for SQS.
 type SQSFixtures struct {
 	// Queues maps queue URL to its attributes row.
@@ -90,6 +98,21 @@ var sharedSQSFixtures = sync.OnceValue(func() *SQSFixtures {
 					"Policy":                                `{"Version":"2012-10-17","Statement":[{"Sid":"AllowEveryone","Effect":"Allow","Principal":"*","Action":["sqs:ReceiveMessage","sqs:SendMessage"],"Resource":"arn:aws:sqs:us-east-1:123456789012:` + SQSPublicPolicy + `"}]}`,
 				},
 			},
+			// SQSManagedSSE: encrypted by SQS with an AWS-owned key. A
+			// redrive policy keeps it off the missing-DLQ row, so the only
+			// thing this queue demonstrates is that managed encryption is
+			// encryption.
+			{
+				QueueURL:  "https://sqs.us-east-1.amazonaws.com/123456789012/" + SQSManagedSSE,
+				QueueName: SQSManagedSSE,
+				Attributes: map[string]string{
+					"ApproximateNumberOfMessages":           "11",
+					"ApproximateNumberOfMessagesNotVisible": "0",
+					"QueueArn":                              "arn:aws:sqs:us-east-1:123456789012:" + SQSManagedSSE,
+					"RedrivePolicy":                         `{"deadLetterTargetArn":"arn:aws:sqs:us-east-1:123456789012:data-pipeline-dlq","maxReceiveCount":5}`,
+					"SqsManagedSseEnabled":                  "true",
+				},
+			},
 			// S3 healthy-bucket dead-letter queue (checkS3SQS pivot).
 			{
 				QueueURL:  "https://sqs.us-east-1.amazonaws.com/123456789012/" + S3DLQueueName,
@@ -110,5 +133,5 @@ func NewSQSFixtures() *SQSFixtures {
 }
 
 func init() {
-	Register(Pin{ShortName: "sqs", Rows: 6, Issues: 0, CoverageGaps: []string{"dim"}})
+	Register(Pin{ShortName: "sqs", Rows: 7, Issues: 0, CoverageGaps: []string{"dim"}})
 }

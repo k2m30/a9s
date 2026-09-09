@@ -247,7 +247,7 @@ func EnrichCloudFrontDistribution(ctx context.Context, clients *ServiceClients, 
 						Tier:  "~",
 					})
 					rows = append(rows, domain.DetailRow{
-						Label: "OriginProtocolPolicy",
+						Label: "Connection to origin",
 						Value: "http-only",
 						Tier:  "~",
 					})

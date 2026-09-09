@@ -366,6 +366,19 @@ const (
 
 	// CFNoGeoRestriction is the distribution with no geographic restriction.
 	CFNoGeoRestriction = "E6F7G8H9I0J1K2"
+
+	// CFS3WebsiteOrigin is the distribution reaching an S3 static-website
+	// endpoint over http-only. It must carry NO insecure-protocol finding:
+	// that endpoint serves HTTP alone, so http-only is the only policy it
+	// accepts and there is nothing for an operator to change. It is the
+	// no-origin-access-control row as well, because a website endpoint is
+	// exactly the origin that cannot have one.
+	CFS3WebsiteOrigin = CFS3OriginNoOAC
+
+	// CFS3WebsiteOriginDomain is that origin's domain: the regional website
+	// endpoint of the same bucket, which is a different hostname from the
+	// REST endpoint the other S3 origins use.
+	CFS3WebsiteOriginDomain = "a9s-demo-nopab.s3-website-us-east-1.amazonaws.com"
 )
 
 // cfHealthyConfig is the baseline every demo distribution config starts from:
@@ -430,6 +443,18 @@ func cfDistributionConfigs() map[string]*cftypes.DistributionConfig {
 		CFCrossAccountOrigin:  cfHealthyConfig("s3-partner-shared", CFCrossAccountOriginDomain, "partner.acme-corp.com"),
 	}
 
+	// CFLoggingOff reaches an ordinary custom origin over http-only as well
+	// as allowing plain HTTP from viewers, so the origin arm of the
+	// insecure-protocol check has a demo row that legitimately trips it. That
+	// origin can serve TLS, which is what separates it from the website
+	// endpoint above.
+	cfgs[CFLoggingOff].Origins.Items[0].OriginAccessControlId = nil
+	cfgs[CFLoggingOff].Origins.Items[0].CustomOriginConfig = &cftypes.CustomOriginConfig{
+		HTTPPort:             aws.Int32(80),
+		HTTPSPort:            aws.Int32(443),
+		OriginProtocolPolicy: cftypes.OriginProtocolPolicyHttpOnly,
+	}
+
 	cfgs[CFDeprecatedTLS].ViewerCertificate.MinimumProtocolVersion = cftypes.MinimumProtocolVersionTLSv12016
 	cfgs[CFNoRootObject].DefaultRootObject = aws.String("")
 	cfgs[CFLoggingOff].Logging = nil
@@ -440,6 +465,16 @@ func cfDistributionConfigs() map[string]*cftypes.DistributionConfig {
 	// conditions are independent and this row demonstrates both.
 	cfgs[CFS3OriginNoOAC].Origins.Items[0].OriginAccessControlId = aws.String("")
 	cfgs[CFS3OriginNoOAC].Origins.Items[0].S3OriginConfig = &cftypes.S3OriginConfig{OriginAccessIdentity: aws.String("")}
+	// It reaches that bucket through the S3 website endpoint, which serves
+	// HTTP alone, so http-only is the only origin protocol policy CloudFront
+	// accepts for it and the insecure-protocol finding must not fire. The
+	// ordinary custom origin on CFLoggingOff is the row that trips it.
+	cfgs[CFS3OriginNoOAC].Origins.Items[0].DomainName = aws.String(CFS3WebsiteOriginDomain)
+	cfgs[CFS3OriginNoOAC].Origins.Items[0].CustomOriginConfig = &cftypes.CustomOriginConfig{
+		HTTPPort:             aws.Int32(80),
+		HTTPSPort:            aws.Int32(443),
+		OriginProtocolPolicy: cftypes.OriginProtocolPolicyHttpOnly,
+	}
 	cfgs[CFS3OriginNoOAC].ViewerCertificate = &cftypes.ViewerCertificate{CloudFrontDefaultCertificate: aws.Bool(true)}
 
 	// Lambda@Edge association on the healthy distribution, for checkCfLambda.
