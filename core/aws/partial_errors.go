@@ -336,10 +336,8 @@ func AggregateFailures(opName string, failures []Failure, total int) error {
 }
 
 // JoinAggregates returns the composite of an outer pass's aggregate and an
-// inner pass's own. The inner error already names the call that failed and
-// how many items it failed for, so folding it into the outer list as one more
-// failure would relabel it with the outer operation and its count. Either may
-// be nil; both classes stay reachable through errors.As.
+// inner pass's own. Each keeps its own operation and count in the text, and
+// both classes stay reachable through errors.As. Either may be nil.
 func JoinAggregates(outer, inner error) error {
 	switch {
 	case inner == nil:

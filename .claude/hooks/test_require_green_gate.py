@@ -208,9 +208,9 @@ class GreenGateHookTest(unittest.TestCase):
             os.utime(self.gate, (when, when))
 
     def test_round_end_with_uncommitted_worktree_blocks(self):
-        """Two rounds were reported done with every test file uncommitted
-        (w27 and w5, 2026-09-06): the next agent's `from:` named a tree that
-        did not hold the work. A round ends with its commit."""
+        """A round reported done with its files uncommitted hands the next
+        agent a `from:` that names a tree without the work. A round ends
+        with its commit."""
         repo = scratch_repo()
         self.addCleanup(shutil.rmtree, repo, True)
         with open(os.path.join(repo, "stray_test.go"), "w") as fh:
@@ -245,17 +245,16 @@ class GreenGateHookTest(unittest.TestCase):
         self.assertEqual(0, code, reason)
 
     def test_done_without_deferred_line_passes(self):
-        """The deferred line is optional. Inverted on 2026-09-09: requiring it
-        made every role manufacture items each round and the orchestrator
-        promote them into spec rows; a task dispatched with four rows reached
-        round seven that way. Do not restore the requirement."""
+        """The deferred line is optional: a mandatory one makes every role
+        manufacture items each round and the orchestrator promote them into
+        spec rows."""
         self.write_gate(GREEN_GATE)
         code, reason = run_hook(payload(DONE_NO_DEFERRED, self.taskdir))
         self.assertEqual(0, code, reason)
 
     def test_qa_round_end_with_uncommitted_worktree_blocks(self):
-        """QA's round is its commit too: an uncommitted QA tree was inherited by
-        a dev round on 2026-09-09 and the two edited it at once."""
+        """QA's round is its commit too: an uncommitted QA tree is inherited by
+        the next dev round, and the two then edit it at once."""
         repo = scratch_repo()
         self.addCleanup(shutil.rmtree, repo, True)
         with open(os.path.join(repo, "stray_test.go"), "w") as fh:
@@ -275,8 +274,8 @@ class GreenGateHookTest(unittest.TestCase):
         self.assertEqual(0, code, reason)
 
     def test_dev_round4_without_ruling_blocks(self):
-        """A task past round 3 is the facilitator's before it goes on; two tasks
-        ran to rounds five and seven on 2026-09-09 with nobody counting."""
+        """A task past round 3 is the facilitator's before it goes on; the
+        orchestrator is the only party that counts rounds, so the hook does."""
         self.write_gate(GREEN_GATE)
         with open(os.path.join(self.taskdir, "log.md"), "w") as fh:
             fh.write("## a9s-dev · round 3 · DONE\n- deferred: none\n")
