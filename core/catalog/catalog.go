@@ -4,6 +4,7 @@ package catalog
 
 import (
 	"fmt"
+	"maps"
 	"strings"
 	"sync/atomic"
 )
@@ -170,9 +171,7 @@ func swapChildren(edit func(map[string]ResourceTypeDef)) {
 		next := map[string]ResourceTypeDef{}
 		if current != nil {
 			next = make(map[string]ResourceTypeDef, len(*current)+1)
-			for k, v := range *current {
-				next[k] = v
-			}
+			maps.Copy(next, *current)
 		}
 		edit(next)
 		if childRegistry.CompareAndSwap(current, &next) {
