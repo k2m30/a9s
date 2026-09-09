@@ -182,3 +182,30 @@ func TestFetchIdentity_APageNamingNoScreenReachesNeitherOfTwo(t *testing.T) {
 			"fallback guessed, and the guess is the screen that happened to be on top", got)
 	}
 }
+
+// TestFetchIdentity_APageNamingNoScreenReachesTheOnlyListEither is row 17's
+// gate. The by-type scan was narrowed to fire only when one screen answers to
+// the result's type and lane, which reads as safe and is not: no production
+// dispatch leaves the identity off, so the only messages that reach it are the
+// ones tests build by hand. A production path that routes a page by its type
+// is a path kept alive for the test suite, and it is the path that put the
+// deeper drill's page on the newer one.
+//
+// One canonical list, one page naming no screen: the page belongs to no
+// screen, and the list keeps what it had.
+func TestFetchIdentity_APageNamingNoScreenReachesTheOnlyListEither(t *testing.T) {
+	c := newTestController(t)
+	c.Apply(app.Action{Kind: app.ActionCommand, Arg: "ec2"})
+	c.ApplyResourcesLoaded("ec2", []resource.Resource{guardRow("i-0aaa111111111111a", "opened")}, nil, false)
+
+	c.Handle(messages.ResourcesLoaded{
+		ResourceType: "ec2",
+		Resources:    []resource.Resource{guardRow("i-0eee555555555555e", "unrouted")},
+		Provenance:   messages.FetchProvenanceCanonicalList,
+	})
+
+	if got := guardListNames(t, c); len(got) != 1 || got[0] != "i-0aaa111111111111a" {
+		t.Errorf("the ec2 list renders %v after a page that names no screen arrived, want just the row it "+
+			"already had — the by-type scan is still routing pages nothing dispatched", got)
+	}
+}
