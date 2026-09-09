@@ -162,12 +162,9 @@ func EnrichECSTasks(ctx context.Context, clients *ServiceClients, resources []re
 		}
 	}
 
-	if err := ecsTaskDefinitionPosture(ctx, clients, &result, taskDefByTaskID); err != nil {
-		failures = append(failures, FailedCall("", err))
-	}
-
-	SetTruncated(&result, truncated)
-	err := Finish(&result, failures, total, op)
+	postureErr := ecsTaskDefinitionPosture(ctx, clients, &result, taskDefByTaskID)
+	SetTruncated(&result, truncated || postureErr != nil)
+	err := JoinAggregates(Finish(&result, failures, total, op), postureErr)
 	return result, err
 }
 

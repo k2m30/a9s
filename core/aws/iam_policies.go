@@ -237,7 +237,6 @@ func FetchIAMPoliciesByIDsFull(ctx context.Context, api IAMAPI, ids []string, st
 			// transient throttle. Surface as aggregate failure with the partial
 			// results we did recover.
 			var failures []Failure
-			failures = append(failures, FailedCall("", inlineErr))
 			resources := make([]resource.Resource, 0, len(ids))
 			seen := make(map[string]struct{}, len(ids))
 			for _, id := range ids {
@@ -254,7 +253,7 @@ func FetchIAMPoliciesByIDsFull(ctx context.Context, api IAMAPI, ids []string, st
 					failures = append(failures, UnusableAnswer(id, "not found"))
 				}
 			}
-			return resources, AggregateFailures("policy FetchByIDs", failures, len(ids))
+			return resources, JoinAggregates(AggregateFailures("policy FetchByIDs", failures, len(ids)), inlineErr)
 		}
 		store.MarkInlineBuilt()
 	}

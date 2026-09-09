@@ -335,6 +335,21 @@ func AggregateFailures(opName string, failures []Failure, total int) error {
 	return classErr{error: err, class: class}
 }
 
+// JoinAggregates returns the composite of an outer pass's aggregate and an
+// inner pass's own. The inner error already names the call that failed and
+// how many items it failed for, so folding it into the outer list as one more
+// failure would relabel it with the outer operation and its count. Either may
+// be nil; both classes stay reachable through errors.As.
+func JoinAggregates(outer, inner error) error {
+	switch {
+	case inner == nil:
+		return outer
+	case outer == nil:
+		return inner
+	}
+	return fmt.Errorf("%w; %w", outer, inner)
+}
+
 // deniedAction reads the action a role lacks out of an AWS authorization
 // message. AWS models the action inside the message rather than as a field of
 // its own, so this reads the message field; it never reads the SDK's
