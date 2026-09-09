@@ -69,12 +69,15 @@ func TestScenario_RedshiftVisual(t *testing.T) {
 
 	// ClusterAvailabilityStatus warning
 	scenario.ExpectRowStatusEquals(demofixtures.RedshiftAvailMaintenanceID, "maintenance")
-	scenario.ExpectRowStatusEquals(demofixtures.RedshiftAvailModifyingID, "modifying")
+	// Task phrase7 row 2 split the two Redshift "modifying" codes: the cluster
+	// status and the availability status both read the bare word, so one list
+	// showed one condition twice.
+	scenario.ExpectRowStatusEquals(demofixtures.RedshiftAvailModifyingID, "modifying — availability affected")
 
 	// Config / maintenance warnings
 	scenario.ExpectRowStatusEquals(demofixtures.RedshiftPendingChangeID, "pending change queued")
 	scenario.ExpectRowStatusEquals(demofixtures.RedshiftMaintenanceDeferredID, "maintenance deferred")
-	scenario.ExpectRowStatusEquals(demofixtures.RedshiftPubliclyAccessibleID, "publicly accessible")
+	scenario.ExpectRowStatusEquals(demofixtures.RedshiftPubliclyAccessibleID, "public endpoint")
 	scenario.ExpectRowStatusEquals(demofixtures.RedshiftUnencryptedID, "unencrypted at rest")
 
 	// Expired deferred-maintenance window — must NOT trigger (U2 negative).
@@ -83,7 +86,7 @@ func TestScenario_RedshiftVisual(t *testing.T) {
 	// U7a — multi-W1: 3 warnings → top + (+2).
 	scenario.ExpectRowStatusEquals(demofixtures.WarnRedshiftMultiID, "pending change queued (+2)")
 	// Intermediate case: 2 warnings → top + (+1).
-	scenario.ExpectRowStatusEquals(demofixtures.WarnRedshiftTwoID, "publicly accessible (+1)")
+	scenario.ExpectRowStatusEquals(demofixtures.WarnRedshiftTwoID, "public endpoint (+1)")
 
 	// U8 — Broken severity beats Warning. Even when public/unencrypted warnings
 	// coexist with a Broken ClusterStatus / ClusterAvailabilityStatus, only the
@@ -172,7 +175,7 @@ func TestScenario_RedshiftVisual(t *testing.T) {
 	// Attention section capitalizes the first rune at render time; data stays lowercase.
 	expectAttentionSection(t, scenario.currentView(), []string{
 		"Pending change queued",
-		"Publicly accessible",
+		"Public endpoint",
 		"Unencrypted at rest",
 	})
 }
@@ -209,11 +212,11 @@ func TestScenario_RedshiftVisual_DetailSurfacesAllIssues(t *testing.T) {
 		{demofixtures.RedshiftAvailModifyingID, []string{"Modifying"}},
 		{demofixtures.RedshiftPendingChangeID, []string{"Pending change queued"}},
 		{demofixtures.RedshiftMaintenanceDeferredID, []string{"Maintenance deferred"}},
-		{demofixtures.RedshiftPubliclyAccessibleID, []string{"Publicly accessible"}},
+		{demofixtures.RedshiftPubliclyAccessibleID, []string{"Public endpoint"}},
 		{demofixtures.RedshiftUnencryptedID, []string{"Unencrypted at rest"}},
 		// Multi-W1: every phrase appears under Attention in §4 precedence order.
-		{demofixtures.WarnRedshiftMultiID, []string{"Pending change queued", "Publicly accessible", "Unencrypted at rest"}},
-		{demofixtures.WarnRedshiftTwoID, []string{"Publicly accessible", "Unencrypted at rest"}},
+		{demofixtures.WarnRedshiftMultiID, []string{"Pending change queued", "Public endpoint", "Unencrypted at rest"}},
+		{demofixtures.WarnRedshiftTwoID, []string{"Public endpoint", "Unencrypted at rest"}},
 		// U8 — Broken suppresses the Warnings, so only the Broken phrase appears.
 		{demofixtures.RedshiftBrokenWithWarningHiddenID, []string{"Broken: storage-full"}},
 		{demofixtures.RedshiftAvailUnavailableWithWarningHiddenID, []string{"Unavailable"}},
@@ -251,7 +254,7 @@ func TestScenario_RedshiftVisual_HealthyRowsHaveNoIssuesPhrases(t *testing.T) {
 		"broken: incompatible-", "broken: hardware-failure", "broken: storage-full",
 		"unavailable", "failed", "maintenance", "modifying",
 		"pending change queued", "maintenance deferred",
-		"publicly accessible", "unencrypted at rest",
+		"public endpoint", "unencrypted at rest",
 	}
 
 	for _, id := range []string{

@@ -59,7 +59,7 @@ func TestScenario_DBIVisual(t *testing.T) {
 
 	// Config Warnings (single-phrase).
 	scenario.ExpectRowStatusEquals(demofixtures.WarnDbiNoBackupsID, "no automated backups")
-	scenario.ExpectRowStatusEquals(demofixtures.WarnDbiPublicID, "publicly accessible")
+	scenario.ExpectRowStatusEquals(demofixtures.WarnDbiPublicID, "public endpoint")
 	scenario.ExpectRowStatusEquals(demofixtures.WarnDbiUnencryptedID, "unencrypted storage")
 	scenario.ExpectRowStatusEquals(demofixtures.WarnDbiUnprotectedID, "deletion protection off")
 
@@ -67,7 +67,7 @@ func TestScenario_DBIVisual(t *testing.T) {
 	scenario.ExpectRowStatusEquals(demofixtures.WarnDbiMultiID, "no automated backups (+2)")
 
 	// Rule 7 — W1 + W2 stack: Warning phrase + (+1) for the hidden Wave-2 finding.
-	scenario.ExpectRowStatusEquals(demofixtures.WarnDbiPublicMaintID, "publicly accessible (+1)")
+	scenario.ExpectRowStatusEquals(demofixtures.WarnDbiPublicMaintID, "public endpoint (+1)")
 
 	// Rule 3 — Wave 2 finding: S4 = "maintenance scheduled"
 	// (docs/resources/dbi.md §4 signal row "Pending maintenance overdue").
@@ -240,14 +240,14 @@ func TestScenario_DBIVisual_DetailSurfacesAllIssues(t *testing.T) {
 		{demofixtures.BrokenDbiEncryptionLockedID, []string{"Encryption key unavailable"}},
 		// Single Config Warnings.
 		{demofixtures.WarnDbiNoBackupsID, []string{"No automated backups"}},
-		{demofixtures.WarnDbiPublicID, []string{"Publicly accessible"}},
+		{demofixtures.WarnDbiPublicID, []string{"Public endpoint"}},
 		{demofixtures.WarnDbiUnencryptedID, []string{"Unencrypted storage"}},
 		{demofixtures.WarnDbiUnprotectedID, []string{"Deletion protection off"}},
 		// Multi Config Warnings — first entry capitalized, rest stay lowercase (only
 		// the first rune of each entry line is capitalized; these are separate entries).
-		{demofixtures.WarnDbiMultiID, []string{"No automated backups", "Publicly accessible", "Unencrypted storage"}},
+		{demofixtures.WarnDbiMultiID, []string{"No automated backups", "Public endpoint", "Unencrypted storage"}},
 		// Wave-1 warning + Wave-2 maintenance — both must appear under Attention.
-		{demofixtures.WarnDbiPublicMaintID, []string{"Publicly accessible", "os-upgrade"}},
+		{demofixtures.WarnDbiPublicMaintID, []string{"Public endpoint", "os-upgrade"}},
 		// Wave-2 only on Healthy row — Attention section present, Wave-2 Summary visible.
 		{demofixtures.MaintDbiScheduledID, []string{"system-update"}},
 		// Legacy fixture: all 4 Wave-1 warnings.
@@ -255,7 +255,7 @@ func TestScenario_DBIVisual_DetailSurfacesAllIssues(t *testing.T) {
 		// now sets DeletionProtection, leaving warn-dbi-unprotected as the one
 		// witness. Do not restore it — TestD4_DeletionProtectionHasOneWitness
 		// fails on it.
-		{"db-public-no-encryption", []string{"No automated backups", "Publicly accessible", "Unencrypted storage"}},
+		{"db-public-no-encryption", []string{"No automated backups", "Public endpoint", "Unencrypted storage"}},
 	}
 
 	for _, tc := range cases {
@@ -289,7 +289,7 @@ func TestScenario_DBIVisual_HealthyRowsHaveNoIssuesPhrases(t *testing.T) {
 
 	wave1Phrases := []string{
 		"no automated backups",
-		"publicly accessible",
+		"public endpoint",
 		"unencrypted storage",
 		"deletion protection off",
 	}

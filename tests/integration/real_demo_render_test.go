@@ -53,7 +53,7 @@ func TestRealDemo_DBIDetailShowsIssues(t *testing.T) {
 		// Attention entries capitalize the first letter for presentation.
 		{
 			id:          demofixtures.WarnDbiMultiID,
-			mustContain: []string{"No automated backups", "Publicly accessible", "Unencrypted storage"},
+			mustContain: []string{"No automated backups", "Public endpoint", "Unencrypted storage"},
 			mustBeAfter: "Attention",
 		},
 		{
@@ -64,12 +64,12 @@ func TestRealDemo_DBIDetailShowsIssues(t *testing.T) {
 			// third copy of the same expectation; the other two are in
 			// aws_dbi_test.go and scenario_dbi_visual_test.go.
 			id:          "db-public-no-encryption",
-			mustContain: []string{"No automated backups", "Publicly accessible", "Unencrypted storage"},
+			mustContain: []string{"No automated backups", "Public endpoint", "Unencrypted storage"},
 			mustBeAfter: "Attention",
 		},
 		{
 			id:          demofixtures.WarnDbiPublicMaintID,
-			mustContain: []string{"Publicly accessible"},
+			mustContain: []string{"Public endpoint"},
 			mustBeAfter: "Attention",
 		},
 	}
