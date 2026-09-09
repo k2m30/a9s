@@ -40,3 +40,36 @@
   the colour and the API's status word: `out of storage`, `node hardware
   failed`, `parameter group rejected`, `restore did not complete`, `subnet
   group cannot host the cluster`, `encryption key store unreachable`.
+
+- Twenty-nine signal explanations that stated something AWS does not do have
+  been rewritten against the service documentation. Among them: a Step
+  Functions workflow without logging still keeps ninety days of execution
+  history unless it is an express workflow, adding brokers to an MSK cluster
+  does not restart the ones already running, a Kinesis stream that is updating
+  is only resharding some of the time, and a Simple Email Service identity that
+  cannot send is usually incomplete rather than switched off.
+
+### Fixed
+
+- Six signals no longer fire on a healthy resource:
+
+  - A queue using the encryption Amazon SQS manages for you is no longer
+    reported as unencrypted. Only a queue with neither that nor a key of your
+    own is.
+  - An SNS topic without a key of your own is described as what it is, a topic
+    whose message encryption uses a key you cannot audit, rather than as one
+    whose messages sit in the clear.
+  - An EKS cluster on Kubernetes 1.28 or newer is no longer told its secrets
+    are unencrypted. Those versions encrypt secrets with an AWS-owned key
+    without being asked; only an older cluster has none.
+  - A VPC whose subnets are covered by flow logs no longer reads as having no
+    record of its traffic. A flow log attached to a subnet or a network
+    interface writes the same records as one attached to the VPC, and all three
+    now count.
+  - A task the scheduler stopped during a deployment, or that Spot reclaimed,
+    is no longer red. Those are the platform doing its job, and they now grey
+    out like any other clean stop; a task that failed to start or whose
+    essential container exited is still red.
+  - A CloudFront distribution in front of an S3 static-website endpoint is no
+    longer told to talk to that origin over HTTPS. The endpoint only serves
+    HTTP, so there is nothing to change.

@@ -46,7 +46,13 @@ func EnrichVPCFlowLogs(ctx context.Context, clients *ServiceClients, resources [
 		if vpcID == "" {
 			return
 		}
-		// Paginate through all flow logs for this VPC.
+		// A flow log attaches to a VPC, a subnet or a network interface, and
+		// all three write the same records, so asking only about the VPC's own
+		// id reports a VPC whose subnets are fully covered as capturing
+		// nothing. The subnet ids come off the row the fetcher built.
+		scopes := append([]string{vpcID}, splitCSV(r.Fields["subnet_ids"])...)
+
+		// Paginate through the flow logs covering this VPC.
 		var allFlowLogs []ec2types.FlowLog
 		var flNextToken *string
 		flPages := 0
@@ -59,7 +65,7 @@ func EnrichVPCFlowLogs(ctx context.Context, clients *ServiceClients, resources [
 			}
 			out, err := clients.EC2.DescribeFlowLogs(ctx, &ec2svc.DescribeFlowLogsInput{
 				Filter: []ec2types.Filter{
-					{Name: aws.String("resource-id"), Values: []string{vpcID}},
+					{Name: aws.String("resource-id"), Values: scopes},
 				},
 				NextToken: flNextToken,
 			})

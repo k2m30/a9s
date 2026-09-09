@@ -123,18 +123,18 @@ One bullet per distinct signal. Keep AWS field names verbatim.
   - **How obtained**: read off what the fetcher already holds for the row, with no extra call.
 
 - **Signal**: `lastStatus==STOPPED`, `StopCode==SpotInterruption`.
-  - **State bucket**: Broken.
+  - **State bucket**: Dim. Spot reclaims capacity it warned about; the task did not fail.
   - **How obtained**: read off what the fetcher already holds for the row, with no extra call.
 
 - **Signal**: `lastStatus==STOPPED`, `StopCode==ServiceSchedulerInitiated`.
-  - **State bucket**: Broken.
+  - **State bucket**: Dim. The service replaces tasks on every deployment and scale-in.
   - **How obtained**: read off what the fetcher already holds for the row, with no extra call.
 
 - **Signal**: `lastStatus==STOPPED`, `StopCode==TerminationNotice`.
-  - **State bucket**: Broken.
+  - **State bucket**: Dim. The instance underneath is going away, which is the platform working.
   - **How obtained**: read off what the fetcher already holds for the row, with no extra call.
 
-- **Signal**: `lastStatus==STOPPED` with `StopCode != UserInitiated`.
+- **Signal**: `lastStatus==STOPPED`, `StopCode==UserInitiated` or absent.
   - **State bucket**: Dim.
   - **How obtained**: `Task.LastStatus` and `Task.StopCode` (both on the `DescribeTasks` response; `StopCode` is one of `TaskFailedToStart`, `EssentialContainerExited`, `UserInitiated`, `ServiceSchedulerInitiated`, `SpotInterruption`, `TerminationNotice`).
 
@@ -213,9 +213,9 @@ One row per signal from §3:
 |---|---|---|---|---|---|
 | `lastStatus==STOPPED`, `StopCode==EssentialContainerExited` | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `stopped: <reason>` |
 | `lastStatus==STOPPED`, `StopCode==TaskFailedToStart` | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `stopped: <reason>` |
-| `lastStatus==STOPPED`, `StopCode==SpotInterruption` | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `stopped: <reason>` |
-| `lastStatus==STOPPED`, `StopCode==ServiceSchedulerInitiated` | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `stopped: <reason>` |
-| `lastStatus==STOPPED`, `StopCode==TerminationNotice` | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `stopped: <reason>` |
+| `lastStatus==STOPPED`, `StopCode==SpotInterruption` | 1 | Dim | n/a | S2, S4 | `stopped (task exited)` |
+| `lastStatus==STOPPED`, `StopCode==ServiceSchedulerInitiated` | 1 | Dim | n/a | S2, S4 | `stopped (task exited)` |
+| `lastStatus==STOPPED`, `StopCode==TerminationNotice` | 1 | Dim | n/a | S2, S4 | `stopped (task exited)` |
 | `lastStatus==STOPPED`, `StopCode==UserInitiated` | 1 | Dim | n/a | S2, S4 | `stopped (task exited)` |
 | `healthStatus==UNHEALTHY` | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `unhealthy` |
 | `lastStatus == PROVISIONING` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `provisioning` |
@@ -286,8 +286,8 @@ ecs-task — COMPUTE. Status key: `status` — the key the status cell reads, an
 | ecs-task.state.stopping | stopping | warn | wave1 | The task's containers are being shut down and will not come back, so anything in flight on them ends here. Check the stop reason once it settles to see whether a deployment, a scale-in or a failure caused it. |
 | ecs-task.state.deprovisioning | deprovisioning | warn | wave1 | The containers have exited and AWS is releasing the task's network interface and volumes. Nothing to act on; the task disappears from this list shortly. |
 | ecs-task.state.stopped | stopped (task exited) | dim | wave1 | — |
-| ecs-task.stop-code.failed | stopped: <reason> | broken | wave1 | The task did not exit on request — something stopped it, so whatever it was serving stopped with it. The stop reason names the cause: a failed container health check, an out-of-memory kill, or an image that could not be pulled are the common ones. |
-| ecs-task.health.unhealthy | unhealthy | broken | wave1 | The container health check inside this task is failing, so the load balancer will stop sending it traffic and the scheduler will replace it. Read the container logs from the moment the check started failing, and confirm the check command and its grace period suit the application's startup time. |
+| ecs-task.stop-code.failed | stopped: <reason> | broken | wave1 | The task stopped because something went wrong rather than because the scheduler or the platform stopped it, so whatever it was serving stopped with it. The stop reason names the cause: an essential container exiting, a task that never started, or the host it was placed on going unhealthy are the common ones. |
+| ecs-task.health.unhealthy | unhealthy | broken | wave1 | The container health check inside this task is failing. A task run by a service is replaced by the scheduler under its deployment settings, and a load balancer stops routing to it only if its target group also marks it unhealthy; a task started on its own is neither replaced nor drained. Read the container logs from when the check started failing, and confirm the check command and its grace period suit the application's startup. |
 | ecs-task.task-failed | task failed | broken | wave2 | This task ended in a failure rather than a clean stop, so the work it was doing did not complete. Read its containers' exit codes and stopped reasons to see which one went and why. |
 | ecs-task.privileged | privileged container | broken | wave2 | A container in this task runs privileged, so it holds the host's full device and kernel-capability set and a container escape becomes a host compromise. Drop the privileged flag and grant only the specific Linux capabilities the workload needs. |
 | ecs-task.host-namespace | shares the host network or process namespace | warn | wave2 | This task shares the host's network or process namespace, so its containers can see and reach every other process and loopback service on that instance. Switch the task definition to the awsvpc network mode and leave the process-namespace setting unset. |

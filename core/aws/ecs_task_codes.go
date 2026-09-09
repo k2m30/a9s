@@ -33,12 +33,12 @@ const (
 	CodeECSTaskStateDeprovisioning domain.FindingCode = "ecs-task.state.deprovisioning"
 
 	// CodeECSTaskStateStopped — task is in the "STOPPED" lifecycle state with a
-	// user-initiated or empty stop code (a normal, non-error stop).
+	// a routine or empty stop code (a normal, non-error stop).
 	CodeECSTaskStateStopped domain.FindingCode = "ecs-task.state.stopped"
 
-	// CodeECSTaskStopCodeFailed — task is STOPPED with a stop code other than
-	// UserInitiated (AWS-initiated stop, e.g. task failed to start or its
-	// essential container exited).
+	// CodeECSTaskStopCodeFailed — task is STOPPED with a stop code that names
+	// a failure rather than the platform doing its job: it failed to start,
+	// or its essential container exited.
 	CodeECSTaskStopCodeFailed domain.FindingCode = "ecs-task.stop-code.failed"
 
 	// CodeECSTaskHealthUnhealthy — task's container health check reports
@@ -50,6 +50,23 @@ const (
 // last_status. Returns nil for terminal/healthy states (RUNNING, STOPPED).
 // Shared by ecs_task.go and ecs_svc_tasks.go::convertEcsTask to keep their
 // lifecycle classification in lockstep.
+// ecsStopCodeIsRoutine reports whether a StopCode names the platform doing its
+// job rather than the task failing. The scheduler stops tasks on every
+// deployment and scale-in, Spot reclaims capacity it warned about, and a
+// termination notice is the instance going away — none of them says anything
+// about the workload, and colouring them broken puts a red row on a normal
+// deployment.
+func ecsStopCodeIsRoutine(stopCode string) bool {
+	switch stopCode {
+	case string(ecstypes.TaskStopCodeUserInitiated),
+		string(ecstypes.TaskStopCodeServiceSchedulerInitiated),
+		string(ecstypes.TaskStopCodeSpotInterruption),
+		string(ecstypes.TaskStopCodeTerminationNotice):
+		return true
+	}
+	return false
+}
+
 func ecsTaskWave1Findings(status string) []domain.Finding {
 	switch status {
 	case "PROVISIONING":
@@ -98,7 +115,7 @@ func ecsTaskStructuralFindings(status, stopCode, healthStatus string) []domain.F
 	// lifecycle findings. This branch asks the narrower question of whether
 	// the task has actually stopped, which is what picks stop-code over dim.
 	if status == "STOPPED" {
-		if stopCode != "" && stopCode != "UserInitiated" {
+		if stopCode != "" && !ecsStopCodeIsRoutine(stopCode) {
 			return []domain.Finding{wave1Finding(CodeECSTaskStopCodeFailed, domain.HumanizeStatusPhrase(stopCode))}
 		}
 		return []domain.Finding{wave1Finding(CodeECSTaskStateStopped)}

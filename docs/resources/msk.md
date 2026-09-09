@@ -233,7 +233,7 @@ msk — MESSAGING. Status key: `state` — the key the status cell reads, and th
 | Code | Phrase | Severity | Source | Detail |
 | --- | --- | --- | --- | --- |
 | msk.warn.creating | creating | warn | wave1 | The cluster's brokers are still being provisioned, so there are no bootstrap endpoints to connect to yet. Wait for it to become active before pointing producers at it. |
-| msk.warn.updating | updating | warn | wave1 | A cluster change is in flight — configuration, broker count or version — and brokers restart one at a time while it runs. Confirm your topics have enough replicas that a single broker restarting does not stall production. |
+| msk.warn.updating | updating | warn | wave1 | A cluster change is in flight, and what it costs depends on the change. A configuration or version update rolls the brokers and restarts them one at a time; adding brokers or storage does not restart anything by itself. Confirm your topics are replicated widely enough to lose a broker before a rolling change starts. |
 | msk.warn.maintenance | maintenance | warn | wave1 | AWS is performing maintenance on this cluster, rolling brokers as it goes. Clients that retry and topics with a replication factor above one ride this out; single-replica topics see errors. |
 | msk.warn.rebooting\_broker | rebooting broker | warn | wave1 | A broker is restarting, so the partitions it leads are moving and clients see brief errors on those partitions. Check that the affected topics have replicas on other brokers. |
 | msk.warn.healing | healing | warn | wave1 | AWS is replacing or repairing a broker after a failure, so the cluster runs with reduced capacity until it finishes. Watch under-replicated partitions during this window. |

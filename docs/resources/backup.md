@@ -149,7 +149,7 @@ backup — BACKUP. Status key: `status` — the key the status cell reads, and t
 <!-- BEGIN GENERATED: findings -->
 | Code | Phrase | Severity | Source | Detail |
 | --- | --- | --- | --- | --- |
-| backup.job-failed | <N job(s)> failed in last 24h | broken | wave2 | A backup job for this plan did not complete in the last day, so the recovery points you expect for that window do not exist. Open the job in AWS Backup for its status message — an IAM permission, a resource deleted mid-job, or a vault lock rule are the usual causes — then rerun the plan once it is fixed. |
+| backup.job-failed | <N job(s)> failed in last 24h | broken | wave2 | A backup job for this plan did not complete in the last day, so the recovery points you expect for that window do not exist. Open the job for its status message: an IAM permission, a resource deleted mid-job, or a vault lock rule are the usual causes. A plan cannot be rerun, so once it is fixed either start an on-demand backup for each resource that was missed or wait for the next scheduled run. |
 | backup.job-partial | partial: <N> of <M resource(s)> skipped | warn | wave2 | The plan ran but skipped some of the resources it selects, so those resources have no recovery point for this window even though the job reports progress. Check the job's resource list against the plan's selection, and the backup role's permissions on the resources that were missed. |
 <!-- END GENERATED: findings -->
 

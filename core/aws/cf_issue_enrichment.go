@@ -229,7 +229,14 @@ func EnrichCloudFrontDistribution(ctx context.Context, clients *ServiceClients, 
 		if cfg.Origins != nil {
 			for _, origin := range cfg.Origins.Items {
 				if origin.CustomOriginConfig != nil &&
-					origin.CustomOriginConfig.OriginProtocolPolicy == cftypes.OriginProtocolPolicyHttpOnly {
+					origin.CustomOriginConfig.OriginProtocolPolicy == cftypes.OriginProtocolPolicyHttpOnly &&
+					// An S3 static-website endpoint serves HTTP only, so
+					// http-only is the sole policy CloudFront accepts for it
+					// and there is nothing here for the operator to switch.
+					// Reaching that content over TLS means moving to the REST
+					// endpoint with origin access control, which is a
+					// different change from the one this finding asks for.
+					!isS3WebsiteEndpoint(aws.ToString(origin.DomainName)) {
 					originID := ""
 					if origin.Id != nil {
 						originID = *origin.Id

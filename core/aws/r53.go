@@ -179,6 +179,16 @@ func enumerateR53AliasTargets(ctx context.Context, api Route53ListResourceRecord
 //
 // The bucket name is NEVER part of this DNSName — the join to a specific
 // bucket is by record name (FQDN) which per AWS must equal the bucket name.
+// A CloudFront origin puts the bucket in front of the same endpoint, which is
+// why the token is looked for anywhere in the host rather than at the start;
+// the host still has to be under amazonaws.com, or an ordinary origin that
+// happens to carry the token in its own name reads as an S3 website.
 func isS3WebsiteEndpoint(dns string) bool {
-	return strings.Contains(dns, "s3-website-") || strings.Contains(dns, "s3-website.")
+	host := strings.TrimSuffix(strings.ToLower(dns), ".")
+	// .com.cn is the China partition's suffix; its website endpoints are the
+	// same shape and serve HTTP only just the same.
+	if !strings.HasSuffix(host, ".amazonaws.com") && !strings.HasSuffix(host, ".amazonaws.com.cn") {
+		return false
+	}
+	return strings.Contains(host, "s3-website-") || strings.Contains(host, "s3-website.")
 }

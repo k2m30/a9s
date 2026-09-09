@@ -105,7 +105,7 @@ Transcribed from `docs/attention-signals.md § Signals § DNS & CDN` row `cf`.
   - **State bucket**: Warning.
   - **How obtained**: `DistributionSummary.ViewerCertificate.MinimumProtocolVersion` field on the list response.
 
-- **Signal**: viewer allows plain HTTP / origin `http-only` (`cf.insecure-protocol`).
+- **Signal**: viewer allows plain HTTP / origin `http-only` (`cf.insecure-protocol`). An S3 static-website endpoint is excluded from the origin half: that endpoint serves HTTP only, so `http-only` is the only setting that works and telling the operator to change it would be wrong.
   - **State bucket**: Warning.
   - **How obtained**: read on the type's bounded Wave 2 pass, which the catalog registers for this type.
 
@@ -154,7 +154,7 @@ One row per signal from §3:
 | `Status == InProgress` | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `deploying: config propagating` |
 | `Enabled == false` | 1 | Dim | n/a | S2, S4 | `disabled (admin-off)` |
 | Weak TLS policy on aliased distribution | 2 | Warning | `~` | S2, S3, S4, S5 | `minimum TLS below 1.2` |
-| viewer allows plain HTTP / origin `http-only` (`cf.insecure-protocol`) | 2 | Warning | `~` | S2, S3, S4, S5 | `traffic allowed without TLS` |
+| viewer allows plain HTTP / origin `http-only`, S3 website endpoints excluded (`cf.insecure-protocol`) | 2 | Warning | `~` | S2, S3, S4, S5 | `traffic allowed without TLS` |
 | `LoggingConfig.Enabled == false` | 2 | Warning | `~` | S2, S3, S4, S5 | `access logging off` |
 | an S3 origin naming a bucket absent from the account | 2 | Broken | `!` | S1, S2, S3, S4, S5 | `S3 origin bucket does not exist` |
 | `DefaultRootObject` empty | 2 | Warning | `~` | S2, S3, S4, S5 | `no default root object` |
@@ -218,7 +218,7 @@ cf — DNS & CDN. Status key: `status` — the key the status cell reads, and th
 | --- | --- | --- | --- | --- |
 | cf.disabled | disabled (admin-off) | dim | wave1 | — |
 | cf.status.in-progress | deploying: config propagating | warn | wave1 | A configuration change is still reaching the edge locations, so viewers may get the old behaviour or the new one depending on where they are. Wait for it to finish before judging anything else about the distribution. |
-| cf.insecure-protocol | traffic allowed without TLS | warn | wave2 | The distribution accepts plain HTTP, or talks to its origin without TLS, so requests and any cookies or tokens in them can be read in transit. Set the viewer protocol policy to redirect to HTTPS, and the origin protocol policy to HTTPS only. |
+| cf.insecure-protocol | traffic allowed without TLS | warn | wave2 | The distribution accepts plain HTTP from viewers, or reaches an origin that can serve TLS over plain HTTP, so requests and any cookies or tokens in them can be read in transit. Redirect viewers to HTTPS, and set the origin protocol policy to HTTPS only for any origin that supports it. |
 | cf.origin-bucket-missing | S3 origin bucket does not exist | broken | wave2 | The distribution forwards requests to a bucket that no longer exists, so those paths fail and anyone who creates a bucket with that name starts serving your traffic. Repoint the origin at a bucket you own, or remove it. |
 | cf.deprecated-tls | minimum TLS below 1.2 | warn | wave2 | Viewers may negotiate a protocol version with known weaknesses, which modern browsers already refuse. Raise the distribution's minimum protocol version to TLS 1.2 or later. |
 | cf.logging-off | access logging off | warn | wave2 | The distribution records no request logs, so an attack or abuse pattern at the edge leaves nothing to investigate. Turn on standard logging and give it a destination. |

@@ -289,6 +289,32 @@ func eksPostureOf(cluster *ekstypes.Cluster, versions map[string]ekstypes.Cluste
 	return p
 }
 
+// eksEncryptsByDefault reports whether this Kubernetes version envelope-encrypts
+// API data with an AWS-owned key without being asked. AWS turned that on for
+// 1.28 and every version after it.
+//
+// An unparseable or absent version reads as false: the finding then fires as it
+// did before, which is the safe direction for a security signal. A patch
+// component is ignored and a major above 1 is ahead of the change, so neither
+// shape reads as a version that leaves secrets unencrypted.
+func eksEncryptsByDefault(version string) bool {
+	majorStr, rest, ok := strings.Cut(version, ".")
+	major, err := strconv.Atoi(majorStr)
+	if !ok || err != nil {
+		return false
+	}
+	if major != 1 {
+		return major > 1
+	}
+	minorStr, _, _ := strings.Cut(rest, ".")
+	minor, err := strconv.Atoi(minorStr)
+	return err == nil && minor >= eksDefaultEnvelopeEncryptionMinor
+}
+
+// eksDefaultEnvelopeEncryptionMinor is the 1.x minor from which AWS supplies
+// envelope encryption itself.
+const eksDefaultEnvelopeEncryptionMinor = 28
+
 // eksMissingLogTypes returns the control-plane log types not being sent. A
 // LogSetup entry that lists a type with Enabled=false does not enable it, and
 // the five may arrive spread across several enabled entries, so this is the
@@ -333,7 +359,12 @@ func eksPostureFindings(status, version string, p eksPosture) []domain.Finding {
 	if p.ControlPlaneLogging == eksLoggingIncomplete {
 		findings = append(findings, wave1Finding(CodeEKSControlPlaneLoggingOff))
 	}
-	if p.SecretsEncryption == eksSecretsNone {
+	// From 1.28 AWS envelope-encrypts Kubernetes API data with an AWS-owned
+	// key on every cluster, so an empty EncryptionConfig there means no
+	// CUSTOMER-managed key rather than no encryption. Below 1.28 it does mean
+	// the secrets are stored with etcd's own protection alone, which is the
+	// condition this code was written for.
+	if p.SecretsEncryption == eksSecretsNone && !eksEncryptsByDefault(version) {
 		findings = append(findings, wave1Finding(CodeEKSSecretsNotKMS))
 	}
 	if p.VersionSupport == eksSupportEnded {

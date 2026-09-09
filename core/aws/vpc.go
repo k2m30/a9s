@@ -5,13 +5,60 @@ package aws
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
+	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
 
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
+
+// stampVPCSubnetIDs writes each VPC's subnet ids onto its row, which the flow
+// log check reads: a flow log attaches to a VPC, a subnet or an interface, and
+// asking only about the VPC's own id calls a fully covered VPC uncovered.
+//
+// One DescribeSubnets for the page, not one per VPC. Reached by type assertion
+// so the narrow DescribeVpcs fakes this fetcher is exercised with keep working
+// — they simply produce no subnet ids, and the check then reads what it read
+// before. A failure is silent for the same reason: the subnet list is context
+// for another check, not a fact this page promises.
+func stampVPCSubnetIDs(ctx context.Context, api EC2DescribeVpcsAPI, resources []resource.Resource) {
+	subnetAPI, ok := api.(EC2DescribeSubnetsAPI)
+	if !ok || len(resources) == 0 {
+		return
+	}
+	vpcIDs := make([]string, 0, len(resources))
+	for _, r := range resources {
+		vpcIDs = append(vpcIDs, r.ID)
+	}
+	byVPC := map[string][]string{}
+	var nextToken *string
+	for range PerParentPageCap {
+		out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*ec2.DescribeSubnetsOutput, error) {
+			return subnetAPI.DescribeSubnets(ctx, &ec2.DescribeSubnetsInput{
+				Filters:   []ec2types.Filter{{Name: aws.String("vpc-id"), Values: vpcIDs}},
+				NextToken: nextToken,
+			})
+		})
+		if err != nil {
+			return
+		}
+		for _, sn := range out.Subnets {
+			byVPC[aws.ToString(sn.VpcId)] = append(byVPC[aws.ToString(sn.VpcId)], aws.ToString(sn.SubnetId))
+		}
+		if out.NextToken == nil {
+			break
+		}
+		nextToken = out.NextToken
+	}
+	for i := range resources {
+		if ids := byVPC[resources[i].ID]; len(ids) > 0 {
+			resources[i].Fields["subnet_ids"] = strings.Join(ids, ",")
+		}
+	}
+}
 
 // FetchVPCsPage fetches a single page of VPCs.
 func FetchVPCsPage(ctx context.Context, api EC2DescribeVpcsAPI, continuationToken string) (resource.FetchResult, error) {
@@ -80,6 +127,8 @@ func FetchVPCsPage(ctx context.Context, api EC2DescribeVpcsAPI, continuationToke
 
 		resources = append(resources, r)
 	}
+
+	stampVPCSubnetIDs(ctx, api, resources)
 
 	nextToken := ""
 	isTruncated := false

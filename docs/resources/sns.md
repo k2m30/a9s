@@ -169,7 +169,7 @@ sns — MESSAGING. Status key: `state` — the column naming it is the status co
 | sns.no-subscribers | topic has no subscribers | warn | wave2 | Nothing is subscribed to this topic, so every message published to it is discarded on arrival. Either subscribe the endpoint that was meant to receive them, or delete the topic and whatever still publishes to it. |
 | sns.all-pending-confirmation | all pending confirmation | warn | wave2 | Every subscription on this topic is still waiting for its endpoint to confirm, so no message is being delivered to anyone. Confirm the subscriptions from their endpoints, or remove the ones that were never wanted. |
 | sns.public-policy | topic policy open to anyone | broken | wave2 | The topic's access policy grants publish or subscribe to every AWS principal, so anyone can read what this topic broadcasts or inject messages its subscribers will trust. Scope the policy's Principal to the accounts and roles that actually use the topic. |
-| sns.no-kms | not encrypted with KMS | warn | wave2 | Messages sit unencrypted in the topic, so anyone who reaches the backing storage or a raw log of it reads their contents. Set a KMS key on the topic so AWS encrypts each message at rest. |
+| sns.no-kms | not encrypted with KMS | warn | wave2 | The topic has no key for server-side encryption, so message bodies are not encrypted with a key you control. The storage underneath is encrypted by AWS regardless, so this is about custody rather than about plaintext on a disk. Attach a KMS key when the messages carry data whose key access you need to grant, revoke and audit. |
 <!-- END GENERATED: findings -->
 
 <!-- BEGIN GENERATED: related -->

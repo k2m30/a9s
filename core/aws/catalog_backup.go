@@ -57,7 +57,7 @@ var backupTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static
 		},
 		IssueEnricherFieldKeys: []string{"status"},
 		Findings: []catalog.FindingDef{
-			{Code: backupCodeJobFailed, Phrase: "<N job(s)> failed in last 24h", Severity: domain.SevBroken, Source: "wave2", Detail: "A backup job for this plan did not complete in the last day, so the recovery points you expect for that window do not exist. Open the job in AWS Backup for its status message — an IAM permission, a resource deleted mid-job, or a vault lock rule are the usual causes — then rerun the plan once it is fixed."},
+			{Code: backupCodeJobFailed, Phrase: "<N job(s)> failed in last 24h", Severity: domain.SevBroken, Source: "wave2", Detail: "A backup job for this plan did not complete in the last day, so the recovery points you expect for that window do not exist. Open the job for its status message: an IAM permission, a resource deleted mid-job, or a vault lock rule are the usual causes. A plan cannot be rerun, so once it is fixed either start an on-demand backup for each resource that was missed or wait for the next scheduled run."},
 			{Code: backupCodeJobPartial, Phrase: "partial: <N> of <M resource(s)> skipped", Severity: domain.SevWarn, Source: "wave2", Detail: "The plan ran but skipped some of the resources it selects, so those resources have no recovery point for this window even though the job reports progress. Check the job's resource list against the plan's selection, and the backup role's permissions on the resources that were missed."},
 		},
 	},
@@ -85,7 +85,7 @@ var backupChildTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // s
 			return FetchCfnEvents(ctx, c.CloudFormation, parentCtx["stack_name"], continuationToken)
 		}),
 		Findings: []catalog.FindingDef{
-			{Code: CodeCfnEventFailed, Phrase: "<failure status, lowercased>", Severity: domain.SevBroken, Source: "wave1", Detail: "This step of the stack operation failed, and CloudFormation stops or rolls back the whole change at the first failure. Read the status reason on this event — it names the resource and the error it returned — and fix that before retrying the stack."},
+			{Code: CodeCfnEventFailed, Phrase: "<failure status, lowercased>", Severity: domain.SevBroken, Source: "wave1", Detail: "This resource operation failed. What happens next depends on the stack's failure options and on what else depended on this resource: CloudFormation may roll the stack back, keep the resources that already succeeded, or carry on with independent ones. Read this event's status reason and then the stack's terminal status before acting."},
 			{Code: CodeCfnEventInProgress, Phrase: "<in-progress status, lowercased>", Severity: domain.SevWarn, Source: "wave1", Detail: "The step is still running, so the stack is mid-change and its resources may be replaced or briefly unavailable until it finishes. Wait for the matching completion event rather than starting another operation on the stack."},
 			{Code: CodeCfnEventDeleted, Phrase: "deleted", Severity: domain.SevDim, Source: "wave1"},
 		},

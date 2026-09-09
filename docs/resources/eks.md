@@ -165,7 +165,7 @@ One bullet per distinct signal.
   - **API call**: same `DescribeCluster` — `Logging.ClusterLogging`.
   - **Cost shape**: per-resource.
 
-- **Signal**: no KMS key covers the cluster's Kubernetes secrets.
+- **Signal**: no KMS key covers the cluster's Kubernetes secrets, on a cluster below Kubernetes 1.28 — from 1.28 AWS envelope-encrypts secrets with an AWS-owned key on every cluster, so an absent encryption configuration there means no customer-managed key rather than no encryption.
   - **State bucket**: Warning.
   - **API call**: same `DescribeCluster` — `EncryptionConfig[].Resources`.
   - **Cost shape**: per-resource.
@@ -217,7 +217,7 @@ One row per signal from §3. The fetcher's own `DescribeCluster` sets the row co
 | endpoint open to the internet | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `cluster endpoint reachable from the internet` |
 | endpoint public but scoped to named ranges | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `cluster endpoint reachable from listed networks` |
 | control-plane log types missing | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `control plane logging incomplete` |
-| no KMS key over secrets | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `secrets not encrypted with KMS` |
+| no KMS key over secrets, below Kubernetes 1.28 | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `secrets not encrypted with KMS` |
 | Kubernetes minor past standard support | 1 | Broken | `!` | S1, S2, S3, S4, S5 | `Kubernetes <version> is out of standard support` |
 | describe denied | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `details denied` |
 | describe answered with nothing | 1 | Warning | `~` | S1, S2, S3, S4, S5 | `details unavailable` |
@@ -275,7 +275,7 @@ eks — CONTAINERS. Status key: `status` — the key the status cell reads, and 
 | eks.public-endpoint | cluster endpoint reachable from the internet | broken | wave1 | The cluster's Kubernetes endpoint answers from the public internet, so its authentication is the only thing between the control plane and every scanner on the network. Turn off public endpoint access and reach the cluster over the VPC, or at minimum restrict public access to the office and build ranges. |
 | eks.public-endpoint-restricted | cluster endpoint reachable from listed networks | warn | wave1 | The cluster's Kubernetes endpoint is public but only the listed address ranges may reach it, so the exposure is bounded by a list somebody has to keep correct. Check the ranges are still the ones you meant, and prefer reaching the cluster over the VPC. |
 | eks.control-plane-logging-off | control plane logging incomplete | warn | wave1 | Some control-plane log types are not being sent to CloudWatch, so an authentication attempt or an admission decision made during an incident leaves no record to investigate. Enable all five control-plane log types on the cluster. |
-| eks.secrets-not-kms | secrets not encrypted with KMS | warn | wave1 | Kubernetes secrets in this cluster are stored in etcd with only the AWS-managed default protection and no envelope encryption of their own. Attach a KMS key to the cluster's secrets encryption configuration so a copy of etcd is useless without that key. |
+| eks.secrets-not-kms | secrets not encrypted with KMS | warn | wave1 | This cluster's Kubernetes version does not envelope-encrypt secrets on its own, and no customer managed key is attached, so secrets sit in etcd with only the platform's own protection. Attach a KMS key to the cluster's secrets encryption configuration, or upgrade to a version that encrypts by default and attach a key if you need to control it yourself. |
 | eks.version-unsupported | Kubernetes <version> is out of standard support | broken | wave1 | This Kubernetes minor is past standard support, so it no longer receives the full patch stream and AWS will upgrade it on its own schedule if you do not. Plan an upgrade to a version in standard support before the automatic one lands during business hours. |
 | eks.warn.details\_denied | details denied | warn | wave1 | The per-item describe call for this row was denied, so a9s can show its name and nothing about its posture — the row is unjudged, not healthy. Grant the read-only describe permission for this type to the role you browse with, then refresh. |
 | eks.warn.details\_unavailable | details unavailable | warn | wave1 | The per-item describe call for this row failed, so a9s can show its name and nothing about its posture — the row is unjudged, not healthy. Retry the refresh; if it persists, check the service's health and whether the call is being throttled. |

@@ -228,7 +228,7 @@ alarm — MONITORING. Status key: `state` — the key the status cell reads, and
 | --- | --- | --- | --- | --- |
 | alarm.state.alarm | alarm triggered | broken | wave1 | The metric this alarm watches has crossed its threshold, which is the condition somebody set it up to be told about. Open the metric behind it for the last few hours and act on what it measures, rather than on the alarm itself. |
 | alarm.state.insufficient\_data | insufficient data | warn | wave1 | The alarm has no data to judge, so it is neither confirming health nor able to fire — and a silent alarm looks exactly like a quiet system. Check that the metric is still being published; a deleted resource or a renamed dimension is the usual cause. |
-| alarm.no\_actions | no actions | warn | wave1 | This alarm changes colour on a dashboard and notifies nobody, so a condition it catches at three in the morning is discovered in the morning. Attach a notification topic or a scaling action, or delete the alarm if nothing was ever going to act on it. |
+| alarm.no\_actions | no actions | warn | wave1 | This alarm has no action attached, so on its own it changes a colour and tells nobody. An EventBridge rule or a composite alarm may still be watching its state changes; check whether one is before assuming nothing reacts. If nothing does, attach a notification topic or delete the alarm. |
 | alarm.actions-disabled | actions disabled | warn | wave1 | The alarm still changes state but runs none of its actions, so nobody is notified when it triggers. Switch actions back on for this alarm. |
 <!-- END GENERATED: findings -->
 

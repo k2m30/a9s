@@ -55,7 +55,10 @@ func SetTypes(types []ResourceTypeDef) {
 // Idempotent on identical input; panics on a second call with different data.
 func SetChildTypes(children []ResourceTypeDef) {
 	validateRelatedDefs(children)
-	if existing := childRegistry.Load(); existing != nil {
+	// Against the install snapshot, not the live map: a test registration is
+	// in the live one, and comparing there would read a child a test added as
+	// a second install with different data.
+	if existing := installedChildren.Load(); existing != nil {
 		if !sameChildren(*existing, children) {
 			panic("catalog.SetChildTypes called twice with different data — refusing to overwrite installed child catalog")
 		}

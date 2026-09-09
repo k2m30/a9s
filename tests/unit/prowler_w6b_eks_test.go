@@ -312,8 +312,13 @@ func TestW6BEKS_LogTypesSplitAcrossEntries_IsHealthy(t *testing.T) {
 
 // ─── row 17: eks.secrets-not-kms ────────────────────────────────────────────
 
+// The cluster is below 1.28 on purpose: from 1.28 AWS envelope-encrypts
+// Kubernetes secrets with an AWS-owned key on every cluster, so an absent
+// EncryptionConfig there means no CUSTOMER key rather than no encryption, and
+// the finding no longer fires. The version this test used to pass (1.33) is
+// not to be restored.
 func TestW6BEKS_SecretsNotKMS_NoEncryptionConfig(t *testing.T) {
-	c := w6bEKSCluster("acme-prod-updating", "1.33")
+	c := w6bEKSCluster("acme-prod-updating", "1.26")
 	c.EncryptionConfig = nil
 	r := w6bEKSFetchOne(t, c)
 
@@ -326,7 +331,7 @@ func TestW6BEKS_SecretsNotKMS_NoEncryptionConfig(t *testing.T) {
 // not cover secrets. Testing only for a non-empty slice reports this cluster
 // as protected.
 func TestW6BEKS_SecretsNotKMS_ConfigDoesNotCoverSecrets(t *testing.T) {
-	c := w6bEKSCluster("acme-other-resources", "1.33")
+	c := w6bEKSCluster("acme-other-resources", "1.26")
 	c.EncryptionConfig = []ekstypes.EncryptionConfig{{
 		Resources: []string{"configmaps"},
 		Provider:  &ekstypes.Provider{KeyArn: aws.String("arn:aws:kms:us-east-1:123456789012:key/aaaa1111-bbbb-2222-cccc-333344445555")},
@@ -490,7 +495,10 @@ func TestW6BEKS_VersionAbsentFromCatalogue_EmitsNoVersionFinding(t *testing.T) {
 // Contract rule 4: four conditions on one cluster are four findings, and the
 // lifecycle finding the fetcher already emits survives alongside them.
 func TestW6BEKS_AllFourConditions_ProduceFourFindings(t *testing.T) {
-	c := w6bEKSCluster("acme-worst-cluster", "1.28")
+	// 1.26 rather than 1.28: the secrets condition only exists below 1.28,
+	// and 1.26 is out of standard support in the catalogue too, so all four
+	// conditions can still hold at once.
+	c := w6bEKSCluster("acme-worst-cluster", "1.26")
 	c.ResourcesVpcConfig.EndpointPublicAccess = true
 	c.ResourcesVpcConfig.PublicAccessCidrs = []string{"0.0.0.0/0"}
 	c.Logging = nil
@@ -500,7 +508,7 @@ func TestW6BEKS_AllFourConditions_ProduceFourFindings(t *testing.T) {
 	pw1RequireFinding(t, r.Findings, w6bEKSCodePublicEndpoint, w6bEKSPhrasePublicEndpoint, domain.SevBroken, "wave1")
 	pw1RequireFinding(t, r.Findings, w6bEKSCodeLoggingOff, w6bEKSPhraseLoggingOff, domain.SevWarn, "wave1")
 	pw1RequireFinding(t, r.Findings, w6bEKSCodeSecretsNotKMS, w6bEKSPhraseSecretsNotKMS, domain.SevWarn, "wave1")
-	pw1RequireFinding(t, r.Findings, w6bEKSCodeVersionOld, w6bEKSVersionPhrase("1.28"), domain.SevBroken, "wave1")
+	pw1RequireFinding(t, r.Findings, w6bEKSCodeVersionOld, w6bEKSVersionPhrase("1.26"), domain.SevBroken, "wave1")
 }
 
 // A cluster being deleted has no posture to fix — contract rule 4.

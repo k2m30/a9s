@@ -240,17 +240,21 @@ func buildEKSClusters() []*ekstypes.Cluster {
 		{
 			Name:    aws.String("acme-degraded-prod"),
 			Arn:     aws.String("arn:aws:eks:us-east-1:123456789012:cluster/acme-degraded-prod"),
-			Version: aws.String("1.28"),
+			Version: aws.String("1.27"),
 			Status:  ekstypes.ClusterStatusActive,
 			RoleArn: aws.String(eksClusterRoleARN),
 			ResourcesVpcConfig: &ekstypes.VpcConfigResponse{
 				VpcId:     aws.String(eksVPCID),
 				SubnetIds: []string{eksSubnetA, eksSubnetB, eksSubnetC},
 			},
-			// EKSVersionUnsupported witness: 1.28 is the one demo minor the
-			// registry reports as out of standard support.
-			Logging:          eksFullControlPlaneLogging(),
-			EncryptionConfig: eksSecretsEncryption(),
+			// EKSVersionUnsupported witness: 1.27 is the one demo minor the
+			// registry reports as out of standard support. It is the
+			// EKSSecretsNoKMS witness too, EncryptionConfig deliberately
+			// absent: from 1.28 AWS envelope-encrypts secrets with an
+			// AWS-owned key on every cluster, so only a cluster below 1.28 has
+			// no encryption at all, and a cluster that old is out of support
+			// as well. One row carries both because a real cluster would.
+			Logging: eksFullControlPlaneLogging(),
 			Health: &ekstypes.ClusterHealth{
 				Issues: []ekstypes.ClusterIssue{
 					{
@@ -280,9 +284,9 @@ func buildEKSClusters() []*ekstypes.Cluster {
 				VpcId:     aws.String(eksVPCID),
 				SubnetIds: []string{eksSubnetA, eksSubnetB},
 			},
-			// EKSSecretsNoKMS witness: EncryptionConfig is deliberately absent.
-			Logging:   eksFullControlPlaneLogging(),
-			CreatedAt: aws.Time(mustTime("2025-08-01T10:00:00Z")),
+			Logging:          eksFullControlPlaneLogging(),
+			EncryptionConfig: eksSecretsEncryption(),
+			CreatedAt:        aws.Time(mustTime("2025-08-01T10:00:00Z")),
 			Tags: map[string]string{
 				"Environment": "prod",
 			},
@@ -565,12 +569,13 @@ const (
 	EKSPublicEndpointRestricted = "acme-qa"
 	// EKSLoggingIncomplete — not all control-plane log types are enabled.
 	EKSLoggingIncomplete = "acme-staging-failed"
-	// EKSSecretsNoKMS — no encryption configuration covers secrets.
-	EKSSecretsNoKMS = "acme-prod-updating"
-	// EKSVersionUnsupported — Kubernetes minor past standard support. This is
-	// the 1.28 cluster: it is the only demo minor that is not also worn by
-	// another cluster, and the ruling is that no cluster's Version changes to
-	// make room for this witness.
+	// EKSSecretsNoKMS — no encryption configuration covers secrets, on the
+	// one cluster old enough for that to mean the secrets are unencrypted.
+	EKSSecretsNoKMS = "acme-degraded-prod"
+	// EKSVersionUnsupported — Kubernetes minor past standard support. The
+	// 1.27 cluster, which is the same row as EKSSecretsNoKMS: no other minor
+	// in the demo registry is out of support, and a cluster old enough to
+	// store its secrets unencrypted is old enough to be out of support.
 	EKSVersionUnsupported = "acme-degraded-prod"
 )
 
@@ -597,11 +602,10 @@ func eksSecretsEncryption() []ekstypes.EncryptionConfig {
 }
 
 // EKSVersionSupport is what the demo registry reports for each Kubernetes
-// minor the fixtures use, backing DescribeClusterVersions. Only 1.28 is out of
-// standard support, which is what makes acme-degraded-prod the sole witness
-// without any cluster's Version being changed to suit the test.
+// minor the fixtures use, backing DescribeClusterVersions. Only 1.27 is out of
+// standard support, which is what makes acme-degraded-prod the sole witness.
 var EKSVersionSupport = map[string]ekstypes.VersionStatus{ //nolint:gochecknoglobals // static demo data
-	"1.28": ekstypes.VersionStatusExtendedSupport,
+	"1.27": ekstypes.VersionStatusExtendedSupport,
 	"1.29": ekstypes.VersionStatusStandardSupport,
 	"1.30": ekstypes.VersionStatusStandardSupport,
 }

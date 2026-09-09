@@ -5,6 +5,7 @@ package aws
 
 import (
 	"context"
+	"strings"
 	"sync"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -61,6 +62,7 @@ func EnrichSQSAttributes(ctx context.Context, clients *ServiceClients, resources
 					sqstypes.QueueAttributeNameRedrivePolicy,
 					sqstypes.QueueAttributeNameVisibilityTimeout,
 					sqstypes.QueueAttributeNameKmsMasterKeyId,
+					sqstypes.QueueAttributeNameSqsManagedSseEnabled,
 					sqstypes.QueueAttributeNamePolicy,
 				},
 			})
@@ -86,7 +88,12 @@ func EnrichSQSAttributes(ctx context.Context, clients *ServiceClients, resources
 		if !hasDLQ {
 			setWave2Finding(&result, r.ID, sqsCodeMissingDLQ, nil)
 		}
-		if out.Attributes["KmsMasterKeyId"] == "" {
+		// SSE-SQS is encryption. An empty KmsMasterKeyId says only that no
+		// customer key is in use; with SqsManagedSseEnabled the queue is
+		// encrypted at rest with an AWS-owned key, and it is on by default for
+		// queues created in the console.
+		if out.Attributes["KmsMasterKeyId"] == "" &&
+			!strings.EqualFold(out.Attributes["SqsManagedSseEnabled"], "true") {
 			setWave2Finding(&result, r.ID, sqsCodeNoKMS, nil)
 		}
 		if doc, parseErr := iampolicy.Parse(out.Attributes["Policy"]); parseErr == nil {

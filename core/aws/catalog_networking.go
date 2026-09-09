@@ -275,7 +275,7 @@ var networkingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 		}),
 		Wave2:                  IssueEnricher{Fn: EnrichVPCFlowLogs, Priority: 100},
 		IssueEnricherFieldKeys: []string{"flow_logs"},
-		FieldKeys:              []string{"vpc_id", "name", "cidr_block", "state", "is_default"},
+		FieldKeys:              []string{"vpc_id", "name", "cidr_block", "state", "is_default", "subnet_ids"},
 		Related: []domain.RelatedDef{
 			{TargetType: "subnet", DisplayName: "Subnets", Checker: checkVPCSubnet, NeedsTargetCache: true, Truncated: true},
 			{TargetType: "sg", DisplayName: "Security Groups", Checker: checkVPCSG, NeedsTargetCache: true, Truncated: true},
@@ -292,7 +292,7 @@ var networkingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 		},
 		Findings: []catalog.FindingDef{
 			{Code: CodeVPCStatePending, Phrase: "pending", Severity: domain.SevWarn, Source: "wave1", Detail: "The VPC is still being created, so subnets, gateways and endpoints cannot be attached to it yet. Wait for it to become available before building into it."},
-			{Code: vpcCodeNoFlowLogs, Phrase: "no active VPC flow logs", Severity: domain.SevWarn, Source: "wave2", Detail: "No flow log is capturing traffic for this VPC, so there is no record of what connected to what — and during an incident that question cannot be answered afterwards. Enable flow logs to CloudWatch Logs or S3 for the VPC."},
+			{Code: vpcCodeNoFlowLogs, Phrase: "no active VPC flow logs", Severity: domain.SevWarn, Source: "wave2", Detail: "No active flow log is capturing traffic for this VPC or for any of its subnets, so there is no record of what connected to what, and during an incident that question cannot be answered afterwards. Enable a flow log on the VPC, to CloudWatch Logs or to S3."},
 		},
 	},
 	{
@@ -467,7 +467,7 @@ var networkingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 		},
 		Findings: []catalog.FindingDef{
 			{Code: CodeIGWStateAttaching, Phrase: "attaching", Severity: domain.SevWarn, Source: "wave1", Detail: "The gateway is still being attached, so the VPC has no internet path through it yet. Wait for the attachment to complete before testing egress or public addressing."},
-			{Code: CodeIGWStateDetaching, Phrase: "detaching", Severity: domain.SevWarn, Source: "wave1", Detail: "The gateway is being detached, and when it goes the VPC loses its internet path: public instances stop being reachable and outbound calls fail. Stop the detachment if anything still depends on it."},
+			{Code: CodeIGWStateDetaching, Phrase: "detaching", Severity: domain.SevWarn, Source: "wave1", Detail: "The gateway is being detached and the call cannot be taken back. When it completes the VPC loses its internet path: public instances stop being reachable and outbound calls fail. If this was not intended, reattach it once the detachment finishes and check the route tables still point at it."},
 			{Code: CodeIGWNoAttachments, Phrase: "no VPC attachments", Severity: domain.SevWarn, Source: "wave1", Detail: "This gateway belongs to no VPC, so it routes nothing. Attach it to the VPC it was created for, or delete it so it stops appearing as available infrastructure."},
 		},
 	},
@@ -661,7 +661,7 @@ var networkingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 			{FieldPath: "Association.AllocationId", TargetType: "eip"},
 		},
 		Findings: []catalog.FindingDef{
-			{Code: CodeENIStateAttaching, Phrase: "attaching", Severity: domain.SevWarn, Source: "wave1", Detail: "The interface is still being attached, so the instance or service it belongs to does not have this network path yet. Wait; an attachment that sticks usually means the subnet is out of addresses."},
+			{Code: CodeENIStateAttaching, Phrase: "attaching", Severity: domain.SevWarn, Source: "wave1", Detail: "The interface is still being attached, so the instance it belongs to does not have this network path yet. If it stays here, read the attachment's error: the usual causes are the interface and the instance being in different Availability Zones, the device index already in use, or the instance type having no room for another interface."},
 			{Code: CodeENIStateDetaching, Phrase: "detaching", Severity: domain.SevWarn, Source: "wave1", Detail: "The interface is being removed from its instance, so the addresses on it stop working there. Confirm nothing is still bound to those addresses."},
 			{Code: CodeENIStateAvailable, Phrase: "available", Severity: domain.SevWarn, Source: "wave1", Detail: "The interface is attached to nothing, which normally means the resource that owned it was deleted and left it behind; it holds addresses in the subnet and can block the subnet's deletion. Delete it once you have confirmed nothing is about to claim it."},
 		},
@@ -838,7 +838,7 @@ var networkingChildTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals 
 		LifecycleKey: "health",
 		FieldKeys:    []string{"target_id", "port", "az", "health", "reason", "reason_human", "description", "target_group_arn"},
 		Findings: []catalog.FindingDef{
-			{Code: CodeTGHealthUnhealthy, Phrase: "<unhealthy check reason>", Severity: domain.SevBroken, Source: "wave1", Detail: "This target is failing the group's health check, so the load balancer has stopped sending it requests; the reason the check gave is the phrase. Fix the target or the check's path, port and matcher."},
+			{Code: CodeTGHealthUnhealthy, Phrase: "<unhealthy check reason>", Severity: domain.SevBroken, Source: "wave1", Detail: "This target is failing the group's health check, so the load balancer stops sending it requests while other targets are still passing. If every target in the group is failing, the load balancer routes to all of them rather than serving nothing, so a whole group in this state is already taking traffic it cannot serve. Fix the reported reason, or the check's path, port and matcher if the target is actually well."},
 			{Code: CodeTGHealthUnavailable, Phrase: "<unavailable check reason>", Severity: domain.SevWarn, Source: "wave1", Detail: "The load balancer cannot health-check this target at all, usually because a security group or network path blocks the check. Open the check's port from the load balancer to the target."},
 			{Code: CodeTGHealthDraining, Phrase: "<draining check reason>", Severity: domain.SevWarn, Source: "wave1", Detail: "The target is deregistering and finishing the requests it already holds. It stops receiving new ones and leaves the group when the deregistration delay elapses."},
 			{Code: CodeTGHealthInitial, Phrase: "<initial check reason>", Severity: domain.SevDim, Source: "wave1"},

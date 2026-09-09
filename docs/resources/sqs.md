@@ -91,7 +91,7 @@ No Wave 1 signals — the list API does not return fields usable for attention. 
   - **Cost shape**: per-resource.
   - **Note**: "main queue" (i.e. non-DLQ) is inferred as the complement of the is-DLQ detection above.
 
-- **Signal**: `KmsMasterKeyId` unset.
+- **Signal**: `KmsMasterKeyId` unset AND `SqsManagedSseEnabled` not `true` — SSE-SQS is server-side encryption with an AWS-owned key, so a queue with it on is encrypted even without a customer key.
   - **State bucket**: Warning.
   - **How obtained**: read on the type's bounded Wave 2 pass, which the catalog registers for this type.
 
@@ -139,7 +139,7 @@ One row per signal from §3:
 | Signal (short) | Wave | State bucket | Severity | Surfaces reached | List text (S4) |
 |---|---|---|---|---|---|
 | `RedrivePolicy unset on main queue` | 2 | Warning | `~` | S2, S3, S4, S5 | `no DLQ configured` |
-| `KmsMasterKeyId` unset | 2 | Warning | `~` | S2, S3, S4, S5 | `not encrypted with KMS` |
+| `KmsMasterKeyId` unset and `SqsManagedSseEnabled` off | 2 | Warning | `~` | S2, S3, S4, S5 | `not encrypted with KMS` |
 | access `Policy` allows a wildcard principal | 2 | Broken | `!` | S1, S2, S3, S4, S5 | `queue policy open to anyone` |
 | `ApproximateNumberOfMessages > threshold` — NOT IMPLEMENTED (backlog; no emission in code as of 2026-07-06) | 2 | Warning | `~` | S2, S4, S5 | `backlog: <N> msgs` |
 | `ApproximateNumberOfMessages rising unbounded` — NOT IMPLEMENTED (backlog; no emission in code as of 2026-07-06) | 2 | Broken | `!` | S1, S2, S4, S5 | `backlog growing: <N> msgs` |
@@ -203,7 +203,7 @@ sqs — MESSAGING. Status key: `state` — the column naming it is the status co
 | Code | Phrase | Severity | Source | Detail |
 | --- | --- | --- | --- | --- |
 | sqs.missing-dlq | no DLQ configured | warn | wave2 | Messages this queue's consumers keep failing on are retried until they expire and are then thrown away, so a poison message is lost with no record of it. Set a redrive policy pointing at a dead-letter queue. |
-| sqs.no-kms | not encrypted with KMS | warn | wave2 | Messages sit unencrypted in the queue, so anyone who reaches the backing storage reads their contents. Set a KMS key on the queue so AWS encrypts each message at rest. |
+| sqs.no-kms | not encrypted with KMS | warn | wave2 | The queue has neither the AWS-managed queue encryption nor a KMS key, so message bodies are held without server-side encryption. Turn on the managed queue encryption, which costs nothing and needs no key policy, or attach a KMS key when you need to control and audit the key yourself. |
 | sqs.public-policy | queue policy open to anyone | broken | wave2 | The queue's access policy grants send or receive to every AWS principal, so anyone can drain the messages or flood the workers reading them. Scope the policy's Principal to the accounts and roles that actually use the queue. |
 <!-- END GENERATED: findings -->
 
