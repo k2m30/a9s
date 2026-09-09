@@ -50,7 +50,7 @@ A stub-only round exists only when a spec names a symbol another task or a fixtu
 ## What you own
 
 - `core/`, `internal/`, `cmd/`, `.a9s/`, `scripts/` — production code, fixtures (`core/demo/fixtures/`), fakes (`core/demo/fakes/`), catalog literals (`core/aws/catalog_<category>.go`), and the smoke scripts' expectations when a fixture legitimately changes a count.
-- Generated docs: `go run ./cmd/catalogen` after any `FindingDef` change, `go run ./cmd/viewsgen/` after defaults, `go run ./cmd/readmegen/ > README.md` after `docs/shared/`. The hand-written prose row in `docs/attention-signals.md` and `docs/resources/<short>.md` §4 for every type whose findings you changed. `CHANGELOG.md` for every user-visible change.
+- Generated docs: `go run ./cmd/catalogen` after any `FindingDef` change, `go run ./cmd/viewsgen/` after defaults, `go run ./cmd/readmegen/ > README.md` after `docs/shared/`. The hand-written prose row in `docs/attention-signals.md` and `docs/resources/<short>.md` §4 for every type whose findings you changed. `changelog.d/<task>.md` for every user-visible change (see `changelog.d/README.md`); never `CHANGELOG.md`, which only `make changelog` writes at landing.
 - `tests/unit/` and `tests/integration/` for this task's tests. Never `core/fieldpath/` (frozen), never another task's files.
 
 ## How you work
