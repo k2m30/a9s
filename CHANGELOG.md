@@ -22,8 +22,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Opening the detail of a row the sweep left at its inspection cap runs that
   row's checks on demand: the Attention block shows what they found, or a
-  clean row, and the list's Status cell agrees. The cap itself is unchanged;
-  every other row keeps the sweep's answer.
+  clean row, and the list's Status cell agrees. The answer is saved with the
+  row, so it survives a restart and a sweep that was already running when the
+  detail opened. The cap itself is unchanged; every other row keeps the
+  sweep's answer.
 
 - The detail view masks a value the secret scanner flagged, wherever the
   resource's own configuration is shown (a Lambda's environment). The
