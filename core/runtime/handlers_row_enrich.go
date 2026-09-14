@@ -107,15 +107,14 @@ func (c *Core) handleRowEnriched(msg messages.RowEnriched) ([]UIIntent, []TaskRe
 			},
 		},
 	}
+	// The detail patch names the row in EnrichmentFindings only when the
+	// check answered for it; a refused check lands its fields alone.
+	detail := PatchDetail{ResourceType: canon, ResourceID: msg.ResourceID, FieldUpdates: msg.FieldUpdates}
 	if !msg.Uninspected {
-		intents = append(intents, PatchDetail{
-			ResourceType:               canon,
-			ResourceID:                 msg.ResourceID,
-			EnrichmentFindings:         msg.Findings,
-			EnrichmentAttentionDetails: msg.AttentionDetails,
-		})
+		detail.EnrichmentFindings = map[string][]domain.Finding{msg.ResourceID: msg.Findings[msg.ResourceID]}
+		detail.EnrichmentAttentionDetails = msg.AttentionDetails
 	}
-	return intents, tasks
+	return append(intents, detail), tasks
 }
 
 // keepRowAnswers folds the rows a KindEnrichRow answered for into a sweep

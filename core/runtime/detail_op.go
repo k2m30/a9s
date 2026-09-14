@@ -6,6 +6,7 @@ import (
 	awsclient "github.com/k2m30/a9s/v3/core/aws"
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
+	"github.com/k2m30/a9s/v3/core/session"
 	"github.com/k2m30/a9s/v3/core/trace"
 )
 
@@ -105,7 +106,11 @@ func (c *Core) BeginDetailOperation(resourceType string, res resource.Resource, 
 		})
 	}
 
-	if check, ok := c.session.EnrichmentTruncatedIDs[resource.CanonicalShortName(op.ResourceType)][op.Resource.ID]; ok && check == awsclient.CheckCap && c.HasIssueEnricher(op.ResourceType) {
+	// A row the sweep left at its cap is checked on demand — from the live
+	// row set only: a disk-seeded row carries no RawStruct, and a rule that
+	// needs one skips silently, which would read as a clean answer.
+	canon := resource.CanonicalShortName(op.ResourceType)
+	if check, ok := c.session.EnrichmentTruncatedIDs[canon][op.Resource.ID]; ok && check == awsclient.CheckCap && c.HasIssueEnricher(op.ResourceType) && c.session.RowStore.Snapshot(canon).Origin != session.OriginDisk {
 		tasks = append(tasks, TaskRequest{
 			Key:     TaskKey{Kind: KindEnrichRow, Scope: scope},
 			Cache:   CacheNone,

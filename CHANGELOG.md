@@ -26,7 +26,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   clean row, and the list's Status cell agrees. The answer is saved with the
   row, so it survives a restart and a sweep that was already running when the
   detail opened, and a global refresh forgets it with everything else. A
-  check refused on demand still lands the fields it read before the refusal.
+  check refused on demand still lands the fields it read before the refusal,
+  and a column a check rewrote shows on the open detail as it does in the
+  list. The check runs on the live row only: a row still shown from the
+  cache stays at its cap until the list lands.
   The cap itself is unchanged; every other row keeps the sweep's answer.
 
 - The detail view masks a value the secret scanner flagged, wherever the

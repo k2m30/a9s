@@ -178,6 +178,16 @@ func TestUninspectedRow_AnswerAfterRestartUpdatesTheBadgeOnDisk(t *testing.T) {
 	core2, ctrl2 := newLiveWebStyleController(t, profile, region)
 	core2.Session().Clients = demo.NewServiceClients()
 	seedFromDisk(ctrl2, profile, region)
+	// Before the live list lands the row is the disk's copy, which carries
+	// no RawStruct: no check runs on it, and the row stays at its cap.
+	if ran := openDetailWithWorkload(t, ctrl2, core2, rows[0]); ran != 0 || len(asked) != 0 {
+		t.Fatalf("a detail opened on a disk-seeded row ran %d checks (asked %v) before the live fetch landed", ran, asked)
+	}
+	if got := uninspectedOnDisk(t, profile, region, rows[0].ID); got == nil || *got != awsclient.CheckCap {
+		t.Fatalf("a check that never ran moved the row's mark on disk to %v", got)
+	}
+	ctrl2.Apply(app.Action{Kind: app.ActionBack})
+	core2.ObserveRows("ec2", rows, &resource.PaginationMeta{IsTruncated: false}, session.OriginFetch, false)
 	if ran := openDetailWithWorkload(t, ctrl2, core2, rows[0]); ran != 1 {
 		t.Fatalf("the capped row's detail dispatched %d on-demand checks, want 1", ran)
 	}

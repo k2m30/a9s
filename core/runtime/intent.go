@@ -65,9 +65,11 @@ func (PatchResourceList) isIntent() {}
 type PatchDetail struct {
 	ResourceType string
 	ResourceID   string
-	Findings     []domain.Finding
-	Attention    map[domain.FindingCode]domain.AttentionDetail
-	FieldUpdates map[string]string
+	// FieldUpdates carries the columns a Wave-2 answer rewrote, keyed by
+	// Resource.ID: an open detail's own copy of the row shows them the way
+	// the list does. Applied to every detail the patch reaches, whether or
+	// not the patch answers for the row's findings.
+	FieldUpdates map[string]map[string]string
 	// EnrichmentFindings carries EVERY independently-evaluated Wave-2 Finding
 	// per resource used by the adapter to look up the findings for a specific
 	// detail view's resource. Keyed by resource.Resource.ID; nil/empty means

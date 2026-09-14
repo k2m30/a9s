@@ -858,6 +858,7 @@ func (c *Core) handleEnrichmentChecked(msg messages.EnrichmentChecked) ([]UIInte
 		// block shows every condition, not just the worst-severity one.
 		intents = append(intents, PatchDetail{
 			ResourceType:               msg.ResourceType,
+			FieldUpdates:               msg.FieldUpdates,
 			EnrichmentFindings:         allFindings,
 			EnrichmentAttentionDetails: msg.AttentionDetails,
 		})

@@ -252,12 +252,49 @@ func TestCappedRow_OnDemandRefusalNamesTheCall(t *testing.T) {
 	if got := c.GetListEnrichmentFindings("ec2")[rows[0].ID]; len(got) != 1 {
 		t.Errorf("a refused re-check folded the row's earlier finding away: store carries %v", got)
 	}
+	if !detailShowsValue(t, c, "web-server-renamed") {
+		t.Errorf("the field the refused check did read never reached the open detail")
+	}
 	c.Apply(app.Action{Kind: app.ActionBack})
 	if got := cellFor(t, *c.Snapshot().Body.List, rows[0].ID, "name"); got != "web-server-renamed" {
 		t.Errorf("the field the refused check did read never reached the list: name cell = %q", got)
 	}
 	if got := uninspectedOnDisk(t, onDemandProfile, onDemandRegion, rows[0].ID); got == nil || *got != uninspectedCheck {
 		t.Errorf("the refusal's mark on disk = %v, want %q — after a restart the row would be re-checked as if only capped", got, uninspectedCheck)
+	}
+}
+
+// detailShowsValue reports whether the detail on top of the stack carries
+// value in one of its fields.
+func detailShowsValue(t *testing.T, c *app.Controller, value string) bool {
+	t.Helper()
+	detail := c.Snapshot().Body.Detail
+	if detail == nil {
+		t.Fatal("no detail body on the snapshot")
+	}
+	for _, f := range detail.Fields {
+		if f.Value == value {
+			return true
+		}
+	}
+	return false
+}
+
+func TestSweepFieldUpdate_ReachesTheOpenDetail(t *testing.T) {
+	c, core, rows := cappedEC2List(t)
+	c.ApplyIntents([]runtime.UIIntent{runtime.PushScreen{
+		ID:      runtime.ScreenDetail,
+		Context: runtime.ScreenContext{ResourceType: "ec2", ResourceID: rows[1].ID},
+	}})
+	c.EnsureDetailState(rows[1], "ec2")
+	intents, _ := core.HandleEvent(messages.EnrichmentChecked{
+		ResourceType: "ec2",
+		TruncatedIDs: map[string]string{rows[0].ID: awsclient.CheckCap, rows[1].ID: awsclient.CheckCap},
+		FieldUpdates: map[string]map[string]string{rows[1].ID: {"name": "api-server-renamed"}},
+	})
+	c.ApplyIntents(intents)
+	if !detailShowsValue(t, c, "api-server-renamed") {
+		t.Errorf("a sweep's field update never reached the open detail")
 	}
 }
 

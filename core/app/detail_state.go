@@ -156,6 +156,29 @@ func (c *Controller) applyDetailFindingsForResource(resourceType, resourceID str
 	}
 }
 
+// applyDetailFieldUpdates rewrites, copy-on-write, the columns a Wave-2
+// answer changed on every stacked detail of the rows it names. Callers must
+// hold c.mu (write).
+func (c *Controller) applyDetailFieldUpdates(resourceType string, updates map[string]map[string]string) {
+	for i := range c.stack {
+		if c.stack[i].ID != runtime.ScreenDetail {
+			continue
+		}
+		ds := c.stack[i].State.Detail
+		if ds == nil || ds.ResourceType != resourceType {
+			continue
+		}
+		fields := updates[ds.Resource.ID]
+		if len(fields) == 0 {
+			continue
+		}
+		merged := make(map[string]string, len(ds.Resource.Fields)+len(fields))
+		maps.Copy(merged, ds.Resource.Fields)
+		maps.Copy(merged, fields)
+		ds.Resource.Fields = merged
+	}
+}
+
 // ClearDetailFindingsForType clears wave-2 enrichment findings from every stacked
 // detail screen whose resource type matches resourceType. Called when enrichment
 // returns no findings for the entire type (nil EnrichmentFindings in PatchDetail).

@@ -373,7 +373,15 @@ func (c *Core) ExecuteTaskAt(ctx context.Context, req TaskRequest, snap Dispatch
 			return nil, fmt.Errorf("ExecuteTask %s: missing EnrichRowPayload", req.Key.Kind)
 		}
 		id := p.Op.Resource.ID
-		r := c.probeEnrichmentRows(ctx, p.Op.Clients, p.Op.ResourceType, []resource.Resource{p.Op.Resource})
+		canon := resource.CanonicalShortName(p.Op.ResourceType)
+		// The check runs on the live row, never the copy the detail opened
+		// with (BeginDetailOperation's rule); a row that is no longer live
+		// stays at its cap.
+		row, live := c.liveRow(canon, id)
+		if !live {
+			return messages.RowEnriched{ResourceType: p.Op.ResourceType, ResourceID: id, Uninspected: true, Check: awsclient.CheckCap, OperationID: p.Op.ID}, nil
+		}
+		r := c.probeEnrichmentRows(ctx, p.Op.Clients, p.Op.ResourceType, []resource.Resource{row})
 		// An account-wide enricher answers for rows it was not asked about;
 		// this task answers for one row and carries nothing else.
 		check, uninspected := r.TruncatedIDs[id]
@@ -648,6 +656,21 @@ func (c *Core) ExecuteTaskAt(ctx context.Context, req TaskRequest, snap Dispatch
 	default:
 		return nil, fmt.Errorf("ExecuteTask: unknown task kind %q", req.Key.Kind)
 	}
+}
+
+// liveRow returns the row store's current row for id when the type's rows
+// came from a fetch or a probe, never from disk.
+func (c *Core) liveRow(canon, id string) (resource.Resource, bool) {
+	tr := c.session.RowStore.Snapshot(canon)
+	if tr.Origin == session.OriginDisk {
+		return resource.Resource{}, false
+	}
+	for _, r := range tr.Rows {
+		if r.ID == id {
+			return r, true
+		}
+	}
+	return resource.Resource{}, false
 }
 
 // availabilityFromResourceCache derives availability entries from RowStore's
