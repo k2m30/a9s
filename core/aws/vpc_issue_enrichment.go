@@ -88,7 +88,7 @@ func EnrichVPCFlowLogs(ctx context.Context, clients *ServiceClients, resources [
 			MarkSkipped(&result, r.ID, &failures, flErr)
 			return
 		case flTruncated:
-			markUninspected(&result, r.ID, checkCap)
+			markUninspected(&result, r.ID, CheckCap)
 			return
 		}
 		// No flow logs at all, or none with ACTIVE status → finding.

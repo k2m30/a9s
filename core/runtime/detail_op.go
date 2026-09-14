@@ -105,6 +105,14 @@ func (c *Core) BeginDetailOperation(resourceType string, res resource.Resource, 
 		})
 	}
 
+	if check, ok := c.session.EnrichmentTruncatedIDs[resource.CanonicalShortName(op.ResourceType)][op.Resource.ID]; ok && check == awsclient.CheckCap && c.HasIssueEnricher(op.ResourceType) {
+		tasks = append(tasks, TaskRequest{
+			Key:     TaskKey{Kind: KindEnrichRow, Scope: scope},
+			Cache:   CacheNone,
+			Payload: EnrichRowPayload{Op: op},
+		})
+	}
+
 	if len(resource.GetRelated(op.ResourceType)) > 0 {
 		tasks = append(tasks, TaskRequest{
 			Key:     TaskKey{Kind: KindRelatedCheck, Scope: scope},

@@ -200,6 +200,11 @@ func (c *Controller) applyIntentsLocked(intents []runtime.UIIntent) {
 				// applyEnrichmentState stores them directly in the controller's
 				// single enrichment store; no single-representative reduction or
 				// fallback wrapping happens on this write path.
+				if v.Enrichment.RowIDs != nil {
+					c.mergeEnrichmentRows(v.ResourceType, issueCount, issueTruncated, v.Enrichment.Findings, v.Enrichment.AttentionDetails, v.Enrichment.RowIDs, issuesAuthoritative)
+					c.applyRowFindingsFor(v.ResourceType, v.Enrichment.Findings, v.Enrichment.AttentionDetails, v.Enrichment.RowIDs)
+					break
+				}
 				c.applyEnrichmentState(v.ResourceType, issueCount, issueTruncated, v.Enrichment.Findings, v.Enrichment.AttentionDetails, issuesAuthoritative)
 				// applyEnrichmentState only stores findings + the issue badge; the
 				// Wave-2 column updates (status/summary) must also reach the cached

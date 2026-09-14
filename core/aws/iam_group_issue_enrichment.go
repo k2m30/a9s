@@ -169,7 +169,7 @@ func EnrichIAMGroup(ctx context.Context, clients *ServiceClients, resources []re
 		case walkErr != nil:
 			MarkSkipped(&result, r.ID, &failures, walkErr)
 		case memberTruncated || attachedTruncated || inlineTruncated:
-			markUninspected(&result, r.ID, checkCap)
+			markUninspected(&result, r.ID, CheckCap)
 		}
 
 		// If any first call failed, we have no data at all — skip findings for this group.

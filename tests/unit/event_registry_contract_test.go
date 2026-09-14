@@ -290,6 +290,8 @@ var ercEventRoutes = map[string]ercRoute{
 			"a side-channel (markMenuSweepAcked) unconditionally, independent of HandleEvent's own gen-guard verdict"},
 	"EnrichmentChecked": {ercNeutralHandled,
 		"Core.HandleEvent (orchestrator.go) case -> handleEnrichmentChecked"},
+	"RowEnriched": {ercNeutralHandled,
+		"Core.HandleEvent (orchestrator.go) case -> handleRowEnriched, gated by the detail-operation gen stamp"},
 	"IdentityLoaded": {ercNeutralHandled,
 		"Core.HandleEvent (orchestrator.go) case -> HandleIdentityLoaded"},
 	"IdentityError": {ercNeutralHandled,

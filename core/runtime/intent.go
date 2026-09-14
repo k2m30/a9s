@@ -41,6 +41,11 @@ type ListEnrichmentPatch struct {
 	AttentionDetails map[string]map[domain.FindingCode]domain.AttentionDetail
 	TruncatedIDs     map[string]string
 	FieldUpdates     map[string]map[string]string
+	// RowIDs, when set, scopes the patch to these rows: Findings and
+	// AttentionDetails are merged into the store for them and folded onto
+	// them alone, and every other row keeps its state. Nil is the sweep's
+	// whole-type answer, which replaces the store.
+	RowIDs []string
 }
 
 // PatchResourceList instructs the adapter to apply the contained patches

@@ -1070,6 +1070,32 @@ func (c *Controller) clearRowFindings(typeName string) {
 // timed-out probe could strip a finding from the screen while the file it
 // was saved to kept it.
 func (c *Controller) applyRowFindings(typeName string, findings map[string][]domain.Finding, details map[string]map[domain.FindingCode]domain.AttentionDetail, uninspected map[string]string) {
+	c.foldRowFindings(typeName, findings, details, func([]resource.Resource) map[string]string { return uninspected })
+}
+
+// applyRowFindingsFor folds a result that answers for ids alone: every other
+// row on the screens and in the store is skipped the way an uninspected row
+// is, because for them this result is no answer.
+func (c *Controller) applyRowFindingsFor(typeName string, findings map[string][]domain.Finding, details map[string]map[domain.FindingCode]domain.AttentionDetail, ids []string) {
+	answered := make(map[string]bool, len(ids))
+	for _, id := range ids {
+		answered[id] = true
+	}
+	c.foldRowFindings(typeName, findings, details, func(rows []resource.Resource) map[string]string {
+		skip := make(map[string]string, len(rows))
+		for _, r := range rows {
+			if !answered[r.ID] {
+				skip[r.ID] = ""
+			}
+		}
+		return skip
+	})
+}
+
+// foldRowFindings is the one walk over every place the controller keeps a
+// type's rows; skipFor names, per row set, the rows the result is no answer
+// for (runtime.FoldWave2Rows' rule).
+func (c *Controller) foldRowFindings(typeName string, findings map[string][]domain.Finding, details map[string]map[domain.FindingCode]domain.AttentionDetail, skipFor func([]resource.Resource) map[string]string) {
 	canon := resource.CanonicalShortName(typeName)
 	td := resource.ResourceTypeDef{ShortName: canon}
 	if t := c.typeDefForLocked(typeName); t != nil {
@@ -1077,7 +1103,7 @@ func (c *Controller) applyRowFindings(typeName string, findings map[string][]dom
 	}
 
 	applySlice := func(rows []resource.Resource) {
-		runtime.FoldWave2Rows(rows, td, findings, details, uninspected)
+		runtime.FoldWave2Rows(rows, td, findings, details, skipFor(rows))
 	}
 
 	for i := range c.stack {

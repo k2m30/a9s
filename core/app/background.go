@@ -10,10 +10,11 @@ import "github.com/k2m30/a9s/v3/core/runtime"
 // screen content, or it is a renderer-only adapter task that must complete
 // before the screen is usable).
 //
-// Exactly 4 kinds are background:
+// Exactly 5 kinds are background:
 //
 //	runtime.KindRelatedCheck    — related-panel fan-out; result feeds RelatedCache/RelatedRows async.
 //	runtime.KindEnrichDetail    — Wave-2 detail enrichment; result patches DetailState async.
+//	runtime.KindEnrichRow       — one capped row's Wave-2 checks; result patches the row async.
 //	runtime.TaskKindProbeEnrich — Wave-2 menu enrichment probe; result patches menu badges async.
 //	runtime.TaskKindSaveCache   — disk cache persistence; no screen content at all.
 //
@@ -21,7 +22,7 @@ import "github.com/k2m30/a9s/v3/core/runtime"
 // unknown kind must not silently be deferred and dropped from a sync render.
 func IsBackgroundTaskKind(kind runtime.TaskKind) bool {
 	switch kind {
-	case runtime.KindRelatedCheck, runtime.KindEnrichDetail, runtime.TaskKindProbeEnrich, runtime.TaskKindSaveCache:
+	case runtime.KindRelatedCheck, runtime.KindEnrichDetail, runtime.KindEnrichRow, runtime.TaskKindProbeEnrich, runtime.TaskKindSaveCache:
 		return true
 	default:
 		return false

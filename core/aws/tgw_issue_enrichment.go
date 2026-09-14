@@ -92,7 +92,7 @@ func EnrichTGWAttachments(ctx context.Context, clients *ServiceClients, resource
 			if fetchErr {
 				MarkSkipped(&result, r.ID, &failures, lastErr)
 			} else {
-				markUninspected(&result, r.ID, checkCap)
+				markUninspected(&result, r.ID, CheckCap)
 			}
 			return
 		}

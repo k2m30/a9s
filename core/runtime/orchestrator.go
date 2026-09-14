@@ -110,6 +110,8 @@ func (c *Core) HandleEvent(ev Event) ([]UIIntent, []TaskRequest) {
 		return c.handleAvailabilityPrefetched(msg)
 	case messages.AvailabilityChecked:
 		return c.handleAvailabilityChecked(msg)
+	case messages.RowEnriched:
+		return c.handleRowEnriched(msg)
 	case messages.EnrichmentChecked:
 		return c.handleEnrichmentChecked(msg)
 	case messages.ResourcesLoaded:

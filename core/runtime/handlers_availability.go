@@ -127,6 +127,13 @@ func (c *Core) handleAvailabilityCacheLoaded(msg messages.AvailabilityCacheLoade
 			var realRows []resource.Resource
 			if cr, ok := rowsByType[shortName]; ok {
 				realRows = rowsFromCacheRows(shortName, cr)
+				// The rows come back with the mark the last sweep left on
+				// them: a row that sweep could not inspect is still not
+				// inspected, and its detail says so until a sweep this
+				// session answers for the type.
+				if uninspected := uninspectedFromCacheRows(cr); len(uninspected) > 0 {
+					c.session.EnrichmentTruncatedIDs[shortName] = uninspected
+				}
 			}
 			// Only real per-type disk row data
 			// feeds RowStore's rows-carrying Observe (OriginDisk — a later live
@@ -886,7 +893,11 @@ func (c *Core) snapshotRowStoreForSave(wave2Answered map[string]bool) *SaveCache
 	if len(resources) == 0 {
 		return nil
 	}
-	return &SaveCachePayload{Resources: resources, Truncated: truncated, Gens: c.rowStoreGens(), Wave2Answered: wave2Answered}
+	uninspected := make(map[string]map[string]string, len(c.session.EnrichmentTruncatedIDs))
+	for rt, ids := range c.session.EnrichmentTruncatedIDs {
+		uninspected[rt] = maps.Clone(ids)
+	}
+	return &SaveCachePayload{Resources: resources, Truncated: truncated, Gens: c.rowStoreGens(), Wave2Answered: wave2Answered, Uninspected: uninspected}
 }
 
 // rowStoreResourcesAndTruncated converts RowStore.SnapshotAll(false) into
@@ -951,6 +962,23 @@ func (c *Core) rowStoreResourcesAndTruncated() (map[string][]resource.Resource, 
 // handleEnrichmentChecked) write into the seeded ProbeResources rows this
 // function produces — an aliased Fields/Findings would let those writes
 // corrupt the in-memory Store the next save reads from.
+// uninspectedFromCacheRows is the persisted "not inspected" set of one type
+// file in the shape Session.EnrichmentTruncatedIDs holds it: row id to the
+// check that refused.
+func uninspectedFromCacheRows(rows []cache.Row) map[string]string {
+	var out map[string]string
+	for _, row := range rows {
+		if row.Uninspected == nil {
+			continue
+		}
+		if out == nil {
+			out = make(map[string]string)
+		}
+		out[row.ID] = *row.Uninspected
+	}
+	return out
+}
+
 func rowsFromCacheRows(shortName string, rows []cache.Row) []resource.Resource {
 	out := make([]resource.Resource, len(rows))
 	for i, row := range rows {

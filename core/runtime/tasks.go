@@ -324,6 +324,11 @@ type SaveCachePayload struct {
 	// writing the older row set over the newer one.
 	Gens          map[string]domain.Gen
 	Wave2Answered map[string]bool
+	// Uninspected is the per-type set of rows the sweep's enricher could not
+	// inspect, keyed by row id to the check that refused, frozen at dispatch
+	// with the rows it describes (Session.EnrichmentTruncatedIDs moves on
+	// while the save waits). A Wave-2-answered type writes it to its file.
+	Uninspected map[string]map[string]string
 }
 
 func (SaveCachePayload) isTaskPayload() {}

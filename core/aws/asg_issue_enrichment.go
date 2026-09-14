@@ -179,7 +179,7 @@ func asgLaunchConfigurationPosture(ctx context.Context, clients *ServiceClients,
 				continue
 			}
 			for _, id := range groupsByLC[name] {
-				markUninspected(result, id, checkCap)
+				markUninspected(result, id, CheckCap)
 			}
 		}
 	}

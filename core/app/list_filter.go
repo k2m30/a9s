@@ -261,13 +261,54 @@ func (c *Controller) applyEnrichmentState(typeName string, issueCount int, trunc
 	c.enrichmentDetails[typeName] = details
 	c.enrichmentTruncated[typeName] = truncated
 	c.enrichmentGen++
+	c.syncEnrichmentBadge(typeName, issueCount, truncated, authoritative)
+}
 
-	// Menu issue-badge sync: the in-list Wave-2 enrichment lane is the ONLY
-	// in-session source of the menu issue badge for renderers that run no
-	// background availability sweep (the web/headless lane) — syncing here
-	// mirrors syncExactTotalToMenu's issue-count half via the shared
-	// syncMenuIssueCount chokepoint, so a TUI-only sweep-driven badge doesn't
-	// mask this lane's inability to update it any other way.
+// mergeEnrichmentRows is applyEnrichmentState for a result that answers for
+// ids alone (ListEnrichmentPatch.RowIDs): those ids are replaced in the
+// store — present in findings or gone from it — and every other row's entry
+// stands.
+func (c *Controller) mergeEnrichmentRows(typeName string, issueCount int, truncated bool, findings map[string][]domain.Finding, details map[string]map[domain.FindingCode]domain.AttentionDetail, ids []string, authoritative bool) {
+	if c.enrichmentStore == nil {
+		c.enrichmentStore = make(map[string]map[string][]domain.Finding)
+	}
+	if c.enrichmentDetails == nil {
+		c.enrichmentDetails = make(map[string]map[string]map[domain.FindingCode]domain.AttentionDetail)
+	}
+	if c.enrichmentTruncated == nil {
+		c.enrichmentTruncated = make(map[string]bool)
+	}
+	if c.enrichmentStore[typeName] == nil {
+		c.enrichmentStore[typeName] = make(map[string][]domain.Finding)
+	}
+	if c.enrichmentDetails[typeName] == nil {
+		c.enrichmentDetails[typeName] = make(map[string]map[domain.FindingCode]domain.AttentionDetail)
+	}
+	for _, id := range ids {
+		if fs := domain.SanitizedFindings(findings[id]); len(fs) > 0 {
+			c.enrichmentStore[typeName][id] = fs
+		} else {
+			delete(c.enrichmentStore[typeName], id)
+		}
+		if ad := domain.SanitizedAttentionDetails(details[id]); len(ad) > 0 {
+			c.enrichmentDetails[typeName][id] = ad
+		} else {
+			delete(c.enrichmentDetails[typeName], id)
+		}
+	}
+	c.enrichmentTruncated[typeName] = truncated
+	c.enrichmentGen++
+	c.syncEnrichmentBadge(typeName, issueCount, truncated, authoritative)
+}
+
+// syncEnrichmentBadge is the menu issue-badge sync behind both store writes:
+// the in-list Wave-2 enrichment lane is the ONLY in-session source of the
+// menu issue badge for renderers that run no background availability sweep
+// (the web/headless lane), through the shared syncMenuIssueCount chokepoint.
+// authoritative propagates the caller's own authority over issueCount: when
+// true (issueCount IS the confirmed Wave-2 result for the type), even a
+// genuine zero flips IssueKnown.
+func (c *Controller) syncEnrichmentBadge(typeName string, issueCount int, truncated, authoritative bool) {
 	canon := resource.CanonicalShortName(typeName)
 	if ms := c.rootMenuState(); ms != nil {
 		// authoritative propagates the caller's own authority over issueCount:

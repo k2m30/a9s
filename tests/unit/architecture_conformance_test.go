@@ -309,6 +309,7 @@ var rowStoreMutationSeamFiles = map[string]struct{}{
 	"runtime/handlers_availability.go": {}, // AmendRows-wrapped FieldUpdates fold
 	"runtime/handlers_resources.go":    {}, // stripWave2FindingsRows: AmendRows-wrapped clear leg only
 	"runtime/helpers.go":               {}, // applyEnrichment: AmendRows-wrapped store leg only
+	"runtime/handlers_row_enrich.go":   {}, // handleRowEnriched: AmendRows-wrapped one-row fold
 }
 
 // TestConformance_Wave2RowMutators_HaveNoUnvettedCallSites pins the CLOSED

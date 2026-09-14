@@ -236,13 +236,15 @@ func checkOf(err error) string {
 	return ""
 }
 
-// checkCap is what a row records when nothing refused: a9s stopped at one of
+// CheckCap is what a row records when nothing refused: a9s stopped at one of
 // its own bounds before reaching the row, so the row was never looked at and
-// there is no failing call to name.
-const checkCap = "stopped at the inspection cap"
+// there is no failing call to name. It is the one mark the runtime acts on:
+// opening such a row's detail runs its checks on demand (KindEnrichRow),
+// since nothing but a9s's own bound stood between the row and an answer.
+const CheckCap = "stopped at the inspection cap"
 
 // markUninspected is the one writer of result.TruncatedIDs. check names what
-// did not answer for this row — the failing API call, or checkCap when a9s's
+// did not answer for this row — the failing API call, or CheckCap when a9s's
 // own bound is what stopped short. Every other recorder in this file routes
 // through it, and no enricher writes the set itself: a direct write reaches
 // the session with the row and without the check, which is the shape the
@@ -328,7 +330,7 @@ func capAtEnrichmentCap[T any](result *IssueEnricherResult, items []T, idsOf fun
 	}
 	for _, item := range items[EnrichmentCap:] {
 		for _, id := range idsOf(item) {
-			markUninspected(result, id, checkCap)
+			markUninspected(result, id, CheckCap)
 		}
 	}
 	SetTruncated(result, true)
@@ -551,7 +553,7 @@ func walkAccountPages[T any](
 	}
 	for _, r := range resources {
 		if rule == manyItemsPerRow || !seen[r.ID] {
-			markUninspected(result, r.ID, checkCap)
+			markUninspected(result, r.ID, CheckCap)
 		}
 	}
 	return items, pages, true, err

@@ -695,6 +695,10 @@ type SaveContent struct {
 	IssuesKnown        bool
 	IssuesTruncated    bool
 	Wave2Authoritative bool
+	// Uninspected is the rows the Wave-2 sweep could not inspect, keyed by id
+	// to the check that refused. Read only when Wave2Authoritative: a save
+	// that carries no Wave-2 answer keeps what the file already records.
+	Uninspected map[string]string
 }
 
 // obsGen is the row-store observation generation the rows were frozen at.
@@ -739,6 +743,7 @@ func (c *Core) saveResourceListCache(target SaveTarget, rows []cache.Row, conten
 		// already carried keeps the stamp that observation earned rather than
 		// reading as newly seen because this save's fetch re-reported it.
 		tf.Rows = stampFindingFirstSeen(existing.Rows, tf.Rows, time.Now())
+		tf.Rows = stampUninspected(existing.Rows, tf.Rows, content.Uninspected, content.Wave2Authoritative)
 		if content.IssuesKnown {
 			tf.Issues = content.Issues
 			tf.IssuesKnown = true
@@ -991,6 +996,13 @@ func (c *Core) BuildEnrichQueue() []string {
 // probe alone has retained.
 // Regression pin: TestProbeEnrichment_CacheSnapshotMergesProbeResources.
 func (c *Core) ProbeEnrichment(ctx context.Context, clients *awsclient.ServiceClients, shortName string) ProbeEnrichmentResult {
+	resources, _ := c.ProbeResources(shortName)
+	return c.probeEnrichmentRows(ctx, clients, shortName, resources)
+}
+
+// probeEnrichmentRows runs shortName's Wave-2 enricher over exactly the rows
+// given: the type's retained rows for a sweep, one row for KindEnrichRow.
+func (c *Core) probeEnrichmentRows(ctx context.Context, clients *awsclient.ServiceClients, shortName string, resources []resource.Resource) ProbeEnrichmentResult {
 	if clients == nil {
 		return ProbeEnrichmentResult{
 			ResourceType: shortName,
@@ -1001,7 +1013,6 @@ func (c *Core) ProbeEnrichment(ctx context.Context, clients *awsclient.ServiceCl
 	if !ok {
 		return ProbeEnrichmentResult{ResourceType: shortName}
 	}
-	resources, _ := c.ProbeResources(shortName)
 	cacheSnap := c.BuildResourceCacheSnapshot()
 
 	probeCtx, cancel := context.WithTimeout(ctx, 10*time.Second)

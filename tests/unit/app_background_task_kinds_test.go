@@ -36,6 +36,7 @@ func TestIsBackgroundTaskKind_TableAllKnownKinds(t *testing.T) {
 		// -- background (4) --
 		{"KindRelatedCheck", runtime.KindRelatedCheck, true},
 		{"KindEnrichDetail", runtime.KindEnrichDetail, true},
+		{"KindEnrichRow", runtime.KindEnrichRow, true},
 		{"TaskKindProbeEnrich", runtime.TaskKindProbeEnrich, true},
 		{"TaskKindSaveCache", runtime.TaskKindSaveCache, true},
 

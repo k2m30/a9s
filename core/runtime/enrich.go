@@ -34,3 +34,16 @@ type EnrichDetailPayload struct {
 
 // isTaskPayload satisfies the TaskPayload marker interface.
 func (EnrichDetailPayload) isTaskPayload() {}
+
+// KindEnrichRow runs a resource type's Wave-2 issue enricher for ONE row: the
+// row the sweep left "not inspected" at its own cap (awsclient.CheckCap) and
+// the operator has now opened. The list cap is unchanged; the row the
+// operator is looking at gets its answer.
+const KindEnrichRow TaskKind = "enrich-row"
+
+// EnrichRowPayload is the typed TaskPayload variant for KindEnrichRow.
+type EnrichRowPayload struct {
+	Op DetailOperation
+}
+
+func (EnrichRowPayload) isTaskPayload() {}

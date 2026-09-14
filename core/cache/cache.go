@@ -63,6 +63,15 @@ type Row struct {
 	// persists; a code absent here that reappears later is treated as newly
 	// observed, not re-dated to its original first sighting (#463).
 	FindingFirstSeen map[domain.FindingCode]time.Time `yaml:"finding_first_seen,omitempty"`
+
+	// Uninspected is set when the last Wave-2 sweep that answered for this
+	// type could not inspect this row, and names the check that refused ("" for
+	// a recorder that had no name to give). The row and its older findings
+	// come back from this file after a restart, so the fact that the last
+	// sweep did not verify them has to come back with them: without it a row
+	// whose check was refused reads as verified until the next sweep. Written
+	// only by a Wave-2-authoritative save; every other save carries it forward.
+	Uninspected *string `yaml:"uninspected,omitempty"`
 }
 
 // deepCopyRows returns a copy of rows in which every element's Fields and
@@ -95,6 +104,10 @@ func deepCopyRows(rows []Row) []Row {
 		}
 		if r.FindingFirstSeen != nil {
 			r.FindingFirstSeen = maps.Clone(r.FindingFirstSeen)
+		}
+		if r.Uninspected != nil {
+			check := *r.Uninspected
+			r.Uninspected = &check
 		}
 		out[i] = r
 	}

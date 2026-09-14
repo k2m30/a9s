@@ -512,6 +512,28 @@ type EnrichDetailResult struct {
 	OperationID  domain.Gen
 }
 
+// RowEnriched is one row's on-demand Wave-2 answer (runtime.KindEnrichRow):
+// the row the sweep left at its inspection cap and the operator has opened.
+// Findings and AttentionDetails carry that row alone. Uninspected says the
+// on-demand check itself could not inspect the row, Check names the call
+// that refused. Stamped with the detail operation that asked, like
+// EnrichDetailResult.
+type RowEnriched struct {
+	ResourceType     string
+	ResourceID       string
+	Findings         map[string][]domain.Finding
+	AttentionDetails map[string]map[domain.FindingCode]domain.AttentionDetail
+	Uninspected      bool
+	Check            string
+	Err              error
+	OperationID      domain.Gen
+}
+
+func (RowEnriched) isEvent()               {}
+func (m RowEnriched) GenStamp() domain.Gen { return m.OperationID }
+func (RowEnriched) GenAspect() Aspect      { return AspectDetailOp }
+func (RowEnriched) AcceptZeroGen() bool    { return true }
+
 func (EnrichDetailResult) isEvent()               {}
 func (m EnrichDetailResult) GenStamp() domain.Gen { return m.OperationID }
 func (EnrichDetailResult) GenAspect() Aspect      { return AspectDetailOp }
@@ -616,6 +638,7 @@ func AllEventSamples() []Event {
 		// resource (cache keys, matching a stacked detail screen) exercises
 		// its real branch instead of an empty-string no-op.
 		EnrichDetailResult{ResourceType: "ec2", ResourceID: "i-sample", EnrichedRes: resource.Resource{Type: "ec2", ID: "i-sample"}},
+		RowEnriched{ResourceType: "ec2", ResourceID: "i-sample"},
 		CostsLoaded{},
 		ThemeFileRead{Theme: "sample"},
 	}

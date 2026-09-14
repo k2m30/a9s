@@ -248,14 +248,15 @@ func (c *Core) ExecuteTaskAt(ctx context.Context, req TaskRequest, snap Dispatch
 		saveResources, saveTruncated := c.rowStoreResourcesAndTruncated()
 		saveGens := c.rowStoreGens()
 		var wave2Answered map[string]bool
+		var uninspected map[string]map[string]string
 		if p, ok := req.Payload.(*SaveCachePayload); ok && p != nil {
 			saveResources, saveTruncated, saveGens = p.Resources, p.Truncated, p.Gens
-			wave2Answered = p.Wave2Answered
+			wave2Answered, uninspected = p.Wave2Answered, p.Uninspected
 		}
 		// A nil-Payload dispatch answers for no type (C6b): only
 		// handleEnrichmentChecked's "all done" branch names Wave-2-answered
 		// types, and it always carries a SaveCachePayload.
-		if err := c.saveProbeResourcesToTypeFiles(dispatchPair, saveResources, saveTruncated, wave2Answered, saveGens); err != nil {
+		if err := c.saveProbeResourcesToTypeFiles(dispatchPair, saveResources, saveTruncated, wave2Answered, uninspected, saveGens); err != nil {
 			flashErr = err
 		}
 		if err := c.SaveAvailabilityFromRows(dispatchPair); err != nil && flashErr == nil {
@@ -365,6 +366,32 @@ func (c *Core) ExecuteTaskAt(ctx context.Context, req TaskRequest, snap Dispatch
 			Err:          err,
 			OperationID:  p.Op.ID,
 		}, nil
+
+	case KindEnrichRow:
+		p, ok := req.Payload.(EnrichRowPayload)
+		if !ok {
+			return nil, fmt.Errorf("ExecuteTask %s: missing EnrichRowPayload", req.Key.Kind)
+		}
+		id := p.Op.Resource.ID
+		r := c.probeEnrichmentRows(ctx, p.Op.Clients, p.Op.ResourceType, []resource.Resource{p.Op.Resource})
+		// An account-wide enricher answers for rows it was not asked about;
+		// this task answers for one row and carries nothing else.
+		check, uninspected := r.TruncatedIDs[id]
+		msg := messages.RowEnriched{
+			ResourceType: p.Op.ResourceType,
+			ResourceID:   id,
+			Uninspected:  uninspected,
+			Check:        check,
+			Err:          r.Err,
+			OperationID:  p.Op.ID,
+		}
+		if fs := r.Findings[id]; len(fs) > 0 {
+			msg.Findings = map[string][]domain.Finding{id: fs}
+		}
+		if ad := r.AttentionDetails[id]; len(ad) > 0 {
+			msg.AttentionDetails = map[string]map[domain.FindingCode]domain.AttentionDetail{id: ad}
+		}
+		return msg, nil
 
 	// --- fetch resources (top-level) ---
 	case KindFetchResources:
@@ -708,10 +735,12 @@ func (c *Core) availabilityFromResourceCache() (
 // failed is absent from it — is a bare rows-carrying observation that must
 // carry forward the Wave-2 data the on-disk rows already have
 // (reconcileTypeFile's carry step).
+// uninspected is the per-type set of rows the enricher could not inspect,
+// frozen with the rows; a Wave-2-answered type writes it to its file.
 // gens carries the row-store observation generation each type's rows were
 // frozen at, so a snapshot this save was queued behind cannot overwrite a
 // newer observation that landed while it waited.
-func (c *Core) saveProbeResourcesToTypeFiles(pair session.Pair, probeResources map[string][]resource.Resource, probeTruncated map[string]bool, wave2Answered map[string]bool, gens map[string]domain.Gen) error {
+func (c *Core) saveProbeResourcesToTypeFiles(pair session.Pair, probeResources map[string][]resource.Resource, probeTruncated map[string]bool, wave2Answered map[string]bool, uninspected map[string]map[string]string, gens map[string]domain.Gen) error {
 	if len(probeResources) == 0 {
 		return nil
 	}
@@ -740,6 +769,7 @@ func (c *Core) saveProbeResourcesToTypeFiles(pair session.Pair, probeResources m
 				IssuesKnown:        issuesKnown,
 				IssuesTruncated:    truncated,
 				Wave2Authoritative: wave2Answered[shortName],
+				Uninspected:        uninspected[shortName],
 			},
 		)
 		if err != nil && firstErr == nil {

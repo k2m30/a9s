@@ -202,6 +202,33 @@ func wave2FindingsOf(findings []domain.Finding) []domain.Finding {
 // so a Wave-2-carried finding keeps the FirstSeen stamp its earlier
 // observation already earned, rather than being treated as newly observed
 // just because this particular save's raw fetch didn't itself re-report it.
+// stampUninspected writes the "not inspected" mark onto the rows a save is
+// about to persist. A Wave-2-authoritative save is the sweep's own answer:
+// exactly the rows in uninspected carry the check that refused them and every
+// other row is verified, so a mark the previous sweep left clears. Any other
+// save learned nothing about Wave-2 and carries each row's stored mark forward
+// by id, the way carryWave2ForRows carries its findings.
+func stampUninspected(oldRows, newRows []cache.Row, uninspected map[string]string, wave2Authoritative bool) []cache.Row {
+	oldByID := make(map[string]*string, len(oldRows))
+	for _, r := range oldRows {
+		oldByID[r.ID] = r.Uninspected
+	}
+	out := make([]cache.Row, len(newRows))
+	for i, row := range newRows {
+		switch {
+		case wave2Authoritative:
+			row.Uninspected = nil
+			if check, ok := uninspected[row.ID]; ok {
+				row.Uninspected = &check
+			}
+		default:
+			row.Uninspected = oldByID[row.ID]
+		}
+		out[i] = row
+	}
+	return out
+}
+
 func stampFindingFirstSeen(oldRows, newRows []cache.Row, now time.Time) []cache.Row {
 	oldByID := make(map[string]cache.Row, len(oldRows))
 	for _, r := range oldRows {
