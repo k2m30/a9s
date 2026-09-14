@@ -738,6 +738,7 @@ func (c *Core) handleEnrichmentChecked(msg messages.EnrichmentChecked) ([]UIInte
 	// Update findings and menu issue count on success or partial success.
 	{
 		c.session.EnrichmentRanSet(msg.ResourceType)
+		msg = c.keepRowAnswers(msg)
 
 		if c.session.EnrichmentTruncatedIDs == nil {
 			c.session.EnrichmentTruncatedIDs = make(map[string]map[string]string)

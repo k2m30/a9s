@@ -340,11 +340,16 @@ func (c *Controller) applyIntentsLocked(intents []runtime.UIIntent) {
 			// correct Attention section immediately. Mirrors the TUI adapter's
 			// former local PatchDetail case in app_dispatch.go (removed — this is
 			// now the single source of truth for both TUI and web/headless).
-			if len(v.EnrichmentFindings) == 0 {
+			switch {
+			case v.ResourceID != "":
+				// One row's answer: only that row's detail changes, whether
+				// it gained findings or came back clean.
+				c.applyDetailFindingsForResource(v.ResourceType, v.ResourceID, v.EnrichmentFindings[v.ResourceID], v.EnrichmentAttentionDetails[v.ResourceID])
+			case len(v.EnrichmentFindings) == 0:
 				// Nil or empty Findings means all resources of this type have
 				// recovered: clear enrichment from every stacked detail screen.
 				c.clearDetailFindingsForType(v.ResourceType)
-			} else {
+			default:
 				// Clear stale findings from every stacked detail of this type first,
 				// so a resource that recovered (absent from the new map) loses its
 				// Attention; then re-apply for resources still reporting findings.

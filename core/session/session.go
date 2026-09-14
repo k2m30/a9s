@@ -309,6 +309,11 @@ type Session struct {
 	EnrichmentRan          map[string]bool
 	enrichmentRanMu        sync.Mutex
 	EnrichmentTruncatedIDs map[string]map[string]string
+	// EnrichmentRowAnswered is the per-type set of rows a KindEnrichRow
+	// answered for since the type's last refresh. A sweep that was already in
+	// flight when the answer landed reports those rows at its cap; the answer
+	// stands, because the sweep never looked at them.
+	EnrichmentRowAnswered map[string]map[string]struct{}
 
 	// EnrichmentTypeGen is the per-type Wave-2 enrichment counter, guarded by
 	// enrichmentTypeGenMu — like ProbeStatus above, a dispatch-time snapshot
@@ -454,6 +459,7 @@ func New() *Session {
 		EnrichmentTypeGen:      make(map[string]domain.Gen),
 		listFetchSeq:           make(map[domain.Gen]domain.Gen),
 		EnrichmentTruncatedIDs: make(map[string]map[string]string),
+		EnrichmentRowAnswered:  make(map[string]map[string]struct{}),
 		ScanHealthLogged:       make(map[string]bool),
 		RowStore:               NewRowStore(),
 		RelatedCache:           NewRelatedCacheLRU(MaxRelatedCacheEntries),
@@ -966,6 +972,7 @@ func (s *Session) Rotate() {
 	s.ScanHealthLogged = make(map[string]bool)
 	s.EnrichmentTypeGenReset()
 	s.EnrichmentTruncatedIDs = make(map[string]map[string]string)
+	s.EnrichmentRowAnswered = make(map[string]map[string]struct{})
 	// EnrichSweepMembers/EnrichListOpenPending: a prior profile/region's
 	// in-flight sweep-window/list-open bookkeeping must not leak into the
 	// next pair's scan — same rationale as EnrichmentRan/EnrichmentTypeGen

@@ -356,6 +356,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.coreUpdate(msg)
 	case messages.EnrichmentChecked:
 		return m.coreUpdate(msg)
+	case messages.RowEnriched:
+		return m.coreUpdate(msg)
 	case messages.EnrichDetailResult:
 		return m.handleEnrichDetailResult(msg)
 	case messages.RelatedCheckResult:

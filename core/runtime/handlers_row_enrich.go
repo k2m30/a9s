@@ -5,6 +5,8 @@ package runtime
 import (
 	"maps"
 
+	awsclient "github.com/k2m30/a9s/v3/core/aws"
+	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 	"github.com/k2m30/a9s/v3/core/runtime/messages"
 )
@@ -43,6 +45,12 @@ func (c *Core) handleRowEnriched(msg messages.RowEnriched) ([]UIIntent, []TaskRe
 		return nil, nil
 	}
 	delete(set, msg.ResourceID)
+	answered := c.session.EnrichmentRowAnswered[canon]
+	if answered == nil {
+		answered = make(map[string]struct{})
+		c.session.EnrichmentRowAnswered[canon] = answered
+	}
+	answered[msg.ResourceID] = struct{}{}
 	c.AmendRows(canon, func(rows []resource.Resource) []resource.Resource {
 		out := make([]resource.Resource, len(rows))
 		copy(out, rows)
@@ -68,6 +76,14 @@ func (c *Core) handleRowEnriched(msg messages.RowEnriched) ([]UIIntent, []TaskRe
 	if tr := c.session.RowStore.Snapshot(canon); tr.Pagination != nil && tr.Pagination.IsTruncated {
 		truncated = true
 	}
+	// The answer outlives the session the way the sweep's does: the
+	// sweep-completion save, with this type answered for, writes the row's
+	// findings and clears its mark on disk (Session.EnrichmentTruncatedIDs no
+	// longer names it, and every other row keeps what the set still says).
+	var tasks []TaskRequest
+	if save := c.snapshotRowStoreForSave(map[string]bool{canon: true}); save != nil {
+		tasks = append(tasks, TaskRequest{Key: TaskKey{Kind: TaskKindSaveCache}, Payload: save})
+	}
 	return []UIIntent{
 		PatchMenu{ResourceType: canon, Issues: unified, Truncated: truncated},
 		PatchResourceList{
@@ -87,5 +103,58 @@ func (c *Core) handleRowEnriched(msg messages.RowEnriched) ([]UIIntent, []TaskRe
 			EnrichmentFindings:         msg.Findings,
 			EnrichmentAttentionDetails: msg.AttentionDetails,
 		},
-	}, nil
+	}, tasks
+}
+
+// keepRowAnswers folds the rows a KindEnrichRow answered for into a sweep
+// result that reports them at its cap: the sweep was dispatched before the
+// answer landed and never looked at those rows, so they keep the answer —
+// out of the uninspected set, and carrying the findings the row store holds
+// for them, so the fold and the list store see them as answered. A sweep
+// that did look at such a row (it is absent from TruncatedIDs, or refused
+// by a named call) supersedes the answer.
+func (c *Core) keepRowAnswers(msg messages.EnrichmentChecked) messages.EnrichmentChecked {
+	answered := c.session.EnrichmentRowAnswered[msg.ResourceType]
+	if len(answered) == 0 {
+		return msg
+	}
+	rows, _ := c.ProbeResources(msg.ResourceType)
+	byID := make(map[string]resource.Resource, len(rows))
+	for _, r := range rows {
+		byID[r.ID] = r
+	}
+	truncated := maps.Clone(msg.TruncatedIDs)
+	findings := maps.Clone(msg.Findings)
+	details := maps.Clone(msg.AttentionDetails)
+	for id := range answered {
+		if truncated[id] != awsclient.CheckCap {
+			continue
+		}
+		delete(truncated, id)
+		row, ok := byID[id]
+		if !ok {
+			continue
+		}
+		var wave2 []domain.Finding
+		for _, f := range row.Findings {
+			if f.IsWave2Sourced() {
+				wave2 = append(wave2, f)
+			}
+		}
+		if len(wave2) == 0 {
+			continue
+		}
+		if findings == nil {
+			findings = make(map[string][]domain.Finding)
+		}
+		findings[id] = wave2
+		if len(row.AttentionDetails) > 0 {
+			if details == nil {
+				details = make(map[string]map[domain.FindingCode]domain.AttentionDetail)
+			}
+			details[id] = maps.Clone(row.AttentionDetails)
+		}
+	}
+	msg.TruncatedIDs, msg.Findings, msg.AttentionDetails = truncated, findings, details
+	return msg
 }

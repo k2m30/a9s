@@ -27,6 +27,9 @@ import (
 
 const onDemandPhrase = "system check failed"
 
+// The pair newTestControllerAndCore's session carries.
+const onDemandProfile, onDemandRegion = "demo", "us-east-1"
+
 // onDemandEC2Enricher answers "system check failed" for every row it is
 // asked about and records what it was asked.
 func onDemandEC2Enricher(t *testing.T, asked *[][]string) {
@@ -53,15 +56,15 @@ func cappedEC2List(t *testing.T) (*app.Controller, *runtime.Core, []resource.Res
 	t.Helper()
 	c, core := newTestControllerAndCore(t)
 	core.Session().Clients = demo.NewServiceClients()
+	seedFromDisk(c, onDemandProfile, onDemandRegion)
 	c.Apply(app.Action{Kind: app.ActionCommand, Arg: "ec2"})
 	rows := uninspectedEC2Rows()
 	c.ApplyResourcesLoaded("ec2", rows, nil, false)
 	core.ObserveRows("ec2", rows, nil, session.OriginFetch, false)
-	intents, _ := core.HandleEvent(messages.EnrichmentChecked{
+	sweepSaveAfterEnrichment(t, core, c, messages.EnrichmentChecked{
 		ResourceType: "ec2",
 		TruncatedIDs: map[string]string{rows[0].ID: awsclient.CheckCap, rows[1].ID: awsclient.CheckCap},
 	})
-	c.ApplyIntents(intents)
 	for _, r := range rows {
 		if got := statusCellFor(t, *c.Snapshot().Body.List, r.ID); got != domain.NotInspectedPhrase {
 			t.Fatalf("precondition: capped row %q Status cell = %q, want %q", r.ID, got, domain.NotInspectedPhrase)
@@ -90,8 +93,15 @@ func openDetailWithWorkload(t *testing.T, c *app.Controller, core *runtime.Core,
 		if err != nil {
 			t.Fatalf("KindEnrichRow: %v", err)
 		}
-		intents, _ := core.HandleEvent(ev)
+		intents, followUps := core.HandleEvent(ev)
 		c.ApplyIntents(intents)
+		for _, f := range followUps {
+			if f.Key.Kind == runtime.TaskKindSaveCache {
+				if _, err := core.ExecuteTask(context.Background(), f); err != nil {
+					t.Fatalf("save after the row answer: %v", err)
+				}
+			}
+		}
 		ran++
 	}
 	return ran
@@ -133,6 +143,60 @@ func TestCappedRow_DetailOpenRunsItsChecks(t *testing.T) {
 	}
 	if got := statusCellFor(t, *body, rows[1].ID); got != domain.NotInspectedPhrase {
 		t.Errorf("the other capped row's Status cell = %q, want %q", got, domain.NotInspectedPhrase)
+	}
+
+	// The answer is on disk: the row's mark is gone and the other row's stays.
+	if got := uninspectedOnDisk(t, onDemandProfile, onDemandRegion, rows[0].ID); got != nil {
+		t.Errorf("the answered row still carries uninspected=%q on disk", *got)
+	}
+	if got := uninspectedOnDisk(t, onDemandProfile, onDemandRegion, rows[1].ID); got == nil || *got != awsclient.CheckCap {
+		t.Errorf("the other capped row's mark on disk = %v, want %q", got, awsclient.CheckCap)
+	}
+
+	// A sweep dispatched before the answer lands afterwards and reports the
+	// row at its cap: it never looked at the row, so the answer stands.
+	intents, _ := core.HandleEvent(messages.EnrichmentChecked{
+		ResourceType: "ec2",
+		TruncatedIDs: map[string]string{rows[0].ID: awsclient.CheckCap, rows[1].ID: awsclient.CheckCap},
+	})
+	c.ApplyIntents(intents)
+	if set := core.EnrichmentTruncatedIDs("ec2"); set[rows[0].ID] != "" || set[rows[1].ID] != awsclient.CheckCap {
+		t.Errorf("after a stale sweep the uninspected set is %v, want only %q capped", set, rows[1].ID)
+	}
+	body = c.Snapshot().Body.List
+	if got := statusCellFor(t, *body, rows[0].ID); got != onDemandPhrase {
+		t.Errorf("after a stale sweep the answered row's Status cell = %q, want %q", got, onDemandPhrase)
+	}
+	if got := c.GetListEnrichmentFindings("ec2")[rows[0].ID]; len(got) != 1 {
+		t.Errorf("after a stale sweep the store carries %v for the answered row, want its one finding", got)
+	}
+}
+
+func TestCappedRow_AnswerLeavesTheOtherOpenDetailAlone(t *testing.T) {
+	var asked [][]string
+	onDemandEC2Enricher(t, &asked)
+	c, core, rows := cappedEC2List(t)
+	// The other capped row's detail is open underneath, carrying a finding
+	// an earlier sweep found.
+	prior := []domain.Finding{{Code: "ec2.stopped", Phrase: "stopped by the operator", Severity: domain.SevWarn, Source: "wave2:ec2"}}
+	c.ApplyIntents([]runtime.UIIntent{runtime.PatchResourceList{
+		ResourceType: "ec2",
+		Enrichment:   &runtime.ListEnrichmentPatch{Findings: map[string][]domain.Finding{rows[1].ID: prior}, TruncatedIDs: core.EnrichmentTruncatedIDs("ec2")},
+	}})
+	c.ApplyIntents([]runtime.UIIntent{runtime.PushScreen{
+		ID:      runtime.ScreenDetail,
+		Context: runtime.ScreenContext{ResourceType: "ec2", ResourceID: rows[1].ID},
+	}})
+	c.EnsureDetailState(rows[1], "ec2")
+	c.ApplyIntents([]runtime.UIIntent{runtime.PatchDetail{ResourceType: "ec2", EnrichmentFindings: map[string][]domain.Finding{rows[1].ID: prior}}})
+	if entries := topAttentionEntries(t, c); !strings.Contains(strings.Join(entries, " "), "stopped by the operator") {
+		t.Fatalf("precondition: the underlying detail reads %v, want its finding", entries)
+	}
+
+	openDetailWithWorkload(t, c, core, rows[0])
+	c.Apply(app.Action{Kind: app.ActionBack})
+	if entries := topAttentionEntries(t, c); !strings.Contains(strings.Join(entries, " "), "stopped by the operator") {
+		t.Errorf("one row's answer cleared the other open detail's finding: %v", entries)
 	}
 }
 
