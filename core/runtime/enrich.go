@@ -10,6 +10,7 @@ package runtime
 
 import (
 	awsclient "github.com/k2m30/a9s/v3/core/aws"
+	"github.com/k2m30/a9s/v3/core/domain"
 )
 
 // KindEnrichDetail is the TaskKind the runtime emits to ask the adapter
@@ -44,6 +45,11 @@ const KindEnrichRow TaskKind = "enrich-row"
 // EnrichRowPayload is the typed TaskPayload variant for KindEnrichRow.
 type EnrichRowPayload struct {
 	Op DetailOperation
+	// Gen and TypeGen are the enrichment epoch the check was dispatched in
+	// (Session.EnrichmentGen, EnrichmentTypeGen[type]); a refresh in the
+	// meantime makes the answer stale, and handleRowEnriched drops it.
+	Gen     domain.Gen
+	TypeGen domain.Gen
 }
 
 func (EnrichRowPayload) isTaskPayload() {}

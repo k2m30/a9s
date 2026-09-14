@@ -17,6 +17,7 @@ import (
 
 	"github.com/k2m30/a9s/v3/core/app"
 	awsclient "github.com/k2m30/a9s/v3/core/aws"
+	"github.com/k2m30/a9s/v3/core/cache"
 	"github.com/k2m30/a9s/v3/core/demo"
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
@@ -186,6 +187,114 @@ func TestCappedRow_DetailOpenRunsItsChecks(t *testing.T) {
 	c.ApplyIntents(intents)
 	if set := core.EnrichmentTruncatedIDs("ec2"); set[rows[0].ID] != awsclient.CheckCap {
 		t.Errorf("after a global refresh a sweep that capped the row left it answered: set is %v", set)
+	}
+}
+
+// findingsOnDisk returns the codes the ec2 type file carries for the row.
+func findingsOnDisk(t *testing.T, profile, region, id string) []string {
+	t.Helper()
+	tf, ok := cache.LoadDirForTest(profile, region).Type("ec2")
+	if !ok {
+		t.Fatal("no ec2 type file on disk")
+	}
+	for _, row := range tf.Rows {
+		if row.ID != id {
+			continue
+		}
+		var codes []string
+		for _, f := range row.Findings {
+			codes = append(codes, string(f.Code))
+		}
+		return codes
+	}
+	t.Fatalf("row %q is not in the ec2 type file", id)
+	return nil
+}
+
+// One row's answer is saved as one row's: the other capped row keeps its
+// mark and the finding an earlier sweep found, on disk as in memory.
+func TestCappedRow_AnswerKeepsTheOtherRowsFindingOnDisk(t *testing.T) {
+	var asked [][]string
+	onDemandEC2Enricher(t, &asked)
+	c, core := newTestControllerAndCore(t)
+	core.Session().Clients = demo.NewServiceClients()
+	seedFromDisk(c, onDemandProfile, onDemandRegion)
+	c.Apply(app.Action{Kind: app.ActionCommand, Arg: "ec2"})
+	rows := uninspectedEC2Rows()
+	c.ApplyResourcesLoaded("ec2", rows, nil, false)
+	core.ObserveRows("ec2", rows, &resource.PaginationMeta{IsTruncated: false}, session.OriginFetch, false)
+	prior := []domain.Finding{{Code: "ec2.stopped", Phrase: "stopped by the operator", Severity: domain.SevWarn, Source: "wave2:ec2"}}
+	sweepSaveAfterEnrichment(t, core, c, messages.EnrichmentChecked{
+		ResourceType: "ec2",
+		Findings:     map[string][]domain.Finding{rows[1].ID: prior},
+		TruncatedIDs: map[string]string{rows[0].ID: awsclient.CheckCap},
+	})
+	sweepSaveAfterEnrichment(t, core, c, messages.EnrichmentChecked{
+		ResourceType: "ec2",
+		TruncatedIDs: map[string]string{rows[0].ID: awsclient.CheckCap, rows[1].ID: awsclient.CheckCap},
+	})
+	if got := findingsOnDisk(t, onDemandProfile, onDemandRegion, rows[1].ID); len(got) != 1 {
+		t.Fatalf("precondition: the capped row's earlier finding is not on disk: %v", got)
+	}
+
+	openDetailWithWorkload(t, c, core, rows[0])
+	if got := findingsOnDisk(t, onDemandProfile, onDemandRegion, rows[1].ID); len(got) != 1 {
+		t.Errorf("another row's on-demand answer dropped this row's finding from disk: %v", got)
+	}
+	if got := uninspectedOnDisk(t, onDemandProfile, onDemandRegion, rows[1].ID); got == nil || *got != awsclient.CheckCap {
+		t.Errorf("another row's on-demand answer moved this row's mark on disk to %v", got)
+	}
+}
+
+// An answer dispatched before a refresh is not the one the refresh asked
+// for: it lands nowhere.
+func TestCappedRow_AnswerFromBeforeARefreshIsDropped(t *testing.T) {
+	for name, refresh := range map[string]func(core *runtime.Core){
+		"list refresh":   func(core *runtime.Core) { core.RefreshListEnrichment("ec2") },
+		"global refresh": func(core *runtime.Core) { core.BumpEnrichmentGen(); core.ResetEnrichmentMaps() },
+	} {
+		t.Run(name, func(t *testing.T) {
+			var asked [][]string
+			onDemandEC2Enricher(t, &asked)
+			c, core, rows := cappedEC2List(t)
+			c.ApplyIntents([]runtime.UIIntent{runtime.PushScreen{
+				ID:      runtime.ScreenDetail,
+				Context: runtime.ScreenContext{ResourceType: "ec2", ResourceID: rows[0].ID},
+			}})
+			c.EnsureDetailState(rows[0], "ec2")
+			_, tasks := core.BeginDetailOperation("ec2", rows[0], false)
+			var ev messages.Event
+			for _, task := range tasks {
+				if task.Key.Kind != runtime.KindEnrichRow {
+					continue
+				}
+				var err error
+				if ev, err = core.ExecuteTask(context.Background(), task); err != nil {
+					t.Fatalf("KindEnrichRow: %v", err)
+				}
+			}
+			if ev == nil {
+				t.Fatal("the capped row's detail dispatched no on-demand check")
+			}
+			refresh(core)
+			intents, tasks := core.HandleEvent(ev)
+			c.ApplyIntents(intents)
+			if len(intents) != 0 || len(tasks) != 0 {
+				t.Errorf("a pre-refresh answer produced %d intents and %d tasks, want none", len(intents), len(tasks))
+			}
+			if got := c.GetListEnrichmentFindings("ec2")[rows[0].ID]; len(got) != 0 {
+				t.Errorf("a pre-refresh answer landed its finding: %v", got)
+			}
+			// The next sweep, which caps the row again, is the truth.
+			intents, _ = core.HandleEvent(messages.EnrichmentChecked{
+				ResourceType: "ec2",
+				TruncatedIDs: map[string]string{rows[0].ID: awsclient.CheckCap},
+			})
+			c.ApplyIntents(intents)
+			if set := core.EnrichmentTruncatedIDs("ec2"); set[rows[0].ID] != awsclient.CheckCap {
+				t.Errorf("a pre-refresh answer outlived the refresh: the uninspected set is %v", set)
+			}
+		})
 	}
 }
 

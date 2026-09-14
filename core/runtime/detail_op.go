@@ -114,7 +114,7 @@ func (c *Core) BeginDetailOperation(resourceType string, res resource.Resource, 
 		tasks = append(tasks, TaskRequest{
 			Key:     TaskKey{Kind: KindEnrichRow, Scope: scope},
 			Cache:   CacheNone,
-			Payload: EnrichRowPayload{Op: op},
+			Payload: EnrichRowPayload{Op: op, Gen: c.session.EnrichmentGen, TypeGen: c.session.EnrichmentTypeGenGet(canon)},
 		})
 	}
 

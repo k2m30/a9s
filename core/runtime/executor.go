@@ -377,22 +377,17 @@ func (c *Core) ExecuteTaskAt(ctx context.Context, req TaskRequest, snap Dispatch
 		// The check runs on the live row, never the copy the detail opened
 		// with (BeginDetailOperation's rule); a row that is no longer live
 		// stays at its cap.
+		msg := messages.RowEnriched{ResourceType: p.Op.ResourceType, ResourceID: id, OperationID: p.Op.ID, Gen: p.Gen, TypeGen: p.TypeGen}
 		row, live := c.liveRow(canon, id)
 		if !live {
-			return messages.RowEnriched{ResourceType: p.Op.ResourceType, ResourceID: id, Uninspected: true, Check: awsclient.CheckCap, OperationID: p.Op.ID}, nil
+			msg.Uninspected, msg.Check = true, awsclient.CheckCap
+			return msg, nil
 		}
 		r := c.probeEnrichmentRows(ctx, p.Op.Clients, p.Op.ResourceType, []resource.Resource{row})
 		// An account-wide enricher answers for rows it was not asked about;
 		// this task answers for one row and carries nothing else.
-		check, uninspected := r.TruncatedIDs[id]
-		msg := messages.RowEnriched{
-			ResourceType: p.Op.ResourceType,
-			ResourceID:   id,
-			Uninspected:  uninspected,
-			Check:        check,
-			Err:          r.Err,
-			OperationID:  p.Op.ID,
-		}
+		msg.Check, msg.Uninspected = r.TruncatedIDs[id]
+		msg.Err = r.Err
 		if fs := r.Findings[id]; len(fs) > 0 {
 			msg.Findings = map[string][]domain.Finding{id: fs}
 		}

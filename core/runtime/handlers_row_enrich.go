@@ -22,6 +22,11 @@ func (c *Core) handleRowEnriched(msg messages.RowEnriched) ([]UIIntent, []TaskRe
 	if td == nil {
 		return nil, nil
 	}
+	// A refresh since the dispatch (the list's, or the menu's) asked for
+	// every row again; an answer from before it is not the one asked for.
+	if msg.Gen != c.session.EnrichmentGen || msg.TypeGen != c.session.EnrichmentTypeGenGet(canon) {
+		return nil, nil
+	}
 	// The same rule as the sweep's: a probe that came back with an error and
 	// nothing else answered for nobody. The row keeps its mark and what it
 	// renders, and the operator hears why (C1: a marked, stale answer beats

@@ -528,6 +528,10 @@ type RowEnriched struct {
 	Check            string
 	Err              error
 	OperationID      domain.Gen
+	// Gen and TypeGen are the enrichment epoch the check ran in; a refresh
+	// since makes the answer stale.
+	Gen     domain.Gen
+	TypeGen domain.Gen
 }
 
 func (RowEnriched) isEvent()               {}
