@@ -669,7 +669,6 @@ func (c *Core) availabilityFromResourceCache() (
 	issueCounts = make(map[string]int)
 	issueTruncated = make(map[string]bool)
 	issueKnown = make(map[string]bool)
-	typeCache := make(map[string]*resource.ResourceTypeDef)
 	for rt, tr := range all {
 		// C6a: the type's population is its authoritative total, which may
 		// exceed the rows in hand (a counts-only observation never touches
@@ -687,31 +686,36 @@ func (c *Core) availabilityFromResourceCache() (
 		isTrunc := tr.Pagination == nil || tr.Pagination.IsTruncated
 		if isTrunc {
 			truncated[rt] = true
-			issueTruncated[rt] = true
 		}
-		td, ok := typeCache[rt]
-		if !ok {
-			td = resource.FindResourceType(rt)
-			typeCache[rt] = td
-		}
-		// One issue counter for the live badge and the persisted one
-		// (unifiedIssueCount): a Wave-2 warning never counts, so a restart
-		// cannot load an issue badge the previous screen never showed.
-		issues := 0
-		if td != nil {
-			issues = unifiedIssueCount(tr.Rows, *td, nil)
-		}
-		issueCounts[rt] = issues
-		// "Probed", not "has rows": the badge's known/unknown state is the
-		// probe status the sweep recorded (session.EnrichmentRan, written
-		// where a Wave-2 result lands), never row presence. A type whose rows
-		// carry only Wave-1 findings has not been asked the Wave-2 question
-		// yet, and persisting it as "probed, this many issues" is the answer
-		// nobody gave. A type with no registered Wave-2 enricher is known by
-		// its Wave-1 rows alone — there is no second answer coming.
-		issueKnown[rt] = c.session.EnrichmentRanGet(rt) || !c.HasIssueEnricher(rt)
+		issueCounts[rt], issueKnown[rt], issueTruncated[rt] = c.typeIssueBadge(rt, tr.Rows, isTrunc, false, c.session.EnrichmentTruncatedIDs[rt])
 	}
 	return
+}
+
+// typeIssueBadge is the one derivation of a type's persisted issue badge
+// from its rows, for the live badge and the on-disk one alike
+// (unifiedIssueCount: a Wave-2 warning never counts, so a restart cannot
+// load a badge the previous screen never showed).
+//
+// "Known" is "probed", not "has rows": the sweep answered this session
+// (session.EnrichmentRan), the save carries a Wave-2 answer of its own (a
+// row answered on demand before this session's sweep ran), or there is no
+// enricher to ask. A type whose rows carry only Wave-1 findings has not been
+// asked the Wave-2 question yet, and persisting it as "probed, this many
+// issues" is the answer nobody gave.
+//
+// "Lower bound" is the sweep's own menu rule: a truncated page, or rows
+// nobody could inspect while something is wrong.
+func (c *Core) typeIssueBadge(rt string, rows []resource.Resource, pageTruncated, wave2Answered bool, uninspected map[string]string) (issues int, known, lower bool) {
+	td := resource.FindResourceType(rt)
+	if td == nil || td.ExcludeFromIssueBadge {
+		return 0, false, pageTruncated
+	}
+	known = wave2Answered || c.session.EnrichmentRanGet(rt) || !c.HasIssueEnricher(rt)
+	if known {
+		issues = unifiedIssueCount(rows, *td, nil)
+	}
+	return issues, known, pageTruncated || (issues > 0 && len(uninspected) > 0)
 }
 
 // saveProbeResourcesToTypeFiles persists probeResources — a snapshot (or, for
@@ -750,27 +754,15 @@ func (c *Core) saveProbeResourcesToTypeFiles(pair session.Pair, probeResources m
 	var firstErr error
 	for shortName, resources := range probeResources {
 		truncated := probeTruncated[shortName]
-		exact := !truncated
-		td := resource.FindResourceType(shortName)
-		// Same rule as availabilityFromResourceCache: "known" is the
-		// answer a probe gave, not the fact that the type carries a badge.
-		// A type with a registered Wave-2 enricher that has not answered yet
-		// has no issue count to persist, and writing one from Wave-1 rows
-		// alone makes the next session open on a confident zero.
-		issuesKnown := td != nil && !td.ExcludeFromIssueBadge &&
-			(c.session.EnrichmentRanGet(shortName) || !c.HasIssueEnricher(shortName))
-		issues := 0
-		if issuesKnown {
-			issues = unifiedIssueCount(resources, *td, nil)
-		}
+		issues, issuesKnown, issuesLower := c.typeIssueBadge(shortName, resources, truncated, wave2Answered[shortName], uninspected[shortName])
 		err := c.SaveTypeRows(
-			SaveTarget{Pair: pair, ObsGen: gens[shortName], Type: shortName, ExactPopulation: exact},
+			SaveTarget{Pair: pair, ObsGen: gens[shortName], Type: shortName, ExactPopulation: !truncated},
 			SaveContent{
 				Resources:          resources,
 				Count:              len(resources),
 				Issues:             issues,
 				IssuesKnown:        issuesKnown,
-				IssuesTruncated:    truncated,
+				IssuesTruncated:    issuesLower,
 				Wave2Authoritative: wave2Answered[shortName],
 				Uninspected:        uninspected[shortName],
 			},

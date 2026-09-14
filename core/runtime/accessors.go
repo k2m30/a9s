@@ -205,8 +205,7 @@ func (c *Core) EnrichmentTruncatedIDs(rt string) map[string]string {
 // DeleteEnrichmentTruncatedIDs clears the per-type truncated-ID set, and
 // with it the rows answered on demand: a refresh re-checks every row.
 func (c *Core) DeleteEnrichmentTruncatedIDs(rt string) {
-	delete(c.session.EnrichmentTruncatedIDs, rt)
-	delete(c.session.EnrichmentRowAnswered, rt)
+	c.session.EnrichmentRowsForget(rt)
 }
 
 // ResetEnrichmentMaps clears the per-type enrichment latches and counters
@@ -215,7 +214,7 @@ func (c *Core) DeleteEnrichmentTruncatedIDs(rt string) {
 func (c *Core) ResetEnrichmentMaps() {
 	c.session.EnrichmentRanReset()
 	c.session.EnrichmentTypeGenReset()
-	c.session.EnrichmentTruncatedIDs = make(map[string]map[string]string)
+	c.session.EnrichmentRowsReset()
 }
 
 // ResetProbeMaps clears the Wave-1 retained-probe row-store entries so the

@@ -22,10 +22,11 @@ func (c *Core) handleRowEnriched(msg messages.RowEnriched) ([]UIIntent, []TaskRe
 	if td == nil {
 		return nil, nil
 	}
-	if msg.Err != nil && len(msg.Findings) == 0 && !msg.Uninspected {
-		// The probe answered for nobody: the row keeps its mark and what it
-		// renders, and the operator hears why (C1: a marked, stale answer
-		// beats a confidently wrong clean one).
+	// The same rule as the sweep's: a probe that came back with an error and
+	// nothing else answered for nobody. The row keeps its mark and what it
+	// renders, and the operator hears why (C1: a marked, stale answer beats
+	// a confidently wrong clean one).
+	if msg.Err != nil && len(msg.Findings) == 0 && len(msg.FieldUpdates) == 0 && !msg.Uninspected {
 		_, region := c.session.CurrentPair()
 		return []UIIntent{FlashIntent{Text: failureLine("enrich "+canon, msg.Err, region), IsError: true}}, nil
 	}
@@ -34,23 +35,23 @@ func (c *Core) handleRowEnriched(msg messages.RowEnriched) ([]UIIntent, []TaskRe
 	if msg.Uninspected {
 		// The on-demand check did not answer either: the row keeps every
 		// finding it renders and the mark now names the call that refused.
-		// Both surfaces read the mark from the session at their next build,
-		// so no patch is emitted — a patch carrying no findings would fold
-		// the row clean.
+		// Both surfaces read the mark from the session at their next build.
 		if set == nil {
 			set = make(map[string]string)
 			c.session.EnrichmentTruncatedIDs[canon] = set
 		}
 		set[msg.ResourceID] = msg.Check
-		return nil, nil
+	} else {
+		delete(set, msg.ResourceID)
+		answered := c.session.EnrichmentRowAnswered[canon]
+		if answered == nil {
+			answered = make(map[string]struct{})
+			c.session.EnrichmentRowAnswered[canon] = answered
+		}
+		answered[msg.ResourceID] = struct{}{}
 	}
-	delete(set, msg.ResourceID)
-	answered := c.session.EnrichmentRowAnswered[canon]
-	if answered == nil {
-		answered = make(map[string]struct{})
-		c.session.EnrichmentRowAnswered[canon] = answered
-	}
-	answered[msg.ResourceID] = struct{}{}
+	// A refused check can still have read a field (a count up to the page
+	// that was refused); the field lands, the findings do not.
 	c.AmendRows(canon, func(rows []resource.Resource) []resource.Resource {
 		out := make([]resource.Resource, len(rows))
 		copy(out, rows)
@@ -58,7 +59,9 @@ func (c *Core) handleRowEnriched(msg messages.RowEnriched) ([]UIIntent, []TaskRe
 			if out[i].ID != msg.ResourceID {
 				continue
 			}
-			ApplyWave2ToRow(&out[i], *td, msg.Findings, msg.AttentionDetails)
+			if !msg.Uninspected {
+				ApplyWave2ToRow(&out[i], *td, msg.Findings, msg.AttentionDetails)
+			}
 			if updates := msg.FieldUpdates[msg.ResourceID]; len(updates) > 0 {
 				fields := make(map[string]string, len(out[i].Fields)+len(updates))
 				maps.Copy(fields, out[i].Fields)
@@ -78,13 +81,19 @@ func (c *Core) handleRowEnriched(msg messages.RowEnriched) ([]UIIntent, []TaskRe
 	}
 	// The answer outlives the session the way the sweep's does: the
 	// sweep-completion save, with this type answered for, writes the row's
-	// findings and clears its mark on disk (Session.EnrichmentTruncatedIDs no
-	// longer names it, and every other row keeps what the set still says).
+	// findings and its mark as the set now has them, and every other row
+	// keeps what the set still says.
 	var tasks []TaskRequest
 	if save := c.snapshotRowStoreForSave(map[string]bool{canon: true}); save != nil {
 		tasks = append(tasks, TaskRequest{Key: TaskKey{Kind: TaskKindSaveCache}, Payload: save})
 	}
-	return []UIIntent{
+	// RowIDs names the rows the answer folds; a refused row is not among
+	// them, so its findings stand and only its field lands.
+	rowIDs := []string{}
+	if !msg.Uninspected {
+		rowIDs = append(rowIDs, msg.ResourceID)
+	}
+	intents := []UIIntent{
 		PatchMenu{ResourceType: canon, Issues: unified, Truncated: truncated},
 		PatchResourceList{
 			ResourceType: canon,
@@ -93,17 +102,20 @@ func (c *Core) handleRowEnriched(msg messages.RowEnriched) ([]UIIntent, []TaskRe
 				Findings:         msg.Findings,
 				AttentionDetails: msg.AttentionDetails,
 				FieldUpdates:     msg.FieldUpdates,
-				TruncatedIDs:     c.session.EnrichmentTruncatedIDs[canon],
-				RowIDs:           []string{msg.ResourceID},
+				TruncatedIDs:     set,
+				RowIDs:           rowIDs,
 			},
 		},
-		PatchDetail{
+	}
+	if !msg.Uninspected {
+		intents = append(intents, PatchDetail{
 			ResourceType:               canon,
 			ResourceID:                 msg.ResourceID,
 			EnrichmentFindings:         msg.Findings,
 			EnrichmentAttentionDetails: msg.AttentionDetails,
-		},
-	}, tasks
+		})
+	}
+	return intents, tasks
 }
 
 // keepRowAnswers folds the rows a KindEnrichRow answered for into a sweep

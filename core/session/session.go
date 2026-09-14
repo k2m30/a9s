@@ -913,6 +913,21 @@ func (s *Session) EnrichmentRanReset() {
 	s.EnrichmentRan = make(map[string]bool)
 }
 
+// EnrichmentRowsReset forgets every type's uninspected rows and on-demand
+// answers (global refresh / Rotate); EnrichmentRowsForget forgets one type's
+// (its refresh). The two sets are one fact — which rows the last sweep did
+// not answer for, and which of those were answered since — so they are only
+// ever cleared together.
+func (s *Session) EnrichmentRowsReset() {
+	s.EnrichmentTruncatedIDs = make(map[string]map[string]string)
+	s.EnrichmentRowAnswered = make(map[string]map[string]struct{})
+}
+
+func (s *Session) EnrichmentRowsForget(rt string) {
+	delete(s.EnrichmentTruncatedIDs, rt)
+	delete(s.EnrichmentRowAnswered, rt)
+}
+
 // Rotate rotates the session when the user switches profile or region. Every
 // generation counter is bumped so that in-flight async messages tagged with
 // the pre-switch gens are rejected by the handlers' gen guards; all cached
@@ -971,8 +986,7 @@ func (s *Session) Rotate() {
 	s.EnrichmentRanReset()
 	s.ScanHealthLogged = make(map[string]bool)
 	s.EnrichmentTypeGenReset()
-	s.EnrichmentTruncatedIDs = make(map[string]map[string]string)
-	s.EnrichmentRowAnswered = make(map[string]map[string]struct{})
+	s.EnrichmentRowsReset()
 	// EnrichSweepMembers/EnrichListOpenPending: a prior profile/region's
 	// in-flight sweep-window/list-open bookkeeping must not leak into the
 	// next pair's scan — same rationale as EnrichmentRan/EnrichmentTypeGen

@@ -60,7 +60,7 @@ func cappedEC2List(t *testing.T) (*app.Controller, *runtime.Core, []resource.Res
 	c.Apply(app.Action{Kind: app.ActionCommand, Arg: "ec2"})
 	rows := uninspectedEC2Rows()
 	c.ApplyResourcesLoaded("ec2", rows, nil, false)
-	core.ObserveRows("ec2", rows, nil, session.OriginFetch, false)
+	core.ObserveRows("ec2", rows, &resource.PaginationMeta{IsTruncated: false}, session.OriginFetch, false)
 	sweepSaveAfterEnrichment(t, core, c, messages.EnrichmentChecked{
 		ResourceType: "ec2",
 		TruncatedIDs: map[string]string{rows[0].ID: awsclient.CheckCap, rows[1].ID: awsclient.CheckCap},
@@ -152,6 +152,11 @@ func TestCappedRow_DetailOpenRunsItsChecks(t *testing.T) {
 	if got := uninspectedOnDisk(t, onDemandProfile, onDemandRegion, rows[1].ID); got == nil || *got != awsclient.CheckCap {
 		t.Errorf("the other capped row's mark on disk = %v, want %q", got, awsclient.CheckCap)
 	}
+	// The badge on disk is the answer's: one issue, still a lower bound
+	// while the other row is uninspected.
+	if issues, known, lower := issuesOnDisk(t, onDemandProfile, onDemandRegion); issues != 1 || !known || !lower {
+		t.Errorf("the badge on disk is %d (known=%v, lower bound=%v), want 1 known and a lower bound", issues, known, lower)
+	}
 
 	// A sweep dispatched before the answer lands afterwards and reports the
 	// row at its cap: it never looked at the row, so the answer stands.
@@ -169,6 +174,18 @@ func TestCappedRow_DetailOpenRunsItsChecks(t *testing.T) {
 	}
 	if got := c.GetListEnrichmentFindings("ec2")[rows[0].ID]; len(got) != 1 {
 		t.Errorf("after a stale sweep the store carries %v for the answered row, want its one finding", got)
+	}
+
+	// A global refresh forgets the answer with the marks: the next sweep's
+	// cap is the row's state again.
+	core.ResetEnrichmentMaps()
+	intents, _ = core.HandleEvent(messages.EnrichmentChecked{
+		ResourceType: "ec2",
+		TruncatedIDs: map[string]string{rows[0].ID: awsclient.CheckCap, rows[1].ID: awsclient.CheckCap},
+	})
+	c.ApplyIntents(intents)
+	if set := core.EnrichmentTruncatedIDs("ec2"); set[rows[0].ID] != awsclient.CheckCap {
+		t.Errorf("after a global refresh a sweep that capped the row left it answered: set is %v", set)
 	}
 }
 
@@ -210,6 +227,8 @@ func TestCappedRow_OnDemandRefusalNamesTheCall(t *testing.T) {
 		}
 		var failures []awsclient.Failure
 		for _, r := range resources {
+			// The name was read before the call that was refused.
+			res.FieldUpdates[r.ID] = map[string]string{"name": "web-server-renamed"}
 			awsclient.MarkSkipped(&res, r.ID, &failures, uninspectedDenied(uninspectedCheck))
 		}
 		return res, nil
@@ -233,6 +252,34 @@ func TestCappedRow_OnDemandRefusalNamesTheCall(t *testing.T) {
 	if got := c.GetListEnrichmentFindings("ec2")[rows[0].ID]; len(got) != 1 {
 		t.Errorf("a refused re-check folded the row's earlier finding away: store carries %v", got)
 	}
+	c.Apply(app.Action{Kind: app.ActionBack})
+	if got := cellFor(t, *c.Snapshot().Body.List, rows[0].ID, "name"); got != "web-server-renamed" {
+		t.Errorf("the field the refused check did read never reached the list: name cell = %q", got)
+	}
+	if got := uninspectedOnDisk(t, onDemandProfile, onDemandRegion, rows[0].ID); got == nil || *got != uninspectedCheck {
+		t.Errorf("the refusal's mark on disk = %v, want %q — after a restart the row would be re-checked as if only capped", got, uninspectedCheck)
+	}
+}
+
+// cellFor returns the cell under the column with the given key.
+func cellFor(t *testing.T, body app.ListBody, id, key string) string {
+	t.Helper()
+	col := -1
+	for i, c := range body.Columns {
+		if c.Key == key {
+			col = i
+		}
+	}
+	if col < 0 {
+		t.Fatalf("the list has no %q column; columns are %+v", key, body.Columns)
+	}
+	for _, row := range body.Rows {
+		if row.ResourceID == id {
+			return row.Cells[col]
+		}
+	}
+	t.Fatalf("row %q not present in the list body", id)
+	return ""
 }
 
 func TestRefusedRow_DetailOpenDoesNotRetry(t *testing.T) {

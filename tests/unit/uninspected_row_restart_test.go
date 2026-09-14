@@ -14,7 +14,9 @@ import (
 	"testing"
 
 	"github.com/k2m30/a9s/v3/core/app"
+	awsclient "github.com/k2m30/a9s/v3/core/aws"
 	"github.com/k2m30/a9s/v3/core/cache"
+	"github.com/k2m30/a9s/v3/core/demo"
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 	"github.com/k2m30/a9s/v3/core/runtime"
@@ -60,6 +62,17 @@ func uninspectedOnDisk(t *testing.T, profile, region, id string) *string {
 	}
 	t.Fatalf("row %q is not in the ec2 type file; rows were %+v", id, tf.Rows)
 	return nil
+}
+
+// issuesOnDisk returns the ec2 type file's badge: count, whether it is
+// known, and whether it is a lower bound.
+func issuesOnDisk(t *testing.T, profile, region string) (int, bool, bool) {
+	t.Helper()
+	tf, ok := cache.LoadDirForTest(profile, region).Type("ec2")
+	if !ok {
+		t.Fatal("no ec2 type file on disk")
+	}
+	return tf.Issues, tf.IssuesKnown, tf.IssuesTruncated
 }
 
 func attentionEntries(t *testing.T, ctrl *app.Controller, row resource.Resource) []string {
@@ -138,6 +151,41 @@ func TestUninspectedRow_MarkSurvivesRestart(t *testing.T) {
 	want := domain.NotInspectedPhrase + ": " + uninspectedCheck
 	if !strings.Contains(strings.Join(entries, " "), want) {
 		t.Errorf("straight after a restart the refused row's Attention block reads %v, want an entry %q", entries, want)
+	}
+}
+
+// A capped row answered on demand straight after a restart, before this
+// session's sweep, still updates the badge the next session boots on.
+func TestUninspectedRow_AnswerAfterRestartUpdatesTheBadgeOnDisk(t *testing.T) {
+	t.Setenv("A9S_CONFIG_FOLDER", t.TempDir())
+	const profile, region = "pilot-prof", "us-east-1"
+	rows := uninspectedEC2Rows()
+	var asked [][]string
+	onDemandEC2Enricher(t, &asked)
+
+	core, ctrl := newLiveWebStyleController(t, profile, region)
+	seedFromDisk(ctrl, profile, region)
+	core.ObserveRows("ec2", rows, &resource.PaginationMeta{IsTruncated: false}, session.OriginFetch, false)
+	sweepSaveAfterEnrichment(t, core, ctrl, messages.EnrichmentChecked{
+		ResourceType: "ec2",
+		TruncatedIDs: map[string]string{rows[0].ID: awsclient.CheckCap},
+		Findings:     map[string][]domain.Finding{},
+	})
+	if issues, known, _ := issuesOnDisk(t, profile, region); issues != 0 || !known {
+		t.Fatalf("precondition: the badge on disk is %d (known=%v), want a known zero", issues, known)
+	}
+
+	core2, ctrl2 := newLiveWebStyleController(t, profile, region)
+	core2.Session().Clients = demo.NewServiceClients()
+	seedFromDisk(ctrl2, profile, region)
+	if ran := openDetailWithWorkload(t, ctrl2, core2, rows[0]); ran != 1 {
+		t.Fatalf("the capped row's detail dispatched %d on-demand checks, want 1", ran)
+	}
+	if got := uninspectedOnDisk(t, profile, region, rows[0].ID); got != nil {
+		t.Errorf("the answered row still carries uninspected=%q on disk", *got)
+	}
+	if issues, known, lower := issuesOnDisk(t, profile, region); issues != 1 || !known || lower {
+		t.Errorf("the badge on disk is %d (known=%v, lower bound=%v) after the answer, want an exact known 1", issues, known, lower)
 	}
 }
 

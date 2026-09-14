@@ -18,19 +18,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - A row the last sweep could not inspect still says so after a restart. The
   check that refused is saved with the row on the sweep's own save and comes
   back with it, so a row whose posture is unknown no longer reads as verified
-  until the next sweep runs.
+  until the next sweep runs. The issue badge saved with the type stays a
+  lower bound while such rows exist, as the menu already showed it.
 
 - Opening the detail of a row the sweep left at its inspection cap runs that
   row's checks on demand: the Attention block shows what they found, or a
   clean row, and the list's Status cell agrees. The answer is saved with the
   row, so it survives a restart and a sweep that was already running when the
-  detail opened. The cap itself is unchanged; every other row keeps the
-  sweep's answer.
+  detail opened, and a global refresh forgets it with everything else. A
+  check refused on demand still lands the fields it read before the refusal.
+  The cap itself is unchanged; every other row keeps the sweep's answer.
 
 - The detail view masks a value the secret scanner flagged, wherever the
-  resource's own configuration is shown (a Lambda's environment). The
-  scanner's rows name where a credential sits; the dump beside them printed
-  the credential.
+  resource's own configuration is shown (a Lambda's environment, a CloudTrail
+  event's raw request block). The scanner's rows name where a credential
+  sits; the dump beside them printed the credential.
 
 - Leftover view files from before two resource types were renamed no longer
   produce a config error on every start. A file written for `docdb-snap` or
