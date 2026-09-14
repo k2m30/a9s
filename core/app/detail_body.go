@@ -17,6 +17,7 @@ import (
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/fieldpath"
 	"github.com/k2m30/a9s/v3/core/resource"
+	"github.com/k2m30/a9s/v3/core/secretscan"
 	"github.com/k2m30/a9s/v3/core/semantics/projection"
 )
 
@@ -314,6 +315,7 @@ func sectionsToFieldItemsDetail(sections []domain.Section, humanizePaths map[str
 		quoted := quotedSections[sec.Title]
 		for _, it := range sec.Items {
 			if !quoted {
+				it = redactCredential(it)
 				if catalog.Humanizes(humanizePaths, it.Path, it.Label) {
 					it.Value = humanizeDetailValue(it)
 				}
@@ -323,6 +325,36 @@ func sectionsToFieldItemsDetail(sections []domain.Section, humanizePaths map[str
 		}
 	}
 	return items
+}
+
+// redactCredential returns the item's value with a credential masked: a
+// resource's own configuration dump (a Lambda's environment, a task
+// definition's container environment) is shown in the detail, and the
+// scanner that flagged a value in it names only where the value sits — the
+// detail must not print what the scanner refused to. The same rule
+// secretscan applies per pair decides here, on the pair the row shows.
+//
+// A nested row carries its whole rendered line — "KEY: value", indented — as
+// both label and value (see humanizeDetailValue), so the pair is read out of
+// the line and the masked line replaces both.
+func redactCredential(it domain.Item) domain.Item {
+	line := it.Value
+	trimmed := strings.TrimLeft(line, " ")
+	if k, v, ok := strings.Cut(trimmed, ": "); ok {
+		if secretscan.Classify(k, v) == "" {
+			return it
+		}
+		masked := line[:len(line)-len(trimmed)] + k + ": " + secretscan.Redact(v)
+		if it.Label == line {
+			it.Label = masked
+		}
+		it.Value = masked
+		return it
+	}
+	if secretscan.Classify(it.Label, it.Value) != "" {
+		it.Value = secretscan.Redact(it.Value)
+	}
+	return it
 }
 
 // humanizeDetailValue rewrites a declared field's value into the words it

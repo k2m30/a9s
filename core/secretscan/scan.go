@@ -82,19 +82,26 @@ var (
 func ScanKV(kv map[string]string) []Hit {
 	var hits []Hit
 	for key, value := range kv {
-		if !isRealValue(value) {
-			continue
-		}
-		kind := scanValue(value)
-		if kind == "" && kvKeyRe.MatchString(key) {
-			kind = KindKeyword
-		}
-		if kind != "" {
+		if kind := Classify(key, value); kind != "" {
 			hits = append(hits, Hit{Kind: kind, Where: key})
 		}
 	}
 	slices.SortFunc(hits, func(a, b Hit) int { return strings.Compare(a.Where, b.Where) })
 	return hits
+}
+
+// Classify names the credential kind one key/value pair carries, or "" when
+// it carries none — ScanKV's rule for a caller that holds a single pair, such
+// as a detail row about to show a value.
+func Classify(key, value string) string {
+	if !isRealValue(value) {
+		return ""
+	}
+	kind := scanValue(value)
+	if kind == "" && kvKeyRe.MatchString(key) {
+		kind = KindKeyword
+	}
+	return kind
 }
 
 // ScanText inspects free text line by line, one hit per line, in line order.
