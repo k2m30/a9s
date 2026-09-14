@@ -393,7 +393,8 @@ var securityChildTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals //
 		}),
 		DetailEnrich: enrichRolePolicy,
 		Findings: []catalog.FindingDef{
-			{Code: CodeRolePolicyOverPrivileged, Phrase: "over-privileged", Severity: domain.SevBroken, Source: "wave1", Detail: "This policy grants far more than the role needs, typically through an action or resource wildcard, so anything assuming the role can do all of it and any compromise is that much larger. Replace the wildcards with the specific actions and ARNs the workload actually calls, starting from the role's access advisor data."},
+			{Code: CodeRolePolicyAdministrator, Phrase: "administrator access", Severity: domain.SevBroken, Source: "wave1", Detail: "This is the AWS-managed AdministratorAccess policy, which allows every action on every resource, so anything assuming the role is an account administrator and any compromise is the whole account. Replace it with a scoped policy covering only the actions the workload actually calls, starting from the role's access advisor data."},
+			{Code: CodeRolePolicyBroadPower, Phrase: "broad power access", Severity: domain.SevBroken, Source: "wave1", Detail: "This is the AWS-managed PowerUserAccess policy, which allows every action except IAM, Organizations and Account, so anything assuming the role can reach every service in the account even though it cannot grant itself more. Replace it with a scoped policy covering only the actions the workload actually calls, starting from the role's access advisor data."},
 			{Code: CodeRolePolicyInline, Phrase: "inline", Severity: domain.SevDim, Source: "wave1"},
 		},
 	},

@@ -434,8 +434,8 @@ func TestRolePolicies_ColorSignal(t *testing.T) {
 		if got := td.ResolveColor(rs[0]); got != resource.ColorBroken {
 			t.Errorf("AdministratorAccess ResolveColor = %v, want ColorBroken", got)
 		}
-		if len(rs[0].Findings) == 0 || rs[0].Findings[0].Code != awsclient.CodeRolePolicyOverPrivileged {
-			t.Errorf("expected over-privileged finding, got %+v", rs[0].Findings)
+		if len(rs[0].Findings) == 0 || rs[0].Findings[0].Code != awsclient.CodeRolePolicyAdministrator {
+			t.Errorf("expected administrator finding, got %+v", rs[0].Findings)
 		}
 	})
 	t.Run("PowerUserAccess_renders_broken_red", func(t *testing.T) {

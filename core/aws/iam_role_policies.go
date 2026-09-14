@@ -13,10 +13,10 @@ import (
 )
 
 // rolePolicyFindings returns the wave1 findings for one attached managed
-// policy. An AWS-managed policy in either dangerous set — administrator
-// (policy_findings.go's adminManagedPolicyResources) or broad power
-// (broadPowerManagedPolicyResources) — emits a broken finding so the row
-// renders red; every other managed policy is healthy.
+// policy. An AWS-managed policy in the administrator set
+// (policy_findings.go's adminManagedPolicyResources) emits the administrator
+// finding, one in the broad-power set (broadPowerManagedPolicyResources) the
+// broad-power finding; every other managed policy is healthy.
 //
 // The ARN decides, not the name. Matching "AdministratorAccess" as a bare
 // string rendered a customer-managed policy an operator happened to give that
@@ -24,8 +24,11 @@ import (
 // nothing AWS returns, since AWS names its own policies in the partition the
 // session is connected to.
 func rolePolicyFindings(policyARN string) []domain.Finding {
-	if awsManagedPolicyIn(policyARN, adminManagedPolicyResources, broadPowerManagedPolicyResources) {
-		return []domain.Finding{wave1Finding(CodeRolePolicyOverPrivileged)}
+	if awsManagedPolicyIn(policyARN, adminManagedPolicyResources) {
+		return []domain.Finding{wave1Finding(CodeRolePolicyAdministrator)}
+	}
+	if awsManagedPolicyIn(policyARN, broadPowerManagedPolicyResources) {
+		return []domain.Finding{wave1Finding(CodeRolePolicyBroadPower)}
 	}
 	return nil
 }
@@ -79,8 +82,6 @@ func FetchRolePolicies(
 			policyArn = *p.PolicyArn
 		}
 
-		status := rolePolicyStatus(policyName)
-
 		managed = append(managed, resource.Resource{
 			ID:       policyArn,
 			Name:     policyName,
@@ -90,7 +91,6 @@ func FetchRolePolicies(
 				"policy_arn":  policyArn,
 				"policy_type": "Managed",
 				"role_name":   roleName,
-				"status":      status,
 			},
 			RawStruct: RolePolicyRow{
 				PolicyName: policyName,
@@ -119,7 +119,6 @@ func FetchRolePolicies(
 				"policy_arn":  "",
 				"policy_type": "Inline",
 				"role_name":   roleName,
-				"status":      "terminated",
 			},
 			RawStruct: RolePolicyRow{
 				PolicyName: name,
@@ -149,15 +148,4 @@ func FetchRolePolicies(
 			TotalHint:   totalHint,
 		},
 	}, nil
-}
-
-// rolePolicyStatus returns "failed" for high-privilege policies that should
-// be visually highlighted (red), empty string otherwise.
-func rolePolicyStatus(policyName string) string {
-	switch policyName {
-	case "AdministratorAccess", "PowerUserAccess":
-		return "failed"
-	default:
-		return ""
-	}
 }

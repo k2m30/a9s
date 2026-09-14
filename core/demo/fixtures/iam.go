@@ -92,6 +92,11 @@ const (
 	// RoleAdminAttached carries the AWS-managed AdministratorAccess policy —
 	// role.admin-attached.
 	RoleAdminAttached = "acme-break-glass-role"
+	// RolePowerUserAttached carries the AWS-managed PowerUserAccess policy —
+	// the role-policy broad-power row, and the healthy control for
+	// role.admin-attached (PowerUserAccess withholds IAM, Organizations and
+	// Account, so the role is not an administrator).
+	RolePowerUserAttached = "acme-platform-engineer-role"
 	// RoleInlinePrivEsc has an inline policy granting iam:PassRole plus
 	// lambda:CreateFunction plus lambda:InvokeFunction —
 	// role.inline-privilege-escalation.
@@ -380,6 +385,15 @@ func buildIAMRoles() []iamtypes.Role {
 			Path:                     aws.String("/"),
 			CreateDate:               aws.Time(time.Date(2025, 2, 14, 9, 0, 0, 0, time.UTC)),
 			Description:              aws.String("Break-glass operator role carrying the AWS-managed AdministratorAccess policy"),
+			AssumeRolePolicyDocument: aws.String(`{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":{"AWS":"arn:aws:iam::123456789012:root"},"Action":"sts:AssumeRole","Condition":{"Bool":{"aws:MultiFactorAuthPresent":"true"}}}]}`),
+		},
+		iamtypes.Role{
+			RoleName:                 aws.String(RolePowerUserAttached),
+			RoleId:                   aws.String("AROAEXAMPLEPOWERUSR1"),
+			Arn:                      aws.String("arn:aws:iam::123456789012:role/" + RolePowerUserAttached),
+			Path:                     aws.String("/"),
+			CreateDate:               aws.Time(time.Date(2025, 3, 3, 11, 0, 0, 0, time.UTC)),
+			Description:              aws.String("Platform engineering role carrying the AWS-managed PowerUserAccess policy"),
 			AssumeRolePolicyDocument: aws.String(`{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":{"AWS":"arn:aws:iam::123456789012:root"},"Action":"sts:AssumeRole","Condition":{"Bool":{"aws:MultiFactorAuthPresent":"true"}}}]}`),
 		},
 		iamtypes.Role{
@@ -1029,6 +1043,9 @@ func buildIAMRelations(f *IAMFixtures) {
 	// Witness attachments and inline documents for the escalation findings.
 	f.AttachedRolePolicies[RoleAdminAttached] = []iamtypes.AttachedPolicy{
 		{PolicyName: aws.String("AdministratorAccess"), PolicyArn: aws.String("arn:aws:iam::aws:policy/AdministratorAccess")},
+	}
+	f.AttachedRolePolicies[RolePowerUserAttached] = []iamtypes.AttachedPolicy{
+		{PolicyName: aws.String("PowerUserAccess"), PolicyArn: aws.String("arn:aws:iam::aws:policy/PowerUserAccess")},
 	}
 	f.InlineRolePolicies[RoleInlinePrivEsc] = []string{"pipeline-deploy"}
 	f.InlinePolicyDocuments[RoleInlinePrivEsc+"/pipeline-deploy"] = url.PathEscape(`{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Action":["iam:PassRole","lambda:CreateFunction","lambda:InvokeFunction"],"Resource":"*"}]}`)

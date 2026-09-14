@@ -11,6 +11,7 @@ import (
 	iamtypes "github.com/aws/aws-sdk-go-v2/service/iam/types"
 
 	awsclient "github.com/k2m30/a9s/v3/core/aws"
+	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
@@ -345,8 +346,8 @@ func TestFetchRolePolicies_NilFields(t *testing.T) {
 }
 
 // TestFetchRolePolicies_AdminHighlight verifies that AdministratorAccess
-// emits an over-privileged wave1 Finding so the row resolves as ColorBroken
-// (red). Pins both Fields["status"]="failed" and the user-visible color.
+// emits the administrator wave1 Finding, phrased "administrator access", so
+// the row resolves as ColorBroken (red).
 func TestFetchRolePolicies_AdminHighlight(t *testing.T) {
 	attachedMock := &mockIAMListAttachedRolePoliciesClient{
 		outputs: []*iam.ListAttachedRolePoliciesOutput{
@@ -376,8 +377,8 @@ func TestFetchRolePolicies_AdminHighlight(t *testing.T) {
 	if len(resources) != 1 {
 		t.Fatalf("expected 1 resource, got %d", len(resources))
 	}
-	if got := resources[0].Fields["status"]; got != "failed" {
-		t.Errorf("AdministratorAccess Fields[\"status\"]: expected %q, got %q", "failed", got)
+	if len(resources[0].Findings) != 1 || resources[0].Findings[0].Code != awsclient.CodeRolePolicyAdministrator || resources[0].Findings[0].Phrase != "administrator access" {
+		t.Errorf("AdministratorAccess Findings: expected one %q finding phrased %q, got %+v", awsclient.CodeRolePolicyAdministrator, "administrator access", resources[0].Findings)
 	}
 	td := resource.GetChildType("role_policies")
 	if td == nil {
@@ -389,8 +390,9 @@ func TestFetchRolePolicies_AdminHighlight(t *testing.T) {
 }
 
 // TestFetchRolePolicies_PowerUserHighlight verifies that PowerUserAccess
-// emits an over-privileged wave1 Finding so the row resolves as ColorBroken
-// (red). Pins both the Fields["status"] migration and the color contract.
+// emits the broad-power wave1 Finding, phrased "broad power access" — not
+// the administrator phrase — at the same severity, so the row resolves as
+// ColorBroken (red).
 func TestFetchRolePolicies_PowerUserHighlight(t *testing.T) {
 	attachedMock := &mockIAMListAttachedRolePoliciesClient{
 		outputs: []*iam.ListAttachedRolePoliciesOutput{
@@ -420,8 +422,11 @@ func TestFetchRolePolicies_PowerUserHighlight(t *testing.T) {
 	if len(resources) != 1 {
 		t.Fatalf("expected 1 resource, got %d", len(resources))
 	}
-	if got := resources[0].Fields["status"]; got != "failed" {
-		t.Errorf("PowerUserAccess Fields[\"status\"]: expected %q, got %q", "failed", got)
+	if len(resources[0].Findings) != 1 || resources[0].Findings[0].Code != awsclient.CodeRolePolicyBroadPower || resources[0].Findings[0].Phrase != "broad power access" {
+		t.Errorf("PowerUserAccess Findings: expected one %q finding phrased %q, got %+v", awsclient.CodeRolePolicyBroadPower, "broad power access", resources[0].Findings)
+	}
+	if resources[0].Findings[0].Severity != domain.SevBroken {
+		t.Errorf("PowerUserAccess severity: expected %v (the administrator row's), got %v", domain.SevBroken, resources[0].Findings[0].Severity)
 	}
 	td := resource.GetChildType("role_policies")
 	if td == nil {
@@ -433,8 +438,7 @@ func TestFetchRolePolicies_PowerUserHighlight(t *testing.T) {
 }
 
 // TestFetchRolePolicies_InlineDim verifies that inline policies emit an
-// inline wave1 Finding so the row resolves as ColorDim (grey), and that the
-// Fields["status"]="terminated" migration is preserved.
+// inline wave1 Finding so the row resolves as ColorDim (grey).
 func TestFetchRolePolicies_InlineDim(t *testing.T) {
 	attachedMock := &mockIAMListAttachedRolePoliciesClient{
 		outputs: []*iam.ListAttachedRolePoliciesOutput{
@@ -455,9 +459,6 @@ func TestFetchRolePolicies_InlineDim(t *testing.T) {
 	resources := result.Resources
 	if len(resources) != 1 {
 		t.Fatalf("expected 1 resource, got %d", len(resources))
-	}
-	if got := resources[0].Fields["status"]; got != "terminated" {
-		t.Errorf("Inline policy Fields[\"status\"]: expected %q, got %q", "terminated", got)
 	}
 	td := resource.GetChildType("role_policies")
 	if td == nil {

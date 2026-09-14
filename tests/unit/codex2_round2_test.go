@@ -18,8 +18,6 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-const codex2OverPrivileged = domain.FindingCode("role-policy.broken.over_privileged")
-
 // ─── item 1 — the dangerous-policy set is matched by the AWS-owned ARN ──────
 
 type codex2RolePolicyFake struct {
@@ -57,24 +55,28 @@ func codex2FetchRolePolicy(t *testing.T, name, arn string) resource.Resource {
 // rendered red while carrying whatever permissions its account gave it.
 func TestRolePolicy_DangerousSetIsMatchedByTheAWSOwnedARN(t *testing.T) {
 	for _, tc := range []struct {
-		name    string
-		policy  string
-		arn     string
-		flagged bool
+		name   string
+		policy string
+		arn    string
+		code   domain.FindingCode
 	}{
-		{"AWS-owned AdministratorAccess", "AdministratorAccess", "arn:aws:iam::aws:policy/AdministratorAccess", true},
-		{"AWS-owned PowerUserAccess", "PowerUserAccess", "arn:aws:iam::aws:policy/PowerUserAccess", true},
-		{"GovCloud AdministratorAccess", "AdministratorAccess", "arn:aws-us-gov:iam::aws:policy/AdministratorAccess", true},
-		{"customer policy of the same name", "AdministratorAccess", "arn:aws:iam::123456789012:policy/AdministratorAccess", false},
-		{"customer policy named PowerUserAccess", "PowerUserAccess", "arn:aws:iam::123456789012:policy/PowerUserAccess", false},
-		{"an AWS read-only policy", "ReadOnlyAccess", "arn:aws:iam::aws:policy/ReadOnlyAccess", false},
+		{"AWS-owned AdministratorAccess", "AdministratorAccess", "arn:aws:iam::aws:policy/AdministratorAccess", awsclient.CodeRolePolicyAdministrator},
+		{"AWS-owned PowerUserAccess", "PowerUserAccess", "arn:aws:iam::aws:policy/PowerUserAccess", awsclient.CodeRolePolicyBroadPower},
+		{"GovCloud AdministratorAccess", "AdministratorAccess", "arn:aws-us-gov:iam::aws:policy/AdministratorAccess", awsclient.CodeRolePolicyAdministrator},
+		{"customer policy of the same name", "AdministratorAccess", "arn:aws:iam::123456789012:policy/AdministratorAccess", ""},
+		{"customer policy named PowerUserAccess", "PowerUserAccess", "arn:aws:iam::123456789012:policy/PowerUserAccess", ""},
+		{"an AWS read-only policy", "ReadOnlyAccess", "arn:aws:iam::aws:policy/ReadOnlyAccess", ""},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			r := codex2FetchRolePolicy(t, tc.policy, tc.arn)
-			if got := codex2HasCode(r.Findings, codex2OverPrivileged); got != tc.flagged {
-				t.Errorf("over-privileged = %v, want %v (findings=%+v)\n"+
-					"the dangerous-policy set is the one in policy_findings.go, matched by the "+
-					"AWS-owned ARN — never by the policy's bare name", got, tc.flagged, r.Findings)
+			var got domain.FindingCode
+			if len(r.Findings) > 0 {
+				got = r.Findings[0].Code
+			}
+			if got != tc.code {
+				t.Errorf("finding code = %q, want %q (findings=%+v)\n"+
+					"the dangerous-policy sets are the ones in policy_findings.go, matched by the "+
+					"AWS-owned ARN — never by the policy's bare name", got, tc.code, r.Findings)
 			}
 		})
 	}
