@@ -151,11 +151,23 @@ func TestCappedRow_OnDemandRefusalNamesTheCall(t *testing.T) {
 		return res, nil
 	}})
 	c, core, rows := cappedEC2List(t)
+	// The row carries a finding an earlier sweep found; a refused re-check
+	// is no answer and must not fold it away.
+	prior := []domain.Finding{{Code: "ec2.impaired", Phrase: onDemandPhrase, Severity: domain.SevBroken, Source: "wave2:ec2"}}
+	c.ApplyIntents([]runtime.UIIntent{runtime.PatchResourceList{
+		ResourceType: "ec2",
+		Enrichment:   &runtime.ListEnrichmentPatch{Findings: map[string][]domain.Finding{rows[0].ID: prior}, TruncatedIDs: core.EnrichmentTruncatedIDs("ec2")},
+	}})
 	openDetailWithWorkload(t, c, core, rows[0])
 
 	want := domain.NotInspectedPhrase + ": " + uninspectedCheck
-	if entries := topAttentionEntries(t, c); !strings.Contains(strings.Join(entries, " "), want) {
+	entries := topAttentionEntries(t, c)
+	joined := strings.Join(entries, " ")
+	if !strings.Contains(joined, want) {
 		t.Errorf("a row whose on-demand check was refused reads %v, want %q — the refusal names the call, not the cap", entries, want)
+	}
+	if got := c.GetListEnrichmentFindings("ec2")[rows[0].ID]; len(got) != 1 {
+		t.Errorf("a refused re-check folded the row's earlier finding away: store carries %v", got)
 	}
 }
 

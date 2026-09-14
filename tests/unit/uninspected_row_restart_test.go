@@ -174,3 +174,35 @@ func TestUninspectedRow_NextSweepThatAnswersClearsTheMark(t *testing.T) {
 		}
 	}
 }
+
+func TestUninspectedRow_SweepOverAShallowerPageKeepsTheDeeperRowsMark(t *testing.T) {
+	t.Setenv("A9S_CONFIG_FOLDER", t.TempDir())
+	const profile, region = "pilot-prof", "us-east-1"
+	rows := uninspectedEC2Rows()
+
+	core, ctrl := newLiveWebStyleController(t, profile, region)
+	seedFromDisk(ctrl, profile, region)
+	core.ObserveRows("ec2", rows, &resource.PaginationMeta{IsTruncated: false}, session.OriginFetch, false)
+	result := uninspectedResultFor(rows[0].ID, rows[1].ID)
+	sweepSaveAfterEnrichment(t, core, ctrl, messages.EnrichmentChecked{
+		ResourceType: "ec2",
+		TruncatedIDs: result.TruncatedIDs,
+		Findings:     result.Findings,
+	})
+
+	// A later sweep submits a shallower truncated page holding only the
+	// first row and answers for it; the file keeps the deeper row, which this
+	// sweep never looked at.
+	if err := core.SaveTypeRows(
+		runtime.SaveTarget{Pair: core.Pair(), Type: "ec2", ExactPopulation: false},
+		runtime.SaveContent{Resources: rows[:1], Count: 1, Wave2Authoritative: true, Uninspected: map[string]string{}},
+	); err != nil {
+		t.Fatalf("sweep save: %v", err)
+	}
+	if got := uninspectedOnDisk(t, profile, region, rows[0].ID); got != nil {
+		t.Errorf("the row the sweep answered for still carries uninspected=%q", *got)
+	}
+	if got := uninspectedOnDisk(t, profile, region, rows[1].ID); got == nil || *got != uninspectedCheck {
+		t.Errorf("the row the sweep never submitted lost its mark: uninspected=%v — it reads as verified after a restart", got)
+	}
+}

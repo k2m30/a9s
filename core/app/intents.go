@@ -202,6 +202,7 @@ func (c *Controller) applyIntentsLocked(intents []runtime.UIIntent) {
 				// fallback wrapping happens on this write path.
 				if v.Enrichment.RowIDs != nil {
 					c.mergeEnrichmentRows(v.ResourceType, issueCount, issueTruncated, v.Enrichment.Findings, v.Enrichment.AttentionDetails, v.Enrichment.RowIDs, issuesAuthoritative)
+					c.applyListFieldUpdates(v.ResourceType, v.Enrichment.FieldUpdates)
 					c.applyRowFindingsFor(v.ResourceType, v.Enrichment.Findings, v.Enrichment.AttentionDetails, v.Enrichment.RowIDs)
 					break
 				}

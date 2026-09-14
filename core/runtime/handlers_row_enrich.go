@@ -3,6 +3,8 @@
 package runtime
 
 import (
+	"maps"
+
 	"github.com/k2m30/a9s/v3/core/resource"
 	"github.com/k2m30/a9s/v3/core/runtime/messages"
 )
@@ -28,24 +30,36 @@ func (c *Core) handleRowEnriched(msg messages.RowEnriched) ([]UIIntent, []TaskRe
 
 	set := c.session.EnrichmentTruncatedIDs[canon]
 	if msg.Uninspected {
+		// The on-demand check did not answer either: the row keeps every
+		// finding it renders and the mark now names the call that refused.
+		// Both surfaces read the mark from the session at their next build,
+		// so no patch is emitted — a patch carrying no findings would fold
+		// the row clean.
 		if set == nil {
 			set = make(map[string]string)
 			c.session.EnrichmentTruncatedIDs[canon] = set
 		}
 		set[msg.ResourceID] = msg.Check
-	} else {
-		delete(set, msg.ResourceID)
-		c.AmendRows(canon, func(rows []resource.Resource) []resource.Resource {
-			out := make([]resource.Resource, len(rows))
-			copy(out, rows)
-			for i := range out {
-				if out[i].ID == msg.ResourceID {
-					ApplyWave2ToRow(&out[i], *td, msg.Findings, msg.AttentionDetails)
-				}
-			}
-			return out
-		})
+		return nil, nil
 	}
+	delete(set, msg.ResourceID)
+	c.AmendRows(canon, func(rows []resource.Resource) []resource.Resource {
+		out := make([]resource.Resource, len(rows))
+		copy(out, rows)
+		for i := range out {
+			if out[i].ID != msg.ResourceID {
+				continue
+			}
+			ApplyWave2ToRow(&out[i], *td, msg.Findings, msg.AttentionDetails)
+			if updates := msg.FieldUpdates[msg.ResourceID]; len(updates) > 0 {
+				fields := make(map[string]string, len(out[i].Fields)+len(updates))
+				maps.Copy(fields, out[i].Fields)
+				maps.Copy(fields, updates)
+				out[i].Fields = fields
+			}
+		}
+		return out
+	})
 
 	rows, _ := c.ProbeResources(canon)
 	unified := unifiedIssueCount(rows, *td, nil)
@@ -62,6 +76,7 @@ func (c *Core) handleRowEnriched(msg messages.RowEnriched) ([]UIIntent, []TaskRe
 			Enrichment: &ListEnrichmentPatch{
 				Findings:         msg.Findings,
 				AttentionDetails: msg.AttentionDetails,
+				FieldUpdates:     msg.FieldUpdates,
 				TruncatedIDs:     c.session.EnrichmentTruncatedIDs[canon],
 				RowIDs:           []string{msg.ResourceID},
 			},

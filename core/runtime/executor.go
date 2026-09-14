@@ -391,6 +391,9 @@ func (c *Core) ExecuteTaskAt(ctx context.Context, req TaskRequest, snap Dispatch
 		if ad := r.AttentionDetails[id]; len(ad) > 0 {
 			msg.AttentionDetails = map[string]map[domain.FindingCode]domain.AttentionDetail{id: ad}
 		}
+		if fu := r.FieldUpdates[id]; len(fu) > 0 {
+			msg.FieldUpdates = map[string]map[string]string{id: fu}
+		}
 		return msg, nil
 
 	// --- fetch resources (top-level) ---

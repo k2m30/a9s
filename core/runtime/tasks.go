@@ -355,6 +355,8 @@ func TaskOpID(p TaskPayload) domain.Gen {
 	switch v := p.(type) {
 	case EnrichDetailPayload:
 		return v.Op.ID
+	case EnrichRowPayload:
+		return v.Op.ID
 	case RelatedCheckPayload:
 		return v.Op.ID
 	default:

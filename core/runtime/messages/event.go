@@ -523,6 +523,7 @@ type RowEnriched struct {
 	ResourceID       string
 	Findings         map[string][]domain.Finding
 	AttentionDetails map[string]map[domain.FindingCode]domain.AttentionDetail
+	FieldUpdates     map[string]map[string]string
 	Uninspected      bool
 	Check            string
 	Err              error

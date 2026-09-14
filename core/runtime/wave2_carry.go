@@ -203,12 +203,15 @@ func wave2FindingsOf(findings []domain.Finding) []domain.Finding {
 // observation already earned, rather than being treated as newly observed
 // just because this particular save's raw fetch didn't itself re-report it.
 // stampUninspected writes the "not inspected" mark onto the rows a save is
-// about to persist. A Wave-2-authoritative save is the sweep's own answer:
-// exactly the rows in uninspected carry the check that refused them and every
-// other row is verified, so a mark the previous sweep left clears. Any other
-// save learned nothing about Wave-2 and carries each row's stored mark forward
-// by id, the way carryWave2ForRows carries its findings.
-func stampUninspected(oldRows, newRows []cache.Row, uninspected map[string]string, wave2Authoritative bool) []cache.Row {
+// about to persist. A Wave-2-authoritative save is the sweep's own answer for
+// the rows it submitted (asked): among those, exactly the ids in uninspected
+// carry the check that refused them and the rest are verified, so a mark the
+// previous sweep left clears. A row the file kept beyond what this save
+// submitted (reconcileTypeFile keeps a deeper stored page over a shallower
+// truncated one) was not looked at, and keeps its mark. Any other save learned
+// nothing about Wave-2 and carries each row's stored mark forward by id, the
+// way carryWave2ForRows carries its findings.
+func stampUninspected(oldRows, newRows []cache.Row, asked map[string]bool, uninspected map[string]string, wave2Authoritative bool) []cache.Row {
 	oldByID := make(map[string]*string, len(oldRows))
 	for _, r := range oldRows {
 		oldByID[r.ID] = r.Uninspected
@@ -216,7 +219,7 @@ func stampUninspected(oldRows, newRows []cache.Row, uninspected map[string]strin
 	out := make([]cache.Row, len(newRows))
 	for i, row := range newRows {
 		switch {
-		case wave2Authoritative:
+		case wave2Authoritative && asked[row.ID]:
 			row.Uninspected = nil
 			if check, ok := uninspected[row.ID]; ok {
 				row.Uninspected = &check

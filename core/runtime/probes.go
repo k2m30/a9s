@@ -743,7 +743,11 @@ func (c *Core) saveResourceListCache(target SaveTarget, rows []cache.Row, conten
 		// already carried keeps the stamp that observation earned rather than
 		// reading as newly seen because this save's fetch re-reported it.
 		tf.Rows = stampFindingFirstSeen(existing.Rows, tf.Rows, time.Now())
-		tf.Rows = stampUninspected(existing.Rows, tf.Rows, content.Uninspected, content.Wave2Authoritative)
+		asked := make(map[string]bool, len(rows))
+		for _, r := range rows {
+			asked[r.ID] = true
+		}
+		tf.Rows = stampUninspected(existing.Rows, tf.Rows, asked, content.Uninspected, content.Wave2Authoritative)
 		if content.IssuesKnown {
 			tf.Issues = content.Issues
 			tf.IssuesKnown = true
