@@ -4,6 +4,7 @@ package unit
 import (
 	"os"
 	"path/filepath"
+	stdruntime "runtime"
 	"strings"
 	"testing"
 
@@ -49,6 +50,9 @@ func wipfixUnreadableConfigs() []struct {
 // config named, then the file's own words — and a caller that adds words to
 // what the formatter returned is a second owner of it.
 func TestFailedProfileRead_ReadsTheSameOnBothLanes(t *testing.T) {
+	if stdruntime.GOOS == "windows" {
+		t.Skip("Windows has no POSIX file modes and phrases file errors in its own words")
+	}
 	for _, tc := range wipfixUnreadableConfigs() {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Setenv("AWS_CONFIG_FILE", tc.path(t))

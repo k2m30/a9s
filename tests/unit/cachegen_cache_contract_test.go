@@ -899,7 +899,7 @@ func TestMenuOrigin_HasOneWriter(t *testing.T) {
 						continue
 					}
 					if sel, ok := idx.X.(*ast.SelectorExpr); ok && sel.Sel.Name == "Origin" {
-						sites = append(sites, fmt.Sprintf("%s:%d", filepath.Join(dir, name), fset.Position(assign.Pos()).Line))
+						sites = append(sites, fmt.Sprintf("%s:%d", filepath.ToSlash(filepath.Join(dir, name)), fset.Position(assign.Pos()).Line))
 					}
 				}
 				return true

@@ -11,6 +11,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	stdruntime "runtime"
 	"strings"
 	"testing"
 	"time"
@@ -79,6 +80,9 @@ func TestECSDemo_EventWitnessSurvivesALongSession(t *testing.T) {
 // missing config file came to read "transport failure", pointing the operator
 // at the network for a problem on their own disk.
 func TestErrClass_LocalFileFailureIsNotTransport(t *testing.T) {
+	if stdruntime.GOOS == "windows" {
+		t.Skip("Windows has no POSIX file modes and phrases file errors in its own words")
+	}
 	dir := t.TempDir()
 
 	unreadable := filepath.Join(dir, "unreadable.yaml")

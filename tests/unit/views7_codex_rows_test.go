@@ -452,6 +452,9 @@ func views7RenamedViewFiles(t *testing.T) map[string]string {
 	if _, err := os.Stat(filepath.Join(root, ".git")); err != nil {
 		t.Skipf("no .git in %s — this gate reads the repo's own rename history", root)
 	}
+	if shallow, _ := exec.CommandContext(t.Context(), "git", "-C", root, "rev-parse", "--is-shallow-repository").Output(); strings.TrimSpace(string(shallow)) == "true" { //nolint:gosec // fixed arguments
+		t.Skip("a shallow clone holds no rename history to read")
+	}
 	out, err := exec.CommandContext(t.Context(), "git", "-C", root, "log", "--diff-filter=R", "-M",
 		"--name-status", "--format=", "--", ".a9s/views").Output() //nolint:gosec // fixed arguments
 	if err != nil {

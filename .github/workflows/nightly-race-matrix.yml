@@ -19,6 +19,8 @@ jobs:
         os: [ubuntu-latest, macos-latest, windows-latest]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          fetch-depth: 0  # the view-file rename gate reads git history
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e  # v7.0.0
         with:
           go-version-file: go.mod
@@ -34,12 +36,23 @@ jobs:
       - uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3  # v9.0.0
         with:
           script: |
-            const title = `Nightly race detector failure — ${new Date().toISOString().slice(0,10)}`;
-            const body = `The nightly race matrix failed.\n\nRun: https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+            const prefix = 'Nightly race detector failure';
+            const run = `https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+            const open = await github.rest.issues.listForRepo({
+              owner: context.repo.owner, repo: context.repo.repo, state: 'open', labels: 'ci', per_page: 100,
+            });
+            const existing = open.data.find(i => i.title.startsWith(prefix) && !i.pull_request);
+            if (existing) {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner, repo: context.repo.repo, issue_number: existing.number,
+                body: `Failed again on ${new Date().toISOString().slice(0,10)}: ${run}`,
+              });
+              return;
+            }
             await github.rest.issues.create({
               owner: context.repo.owner,
               repo: context.repo.repo,
-              title,
-              body,
+              title: `${prefix} — ${new Date().toISOString().slice(0,10)}`,
+              body: `The nightly race matrix failed.\n\nRun: ${run}`,
               labels: ['bug', 'ci'],
             });

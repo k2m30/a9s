@@ -14,6 +14,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	stdruntime "runtime"
 	"strconv"
 	"strings"
 	"testing"
@@ -25,6 +26,9 @@ import (
 // local-file cause: what went wrong with the file, with neither the fetcher's
 // own call-stack wrapper nor a guess at an AWS error class in front of it.
 func TestProfileSelector_LocalConfigFailureIsPhrased(t *testing.T) {
+	if stdruntime.GOOS == "windows" {
+		t.Skip("Windows has no POSIX file modes and phrases file errors in its own words")
+	}
 	cases := []struct {
 		name string
 		path func(t *testing.T) string
