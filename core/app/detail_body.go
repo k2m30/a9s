@@ -314,8 +314,6 @@ func sectionsToFieldItemsDetail(sections []domain.Section, humanizePaths map[str
 		}
 		quoted := quotedSections[sec.Title]
 		for _, it := range sec.Items {
-			// A credential is masked in a quoted section too: the quotation
-			// keeps AWS's wording, not its secrets.
 			it = redactCredential(it)
 			if !quoted {
 				if catalog.Humanizes(humanizePaths, it.Path, it.Label) {

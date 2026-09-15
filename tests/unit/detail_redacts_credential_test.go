@@ -5,7 +5,7 @@ package unit_test
 // detail_redacts_credential_test.go — a value the secret scanner flags never
 // reaches the detail screen in the clear. The scanner's own rows name only
 // where a credential sits; the resource's configuration dump beside them
-// (a Lambda's environment) showed the value itself.
+// (a Lambda's environment) must not print it.
 
 import (
 	"strings"

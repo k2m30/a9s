@@ -343,10 +343,6 @@ func (c *Controller) applyIntentsLocked(intents []runtime.UIIntent) {
 			c.applyDetailFieldUpdates(v.ResourceType, v.FieldUpdates)
 			switch {
 			case v.ResourceID != "":
-				// One row's answer: only that row's detail changes, whether
-				// it gained findings or came back clean. A patch that does
-				// not name the row answered for its fields alone (a refused
-				// check), and its findings stand.
 				if fs, answered := v.EnrichmentFindings[v.ResourceID]; answered {
 					c.applyDetailFindingsForResource(v.ResourceType, v.ResourceID, fs, v.EnrichmentAttentionDetails[v.ResourceID])
 				}

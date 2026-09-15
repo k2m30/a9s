@@ -38,8 +38,6 @@ func (c *Core) handleRowEnriched(msg messages.RowEnriched) ([]UIIntent, []TaskRe
 
 	set := c.session.EnrichmentTruncatedIDs[canon]
 	if msg.Uninspected {
-		// The on-demand check did not answer either: the row keeps every
-		// finding it renders and the mark now names the call that refused.
 		// Both surfaces read the mark from the session at their next build.
 		if set == nil {
 			set = make(map[string]string)
@@ -84,16 +82,11 @@ func (c *Core) handleRowEnriched(msg messages.RowEnriched) ([]UIIntent, []TaskRe
 	if tr := c.session.RowStore.Snapshot(canon); tr.Pagination != nil && tr.Pagination.IsTruncated {
 		truncated = true
 	}
-	// The answer outlives the session the way the sweep's does: the
-	// sweep-completion save, with this type answered for, writes the row's
-	// findings and its mark as the set now has them, and every other row
-	// keeps what the set still says.
+	// Saved the way the sweep's answer is, with the set as it now stands.
 	var tasks []TaskRequest
 	if save := c.snapshotRowStoreForSave(map[string]bool{canon: true}); save != nil {
 		tasks = append(tasks, TaskRequest{Key: TaskKey{Kind: TaskKindSaveCache}, Payload: save})
 	}
-	// RowIDs names the rows the answer folds; a refused row is not among
-	// them, so its findings stand and only its field lands.
 	rowIDs := []string{}
 	if !msg.Uninspected {
 		rowIDs = append(rowIDs, msg.ResourceID)
@@ -112,8 +105,6 @@ func (c *Core) handleRowEnriched(msg messages.RowEnriched) ([]UIIntent, []TaskRe
 			},
 		},
 	}
-	// The detail patch names the row in EnrichmentFindings only when the
-	// check answered for it; a refused check lands its fields alone.
 	detail := PatchDetail{ResourceType: canon, ResourceID: msg.ResourceID, FieldUpdates: msg.FieldUpdates}
 	if !msg.Uninspected {
 		detail.EnrichmentFindings = map[string][]domain.Finding{msg.ResourceID: msg.Findings[msg.ResourceID]}

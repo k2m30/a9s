@@ -146,15 +146,12 @@ func TestCappedRow_DetailOpenRunsItsChecks(t *testing.T) {
 		t.Errorf("the other capped row's Status cell = %q, want %q", got, domain.NotInspectedPhrase)
 	}
 
-	// The answer is on disk: the row's mark is gone and the other row's stays.
 	if got := uninspectedOnDisk(t, onDemandProfile, onDemandRegion, rows[0].ID); got != nil {
 		t.Errorf("the answered row still carries uninspected=%q on disk", *got)
 	}
 	if got := uninspectedOnDisk(t, onDemandProfile, onDemandRegion, rows[1].ID); got == nil || *got != awsclient.CheckCap {
 		t.Errorf("the other capped row's mark on disk = %v, want %q", got, awsclient.CheckCap)
 	}
-	// The badge on disk is the answer's: one issue, still a lower bound
-	// while the other row is uninspected.
 	if issues, known, lower := issuesOnDisk(t, onDemandProfile, onDemandRegion); issues != 1 || !known || !lower {
 		t.Errorf("the badge on disk is %d (known=%v, lower bound=%v), want 1 known and a lower bound", issues, known, lower)
 	}
@@ -285,7 +282,6 @@ func TestCappedRow_AnswerFromBeforeARefreshIsDropped(t *testing.T) {
 			if got := c.GetListEnrichmentFindings("ec2")[rows[0].ID]; len(got) != 0 {
 				t.Errorf("a pre-refresh answer landed its finding: %v", got)
 			}
-			// The next sweep, which caps the row again, is the truth.
 			intents, _ = core.HandleEvent(messages.EnrichmentChecked{
 				ResourceType: "ec2",
 				TruncatedIDs: map[string]string{rows[0].ID: awsclient.CheckCap},
@@ -302,8 +298,6 @@ func TestCappedRow_AnswerLeavesTheOtherOpenDetailAlone(t *testing.T) {
 	var asked [][]string
 	onDemandEC2Enricher(t, &asked)
 	c, core, rows := cappedEC2List(t)
-	// The other capped row's detail is open underneath, carrying a finding
-	// an earlier sweep found.
 	prior := []domain.Finding{{Code: "ec2.stopped", Phrase: "stopped by the operator", Severity: domain.SevWarn, Source: "wave2:ec2"}}
 	c.ApplyIntents([]runtime.UIIntent{runtime.PatchResourceList{
 		ResourceType: "ec2",

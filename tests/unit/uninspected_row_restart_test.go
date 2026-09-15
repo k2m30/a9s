@@ -141,7 +141,6 @@ func TestUninspectedRow_MarkSurvivesRestart(t *testing.T) {
 		t.Fatalf("a save with no Wave-2 answer dropped the mark: uninspected=%v", got)
 	}
 
-	// Restart: a new session on the same pair, seeded from disk only.
 	core2, ctrl2 := newLiveWebStyleController(t, profile, region)
 	seedFromDisk(ctrl2, profile, region)
 	if got := core2.EnrichmentTruncatedIDs("ec2"); got[rows[0].ID] != uninspectedCheck || len(got) != 1 {

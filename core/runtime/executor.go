@@ -374,9 +374,6 @@ func (c *Core) ExecuteTaskAt(ctx context.Context, req TaskRequest, snap Dispatch
 		}
 		id := p.Op.Resource.ID
 		canon := resource.CanonicalShortName(p.Op.ResourceType)
-		// The check runs on the live row, never the copy the detail opened
-		// with (BeginDetailOperation's rule); a row that is no longer live
-		// stays at its cap.
 		msg := messages.RowEnriched{ResourceType: p.Op.ResourceType, ResourceID: id, OperationID: p.Op.ID, Gen: p.Gen, TypeGen: p.TypeGen}
 		row, live := c.liveRow(canon, id)
 		if !live {

@@ -47,7 +47,7 @@ type EnrichRowPayload struct {
 	Op DetailOperation
 	// Gen and TypeGen are the enrichment epoch the check was dispatched in
 	// (Session.EnrichmentGen, EnrichmentTypeGen[type]); a refresh in the
-	// meantime makes the answer stale, and handleRowEnriched drops it.
+	// meantime makes the answer stale.
 	Gen     domain.Gen
 	TypeGen domain.Gen
 }

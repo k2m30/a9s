@@ -13,16 +13,11 @@ import (
 )
 
 // rolePolicyFindings returns the wave1 findings for one attached managed
-// policy. An AWS-managed policy in the administrator set
-// (policy_findings.go's adminManagedPolicyResources) emits the administrator
-// finding, one in the broad-power set (broadPowerManagedPolicyResources) the
-// broad-power finding; every other managed policy is healthy.
+// policy.
 //
-// The ARN decides, not the name. Matching "AdministratorAccess" as a bare
-// string rendered a customer-managed policy an operator happened to give that
-// name red while carrying whatever its own document allows, and missed
-// nothing AWS returns, since AWS names its own policies in the partition the
-// session is connected to.
+// The ARN decides, not the name: a customer-managed policy may be named
+// AdministratorAccess while carrying whatever its own document allows, and
+// AWS's own policies sit in the partition the session is connected to.
 func rolePolicyFindings(policyARN string) []domain.Finding {
 	if awsManagedPolicyIn(policyARN, adminManagedPolicyResources) {
 		return []domain.Finding{wave1Finding(CodeRolePolicyAdministrator)}
