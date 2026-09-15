@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.57.0] - 2026-09-15
+
 ### Fixed
 
 - A live start whose on-disk cache loads before the AWS connection completes
@@ -14,10 +16,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   "verifying 0/70" for the whole session, no row ever got a count or an issue
   badge from the scan, and only the types the operator opened by hand showed
   anything at all.
-
-## [3.57.0] - 2026-09-15
-
-### Fixed
 
 - The main menu's "refreshing…" line clears when the start-up scan finishes.
   In the terminal it stayed on screen for the rest of the session, so a
