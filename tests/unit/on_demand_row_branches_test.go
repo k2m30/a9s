@@ -293,6 +293,86 @@ func TestOnDemandAnswer_KeepsItsAttentionDetailsThroughAStaleSweep(t *testing.T)
 	}
 }
 
+// Row 5 — a clean on-demand answer is as much an answer as a finding is. A
+// sweep dispatched before it reports the row at its cap; the row carries
+// nothing for the fold to restore, and must still come out answered rather
+// than back under the cap the operator already cleared by opening it.
+func TestOnDemandAnswer_CleanAnswerSurvivesAStaleSweep(t *testing.T) {
+	stubEC2Enricher(t, func([]resource.Resource) (awsclient.IssueEnricherResult, error) {
+		return emptyEnricherResult(), nil
+	})
+	c, core, rows := cappedEC2List(t)
+
+	runEnrichRow(t, c, core, rows[0])
+
+	intents, _ := core.HandleEvent(messages.EnrichmentChecked{
+		ResourceType: "ec2",
+		TruncatedIDs: map[string]string{rows[0].ID: awsclient.CheckCap, rows[1].ID: awsclient.CheckCap},
+	})
+	c.ApplyIntents(intents)
+
+	set := core.EnrichmentTruncatedIDs("ec2")
+	if got, still := set[rows[0].ID]; still {
+		t.Errorf("a stale sweep put the cleanly answered row back at %q; the set is %v", got, set)
+	}
+	if set[rows[1].ID] != awsclient.CheckCap {
+		t.Errorf("the row the sweep really did leave at its cap reads %q, want %q", set[rows[1].ID], awsclient.CheckCap)
+	}
+	c.Apply(app.Action{Kind: app.ActionBack})
+	if got := statusCellFor(t, *c.Snapshot().Body.List, rows[0].ID); got != "running" {
+		t.Errorf("after a stale sweep the cleanly answered row's Status cell reads %q, want its own state", got)
+	}
+	if got := statusCellFor(t, *c.Snapshot().Body.List, rows[1].ID); got != domain.NotInspectedPhrase {
+		t.Errorf("the other capped row's Status cell reads %q, want %q", got, domain.NotInspectedPhrase)
+	}
+}
+
+// Row 5 — the row an on-demand check answered for can be gone from the
+// account by the time the sweep that was dispatched before it lands. There is
+// no row left to restore the answer from, and the fold must neither resurrect
+// it under the cap nor fail on its absence.
+func TestOnDemandAnswer_AnsweredRowGoneBeforeTheStaleSweepLands(t *testing.T) {
+	stubEC2Enricher(t, func(resources []resource.Resource) (awsclient.IssueEnricherResult, error) {
+		res := emptyEnricherResult()
+		for _, r := range resources {
+			res.Findings[r.ID] = []domain.Finding{{Code: "ec2.impaired", Phrase: onDemandPhrase, Severity: domain.SevBroken, Source: "wave2:ec2"}}
+		}
+		return res, nil
+	})
+	c, core, rows := cappedEC2List(t)
+
+	runEnrichRow(t, c, core, rows[0])
+	c.Apply(app.Action{Kind: app.ActionBack})
+	core.ObserveRows("ec2", rows[1:], &resource.PaginationMeta{IsTruncated: false}, session.OriginFetch, false)
+	c.ApplyResourcesLoaded("ec2", rows[1:], &resource.PaginationMeta{IsTruncated: false}, false)
+
+	intents, _ := core.HandleEvent(messages.EnrichmentChecked{
+		ResourceType: "ec2",
+		TruncatedIDs: map[string]string{rows[0].ID: awsclient.CheckCap, rows[1].ID: awsclient.CheckCap},
+	})
+	c.ApplyIntents(intents)
+
+	set := core.EnrichmentTruncatedIDs("ec2")
+	if got, still := set[rows[0].ID]; still {
+		t.Errorf("the deleted row came back at %q; the set is %v", got, set)
+	}
+	if set[rows[1].ID] != awsclient.CheckCap {
+		t.Errorf("the surviving capped row reads %q, want %q", set[rows[1].ID], awsclient.CheckCap)
+	}
+	if got, carried := c.GetListEnrichmentFindings("ec2")[rows[0].ID]; carried {
+		t.Errorf("the deleted row carries %v in the list store", got)
+	}
+	body := *c.Snapshot().Body.List
+	for _, row := range body.Rows {
+		if row.ResourceID == rows[0].ID {
+			t.Errorf("the deleted row is back in the list: %+v", row)
+		}
+	}
+	if got := statusCellFor(t, body, rows[1].ID); got != domain.NotInspectedPhrase {
+		t.Errorf("the surviving capped row's Status cell reads %q, want %q", got, domain.NotInspectedPhrase)
+	}
+}
+
 // Row 6 — the web host runs against the clients its bootstrap handed it, so
 // the region it was started with is the only one it has. `:region` says so
 // rather than opening a selector that cannot switch anything.
