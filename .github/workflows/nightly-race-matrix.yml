@@ -25,7 +25,9 @@ jobs:
         with:
           go-version-file: go.mod
       - name: Run tests with race detector
-        run: go test -race ./tests/unit/... -timeout 1200s -shuffle=on
+        # Windows under the race detector needs about 18 minutes; macOS and
+        # Ubuntu about 8. The ceiling leaves the same margin for all three.
+        run: go test -race ./tests/unit/... -timeout 2400s -shuffle=on
 
   open-issue-on-failure:
     name: Report failure
