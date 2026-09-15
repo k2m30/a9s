@@ -768,8 +768,8 @@ func (s *Store) Save() error {
 		return fmt.Errorf("costs: marshaling cache: %w", err)
 	}
 
-	// Windows refuses a rename onto a path another process is renaming onto,
-	// so saves of one cache path are serialised here.
+	// Windows refuses a rename onto a path a concurrent rename already holds,
+	// so two sessions in this process take turns on one cache path.
 	lock, _ := savePathLocks.LoadOrStore(s.path, &sync.Mutex{})
 	mu := lock.(*sync.Mutex)
 	mu.Lock()
