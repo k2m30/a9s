@@ -739,6 +739,10 @@ func (s *Store) ApplyFetchResult(r FetchResult, now time.Time) {
 	}
 }
 
+// savePathLocks holds one mutex per resolved cache path, shared by every
+// Store in the process that writes that path.
+var savePathLocks sync.Map
+
 // Save persists the Store to CachePath(profile) via atomic temp-write +
 // rename, mirroring core/cache's save convention.
 func (s *Store) Save() error {
@@ -763,6 +767,13 @@ func (s *Store) Save() error {
 	if err != nil {
 		return fmt.Errorf("costs: marshaling cache: %w", err)
 	}
+
+	// Windows refuses a rename onto a path another process is renaming onto,
+	// so saves of one cache path are serialised here.
+	lock, _ := savePathLocks.LoadOrStore(s.path, &sync.Mutex{})
+	mu := lock.(*sync.Mutex)
+	mu.Lock()
+	defer mu.Unlock()
 
 	// One temp file per save: two sessions on the same profile save the same
 	// path, and a shared temp name lets one rename the other's half-written
