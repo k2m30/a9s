@@ -312,6 +312,12 @@ func TestListOpen_ResourcesLoaded_ClearsRefreshingAndSwapsRows(t *testing.T) {
 // AvailChecked/AvailTotal progress counter already present on MenuState
 // (see menuProgressIndicator in menu.go). This test pins the OUTCOME
 // (MenuBody.Refreshing) rather than a specific internal counter name.
+//
+// Task c8 row 1: the setup reaches "during" through the sweep-start progress
+// intent, because those counters are now the only source of Refreshing. A
+// bare RowStore seed is not a sweep and must not be restored here — on the
+// terminal lane nothing ever acknowledged such a seed, so the menu said
+// "refreshing…" for the rest of the session.
 func TestMenu_Refreshing_TrueDuringBackgroundSweep_FalseOnComplete(t *testing.T) {
 	core, c := newSeededTestController(t)
 
@@ -322,13 +328,17 @@ func TestMenu_Refreshing_TrueDuringBackgroundSweep_FalseOnComplete(t *testing.T)
 		runtime.PatchMenuAvailability{ResourceType: "ec2", Count: 3, Truncated: false},
 	})
 
-	// Simulate the background sweep starting: at least one AvailabilityChecked
-	// has NOT yet arrived for all known types. We drive this through the same
-	// event lane the runtime uses so this test exercises the real seam, not a
-	// hand-built MenuState.
-	core.Session().RowStore.Observe("ec2", []resource.Resource{
-		{ID: "i-0sweep0001", Type: "ec2"},
-	}, nil, session.OriginProbe, false)
+	// The sweep starts: the runtime sets its own queue/counters and emits the
+	// {Checked: 0, Total: N} progress intent (handlers_availability.go), which
+	// is the whole of "a sweep is in flight". A one-type sweep keeps the
+	// completion below to a single probe result.
+	sess := core.Session()
+	sess.AvailQueue = nil
+	sess.AvailChecked = 0
+	sess.AvailTotal = 1
+	c.ApplyIntents([]runtime.UIIntent{
+		runtime.PatchMenuCheckProgress{Checked: 0, Total: 1},
+	})
 
 	snapDuring := c.Snapshot()
 	if snapDuring.Body.Menu == nil {

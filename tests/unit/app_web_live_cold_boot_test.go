@@ -151,14 +151,9 @@ func TestWebBoot_AvailabilityCacheLoaded_AppliesCountsAndIssuesToMenu(t *testing
 // ExecuteTask(TaskKindLoadAvailCache) produces) through Controller.Handle,
 // exactly as DrainSyncProgress does for BootstrapLive's returned tasks.
 //
-// core/app/menu.go's menuRefreshing() reports true only for a type
-// RowStore.ProbeOriginTypeNames() names, which itself requires
-// len(Rows) > 0 for that type's OriginProbe/OriginDisk entry. A counts-only
-// AvailabilityCacheLoaded entry with no real per-type disk file (C6a: never
-// fabricates Rows) therefore does NOT make menuRefreshing() see it — this
-// fixture seeds a REAL on-disk s3 file so RowStore genuinely retains
-// OriginDisk rows for at least one queued type, exercising the sweep-in-
-// flight signal Contract B describes.
+// The fixture seeds a REAL on-disk s3 file so the cache load has a type to
+// retain rows for, exercising the sweep-in-flight signal Contract B
+// describes end to end rather than an empty-seed shortcut.
 func TestWebBoot_Refreshing_TrueDuringCacheSeededSweep_FalseOnComplete(t *testing.T) {
 	t.Setenv("A9S_CONFIG_FOLDER", t.TempDir())
 	core, ctrl := newLiveWebStyleController(t, "webboot-refreshing-prof", "us-east-1")

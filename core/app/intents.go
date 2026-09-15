@@ -169,11 +169,6 @@ func (c *Controller) applyIntentsLocked(intents []runtime.UIIntent) {
 			c.enrichmentDetails = nil
 			c.enrichmentTruncated = nil
 			c.enrichmentGen++
-			// The sweep acknowledgements belong to the availability state
-			// this intent clears: a pair switch or a manual refresh starts a
-			// new sweep, and a type acknowledged by the previous one must not
-			// let the menu report the new one as already finished.
-			c.menuSweepAcked = nil
 
 		case runtime.PatchResourceList:
 			// Apply enrichment data (findings + issue badge) to the controller's

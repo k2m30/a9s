@@ -157,18 +157,6 @@ type Controller struct {
 	// session and carries its own Header.Mode value ("demo") set elsewhere.
 	uiMode string
 
-	// menuSweepAcked tracks, per resource type, whether an AvailabilityChecked
-	// result has landed for a type currently retained in
-	// core.Session().ProbeResources. MenuBody.Refreshing (the menu-refreshing
-	// signal) is true
-	// while any type present in ProbeResources has not yet been acked here —
-	// i.e. a background availability sweep is still confirming/replacing a
-	// cache-seeded startup. Handle marks a type acked unconditionally on any
-	// AvailabilityChecked arrival (even one the central gen-guard treats as
-	// stale) because the sweep-in-flight signal tracks wall-clock probe
-	// completion, not generation validity.
-	menuSweepAcked map[string]bool
-
 	// availSaveStop signals the cache writer to drain and exit; closed
 	// exactly once by Close via availSaveCloseOnce.
 	availSaveStop chan struct{}

@@ -542,9 +542,8 @@ func (s *RowStore) ClearProbeOrigin() {
 // Wave-1 probe or disk seed confirmed zero rows this session, Gen!=0 with an
 // empty Rows slice — see Observe's Gen-monotonicity contract) is still a
 // completed observation and must be included, so a caller sweeping "every
-// type the probe/disk-seed pass has touched this round" (e.g. the
-// menuRefreshing ack loop) does not stall waiting for an ack that will never
-// arrive for a type that legitimately has nothing to show.
+// type the probe/disk-seed pass has touched this round" sees it rather than
+// waiting on a type that legitimately has nothing to show.
 func (s *RowStore) ProbeOriginTypeNames() []string {
 	s.mu.Lock()
 	defer s.mu.Unlock()

@@ -286,8 +286,7 @@ var ercEventRoutes = map[string]ercRoute{
 	"AvailabilityPrefetched": {ercNeutralHandled,
 		"Core.HandleEvent (orchestrator.go) case -> handleAvailabilityPrefetched"},
 	"AvailabilityChecked": {ercNeutralHandled,
-		"Core.HandleEvent (orchestrator.go) case -> handleAvailabilityChecked; Controller.Handle (handle.go) also runs " +
-			"a side-channel (markMenuSweepAcked) unconditionally, independent of HandleEvent's own gen-guard verdict"},
+		"Core.HandleEvent (orchestrator.go) case -> handleAvailabilityChecked"},
 	"EnrichmentChecked": {ercNeutralHandled,
 		"Core.HandleEvent (orchestrator.go) case -> handleEnrichmentChecked"},
 	"RowEnriched": {ercNeutralHandled,

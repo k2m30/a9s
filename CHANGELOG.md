@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- The main menu's "refreshing…" line clears when the start-up scan finishes.
+  In the terminal it stayed on screen for the rest of the session, so a
+  finished start-up looked like a stuck one. It now shows exactly while the
+  scan is running, the same as the frame title's progress and the web menu.
+
 - A role's attached AWS-managed AdministratorAccess and PowerUserAccess
   policies are two different rows in the role-policies view: "administrator
   access" and "broad power access", at the same severity. Both read

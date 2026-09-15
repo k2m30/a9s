@@ -68,16 +68,6 @@ func (c *Controller) Handle(ev runtime.Event) (ViewState, []runtime.TaskRequest)
 	// applyIntents does not act on it, so route it through the shared helper.
 	tasks = append(tasks, c.refreshTasksForIntents(intents)...)
 
-	// Menu-refreshing signal: mark the type's availability sweep acked when
-	// its AvailabilityChecked result arrives. Only a result of the CURRENT
-	// generation may do so — a probe dispatched before a pair switch or a
-	// manual refresh answers for a sweep that no longer exists, and letting
-	// it ack would make the menu claim the live sweep had already reached
-	// that type.
-	if msg, ok := ev.(messages.AvailabilityChecked); ok && !messages.IsStale(msg, c.core) {
-		c.markMenuSweepAcked(msg.ResourceType)
-	}
-
 	// HandleEvent's central GenStamped guard drops stale events from the intent
 	// path, but the row mutation below runs unconditionally. A host that passes
 	// task results straight to Handle (headless/web) would otherwise let a late

@@ -535,11 +535,18 @@ func TestPairReEntry_SweepsAgain(t *testing.T) {
 // TestMenuRefreshing_StaleProbeResult_DoesNotAcknowledgeTheSweep: a probe
 // result from a superseded generation must not make the menu claim the
 // sweep reached that type.
+//
+// Task c8 row 1: the sweep is started through the real cache-load event, and
+// the pin is that the stale result advances neither the progress counter nor
+// Refreshing. The earlier form seeded RowStore and relied on the per-type
+// acknowledgement map; that map is gone, and a bare RowStore seed must not be
+// restored as the stand-in for a sweep.
 func TestMenuRefreshing_StaleProbeResult_DoesNotAcknowledgeTheSweep(t *testing.T) {
 	t.Setenv("A9S_CONFIG_FOLDER", t.TempDir())
 
 	ctrl, core, _ := newCachegenController(t, "cachegen-staleack", "us-east-1")
 	core.ObserveRows("s3", cachegenRows(1, "bucket-ack"), &resource.PaginationMeta{IsTruncated: false}, session.OriginProbe, false)
+	ctrl.Handle(messages.AvailabilityCacheLoaded{Entries: map[string]int{"s3": 1}})
 
 	ctrl.Handle(messages.AvailabilityChecked{ResourceType: "s3", Count: 1, Gen: 4242})
 
@@ -550,28 +557,46 @@ func TestMenuRefreshing_StaleProbeResult_DoesNotAcknowledgeTheSweep(t *testing.T
 	if !body.Refreshing {
 		t.Error("a stale-generation probe result acknowledged the current sweep — only a current-generation result may clear a type's refreshing mark")
 	}
+	if !strings.HasPrefix(body.Progress, "[verifying 0/") {
+		t.Errorf("menu progress after a stale-generation probe result = %q, want a sweep still at 0 checked — a result from a superseded generation answers for no probe of this one", body.Progress)
+	}
 }
 
 // TestMenuClearAvailability_ResetsSweepAcknowledgements: a manual full
 // refresh must leave the menu refreshing until the new sweep answers.
+//
+// Task c8 row 1: the clear now resets the AvailChecked/AvailTotal counters
+// (MenuState.ClearAvailability) that Refreshing reads, and the restarted
+// sweep's own cache load re-arms them. The old form asserted Refreshing true
+// from the clear intent alone, which only held because a separate
+// acknowledgement map survived it; that map is gone and the assertion is not
+// to be restored — with the counters cleared, a menu claiming a sweep in
+// flight before one has started would be the defect.
 func TestMenuClearAvailability_ResetsSweepAcknowledgements(t *testing.T) {
 	t.Setenv("A9S_CONFIG_FOLDER", t.TempDir())
 
-	ctrl, core, _ := newCachegenController(t, "cachegen-clearack", "us-east-1")
+	ctrl, core, sess := newCachegenController(t, "cachegen-clearack", "us-east-1")
 	core.ObserveRows("s3", cachegenRows(1, "bucket-clear"), &resource.PaginationMeta{IsTruncated: false}, session.OriginProbe, false)
+	ctrl.Handle(messages.AvailabilityCacheLoaded{Entries: map[string]int{"s3": 1}})
+	sess.AvailQueue = nil
+	sess.AvailChecked = 0
+	sess.AvailTotal = 1
 	ctrl.Handle(messages.AvailabilityChecked{ResourceType: "s3", Count: 1, Gen: core.AvailabilityGen()})
 
 	if body := ctrl.Snapshot().Body.Menu; body != nil && body.Refreshing {
 		t.Fatal("menu still refreshing after the only probed type answered — precondition for this pin failed")
 	}
 
-	ctrl.ApplyIntents([]runtime.UIIntent{runtime.MenuClearAvailabilityIntent{}})
+	if tasks := ctrl.RestartAvailabilitySweep(); len(tasks) == 0 {
+		t.Fatal("RestartAvailabilitySweep returned no task — the manual refresh dispatches the cache load that restarts the sweep")
+	}
+	ctrl.Handle(messages.AvailabilityCacheLoaded{Entries: map[string]int{"s3": 1}})
 	body := ctrl.Snapshot().Body.Menu
 	if body == nil {
 		t.Fatal("menu body is nil")
 	}
 	if !body.Refreshing {
-		t.Error("the menu reported a finished sweep immediately after a manual refresh cleared it — the acknowledgement map must be cleared at the same point the menu's availability is")
+		t.Error("the menu reported a finished sweep on the one a manual refresh just restarted — the cleared availability state must carry the sweep counters with it")
 	}
 }
 

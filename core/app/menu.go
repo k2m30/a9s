@@ -198,23 +198,6 @@ func menuActiveKey(ms *MenuState, item resource.ResourceTypeDef) string {
 	return item.ShortName
 }
 
-// markMenuSweepAcked records that resource type shortName's background
-// availability probe result has landed, clearing it from the Refreshing
-// computation in menuRefreshing. Canonicalizes aliases to the registered
-// ShortName so an alias-keyed ProbeResources entry (e.g. "rds" retained
-// under the canonical "dbi" key) still matches.  Caller must hold c.mu
-// (write) — called from Handle, which already holds the lock.
-func (c *Controller) markMenuSweepAcked(shortName string) {
-	if shortName == "" {
-		return
-	}
-	canon := resource.CanonicalShortName(shortName)
-	if c.menuSweepAcked == nil {
-		c.menuSweepAcked = make(map[string]bool)
-	}
-	c.menuSweepAcked[canon] = true
-}
-
 // syncMenuIssueCount records one observation of canon's issue badge under the
 // single rule every writer of that badge follows: an authoritative
 // observation assigns the count, a non-authoritative one only raises it and
@@ -464,23 +447,6 @@ func (c *Controller) Close() {
 	c.availSaveWG.Wait()
 }
 
-// menuRefreshing reports whether a background availability sweep is still in
-// flight: true when RowStore holds at least one OriginProbe/OriginDisk type
-// whose probe result has not yet been acked via markMenuSweepAcked. This is
-// the MenuBody.Refreshing menu-refreshing signal — a cache-seeded startup (RowStore
-// populated from the on-disk availability cache before any live probe
-// completes) shows Refreshing=true until every retained type's
-// AvailabilityChecked result lands. Caller must hold c.mu (at least read).
-func (c *Controller) menuRefreshing() bool {
-	for _, shortName := range c.core.ProbeOriginTypeNames() {
-		canon := resource.CanonicalShortName(shortName)
-		if !c.menuSweepAcked[canon] {
-			return true
-		}
-	}
-	return false
-}
-
 // buildMenuBody constructs a MenuBody from MenuState + the resource catalog.
 // Applies filter + attention + skip-unavailable + badge logic and produces
 // renderer-agnostic data. mainmenu.go View() delegates to this via the
@@ -555,6 +521,7 @@ func buildMenuBody(ms *MenuState) *MenuBody {
 		Filter:        ms.Filter,
 		AttentionOnly: ms.AttentionOnly,
 		Progress:      menuProgressIndicator(ms),
+		Refreshing:    menuSweepInFlight(ms),
 	}
 }
 
@@ -585,6 +552,16 @@ func menuFrameTitle(ms *MenuState) string {
 	return title
 }
 
+// menuSweepInFlight reports whether the Wave-1 availability sweep is still
+// running. The runtime owns these counters: PatchMenuCheckProgress carries
+// {0, N} at sweep start, {k, N} per probe result, and {0, 0} on completion
+// (core/runtime/handlers_availability.go). MenuBody.Refreshing and
+// menuProgressIndicator's "[verifying k/N]" are two renderings of this one
+// fact, so they read it here rather than each deciding for itself.
+func menuSweepInFlight(ms *MenuState) bool {
+	return ms.AvailTotal > 0 && ms.AvailChecked < ms.AvailTotal
+}
+
 // menuProgressIndicator returns the scan/enrichment progress suffix only —
 // empty when no scan is active. Both the frame title (menuFrameTitle) and
 // MenuBody.Progress read it, so the headless body and the TUI cannot describe
@@ -595,7 +572,7 @@ func menuProgressIndicator(ms *MenuState) string {
 	if ms.EnrichTotal > 0 && ms.EnrichChecked < ms.EnrichTotal {
 		return "[enriching " + strconv.Itoa(ms.EnrichChecked) + "/" + strconv.Itoa(ms.EnrichTotal) + "]"
 	}
-	if ms.AvailTotal > 0 && ms.AvailChecked < ms.AvailTotal {
+	if menuSweepInFlight(ms) {
 		return "[verifying " + strconv.Itoa(ms.AvailChecked) + "/" + strconv.Itoa(ms.AvailTotal) + "]"
 	}
 	return ""

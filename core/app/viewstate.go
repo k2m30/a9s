@@ -416,10 +416,10 @@ type MenuBody struct {
 	Filter        string      `json:"filter,omitempty"`
 	AttentionOnly bool        `json:"attention_only,omitempty"`
 	Progress      string      `json:"progress,omitempty"`
-	// Refreshing is true while a background availability sweep is running
-	// after a cache-seeded startup (session ProbeResources holds entries that
-	// have not yet been acknowledged by a matching AvailabilityChecked
-	// result). False once every outstanding probe result has landed.
+	// Refreshing is true while the Wave-1 availability sweep is running, i.e.
+	// while MenuState's AvailChecked/AvailTotal counters report outstanding
+	// probes (menuSweepInFlight). False once the last probe result has landed,
+	// and on a session where no sweep ever started.
 	Refreshing bool `json:"refreshing,omitempty"`
 }
 
