@@ -320,3 +320,34 @@ func TestEnrichECRRepository_OneDeniedReadOfTwoRepos(t *testing.T) {
 			failed, total, err.Error())
 	}
 }
+
+// TestEnrichStepFunctionsStatus_ExpressMachineCountsInTheTotal pins that the
+// denominator counts every state machine the pass read, not only the ones it
+// goes on to list executions for. The configuration read runs for every
+// machine carrying an ARN, express included, so an express machine whose
+// DescribeStateMachine is refused is one failed resource out of one read — a
+// numerator larger than the total tells the operator more things failed than
+// exist.
+func TestEnrichStepFunctionsStatus_ExpressMachineCountsInTheTotal(t *testing.T) {
+	const sm = "example-express-flow"
+	f := newW5SFNFake()
+	f.describeErr[w5SFNArn(sm)] = deniedCall("DescribeStateMachine", "states:DescribeStateMachine")
+
+	_, err := awsclient.EnrichStepFunctionsStatus(
+		context.Background(),
+		&awsclient.ServiceClients{SFN: f},
+		[]resource.Resource{w5SFNRes(sm, "EXPRESS")},
+		nil,
+	)
+	if err == nil {
+		t.Fatal("a refused DescribeStateMachine must surface a composite error")
+	}
+	line := err.Error()
+	failed, total := aggCounts(t, line)
+	if failed != 1 || total != 1 {
+		t.Errorf("one express machine whose configuration read is refused reads as %d of %d IDs, want 1 of 1: %q", failed, total, line)
+	}
+	if strings.Contains(line, " of 0 IDs") {
+		t.Errorf("the express machine the pass read is missing from the denominator: %q", line)
+	}
+}
