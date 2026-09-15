@@ -18,7 +18,7 @@ import (
 // Controller.BootstrapLive so the GET / handler never blocks on AWS. The
 // startup command is likewise applied synchronously for demo and in the
 // background bootstrap for live.
-func newSession(profile, region, command string, demoMode, noCache bool, viewCfg *config.ViewsConfig, configReport string) *app.Controller {
+func newSession(profile, region, command string, demoMode, noCache bool, viewCfg *config.ViewsConfig, configReport string) (*app.Controller, *runtime.Core) {
 	core := runtime.Bootstrap(profile, region, resource.AllResourceTypes())
 	if demoMode {
 		core.SetPreSuppliedClients(demo.NewServiceClients())
@@ -81,5 +81,5 @@ func newSession(profile, region, command string, demoMode, noCache bool, viewCfg
 	// Live path: ctrl is returned on the menu; getOrCreateSession connects to AWS
 	// in the background (BootstrapLive) which drives the armed -c navigation
 	// once ClientsReady + the availability seed land.
-	return ctrl
+	return ctrl, core
 }

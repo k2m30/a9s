@@ -702,7 +702,7 @@ func (c *Core) availabilityFromResourceCache() (
 		if isTrunc {
 			truncated[rt] = true
 		}
-		issueCounts[rt], issueKnown[rt], issueTruncated[rt] = c.typeIssueBadge(rt, tr.Rows, isTrunc, false, c.session.EnrichmentTruncatedIDs[rt])
+		issueCounts[rt], issueKnown[rt], issueTruncated[rt] = c.typeIssueBadge(rt, tr.Rows, isTrunc, false)
 	}
 	return
 }
@@ -719,9 +719,11 @@ func (c *Core) availabilityFromResourceCache() (
 // asked the Wave-2 question yet, and persisting it as "probed, this many
 // issues" is the answer nobody gave.
 //
-// "Lower bound" is the sweep's own menu rule: a truncated page, or rows
-// nobody could inspect while something is wrong.
-func (c *Core) typeIssueBadge(rt string, rows []resource.Resource, pageTruncated, wave2Answered bool, uninspected map[string]string) (issues int, known, lower bool) {
+// "Lower bound" here is the page's; the rows nobody could inspect widen it
+// where the file is written (badgeLowerBound), from the marks on the rows
+// themselves. This runs on the cache writer's goroutine, so it reads
+// nothing of the session's that the handler loop writes bare.
+func (c *Core) typeIssueBadge(rt string, rows []resource.Resource, pageTruncated, wave2Answered bool) (issues int, known, lower bool) {
 	td := resource.FindResourceType(rt)
 	if td == nil || td.ExcludeFromIssueBadge {
 		return 0, false, pageTruncated
@@ -730,7 +732,7 @@ func (c *Core) typeIssueBadge(rt string, rows []resource.Resource, pageTruncated
 	if known {
 		issues = unifiedIssueCount(rows, *td, nil)
 	}
-	return issues, known, pageTruncated || (issues > 0 && len(uninspected) > 0)
+	return issues, known, pageTruncated
 }
 
 // saveProbeResourcesToTypeFiles persists probeResources — a snapshot (or, for
@@ -769,7 +771,7 @@ func (c *Core) saveProbeResourcesToTypeFiles(pair session.Pair, probeResources m
 	var firstErr error
 	for shortName, resources := range probeResources {
 		truncated := probeTruncated[shortName]
-		issues, issuesKnown, issuesLower := c.typeIssueBadge(shortName, resources, truncated, wave2Answered[shortName], uninspected[shortName])
+		issues, issuesKnown, issuesLower := c.typeIssueBadge(shortName, resources, truncated, wave2Answered[shortName])
 		err := c.SaveTypeRows(
 			SaveTarget{Pair: pair, ObsGen: gens[shortName], Type: shortName, ExactPopulation: !truncated},
 			SaveContent{

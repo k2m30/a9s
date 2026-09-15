@@ -3,7 +3,6 @@
 package web
 
 import (
-	"context"
 	"crypto/rand"
 	"crypto/subtle"
 	"encoding/hex"
@@ -229,7 +228,7 @@ func (s *Server) handleAction(w http.ResponseWriter, r *http.Request) {
 	isBackground := func(kind runtime.TaskKind) bool {
 		return app.IsBackgroundFetchTask(runtime.TaskRequest{Key: runtime.TaskKey{Kind: kind}}, renderable)
 	}
-	background := app.DrainSyncPartition(context.Background(), entry.ctrl, tasks, isBackground, nil)
+	background := app.DrainSyncPartition(s.lifetime, entry.ctrl, tasks, isBackground, nil)
 	vs := entry.ctrl.Snapshot()
 	entry.mu.Unlock()
 
@@ -237,8 +236,8 @@ func (s *Server) handleAction(w http.ResponseWriter, r *http.Request) {
 	s.notifySubscribers(entry)
 
 	// Background tasks drain in their own goroutine, outside entry.mu and
-	// outside the request lifetime (a bounded timeout context, not r.Context,
-	// since the request itself is about to complete).
+	// outside the request lifetime: the request is about to complete, so
+	// they live under the server's lifetime instead.
 	s.drainBackgroundTasks(entry, background)
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")

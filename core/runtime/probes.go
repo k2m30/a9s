@@ -463,7 +463,7 @@ func (c *Core) saveAvailabilityCache(
 			if issueKnown[rawName] {
 				tf.Issues = issueCounts[rawName]
 				tf.IssuesKnown = true
-				tf.IssuesTruncated = issueTruncated[rawName]
+				tf.IssuesTruncated = badgeLowerBound(tf, issueTruncated[rawName])
 			} else {
 				tf.Issues = existing.Issues
 				tf.IssuesKnown = existing.IssuesKnown
@@ -751,7 +751,7 @@ func (c *Core) saveResourceListCache(target SaveTarget, rows []cache.Row, conten
 		if content.IssuesKnown {
 			tf.Issues = content.Issues
 			tf.IssuesKnown = true
-			tf.IssuesTruncated = content.IssuesTruncated
+			tf.IssuesTruncated = badgeLowerBound(tf, content.IssuesTruncated)
 		} else {
 			tf.Issues = existing.Issues
 			tf.IssuesKnown = existing.IssuesKnown
@@ -1002,6 +1002,22 @@ func (c *Core) BuildEnrichQueue() []string {
 func (c *Core) ProbeEnrichment(ctx context.Context, clients *awsclient.ServiceClients, shortName string) ProbeEnrichmentResult {
 	resources, _ := c.ProbeResources(shortName)
 	return c.probeEnrichmentRows(ctx, clients, shortName, resources)
+}
+
+// badgeLowerBound is the sweep's own menu rule for the badge a type file
+// carries: a truncated page keeps the count open, and so do rows nobody
+// could inspect while something is wrong. The marks are read from the rows
+// about to be written, under the store lock every writer holds.
+func badgeLowerBound(tf cache.TypeFile, pageTruncated bool) bool {
+	if pageTruncated || tf.Issues == 0 {
+		return pageTruncated
+	}
+	for _, row := range tf.Rows {
+		if row.Uninspected != nil {
+			return true
+		}
+	}
+	return false
 }
 
 // probeEnrichmentRows runs shortName's Wave-2 enricher over exactly the rows
