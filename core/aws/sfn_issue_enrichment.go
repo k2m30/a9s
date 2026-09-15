@@ -57,6 +57,9 @@ func EnrichStepFunctionsStatus(ctx context.Context, clients *ServiceClients, res
 		if smARN == "" {
 			return
 		}
+		mu.Lock()
+		total++
+		mu.Unlock()
 		// The configuration checks read DescribeStateMachine, which every
 		// state machine answers. They run before the execution listing and
 		// are not subject to its EXPRESS skip.
@@ -69,9 +72,6 @@ func EnrichStepFunctionsStatus(ctx context.Context, clients *ServiceClients, res
 		if r.Fields["type"] == "EXPRESS" {
 			return
 		}
-		mu.Lock()
-		total++
-		mu.Unlock()
 		out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*sfn.ListExecutionsOutput, error) {
 			return clients.SFN.ListExecutions(ctx, &sfn.ListExecutionsInput{
 				StateMachineArn: aws.String(smARN),

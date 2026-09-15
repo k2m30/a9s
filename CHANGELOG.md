@@ -14,7 +14,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   on two of them used to count both refusals, so the line could claim more
   failures than there are resources — "failed for 220 of 50 IDs" for fifty
   buckets. The reasons after the colon still say how many calls each refusal
-  covered.
+  covered. The state-machine line's total now counts every machine the check
+  read, so an EXPRESS workflow whose configuration read is refused reads
+  "failed for 1 of 1 IDs" instead of "1 of 0".
 
 - Every check that reads several things about one resource names the check in
   the error log instead of one of its calls. A repository whose two policy
