@@ -40,7 +40,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the terminal does; the startup command was dropped without a cache.
 
 - Two web sessions on one profile no longer trip over each other saving the
-  Cost Explorer cache: each save writes its own temporary file.
+  Cost Explorer cache: each save writes its own temporary file, and saves of
+  one file take turns, which Windows requires before a rename onto it.
 
 - A JSON action posted to the web server is capped at 1 MiB like a form
   action.
