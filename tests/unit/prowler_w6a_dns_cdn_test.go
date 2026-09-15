@@ -311,12 +311,6 @@ func TestW6AR53_RecordListingFailureTruncatesTheZone(t *testing.T) {
 	w2AssertNoCode(t, res.Findings["Z0FAIL00000000000000"], w6aR53Dangling)
 }
 
-// TestW6AR53_CatalogDefs pins the catalog rows for both r53 codes.
-func TestW6AR53_CatalogDefs(t *testing.T) {
-	w2AssertFindingDef(t, "r53", w6aR53QueryLoggingOff, "query logging off", domain.SevWarn, "wave2")
-	w2AssertFindingDef(t, "r53", w6aR53Dangling, "record points at an unassociated elastic IP", domain.SevBroken, "wave2")
-}
-
 // ---------------------------------------------------------------------------
 // cf — rows 10-16
 // ---------------------------------------------------------------------------
@@ -721,24 +715,6 @@ func TestW6ACF_CapBoundary(t *testing.T) {
 	overCap := w6aEnrichCF(t, &w6aCFFake{configs: configs}, w6aS3NameCache(false, "acme-live-origin"), ids...)
 	if !overCap.Truncated {
 		t.Error("EnrichmentCap+1 distributions did not report Truncated")
-	}
-}
-
-// TestW6ACF_CatalogDefs pins the catalog rows for the seven cf codes.
-func TestW6ACF_CatalogDefs(t *testing.T) {
-	for _, c := range []struct {
-		code, phrase string
-		sev          domain.Severity
-	}{
-		{w6aCFOriginMissing, "S3 origin bucket does not exist", domain.SevBroken},
-		{w6aCFDeprecatedTLS, "minimum TLS below 1.2", domain.SevWarn},
-		{w6aCFLoggingOff, "access logging off", domain.SevWarn},
-		{w6aCFNoRootObject, "no default root object", domain.SevWarn},
-		{w6aCFNoOAC, "S3 origin without origin access control", domain.SevWarn},
-		{w6aCFDefaultCert, "uses the default CloudFront certificate", domain.SevWarn},
-		{w6aCFNoGeoRestriction, "no geo restriction", domain.SevWarn},
-	} {
-		w2AssertFindingDef(t, "cf", c.code, c.phrase, c.sev, "wave2")
 	}
 }
 

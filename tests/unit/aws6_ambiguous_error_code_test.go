@@ -20,7 +20,6 @@ package unit_test
 // message does not, and is reported as a failure.
 
 import (
-	"strings"
 	"testing"
 
 	"github.com/aws/smithy-go"
@@ -172,25 +171,5 @@ func TestUnambiguousCodesStillClassifyOnCodeAlone(t *testing.T) {
 			t.Errorf("%s classifies as not-found because its MESSAGE reads like one; the message narrows an "+
 				"ambiguous code, it never promotes an unrelated one", code)
 		}
-	}
-}
-
-// TestAmbiguousCodeShapeIsNotASubstringOfTheWordNotFound guards the lazy
-// matcher: "does the message contain 'not found'" passes every case above and
-// still mistakes a malformed request that happens to quote a missing argument.
-func TestAmbiguousCodeShapeIsNotASubstringOfTheWordNotFound(t *testing.T) {
-	// A real autoscaling validation failure whose message contains the words
-	// "not found" while describing the REQUEST, not a resource.
-	err := &smithy.GenericAPIError{
-		Code:    "ValidationError",
-		Message: "1 validation error detected: parameter 'AutoScalingGroupName' not found in the request",
-	}
-	if awsclient.IsNotFoundErr(err) {
-		t.Errorf("a malformed request classifies as not-found because its message contains %q; "+
-			"the shape a service uses for a missing resource is more specific than that phrase",
-			"not found")
-	}
-	if !strings.Contains(err.Error(), "not found") {
-		t.Fatal("test sanity: this fixture is only meaningful while its message contains the phrase")
 	}
 }

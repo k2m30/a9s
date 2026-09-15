@@ -508,42 +508,7 @@ func TestQA_S3_YAML_FromObjectList(t *testing.T) {
 
 // Test copy returns the selected resource ID (clipboard not tested, just the data)
 
-// Test that the S3 bucket list has the four columns the operator sees.
-//
-// The built-in view renders Region and Status as well as the two the type
-// lists by itself.
-func TestQA_S3_BucketList_ExpectedColumns(t *testing.T) {
-	rt := resource.FindResourceType("s3")
-	if rt == nil {
-		t.Fatal("resource type 's3' not found")
-	}
-	want := []string{"Bucket Name", "Region", "Creation Date", "Status"}
-	if len(rt.Columns) != len(want) {
-		t.Fatalf("S3 bucket list should have %d columns, got %d", len(want), len(rt.Columns))
-	}
-	for i, title := range want {
-		if rt.Columns[i].Title != title {
-			t.Errorf("column %d should be %q, got %q", i, title, rt.Columns[i].Title)
-		}
-	}
-}
-
 // Test that S3 object list has the expected columns
-
-func TestQA_S3_ObjectList_ExpectedColumns(t *testing.T) {
-	cols := resource.S3ObjectColumns()
-	// The order is the built-in view's, which is the order rendered.
-	expectedTitles := []string{"Key", "Size", "Storage Class", "Last Modified"}
-
-	if len(cols) != len(expectedTitles) {
-		t.Fatalf("S3 object columns count: expected %d, got %d", len(expectedTitles), len(cols))
-	}
-	for i, expected := range expectedTitles {
-		if cols[i].Title != expected {
-			t.Errorf("column %d title: expected %q, got %q", i, expected, cols[i].Title)
-		}
-	}
-}
 
 // Test that S3 bucket list ResourceType() returns "s3"
 

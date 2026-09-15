@@ -15,7 +15,6 @@ package unit
 //   - out.Configuration == nil leaves the original list-level config in place
 //   - FunctionEnriched re-enrichment path accepted as RawStruct
 //   - API error propagated
-//   - registry sanity: GetDetailEnricher("lambda") non-nil
 
 import (
 	"context"
@@ -336,16 +335,5 @@ func TestEnrichLambda_APIError_Propagated(t *testing.T) {
 	_, err := enricher(context.Background(), makeLambdaCtx(fake), res)
 	if err == nil {
 		t.Fatal("expected error from API failure, got nil")
-	}
-}
-
-// ---------------------------------------------------------------------------
-// Tests: registry sanity
-// ---------------------------------------------------------------------------
-
-func TestDetailEnricherRegistry_Lambda_IsNonNil(t *testing.T) {
-	e := resource.GetDetailEnricher("lambda")
-	if e == nil {
-		t.Fatal("lambda detail enricher must be registered and non-nil")
 	}
 }

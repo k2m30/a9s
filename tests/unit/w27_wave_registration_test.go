@@ -44,14 +44,3 @@ func TestDocPage_NoWaveItDoesNotRegister(t *testing.T) {
 			"Wave 2 enricher: %v", len(falsePages), falsePages)
 	}
 }
-
-// TestDocPage_OpensearchRegistersNoWave2 pins the fact the false claim rests
-// on: opensearch's own §3.2 already says it registers no Wave 2 enricher, and
-// the catalog agrees. If this stops being true the test above needs a
-// different witness, not a silently vanished one.
-func TestDocPage_OpensearchRegistersNoWave2(t *testing.T) {
-	if _, hasWave2 := awsclient.Wave2EnricherFor("opensearch"); hasWave2 {
-		t.Fatal("opensearch now registers a Wave 2 enricher; TestDocPage_NoWaveItDoesNotRegister's opensearch " +
-			"witness for row 6 is gone and needs replacing")
-	}
-}

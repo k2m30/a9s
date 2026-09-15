@@ -615,36 +615,3 @@ func TestW4RoleAdminAttachedNilClient(t *testing.T) {
 		t.Errorf("Findings = %v, want empty", res.Findings)
 	}
 }
-
-// --- catalog registration ---------------------------------------------------
-
-// TestW4RoleFindingDefs pins that every role code the batch emits has a
-// registry row whose phrase and severity match the emitted finding. Without
-// it the code renders with no phrase in the menu and misses the docs table.
-func TestW4RoleFindingDefs(t *testing.T) {
-	cases := []struct {
-		code   domain.FindingCode
-		phrase string
-		sev    domain.Severity
-		source string
-	}{
-		{w4CodeRoleWildcardTrust, w4PhraseRoleWildcardTrust, domain.SevBroken, "wave1"},
-		{w4CodeRoleConfusedDeputy, w4PhraseRoleConfusedDeputy, domain.SevWarn, "wave1"},
-		{w4CodeRoleInlinePrivEsc, "inline policy allows privilege escalation", domain.SevBroken, "wave1"},
-		{w4CodeRoleAdminAttached, w4PhraseRoleAdminAttached, domain.SevWarn, "wave2"},
-	}
-	for _, tc := range cases {
-		t.Run(string(tc.code), func(t *testing.T) {
-			def := w4FindingDef(t, "role", tc.code)
-			if def.Phrase != tc.phrase {
-				t.Errorf("Phrase = %q, want %q", def.Phrase, tc.phrase)
-			}
-			if def.Severity != tc.sev {
-				t.Errorf("Severity = %v, want %v", def.Severity, tc.sev)
-			}
-			if def.Source != tc.source {
-				t.Errorf("Source = %q, want %q", def.Source, tc.source)
-			}
-		})
-	}
-}

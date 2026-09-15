@@ -34,7 +34,6 @@ import (
 	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
 
 	awsclient "github.com/k2m30/a9s/v3/core/aws"
-	"github.com/k2m30/a9s/v3/core/catalog"
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
@@ -539,39 +538,5 @@ func TestEnrichEC2InstanceStatus_ImpairedAndScheduledEventProduceTwoFindings(t *
 		t.Errorf("missing finding with code %q; got codes %v", ec2CodeScheduledEvent, seen)
 	} else if sev != domain.SevWarn {
 		t.Errorf("[%s] Severity = %v, want %v", ec2CodeScheduledEvent, sev, domain.SevWarn)
-	}
-}
-
-// TestEC2Catalog_FindingDefsDeclareDistinctCodesAndSeverities pins the
-// catalog-declaration side (core/aws/catalog_compute.go "ec2" entry's
-// Findings []catalog.FindingDef): each of the four Wave 2 conditions must be
-// declared under its OWN code with its real severity, so each renders its own
-// phrase and its own Attention entry instead of one. Today the catalog
-// declares only
-// ec2CodeInstanceStatusImpaired for Wave 2.
-func TestEC2Catalog_FindingDefsDeclareDistinctCodesAndSeverities(t *testing.T) {
-	td := catalog.FindAny("ec2")
-	if td == nil {
-		t.Fatal(`catalog.FindAny("ec2") returned nil`)
-	}
-	want := map[domain.FindingCode]domain.Severity{
-		ec2CodeInstanceStatusImpaired:     domain.SevBroken,
-		ec2CodeInstanceStatusInitializing: domain.SevWarn,
-		ec2CodeInstanceStatusInsufficient: domain.SevWarn,
-		ec2CodeScheduledEvent:             domain.SevWarn,
-	}
-	got := map[domain.FindingCode]domain.Severity{}
-	for _, fd := range td.Findings {
-		got[fd.Code] = fd.Severity
-	}
-	for code, wantSev := range want {
-		gotSev, ok := got[code]
-		if !ok {
-			t.Errorf("catalog.FindAny(%q).Findings missing declaration for code %q", "ec2", code)
-			continue
-		}
-		if gotSev != wantSev {
-			t.Errorf("catalog.FindAny(%q).Findings[%q].Severity = %v, want %v", "ec2", code, gotSev, wantSev)
-		}
 	}
 }

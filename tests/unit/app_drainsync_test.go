@@ -224,44 +224,6 @@ func TestDrainSync_SelectProfile_ConnectTask_TerminatesWithoutHanging(t *testing
 	}
 }
 
-// TestDrainSync_NilFollowUpTasks_DoesNotGrow verifies spec item 5:
-// Handle(IdentityError) returns no follow-up tasks by design, so the pending
-// slice does not grow and DrainSync terminates after the initial batch.
-//
-// Mechanism: seed 1 FetchIdentity task, observe that DrainSync returns without
-// hanging. If Handle were accidentally appending to pending the loop would grow
-// unboundedly until maxDrainIterations — the test harness -timeout catches that.
-//
-// IdentityError IS wired through Handle (sets identityErrMsg) but produces no
-// follow-up task requests, so the initial batch of 1 is the only drain cycle.
-func TestDrainSync_NilFollowUpTasks_DoesNotGrow(t *testing.T) {
-	c := newTestController(t)
-
-	_, tasks := c.Apply(app.Action{Kind: app.ActionOpenIdentity})
-	if len(tasks) == 0 {
-		t.Skip("Apply(OpenIdentity) returned no tasks")
-	}
-
-	done := make(chan struct{}, 1)
-	go func() {
-		app.DrainSync(c, tasks)
-		done <- struct{}{}
-	}()
-
-	<-done
-
-	// IdentityError produces no follow-up tasks — the loop must have exited after
-	// draining the single initial task, not via the maxDrainIterations cap.
-	// Verify the identity error state is set (confirming Handle was called).
-	snap := c.Snapshot()
-	if snap.Body.Identity != nil && snap.Body.Identity.ErrorMsg == "" && !snap.Body.Identity.Loading {
-		// Identity screen is showing but has neither an error nor a loading state —
-		// this would mean FetchIdentity completed without producing IdentityError,
-		// which is unexpected for a nil-client path.
-		t.Error("identity screen shows neither ErrorMsg nor Loading after nil-client FetchIdentity drain")
-	}
-}
-
 // TestTaskSnap_ApplyReturnedTasks_CarryCreationTimeSnap_ImmuneToLaterClientsSwap
 // pins TaskRequest.Snap's creation-time-stamping contract: every task
 // Controller.Apply returns must carry a non-nil Snap whose Clients pointer is

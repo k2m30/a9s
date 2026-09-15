@@ -274,44 +274,6 @@ func TestW4SecretPolicyNilClient(t *testing.T) {
 	}
 }
 
-// TestW4SecretsEnricherIsRegistered pins the wiring: an enricher the catalog
-// does not know about never runs, so the two rows would never reach a row.
-func TestW4SecretsEnricherIsRegistered(t *testing.T) {
-	enricher, ok := awsclient.Wave2EnricherFor("secrets")
-	if !ok || enricher.Fn == nil {
-		t.Fatalf("secrets has no Wave 2 enricher registered")
-	}
-	if enricher.Priority != 100 {
-		t.Errorf("Priority = %d, want 100", enricher.Priority)
-	}
-}
-
-// TestW4SecretsFindingDefs pins the registry rows for the two new codes.
-func TestW4SecretsFindingDefs(t *testing.T) {
-	cases := []struct {
-		code   domain.FindingCode
-		phrase string
-		sev    domain.Severity
-	}{
-		{w4CodeSecretPublicPolicy, w4PhraseSecretPublic, domain.SevBroken},
-		{w4CodeSecretCrossAccount, w4PhraseSecretCrossAcct, domain.SevWarn},
-	}
-	for _, tc := range cases {
-		t.Run(string(tc.code), func(t *testing.T) {
-			def := w4FindingDef(t, "secrets", tc.code)
-			if def.Phrase != tc.phrase {
-				t.Errorf("Phrase = %q, want %q", def.Phrase, tc.phrase)
-			}
-			if def.Severity != tc.sev {
-				t.Errorf("Severity = %v, want %v", def.Severity, tc.sev)
-			}
-			if def.Source != "wave2" {
-				t.Errorf("Source = %q, want wave2", def.Source)
-			}
-		})
-	}
-}
-
 // A wildcard principal scoped by a condition whose values arrive as an array
 // rather than a scalar. Both shapes are legal IAM and mean the same thing.
 const w4SecretConditionArrayDoc = `{"Version":"2012-10-17","Statement":[{"Sid":"AllowOrg",` +

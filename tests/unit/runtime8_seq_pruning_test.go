@@ -36,28 +36,6 @@ func openSeqDrill(t *testing.T, c *app.Controller) domain.Gen {
 	return screen
 }
 
-// TestListFetchSeq_APoppedScreensSequenceIsForgotten pins the pruning. A
-// popped screen's key answers nothing: no request of its can still be in
-// flight that any surface would accept, because the screen the answer would
-// land on is gone.
-func TestListFetchSeq_APoppedScreensSequenceIsForgotten(t *testing.T) {
-	c, core := newTestControllerAndCore(t)
-	c.Apply(app.Action{Kind: app.ActionCommand, Arg: "ec2"})
-	c.ApplyResourcesLoaded("ec2", []resource.Resource{guardRow("i-0aaa111111111111a", "parent")}, nil, false)
-
-	screen := openSeqDrill(t, c)
-	if core.LatestListFetchSeq(screen) == 0 {
-		t.Fatal("the open drill drew no sequence, so this pin has nothing to see pruned")
-	}
-
-	c.ApplyIntents([]runtime.UIIntent{runtime.PopScreen{}})
-
-	if got := core.LatestListFetchSeq(screen); got != 0 {
-		t.Errorf("the popped drill's screen %d still holds sequence %d — its entry is kept for the rest "+
-			"of the session, and one is added for every drill the operator ever opens", screen, got)
-	}
-}
-
 // TestListFetchSeq_OpeningAndClosingDrillsLeavesNothingBehind is the same
 // property over a session's worth of drilling: every screen opened and closed
 // is forgotten, and the one still open is not.

@@ -30,34 +30,6 @@ import (
 )
 
 // ---------------------------------------------------------------------------
-// Test 1: TruncatedResult helper exists and compiles
-// ---------------------------------------------------------------------------
-
-// TestTruncatedResultHelperExists proves that relatedResultTrunc is
-// callable with a string argument and returns a resource.RelatedCheckResult.
-// If the function is removed or renamed, this test will fail to compile.
-func TestTruncatedResultHelperExists(t *testing.T) {
-	result := resource.KnownRelated("test", nil, true)
-
-	// Verify the shape: Truncated=true, Count=0, TargetType echoed.
-	if result.TargetType() != "test" {
-		t.Errorf("TruncatedResult(\"test\").TargetType = %q; want %q", result.TargetType(), "test")
-	}
-	if result.Count() != 0 {
-		t.Errorf("TruncatedResult(\"test\").Count = %d; want 0", result.Count())
-	}
-	if !result.Truncated() {
-		t.Errorf("TruncatedResult(\"test\").Truncated = false; want true")
-	}
-	if result.Err() != nil {
-		t.Errorf("TruncatedResult(\"test\").Err = %v; want nil", result.Err())
-	}
-	if len(result.ResourceIDs()) != 0 {
-		t.Errorf("TruncatedResult(\"test\").ResourceIDs = %v; want empty", result.ResourceIDs())
-	}
-}
-
-// ---------------------------------------------------------------------------
 // Test 2: TruncatedResult result passes ValidateRelatedResult
 // ---------------------------------------------------------------------------
 

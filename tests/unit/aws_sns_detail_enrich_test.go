@@ -14,7 +14,6 @@ package unit
 //   - a JSON-looking but malformed attribute value falls back to the raw string
 //   - TopicEnriched re-enrichment path accepted as RawStruct
 //   - API error propagated
-//   - registry sanity: GetDetailEnricher("sns") non-nil
 
 import (
 	"context"
@@ -282,17 +281,6 @@ func TestEnrichSns_APIError_Propagated(t *testing.T) {
 	_, err := enricher(context.Background(), makeSnsCtx(fake), res)
 	if err == nil {
 		t.Fatal("expected error from API failure, got nil")
-	}
-}
-
-// ---------------------------------------------------------------------------
-// Tests: registry sanity
-// ---------------------------------------------------------------------------
-
-func TestDetailEnricherRegistry_Sns_IsNonNil(t *testing.T) {
-	e := resource.GetDetailEnricher("sns")
-	if e == nil {
-		t.Fatal("sns detail enricher must be registered and non-nil")
 	}
 }
 

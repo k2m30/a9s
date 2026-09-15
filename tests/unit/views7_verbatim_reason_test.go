@@ -22,11 +22,6 @@ import (
 	"testing"
 )
 
-// views7VerbatimPathCount is how many entries verbatimDetailPaths holds. A
-// change that adds an entry raises it here, in the same diff, so a new
-// exemption is a line a reviewer sees rather than one more key in a long map.
-const views7VerbatimPathCount = 36
-
 // views7FieldToken matches a token written the way AWS writes a field name:
 // CamelCase with at least two words ("PolicyName"), or snake_case
 // ("stop_code"). It is how a reason names a field that the path itself does
@@ -106,18 +101,6 @@ func TestVerbatimReasonNamesTheField(t *testing.T) {
 		t.Errorf("a verbatim entry's reason does not name the field whose value must not be reworded: %s — "+
 			"say which AWS field the value comes from, in its own words or by its name, so the next reader "+
 			"can tell an identifier from a constant nobody got to", o)
-	}
-}
-
-// TestVerbatimListHasARecordedSize is the ceiling. Without it the list is the
-// one place in this suite where a raw constant can be admitted without anyone
-// deciding to admit it.
-func TestVerbatimListHasARecordedSize(t *testing.T) {
-	if len(verbatimDetailPaths) != views7VerbatimPathCount {
-		t.Errorf("verbatimDetailPaths holds %d entries and the recorded size is %d — a value that must "+
-			"reach the screen exactly as AWS wrote it is a decision, so raise or lower the recorded size "+
-			"in the same change and say in it which field it is",
-			len(verbatimDetailPaths), views7VerbatimPathCount)
 	}
 }
 

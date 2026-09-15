@@ -425,13 +425,6 @@ func TestW6BECR_AllFourConditions_ProduceFourFindings(t *testing.T) {
 
 // ─── catalog ────────────────────────────────────────────────────────────────
 
-func TestW6BECR_FindingDefsRegistered(t *testing.T) {
-	w2AssertFindingDef(t, "ecr", string(w6bECRCodeScanOnPushOff), w6bECRPhraseScanOnPushOff, domain.SevWarn, "wave1")
-	w2AssertFindingDef(t, "ecr", string(w6bECRCodeMutableTags), w6bECRPhraseMutableTags, domain.SevWarn, "wave1")
-	w2AssertFindingDef(t, "ecr", string(w6bECRCodePublicPolicy), w6bECRPhrasePublicPolicy, domain.SevBroken, "wave2")
-	w2AssertFindingDef(t, "ecr", string(w6bECRCodeNoLifecycle), w6bECRPhraseNoLifecycle, domain.SevWarn, "wave2")
-}
-
 // The enricher reaches GetLifecyclePolicy by type assertion, so a client that
 // predates the call must degrade to "no lifecycle finding" rather than
 // reporting every repository as unpolicied.

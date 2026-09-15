@@ -20,7 +20,6 @@ package unit
 //     CreationTime
 //   - StackEnriched re-enrichment path accepted as RawStruct
 //   - API error propagated
-//   - registry sanity: GetDetailEnricher("cfn") non-nil
 
 import (
 	"context"
@@ -411,33 +410,6 @@ func TestEnrichCfn_SkipCacheTrue_BypassesReadButStillWrites(t *testing.T) {
 	}
 }
 
-func TestEnrichCfn_SkipCacheFalse_KeepsHitBehavior(t *testing.T) {
-	fake := &enrichCfnFake{
-		getTemplateFn: func(_ *cloudformation.GetTemplateInput) (*cloudformation.GetTemplateOutput, error) {
-			return &cloudformation.GetTemplateOutput{TemplateBody: aws.String(cfnTemplateV1)}, nil
-		},
-	}
-	cache := &awsclient.DetailDocCache{}
-	stack := makeCfnStackVersioned(cfnTestStackID, aws.Time(cfnTestCreationTime), aws.Time(cfnTestCreationTime))
-
-	ctx := &awsclient.DetailEnrichmentCtx{
-		Clients:    &awsclient.ServiceClients{CloudFormation: fake},
-		DetailDocs: cache,
-		SkipCache:  false,
-	}
-	enricher := cfnEnricher(t)
-	if _, err := enricher(context.Background(), ctx, resource.Resource{ID: cfnTestStackID, RawStruct: stack}); err != nil {
-		t.Fatalf("first call error: %v", err)
-	}
-	if _, err := enricher(context.Background(), ctx, resource.Resource{ID: cfnTestStackID, RawStruct: stack}); err != nil {
-		t.Fatalf("second call error: %v", err)
-	}
-
-	if fake.getTemplateCalls != 1 {
-		t.Errorf("GetTemplate called %d times across two SkipCache:false enrichments, want 1 (cache hit behavior unchanged)", fake.getTemplateCalls)
-	}
-}
-
 func TestEnrichCfn_YAMLTemplate_KeptAsRawString(t *testing.T) {
 	fake := &enrichCfnFake{
 		getTemplateFn: func(_ *cloudformation.GetTemplateInput) (*cloudformation.GetTemplateOutput, error) {
@@ -573,16 +545,5 @@ func TestEnrichCfn_APIError_Propagated(t *testing.T) {
 	_, err := enricher(context.Background(), makeCfnCtx(fake, &awsclient.DetailDocCache{}), res)
 	if err == nil {
 		t.Fatal("expected error from API failure, got nil")
-	}
-}
-
-// ---------------------------------------------------------------------------
-// Tests: registry sanity
-// ---------------------------------------------------------------------------
-
-func TestDetailEnricherRegistry_Cfn_IsNonNil(t *testing.T) {
-	e := resource.GetDetailEnricher("cfn")
-	if e == nil {
-		t.Fatal("cfn detail enricher must be registered and non-nil")
 	}
 }

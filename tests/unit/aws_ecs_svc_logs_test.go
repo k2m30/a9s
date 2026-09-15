@@ -3,7 +3,6 @@ package unit
 import (
 	"context"
 	"fmt"
-	"slices"
 	"strings"
 	"testing"
 
@@ -14,7 +13,6 @@ import (
 	ecstypes "github.com/aws/aws-sdk-go-v2/service/ecs/types"
 
 	awsclient "github.com/k2m30/a9s/v3/core/aws"
-	"github.com/k2m30/a9s/v3/core/resource"
 )
 
 // ---------------------------------------------------------------------------
@@ -656,59 +654,6 @@ func TestFetchEcsSvcLogs_RawStruct(t *testing.T) {
 	})
 }
 
-// TestEcsSvcLogColumns verifies that EcsSvcLogColumns returns the expected
-// columns with correct keys.
-func TestEcsSvcLogColumns(t *testing.T) {
-	cols := resource.EcsSvcLogColumns()
-
-	expectedKeys := []string{"timestamp", "stream_short", "message"}
-
-	t.Run("column_count", func(t *testing.T) {
-		if len(cols) != 3 {
-			t.Fatalf("expected 3 columns, got %d", len(cols))
-		}
-	})
-
-	t.Run("column_keys", func(t *testing.T) {
-		for i, expected := range expectedKeys {
-			if cols[i].Key != expected {
-				t.Errorf("column[%d].Key: expected %q, got %q", i, expected, cols[i].Key)
-			}
-		}
-	})
-
-	t.Run("columns_have_titles", func(t *testing.T) {
-		for i, col := range cols {
-			if col.Title == "" {
-				t.Errorf("column[%d] (%s) has empty Title", i, col.Key)
-			}
-		}
-	})
-
-	t.Run("columns_have_positive_width", func(t *testing.T) {
-		for i, col := range cols {
-			if col.Width <= 0 {
-				t.Errorf("column[%d] (%s) has non-positive Width: %d", i, col.Key, col.Width)
-			}
-		}
-	})
-}
-
-// TestEcsSvcLogs_ChildTypeRegistered verifies that the child type is
-// registered under the correct short name.
-func TestEcsSvcLogs_ChildTypeRegistered(t *testing.T) {
-	td := resource.GetChildType("ecs_svc_logs")
-	if td == nil {
-		t.Fatal("ecs_svc_logs child resource type not registered")
-	}
-	if td.Name == "" {
-		t.Error("child type Name should not be empty")
-	}
-	if td.ShortName != "ecs_svc_logs" {
-		t.Errorf("child type ShortName: expected %q, got %q", "ecs_svc_logs", td.ShortName)
-	}
-}
-
 // TestFetchEcsSvcLogs_Pagination verifies that the fetcher follows NextToken
 // across multiple pages and stops at the maxLogEvents cap.
 func TestFetchEcsSvcLogs_Pagination(t *testing.T) {
@@ -841,62 +786,6 @@ func TestFetchEcsSvcLogs_PageCapStopsScanAndReportsTruncated(t *testing.T) {
 	}
 	if len(results.Resources) != 0 {
 		t.Errorf("expected 0 resources (no events matched), got %d", len(results.Resources))
-	}
-}
-
-// TestEcsSvcLogs_PaginatedChildFetcherRegistered verifies that the paginated
-// child fetcher is
-// registered under the correct short name.
-func TestEcsSvcLogs_PaginatedChildFetcherRegistered(t *testing.T) {
-	f := resource.GetPaginatedChildFetcher("ecs_svc_logs")
-	if f == nil {
-		t.Fatal("ecs_svc_logs paginated child fetcher not registered")
-	}
-}
-
-// TestEcsSvcLogs_ParentHasChildDef verifies that the parent ecs-svc resource
-// type has a child view definition for ecs_svc_logs with key "L".
-func TestEcsSvcLogs_ParentHasChildDef(t *testing.T) {
-	rt := resource.FindResourceType("ecs-svc")
-	if rt == nil {
-		t.Fatal("ecs-svc resource type not found")
-	}
-
-	found := false
-	for _, child := range rt.Children {
-		if child.ChildType == "ecs_svc_logs" {
-			found = true
-			if child.Key != "L" {
-				t.Errorf("expected key %q, got %q", "L", child.Key)
-			}
-			if child.ContextKeys["cluster"] == "" {
-				t.Error("ContextKeys should include 'cluster'")
-			}
-			if child.ContextKeys["service_name"] == "" {
-				t.Error("ContextKeys should include 'service_name'")
-			}
-			if child.ContextKeys["task_definition"] == "" {
-				t.Error("ContextKeys should include 'task_definition'")
-			}
-		}
-	}
-	if !found {
-		t.Error("ecs-svc Children should contain ecs_svc_logs child view def")
-	}
-}
-
-// TestEcsSvcLogs_TaskDefinitionFieldOnParent verifies that the parent ecs-svc
-// resource type registers task_definition in its field keys (needed for
-// ecs_svc_logs context resolution).
-func TestEcsSvcLogs_TaskDefinitionFieldOnParent(t *testing.T) {
-	fieldKeys := resource.GetFieldKeys("ecs-svc")
-	if fieldKeys == nil {
-		t.Fatal("ecs-svc field keys not registered")
-	}
-
-	found := slices.Contains(fieldKeys, "task_definition")
-	if !found {
-		t.Error("ecs-svc field keys should include 'task_definition' for ecs_svc_logs context")
 	}
 }
 

@@ -254,14 +254,6 @@ func TestFetchManagedPolicyDocument_NoCache_EachCallHitsAPI(t *testing.T) {
 	}
 }
 
-func TestDetailEnricherRegistry_RolePolicies_EnricherIsNonNil(t *testing.T) {
-	// Verify the registered detail enricher is the real one (not a stub).
-	e := resource.GetDetailEnricher("role_policies")
-	if e == nil {
-		t.Fatal("role_policies detail enricher must not be nil")
-	}
-}
-
 func TestDecodePolicyDocument_PlusSignPreserved(t *testing.T) {
 	// IAM uses RFC 3986 percent-encoding, not query-string encoding.
 	// A literal + in a policy value (e.g., external ID) must be preserved,

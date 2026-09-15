@@ -515,22 +515,6 @@ func TestW6AAPIGW_NoV1ClientLeavesTheV2LaneWorking(t *testing.T) {
 		"no authorizer", domain.SevWarn, "wave2")
 }
 
-// TestW6AAPIGW_CatalogDefs pins the catalog rows for the five apigw codes.
-func TestW6AAPIGW_CatalogDefs(t *testing.T) {
-	for _, c := range []struct {
-		code, phrase string
-		sev          domain.Severity
-	}{
-		{w6aAPIGWNoAuthPublic, "internet-facing with no authorizer", domain.SevBroken},
-		{w6aAPIGWNoAuth, "no authorizer", domain.SevWarn},
-		{w6aAPIGWNoAccessLogs, "no access logs", domain.SevWarn},
-		{w6aAPIGWTracingOff, "X-Ray tracing off", domain.SevWarn},
-		{w6aAPIGWStageSecret, "credential in stage variables", domain.SevBroken},
-	} {
-		w2AssertFindingDef(t, "apigw", c.code, c.phrase, c.sev, "wave2")
-	}
-}
-
 // ---------------------------------------------------------------------------
 // shared
 // ---------------------------------------------------------------------------

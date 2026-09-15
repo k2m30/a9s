@@ -1145,33 +1145,6 @@ func TestNewCoalescingLambda_PassThrough_ListFunctionsReachesInnerFake(t *testin
 	}
 }
 
-// TestNewCoalescingLambda_SatisfiesEveryNarrowLambdaInterface is a
-// compile-level assertion (#261 boundary-sealing wave, item d): the
-// decorator NewCoalescingLambda returns must still satisfy every narrow
-// Lambda interface asserted anywhere in core/aws (apigw_related.go,
-// related_common.go, secrets_related_extra.go, lambda_related.go,
-// lambda_detail_enrichment.go each narrow ServiceClients.Lambda to one of
-// these) — a future decorator field rename or method-set change that
-// silently dropped one would break those call sites' type assertions rather
-// than fail to compile here.
-func TestNewCoalescingLambda_SatisfiesEveryNarrowLambdaInterface(t *testing.T) {
-	decorated := awsclient.NewCoalescingLambda(&coalesceLambdaFake{})
-
-	var _ awsclient.LambdaAPI = decorated
-	if _, ok := decorated.(awsclient.LambdaGetFunctionAPI); !ok {
-		t.Error("NewCoalescingLambda's result does not satisfy LambdaGetFunctionAPI")
-	}
-	if _, ok := decorated.(awsclient.LambdaListFunctionsAPI); !ok {
-		t.Error("NewCoalescingLambda's result does not satisfy LambdaListFunctionsAPI")
-	}
-	if _, ok := decorated.(awsclient.LambdaListEventSourceMappingsAPI); !ok {
-		t.Error("NewCoalescingLambda's result does not satisfy LambdaListEventSourceMappingsAPI")
-	}
-	if _, ok := decorated.(awsclient.LambdaListTagsAPI); !ok {
-		t.Error("NewCoalescingLambda's result does not satisfy LambdaListTagsAPI")
-	}
-}
-
 // coalesceLambdaECRDefByTarget returns the "lambda" RelatedDef targeting
 // "ecr" (checkLambdaECR, core/aws/lambda_related.go) — the same lookup
 // aws_lambda_related_test.go's lambdaCheckerByTarget performs, duplicated

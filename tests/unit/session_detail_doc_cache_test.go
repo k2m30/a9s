@@ -49,15 +49,5 @@ func TestSession_Rotate_ReplacesDetailDocCache(t *testing.T) {
 	}
 }
 
-func TestSession_Rotate_DetailDocCache_UsableAfterRotate(t *testing.T) {
-	s := session.New()
-	s.Rotate()
-
-	s.DetailDocCache.Set("cfn:new-account-stack", "fresh-template")
-	if got := s.DetailDocCache.Get("cfn:new-account-stack"); got != "fresh-template" {
-		t.Errorf("DetailDocCache after Rotate() should be immediately usable, got %v", got)
-	}
-}
-
 // Compile-time check that the field type matches the contract exactly.
 var _ *awsclient.DetailDocCache = (&session.Session{}).DetailDocCache

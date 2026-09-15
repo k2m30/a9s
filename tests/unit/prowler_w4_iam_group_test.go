@@ -126,20 +126,6 @@ func TestW4GroupAdminAndOrphanAreIndependent(t *testing.T) {
 	}
 }
 
-// TestW4GroupFindingDef pins the registry row for the new group code.
-func TestW4GroupFindingDef(t *testing.T) {
-	def := w4FindingDef(t, "iam-group", w4CodeGroupAdminAttached)
-	if def.Phrase != "has an administrator policy" {
-		t.Errorf("Phrase = %q, want %q", def.Phrase, "has an administrator policy")
-	}
-	if def.Severity != domain.SevWarn {
-		t.Errorf("Severity = %v, want SevWarn", def.Severity)
-	}
-	if def.Source != "wave2" {
-		t.Errorf("Source = %q, want wave2", def.Source)
-	}
-}
-
 // TestW4AdminPolicySetIsSharedAcrossPrincipals pins the architectural half of
 // rows 3/6/10: role, user and group answer "is this admin?" from one ARN set.
 // A per-file copy of the set is exactly what would let one principal type

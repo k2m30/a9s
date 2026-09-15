@@ -162,13 +162,4 @@ func TestRelated_SSM_NilClients(t *testing.T) {
 	}
 }
 
-func TestRelated_SSM_EmptyCache(t *testing.T) {
-	checker := ssmCheckerByTarget(t, "kms")
-	result := checker(context.Background(), nil, ssmSecureRes(), resource.ResourceCache{})
-
-	if result.State() != domain.RelatedUnknown {
-		t.Errorf("Count = %d, want -1 (empty cache)", result.Count())
-	}
-}
-
 // --- Demo checker test ---

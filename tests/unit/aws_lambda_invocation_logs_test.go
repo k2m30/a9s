@@ -12,7 +12,6 @@ import (
 	cwlogstypes "github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs/types"
 
 	awsclient "github.com/k2m30/a9s/v3/core/aws"
-	"github.com/k2m30/a9s/v3/core/resource"
 )
 
 // ---------------------------------------------------------------------------
@@ -509,44 +508,6 @@ func TestFetchLambdaInvocationLogs_StartTimeBound(t *testing.T) {
 	if mock.lastInput.StartTime == nil {
 		t.Fatal("FilterLogEvents must set StartTime to avoid scanning entire log group history")
 	}
-}
-
-// TestLambdaInvocationLogColumns verifies that LambdaInvocationLogColumns
-// returns the expected columns with correct keys.
-func TestLambdaInvocationLogColumns(t *testing.T) {
-	cols := resource.LambdaInvocationLogColumns()
-
-	expectedKeys := []string{"timestamp", "message"}
-
-	t.Run("column_count", func(t *testing.T) {
-		if len(cols) != 2 {
-			t.Fatalf("expected 2 columns, got %d", len(cols))
-		}
-	})
-
-	t.Run("column_keys", func(t *testing.T) {
-		for i, expected := range expectedKeys {
-			if cols[i].Key != expected {
-				t.Errorf("column[%d].Key: expected %q, got %q", i, expected, cols[i].Key)
-			}
-		}
-	})
-
-	t.Run("columns_have_titles", func(t *testing.T) {
-		for i, col := range cols {
-			if col.Title == "" {
-				t.Errorf("column[%d] (%s) has empty Title", i, col.Key)
-			}
-		}
-	})
-
-	t.Run("columns_have_positive_width", func(t *testing.T) {
-		for i, col := range cols {
-			if col.Width <= 0 {
-				t.Errorf("column[%d] (%s) has non-positive Width: %d", i, col.Key, col.Width)
-			}
-		}
-	})
 }
 
 // TestFetchLambdaInvocationLogs_ContinuationTokenForwarded verifies that a

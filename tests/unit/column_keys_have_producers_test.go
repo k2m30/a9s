@@ -181,27 +181,3 @@ func TestEnricherFieldKeys_RegisterCallsAreInInitBlock(t *testing.T) {
 		)
 	}
 }
-
-// TestProducerAllowlistCarriesNoLifecycleKeyEntry pins the other half of row
-// 11. Fifteen entries in one allowlist sharing one justification is one rule
-// written fifteen times: the next type with a findings-filled status column
-// adds a sixteenth, and the day one of the fifteen gains a real producer
-// nobody removes its line.
-//
-// A status column whose key is the type's lifecycle key needs no per-type
-// exemption at all — the rule is the shape, and the gate can say it once.
-func TestProducerAllowlistCarriesNoLifecycleKeyEntry(t *testing.T) {
-	for _, td := range resource.AllResourceTypes() {
-		lifecycleKey := td.LifecycleKey
-		if lifecycleKey == "" {
-			lifecycleKey = "state"
-		}
-		for key := range columnKeyProducerAllowlist[td.ShortName] {
-			if key == lifecycleKey || key == "status" {
-				t.Errorf("the producers allowlist exempts %s/%q by name, which is the type's lifecycle "+
-					"key — a status column filled from findings is one rule about a shape, not fifteen "+
-					"entries about fifteen types", td.ShortName, key)
-			}
-		}
-	}
-}

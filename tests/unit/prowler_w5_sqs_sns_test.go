@@ -24,7 +24,6 @@ import (
 	sqstypes "github.com/aws/aws-sdk-go-v2/service/sqs/types"
 
 	awsclient "github.com/k2m30/a9s/v3/core/aws"
-	"github.com/k2m30/a9s/v3/core/catalog"
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
@@ -409,11 +408,6 @@ func TestW5_SQSPublicPolicy_NilClientReturnsEmptyResult(t *testing.T) {
 	}
 }
 
-func TestW5_SQSPublicPolicy_CatalogDef(t *testing.T) {
-	w2AssertFindingDef(t, "sqs", "sqs.public-policy",
-		"queue policy open to anyone", domain.SevBroken, "wave2")
-}
-
 // ---------------------------------------------------------------------------
 // Rows 2, 3 — sns.public-policy, sns.no-kms
 // ---------------------------------------------------------------------------
@@ -743,13 +737,6 @@ func TestW5_SNSTopicAttributes_NilClientReturnsEmptyResult(t *testing.T) {
 	}
 }
 
-func TestW5_SNSCatalogDefs(t *testing.T) {
-	w2AssertFindingDef(t, "sns", "sns.public-policy",
-		"topic policy open to anyone", domain.SevBroken, "wave2")
-	w2AssertFindingDef(t, "sns", "sns.no-kms",
-		"not encrypted with KMS", domain.SevWarn, "wave2")
-}
-
 // ---------------------------------------------------------------------------
 // Row 4 — sns-sub.plain-http (wave 1, three call sites)
 // ---------------------------------------------------------------------------
@@ -943,33 +930,4 @@ func TestW5_SNSSubPlainHTTP_DeletedSubscriptionEmitsNoPostureFinding(t *testing.
 		t.Fatalf("FetchSNSSubscriptionsPage: %v", err)
 	}
 	w2AssertNoCode(t, out.Resources[0].Findings, "sns-sub.plain-http")
-}
-
-// The code is declared on BOTH sns-sub literals — the top-level type and the
-// topic's child view — because both render the same rows, and a code with no
-// FindingDef on the literal a row is rendered under is invisible there.
-func TestW5_SNSSubCatalogDefOnBothLiterals(t *testing.T) {
-	w2AssertFindingDef(t, "sns-sub", "sns-sub.plain-http",
-		"delivers over plain HTTP", domain.SevWarn, "wave1")
-
-	child := catalog.ChildOnly("sns_subscriptions")
-	if child == nil {
-		t.Fatal(`catalog.ChildOnly("sns_subscriptions") returned nil`)
-	}
-	for _, fd := range child.Findings {
-		if string(fd.Code) != "sns-sub.plain-http" {
-			continue
-		}
-		if fd.Phrase != "delivers over plain HTTP" {
-			t.Errorf("child literal FindingDef Phrase = %q, want %q", fd.Phrase, "delivers over plain HTTP")
-		}
-		if fd.Severity != domain.SevWarn {
-			t.Errorf("child literal FindingDef Severity = %v, want %v", fd.Severity, domain.SevWarn)
-		}
-		if fd.Source != "wave1" {
-			t.Errorf("child literal FindingDef Source = %q, want %q", fd.Source, "wave1")
-		}
-		return
-	}
-	t.Error(`no FindingDef for "sns-sub.plain-http" on the sns_subscriptions child literal; the topic's subscription list renders the same rows as the top-level type and would not know the code`)
 }

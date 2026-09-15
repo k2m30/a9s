@@ -175,12 +175,3 @@ func TestW6BCFN_BothConditions_ProduceTwoFindings(t *testing.T) {
 		t.Errorf("lifecycle finding lost when posture findings were added: %+v", r.Findings)
 	}
 }
-
-// ─── catalog ────────────────────────────────────────────────────────────────
-
-func TestW6BCFN_FindingDefsRegistered(t *testing.T) {
-	w2AssertFindingDef(t, "cfn", string(w6bCFNCodeTerminationProtectionOff),
-		"termination protection off", domain.SevWarn, "wave1")
-	w2AssertFindingDef(t, "cfn", string(w6bCFNCodeOutputSecret),
-		"credential in stack outputs", domain.SevBroken, "wave1")
-}

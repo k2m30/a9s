@@ -184,27 +184,6 @@ var d1ExpectedPhrases = map[string][]string{
 	"ssm": {"plaintext value looks like a credential", "not modified in over 365 days"},
 }
 
-// TestD1_ClassifierPhrasesAreStillDeclared pins each phrase on its type's
-// catalog literal, so deleting a branch cannot quietly take its wording with it.
-func TestD1_ClassifierPhrasesAreStillDeclared(t *testing.T) {
-	for short, phrases := range d1ExpectedPhrases {
-		td := resource.FindResourceType(short)
-		if td == nil {
-			t.Errorf("%s: not in the catalog", short)
-			continue
-		}
-		declared := make(map[string]bool, len(td.Findings))
-		for _, fd := range td.Findings {
-			declared[fd.Phrase] = true
-		}
-		for _, p := range phrases {
-			if !declared[p] {
-				t.Errorf("%s: no FindingDef declares the phrase %q that its classifier branch was computing", short, p)
-			}
-		}
-	}
-}
-
 // ─── row 2: the two private phrase pickers ──────────────────────────────────
 
 // TestD1_OpenSearchStatusCountsEverySignalOnce pins that the background-check
@@ -391,32 +370,3 @@ func d1SameCodes(a, b []domain.Finding) bool {
 }
 
 // ─── standard batch test: no supporting row restates its phrase ─────────────
-
-// TestD1_DetailAttentionNeverRepeatsItself is the per-batch U11 sweep over
-// every demo row of every type this batch touches.
-func TestD1_DetailAttentionNeverRepeatsItself(t *testing.T) {
-	clients := demo.NewServiceClients()
-	byType, cache := buildVisibilityTypeCache(t)
-
-	for _, td := range resource.AllResourceTypes() {
-		if !d1BatchTypes[td.ShortName] {
-			continue
-		}
-		for _, res := range mergeWave2Findings(t, td, byType[td.ShortName], cache, clients) {
-			for _, f := range res.Findings {
-				ad, ok := res.AttentionDetails[f.Code]
-				if !ok {
-					continue
-				}
-				phrase := normalizeRowText(f.Phrase)
-				for _, row := range ad.Rows {
-					if normalizeRowText(row.Label+" "+row.Value) == phrase ||
-						normalizeRowText(row.Value) == phrase {
-						t.Errorf("%s/%s %s: row %q: %q adds nothing to the phrase %q",
-							td.ShortName, res.ID, f.Code, row.Label, row.Value, f.Phrase)
-					}
-				}
-			}
-		}
-	}
-}

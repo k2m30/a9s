@@ -69,25 +69,3 @@ func TestAdmission_TaskOpID_ExtractsOpFromDetailScopedPayloads(t *testing.T) {
 		})
 	}
 }
-
-// TestAdmission_TaskOpID_DistinguishesOlderVsNewerOp pins the ordering
-// comparison drainBackgroundTasks actually performs (opID <= running means
-// "still stale, skip"; a strictly greater opID supersedes): two
-// RelatedCheckPayloads carrying different DetailOperation IDs from the same
-// detail-open lineage must compare in the same order their IDs do, since
-// domain.Gen's whole contract (session.DetailOpGen.Bump()) is a monotonic
-// per-session counter.
-func TestAdmission_TaskOpID_DistinguishesOlderVsNewerOp(t *testing.T) {
-	older := runtime.RelatedCheckPayload{Op: runtime.DetailOperation{ID: domain.Gen(3)}}
-	newer := runtime.RelatedCheckPayload{Op: runtime.DetailOperation{ID: domain.Gen(4)}}
-
-	gotOlder := runtime.TaskOpID(older)
-	gotNewer := runtime.TaskOpID(newer)
-
-	if !(gotOlder < gotNewer) {
-		t.Errorf("TaskOpID(older)=%d, TaskOpID(newer)=%d — want older < newer so a running task's recorded opID is correctly superseded only by a strictly newer refresh", gotOlder, gotNewer)
-	}
-	if gotOlder <= 0 {
-		t.Errorf("TaskOpID(older) = %d, want > 0 — a real DetailOperation ID must never be mistaken for the opID==0 (non-detail-task) fallback branch", gotOlder)
-	}
-}

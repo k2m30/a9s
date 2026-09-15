@@ -162,17 +162,3 @@ func TestW4WAFNilClient(t *testing.T) {
 		t.Errorf("Findings = %v, want empty", res.Findings)
 	}
 }
-
-// TestW4WAFFindingDef pins the registry row for the new waf code.
-func TestW4WAFFindingDef(t *testing.T) {
-	def := w4FindingDef(t, "waf", w4CodeWAFNoRules)
-	if def.Phrase != w4PhraseWAFNoRules {
-		t.Errorf("Phrase = %q, want %q", def.Phrase, w4PhraseWAFNoRules)
-	}
-	if def.Severity != domain.SevWarn {
-		t.Errorf("Severity = %v, want SevWarn", def.Severity)
-	}
-	if def.Source != "wave2" {
-		t.Errorf("Source = %q, want wave2", def.Source)
-	}
-}

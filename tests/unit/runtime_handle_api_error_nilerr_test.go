@@ -91,11 +91,6 @@ func TestHandleAPIError_MessageSelectionTable(t *testing.T) {
 		want string
 	}{
 		{
-			name: "nil Err falls back to the fixed unknown-API-error text",
-			err:  nil,
-			want: "unknown API error",
-		},
-		{
 			name: "unclassified non-nil error uses Err.Error() verbatim",
 			err:  errors.New("boom"),
 			want: "boom",

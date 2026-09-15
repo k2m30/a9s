@@ -19,7 +19,6 @@ package unit
 //   - nil/empty UserData attribute → ""
 //   - InstanceEnriched re-enrichment path accepted as RawStruct
 //   - API error propagated
-//   - registry sanity: GetDetailEnricher("ec2") non-nil
 //
 // The EC2 fake must implement all 21 methods of the EC2API aggregate (the
 // static type of ServiceClients.EC2) plus EC2DescribeInstanceAttributeAPI,
@@ -549,16 +548,5 @@ func TestEnrichEc2_APIError_Propagated(t *testing.T) {
 	_, err := enricher(context.Background(), makeEc2Ctx(fake), res)
 	if err == nil {
 		t.Fatal("expected error from API failure, got nil")
-	}
-}
-
-// ---------------------------------------------------------------------------
-// Tests: registry sanity
-// ---------------------------------------------------------------------------
-
-func TestDetailEnricherRegistry_Ec2_IsNonNil(t *testing.T) {
-	e := resource.GetDetailEnricher("ec2")
-	if e == nil {
-		t.Fatal("ec2 detail enricher must be registered and non-nil")
 	}
 }

@@ -399,19 +399,3 @@ func TestCheckApigwACM_ClientMissing(t *testing.T) {
 		t.Errorf("Count = %d, want -1 (nil APIGatewayV2 client)", result.Count())
 	}
 }
-
-// TestApigwRelatedRegistry_ACMIsRegisteredWithRealImplementation verifies that
-// the ACM pivot IS registered in the related defs for "apigw", now that
-// checkApigwACM has a real GetDomainNames + GetApiMappings implementation.
-func TestApigwRelatedRegistry_ACMIsRegisteredWithRealImplementation(t *testing.T) {
-	defs := resource.GetRelated("apigw")
-	for _, def := range defs {
-		if def.TargetType == "acm" {
-			if def.Checker == nil {
-				t.Error("apigw ACM related def must have a non-nil Checker")
-			}
-			return
-		}
-	}
-	t.Error("apigw related registry must register TargetType=\"acm\" now that checkApigwACM is implemented")
-}

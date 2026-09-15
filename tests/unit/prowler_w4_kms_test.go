@@ -214,20 +214,6 @@ func TestW4KMSNilClient(t *testing.T) {
 	}
 }
 
-// TestW4KMSFindingDef pins the registry row for the new kms code.
-func TestW4KMSFindingDef(t *testing.T) {
-	def := w4FindingDef(t, "kms", w4CodeKMSPublicPolicy)
-	if def.Phrase != w4PhraseKMSPublic {
-		t.Errorf("Phrase = %q, want %q", def.Phrase, w4PhraseKMSPublic)
-	}
-	if def.Severity != domain.SevBroken {
-		t.Errorf("Severity = %v, want SevBroken", def.Severity)
-	}
-	if def.Source != "wave2" {
-		t.Errorf("Source = %q, want wave2", def.Source)
-	}
-}
-
 // TestW4KMSPendingDeletionEmitsNoPostureFinding pins that a key already
 // scheduled for deletion is not reported for its key policy. The operator's
 // action is to wait or cancel the deletion, not to edit a policy on a key

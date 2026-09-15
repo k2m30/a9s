@@ -123,12 +123,6 @@ func TestIssue119GoldenFilesAllBelongToAScenario(t *testing.T) {
 	}
 }
 
-func TestIssue119ScenarioCatalog(t *testing.T) {
-	for _, sc := range issue119Scenarios() {
-		t.Logf("scenario: %s", sc.name)
-	}
-}
-
 func collectIssue119ScenarioViews(t *testing.T, noColor bool) map[string]string {
 	t.Helper()
 	oldVersion := tui.Version

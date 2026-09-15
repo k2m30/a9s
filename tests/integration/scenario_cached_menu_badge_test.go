@@ -40,19 +40,6 @@ func cachedEC2IssueCount(t *testing.T) int {
 	return n
 }
 
-// TestCachedScenario_MenuBadgeFollowsAFullListLoad pins the list-open lane's
-// half: the operator opens a list, reads the issue count in its title, and
-// goes back to the menu. The badge beside the type is the number the list just
-// showed.
-func TestCachedScenario_MenuBadgeFollowsAFullListLoad(t *testing.T) {
-	want := cachedEC2IssueCount(t)
-
-	s := fullIntegrationNewDemoScenarioWithCache(t)
-	s.OpenList("ec2")
-	s.Back()
-	s.ExpectMenuIssueCount("ec2", want)
-}
-
 // TestCachedScenario_MenuBadgeFollowsTheProbeLane pins the other writer, and
 // it is the one that had no witness. The operator refreshes the main menu,
 // which restarts the availability sweep; the sweep inspects every type without

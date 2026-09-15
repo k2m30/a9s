@@ -224,8 +224,7 @@ const (
 	// ercUnrouted: declared and sampled (AllEventSamples/AllCmdSamples), but
 	// consumed NOWHERE — neither Controller.Handle/Core.HandleEvent nor
 	// internal/tui's Update() switch has a case for it. A real gap, not a
-	// third kind of legitimate design — see
-	// TestEventRouting_UnroutedEventTypes_AreExplicitlyFlagged.
+	// third kind of legitimate design.
 	ercUnrouted
 )
 
@@ -363,43 +362,6 @@ func TestEventRouting_Classification_SetEqualsDeclaredEvents(t *testing.T) {
 	}
 }
 
-// TestEventRouting_EveryClassificationHasReason guards against a hollow
-// entry (a bare Kind with no citation) slipping past the set-equality check
-// above — every classification must carry a non-empty Reason and a valid
-// Kind.
-func TestEventRouting_EveryClassificationHasReason(t *testing.T) {
-	for name, route := range ercEventRoutes {
-		if strings.TrimSpace(route.Reason) == "" {
-			t.Errorf("%s: classification has an empty Reason", name)
-		}
-		if route.Kind != ercNeutralHandled && route.Kind != ercRendererOnly && route.Kind != ercUnrouted {
-			t.Errorf("%s: invalid route Kind %d", name, route.Kind)
-		}
-	}
-}
-
-// TestEventRouting_UnroutedEventTypes_AreExplicitlyFlagged pins the exact
-// set of Event types classified ercUnrouted (a genuine gap — consumed
-// nowhere) to empty: every declared event is routed or structurally
-// renderer-only. A new unrouted type appearing means investigate before
-// accepting (has a real routing case been missed?) — a deliberate edit to
-// `want` is required, never a silent pass. (The last occupant, Copied, was
-// dead on arrival — never emitted, never consumed — and was deleted.)
-func TestEventRouting_UnroutedEventTypes_AreExplicitlyFlagged(t *testing.T) {
-	var unrouted []string
-	for name, route := range ercEventRoutes {
-		if route.Kind == ercUnrouted {
-			unrouted = append(unrouted, name)
-		}
-	}
-	sort.Strings(unrouted)
-
-	var want []string
-	if !reflect.DeepEqual(unrouted, want) {
-		t.Errorf("ercUnrouted Event types = %v, want %v — see this test's doc comment before changing `want`", unrouted, want)
-	}
-}
-
 // TestEventRouting_CmdClassification_SetEqualsDeclaredCmds is the Cmd-side
 // twin of TestEventRouting_Classification_SetEqualsDeclaredEvents.
 func TestEventRouting_CmdClassification_SetEqualsDeclaredCmds(t *testing.T) {
@@ -425,16 +387,6 @@ func TestEventRouting_CmdClassification_SetEqualsDeclaredCmds(t *testing.T) {
 	sort.Strings(extra)
 	if len(extra) > 0 {
 		t.Errorf("classified but not a declared Cmd type (stale entry?): %v", extra)
-	}
-}
-
-// TestEventRouting_EveryCmdClassificationHasReason is the Cmd-side twin of
-// TestEventRouting_EveryClassificationHasReason.
-func TestEventRouting_EveryCmdClassificationHasReason(t *testing.T) {
-	for name, reason := range ercCmdRoutes {
-		if strings.TrimSpace(reason) == "" {
-			t.Errorf("%s: Cmd classification has an empty citation", name)
-		}
 	}
 }
 

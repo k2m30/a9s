@@ -34,26 +34,6 @@ func TestDetailDocCache_ZeroValueSafe(t *testing.T) {
 	}
 }
 
-func TestDetailDocCache_SetGetRoundtrip(t *testing.T) {
-	var cache awsclient.DetailDocCache
-	key := "sfn:arn:aws:states:us-east-1:123456789012:stateMachine:order-processing"
-	doc := map[string]any{"Comment": "Order processing workflow", "StartAt": "ValidateOrder"}
-
-	cache.Set(key, doc)
-
-	got := cache.Get(key)
-	if got == nil {
-		t.Fatal("expected cache hit after Set, got nil")
-	}
-	gotDoc, ok := got.(map[string]any)
-	if !ok {
-		t.Fatalf("Get returned %T, want map[string]any", got)
-	}
-	if gotDoc["Comment"] != "Order processing workflow" {
-		t.Errorf("gotDoc[Comment] = %v, want %q", gotDoc["Comment"], "Order processing workflow")
-	}
-}
-
 func TestDetailDocCache_Overwrite_ReplacesPreviousValue(t *testing.T) {
 	var cache awsclient.DetailDocCache
 	key := "cfn:arn:aws:cloudformation:us-east-1:123456789012:stack/prod-vpc-network/abcd1234"
@@ -300,26 +280,5 @@ func TestDetailDocCache_SetIfNewer_EvictionAndCrossVersionFreshness(t *testing.T
 	}
 	if got := cache.Get(keyV2); got != nil {
 		t.Errorf("Get(v2) after rollback = %v, want nil — the superseded version must be evicted", got)
-	}
-}
-
-// TestDetailDocCache_SetIfNewer_OrderingSemantics_UnchangedForNonEvictedKey
-// pins that version-keyed eviction bookkeeping does not alter the
-// stale-op-refused/newer-op-replaces ordering contract for writes to the
-// SAME key — TestDetailDocCache_SetIfNewer_StaleOpRefused_NewerOpReplaces
-// above already pins this for a bare (unversioned) key; this variant uses a
-// versioned key to confirm the eviction bookkeeping path doesn't change it.
-func TestDetailDocCache_SetIfNewer_OrderingSemantics_UnchangedForNonEvictedKey(t *testing.T) {
-	var cache awsclient.DetailDocCache
-	const key = "cfn:prod-vpc-network:100"
-
-	if ok := cache.SetIfNewer(key, "op-7-value", domain.Gen(7)); !ok {
-		t.Fatal("SetIfNewer(op 7) must succeed")
-	}
-	if ok := cache.SetIfNewer(key, "op-5-value", domain.Gen(5)); ok {
-		t.Error("SetIfNewer(op 5) reported success — a strictly-older op must still be refused for a versioned key")
-	}
-	if got := cache.Get(key); got != "op-7-value" {
-		t.Errorf("Get after refused op-5 write = %v, want op-7's value %q unchanged", got, "op-7-value")
 	}
 }

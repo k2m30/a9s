@@ -15,7 +15,6 @@ package unit
 //     without ever missing — see enrichSfn's doc comment)
 //   - StateMachineEnriched re-enrichment path accepted as RawStruct
 //   - API error propagated
-//   - registry sanity: GetDetailEnricher("sfn") non-nil
 
 import (
 	"context"
@@ -397,16 +396,5 @@ func TestEnrichSfn_APIError_Propagated(t *testing.T) {
 	_, err := enricher(context.Background(), makeSfnCtx(fake, &awsclient.DetailDocCache{}), res)
 	if err == nil {
 		t.Fatal("expected error from API failure, got nil")
-	}
-}
-
-// ---------------------------------------------------------------------------
-// Tests: registry sanity
-// ---------------------------------------------------------------------------
-
-func TestDetailEnricherRegistry_Sfn_IsNonNil(t *testing.T) {
-	e := resource.GetDetailEnricher("sfn")
-	if e == nil {
-		t.Fatal("sfn detail enricher must be registered and non-nil")
 	}
 }

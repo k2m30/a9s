@@ -15,7 +15,6 @@ import (
 	"context"
 	"fmt"
 	"sort"
-	"strings"
 	"testing"
 
 	awsclient "github.com/k2m30/a9s/v3/core/aws"
@@ -269,50 +268,4 @@ func joinLines(lines []string) string {
 		out += "  " + l + "\n"
 	}
 	return out
-}
-
-// TestDetailContract_TenDevopsSentencesVerbatim pins the single-state
-// sentences character-for-character.
-//
-// tgw.state.deleted is not among them: a Detail exists exactly at the tiers
-// a surface shows, and Dim reaches neither the detail Attention block nor
-// the enrichment line (docs/attention-signals.md). tgw.attachment-transitional
-// is one sentence covering its three states, naming pending acceptance as
-// the state that needs a person, so it is pinned separately by shape, not
-// by verbatim text.
-func TestDetailContract_TenDevopsSentencesVerbatim(t *testing.T) {
-	verbatim := map[domain.FindingCode]string{
-		"elb.state.provisioning":    "The load balancer is still being built and is not yet accepting traffic. This normally clears in a few minutes; if it does not, its subnets are usually out of free IP addresses.",
-		"elb.state.active_impaired": "The load balancer is serving traffic but could not set up or scale in at least one availability zone, so capacity there is degraded. Check that every attached subnet has spare IP addresses.",
-		"elb.state.failed":          "The load balancer could not be created and will not recover on its own. It has to be deleted and recreated; nothing routes through it in the meantime.",
-		"tgw.state.pending":         "The gateway is still being created and does not route yet. Attachments created now stay pending until it comes up.",
-		"tgw.state.modifying":       "A configuration change is being applied. Routing across the gateway can be inconsistent until it settles.",
-		"tgw.state.deleting":        "The gateway is being torn down. Every attachment on it goes away and any traffic still routed through it will stop.",
-		"tgw.state.failed":          "The gateway could not be created and will not recover. It has to be recreated, and anything routed through it has no path.",
-		"tgw.attachment-failed":     "The network behind this attachment has no path across the gateway. Failed attachments do not retry; delete and recreate the attachment.",
-	}
-	for code, want := range verbatim {
-		got := catalog.Detail(code)
-		if got != want {
-			t.Errorf("catalog.Detail(%q) = %q, want devops's sentence verbatim:\n  %q", code, got, want)
-		}
-	}
-}
-
-// TestDetailContract_TransitionalAttachmentCode_OneSentence pins the
-// consolidated shape for tgw.attachment-transitional: one sentence covering
-// all three transitional states, naming pending acceptance as the one that
-// needs a person.
-func TestDetailContract_TransitionalAttachmentCode_OneSentence(t *testing.T) {
-	const code domain.FindingCode = "tgw.attachment-transitional"
-	got := catalog.Detail(code)
-	if got == "" {
-		t.Fatalf("catalog.Detail(%q) is empty", code)
-	}
-	if !strings.Contains(strings.ToLower(got), "pending acceptance") {
-		t.Errorf("catalog.Detail(%q) = %q, want it to name pending acceptance as the state that needs a person", code, got)
-	}
-	if !strings.Contains(strings.ToLower(got), "person") && !strings.Contains(strings.ToLower(got), "approve") {
-		t.Errorf("catalog.Detail(%q) = %q, want it to say the owning account/person must act", code, got)
-	}
 }

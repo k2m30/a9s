@@ -341,12 +341,3 @@ func TestW6BCB_AllFourConditions_ProduceFourFindings(t *testing.T) {
 	pw1RequireFinding(t, r.Findings, w6bCBCodeSourceURLCredetial, w6bCBPhraseSourceURLCred, domain.SevBroken, "wave1")
 	pw1RequireFinding(t, r.Findings, w6bCBCodeEnvSecret, w6bCBPhraseEnvSecret, domain.SevBroken, "wave1")
 }
-
-// ─── catalog ────────────────────────────────────────────────────────────────
-
-func TestW6BCB_FindingDefsRegistered(t *testing.T) {
-	w2AssertFindingDef(t, "cb", string(w6bCBCodePublicBuilds), w6bCBPhrasePublicBuilds, domain.SevBroken, "wave1")
-	w2AssertFindingDef(t, "cb", string(w6bCBCodeBuildspecFromSrc), w6bCBPhraseBuildspecFromSrc, domain.SevWarn, "wave1")
-	w2AssertFindingDef(t, "cb", string(w6bCBCodeSourceURLCredetial), w6bCBPhraseSourceURLCred, domain.SevBroken, "wave1")
-	w2AssertFindingDef(t, "cb", string(w6bCBCodeEnvSecret), w6bCBPhraseEnvSecret, domain.SevBroken, "wave1")
-}

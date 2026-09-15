@@ -15,9 +15,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/k2m30/a9s/v3/core/catalog"
 	"github.com/k2m30/a9s/v3/core/domain"
-	"github.com/k2m30/a9s/v3/core/resource"
 )
 
 // w4FindingByCode returns the single finding carrying code. It fails the
@@ -112,22 +110,4 @@ func w4AssertRows(
 			t.Errorf("row %d = %q: %q, want %q: %q", i, ad.Rows[i].Label, ad.Rows[i].Value, w.Label, w.Value)
 		}
 	}
-}
-
-// w4FindingDef returns the catalog FindingDef declared for code on the type
-// registered as shortName. A code emitted without a FindingDef has no
-// registry row, so the menu badge and the docs table never learn about it.
-func w4FindingDef(t *testing.T, shortName string, code domain.FindingCode) catalog.FindingDef {
-	t.Helper()
-	td := resource.FindResourceType(shortName)
-	if td == nil {
-		t.Fatalf("resource type %q not registered", shortName)
-	}
-	for _, d := range td.Findings {
-		if d.Code == code {
-			return d
-		}
-	}
-	t.Fatalf("no catalog.FindingDef for %q on type %q", code, shortName)
-	return catalog.FindingDef{}
 }

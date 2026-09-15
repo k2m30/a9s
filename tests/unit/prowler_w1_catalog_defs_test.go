@@ -52,37 +52,6 @@ var pw1ComputeDefs = []pw1DefExpectation{
 	{"lt", "lt.user-data-secret", "credential in user data", domain.SevBroken, "wave2"},
 }
 
-// TestProwlerW1_ComputeFindingDefsDeclared pins each new code's catalog row.
-func TestProwlerW1_ComputeFindingDefsDeclared(t *testing.T) {
-	for _, want := range pw1ComputeDefs {
-		td := catalog.FindAny(want.shortName)
-		if td == nil {
-			t.Errorf("%s: not in the catalog", want.shortName)
-			continue
-		}
-		var got *catalog.FindingDef
-		for i := range td.Findings {
-			if td.Findings[i].Code == want.code {
-				got = &td.Findings[i]
-				break
-			}
-		}
-		if got == nil {
-			t.Errorf("%s: no FindingDef for %q", want.shortName, want.code)
-			continue
-		}
-		if got.Phrase != want.phrase {
-			t.Errorf("%s %q: Phrase = %q, want %q", want.shortName, want.code, got.Phrase, want.phrase)
-		}
-		if got.Severity != want.severity {
-			t.Errorf("%s %q: Severity = %v, want %v", want.shortName, want.code, got.Severity, want.severity)
-		}
-		if got.Source != want.source {
-			t.Errorf("%s %q: Source = %q, want %q", want.shortName, want.code, got.Source, want.source)
-		}
-	}
-}
-
 // TestProwlerW1_ComputeCodesAreUnique pins that no code is declared twice on
 // the same type — a duplicate row makes the findings overview double-count.
 func TestProwlerW1_ComputeCodesAreUnique(t *testing.T) {

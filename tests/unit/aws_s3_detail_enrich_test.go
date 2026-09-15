@@ -22,7 +22,6 @@ package unit
 //   - a non-benign error from any of the three calls propagates and leaves
 //     res.RawStruct unchanged (the enricher returns before reassigning it)
 //   - BucketEnriched re-enrichment path accepted as RawStruct
-//   - registry sanity: GetDetailEnricher("s3") non-nil
 
 import (
 	"context"
@@ -508,16 +507,5 @@ func TestEnrichS3_BucketEnrichedRawStruct_Accepted(t *testing.T) {
 	policy, ok := enriched.Policy.(map[string]any)
 	if !ok || policy["Version"] != "2012-10-17" {
 		t.Errorf("enriched.Policy = %v, want refreshed parsed policy", enriched.Policy)
-	}
-}
-
-// ---------------------------------------------------------------------------
-// Tests: registry sanity
-// ---------------------------------------------------------------------------
-
-func TestDetailEnricherRegistry_S3_IsNonNil(t *testing.T) {
-	e := resource.GetDetailEnricher("s3")
-	if e == nil {
-		t.Fatal("s3 detail enricher must be registered and non-nil")
 	}
 }

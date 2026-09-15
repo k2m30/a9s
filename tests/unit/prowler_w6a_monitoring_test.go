@@ -151,12 +151,6 @@ func TestW6ATrail_ConditionsAreIndependent(t *testing.T) {
 	}
 }
 
-// TestW6ATrail_CatalogDefs pins the catalog rows for the wave-1 trail codes.
-func TestW6ATrail_CatalogDefs(t *testing.T) {
-	w2AssertFindingDef(t, "trail", w6aTrailNoCWLogs, "not delivering to CloudWatch Logs", domain.SevWarn, "wave1")
-	w2AssertFindingDef(t, "trail", w6aTrailNoKMS, "log files not KMS-encrypted", domain.SevWarn, "wave1")
-}
-
 // ---------------------------------------------------------------------------
 // trail — rows 4-5 (wave 2, read from S3 directly)
 // ---------------------------------------------------------------------------
@@ -334,12 +328,6 @@ func TestW6ATrailLogBucket_CapBoundsTheIssueCount(t *testing.T) {
 	if res := w6aEnrichTrail(t, &w6aTrailS3Fake{}, mk(awsclient.EnrichmentCap+1)...); !res.Truncated {
 		t.Error("EnrichmentCap+1 trails did not report Truncated")
 	}
-}
-
-// TestW6ATrailLogBucket_CatalogDefs pins the wave-2 catalog rows.
-func TestW6ATrailLogBucket_CatalogDefs(t *testing.T) {
-	w2AssertFindingDef(t, "trail", w6aTrailBucketPublic, "log bucket is publicly accessible", domain.SevBroken, "wave2")
-	w2AssertFindingDef(t, "trail", w6aTrailBucketNoAccess, "log bucket has no access logging", domain.SevWarn, "wave2")
 }
 
 // ---------------------------------------------------------------------------

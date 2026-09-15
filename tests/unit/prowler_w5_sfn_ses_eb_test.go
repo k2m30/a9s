@@ -390,15 +390,6 @@ func TestW5_SFN_APIErrorOnOneMachineTruncatesOnlyThatMachine(t *testing.T) {
 		"execution logging off", domain.SevWarn, "wave2")
 }
 
-func TestW5_SFNCatalogDefs(t *testing.T) {
-	w2AssertFindingDef(t, "sfn", "sfn.logging-off",
-		"execution logging off", domain.SevWarn, "wave2")
-	w2AssertFindingDef(t, "sfn", "sfn.no-cmk",
-		"not encrypted with a customer key", domain.SevWarn, "wave2")
-	w2AssertFindingDef(t, "sfn", "sfn.definition-secret",
-		"credential in state machine definition", domain.SevBroken, "wave2")
-}
-
 // ---------------------------------------------------------------------------
 // Row 12 — ses.dkim-off
 // ---------------------------------------------------------------------------
@@ -593,11 +584,6 @@ func TestW5_SESDKIMDoesNotDisplaceTheAccountFinding(t *testing.T) {
 	if _, ok := w2Find(res.Findings[id], "ses.dkim-off"); !ok {
 		t.Errorf("no ses.dkim-off alongside it; got %v", w2Codes(res.Findings[id]))
 	}
-}
-
-func TestW5_SESCatalogDef(t *testing.T) {
-	w2AssertFindingDef(t, "ses", "ses.dkim-off",
-		"DKIM not enabled", domain.SevWarn, "wave2")
 }
 
 // ---------------------------------------------------------------------------
@@ -926,15 +912,6 @@ func TestW5_EB_NilClientReturnsEmptyResult(t *testing.T) {
 	if len(res.Findings) != 0 {
 		t.Errorf("Findings = %v on a session with no Elastic Beanstalk client", res.Findings)
 	}
-}
-
-func TestW5_EBCatalogDefs(t *testing.T) {
-	w2AssertFindingDef(t, "eb", "eb.managed-updates-off",
-		"managed platform updates off", domain.SevWarn, "wave2")
-	w2AssertFindingDef(t, "eb", "eb.enhanced-health-off",
-		"enhanced health reporting off", domain.SevWarn, "wave2")
-	w2AssertFindingDef(t, "eb", "eb.cloudwatch-logs-off",
-		"log streaming to CloudWatch off", domain.SevWarn, "wave2")
 }
 
 // Rule 4: a resource being torn down emits no posture finding. The demo

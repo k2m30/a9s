@@ -268,22 +268,3 @@ func TestW4PolicyPrivEscNilClient(t *testing.T) {
 		t.Errorf("Findings = %v, want empty", res.Findings)
 	}
 }
-
-// TestW4PolicyFindingDef pins the registry row for the new policy code.
-func TestW4PolicyFindingDef(t *testing.T) {
-	def := w4FindingDef(t, "policy", w4CodePolicyPrivEsc)
-	// The combo is in the rows, so the declaration carries no placeholder for
-	// it.
-	if strings.Contains(def.Phrase, "<") {
-		t.Errorf("Phrase = %q; the combo is a supporting row, so the declaration needs no placeholder", def.Phrase)
-	}
-	if def.Phrase != "allows privilege escalation" {
-		t.Errorf("Phrase = %q, want %q", def.Phrase, "allows privilege escalation")
-	}
-	if def.Severity != domain.SevBroken {
-		t.Errorf("Severity = %v, want SevBroken", def.Severity)
-	}
-	if def.Source != "wave2" {
-		t.Errorf("Source = %q, want %q", def.Source, "wave2")
-	}
-}

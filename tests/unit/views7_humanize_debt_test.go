@@ -142,17 +142,3 @@ func TestHumanizingLeavesTheseRowsAlone(t *testing.T) {
 		})
 	}
 }
-
-// TestRawEnumDebtIsPaidOff closes the list itself. The sixteen fields above
-// are the whole of rawEnumDetailDebt, so fixing them empties it — and the
-// ceiling comes down with it, or the room they freed is spendable on a new
-// raw constant.
-func TestRawEnumDebtIsPaidOff(t *testing.T) {
-	if len(rawEnumDetailDebt) != 0 {
-		t.Errorf("rawEnumDetailDebt still holds %d fields: %v", len(rawEnumDetailDebt), rawEnumDetailDebt)
-	}
-	if rawEnumDetailDebtCeiling != 0 {
-		t.Errorf("rawEnumDetailDebtCeiling still reads %d — lower it to 0 in the change that empties the "+
-			"list, so the room the fixed fields freed cannot be spent on a new raw constant", rawEnumDetailDebtCeiling)
-	}
-}

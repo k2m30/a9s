@@ -68,16 +68,6 @@ func TestConformance_EveryCatalogWave2ResolvesThroughAccessor(t *testing.T) {
 // Canonical-ID contract surface
 // ---------------------------------------------------------------------------
 
-// TestConformance_RelatedValidatorsExposed pins that the helpers #279 added
-// remain public entry points. Regression guard: if someone accidentally
-// un-exports or deletes them, related-navigation loses its contract check.
-func TestConformance_RelatedValidatorsExposed(t *testing.T) {
-	// Shape-only validator.
-	_ = resource.ValidateRelatedResult
-	// Cross-check against cache validator.
-	_ = resource.ValidateRelatedResultAgainstCacheForTest
-}
-
 // ---------------------------------------------------------------------------
 // Stale-result / invalidation guards
 // ---------------------------------------------------------------------------

@@ -303,13 +303,6 @@ func TestW5_MSK_NilClientReturnsEmptyResult(t *testing.T) {
 	}
 }
 
-func TestW5_MSKCatalogDefs(t *testing.T) {
-	w2AssertFindingDef(t, "msk", "msk.public-access",
-		"brokers reachable from the internet", domain.SevBroken, "wave2")
-	w2AssertFindingDef(t, "msk", "msk.unauthenticated",
-		"unauthenticated access allowed", domain.SevBroken, "wave2")
-}
-
 // ---------------------------------------------------------------------------
 // Rows 7, 8 — kinesis.unencrypted, kinesis.min-retention
 // ---------------------------------------------------------------------------
@@ -640,21 +633,6 @@ func TestW5_Kinesis_NilClientReturnsEmptyResult(t *testing.T) {
 	if len(res.Findings) != 0 {
 		t.Errorf("Findings = %v on a session with no Kinesis client", res.Findings)
 	}
-}
-
-// The type gained a Wave2 registration it never had. Without it the enricher
-// exists but nothing in the app ever calls it.
-func TestW5_KinesisWave2EnricherIsRegistered(t *testing.T) {
-	if e := w2Enricher(t, "kinesis"); e == nil {
-		t.Fatal("kinesis has no Wave2 enricher registered on its catalog literal")
-	}
-}
-
-func TestW5_KinesisCatalogDefs(t *testing.T) {
-	w2AssertFindingDef(t, "kinesis", "kinesis.unencrypted",
-		"not encrypted at rest", domain.SevWarn, "wave2")
-	w2AssertFindingDef(t, "kinesis", "kinesis.min-retention",
-		"24h retention", domain.SevWarn, "wave2")
 }
 
 // Rule 4: a cluster being torn down, or already failed, carries no

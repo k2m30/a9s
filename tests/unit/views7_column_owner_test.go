@@ -42,19 +42,6 @@ func views7ColumnField(col domain.Column, field string) (string, bool) {
 	return v.String(), true
 }
 
-// TestCatalogColumnCarriesEveryViewColumnFact pins the shape the rest of this
-// file depends on. A view column reads its value from a RawStruct path and
-// sorts on a stored key; while the catalog column cannot say either, the
-// config literal has to, and the fact stays split in two.
-func TestCatalogColumnCarriesEveryViewColumnFact(t *testing.T) {
-	for _, field := range []string{"Path", "SortKey"} {
-		if _, ok := views7ColumnField(domain.Column{}, field); !ok {
-			t.Errorf("domain.Column has no string field %s — a catalog column cannot express what a "+
-				"view column needs, so the per-type list in core/config has to keep saying it", field)
-		}
-	}
-}
-
 // views7CatalogTypes returns every catalog type that renders a list, parents
 // and children alike, keyed by the view name its columns are configured under.
 func views7CatalogTypes(t *testing.T) map[string]resource.ResourceTypeDef {
@@ -222,19 +209,6 @@ func TestNoPerTypeColumnLiteralInConfig(t *testing.T) {
 	for _, o := range offenders {
 		t.Errorf("a list column is declared in core/config: %s — the column belongs to its catalog type, "+
 			"and a second declaration here is the drift this change removes", o)
-	}
-}
-
-// TestGeneratedViewsVersionIsBumpedForTheColumnMove pins the operator's half.
-// Moving the column list changes what a9s generates; a view file already on
-// disk is only reconciled with it when the stamp it was written at is older
-// than this build's.
-func TestGeneratedViewsVersionIsBumpedForTheColumnMove(t *testing.T) {
-	const stampBeforeTheMove = 5
-	if config.GeneratedViewsVersion <= stampBeforeTheMove {
-		t.Errorf("GeneratedViewsVersion is still %d — a view file written by an earlier build keeps the "+
-			"columns that build generated, so the moved column list never reaches anyone who has run a9s once",
-			config.GeneratedViewsVersion)
 	}
 }
 

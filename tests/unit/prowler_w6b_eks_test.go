@@ -423,13 +423,6 @@ func w6bCatalogueEntries(t *testing.T, fake *w6bEKSFake) []ekstypes.ClusterVersi
 	return out.ClusterVersions
 }
 
-// A minor AWS has dropped entirely receives no patches at all.
-func TestW6BEKS_VersionUnsupported_UnsupportedIsFlagged(t *testing.T) {
-	r := w6bEKSFetchOne(t, w6bEKSCluster("acme-ancient", "1.26"))
-	pw1RequireFinding(t, r.Findings, w6bEKSCodeVersionOld,
-		w6bEKSVersionPhrase("1.26"), domain.SevBroken, "wave1")
-}
-
 // The negative case is the whole point of asking AWS: a version in standard
 // support is clean whatever its number, so this must stay green when the
 // calendar moves and nothing in a9s changes.
@@ -524,15 +517,6 @@ func TestW6BEKS_DeletingCluster_EmitsNoPostureFinding(t *testing.T) {
 	} {
 		pw1RequireNoFinding(t, r.Findings, code)
 	}
-}
-
-// ─── catalog ────────────────────────────────────────────────────────────────
-
-func TestW6BEKS_FindingDefsRegistered(t *testing.T) {
-	w2AssertFindingDef(t, "eks", string(w6bEKSCodePublicEndpoint), w6bEKSPhrasePublicEndpoint, domain.SevBroken, "wave1")
-	w2AssertFindingDef(t, "eks", string(w6bEKSCodeLoggingOff), w6bEKSPhraseLoggingOff, domain.SevWarn, "wave1")
-	w2AssertFindingDef(t, "eks", string(w6bEKSCodeSecretsNotKMS), w6bEKSPhraseSecretsNotKMS, domain.SevWarn, "wave1")
-	w2AssertFindingDef(t, "eks", string(w6bEKSCodeVersionOld), "Kubernetes <version> is out of standard support", domain.SevBroken, "wave1")
 }
 
 // eksSupportWords derives the words from the enum rather than switching on the

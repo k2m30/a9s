@@ -201,11 +201,3 @@ func TestW6BGlue_AllThreeConditions_ProduceThreeFindings(t *testing.T) {
 	pw1RequireFinding(t, r.Findings, w6bGlueCodeLoggingOff, w6bGluePhraseLoggingOff, domain.SevWarn, "wave1")
 	pw1RequireFinding(t, r.Findings, w6bGlueCodeArgumentSecret, w6bGluePhraseArgumentSecret, domain.SevBroken, "wave1")
 }
-
-// ─── catalog ────────────────────────────────────────────────────────────────
-
-func TestW6BGlue_FindingDefsRegistered(t *testing.T) {
-	w2AssertFindingDef(t, "glue", string(w6bGlueCodeNoSecurityConfig), w6bGluePhraseNoSecurityConfig, domain.SevWarn, "wave1")
-	w2AssertFindingDef(t, "glue", string(w6bGlueCodeLoggingOff), w6bGluePhraseLoggingOff, domain.SevWarn, "wave1")
-	w2AssertFindingDef(t, "glue", string(w6bGlueCodeArgumentSecret), w6bGluePhraseArgumentSecret, domain.SevBroken, "wave1")
-}

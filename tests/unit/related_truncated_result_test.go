@@ -52,38 +52,6 @@ import (
 )
 
 // ─────────────────────────────────────────────────────────────────────────────
-// TestTruncatedResult_ReturnsTruncatedResult
-// ─────────────────────────────────────────────────────────────────────────────
-
-// TestTruncatedResult_ReturnsTruncatedResult verifies that TruncatedResult
-// returns a fully-populated RelatedCheckResult with Count=0, Truncated=true,
-// the given TargetType, empty ResourceIDs, and nil Err.
-//
-// KnownRelated always allocates its internal ID slice via make([]string, 0,
-// len(ids)), so ResourceIDs() is never a literal nil for a KnownRelated
-// result — only empty; ValidateRelatedResult/EffectiveState/
-// IsRelatedActionable treat nil and empty ResourceIDs identically.
-func TestTruncatedResult_ReturnsTruncatedResult(t *testing.T) {
-	result := resource.KnownRelated("vpc", nil, true)
-
-	if result.TargetType() != "vpc" {
-		t.Errorf("TargetType = %q, want %q", result.TargetType(), "vpc")
-	}
-	if result.Count() != 0 {
-		t.Errorf("Count = %d, want 0", result.Count())
-	}
-	if !result.Truncated() {
-		t.Error("Truncated = false, want true")
-	}
-	if len(result.ResourceIDs()) != 0 {
-		t.Errorf("ResourceIDs = %v, want empty", result.ResourceIDs())
-	}
-	if result.Err() != nil {
-		t.Errorf("Err = %v, want nil", result.Err())
-	}
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
 // TestTruncatedResult_EmptyTargetType
 // ─────────────────────────────────────────────────────────────────────────────
 

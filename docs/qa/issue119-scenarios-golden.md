@@ -19,12 +19,6 @@ Verify current app rendering against saved goldens:
 go test ./tests/unit -run TestIssue119ScenarioGoldens -v
 ```
 
-List available scenarios:
-
-```bash
-go test ./tests/unit -run TestIssue119ScenarioCatalog -v
-```
-
 ## What gets generated
 
 For each scenario, two files are produced:

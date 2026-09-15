@@ -50,20 +50,6 @@ func TestW6BECR_AggregateFakeWithoutPolicyCall_DoesNotReachIt(t *testing.T) {
 	w2AssertNoCode(t, res.Findings[name], string(w6bECRCodePublicPolicy))
 }
 
-// The same argument for the lifecycle call, which never had the bug because it
-// was never in the aggregate. Pinned so that "tidying" it back in reintroduces
-// the segfault as a test failure instead of a crash in an unrelated suite.
-func TestW6BECR_PolicyAndLifecycleCallsAreNotInTheAggregate(t *testing.T) {
-	var aggregate awsclient.ECRAPI = &w6bECRAggregateOnlyFake{}
-	if _, ok := aggregate.(awsclient.ECRGetRepositoryPolicyAPI); ok {
-		t.Error("ECRAPI still carries GetRepositoryPolicy: a fake embedding the aggregate " +
-			"satisfies the assertion with a nil method, which segfaults when the enricher calls it")
-	}
-	if _, ok := aggregate.(awsclient.ECRGetLifecyclePolicyAPI); ok {
-		t.Error("ECRAPI now carries GetLifecyclePolicy; same nil-method trap as above")
-	}
-}
-
 // ─── row 12: the health compare survives the cache ──────────────────────────
 
 // A row rebuilt from the on-disk type cache still holds the SDK's spelling

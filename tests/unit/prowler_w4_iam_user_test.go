@@ -445,35 +445,6 @@ func TestW4UserBatchErrorLeavesSiblingsEvaluated(t *testing.T) {
 		w4PhraseUserTwoActiveKeys, domain.SevWarn, w4SourceUserWave2)
 }
 
-// TestW4UserFindingDefs pins the registry rows for the four new user codes.
-func TestW4UserFindingDefs(t *testing.T) {
-	cases := []struct {
-		code   domain.FindingCode
-		phrase string
-	}{
-		{w4CodeUserAdminAttached, "has an administrator policy"},
-		{w4CodeUserConsoleNeverUse, w4PhraseUserConsoleNever},
-		// The idle days are a supporting row, so the declaration carries no
-		// placeholder for them.
-		{w4CodeUserKeyUnused, "access key unused"},
-		{w4CodeUserTwoActiveKeys, w4PhraseUserTwoActiveKeys},
-	}
-	for _, tc := range cases {
-		t.Run(string(tc.code), func(t *testing.T) {
-			def := w4FindingDef(t, "iam-user", tc.code)
-			if def.Phrase != tc.phrase {
-				t.Errorf("Phrase = %q, want %q", def.Phrase, tc.phrase)
-			}
-			if def.Severity != domain.SevWarn {
-				t.Errorf("Severity = %v, want SevWarn", def.Severity)
-			}
-			if def.Source != "wave2" {
-				t.Errorf("Source = %q, want wave2", def.Source)
-			}
-		})
-	}
-}
-
 // TestW4UserNilClient pins the nil-client contract.
 func TestW4UserNilClient(t *testing.T) {
 	res, err := awsclient.EnrichIAMUserMFA(context.Background(), &awsclient.ServiceClients{},

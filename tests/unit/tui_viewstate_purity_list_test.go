@@ -193,10 +193,3 @@ func TestViewStatePurity_List_StatusCellFollowsCellsNotFindingsPhrase(t *testing
 // as a deliberately non-compiling marker asking for the field; it compiles
 // now, and stays as the pin that the field is not quietly removed.
 // ---------------------------------------------------------------------------
-
-func TestViewStatePurity_List_StatusColFieldExists(t *testing.T) {
-	body := app.ListBody{StatusCol: 1}
-	if body.StatusCol != 1 {
-		t.Fatal("unreachable")
-	}
-}
