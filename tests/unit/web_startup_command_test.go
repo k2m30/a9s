@@ -14,7 +14,7 @@ func TestWebSession_StartupCommandIsArmedWithoutCache(t *testing.T) {
 	t.Setenv("A9S_CONFIG_FOLDER", t.TempDir())
 	for name, noCache := range map[string]bool{"cached": false, "no-cache": true} {
 		t.Run(name, func(t *testing.T) {
-			if got := web.ArmedStartupCommandForTest(t, "example-readonly", "us-east-1", "ec2", false, noCache); got != "ec2" {
+			if got := web.SessionCoreForTest(t, "example-readonly", "us-east-1", "ec2", false, noCache).Session().Command; got != "ec2" {
 				t.Errorf("a live %s session armed %q as its startup command, want ec2", name, got)
 			}
 		})

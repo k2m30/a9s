@@ -2,12 +2,16 @@
 
 package web
 
-import "testing"
+import (
+	"testing"
 
-// ArmedStartupCommandForTest builds a session the way the server does and
-// returns the startup command armed on it.
-func ArmedStartupCommandForTest(t *testing.T, profile, region, command string, demoMode, noCache bool) string {
+	"github.com/k2m30/a9s/v3/core/runtime"
+)
+
+// SessionCoreForTest builds a session the way the server does and returns its
+// runtime core.
+func SessionCoreForTest(t *testing.T, profile, region, command string, demoMode, noCache bool) *runtime.Core {
 	t.Helper()
 	_, core := newSession(profile, region, command, demoMode, noCache, nil, "")
-	return core.Session().Command
+	return core
 }
