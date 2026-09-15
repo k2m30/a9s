@@ -39,6 +39,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `a9s --web --no-cache -c <resource>` opens the resource once connected, as
   the terminal does; the startup command was dropped without a cache.
 
+- A profile or region switched at startup, before the background connect has
+  been dispatched, is the pair the web session signs in to. It connected the
+  pair it was started with, so a session that had already moved on reported
+  another account's resources under the new profile's name.
+
+- `a9s --demo --web` keeps its cache unless `--no-cache` is passed, the way
+  the terminal demo does. The web demo always ran cacheless, so the menu's
+  issue badges came up on a path the installed app never takes.
+
+- A refused AWS call that has run out of retries returns as soon as the last
+  attempt fails, instead of sleeping one more backoff first.
+
+- The SNS topic, Route 53 zone and API Gateway posture sweeps read each row's
+  AWS answer without holding the others behind it, so a slow account's Wave-2
+  sweep finishes in the time the slowest row takes rather than the sum.
+
 - Two web sessions on one profile no longer trip over each other saving the
   Cost Explorer cache: each save writes its own temporary file, and saves of
   one file take turns, which Windows requires before a rename onto it.

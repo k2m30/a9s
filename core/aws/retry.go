@@ -52,6 +52,12 @@ func RetryOnThrottle[T any](ctx context.Context, cfg RetryConfig, fn func() (T, 
 
 		lastErr = err
 
+		// A backoff spaces one attempt from the next; after the last permitted
+		// attempt there is none to space it from.
+		if attempt == cfg.MaxAttempts-1 {
+			break
+		}
+
 		delay := min(cfg.BaseDelay*time.Duration(1<<attempt), cfg.MaxDelay)
 		if cfg.Jitter {
 			delay = delay/2 + time.Duration(rand.Int63n(int64(delay/2))) //nolint:gosec // jitter does not need crypto rand

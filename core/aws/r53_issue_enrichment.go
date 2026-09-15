@@ -166,39 +166,50 @@ func EnrichRoute53Zone(ctx context.Context, clients *ServiceClients, resources [
 		mu.Lock()
 		total++
 		mu.Unlock()
-		out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*r53svc.GetHostedZoneOutput, error) {
-			return clients.Route53.GetHostedZone(ctx, &r53svc.GetHostedZoneInput{
-				Id: aws.String(zoneID),
-			})
-		})
-		mu.Lock()
-		defer mu.Unlock()
-		if err != nil {
-			MarkSkipped(&result, r.ID, &failures, err)
-			return
-		}
-		if out.HostedZone == nil {
-			return
-		}
-		// Only raise the orphan finding for private zones — public zones
-		// cannot have VPC associations. The public-zone rows are evaluated
-		// first, since they are the other half of this call's answer.
-		if out.HostedZone.Config == nil || !out.HostedZone.Config.PrivateZone {
-			r53PublicZoneFindings(ctx, clients, &result, &failures, r, zoneID, held)
-			return
-		}
-		if len(out.VPCs) > 0 {
-			return
-		}
-		// The zone identifier is the row's whole job: the phrase already says
-		// what is wrong, so a second row repeating it prints one fact twice.
-		setWave2Finding(&result, r.ID, r53CodeOrphanPrivateZone, []domain.DetailRow{
-			{Label: "Zone ID", Value: zoneID, Tier: "~"},
-		})
+		row, rowFailures := r53ZoneRow(ctx, clients, r, zoneID, held)
+		mergeRowResult(&mu, &result, &failures, row, rowFailures)
 	})
 
 	return result,
 		AggregateFailures("GetHostedZone", failures, total)
+}
+
+// r53ZoneRow evaluates one hosted zone into a result of its own, which the
+// caller merges under its lock. The zone read and the public-zone calls
+// therefore run outside that lock, so one slow zone no longer holds every
+// other zone behind it.
+func r53ZoneRow(ctx context.Context, clients *ServiceClients, r resource.Resource, zoneID string, held map[string]string) (IssueEnricherResult, []Failure) {
+	row := newRowResult()
+	var rowFailures []Failure
+
+	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*r53svc.GetHostedZoneOutput, error) {
+		return clients.Route53.GetHostedZone(ctx, &r53svc.GetHostedZoneInput{
+			Id: aws.String(zoneID),
+		})
+	})
+	if err != nil {
+		MarkSkipped(&row, r.ID, &rowFailures, err)
+		return row, rowFailures
+	}
+	if out.HostedZone == nil {
+		return row, rowFailures
+	}
+	// Only raise the orphan finding for private zones — public zones
+	// cannot have VPC associations. The public-zone rows are evaluated
+	// first, since they are the other half of this call's answer.
+	if out.HostedZone.Config == nil || !out.HostedZone.Config.PrivateZone {
+		r53PublicZoneFindings(ctx, clients, &row, &rowFailures, r, zoneID, held)
+		return row, rowFailures
+	}
+	if len(out.VPCs) > 0 {
+		return row, rowFailures
+	}
+	// The zone identifier is the row's whole job: the phrase already says
+	// what is wrong, so a second row repeating it prints one fact twice.
+	setWave2Finding(&row, r.ID, r53CodeOrphanPrivateZone, []domain.DetailRow{
+		{Label: "Zone ID", Value: zoneID, Tier: "~"},
+	})
+	return row, rowFailures
 }
 
 // r53PublicZoneFindings evaluates the two public-zone rows: query logging, and

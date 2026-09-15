@@ -77,71 +77,78 @@ func EnrichAPIGatewayStage(ctx context.Context, clients *ServiceClients, resourc
 			if !hasV1 {
 				return
 			}
-			mu.Lock()
-			defer mu.Unlock()
-			if restErr := apigwRESTFindings(ctx, v1, &result, r, ownAccount); restErr != nil {
-				MarkSkipped(&result, r.ID, &failures, restErr)
-			}
+			row, rowFailures := apigwRESTRow(ctx, v1, r, ownAccount)
+			mergeRowResult(&mu, &result, &failures, row, rowFailures)
 			return
 		}
-		var stages []apigatewayv2types.Stage
-		stagesTruncated := false
-		var stagesNextToken *string
-		stagePages := 0
-		var fetchErr error
-		for {
-			if stagePages >= PerParentPageCap {
-				stagesTruncated = true
-				break
-			}
-			out, err := clients.APIGatewayV2.GetStages(ctx, &apigatewayv2.GetStagesInput{
-				ApiId:     aws.String(apiID),
-				NextToken: stagesNextToken,
-			})
-			stagePages++
-			if err != nil {
-				fetchErr = err
-				break
-			}
-			stages = append(stages, out.Items...)
-			if out.NextToken == nil {
-				break
-			}
-			stagesNextToken = out.NextToken
+		row, rowFailures := apigwHTTPRow(ctx, clients, r)
+		mergeRowResult(&mu, &result, &failures, row, rowFailures)
+	})
+	return result, AggregateFailures("authorizers and stages", failures, n)
+}
+
+// apigwRESTRow evaluates one REST API into a result of its own, which the
+// caller merges under its lock.
+func apigwRESTRow(ctx context.Context, v1 apigwV1API, r resource.Resource, ownAccount string) (IssueEnricherResult, []Failure) {
+	row := newRowResult()
+	var rowFailures []Failure
+	if restErr := apigwRESTFindings(ctx, v1, &row, r, ownAccount); restErr != nil {
+		MarkSkipped(&row, r.ID, &rowFailures, restErr)
+	}
+	return row, rowFailures
+}
+
+// apigwHTTPRow evaluates one HTTP API — its stage walk and its authorizer
+// verdict — into a result of its own, which the caller merges under its lock.
+// The AWS calls therefore run outside that lock, so one slow API no longer
+// holds every other API behind it.
+func apigwHTTPRow(ctx context.Context, clients *ServiceClients, r resource.Resource) (IssueEnricherResult, []Failure) {
+	apiID := r.ID
+	row := newRowResult()
+	var rowFailures []Failure
+	var stages []apigatewayv2types.Stage
+	stagesTruncated := false
+	var stagesNextToken *string
+	stagePages := 0
+	var fetchErr error
+	for {
+		if stagePages >= PerParentPageCap {
+			stagesTruncated = true
+			break
+		}
+		out, err := clients.APIGatewayV2.GetStages(ctx, &apigatewayv2.GetStagesInput{
+			ApiId:     aws.String(apiID),
+			NextToken: stagesNextToken,
+		})
+		stagePages++
+		if err != nil {
+			fetchErr = err
+			break
+		}
+		stages = append(stages, out.Items...)
+		if out.NextToken == nil {
+			break
+		}
+		stagesNextToken = out.NextToken
+	}
+
+	stagesCountStr := resource.FormatExact(len(stages))
+	if stagesTruncated {
+		stagesCountStr = resource.FormatTruncated(len(stages))
+	}
+	var rows []domain.DetailRow
+
+	for _, stage := range stages {
+		stageName := stage.StageName
+		if stageName == nil {
+			stageName = aws.String("(unnamed)")
 		}
 
-		stagesCountStr := resource.FormatExact(len(stages))
-		if stagesTruncated {
-			stagesCountStr = resource.FormatTruncated(len(stages))
-		}
-		var rows []domain.DetailRow
-
-		for _, stage := range stages {
-			stageName := stage.StageName
-			if stageName == nil {
-				stageName = aws.String("(unnamed)")
-			}
-
-			// Check throttling on DefaultRouteSettings.
-			if drs := stage.DefaultRouteSettings; drs != nil {
-				noThrottle := (drs.ThrottlingBurstLimit != nil && *drs.ThrottlingBurstLimit == 0) ||
-					(drs.ThrottlingRateLimit != nil && *drs.ThrottlingRateLimit == 0)
-				if noThrottle {
-					rows = append(rows, domain.DetailRow{
-						Label: "Stage",
-						Value: *stageName,
-						Tier:  "~",
-					})
-					rows = append(rows, domain.DetailRow{
-						Label: "Issue",
-						Value: "no throttling configured (DoS risk)",
-						Tier:  "~",
-					})
-				}
-			}
-
-			// Check access log settings.
-			if stage.AccessLogSettings == nil {
+		// Check throttling on DefaultRouteSettings.
+		if drs := stage.DefaultRouteSettings; drs != nil {
+			noThrottle := (drs.ThrottlingBurstLimit != nil && *drs.ThrottlingBurstLimit == 0) ||
+				(drs.ThrottlingRateLimit != nil && *drs.ThrottlingRateLimit == 0)
+			if noThrottle {
 				rows = append(rows, domain.DetailRow{
 					Label: "Stage",
 					Value: *stageName,
@@ -149,48 +156,59 @@ func EnrichAPIGatewayStage(ctx context.Context, clients *ServiceClients, resourc
 				})
 				rows = append(rows, domain.DetailRow{
 					Label: "Issue",
-					Value: "access logs disabled",
+					Value: "no throttling configured (DoS risk)",
 					Tier:  "~",
 				})
 			}
 		}
 
-		mu.Lock()
-		defer mu.Unlock()
-
-		if authErr := apigwHTTPNoAuthorizer(ctx, clients, &result, apiID); authErr != nil {
-			MarkSkipped(&result, r.ID, &failures, authErr)
-		}
-
-		if fetchErr != nil {
-			MarkSkipped(&result, r.ID, &failures, fetchErr)
-		}
-		// A stage-count page cap is not a coverage gap on the row: the "+" on
-		// stages_count is where it is reported. Marking the ID truncated would
-		// make FoldWave2Rows skip the row, dropping the authorizer verdict
-		// above — a separate call the stage walk says nothing about.
-		result.FieldUpdates[apiID] = map[string]string{"stages_count": stagesCountStr}
-
-		stagesCount := len(stages)
-		if stagesCount == 0 && !stagesTruncated && fetchErr == nil {
-			// No deployed stages — surface as an informational finding.
-			// Only emitted when stage fetch succeeded (no error, no page cap).
-			// The phrase says there are none; the row says what kind of API
-			// is sitting undeployed, which the phrase cannot.
-			setWave2Finding(&result, apiID, apigwCodeNoDeployedStages, []domain.DetailRow{{
-				Label: "Protocol",
-				Value: strings.ToLower(r.Fields["protocol"]),
+		// Check access log settings.
+		if stage.AccessLogSettings == nil {
+			rows = append(rows, domain.DetailRow{
+				Label: "Stage",
+				Value: *stageName,
 				Tier:  "~",
-			}})
+			})
+			rows = append(rows, domain.DetailRow{
+				Label: "Issue",
+				Value: "access logs disabled",
+				Tier:  "~",
+			})
+		}
+	}
 
-			return
-		}
-		if len(rows) == 0 {
-			return
-		}
-		setWave2Finding(&result, apiID, apigwCodeStageConfigIssues, rows)
-	})
-	return result, AggregateFailures("authorizers and stages", failures, n)
+	if authErr := apigwHTTPNoAuthorizer(ctx, clients, &row, apiID); authErr != nil {
+		MarkSkipped(&row, r.ID, &rowFailures, authErr)
+	}
+
+	if fetchErr != nil {
+		MarkSkipped(&row, r.ID, &rowFailures, fetchErr)
+	}
+	// A stage-count page cap is not a coverage gap on the row: the "+" on
+	// stages_count is where it is reported. Marking the ID truncated would
+	// make FoldWave2Rows skip the row, dropping the authorizer verdict
+	// above — a separate call the stage walk says nothing about.
+	row.FieldUpdates[apiID] = map[string]string{"stages_count": stagesCountStr}
+
+	stagesCount := len(stages)
+	if stagesCount == 0 && !stagesTruncated && fetchErr == nil {
+		// No deployed stages — surface as an informational finding.
+		// Only emitted when stage fetch succeeded (no error, no page cap).
+		// The phrase says there are none; the row says what kind of API
+		// is sitting undeployed, which the phrase cannot.
+		setWave2Finding(&row, apiID, apigwCodeNoDeployedStages, []domain.DetailRow{{
+			Label: "Protocol",
+			Value: strings.ToLower(r.Fields["protocol"]),
+			Tier:  "~",
+		}})
+
+		return row, rowFailures
+	}
+	if len(rows) == 0 {
+		return row, rowFailures
+	}
+	setWave2Finding(&row, apiID, apigwCodeStageConfigIssues, rows)
+	return row, rowFailures
 }
 
 // apigwV1API is the pair of REST calls the enricher needs. It is reached by

@@ -14,8 +14,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"maps"
 	"slices"
 	"strings"
+	"sync"
 
 	"github.com/aws/smithy-go"
 
@@ -222,6 +224,67 @@ func MarkSkipped(result *IssueEnricherResult, id string, failures *[]Failure, er
 		return
 	}
 	*failures = append(*failures, FailedCall(id, err))
+}
+
+// mergeRowResult folds one row's result and its failures into the shared ones
+// under mu. It is what lets a parallel enricher evaluate a row into a result
+// of its own: the AWS calls that fill that result run outside the lock, and
+// the lock covers this merge only, so one row's slow call no longer serialises
+// every other row behind it.
+//
+// A code already raised on an ID is not raised again and supporting rows go
+// through capRows, so two rows carrying the same ID — one resource listed
+// twice — merge exactly as setWave2Finding collapses them inside a single
+// result: the condition is stated once and every listing's rows are kept.
+func mergeRowResult(mu *sync.Mutex, shared *IssueEnricherResult, sharedFailures *[]Failure, row IssueEnricherResult, rowFailures []Failure) {
+	mu.Lock()
+	defer mu.Unlock()
+
+	shared.Truncated = shared.Truncated || row.Truncated
+	for id, findings := range row.Findings {
+		for _, f := range findings {
+			if slices.ContainsFunc(shared.Findings[id], func(g domain.Finding) bool { return g.Code == f.Code }) {
+				continue
+			}
+			shared.Findings[id] = append(shared.Findings[id], f)
+		}
+	}
+	maps.Copy(shared.TruncatedIDs, row.TruncatedIDs)
+	if len(row.FieldUpdates) > 0 && shared.FieldUpdates == nil {
+		shared.FieldUpdates = make(map[string]map[string]string)
+	}
+	for id, fields := range row.FieldUpdates {
+		if shared.FieldUpdates[id] == nil {
+			shared.FieldUpdates[id] = make(map[string]string, len(fields))
+		}
+		maps.Copy(shared.FieldUpdates[id], fields)
+	}
+	if len(row.AttentionDetails) > 0 && shared.AttentionDetails == nil {
+		shared.AttentionDetails = make(map[string]map[domain.FindingCode]domain.AttentionDetail)
+	}
+	for id, byCode := range row.AttentionDetails {
+		if shared.AttentionDetails[id] == nil {
+			shared.AttentionDetails[id] = make(map[domain.FindingCode]domain.AttentionDetail, len(byCode))
+		}
+		for code, detail := range byCode {
+			kept := shared.AttentionDetails[id][code]
+			kept.Rows = capRows(kept.Rows, detail.Rows)
+			shared.AttentionDetails[id][code] = kept
+		}
+	}
+	*sharedFailures = append(*sharedFailures, rowFailures...)
+}
+
+// newRowResult is the per-row result a worker fills before mergeRowResult
+// folds it in. Every map the Wave-2 helpers write to is present, so
+// setWave2Finding, MarkSkipped and a field update can be called on it without
+// each worker remembering which maps they need.
+func newRowResult() IssueEnricherResult {
+	return IssueEnricherResult{
+		Findings:     make(map[string][]domain.Finding),
+		TruncatedIDs: make(map[string]string),
+		FieldUpdates: make(map[string]map[string]string),
+	}
 }
 
 // checkOf names the check an error came from: the SDK writes the operation

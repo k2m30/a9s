@@ -32,11 +32,23 @@ const liveConnectTimeout = 30 * time.Second
 // failure is routed through Core.HandleClientsReady below (same as success),
 // so the error flash and rollback surface here rather than being left for the
 // caller to reconstruct separately.
-func (c *Controller) BootstrapLive(profile, region string) []runtime.TaskRequest {
+//
+// The pair connected is the one the session holds when the connect is
+// dispatched, read together with the connect generation under the controller
+// lock — not the startup pair in the parameters, which a profile or region
+// switch landing before this call has already replaced. Connecting the startup
+// pair would sign the session in to an account the operator has left and
+// attribute every later result to it. The parameters stay on the signature
+// because the callers name the pair they started the session with.
+func (c *Controller) BootstrapLive(_, _ string) []runtime.TaskRequest {
 	ctx, cancel := context.WithTimeout(context.Background(), liveConnectTimeout)
 	defer cancel()
 
+	c.mu.Lock()
+	profile, region := c.core.Profile(), c.core.Region()
 	connectGen := c.core.ConnectGen()
+	c.mu.Unlock()
+
 	req := runtime.TaskRequest{
 		Key:     runtime.TaskKey{Kind: runtime.TaskKindConnect},
 		Payload: runtime.ConnectPayload{Profile: profile, Region: region, Gen: connectGen},

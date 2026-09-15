@@ -22,11 +22,13 @@ func newSession(profile, region, command string, demoMode, noCache bool, viewCfg
 	core := runtime.Bootstrap(profile, region, resource.AllResourceTypes())
 	if demoMode {
 		core.SetPreSuppliedClients(demo.NewServiceClients())
-		core.SetNoCache(true)
 		core.SetIsDemo(true)
-	} else if noCache {
-		core.SetNoCache(true)
 	}
+	// Whether the session keeps a cache is --no-cache's answer in demo too, the
+	// way cmd/a9s/main.go answers it for the terminal: forcing it off runs the
+	// demo on a lane the installed app does not, with no cache load on start
+	// and therefore no cache-load-then-sweep chain behind the menu badges.
+	core.SetNoCache(noCache)
 	ctrl := app.New(core)
 	ctrl.SetViewConfig(viewCfg)
 	ctrl.SetUIMode("web")
