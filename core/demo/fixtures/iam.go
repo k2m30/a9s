@@ -1159,7 +1159,7 @@ func buildIAMRelations(f *IAMFixtures) {
 }
 
 func init() {
-	Register(Pin{ShortName: "role", Rows: 56, Issues: 4, CoverageGaps: []string{"dim"}})
+	Register(Pin{ShortName: "role", Rows: 57, Issues: 4, CoverageGaps: []string{"dim"}})
 	Register(Pin{ShortName: "policy", Rows: 28, Issues: 1, CoverageGaps: []string{"dim"}})
 	Register(Pin{ShortName: "iam-user", Rows: 12, Issues: 0, CoverageGaps: []string{"dim"}})
 	Register(Pin{ShortName: "iam-group", Rows: 5, Issues: 0, CoverageGaps: []string{"broken", "dim"}})

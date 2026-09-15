@@ -376,5 +376,5 @@ func NewSecretsFixtures() *SecretsFixtures {
 }
 
 func init() {
-	Register(Pin{ShortName: "secrets", Rows: 38, Issues: 21, CoverageGaps: []string{"dim"}})
+	Register(Pin{ShortName: "secrets", Rows: 38, Issues: 26, CoverageGaps: []string{"dim"}})
 }
