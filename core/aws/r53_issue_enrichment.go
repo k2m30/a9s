@@ -174,10 +174,8 @@ func EnrichRoute53Zone(ctx context.Context, clients *ServiceClients, resources [
 		AggregateFailures("GetHostedZone", failures, total)
 }
 
-// r53ZoneRow evaluates one hosted zone into a result of its own, which the
-// caller merges under its lock. The zone read and the public-zone calls
-// therefore run outside that lock, so one slow zone no longer holds every
-// other zone behind it.
+// r53ZoneRow evaluates one hosted zone into a result of its own; the caller
+// holds its lock for the merge alone.
 func r53ZoneRow(ctx context.Context, clients *ServiceClients, r resource.Resource, zoneID string, held map[string]string) (IssueEnricherResult, []Failure) {
 	row := newRowResult()
 	var rowFailures []Failure

@@ -227,10 +227,8 @@ func MarkSkipped(result *IssueEnricherResult, id string, failures *[]Failure, er
 }
 
 // mergeRowResult folds one row's result and its failures into the shared ones
-// under mu. It is what lets a parallel enricher evaluate a row into a result
-// of its own: the AWS calls that fill that result run outside the lock, and
-// the lock covers this merge only, so one row's slow call no longer serialises
-// every other row behind it.
+// under mu. A parallel enricher evaluates each row into a result of its own
+// with the lock released, and holds it for this merge alone.
 //
 // A code already raised on an ID is not raised again and supporting rows go
 // through capRows, so two rows carrying the same ID — one resource listed

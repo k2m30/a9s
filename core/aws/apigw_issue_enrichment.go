@@ -99,9 +99,8 @@ func apigwRESTRow(ctx context.Context, v1 apigwV1API, r resource.Resource, ownAc
 }
 
 // apigwHTTPRow evaluates one HTTP API — its stage walk and its authorizer
-// verdict — into a result of its own, which the caller merges under its lock.
-// The AWS calls therefore run outside that lock, so one slow API no longer
-// holds every other API behind it.
+// verdict — into a result of its own; the caller holds its lock for the merge
+// alone.
 func apigwHTTPRow(ctx context.Context, clients *ServiceClients, r resource.Resource) (IssueEnricherResult, []Failure) {
 	apiID := r.ID
 	row := newRowResult()

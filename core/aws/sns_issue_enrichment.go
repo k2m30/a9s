@@ -56,9 +56,7 @@ func EnrichSNSSubscriptions(ctx context.Context, clients *ServiceClients, resour
 }
 
 // snsTopicRow evaluates one topic — its subscription walk and its posture —
-// into a result of its own, which the caller merges under its lock. The AWS
-// calls therefore run outside that lock, so one slow topic no longer holds
-// every other topic behind it.
+// into a result of its own; the caller holds its lock for the merge alone.
 func snsTopicRow(ctx context.Context, clients *ServiceClients, r resource.Resource, ownAccount string) (IssueEnricherResult, []Failure) {
 	topicARN := r.ID // fetcher emits ID=ARN
 	row := newRowResult()
