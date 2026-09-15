@@ -258,8 +258,15 @@ func isPhrased(err error) bool {
 //	"<op> failed for 46 of 46 IDs: not authorized to perform ec2:DescribeSnapshotAttribute (e.g. snap-0abc)"
 //	"<op> failed for 3 of 9 IDs: timeout (2, e.g. snap-1); no metadata (1, e.g. snap-3)"
 //
+// Both counts are resources: a check that issues several calls per resource
+// and is refused twice on the same one has failed that resource once, so the
+// numerator is the number of distinct ids among the failures. The per-cause
+// counts after the colon stay call counts — one denial never speaks for
+// another.
+//
 // A record FailedOnPage made names the page instead of an example, because a
-// page that never arrived carries no resource to point at.
+// page that never arrived carries no resource to point at; holding no id, each
+// such record counts once in the numerator against a total of pages.
 //
 // Above aggregateFailuresCap distinct causes the rest are summarized as
 // "; and N more causes". Grouping is per cause rather than per class so two
@@ -290,7 +297,11 @@ func AggregateFailures(opName string, failures []Failure, total int) error {
 	var groups []*group
 	byCause := map[string]*group{}
 	class := failures[0].Class
-	for _, f := range failures {
+	failed := 0
+	for i, f := range failures {
+		if f.ID == "" || i == 0 || f.ID != failures[i-1].ID {
+			failed++
+		}
 		g, ok := byCause[f.Cause]
 		if !ok {
 			g = &group{cause: f.Cause, example: f.ID, page: f.Page}
@@ -328,7 +339,7 @@ func AggregateFailures(opName string, failures []Failure, total int) error {
 	}
 
 	err := fmt.Errorf("%s failed for %d of %d IDs: %s%s",
-		opName, len(failures), total, strings.Join(parts, "; "), suffix)
+		opName, failed, total, strings.Join(parts, "; "), suffix)
 	if class == "" {
 		return err
 	}

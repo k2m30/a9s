@@ -216,7 +216,6 @@ func EnrichELBAttributes(ctx context.Context, clients *ServiceClients, resources
 		listeners, err := allELBListeners(ctx, clients.ELBv2, lbARN)
 		mu.Lock()
 		defer mu.Unlock()
-		total++
 		if err != nil {
 			MarkSkipped(&result, r.ID, &failures, err)
 			return
@@ -246,7 +245,7 @@ func EnrichELBAttributes(ctx context.Context, clients *ServiceClients, resources
 	})
 
 	MarkInformationalOnly(&result)
-	return result, AggregateFailures("DescribeLoadBalancerAttributes/DescribeListeners", failures, total)
+	return result, AggregateFailures("load balancer attributes and listeners", failures, total)
 }
 
 // allELBListeners reads a balancer's listeners to the end. DescribeListeners

@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- The error log's "failed for N of M IDs" line counts resources in both
+  numbers. A check that reads several things about one resource and is refused
+  on two of them used to count both refusals, so the line could claim more
+  failures than there are resources — "failed for 220 of 50 IDs" for fifty
+  buckets. The reasons after the colon still say how many calls each refusal
+  covered.
+
+- The container-registry, load-balancer and function posture lines name the
+  check instead of one of its calls. A repository whose two policy reads were
+  refused read as "DescribeImages failed", the one call that answered. They now
+  read "repository posture", "load balancer attributes and listeners" and
+  "function policy and URL posture", the way the bucket and key posture lines
+  already did. The load-balancer line's total counts each balancer once rather
+  than once per call.
+
 ## [3.57.0] - 2026-09-15
 
 ### Fixed
