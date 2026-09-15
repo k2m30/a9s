@@ -313,11 +313,8 @@ func TestListOpen_ResourcesLoaded_ClearsRefreshingAndSwapsRows(t *testing.T) {
 // (see menuProgressIndicator in menu.go). This test pins the OUTCOME
 // (MenuBody.Refreshing) rather than a specific internal counter name.
 //
-// Task c8 row 1: the setup reaches "during" through the sweep-start progress
-// intent, because those counters are now the only source of Refreshing. A
-// bare RowStore seed is not a sweep and must not be restored here — on the
-// terminal lane nothing ever acknowledged such a seed, so the menu said
-// "refreshing…" for the rest of the session.
+// "During" is reached through the sweep-start progress intent: the counters
+// are Refreshing's only source, and a bare RowStore seed is not a sweep.
 func TestMenu_Refreshing_TrueDuringBackgroundSweep_FalseOnComplete(t *testing.T) {
 	core, c := newSeededTestController(t)
 

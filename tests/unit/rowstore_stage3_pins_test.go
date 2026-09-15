@@ -292,7 +292,7 @@ func TestRelatedDrillParity_PartialOnlyRows_MultiIDCoverage_NoFetchTask(t *testi
 }
 
 // =============================================================================
-// Pin 4 — menuRefreshing counts-only pin: a counts-only
+// Pin 4 — sweep counters on a counts-only seed: a counts-only
 // AvailabilityCacheLoaded seed (no per-type disk row data) must still show
 // the menu's refreshing/updating indicator until the sweep completes for
 // that type.
@@ -309,12 +309,10 @@ func TestRelatedDrillParity_PartialOnlyRows_MultiIDCoverage_NoFetchTask(t *testi
 // ViewState.Body.Menu.Refreshing is true immediately after the seed (sweep
 // still in flight), then flips false once the matching AvailabilityChecked
 // result lands (Gen=1, matching session.New()'s AvailabilityGen seed).
-// Task c8 row 1: Refreshing is the sweep's AvailChecked/AvailTotal counters,
-// which the cache-load event arms for every registered type regardless of how
-// a given type was seeded — so the counts-only seed is covered by
-// construction. The completion half drives the queue down to this one type,
-// because "one of the registered types answered" is not a finished sweep and
-// the old per-type acknowledgement reading of it is not to be restored.
+// Refreshing is the sweep's AvailChecked/AvailTotal counters, which the
+// cache-load event arms for every registered type regardless of how a given
+// type was seeded. The completion half drives the queue down to this one
+// type: one answered type out of the registered set is not a finished sweep.
 func TestMenuRefreshing_CountsOnlySeed_StaysRefreshingUntilSweepCompletes(t *testing.T) {
 	s, _, c := newRowStorePinsTestController(t)
 

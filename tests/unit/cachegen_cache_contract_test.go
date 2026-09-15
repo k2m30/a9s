@@ -536,11 +536,9 @@ func TestPairReEntry_SweepsAgain(t *testing.T) {
 // result from a superseded generation must not make the menu claim the
 // sweep reached that type.
 //
-// Task c8 row 1: the sweep is started through the real cache-load event, and
-// the pin is that the stale result advances neither the progress counter nor
-// Refreshing. The earlier form seeded RowStore and relied on the per-type
-// acknowledgement map; that map is gone, and a bare RowStore seed must not be
-// restored as the stand-in for a sweep.
+// The sweep is started through the real cache-load event; the pin is that the
+// stale result advances neither the progress counter nor Refreshing. A bare
+// RowStore seed is not a sweep and cannot stand in for one here.
 func TestMenuRefreshing_StaleProbeResult_DoesNotAcknowledgeTheSweep(t *testing.T) {
 	t.Setenv("A9S_CONFIG_FOLDER", t.TempDir())
 
@@ -565,13 +563,11 @@ func TestMenuRefreshing_StaleProbeResult_DoesNotAcknowledgeTheSweep(t *testing.T
 // TestMenuClearAvailability_ResetsSweepAcknowledgements: a manual full
 // refresh must leave the menu refreshing until the new sweep answers.
 //
-// Task c8 row 1: the clear now resets the AvailChecked/AvailTotal counters
-// (MenuState.ClearAvailability) that Refreshing reads, and the restarted
-// sweep's own cache load re-arms them. The old form asserted Refreshing true
-// from the clear intent alone, which only held because a separate
-// acknowledgement map survived it; that map is gone and the assertion is not
-// to be restored — with the counters cleared, a menu claiming a sweep in
-// flight before one has started would be the defect.
+// The clear zeroes the AvailChecked/AvailTotal counters Refreshing reads
+// (MenuState.ClearAvailability) and the restarted sweep's own cache load
+// re-arms them. Between the two the menu is not refreshing: with the counters
+// cleared, a menu claiming a sweep in flight before one has started would be
+// the defect.
 func TestMenuClearAvailability_ResetsSweepAcknowledgements(t *testing.T) {
 	t.Setenv("A9S_CONFIG_FOLDER", t.TempDir())
 
