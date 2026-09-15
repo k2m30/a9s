@@ -1,33 +1,24 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-// app_rotation_task_ctx_test.go — RED pin for the code-review finding that a
-// profile/region switch does not abort in-flight background AWS work.
+// app_rotation_task_ctx_test.go — a profile/region switch cancels the
+// background AWS work dispatched for the pair being left.
 //
-// internal/tui/app_dispatch.go:251 (executeTaskCmd) does `ctx := m.appCtx`
-// and forwards it to every Core.ExecuteTaskAt call dispatched through
-// tasksToCmd — including TaskKindProbeAvailability/TaskKindProbeEnrich, the
-// background probe lanes. m.appCtx (internal/tui/app.go:116) is a single
-// context.WithCancel(Background) created once in tui.New and cancelled ONLY
-// by tea.QuitMsg or Model.Cancel() (see app_cancellation_test.go's
-// TestModel_QuitCancelsAppContext / TestModel_Cancel_CancelsAppContext,
-// which already pin quit-time cancellation — not duplicated here).
-// session.Rotate() (core/session/session.go:721, invoked by
-// Core.HandleProfileSelected/HandleRegionSelected) never touches appCtx at
-// all, so an already-dispatched probe survives a profile/region switch and
-// keeps burning its own AWS budget (ProbeResourceAvailability wraps ctx in
-// its own 10s context.WithTimeout, core/runtime/probes.go:667) until IT
-// decides to stop, not until the switch does. This is distinct from the 30s
-// fetchTimeout in core/runtime/fetchers.go: that bounds the interactive
-// FetchResources/FetchIdentity/etc. lanes, not the background task lanes
-// this file exercises.
+// executeTaskCmd (internal/tui/app_dispatch.go) forwards m.pairCtx to every
+// Core.ExecuteTaskAt call dispatched through dispatchTaskRequests, including
+// the TaskKindProbeAvailability/TaskKindProbeEnrich background lanes. The
+// switch cancels that context and re-arms a fresh one (app_session.go), so an
+// already-dispatched probe stops with its pair instead of running until its
+// own 10s timeout (ProbeResourceAvailability, core/runtime/probes.go).
+// m.appCtx, the app-wide context, is cancelled only by tea.QuitMsg or
+// Model.Cancel() (pinned by app_cancellation_test.go, not duplicated here).
+// The 30s fetchTimeout in core/runtime/fetchers.go bounds the interactive
+// FetchResources/FetchIdentity lanes, not the background lanes this file
+// exercises.
 //
-// Harness design (see the score-mode feasibility note this test resolves):
-// neither of the two files the original finding cited as an "established
-// tea.Cmd-execution harness" actually run through the TUI's
-// executeTaskCmd/tasksToCmd path — runtime_fetch_ctx_deadline_test.go and
-// runtime_enrich_dispatch_window_test.go both drive core.Core methods
-// directly, bypassing internal/tui.Model entirely (confirmed by reading
-// both files). The real harness assembled here instead:
+// Harness design: runtime_fetch_ctx_deadline_test.go and
+// runtime_enrich_dispatch_window_test.go drive core.Core methods directly and
+// never pass through the TUI's executeTaskCmd/dispatchTaskRequests lane, so
+// this file assembles its own:
 //
 //  1. Registers resource.SetAvailabilityFetcherForTest fakes for
 //     resource.AllShortNames()[0:4] — the exact window
@@ -47,8 +38,8 @@
 //     ONLY the 4 TaskKindProbeAvailability cmds (handleAvailabilityCacheLoaded
 //     has no other task source once Clients is already set and Command is
 //     empty).
-//  3. tasksToCmd routes every TaskKindProbeAvailability through
-//     executeTaskCmd (app_dispatch.go:196-199) and coreUpdate wraps the
+//  3. dispatchTaskRequests routes every TaskKindProbeAvailability through
+//     executeTaskCmd and coreUpdate wraps the
 //     result in nested tea.Batch — runBatchConcurrently below walks the
 //     resulting tea.BatchMsg tree and runs every leaf cmd on its own
 //     goroutine, the concurrent counterpart to

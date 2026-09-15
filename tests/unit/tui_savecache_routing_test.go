@@ -1,36 +1,20 @@
-// tui_savecache_routing_test.go — RED pin for the TUI save-cache
-// row-persistence routing defect (C6 + Goal 4 of
-// docs/design/cache-requirements.md).
-//
-// Root cause: internal/tui/app_dispatch.go's tasksToCmd intercepts
-// runtime.TaskKindSaveCache and calls the TUI-local m.saveAvailabilityCache()
-// (internal/tui/probe_adapter.go — counts-only, sourced from the controller's
-// MenuState), bypassing the shared executor path
-// (core/runtime/executor.go's TaskKindSaveCache case) which additionally
-// calls saveProbeResourcesToTypeFiles to persist per-type rows/findings from
-// the dispatch-time *SaveCachePayload snapshot. A live TUI session therefore
-// persists ~/.a9s cache type files with a correct Count/Issues header but
-// ZERO Rows, while the headless/web executor path (already pinned by
+// tui_savecache_routing_test.go — the TUI lane's sweep-completion save
+// persists the swept type's rows, not only its count (C6 + Goal 4 of
+// docs/design/cache-requirements.md). The headless lane's equivalent is
 // TestAvailabilitySweepAndEnrichment_PersistsRowsPerType_WithoutAnyListOpen
-// in app_pilot_defects_test.go, driven through app.Controller +
-// runtime.Core directly) persists rows correctly.
+// in app_pilot_defects_test.go.
 //
-// This file drives the SAME AvailabilityChecked-queue-drained completion
-// through the actual renderer seam a live TUI session uses:
-// tui.Model.Update -> m.coreUpdate -> m.tasksToCmd -> (TaskKindSaveCache
-// case) -> the tea.Cmd(s) executed exactly as the Bubble Tea runtime would.
-//
-// Reachability: internal/tui.Model's dispatch lane (tasksToCmd,
-// executeTaskCmd, coreUpdate) is entirely unexported. The only reachable
-// seam from tests/unit is tui.Model's exported tea.Model interface
-// (Update/View/Init) via the tuitest harness (tests/unit/tuitest/tuitest.go),
-// exactly as tui_root_test.go and app_enrich_test.go already do. Driving
-// messages.AvailabilityChecked with the queue naturally drained (AvailQueue
-// nil, AvailTotal 0 by default per session.New(), so a single Checked event
-// satisfies "all checks done") reaches handleAvailabilityChecked's
-// queue-exhausted branch, which appends the TaskKindSaveCache task carrying
-// the dispatch-time snapshotProbeResourcesForSave() payload — the exact
-// production sequence a live sweep-completion produces.
+// The drive goes through the seam a live session uses: tui.Model.Update ->
+// coreUpdate -> dispatchTaskRequests -> the tea.Cmd the shared executor's
+// TaskKindSaveCache case builds, executed exactly as the Bubble Tea runtime
+// would. That dispatch lane is unexported, so the only reachable seam from
+// tests/unit is tui.Model's tea.Model interface via the tuitest harness
+// (tests/unit/tuitest/tuitest.go). A single messages.AvailabilityChecked
+// with the queue already drained (AvailQueue nil, AvailTotal 0 per
+// session.New()) reaches handleAvailabilityChecked's queue-exhausted branch,
+// which appends the TaskKindSaveCache task carrying the dispatch-time
+// snapshotProbeResourcesForSave() payload — the exact production sequence a
+// live sweep completion produces.
 package unit
 
 import (
@@ -90,10 +74,9 @@ func driveSweepCompletion(m tui.Model, sweepResources []resource.Resource) (tui.
 }
 
 // runCmdTree recursively executes cmd, delivering every resulting tea.Msg
-// back into m.Update, exactly as the Bubble Tea event loop would. This is
-// required because tasksToCmd's TaskKindSaveCache branch returns a tea.Cmd
-// that must actually be invoked for the save to happen — the fix under test
-// is entirely about what that returned tea.Cmd does when it runs.
+// back into m.Update, exactly as the Bubble Tea event loop would. The save
+// happens inside the tea.Cmd dispatchTaskRequests returns, so that cmd must
+// actually run for the type file to be written.
 func runCmdTree(t *testing.T, m tui.Model, cmd tea.Cmd) tui.Model {
 	t.Helper()
 	if cmd == nil {
@@ -117,10 +100,7 @@ func runCmdTree(t *testing.T, m tui.Model, cmd tea.Cmd) tui.Model {
 
 // TestTUISaveCache_PersistsRowsToTypeFile pins the save-cache routing: a TUI-driven
 // availability-sweep-completion save must persist the swept type's rows to
-// disk, not just its availability count. RED originally — tasksToCmd's
-// TaskKindSaveCache case called m.saveAvailabilityCache() (counts-only from
-// MenuState), never reaching saveProbeResourcesToTypeFiles, so tf.Rows stayed
-// empty even though the sweep carried a real row with a finding.
+// disk, not just its availability count.
 //
 // This pin is about SAVE-PLUMBING, not enrichment: TaskKindSaveCache persists
 // from the dispatch-time SaveCachePayload snapshot taken BEFORE Wave-2
