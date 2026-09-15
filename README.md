@@ -57,7 +57,7 @@ usage type → (for EC2, last 14 days) the individual instances — and one more
 `Enter` opens the standard resource detail view of the machine behind the
 number.
 
-- Pivot rows by service, region, linked account, usage type, purchase option, or charge category (`1`-`6`)
+- Pivot rows by service, region, linked account, usage type, purchase type, or record type (`1`-`6`)
 - Zoom the time axis from years to months, weeks, and days (`+`/`-`), anchored at the cursor
 - Cycle cost metrics — invoice, unblended, amortized, net amortized, blended (`b`)
 - Closed months are fetched once and cached on disk per profile: instant on restart, works offline

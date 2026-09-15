@@ -34,7 +34,7 @@
 | `e` | Open Service Events (ECS Services) / Agreements (Transfer Family) |
 | `L` | Open Container Logs (ECS Services) |
 | `m` | Load more (paginated lists, also in demo mode) |
-| `R` | Open Stack Resources (CFN Stacks) |
+| `r` / `R` | Open Stack Resources (CFN Stacks) |
 | `s` | Open source view (reserved for future child views) |
 | `w` | Toggle line wrap (in YAML, JSON, detail, and reveal views) |
 | `Tab` | Autocomplete (in command mode) / Switch focus (in detail view with related panel) |
@@ -50,7 +50,7 @@
 | `+` / `=` | Zoom in (year → month → week → day, anchored at the cursor) |
 | `-` / `_` | Zoom out |
 | `b` | Cycle cost metric (invoice → unblended → amortized → net amortized → blended) |
-| `1`-`6` | Pivot rows: service, region, account, usage type, purchase option, charge category |
+| `1`-`6` | Pivot rows: service, region, account, usage type, purchase type, record type |
 | `0` | Reset to the default view |
 | `Ctrl+R` | Force-refresh the open period |
 

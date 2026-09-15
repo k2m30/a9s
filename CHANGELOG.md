@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.57.0] - 2026-09-15
+
 ### Fixed
 
 - The main menu's "refreshing…" line clears when the start-up scan finishes.
@@ -1138,10 +1140,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   call as executed or served without a new request, an enrichment
   cache hit/miss/write, and a result fold's accept/reject decision
   (#488). Off by default; writes only to the given file, never stdout.
-- `make changelog` assembles `CHANGELOG.md`'s Unreleased section from one
-  fragment file per task under `changelog.d/`, so two tasks landing at once no
-  longer conflict in the changelog. `make ready-to-release` refuses while a
-  fragment is unassembled.
 - `scripts/task-file-overlap.sh` names the files two task branches both touch,
   which is the check the "no two live tasks share a file" rule needed.
 - An expired certificate, an EventBridge rule with no targets, and a target

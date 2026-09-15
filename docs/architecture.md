@@ -303,6 +303,7 @@ cmd/
   catalogen/        # catalog codegen
   snapshot/         # web-e2e snapshot collector
   checklist/        # web-e2e checklist oracle
+  readonlycheck/    # AST scan for write-verb calls in core/aws and core/runtime (`make verify-readonly`)
 
 core/            # platform-agnostic core — renderer-free, gated by `make verify-renderer-free`
   app/           # headless controller (Controller) — shared list/detail/menu/cost state+render, consumed by both tui/ and web/
@@ -318,12 +319,16 @@ core/            # platform-agnostic core — renderer-free, gated by `make veri
     fakes/       #   per-service fake API implementations
   domain/        # leaf type-declaration package: Resource, Type, Severity, FindingCode, Finding, AttentionDetail, Color, Gen, plus query-contract types. Introduced in Phase 01 (`docs/historical/refactor/landed/01-projection-hook.md`); `Gen` added in Phase 05a-gens.
   fieldpath/     # struct field extraction via reflection (frozen — don't modify)
+  iampolicy/     # shared policy-exposure engine: statement parsing, public/cross-account evaluation, privilege-escalation action sets
   jsonyaml/      # renderer-free JSON→YAML helpers (used by projection without pulling in lipgloss)
+  logging/       # process-wide structured logger behind --log-file (off by default)
   resource/      # stable façade over domain/ + catalog/ — type aliases plus original helpers (NavIDFromValue, RelatedEnter, ResolveChildContext) and the test-only related override registry
   runtime/       # platform-agnostic app core: Core (orchestrator.go), handlers, screens, tasks, state, intents; 30s fetchTimeout on interactive fetch lanes (fetchers.go)
     messages/    #   typed Cmd/Event message taxonomy (cmd.go, event.go, messages.go marker interfaces)
+  secretscan/    # plaintext-credential scanner shared by every enricher that reads user data, variables, outputs and definitions
   semantics/     # shared semantic helpers: projection (DetailProjector), ctevent (CloudTrail event summarization), selector (shared ARN/tag matching)
   session/       # session.Session — all session-scoped mutable state + capability stores; Rotate() invalidates in-flight gens
+  trace/         # --trace JSON-lines diagnostic stream of the detail-operation lifecycle
   web/           # web mode: HTTP server rendering the same controller state (server.go, templates/, static/)
 
 internal/
@@ -1047,7 +1052,7 @@ main.go → parseFlags → tui.New(profile, region, opts...)
 - `WithProfile(p)` — override the profile string (used in tests to set a specific profile without live AWS)
 - `WithRegion(r)` — override the region string (used in tests to set a specific region without live AWS)
 - `WithCommand("ec2")` — open directly to a resource type on startup
-- `WithActiveTheme(name)` — set the initial active theme filename for the theme selector (used by `--theme` CLI flag)
+- `WithActiveTheme(name)` — set the initial active theme filename for the theme selector (from the `theme` key in `config.yaml`; there is no CLI flag)
 
 ---
 
