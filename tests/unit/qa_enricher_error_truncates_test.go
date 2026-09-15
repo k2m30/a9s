@@ -141,11 +141,16 @@ func TestEnrichStepFunctionsStatus_ListExecutionsError_SetsTruncated(t *testing.
 	if err == nil {
 		t.Fatal("enricher must surface a composite error when ListExecutions fails")
 	}
-	// The aggregate names the call, not the type: the type comes from the
-	// registry key at the surface, and a type in the label would render it
-	// twice ("enrich sfn: sfn-enrich: ...").
-	if errStr := err.Error(); !strings.Contains(errStr, "ListExecutions") {
-		t.Errorf("composite error must name the call, ListExecutions, got: %q", errStr)
+	// A check that issues several calls per resource names the check, never
+	// one of its calls: the state-machine pass also reads DescribeStateMachine
+	// for the configuration signals, and a label naming the execution read
+	// would point at the call that answered whenever that one is refused. The
+	// type is not in the label either — it comes from the registry key at the
+	// surface, and a type here would render twice ("enrich sfn: sfn-enrich:
+	// ...").
+	const sfnAggregateOp = "state machine executions and configuration"
+	if errStr := err.Error(); !strings.Contains(errStr, sfnAggregateOp) {
+		t.Errorf("composite error must name the check, %q, got: %q", sfnAggregateOp, errStr)
 	}
 	if errStr := err.Error(); !strings.Contains(errStr, smName) {
 		t.Errorf("composite error must contain the failing state machine ID %q, got: %q", smName, errStr)

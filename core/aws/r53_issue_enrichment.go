@@ -171,7 +171,7 @@ func EnrichRoute53Zone(ctx context.Context, clients *ServiceClients, resources [
 	})
 
 	return result,
-		AggregateFailures("GetHostedZone", failures, total)
+		AggregateFailures("hosted zone posture and records", failures, total)
 }
 
 // r53ZoneRow evaluates one hosted zone into a result of its own; the caller

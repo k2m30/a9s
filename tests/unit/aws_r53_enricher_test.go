@@ -250,11 +250,15 @@ func TestEnrichRoute53Zone_APIErrorMarksRowTruncatedIDNotBadge(t *testing.T) {
 	if err == nil {
 		t.Fatal("enricher must surface a composite error when an API call fails")
 	}
-	// The aggregate names the call, not the type: the type comes from the
-	// registry key at the surface, and a type in the label would render it
-	// twice ("enrich r53: r53: GetHostedZone ...").
-	if errStr := err.Error(); !strings.Contains(errStr, "GetHostedZone") {
-		t.Errorf("composite error must name the call, %q, got: %q", "GetHostedZone", errStr)
+	// A check that issues several calls per resource names the check, never
+	// one of its calls: the zone pass also reads the query-logging configs and
+	// the record sets, and either of them failing would still be reported
+	// under a label naming the zone read. The type is not in the label either
+	// — it comes from the registry key at the surface, and a type here would
+	// render twice ("enrich r53: r53: ...").
+	const r53AggregateOp = "hosted zone posture and records"
+	if errStr := err.Error(); !strings.Contains(errStr, r53AggregateOp) {
+		t.Errorf("composite error must name the check, %q, got: %q", r53AggregateOp, errStr)
 	}
 	if errStr := err.Error(); !strings.Contains(errStr, r53ZoneID1) {
 		t.Errorf("composite error must contain the failing zone ID %q, got: %q", r53ZoneID1, errStr)

@@ -16,13 +16,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   buckets. The reasons after the colon still say how many calls each refusal
   covered.
 
-- The container-registry, load-balancer and function posture lines name the
-  check instead of one of its calls. A repository whose two policy reads were
-  refused read as "DescribeImages failed", the one call that answered. They now
-  read "repository posture", "load balancer attributes and listeners" and
-  "function policy and URL posture", the way the bucket and key posture lines
-  already did. The load-balancer line's total counts each balancer once rather
-  than once per call.
+- Every check that reads several things about one resource names the check in
+  the error log instead of one of its calls. A repository whose two policy
+  reads were refused read as "DescribeImages failed", the one call that
+  answered, and a web ACL whose associations could not be listed read as
+  "GetLoggingConfiguration failed". They now read "repository posture", "load
+  balancer attributes and listeners", "function policy and URL posture", "web
+  ACL logging and associations", "hosted zone posture and records" and "state
+  machine executions and configuration", the way the bucket and key posture
+  lines already did. The reason after the colon still names the exact action
+  the role lacks. The load-balancer line's total counts each balancer once
+  rather than once per call.
 
 ## [3.57.0] - 2026-09-15
 

@@ -161,5 +161,5 @@ func EnrichWAFLogging(ctx context.Context, clients *ServiceClients, resources []
 	// All WAF logging findings are severity "~" (informational).
 	MarkInformationalOnly(&result)
 	return result,
-		AggregateFailures("GetLoggingConfiguration", failures, total)
+		AggregateFailures("web ACL logging and associations", failures, total)
 }

@@ -125,7 +125,7 @@ func EnrichStepFunctionsStatus(ctx context.Context, clients *ServiceClients, res
 
 	SetTruncated(&result, truncated)
 	return result,
-		AggregateFailures("ListExecutions", failures, total)
+		AggregateFailures("state machine executions and configuration", failures, total)
 }
 
 // sfnConfigurationPosture reads DescribeStateMachine and records the three

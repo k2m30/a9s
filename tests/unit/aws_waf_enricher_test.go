@@ -284,11 +284,14 @@ func TestEnrichWAFLogging_APIErrorMarksRowTruncatedIDNotBadge(t *testing.T) {
 	if err == nil {
 		t.Fatal("enricher must surface a composite error when an API call fails")
 	}
-	// The aggregate names the call, not the type: the type comes from the
-	// registry key at the surface, and a type in the label would render it
-	// twice ("enrich waf: waf: GetLoggingConfiguration ...").
-	if errStr := err.Error(); !strings.Contains(errStr, "GetLoggingConfiguration") {
-		t.Errorf("composite error must name the call, %q, got: %q", "GetLoggingConfiguration", errStr)
+	// A check that issues several calls per resource names the check, never
+	// one of its calls: any single call named there is the one that answered
+	// as often as the one that failed. The type is not in the label either —
+	// it comes from the registry key at the surface, and a type here would
+	// render twice ("enrich waf: waf: ...").
+	const wafAggregateOp = "web ACL logging and associations"
+	if errStr := err.Error(); !strings.Contains(errStr, wafAggregateOp) {
+		t.Errorf("composite error must name the check, %q, got: %q", wafAggregateOp, errStr)
 	}
 	if errStr := err.Error(); !strings.Contains(errStr, wafACLARN1) {
 		t.Errorf("composite error must contain the failing WebACL ARN %q, got: %q", wafACLARN1, errStr)

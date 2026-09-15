@@ -88,11 +88,14 @@ func TestEnrichRoute53Zone_AccessDenied_StillAggregates(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected non-nil composite error for AccessDenied; NoSuchHostedZone silent-truncation must not swallow other errors")
 	}
-	// The aggregate names the call, not the type: the type comes from the
-	// registry key at the surface, and a type in the label would render it
-	// twice ("enrich r53: r53-enrich: ...").
-	if !strings.Contains(err.Error(), "GetHostedZone") {
-		t.Errorf("composite error must name the call, GetHostedZone, got: %q", err.Error())
+	// A check that issues several calls per resource names the check, never
+	// one of its calls; the denial's own cause still quotes the action, which
+	// is where the operator reads which call the role lacks. The type is not
+	// in the label either: it comes from the registry key at the surface, and
+	// a type here would render twice ("enrich r53: r53-enrich: ...").
+	const r53AggregateOp = "hosted zone posture and records"
+	if !strings.Contains(err.Error(), r53AggregateOp) {
+		t.Errorf("composite error must name the check, %q, got: %q", r53AggregateOp, err.Error())
 	}
 	if !strings.Contains(err.Error(), r53ZoneID1) {
 		t.Errorf("composite error must name the failing zone %q, got: %q", r53ZoneID1, err.Error())
