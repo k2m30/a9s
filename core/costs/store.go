@@ -764,11 +764,24 @@ func (s *Store) Save() error {
 		return fmt.Errorf("costs: marshaling cache: %w", err)
 	}
 
-	tmp := s.path + ".tmp"
-	if err := os.WriteFile(tmp, out, 0o600); err != nil {
+	// One temp file per save: two sessions on the same profile save the same
+	// path, and a shared temp name lets one rename the other's half-written
+	// file into place.
+	tmp, err := os.CreateTemp(filepath.Dir(s.path), filepath.Base(s.path)+".tmp.*")
+	if err != nil {
+		return fmt.Errorf("costs: creating cache temp file: %w", err)
+	}
+	if _, err := tmp.Write(out); err != nil {
+		_ = tmp.Close()
+		_ = os.Remove(tmp.Name())
 		return fmt.Errorf("costs: writing cache: %w", err)
 	}
-	if err := os.Rename(tmp, s.path); err != nil {
+	if err := tmp.Close(); err != nil {
+		_ = os.Remove(tmp.Name())
+		return fmt.Errorf("costs: writing cache: %w", err)
+	}
+	if err := os.Rename(tmp.Name(), s.path); err != nil {
+		_ = os.Remove(tmp.Name())
 		return fmt.Errorf("costs: renaming cache: %w", err)
 	}
 	return nil

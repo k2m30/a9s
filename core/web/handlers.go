@@ -191,6 +191,7 @@ func (s *Server) handleAction(w http.ResponseWriter, r *http.Request) {
 	entry := s.requireSession(w, r)
 
 	var action app.Action
+	r.Body = http.MaxBytesReader(w, r.Body, 1<<20) // 1 MiB limit against memory exhaustion
 	ct := r.Header.Get("Content-Type")
 	if ct == "application/json" || (len(ct) > 16 && ct[:16] == "application/json") {
 		if err := json.NewDecoder(r.Body).Decode(&action); err != nil {
@@ -199,7 +200,6 @@ func (s *Server) handleAction(w http.ResponseWriter, r *http.Request) {
 		}
 	} else {
 		// Form-encoded fallback: kind=<kind>&arg=<arg>
-		r.Body = http.MaxBytesReader(w, r.Body, 1<<20) // 1 MiB limit against memory exhaustion
 		_ = r.ParseForm()
 		action.Kind = app.ActionKind(r.FormValue("kind"))
 		action.Arg = r.FormValue("arg")

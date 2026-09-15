@@ -93,9 +93,25 @@ func (c *Controller) applyNavResult(res runtime.NavigateResult) []runtime.TaskRe
 		c.applyIntents([]runtime.UIIntent{runtime.PushScreen{ID: runtime.ScreenHelp}})
 
 	case runtime.NavigateKindPushRegion:
+		if c.core.PreSuppliedClients() != nil {
+			c.applyIntents([]runtime.UIIntent{runtime.FlashIntent{Text: "region switching is disabled in demo mode", IsError: true}})
+			return nil
+		}
 		c.applyIntents([]runtime.UIIntent{runtime.PushScreen{ID: runtime.ScreenRegion}})
+		regions := c.core.AllRegions()
+		codes := make([]string, len(regions))
+		for i, r := range regions {
+			codes[i] = r.Code
+		}
+		c.ensureSelectorState(codes, c.core.Region(), "aws-regions")
 
 	case runtime.NavigateKindPushTheme:
+		// A theme is a terminal setting: the web page has its own look, and
+		// the theme file is read by the terminal host alone.
+		if c.uiMode == "web" {
+			c.applyIntents([]runtime.UIIntent{runtime.FlashIntent{Text: "themes apply to the terminal, not the web page", IsError: true}})
+			return nil
+		}
 		c.applyIntents([]runtime.UIIntent{runtime.PushScreen{ID: runtime.ScreenTheme}})
 
 	case runtime.NavigateKindPushCosts:
@@ -109,8 +125,12 @@ func (c *Controller) applyNavResult(res runtime.NavigateResult) []runtime.TaskRe
 		}
 
 	case runtime.NavigateKindFetchProfiles:
-		// No stack change — the adapter starts the fetch task; when the result
-		// arrives (ProfilesLoaded), HandleProfilesLoaded pushes ScreenProfileSelector.
+		// The terminal adapter starts the fetch task and HandleProfilesLoaded
+		// pushes the selector when the result arrives; a host with no adapter
+		// opens it synchronously.
+		if c.uiMode == "web" {
+			return c.openProfileSelectorLocked()
+		}
 
 	case runtime.NavigateKindFlash, runtime.NavigateKindNoop:
 		// No stack change — flash is surfaced via FlashIntent in the intent stream.

@@ -20,13 +20,18 @@ import (
 func (c *Controller) OpenProfileSelector() (ViewState, []runtime.TaskRequest) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
+	tasks := c.openProfileSelectorLocked()
+	return c.snapshot(), tasks
+}
 
+// openProfileSelectorLocked is OpenProfileSelector's body; callers hold c.mu.
+func (c *Controller) openProfileSelectorLocked() []runtime.TaskRequest {
 	if c.core.PreSuppliedClients() != nil {
 		c.applyIntents([]runtime.UIIntent{runtime.FlashIntent{
 			Text:    "context switching is disabled in demo mode",
 			IsError: true,
 		}})
-		return c.snapshot(), nil
+		return nil
 	}
 
 	profiles, err := c.core.FetchProfiles()
@@ -35,7 +40,7 @@ func (c *Controller) OpenProfileSelector() (ViewState, []runtime.TaskRequest) {
 			Text:    awsclient.LocalConfigFailure(err),
 			IsError: true,
 		}})
-		return c.snapshot(), nil
+		return nil
 	}
 
 	intents, tasks := c.core.HandleProfilesLoaded(runtime.ProfilesLoadedEvent{Profiles: profiles})
@@ -44,6 +49,5 @@ func (c *Controller) OpenProfileSelector() (ViewState, []runtime.TaskRequest) {
 	// which calls EnsureSelectorState right after the same PushScreen — the
 	// lock-free variant, since c.mu is already held here.
 	c.ensureSelectorState(profiles, c.core.Profile(), "aws-profiles")
-	tasks = c.stampDispatchSnapshotLocked(tasks)
-	return c.snapshot(), tasks
+	return c.stampDispatchSnapshotLocked(tasks)
 }

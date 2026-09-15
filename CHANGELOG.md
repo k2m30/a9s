@@ -32,6 +32,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   cache stays at its cap until the list lands.
   The cap itself is unchanged; every other row keeps the sweep's answer.
 
+- The web page's `:profile` and `:region` commands open their selectors; they
+  showed nothing before. `:theme` on the web page says that themes are a
+  terminal setting instead of opening a blank screen.
+
+- `a9s --web --no-cache -c <resource>` opens the resource once connected, as
+  the terminal does; the startup command was dropped without a cache.
+
+- Two web sessions on one profile no longer trip over each other saving the
+  Cost Explorer cache: each save writes its own temporary file.
+
+- A JSON action posted to the web server is capped at 1 MiB like a form
+  action.
+
 - The detail view masks a value the secret scanner flagged, wherever the
   resource's own configuration is shown (a Lambda's environment, a CloudTrail
   event's raw request block). The scanner's rows name where a credential

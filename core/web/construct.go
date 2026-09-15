@@ -60,16 +60,16 @@ func newSession(profile, region, command string, demoMode, noCache bool, viewCfg
 			ev := runtime.CacheStoreToEvent(store)
 			ctrl.Handle(ev)
 		}
-		if command != "" {
-			// Mirror tui.WithCommand: arm the runtime's one-shot -c navigation
-			// (session.Command) instead of applying it server-side later.
-			// HandleClientsReady (called from BootstrapLive once AWS connects)
-			// arms session.CommandArmed/PendingCommand, and
-			// handleAvailabilityCacheLoaded dispatches the deferred
-			// TaskKindEmitNavigate once its ProbeResources seed has landed
-			// (deferred -c navigation, D11) — the same ordering the TUI's -c flag relies on.
-			core.SetCommand(command)
-		}
+	}
+	if core.PreSuppliedClients() == nil && command != "" {
+		// Mirror tui.WithCommand: arm the runtime's one-shot -c navigation
+		// (session.Command) instead of applying it server-side later.
+		// HandleClientsReady (called from BootstrapLive once AWS connects)
+		// arms session.CommandArmed/PendingCommand, and
+		// handleAvailabilityCacheLoaded dispatches the deferred
+		// TaskKindEmitNavigate once its ProbeResources seed has landed
+		// (deferred -c navigation, D11) — the same ordering the TUI's -c flag relies on.
+		core.SetCommand(command)
 	}
 	// The config report goes on last: Controller.Apply clears the flash at the
 	// start of every action, so a report set before the startup command would
