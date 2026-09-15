@@ -181,7 +181,7 @@ test.describe("presentation doctrine — web parity (demo fixtures)", () => {
     await expect(
       detail,
       "the Attention block must carry the operator cause sentence, not just the phrase",
-    ).toContainText("Bucket-level public access block is missing or partial");
+    ).toContainText("does not set all four public-access settings");
   });
 
   test("tg detail → target health child view: humanized phrase, no raw reason enum", async ({ page }) => {
