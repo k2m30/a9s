@@ -4,6 +4,10 @@ import { readServer } from "./server";
 // Booted + tokenized by global-setup. The tokenized URL establishes the session.
 const server = readServer();
 
+// resource.DetailFrameTitle composes every detail frame title as
+// "detail -- <ID> (<Name>)"; both hosts render it from the same DetailBody.
+const EC2_DETAIL_TITLE = "detail -- i-0a1b2c3d4e5f60001 (web-prod-01)";
+
 // This spec asserts demo-fixture specifics (web-prod-01, acme-web-tg, ec2(27)…),
 // so it is meaningless against live AWS data. Skip the whole file in live mode;
 // the data-agnostic live checks live in live-readonly.spec.ts.
@@ -64,7 +68,7 @@ test.describe("a9s web UI — real-browser key navigation", () => {
       detailTitle,
       "frame-title must update on navigation, not stay on the prior screen",
     ).not.toBe(listTitle);
-    expect(detailTitle).toBe("web-prod-01");
+    expect(detailTitle).toBe(EC2_DETAIL_TITLE);
   });
 
   test("detail sub-fields render once, not duplicated", async ({ page }) => {
@@ -105,7 +109,7 @@ test.describe("a9s web UI — real-browser key navigation", () => {
     await expect(
       page.locator("#frame-title"),
       "single-target related-navigate must seed the detail from cache, not land on an empty placeholder titled 'detail'",
-    ).toHaveText("acme-web-tg");
+    ).toHaveText("detail -- acme-web-tg (acme-web-tg)");
     expect(await page.locator(".detail-fields .field-row").count()).toBeGreaterThan(0);
   });
 
@@ -128,7 +132,7 @@ test.describe("a9s web UI — real-browser key navigation", () => {
     await expect(page.locator(".list-table")).toBeVisible();
     await press(page, "Enter"); // list ROW -> detail
     await expect(page.locator(".detail-layout")).toBeVisible();
-    await expect(page.locator("#frame-title")).toHaveText("web-prod-01");
+    await expect(page.locator("#frame-title")).toHaveText(EC2_DETAIL_TITLE);
   });
 
   test("clicking a list row opens the detail", async ({ page }) => {
@@ -160,7 +164,7 @@ test.describe("a9s web UI — real-browser key navigation", () => {
     await expect(page.locator(".list-table")).toBeVisible();
     await press(page, "d"); // -> web-prod-01 detail
     await expect(page.locator(".detail-layout")).toBeVisible();
-    await expect(page.locator("#frame-title")).toHaveText("web-prod-01");
+    await expect(page.locator("#frame-title")).toHaveText(EC2_DETAIL_TITLE);
 
     const navField = page.locator(".field-navigable").first();
     await expect(navField).toBeVisible();
@@ -169,7 +173,7 @@ test.describe("a9s web UI — real-browser key navigation", () => {
     await expect(
       page.locator("#frame-title"),
       "clicking a navigable field must navigate away from the web-prod-01 detail",
-    ).not.toHaveText("web-prod-01");
+    ).not.toHaveText(EC2_DETAIL_TITLE);
     await expect(page.locator(".detail-layout, .list-table")).toBeVisible();
   });
 });
@@ -259,7 +263,7 @@ test.describe("a9s web UI — menu fidelity + interaction (TUI parity)", () => {
     await press(page, "Enter"); // menu -> ec2 list
     await expect(page.locator(".list-table")).toBeVisible();
     await press(page, "d"); // -> web-prod-01 detail
-    await expect(page.locator("#frame-title")).toHaveText("web-prod-01");
+    await expect(page.locator("#frame-title")).toHaveText(EC2_DETAIL_TITLE);
 
     await press(page, "ArrowDown");
     await expect(page.locator(".field-row.field-cursor")).toHaveCount(1);
@@ -280,7 +284,7 @@ test.describe("a9s web UI — menu fidelity + interaction (TUI parity)", () => {
     await expect(
       page.locator("#frame-title"),
       "Enter on a focused navigable field must navigate away from web-prod-01",
-    ).not.toHaveText("web-prod-01");
+    ).not.toHaveText(EC2_DETAIL_TITLE);
     await expect(page.locator(".detail-layout")).toBeVisible();
   });
 
@@ -403,7 +407,7 @@ test.describe("a9s web UI — detail related-panel + layout (TUI parity)", () =>
     // row. The template now gates .field-cursor on (not RelatedFocused).
     await press(page, "Enter"); // menu -> ec2 list
     await press(page, "d"); // -> web-prod-01 detail
-    await expect(page.locator("#frame-title")).toHaveText("web-prod-01");
+    await expect(page.locator("#frame-title")).toHaveText(EC2_DETAIL_TITLE);
     await expect(page.locator(".related-panel")).toBeVisible();
 
     // Move the left field cursor onto a navigable field.
@@ -426,7 +430,7 @@ test.describe("a9s web UI — detail related-panel + layout (TUI parity)", () =>
     await expect(
       page.locator("#frame-title"),
       "Enter on the focused related row must navigate away from web-prod-01",
-    ).not.toHaveText("web-prod-01");
+    ).not.toHaveText(EC2_DETAIL_TITLE);
   });
 
   test("r toggles the related panel (footer advertises 'r Related', not refresh)", async ({ page }) => {

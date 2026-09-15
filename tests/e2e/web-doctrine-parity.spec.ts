@@ -70,7 +70,7 @@ async function openFlaggedS3Detail(page: Page): Promise<void> {
   await expect(page.locator(".list-table tbody tr")).toHaveCount(1);
   await press(page, "d");
   await expect(page.locator(".detail-layout")).toBeVisible();
-  await expect(page.locator("#frame-title")).toHaveText("a9s-demo-nopab");
+  await expect(page.locator("#frame-title")).toHaveText("detail -- a9s-demo-nopab (a9s-demo-nopab)");
 }
 
 // openTargetHealthChildView walks tg list → acme-web-tg detail → tg_health
@@ -89,7 +89,7 @@ async function openTargetHealthChildView(page: Page): Promise<void> {
   await command(page, "tg");
   await press(page, "d"); // cursor starts on row 0 = acme-web-tg
   await expect(page.locator(".detail-layout")).toBeVisible();
-  await expect(page.locator("#frame-title")).toHaveText("acme-web-tg");
+  await expect(page.locator("#frame-title")).toHaveText("detail -- acme-web-tg (acme-web-tg)");
 
   await Promise.all([
     page.waitForResponse(
@@ -149,8 +149,8 @@ test.describe("presentation doctrine — web parity (demo fixtures)", () => {
     await expect(unencrypted).toHaveCount(1);
     await expect(
       unencrypted.locator("td").nth(statusCol),
-      "unencrypted witness must render the wave-1 finding phrase in Status",
-    ).toHaveText("unencrypted");
+      "unencrypted witness must render the top phrase plus its other-findings count, the shape domain.StatusPhrase renders",
+    ).toHaveText("unencrypted (+1)");
     await expect(unencrypted).toHaveClass(/row-warning/);
 
     const orphan = page.locator(".list-table tbody tr", { hasText: "old-orphan-vol" });
