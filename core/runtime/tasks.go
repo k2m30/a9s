@@ -257,7 +257,7 @@ func (EmitAPIErrorPayload) isTaskPayload() {}
 
 // FetchChildResourcesPayload carries the child-type short name and the
 // parent context map used by the adapter's paginated child fetcher.
-// Emitted by HandleEnterChildView so the adapter's tasksToCmd can build
+// Emitted by HandleEnterChildView so the adapter's task dispatcher can build
 // the existing fetchChildResources closure without parsing TaskKey.Scope.
 type FetchChildResourcesPayload struct {
 	ChildType     string

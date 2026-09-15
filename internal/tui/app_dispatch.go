@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 // app_dispatch.go — TUI-side runtime intent + task dispatchers (applyIntents,
-// pushScreen, applyTheme, tasksToCmd, dispatchTaskRequests, coreUpdate).
+// pushScreen, applyTheme, dispatchTaskRequests, coreUpdate).
 //
 // applyIntents forwards every intent to the headless controller
 // (m.ctrl.ApplyIntents) first — see core/app/intents.go for the
@@ -203,63 +203,6 @@ func (m *Model) applyTheme(v runtime.ApplyThemeIntent) tea.Cmd {
 	return nil
 }
 
-// tasksToCmd converts a []runtime.TaskRequest returned by m.core into a
-// single tea.Cmd (or nil when the slice is empty). The TaskKind switch
-// matches the symmetric runtimeTasksToCmd in runtime_adapter.go used
-// by handleEnrichDetail; this dispatcher additionally covers the
-// availability/enrich probe + save-cache tasks that the singular
-// dispatcher does not route.
-func (m *Model) tasksToCmd(tasks []runtime.TaskRequest) tea.Cmd {
-	var cmds []tea.Cmd
-	for _, req := range tasks {
-		switch req.Key.Kind {
-		case runtime.TaskKindProbeAvailability, runtime.TaskKindProbeEnrich, runtime.TaskKindFetchChildResources:
-			// Route through ExecuteTask; fall back to adapter handling for
-			// ErrAdapterOnlyTask (defensive — these kinds are not adapter-only).
-			cmd := m.executeTaskCmd(req)
-			if cmd != nil {
-				cmds = append(cmds, cmd)
-			}
-
-		case runtime.TaskKindSaveCache:
-			// Must route through the shared executor (not an adapter-local
-			// save) so req.Payload's *SaveCachePayload reaches the
-			// executor's row/finding persistence — an adapter-local save
-			// would silently drop per-type rows, keeping only counts.
-			cmd := m.executeTaskCmd(req)
-			if cmd != nil {
-				cmds = append(cmds, cmd)
-			}
-
-		case runtime.TaskKindReadThemeFile:
-			// ErrAdapterOnlyTask — renderer concern, keep adapter-local.
-			if p, ok := req.Payload.(runtime.ReadThemePayload); ok {
-				cmds = append(cmds, readThemeFileCmd(p))
-			}
-
-		case runtime.TaskKindSaveThemeConfig:
-			// ErrAdapterOnlyTask — renderer concern, keep adapter-local.
-			if p, ok := req.Payload.(runtime.SaveThemeConfigPayload); ok {
-				cmds = append(cmds, saveThemeConfigCmd(p))
-			}
-
-		case runtime.TaskKindEmitNavigate:
-			// ErrAdapterOnlyTask — navigation directive; keep adapter-local.
-			// Deferred -c navigation (D11): handleAvailabilityCacheLoaded emits this once its
-			// ProbeResources seed has landed, so this must reach the same
-			// emitNavigateCmd translator runtimeTasksToCmd uses for the
-			// NoCache path's direct emission.
-			if p, ok := req.Payload.(runtime.EmitNavigatePayload); ok {
-				cmds = append(cmds, emitNavigateCmd(p))
-			}
-		}
-	}
-	if len(cmds) == 0 {
-		return nil
-	}
-	return tea.Batch(cmds...)
-}
-
 // executeTaskCmd wraps Core.ExecuteTaskAt in a tea.Cmd. The returned event is
 // delivered back into the Update loop as a tea.Msg. Adapter-only tasks fall
 // back to nil (they must be handled by the caller's kind-specific branch).
@@ -308,14 +251,17 @@ func (m Model) executeTaskCmd(req runtime.TaskRequest) tea.Cmd {
 	}
 }
 
-// dispatchTaskRequests is the single shared task->tea.Cmd translation switch
-// every screen's adapter routes through, so a task kind's translation rule
-// lives in exactly one place — a future kind added here works from every
-// caller, not just the one that happened to need it first. Consolidates the
-// former per-screen switches in runtime_adapter_related.go
-// (relatedNavigateTasksToCmd) and app_costs.go (handleCostsKeyMsg), which
-// independently reimplemented the same KindFetchByIDDetail navigation
-// special case and generic executeTaskCmd passthrough.
+// dispatchTaskRequests is the only task->tea.Cmd translation switch in the
+// TUI adapter: every screen adapter, every ported handler and coreUpdate
+// route their TaskRequests through it, so a task kind's translation rule
+// lives in exactly one place and a kind added here works from every caller.
+//
+// A case exists only for a kind with an adapter-only side effect ExecuteTask
+// cannot perform (a renderer timer, a navigation directive, a file the TUI
+// owns, a per-call timeout, a fan-out of progressive messages). Every other
+// kind reaches Core.ExecuteTask through default — membership in a list of
+// kinds is never what makes a task dispatchable, so a kind whose payload the
+// adapter does not recognise still runs.
 //
 // KindFetchFiltered is deliberately absent: HandleRelatedNavigate never
 // attaches a payload to that task — the filter clause travels out-of-band on
@@ -370,10 +316,41 @@ func (m Model) dispatchTaskRequests(tasks []runtime.TaskRequest) tea.Cmd {
 			}
 			cmds = append(cmds, m.executeTaskCmd(t))
 
+		// The five kinds below are the ones Core.ExecuteTask rejects with
+		// ErrAdapterOnlyTask (core/runtime/executor.go): a renderer timer, two
+		// re-dispatches into the render loop, and two files the TUI owns. A
+		// task whose payload is missing or wrong-typed is a runtime bug and is
+		// dropped — there is nothing to build the closure from.
+		case runtime.TaskKindFlashTick:
+			if p, ok := t.Payload.(runtime.FlashTickPayload); ok {
+				cmds = append(cmds, flashTickCmd(p))
+			}
+
+		case runtime.TaskKindEmitNavigate:
+			if p, ok := t.Payload.(runtime.EmitNavigatePayload); ok {
+				cmds = append(cmds, emitNavigateCmd(p))
+			}
+
+		case runtime.TaskKindEmitAPIError:
+			if p, ok := t.Payload.(runtime.EmitAPIErrorPayload); ok {
+				cmds = append(cmds, emitAPIErrorCmd(p))
+			}
+
+		case runtime.TaskKindReadThemeFile:
+			if p, ok := t.Payload.(runtime.ReadThemePayload); ok {
+				cmds = append(cmds, readThemeFileCmd(p))
+			}
+
+		case runtime.TaskKindSaveThemeConfig:
+			if p, ok := t.Payload.(runtime.SaveThemeConfigPayload); ok {
+				cmds = append(cmds, saveThemeConfigCmd(p))
+			}
+
 		default:
-			// Every other kind (KindFetchResources, KindFetchCosts, and any
-			// future addition with no adapter-only side effect) is a plain
-			// ExecuteTask passthrough.
+			// Every other kind (KindFetchResources, KindFetchCosts, the
+			// availability/enrich probes, save-cache, and any future addition
+			// with no adapter-only side effect) is a plain ExecuteTask
+			// passthrough.
 			cmds = append(cmds, m.executeTaskCmd(t))
 		}
 	}
@@ -395,7 +372,7 @@ func (m Model) dispatchTaskRequests(tasks []runtime.TaskRequest) tea.Cmd {
 func (m Model) coreUpdate(msg messages.Event) (tea.Model, tea.Cmd) {
 	intents, tasks := m.core.HandleEvent(msg)
 	cmds := m.applyIntents(intents)
-	if tc := m.tasksToCmd(tasks); tc != nil {
+	if tc := m.dispatchTaskRequests(tasks); tc != nil {
 		cmds = append(cmds, tc)
 	}
 	return m, tea.Batch(cmds...)

@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- A live start whose on-disk cache loads before the AWS connection completes
+  now runs its availability scan. When that order happened the menu stayed at
+  "verifying 0/70" for the whole session, no row ever got a count or an issue
+  badge from the scan, and only the types the operator opened by hand showed
+  anything at all.
+
 ## [3.57.0] - 2026-09-15
 
 ### Fixed

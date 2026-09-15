@@ -13,10 +13,12 @@
 //     and returns a single tea.Cmd for intents that need follow-up work,
 //     such as RefreshActiveListIntent.
 //
-//  2. runtimeTasksToCmd / enrichDetailCmd — the TaskRequest-to-tea.Cmd
-//     translator. Tasks carry typed Payload values (runtime.TaskPayload
-//     variants); the adapter type-switches on Payload to recover all
-//     fields without parsing TaskKey.Scope or accepting side-channel
+//  2. the adapter-local tea.Cmd builders the one task translator
+//     (dispatchTaskRequests, app_dispatch.go) calls for the kinds
+//     Core.ExecuteTask rejects as adapter-only: flashTickCmd,
+//     emitNavigateCmd, emitAPIErrorCmd and enrichDetailCmd. Each recovers
+//     its fields from the task's typed Payload (a runtime.TaskPayload
+//     variant) rather than parsing TaskKey.Scope or taking side-channel
 //     arguments. enrichDetailCmd stays in the adapter because it returns
 //     tea.Cmd and wraps a 10 s per-call timeout Core.ExecuteTask's
 //     KindEnrichDetail path does not apply.
@@ -166,76 +168,6 @@ func (m *Model) applyIntent(intent runtime.UIIntent) tea.Cmd {
 	return nil
 }
 
-// runtimeTasksToCmd translates a slice of runtime.TaskRequest values
-// into a single Bubble Tea command. Each task carries a typed Payload
-// (a runtime.TaskPayload variant) whose concrete type tells the adapter
-// which closure builder to use. Unknown payload types are dropped for
-// forward-compat with newer runtime builds.
-func (m Model) runtimeTasksToCmd(tasks []runtime.TaskRequest) tea.Cmd {
-	if len(tasks) == 0 {
-		return nil
-	}
-	var cmds []tea.Cmd
-	for _, t := range tasks {
-		switch p := t.Payload.(type) {
-		case runtime.EnrichDetailPayload:
-			// Keep adapter-local: the adapter wraps a 10 s per-call timeout that
-			// Core.ExecuteTask's KindEnrichDetail path does not apply.
-			cmds = append(cmds, m.enrichDetailCmd(p))
-
-		case runtime.ConnectPayload:
-			// ExecuteTask handles TaskKindConnect.
-			cmds = append(cmds, m.executeTaskCmd(t))
-
-		case runtime.FetchIdentityPayload:
-			// ExecuteTask handles TaskKindFetchIdentity.
-			cmds = append(cmds, m.executeTaskCmd(t))
-
-		case runtime.LoadAvailCachePayload:
-			// ExecuteTask handles TaskKindLoadAvailCache.
-			cmds = append(cmds, m.executeTaskCmd(t))
-
-		case runtime.DemoPrefetchCountsPayload:
-			// ExecuteTask handles TaskKindDemoPrefetchCounts.
-			cmds = append(cmds, m.executeTaskCmd(t))
-
-		case runtime.FlashTickPayload:
-			// ErrAdapterOnlyTask — timer is a renderer concern; keep adapter-local.
-			cmds = append(cmds, flashTickCmd(p))
-
-		case runtime.EmitNavigatePayload:
-			// ErrAdapterOnlyTask — navigation directive; keep adapter-local.
-			cmds = append(cmds, emitNavigateCmd(p))
-
-		case runtime.EmitAPIErrorPayload:
-			// ErrAdapterOnlyTask — re-dispatches into the render loop; keep adapter-local.
-			cmds = append(cmds, emitAPIErrorCmd(p))
-
-		case runtime.FetchChildResourcesPayload:
-			// ExecuteTask handles TaskKindFetchChildResources.
-			if cmd := m.executeTaskCmd(t); cmd != nil {
-				cmds = append(cmds, cmd)
-			}
-
-		case runtime.ReadThemePayload:
-			// ErrAdapterOnlyTask — theme file read produces a TUI-private message; keep adapter-local.
-			cmds = append(cmds, readThemeFileCmd(p))
-
-		case runtime.SaveThemeConfigPayload:
-			// ErrAdapterOnlyTask — persists a theme choice with no data event; keep adapter-local.
-			cmds = append(cmds, saveThemeConfigCmd(p))
-		}
-	}
-	switch len(cmds) {
-	case 0:
-		return nil
-	case 1:
-		return cmds[0]
-	default:
-		return tea.Batch(cmds...)
-	}
-}
-
 // enrichDetailCmd builds the Bubble Tea command that runs the on-demand
 // detail enricher and emits an EnrichDetailResultMsg. It reads every
 // runtime-side input (DetailCtx, the operation) from the typed payload —
@@ -320,7 +252,7 @@ func (m *Model) dispatchHandlerResult(intents []runtime.UIIntent, tasks []runtim
 			cmds = append(cmds, c)
 		}
 	}
-	if tc := m.runtimeTasksToCmd(tasks); tc != nil {
+	if tc := m.dispatchTaskRequests(tasks); tc != nil {
 		cmds = append(cmds, tc)
 	}
 	switch len(cmds) {

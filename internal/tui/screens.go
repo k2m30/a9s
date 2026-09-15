@@ -97,7 +97,7 @@ func defaultBuilders() builders {
 
 // dispatchCoreScreenResult walks the intents/tasks returned by a screen
 // (view-stack) Handle* method using the plural-semantics path (applyIntents +
-// tasksToCmd). The key behavioural difference from dispatchHandlerResult
+// dispatchTaskRequests). The key behavioural difference from dispatchHandlerResult
 // (used by the flash/session handlers) is that FlashIntent is re-emitted as
 // messages.Flash via cmd rather than direct-mutated. Those handlers
 // pre-bump m.flash.gen and pair FlashIntent with FlashTickPayload so
@@ -107,7 +107,7 @@ func defaultBuilders() builders {
 // that downstream tests assert on.
 func (m *Model) dispatchCoreScreenResult(intents []runtime.UIIntent, tasks []runtime.TaskRequest) tea.Cmd {
 	cmds := m.applyIntents(intents)
-	if tc := m.tasksToCmd(tasks); tc != nil {
+	if tc := m.dispatchTaskRequests(tasks); tc != nil {
 		cmds = append(cmds, tc)
 	}
 	switch len(cmds) {
