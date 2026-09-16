@@ -79,7 +79,7 @@ var sharedR53Fixtures = sync.OnceValue(func() *R53Fixtures {
 				Id:                     aws.String("/hostedzone/Z4567890123ABCDEFGHIJ"),
 				Name:                   aws.String("demo.acme-corp.com."),
 				CallerReference:        aws.String("2025-10-01T00:00:00Z"),
-				ResourceRecordSetCount: aws.Int64(4),
+				ResourceRecordSetCount: aws.Int64(3),
 				Config: &r53types.HostedZoneConfig{
 					Comment:     aws.String("Demo zone with S3-website alias for a9s-demo-healthy"),
 					PrivateZone: false,
@@ -265,6 +265,23 @@ var sharedR53Fixtures = sync.OnceValue(func() *R53Fixtures {
 			// Both r53↔s3 directions join on the record name, so this one
 			// record is the witness for the pivot each way.
 			"/hostedzone/Z4567890123ABCDEFGHIJ": {
+				{
+					Name: aws.String("demo.acme-corp.com."),
+					Type: r53types.RRTypeNs,
+					TTL:  aws.Int64(172800),
+					ResourceRecords: []r53types.ResourceRecord{
+						{Value: aws.String("ns-555.awsdns-55.com.")},
+						{Value: aws.String("ns-666.awsdns-66.net.")},
+					},
+				},
+				{
+					Name: aws.String("demo.acme-corp.com."),
+					Type: r53types.RRTypeSoa,
+					TTL:  aws.Int64(900),
+					ResourceRecords: []r53types.ResourceRecord{
+						{Value: aws.String("ns-555.awsdns-55.com. awsdns-hostmaster.amazon.com. 1 7200 900 1209600 86400")},
+					},
+				},
 				{
 					Name: aws.String(HealthyBucketName + "."),
 					Type: r53types.RRTypeA,
