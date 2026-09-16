@@ -256,8 +256,8 @@ func visibleRelatedRowCount(ds *DetailState) int {
 	return count
 }
 
-// isSelfPivotZeroDetailRow mirrors rightColumnModel.isSelfPivotZeroRow for
-// DetailRelatedRow values.
+// isSelfPivotZeroDetailRow reports a self-targeted related row that
+// resolved to nothing; the panel hides those.
 func isSelfPivotZeroDetailRow(row DetailRelatedRow, sourceType string) bool {
 	return !row.Loading &&
 		row.Err == "" &&

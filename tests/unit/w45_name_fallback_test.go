@@ -230,7 +230,7 @@ func TestW45_NameFallbackOnlyFillsTheIdentityColumn(t *testing.T) {
 	alarmTD, alarmRow := w45DemoRow(t, "alarm", "api-high-error-rate")
 	redshiftTD, redshiftRow := w45DemoRow(t, "redshift", "acme-warehouse")
 	codeartifactTD, codeartifactRow := w45DemoRow(t, "codeartifact", "acme-npm")
-	// row 4 (codex-0916): a node group's row id is "<cluster>/<nodegroup>".
+	// a node group's row id is "<cluster>/<nodegroup>".
 	ngTD, ngRow := w45DemoRow(t, "ng", "acme-prod/general-pool")
 
 	stagesTD := resource.GetChildType("pipeline_stages")

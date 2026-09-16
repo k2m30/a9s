@@ -269,7 +269,7 @@ func TestFindingRowCap_NodeGroupHealthIssueRowsCappedAtTheSink(t *testing.T) {
 	// Two subtests over one fetch: the over-cap half aborts on its first
 	// mismatch, and the negative half has to keep running when it does.
 	t.Run("over_the_cap", func(t *testing.T) {
-		// row 4 (codex-0916): node-group ids are "<cluster>/<nodegroup>".
+		// node-group ids are "<cluster>/<nodegroup>".
 		overRow, ok := byID[cluster+"/ng-over"]
 		if !ok {
 			t.Fatalf("ng-over missing from the fetch result; got %+v", byID)

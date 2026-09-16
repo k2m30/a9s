@@ -1429,7 +1429,7 @@ func TestFetchNodeGroups_Pagination(t *testing.T) {
 		}
 	})
 
-	// row 4 (codex-0916): node-group ids are "<cluster>/<nodegroup>".
+	// node-group ids are "<cluster>/<nodegroup>".
 	t.Run("cluster_A_nodegroups", func(t *testing.T) {
 		if resources[0].ID != "cluster-A/ng-a1" {
 			t.Errorf("expected %q, got %q", "cluster-A/ng-a1", resources[0].ID)
@@ -1566,7 +1566,7 @@ func TestFetchNodeGroups_MultiPageClusterLosesNoNodeGroups(t *testing.T) {
 			}
 			seen[r.ID] = r
 		}
-		// row 4 (codex-0916): node-group ids are "<cluster>/<nodegroup>".
+		// node-group ids are "<cluster>/<nodegroup>".
 		for _, wantID := range []string{"cluster-solo/ng-s1", "cluster-solo/ng-s2", "cluster-solo/ng-s3", "cluster-solo/ng-s4", "cluster-solo/ng-s5"} {
 			if _, ok := seen[wantID]; !ok {
 				t.Errorf("node group %q missing from accumulated result — page-2 node groups must not be lost", wantID)
@@ -1649,7 +1649,7 @@ func TestFetchNodeGroups_MultiPageClusterLosesNoNodeGroups(t *testing.T) {
 			seen[r.ID] = true
 		}
 
-		// row 4 (codex-0916): node-group ids are "<cluster>/<nodegroup>".
+		// node-group ids are "<cluster>/<nodegroup>".
 		if !seen["cluster-A/ng-a3"] {
 			ids := make([]string, len(resources))
 			for i, r := range resources {
@@ -1806,7 +1806,7 @@ func TestFetchNodeGroups_ResultCapLosesContinuation(t *testing.T) {
 			}
 			seen[r.ID] = true
 		}
-		// row 4 (codex-0916): node-group ids are "<cluster>/<nodegroup>".
+		// node-group ids are "<cluster>/<nodegroup>".
 		for _, name := range allNames {
 			wantID := "cluster-mega/" + name
 			if !seen[wantID] {
@@ -1861,7 +1861,7 @@ func TestFetchNodeGroups_ResultCapLosesContinuation(t *testing.T) {
 			}
 			seen[r.ID] = true
 		}
-		// row 4 (codex-0916): node-group ids are "<cluster>/<nodegroup>".
+		// node-group ids are "<cluster>/<nodegroup>".
 		if !seen["cluster-b/"+secondClusterNG] {
 			t.Errorf("cluster-b's node group %q never appears in the accumulated result — "+
 				"resume skipped past the capped cluster instead of returning to it", secondClusterNG)

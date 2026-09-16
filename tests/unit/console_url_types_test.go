@@ -172,7 +172,7 @@ func TestConsoleURL_PerType(t *testing.T) {
 			},
 		},
 		{
-			// row 4 (codex-0916): the row id is "<cluster>/<nodegroup>"; the
+			// the row id is "<cluster>/<nodegroup>"; the
 			// console addresses the node group by its bare name.
 			name: "ng", shortName: "ng", pickID: "acme-prod/general-pool",
 			want: func(row resource.Resource) string {

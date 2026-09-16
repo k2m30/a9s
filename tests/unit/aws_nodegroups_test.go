@@ -118,7 +118,7 @@ func TestFetchNodeGroups_ParsesMultipleClustersAndGroups(t *testing.T) {
 
 	// Verify first node group (ng-web from cluster-a)
 	r0 := resources[0]
-	// row 4 (codex-0916): the row id is "<cluster>/<nodegroup>" so a name
+	// the row id is "<cluster>/<nodegroup>" so a name
 	// reused across clusters keeps its own row; the bare name is Name and
 	// Fields["nodegroup_name"].
 	if r0.ID != "cluster-a/ng-web" {
@@ -257,7 +257,7 @@ func TestFetchNodeGroups_DescribeNodegroupError(t *testing.T) {
 	if len(resources) != 1 {
 		t.Fatalf("expected 1 degraded resource on describe failure, got %d resources", len(resources))
 	}
-	// row 4 (codex-0916): a degraded row carries the same cluster-scoped id.
+	// a degraded row carries the same cluster-scoped id.
 	if resources[0].ID != "cluster-a/ng-web" {
 		t.Errorf("degraded resource ID: expected %q, got %q", "cluster-a/ng-web", resources[0].ID)
 	}
@@ -480,8 +480,8 @@ func TestFetchNodeGroups_RealAWSData(t *testing.T) {
 		t.Fatalf("expected 3 resources from real data, got %d", len(resources))
 	}
 
-	// Lookup by the bare node-group name: row 4 (codex-0916) made the resource
-	// id "<cluster>/<nodegroup>", and this test is about the fields of each
+	// Lookup by the bare node-group name: the resource id is
+	// "<cluster>/<nodegroup>", and this test is about the fields of each
 	// node group rather than its identity.
 	byName := make(map[string]int)
 	for i, r := range resources {
@@ -600,11 +600,11 @@ func TestFetchNodeGroups_RealAWSData(t *testing.T) {
 		if r.Fields["cluster_name"] != "test-cluster-1" {
 			t.Errorf("resource[%d].Fields[cluster_name]: expected %q, got %q", i, "test-cluster-1", r.Fields["cluster_name"])
 		}
-		// row 4 (codex-0916): the id is the cluster-scoped name, the display
+		// the id is the cluster-scoped name, the display
 		// name the bare one. The old assertion was ID == Name; it is not to be
 		// restored, since a bare-name id drops a node group whose name another
 		// cluster also uses.
-		if want := r.Fields["cluster_name"] + "/" + r.Name; r.ID != want {
+		if want := "test-cluster-1/" + r.Name; r.ID != want {
 			t.Errorf("resource[%d]: ID (%q) should be %q", i, r.ID, want)
 		}
 		// Required fields present

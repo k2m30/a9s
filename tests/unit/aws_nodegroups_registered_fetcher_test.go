@@ -357,7 +357,7 @@ func TestRegisteredNGFetcher_NilNodegroup_KeepsDegradedRow(t *testing.T) {
 	if len(result.Resources) != 2 {
 		t.Fatalf("expected 2 rows (1 full + 1 degraded), got %d", len(result.Resources))
 	}
-	// row 4 (codex-0916): a node-group row is identified by "<cluster>/<name>",
+	// a node-group row is identified by "<cluster>/<name>",
 	// degraded rows included. The bare name is Fields["nodegroup_name"].
 	var ghost *resource.Resource
 	for i := range result.Resources {
