@@ -9,9 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- A bucket whose access control list grants a permission to everyone on the
-  internet now reports "publicly accessible", the same broken-tier finding a
-  public bucket policy reports, with a row naming the group and the permission.
+- A bucket whose access control list grants a permission to anyone at all, or
+  to every signed-in AWS account, now reports "publicly accessible", the same
+  broken-tier finding a public bucket policy reports, with a row naming the
+  group and the permission.
   A bucket that ignores public access control lists does not report it. A
   bucket public both ways reports it once and shows both rows.
 
