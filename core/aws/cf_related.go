@@ -41,11 +41,8 @@ func checkCfS3(ctx context.Context, clients any, res resource.Resource, cache re
 		if origin.DomainName == nil {
 			continue
 		}
-		domain := *origin.DomainName
-		// Extract bucket name: the part before ".s3"
-		idx := strings.Index(domain, ".s3")
-		if idx > 0 {
-			bucketNames[domain[:idx]] = struct{}{}
+		if bucket, ok := S3OriginBucket(*origin.DomainName); ok {
+			bucketNames[bucket] = struct{}{}
 		}
 	}
 	if len(bucketNames) == 0 {
@@ -343,9 +340,9 @@ func checkCfLogs(ctx context.Context, clients any, res resource.Resource, _ reso
 	if lg.Enabled == nil || !*lg.Enabled || lg.Bucket == nil || *lg.Bucket == "" {
 		return resource.KnownRelated("logs", nil, false)
 	}
-	bucket := *lg.Bucket
-	if idx := strings.Index(bucket, ".s3"); idx > 0 {
-		bucket = bucket[:idx]
+	bucket, ok := S3OriginBucket(*lg.Bucket)
+	if !ok {
+		return resource.KnownRelated("logs", nil, false)
 	}
 	return relatedResult("logs", []string{bucket})
 }

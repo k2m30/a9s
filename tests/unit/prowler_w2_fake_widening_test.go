@@ -4,7 +4,7 @@ package unit
 // pre-existing fakes satisfying the aggregate interfaces the w2 Prowler batch
 // widened (S3API/S3FullAPI gained the five bucket-posture reads, RDSAPI and
 // DocDBAPI gained the snapshot attribute read, RedshiftAPI gained the cluster
-// parameter read).
+// parameter read), and the bucket ACL read S3API gained after it.
 //
 // Every stub answers the healthy value for its condition, so the fakes that
 // carry them keep producing exactly the findings their own tests were written
@@ -53,6 +53,19 @@ func w2HealthyLogging() *s3.GetBucketLoggingOutput {
 func w2HealthyLifecycle() *s3.GetBucketLifecycleConfigurationOutput {
 	return &s3.GetBucketLifecycleConfigurationOutput{
 		Rules: []s3types.LifecycleRule{{ID: aws.String("expire-old"), Status: s3types.ExpirationStatusEnabled}},
+	}
+}
+
+// w2HealthyACL is the default bucket ACL: the owner's own FULL_CONTROL and
+// nothing else. No group grant, so no bucket carrying it reads as public.
+func w2HealthyACL() *s3.GetBucketAclOutput {
+	owner := &s3types.Owner{ID: aws.String("acme000000000000000000000000000000000000000000000000000000000ow")}
+	return &s3.GetBucketAclOutput{
+		Owner: owner,
+		Grants: []s3types.Grant{{
+			Grantee:    &s3types.Grantee{Type: s3types.TypeCanonicalUser, ID: owner.ID},
+			Permission: s3types.PermissionFullControl,
+		}},
 	}
 }
 
@@ -154,6 +167,28 @@ func (f *s3PABFake) GetObjectLockConfiguration(_ context.Context, _ *s3.GetObjec
 	return w2HealthyObjectLock(), nil
 }
 
+func (f *s3PABFake) GetBucketAcl(_ context.Context, _ *s3.GetBucketAclInput, _ ...func(*s3.Options)) (*s3.GetBucketAclOutput, error) {
+	return w2HealthyACL(), nil
+}
+
+func (f *enrichS3FakeNoBucketAPIs) GetBucketAcl(_ context.Context, _ *s3.GetBucketAclInput, _ ...func(*s3.Options)) (*s3.GetBucketAclOutput, error) {
+	return w2HealthyACL(), nil
+}
+
+func (f *enrichS3Fake) GetBucketAcl(_ context.Context, _ *s3.GetBucketAclInput, _ ...func(*s3.Options)) (*s3.GetBucketAclOutput, error) {
+	return w2HealthyACL(), nil
+}
+
+func (f *coalesceS3Fake) GetBucketAcl(_ context.Context, _ *s3.GetBucketAclInput, _ ...func(*s3.Options)) (*s3.GetBucketAclOutput, error) {
+	return w2HealthyACL(), nil
+}
+
+// s3TwoDenialsFake refuses two calls on purpose; the ACL is not one of them,
+// so it answers healthily and the bucket still reports exactly two causes.
+func (f *s3TwoDenialsFake) GetBucketAcl(_ context.Context, _ *s3.GetBucketAclInput, _ ...func(*s3.Options)) (*s3.GetBucketAclOutput, error) {
+	return w2HealthyACL(), nil
+}
+
 // The two cross-region fakes deliberately answer the cross-region error on
 // every call, so the enricher's "one redirect marks the bucket unknown and
 // skips the rest" rule is exercised on the new calls too.
@@ -192,6 +227,13 @@ func (f *s3CrossRegionFake) GetObjectLockConfiguration(ctx context.Context, in *
 	return w2HealthyObjectLock(), nil
 }
 
+func (f *s3CrossRegionFake) GetBucketAcl(ctx context.Context, in *s3.GetBucketAclInput, _ ...func(*s3.Options)) (*s3.GetBucketAclOutput, error) {
+	if _, err := f.GetPublicAccessBlock(ctx, &s3.GetPublicAccessBlockInput{Bucket: in.Bucket}); err != nil {
+		return nil, err
+	}
+	return w2HealthyACL(), nil
+}
+
 func (f *fakeS3IllegalLocation) GetBucketPolicyStatus(ctx context.Context, in *s3.GetBucketPolicyStatusInput, _ ...func(*s3.Options)) (*s3.GetBucketPolicyStatusOutput, error) {
 	if _, err := f.GetPublicAccessBlock(ctx, &s3.GetPublicAccessBlockInput{Bucket: in.Bucket}); err != nil {
 		return nil, err
@@ -225,6 +267,13 @@ func (f *fakeS3IllegalLocation) GetObjectLockConfiguration(ctx context.Context, 
 		return nil, err
 	}
 	return w2HealthyObjectLock(), nil
+}
+
+func (f *fakeS3IllegalLocation) GetBucketAcl(ctx context.Context, in *s3.GetBucketAclInput, _ ...func(*s3.Options)) (*s3.GetBucketAclOutput, error) {
+	if _, err := f.GetPublicAccessBlock(ctx, &s3.GetPublicAccessBlockInput{Bucket: in.Bucket}); err != nil {
+		return nil, err
+	}
+	return w2HealthyACL(), nil
 }
 
 // ---------------------------------------------------------------------------

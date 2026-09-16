@@ -5,12 +5,13 @@ package unit_test
 //  1. checkSQSSQS (exercises sqsRedriveTarget via public related checker)
 //  2. Actor() via IAMUser ARN path (exercises arnLastSegment indirectly)
 //  3. ExtractTarget() via ARN-only resources (exercises labelFromARN indirectly)
-//  4. FetchS3BucketsPageWithNotifications (exercises firstS3NotificationTargets)
+//  4. FetchS3BucketsPageWithNotifications (exercises s3NotificationTargets)
 //  5. buildinfo.ResolveCommit
 //  6. buildinfo.ResolveDate
 
 import (
 	"context"
+	"strings"
 	"testing"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -489,7 +490,13 @@ func TestFetchS3BucketsPageWithNotifications_NilNotificationAPI(t *testing.T) {
 }
 
 // TestFetchS3BucketsPageWithNotifications_NotificationAPIError verifies that a
-// notification API error is tolerated (best-effort enrichment — not a fatal error).
+// refused notification lookup keeps the bucket in the list and reports the
+// refusal.
+//
+// Spec row s3-0916/2: the destinations are unknown, not absent, so the
+// aggregated error and Fields["notification_error"] carry the refusal and the
+// three notification pivots render it instead of a zero. A nil error here
+// would put the pivots back to claiming the bucket notifies nothing.
 func TestFetchS3BucketsPageWithNotifications_NotificationAPIError(t *testing.T) {
 	listMock := &mockS3ListBucketsForNotification{
 		output: &s3.ListBucketsOutput{
@@ -499,8 +506,6 @@ func TestFetchS3BucketsPageWithNotifications_NotificationAPIError(t *testing.T) 
 		},
 	}
 
-	// The notification API returns an error (e.g., permission denied).
-	// The bucket should still be returned with empty notification fields.
 	notifMock := &mockS3GetBucketNotificationClient{
 		Err: &mockAWSError{code: "AccessDenied", message: "Access Denied"},
 	}
@@ -511,8 +516,11 @@ func TestFetchS3BucketsPageWithNotifications_NotificationAPIError(t *testing.T) 
 		notifMock,
 		"",
 	)
-	if err != nil {
-		t.Fatalf("expected no error (best-effort enrichment), got %v", err)
+	if err == nil {
+		t.Fatal("expected the refusal aggregated, got nil")
+	}
+	if !strings.Contains(err.Error(), "error-bucket") {
+		t.Errorf("error = %q, want it to name the bucket", err.Error())
 	}
 	if len(result.Resources) != 1 {
 		t.Fatalf("expected 1 resource, got %d", len(result.Resources))
@@ -520,6 +528,9 @@ func TestFetchS3BucketsPageWithNotifications_NotificationAPIError(t *testing.T) 
 	r := result.Resources[0]
 	if r.ID != "error-bucket" {
 		t.Errorf("ID = %q, want %q", r.ID, "error-bucket")
+	}
+	if r.Fields["notification_error"] == "" {
+		t.Error(`Fields["notification_error"] = "", want the refusal text`)
 	}
 	for _, field := range []string{"notification_lambda", "notification_sqs", "notification_sns"} {
 		if r.Fields[field] != "" {

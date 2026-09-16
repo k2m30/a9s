@@ -495,13 +495,18 @@ func checkLambdaS3(ctx context.Context, clients any, res resource.Resource, cach
 	}
 	var ids []string
 	for _, bRes := range s3List {
-		n := bRes.Fields["notification_lambda"]
-		if n == "" {
-			continue
-		}
-		if (fnARN != "" && n == fnARN) ||
-			(fnName != "" && strings.HasSuffix(n, ":function:"+fnName)) {
-			ids = append(ids, bRes.ID)
+		// The field is the bucket's whole comma-joined destination list; a
+		// bucket that notifies this function second is still this function's
+		// bucket.
+		for n := range strings.SplitSeq(bRes.Fields["notification_lambda"], ",") {
+			if n == "" {
+				continue
+			}
+			if (fnARN != "" && n == fnARN) ||
+				(fnName != "" && strings.HasSuffix(n, ":function:"+fnName)) {
+				ids = append(ids, bRes.ID)
+				break
+			}
 		}
 	}
 	return relatedResultTrunc("s3", ids, truncated)

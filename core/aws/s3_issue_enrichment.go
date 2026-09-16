@@ -167,6 +167,7 @@ type s3BucketPosture struct {
 type s3PostureAPI interface {
 	S3GetPublicAccessBlockAPI
 	S3GetBucketPolicyStatusAPI
+	S3GetBucketAclAPI
 	S3GetBucketVersioningAPI
 	S3GetBucketLoggingAPI
 	S3GetBucketLifecycleAPI
@@ -183,11 +184,18 @@ func scanS3BucketPosture(ctx context.Context, api s3PostureAPI, bucket string) s
 		p.findings = append(p.findings, s3PostureFinding{code: code, rows: rows})
 	}
 
+	// Whether the bucket's own block makes S3 disregard the public grants its
+	// ACL already carries; read here, used by the ACL condition below.
+	ignorePublicACLs := false
+
 	pabOut, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*s3.GetPublicAccessBlockOutput, error) {
 		return api.GetPublicAccessBlock(ctx, &s3.GetPublicAccessBlockInput{Bucket: aws.String(bucket)})
 	})
 	switch {
 	case err == nil || isS3APIErrCode(err, "NoSuchPublicAccessBlockConfiguration"):
+		if pabOut != nil && pabOut.PublicAccessBlockConfiguration != nil {
+			ignorePublicACLs = aws.ToBool(pabOut.PublicAccessBlockConfiguration.IgnorePublicAcls)
+		}
 		if rows := s3PABRows(pabOut, err); rows != nil {
 			p.pabIncomplete = true
 			add(s3CodePublicAccessBlockIncomplete, rows)
@@ -210,6 +218,24 @@ func scanS3BucketPosture(ctx context.Context, api s3PostureAPI, bucket string) s
 		}
 	// A bucket with no policy at all cannot be public by policy.
 	case isS3APIErrCode(err, "NoSuchBucketPolicy"):
+	case IsNotFoundErr(err), isS3CrossRegionErr(err):
+		p.unreachable = err
+		return p
+	default:
+		p.failures = append(p.failures, err)
+	}
+
+	aclOut, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*s3.GetBucketAclOutput, error) {
+		return api.GetBucketAcl(ctx, &s3.GetBucketAclInput{Bucket: aws.String(bucket)})
+	})
+	switch {
+	case err == nil:
+		// The same code as the policy route: one bucket reachable from the
+		// internet is one condition, however many ways in it has, and
+		// setWave2Finding merges the supporting rows under it.
+		if rows := s3ACLPublicRows(aclOut, ignorePublicACLs); rows != nil {
+			add(s3CodePublic, rows)
+		}
 	case IsNotFoundErr(err), isS3CrossRegionErr(err):
 		p.unreachable = err
 		return p
@@ -338,6 +364,47 @@ func s3PABRows(out *s3.GetPublicAccessBlockOutput, err error) []domain.DetailRow
 		return nil
 	}
 	return append(rows, domain.DetailRow{Label: "Account-level PAB", Value: "may still apply"})
+}
+
+// Canonical group URIs S3 grants an ACL permission to. Both reach the whole
+// internet: AuthenticatedUsers is every AWS account, and anyone can open one.
+const (
+	s3ACLGroupAllUsers           = "http://acs.amazonaws.com/groups/global/AllUsers"
+	s3ACLGroupAuthenticatedUsers = "http://acs.amazonaws.com/groups/global/AuthenticatedUsers"
+)
+
+// s3ACLPublicRows returns one row per ACL grant that opens the bucket to a
+// public group, or nil when the ACL grants nothing publicly.
+//
+// ignorePublicACLs is the bucket's own IgnorePublicAcls setting: with it on,
+// S3 disregards the public grants already on the bucket, so they reach nobody.
+// BlockPublicAcls is a different setting — it refuses new grants and leaves
+// the existing ones live — so it does not suppress these rows.
+func s3ACLPublicRows(out *s3.GetBucketAclOutput, ignorePublicACLs bool) []domain.DetailRow {
+	if out == nil || ignorePublicACLs {
+		return nil
+	}
+	var rows []domain.DetailRow
+	for _, g := range out.Grants {
+		if g.Grantee == nil || g.Grantee.Type != s3types.TypeGroup {
+			continue
+		}
+		group := ""
+		switch aws.ToString(g.Grantee.URI) {
+		case s3ACLGroupAllUsers:
+			group = "AllUsers"
+		case s3ACLGroupAuthenticatedUsers:
+			group = "AuthenticatedUsers"
+		default:
+			continue
+		}
+		rows = append(rows, domain.DetailRow{
+			Label: "Access control list",
+			Value: group + " " + string(g.Permission),
+			Tier:  "!",
+		})
+	}
+	return rows
 }
 
 // isS3APIErrCode reports whether err is the named S3 API error code. The

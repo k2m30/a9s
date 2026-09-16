@@ -58,6 +58,11 @@ const (
 
 	// S3BucketPublic is the bucket AWS reports as public by policy.
 	S3BucketPublic = "acme-public-datasets"
+	// S3BucketPublicByACL is the bucket that is public the other way: no
+	// policy at all, a legacy ACL grant to AllUsers, and no public access
+	// block to disregard it. It doubles as the no-PAB witness, which is what
+	// leaves the grant live.
+	S3BucketPublicByACL = "a9s-demo-nopab"
 	// S3BucketVersioningOff is the bucket that has never had versioning enabled.
 	S3BucketVersioningOff = "acme-versioning-off"
 	// S3BucketMFADeleteOff has versioning enabled but MFA delete disabled.
@@ -104,6 +109,10 @@ type S3Fixtures struct {
 	// PolicyStatuses maps bucket names to the verdict GetBucketPolicyStatus
 	// returns. A missing key means not public.
 	PolicyStatuses map[string]*s3.GetBucketPolicyStatusOutput
+	// BucketACLs maps bucket names to the grants GetBucketAcl returns beyond
+	// the owner's own FULL_CONTROL. A missing key means the default ACL, which
+	// grants nobody but the owner.
+	BucketACLs map[string][]s3types.Grant
 	// VersioningConfigs maps bucket names to their versioning state. A missing
 	// key means versioning and MFA delete are both enabled.
 	VersioningConfigs map[string]*s3.GetBucketVersioningOutput
@@ -142,6 +151,7 @@ var sharedS3Fixtures = sync.OnceValue(func() *S3Fixtures {
 		BucketPolicies:           buildS3BucketPolicies(),
 		CORSConfigs:              buildS3CORSConfigs(),
 		PolicyStatuses:           buildS3PolicyStatuses(),
+		BucketACLs:               buildS3BucketACLs(),
 		VersioningConfigs:        buildS3VersioningConfigs(),
 		ObjectLockConfigs:        buildS3ObjectLockConfigs(),
 		Objects:                  buildS3Objects(),
@@ -186,7 +196,7 @@ func buildS3Buckets() []s3types.Bucket {
 		// Logs target: plain access-log destination bucket (no issues).
 		{LogsBucketName, "arn:aws:s3:::" + LogsBucketName, "us-east-1", "2025-01-10T10:05:00+00:00"},
 		// Warning: no bucket-level PAB configured (account-level policy may apply).
-		{"a9s-demo-nopab", "arn:aws:s3:::a9s-demo-nopab", "us-east-1", "2025-02-01T12:00:00+00:00"},
+		{S3BucketPublicByACL, "arn:aws:s3:::" + S3BucketPublicByACL, "us-east-1", "2025-02-01T12:00:00+00:00"},
 		// Warning: PAB partial — BlockPublicAcls=false, others true.
 		{"a9s-demo-partial-pab", "arn:aws:s3:::a9s-demo-partial-pab", "us-east-1", "2025-03-15T09:00:00+00:00"},
 		// Warning: PAB multi-false — BlockPublicAcls=false AND BlockPublicPolicy=false.
@@ -297,7 +307,7 @@ func buildS3PublicAccessBlockConfigs() map[string]*s3.GetPublicAccessBlockOutput
 			},
 		},
 		// no-pab: return nil → fake returns NoSuchPublicAccessBlockConfiguration.
-		"a9s-demo-nopab": nil,
+		S3BucketPublicByACL: nil,
 		// partial-pab: BlockPublicAcls=false, others true → Warning (one flag off).
 		"a9s-demo-partial-pab": {
 			PublicAccessBlockConfiguration: &s3types.PublicAccessBlockConfiguration{
@@ -366,7 +376,7 @@ func buildS3EncryptionConfigs() map[string]*s3.GetBucketEncryptionOutput {
 		// PAB-issue buckets share the same KMS key — so an operator
 		// pivoting from an issue bucket sees a non-zero KMS relation
 		// and can drill into the key that encrypts their data.
-		"a9s-demo-nopab":         kmsOut,
+		S3BucketPublicByACL:      kmsOut,
 		"a9s-demo-partial-pab":   kmsOut,
 		"a9s-demo-multifail-pab": kmsOut,
 		"a9s-demo-nilcfg":        kmsOut,
@@ -419,7 +429,7 @@ func buildS3TaggingConfigs() map[string]*s3.GetBucketTaggingOutput {
 		// An operator chasing a public-access finding wants to reach the
 		// stack template to see the policy as declared.
 		HealthyBucketName:        cfnTagged,
-		"a9s-demo-nopab":         cfnTagged,
+		S3BucketPublicByACL:      cfnTagged,
 		"a9s-demo-partial-pab":   cfnTagged,
 		"a9s-demo-multifail-pab": cfnTagged,
 		"a9s-demo-nilcfg":        cfnTagged,
@@ -505,6 +515,21 @@ func buildS3PolicyStatuses() map[string]*s3.GetBucketPolicyStatusOutput {
 		S3BucketPublic: {
 			PolicyStatus: &s3types.PolicyStatus{IsPublic: aws.Bool(true)},
 		},
+	}
+}
+
+// buildS3BucketACLs returns the ACL grant overrides. Only the ACL-public
+// witness carries a grant; every other bucket has no entry, and the fake
+// answers with the default owner-only ACL.
+func buildS3BucketACLs() map[string][]s3types.Grant {
+	return map[string][]s3types.Grant{
+		S3BucketPublicByACL: {{
+			Grantee: &s3types.Grantee{
+				Type: s3types.TypeGroup,
+				URI:  aws.String("http://acs.amazonaws.com/groups/global/AllUsers"),
+			},
+			Permission: s3types.PermissionRead,
+		}},
 	}
 }
 

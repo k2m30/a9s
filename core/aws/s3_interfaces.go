@@ -87,6 +87,13 @@ type S3GetBucketVersioningAPI interface {
 	GetBucketVersioning(ctx context.Context, params *s3.GetBucketVersioningInput, optFns ...func(*s3.Options)) (*s3.GetBucketVersioningOutput, error)
 }
 
+// S3GetBucketAclAPI defines the interface for the S3 GetBucketAcl operation.
+// Used by EnrichS3Posture: a legacy grant to a public group opens a bucket
+// with no policy at all, which GetBucketPolicyStatus says nothing about.
+type S3GetBucketAclAPI interface {
+	GetBucketAcl(ctx context.Context, params *s3.GetBucketAclInput, optFns ...func(*s3.Options)) (*s3.GetBucketAclOutput, error)
+}
+
 // S3GetObjectLockConfigurationAPI defines the interface for the S3
 // GetObjectLockConfiguration operation. Used by EnrichS3Posture.
 type S3GetObjectLockConfigurationAPI interface {
@@ -111,6 +118,7 @@ type S3API interface {
 	// Wave 2 enrichment (EnrichS3Posture).
 	S3GetPublicAccessBlockAPI
 	S3GetBucketPolicyStatusAPI
+	S3GetBucketAclAPI
 	S3GetBucketVersioningAPI
 	S3GetBucketLoggingAPI
 	S3GetBucketLifecycleAPI

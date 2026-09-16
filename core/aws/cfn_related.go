@@ -121,13 +121,17 @@ func checkCfnSNS(_ context.Context, _ any, res resource.Resource, _ resource.Res
 // returns the PhysicalResourceIds whose ResourceType matches the given value
 // (e.g. "AWS::S3::Bucket"). Pattern C — single paginated API call; we read
 // the first page only to honor the 1-call budget.
-func cfnStackResourcesByType(ctx context.Context, clients any, stackName, resourceType string) ([]string, bool) {
+//
+// truncated reports that the page carried a NextToken: resources of the wanted
+// type may sit on pages nobody read, so the count the caller renders is a
+// lower bound and never an exact figure.
+func cfnStackResourcesByType(ctx context.Context, clients any, stackName, resourceType string) (ids []string, truncated, ok bool) {
 	if stackName == "" {
-		return nil, true
+		return nil, false, true
 	}
-	c, ok := clients.(*ServiceClients)
-	if !ok || c == nil || c.CloudFormation == nil {
-		return nil, false
+	c, isClients := clients.(*ServiceClients)
+	if !isClients || c == nil || c.CloudFormation == nil {
+		return nil, false, false
 	}
 	out, err := c.CloudFormation.ListStackResources(ctx, &cloudformation.ListStackResourcesInput{
 		StackName: aws.String(stackName),
@@ -136,9 +140,8 @@ func cfnStackResourcesByType(ctx context.Context, clients any, stackName, resour
 	// renders "?" rather than claiming the stack holds no such resources.
 	// no finding: false is the answer this helper exists to give.
 	if err != nil || out == nil {
-		return nil, false
+		return nil, false, false
 	}
-	var ids []string
 	for _, r := range out.StackResourceSummaries {
 		if r.ResourceType == nil || *r.ResourceType != resourceType {
 			continue
@@ -148,26 +151,26 @@ func cfnStackResourcesByType(ctx context.Context, clients any, stackName, resour
 		}
 		ids = append(ids, *r.PhysicalResourceId)
 	}
-	return ids, true
+	return ids, aws.ToString(out.NextToken) != "", true
 }
 
 // checkCfnS3 calls ListStackResources and returns S3 buckets created by the
 // stack (ResourceType=AWS::S3::Bucket).
 func checkCfnS3(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	ids, ok := cfnStackResourcesByType(ctx, clients, res.ID, "AWS::S3::Bucket")
+	ids, truncated, ok := cfnStackResourcesByType(ctx, clients, res.ID, "AWS::S3::Bucket")
 	if !ok {
 		return resource.UnknownRelated("s3")
 	}
-	return relatedResult("s3", ids)
+	return relatedResultTrunc("s3", ids, truncated)
 }
 
 // checkCfnEBRule calls ListStackResources and returns EventBridge rules
 // created by the stack (ResourceType=AWS::Events::Rule). The PhysicalResourceId
 // of an Events::Rule is the rule name.
 func checkCfnEBRule(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	ids, ok := cfnStackResourcesByType(ctx, clients, res.ID, "AWS::Events::Rule")
+	ids, truncated, ok := cfnStackResourcesByType(ctx, clients, res.ID, "AWS::Events::Rule")
 	if !ok {
 		return resource.UnknownRelated("eb-rule")
 	}
-	return relatedResult("eb-rule", ids)
+	return relatedResultTrunc("eb-rule", ids, truncated)
 }

@@ -224,8 +224,9 @@ func checkR53APIGW(ctx context.Context, clients any, res resource.Resource, cach
 	return r53RelatedResult("apigw", ids, recordsTruncated, apigwTruncated)
 }
 
-// checkR53S3 reports S3 buckets referenced by AliasTarget.DNSName (S3 website
-// endpoints) in this zone's records.
+// checkR53S3 reports the S3 buckets this zone's S3-website alias records
+// address. The bucket is the record's own name — see r53S3WebsiteBucketNames,
+// which the zone fetcher joins on too.
 func checkR53S3(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	zoneID := res.ID
 	if zoneID == "" {
@@ -238,17 +239,9 @@ func checkR53S3(ctx context.Context, clients any, res resource.Resource, cache r
 		}
 		return resource.ErrorRelated("s3", err)
 	}
-	aliases := r53AliasDNSNames(sets)
 	wantedBuckets := make(map[string]struct{})
-	for _, d := range aliases {
-		// S3 website alias: <bucket>.s3-website-<region>.amazonaws.com
-		// or <bucket>.s3-website.<region>.amazonaws.com
-		if !strings.Contains(d, ".s3-website") {
-			continue
-		}
-		if idx := strings.Index(d, ".s3-website"); idx > 0 {
-			wantedBuckets[d[:idx]] = struct{}{}
-		}
+	for _, name := range r53S3WebsiteBucketNames(sets) {
+		wantedBuckets[name] = struct{}{}
 	}
 	if len(wantedBuckets) == 0 {
 		return relatedResultTrunc("s3", nil, recordsTruncated)

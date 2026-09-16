@@ -119,7 +119,7 @@ func TestGenerateResourceDocStatusKeyHeader(t *testing.T) {
 				Name:      "S3 Buckets",
 				ShortName: "s3",
 				Category:  "STORAGE",
-				FieldKeys: []string{"name", "creation_date", "notification_lambda", "notification_sqs", "notification_sns"},
+				FieldKeys: []string{"name", "creation_date", "notification_lambda", "notification_sqs", "notification_sns", "notification_error", "notification_truncated"},
 			},
 			wantHeader: "s3 — STORAGE. Status key: `state` — the column naming it is the status column, and no fetcher writes it, so the cell is the finding phrase.",
 		},

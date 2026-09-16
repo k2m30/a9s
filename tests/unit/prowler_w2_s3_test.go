@@ -93,6 +93,23 @@ func (f *w2S3Posture) GetBucketPolicyStatus(_ context.Context, in *s3.GetBucketP
 	}, nil
 }
 
+// GetBucketAcl answers the default owner-only ACL: the rows this fake serves
+// are about the policy and the block, and a group grant here would make every
+// one of their buckets public.
+func (f *w2S3Posture) GetBucketAcl(_ context.Context, in *s3.GetBucketAclInput, _ ...func(*s3.Options)) (*s3.GetBucketAclOutput, error) {
+	if err := f.fail(aws.ToString(in.Bucket)); err != nil {
+		return nil, err
+	}
+	owner := &s3types.Owner{ID: aws.String("acme000000000000000000000000000000000000000000000000000000000ow")}
+	return &s3.GetBucketAclOutput{
+		Owner: owner,
+		Grants: []s3types.Grant{{
+			Grantee:    &s3types.Grantee{Type: s3types.TypeCanonicalUser, ID: owner.ID},
+			Permission: s3types.PermissionFullControl,
+		}},
+	}, nil
+}
+
 func (f *w2S3Posture) GetBucketVersioning(_ context.Context, in *s3.GetBucketVersioningInput, _ ...func(*s3.Options)) (*s3.GetBucketVersioningOutput, error) {
 	b := aws.ToString(in.Bucket)
 	if err := f.fail(b); err != nil {

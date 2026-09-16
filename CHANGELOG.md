@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- A bucket whose access control list grants a permission to everyone on the
+  internet now reports "publicly accessible", the same broken-tier finding a
+  public bucket policy reports, with a row naming the group and the permission.
+  A bucket that ignores public access control lists does not report it. A
+  bucket public both ways reports it once and shows both rows.
+
 ### Fixed
 
 - The Principal row of a CloudTrail event opens the IAM role when the caller
@@ -23,6 +31,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   modifying action, root or cross-account activity) is now stored on the row
   and declared in its field list, so it travels with the event instead of
   being recomputed from the severity tier alone.
+
+- A bucket row now carries every event notification destination, not the first
+  of each kind, so the Lambda, SNS and SQS rows of a bucket that fans one event
+  out to several targets list all of them. A lookup that was refused reports
+  the refusal instead of an empty list, and a bucket in another region shows
+  "0+" rather than a confident zero.
+
+- The S3 Buckets row of a hosted zone now finds the buckets its website alias
+  records point at. The bucket is taken from the record's own name, which is
+  what AWS requires it to be; previously it was read out of the alias target,
+  which never contains it, and the row was always empty.
+
+- The CloudFront and S3 rows now match a bucket against the whole origin
+  hostname. A distribution serving "my-assets" no longer appears on the bucket
+  "assets", and a host that merely contains "s3", such as a proxy, no longer
+  reads as a bucket. A bucket whose own name contains dots or an "s3" label is
+  now matched whole, in the origin list and in the access-log destination.
+
+- The S3 Buckets and EventBridge Rules rows of a CloudFormation stack now show
+  "(N+)" when the stack has more resources than the one page a9s reads, so a
+  stack whose buckets all sit on a later page no longer shows a dead-end "(0)".
 
 - Two clusters that each own a node group of the same name now show two node
   group rows. The list identifies a node group by its cluster and its name, so

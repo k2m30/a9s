@@ -81,6 +81,21 @@ func (f *fakeRedshiftCR) DescribeClusterParameters(_ context.Context, _ *redshif
 // s3
 // ---------------------------------------------------------------------------
 
+// The default ACL: the owner's own FULL_CONTROL and no group grant, so no
+// bucket served by a fake embedding s3NoopAPI reads as public by ACL. Declared
+// once on the embedded base rather than per fake — the posture scan calls it
+// for every bucket, and no test here varies the answer.
+func (s3NoopAPI) GetBucketAcl(_ context.Context, _ *s3.GetBucketAclInput, _ ...func(*s3.Options)) (*s3.GetBucketAclOutput, error) {
+	owner := &s3types.Owner{ID: aws.String("acme000000000000000000000000000000000000000000000000000000000ow")}
+	return &s3.GetBucketAclOutput{
+		Owner: owner,
+		Grants: []s3types.Grant{{
+			Grantee:    &s3types.Grantee{Type: s3types.TypeCanonicalUser, ID: owner.ID},
+			Permission: s3types.PermissionFullControl,
+		}},
+	}, nil
+}
+
 func (f *s3TaggingErrFake) GetBucketPolicyStatus(_ context.Context, _ *s3.GetBucketPolicyStatusInput, _ ...func(*s3.Options)) (*s3.GetBucketPolicyStatusOutput, error) {
 	return w2xHealthyPolicyStatus(), nil
 }

@@ -6,6 +6,7 @@ package aws
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"slices"
 	"strings"
 
@@ -38,64 +39,76 @@ func s3BenignAbsenceErr(err error, code string) bool {
 	return ErrCodeIs(err, code)
 }
 
-// checkS3Lambda returns the Lambda function ARNs referenced by this bucket's
-// notification configuration. The bucket fetcher populates Fields["notification_lambda"]
-// via GetBucketNotificationConfiguration (first Lambda target). Forward lookup
-// (Pattern F): no cache needed, but the fetcher must have run with the notification
-// API enabled for the field to be set. When the field is absent we can't tell
-// the difference between "no notifications" and "notifications not enriched":
-// Count: 0 is safest because the fetcher either enriches or leaves it "".
+// s3NotificationRelated turns one of the bucket fetcher's comma-joined
+// notification fields into a related result. Forward lookup (Pattern F): no
+// cache needed, but the fetcher must have run with the notification API
+// enabled for the fields to be set.
+//
+// The lookup either answered (a list, empty when the bucket notifies nothing
+// of this kind), was refused, or could not be made from this client's region.
+// The last two are not zeros: a refusal is reported as the error it was, and a
+// cross-region bucket soft-truncates so the row renders "0+".
+//
+// idOf maps a destination ARN to the target type's Resource.ID and rejects a
+// shape that would navigate nowhere.
+func s3NotificationRelated(
+	target, field string,
+	res resource.Resource,
+	idOf func(string) (string, bool),
+) resource.RelatedCheckResult {
+	if msg := res.Fields["notification_error"]; msg != "" {
+		return resource.ErrorRelated(target, errors.New(msg))
+	}
+	if res.Fields["notification_truncated"] == "true" {
+		return relatedResultTrunc(target, nil, true)
+	}
+	var ids []string
+	for arn := range strings.SplitSeq(res.Fields[field], ",") {
+		if id, ok := idOf(arn); ok {
+			ids = append(ids, id)
+		}
+	}
+	return relatedResult(target, ids)
+}
+
+// checkS3Lambda returns the Lambda functions this bucket's notification
+// configuration targets.
 func checkS3Lambda(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	arn := res.Fields["notification_lambda"]
-	if arn == "" {
-		return resource.KnownRelated("lambda", nil, false)
-	}
-	// Lambda ARN format: arn:aws:lambda:region:account:function:NAME[:VERSION]
-	parts := strings.Split(arn, ":")
-	if len(parts) < 7 {
-		return resource.KnownRelated("lambda", nil, false)
-	}
-	name := parts[6]
-	if name == "" {
-		return resource.KnownRelated("lambda", nil, false)
-	}
-	return relatedResult("lambda", []string{name})
+	return s3NotificationRelated("lambda", "notification_lambda", res, func(arn string) (string, bool) {
+		// arn:aws:lambda:region:account:function:NAME[:VERSION]
+		parts := strings.Split(arn, ":")
+		if len(parts) < 7 || parts[6] == "" {
+			return "", false
+		}
+		return parts[6], true
+	})
 }
 
-// checkS3SNS returns the SNS topic from the bucket's notification configuration,
-// populated in Fields["notification_sns"] by GetBucketNotificationConfiguration.
-// The SNS fetcher indexes Resource.ID by full topic ARN (sns.go — TopicArn),
-// so this checker must return the ARN unchanged — stripping to the bare topic
-// name breaks drill-through.
+// checkS3SNS returns the SNS topics this bucket's notification configuration
+// targets. The SNS fetcher indexes Resource.ID by full topic ARN (sns.go —
+// TopicArn), so this checker returns the ARN unchanged: stripping to the bare
+// topic name breaks drill-through.
 func checkS3SNS(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	arn := res.Fields["notification_sns"]
-	if arn == "" {
-		return resource.KnownRelated("sns", nil, false)
-	}
-	// Basic ARN shape guard — arn:aws:sns:region:account:TopicName has 6 parts.
-	if parts := strings.Split(arn, ":"); len(parts) < 6 || parts[5] == "" {
-		return resource.KnownRelated("sns", nil, false)
-	}
-	return relatedResult("sns", []string{arn})
+	return s3NotificationRelated("sns", "notification_sns", res, func(arn string) (string, bool) {
+		// arn:aws:sns:region:account:TopicName
+		if parts := strings.Split(arn, ":"); len(parts) < 6 || parts[5] == "" {
+			return "", false
+		}
+		return arn, true
+	})
 }
 
-// checkS3SQS returns the SQS queue from the bucket's notification configuration,
-// populated in Fields["notification_sqs"] by GetBucketNotificationConfiguration.
+// checkS3SQS returns the SQS queues this bucket's notification configuration
+// targets.
 func checkS3SQS(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	arn := res.Fields["notification_sqs"]
-	if arn == "" {
-		return resource.KnownRelated("sqs", nil, false)
-	}
-	// SQS queue ARN: arn:aws:sqs:region:account:QueueName
-	parts := strings.Split(arn, ":")
-	if len(parts) < 6 {
-		return resource.KnownRelated("sqs", nil, false)
-	}
-	name := parts[5]
-	if name == "" {
-		return resource.KnownRelated("sqs", nil, false)
-	}
-	return relatedResult("sqs", []string{name})
+	return s3NotificationRelated("sqs", "notification_sqs", res, func(arn string) (string, bool) {
+		// arn:aws:sqs:region:account:QueueName
+		parts := strings.Split(arn, ":")
+		if len(parts) < 6 || parts[5] == "" {
+			return "", false
+		}
+		return parts[5], true
+	})
 }
 
 // checkS3CFN calls s3:GetBucketTagging to read the bucket's tags and looks up
@@ -573,10 +586,9 @@ func checkS3Trail(ctx context.Context, clients any, res resource.Resource, cache
 }
 
 // checkS3CF searches the CloudFront cache for distributions with origins that
-// reference this S3 bucket. Origin DomainName formats:
-//   - {bucket}.s3.amazonaws.com
-//   - {bucket}.s3-website.{region}.amazonaws.com
-//   - {bucket}.s3.{region}.amazonaws.com
+// reference this S3 bucket. S3OriginBucket parses the origin hostname and the
+// bucket it addresses must equal this one: a host that merely carries an "s3"
+// token (a proxy at assets.s3-proxy.example.com) addresses no bucket at all.
 func checkS3CF(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	bucketName := res.ID
 	if bucketName == "" {
@@ -604,7 +616,7 @@ func checkS3CF(ctx context.Context, clients any, res resource.Resource, cache re
 			if origin.DomainName == nil {
 				continue
 			}
-			if strings.Contains(*origin.DomainName, bucketName+".s3") {
+			if bucket, ok := S3OriginBucket(*origin.DomainName); ok && bucket == bucketName {
 				ids = append(ids, cfRes.ID)
 				break
 			}

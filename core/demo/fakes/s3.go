@@ -18,6 +18,10 @@ import (
 	"github.com/k2m30/a9s/v3/core/demo/fixtures"
 )
 
+// demoBucketOwnerID is the canonical user ID every demo bucket belongs to. S3
+// returns a 64-hex-character opaque ID, not an account number.
+const demoBucketOwnerID = "a9c0de0000000000000000000000000000000000000000000000000000demo01"
+
 // S3Fake implements the S3 bucket and object interfaces against fixture data.
 type S3Fake struct {
 	fix *fixtures.S3Fixtures
@@ -271,6 +275,27 @@ func (f *S3Fake) GetBucketPolicyStatus(_ context.Context, input *s3.GetBucketPol
 	}
 	return &s3.GetBucketPolicyStatusOutput{
 		PolicyStatus: &s3types.PolicyStatus{IsPublic: new(false)},
+	}, nil
+}
+
+// GetBucketAcl returns the bucket's access control list: the owner's own
+// FULL_CONTROL, which every bucket carries, plus whatever grants the fixtures
+// add for that bucket.
+func (f *S3Fake) GetBucketAcl(_ context.Context, input *s3.GetBucketAclInput, _ ...func(*s3.Options)) (*s3.GetBucketAclOutput, error) {
+	if input.Bucket == nil {
+		return nil, fmt.Errorf("GetBucketAcl: bucket name is required")
+	}
+	owner := &s3types.Owner{
+		ID:          aws.String(demoBucketOwnerID),
+		DisplayName: aws.String("a9s-demo"),
+	}
+	grants := []s3types.Grant{{
+		Grantee:    &s3types.Grantee{Type: s3types.TypeCanonicalUser, ID: owner.ID, DisplayName: owner.DisplayName},
+		Permission: s3types.PermissionFullControl,
+	}}
+	return &s3.GetBucketAclOutput{
+		Owner:  owner,
+		Grants: append(grants, f.fix.BucketACLs[*input.Bucket]...),
 	}, nil
 }
 

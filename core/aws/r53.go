@@ -10,6 +10,7 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/route53"
+	r53types "github.com/aws/aws-sdk-go-v2/service/route53/types"
 
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
@@ -158,18 +159,39 @@ func enumerateR53AliasTargets(ctx context.Context, api Route53ListResourceRecord
 	if out == nil {
 		return "", "", UnusableAnswerErr{Call: "ListResourceRecordSets", Field: "record sets"}
 	}
-	var aliases, s3Website []string
+	var aliases []string
 	for _, rr := range out.ResourceRecordSets {
 		if rr.AliasTarget == nil || rr.AliasTarget.DNSName == nil {
 			continue
 		}
-		dns := *rr.AliasTarget.DNSName
-		aliases = append(aliases, dns)
-		if isS3WebsiteEndpoint(dns) && rr.Name != nil && *rr.Name != "" {
-			s3Website = append(s3Website, strings.TrimSuffix(*rr.Name, "."))
+		aliases = append(aliases, *rr.AliasTarget.DNSName)
+	}
+	return strings.Join(aliases, ","), strings.Join(r53S3WebsiteBucketNames(out.ResourceRecordSets), ","), nil
+}
+
+// r53S3WebsiteBucketNames returns the bucket each S3-website alias record in
+// the set addresses. AWS requires such a record's name to equal the bucket
+// name, and the alias target is the bare regional endpoint, so the record name
+// is the only place the bucket can be read from.
+//
+// It is the single owner of that derivation: the zone fetcher stores the names
+// in Fields["s3website_alias_names"] and checkR53S3 joins them against the
+// bucket list, and the two joining on different rules reports a zone's buckets
+// in one direction only.
+func r53S3WebsiteBucketNames(sets []r53types.ResourceRecordSet) []string {
+	var names []string
+	for _, rr := range sets {
+		if rr.AliasTarget == nil || rr.AliasTarget.DNSName == nil || rr.Name == nil {
+			continue
+		}
+		if !isS3WebsiteEndpoint(*rr.AliasTarget.DNSName) {
+			continue
+		}
+		if name := strings.TrimSuffix(strings.ToLower(*rr.Name), "."); name != "" {
+			names = append(names, name)
 		}
 	}
-	return strings.Join(aliases, ","), strings.Join(s3Website, ","), nil
+	return names
 }
 
 // isS3WebsiteEndpoint reports whether a Route 53 AliasTarget DNSName is

@@ -72,6 +72,15 @@ var w2BenchWitnesses = []struct {
 	{"efs", "efs.no-backup-policy"},
 }
 
+// w2BenchWitnessCount overrides the default of one carrier for a code a demo
+// row can reach by more than one route. s3.public has two: AWS reporting the
+// bucket policy public, and an access control list granting a public group.
+// The bench shows one bucket for each, so an operator sees both phrasings of
+// the same finding (spec row s3-0916/1).
+var w2BenchWitnessCount = map[string]int{
+	"s3.public": 2,
+}
+
 func TestW2DemoBenchOneWitnessPerFinding(t *testing.T) {
 	clients := demo.NewServiceClients()
 	byType, cache := buildVisibilityTypeCache(t)
@@ -101,9 +110,13 @@ func TestW2DemoBenchOneWitnessPerFinding(t *testing.T) {
 				}
 			}
 			sort.Strings(carriers)
-			if len(carriers) != 1 {
-				t.Errorf("%s: %d demo rows carry %q (%v); want exactly 1 witness",
-					w.shortName, len(carriers), w.code, carriers)
+			want, ok := w2BenchWitnessCount[w.code]
+			if !ok {
+				want = 1
+			}
+			if len(carriers) != want {
+				t.Errorf("%s: %d demo rows carry %q (%v); want exactly %d witness(es)",
+					w.shortName, len(carriers), w.code, carriers, want)
 			}
 		})
 	}

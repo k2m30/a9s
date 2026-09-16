@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"strconv"
+	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
@@ -50,6 +51,7 @@ func FetchS3BucketsPageWithNotifications(
 	}
 
 	var resources []resource.Resource
+	var failures []Failure
 	for _, bucket := range output.Buckets {
 		bucketName := ""
 		if bucket.Name != nil {
@@ -60,20 +62,35 @@ func FetchS3BucketsPageWithNotifications(
 		if bucket.CreationDate != nil {
 			creationDate = bucket.CreationDate.Format("2006-01-02 15:04")
 		}
-		lambdaArn, sqsArn, snsArn := "", "", ""
+		lambdaArns, sqsArns, snsArns := "", "", ""
+		notificationError, notificationTruncated := "", ""
 		if notificationAPI != nil && bucketName != "" {
-			lambdaArn, sqsArn, snsArn, _ = firstS3NotificationTargets(ctx, notificationAPI, bucketName)
+			var notificationErr error
+			lambdaArns, sqsArns, snsArns, notificationErr = s3NotificationTargets(ctx, notificationAPI, bucketName)
+			switch {
+			case notificationErr == nil:
+			// A bucket outside this client's region is operational: the
+			// destinations are unknown, not absent, and the pivots render a
+			// soft-truncated zero rather than a refusal in the `!` log.
+			case isS3CrossRegionErr(notificationErr):
+				notificationTruncated = "true"
+			default:
+				notificationError = notificationErr.Error()
+				failures = append(failures, FailedCall(bucketName, notificationErr))
+			}
 		}
 
 		r := resource.Resource{
 			ID:   bucketName,
 			Name: bucketName,
 			Fields: map[string]string{
-				"name":                bucketName,
-				"creation_date":       creationDate,
-				"notification_lambda": lambdaArn,
-				"notification_sqs":    sqsArn,
-				"notification_sns":    snsArn,
+				"name":                   bucketName,
+				"creation_date":          creationDate,
+				"notification_lambda":    lambdaArns,
+				"notification_sqs":       sqsArns,
+				"notification_sns":       snsArns,
+				"notification_error":     notificationError,
+				"notification_truncated": notificationTruncated,
 			},
 			RawStruct: bucket,
 		}
@@ -102,42 +119,54 @@ func FetchS3BucketsPageWithNotifications(
 			PageSize:    len(resources),
 			TotalHint:   totalHint,
 		},
-	}, nil
+	}, AggregateFailures("GetBucketNotificationConfiguration", failures, len(output.Buckets))
 }
 
-func firstS3NotificationTargets(
+// s3NotificationTargets returns every destination of each kind the bucket
+// notifies, comma-joined in the order the API listed them. A bucket may fan one
+// event out to several functions, queues or topics, and reporting only the
+// first hides the rest of the blast radius from every pivot that joins on
+// these fields. ARNs carry no commas, so the join is lossless.
+//
+// A call that did not answer returns the reason: an empty list read as "this
+// bucket notifies nothing" is a confident zero drawn from a call nobody
+// completed.
+func s3NotificationTargets(
 	ctx context.Context,
 	api S3GetBucketNotificationConfigurationAPI,
 	bucket string,
-) (lambdaArn, sqsArn, snsArn string, _ error) {
+) (lambdaArns, sqsArns, snsArns string, _ error) {
 	out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*s3.GetBucketNotificationConfigurationOutput, error) {
 		return api.GetBucketNotificationConfiguration(ctx, &s3.GetBucketNotificationConfigurationInput{
 			Bucket: aws.String(bucket),
 		})
 	})
 	if err != nil {
-		// Best effort enrichment: keep list results even if this lookup fails.
-		return "", "", "", nil
+		return "", "", "", err
 	}
+	if out == nil {
+		return "", "", "", UnusableAnswerErr{
+			Call:  "GetBucketNotificationConfiguration",
+			Field: "notification configuration",
+		}
+	}
+	var lambdas, queues, topics []string
 	for _, c := range out.LambdaFunctionConfigurations {
-		if c.LambdaFunctionArn != nil && *c.LambdaFunctionArn != "" {
-			lambdaArn = *c.LambdaFunctionArn
-			break
+		if arn := aws.ToString(c.LambdaFunctionArn); arn != "" {
+			lambdas = append(lambdas, arn)
 		}
 	}
 	for _, c := range out.QueueConfigurations {
-		if c.QueueArn != nil && *c.QueueArn != "" {
-			sqsArn = *c.QueueArn
-			break
+		if arn := aws.ToString(c.QueueArn); arn != "" {
+			queues = append(queues, arn)
 		}
 	}
 	for _, c := range out.TopicConfigurations {
-		if c.TopicArn != nil && *c.TopicArn != "" {
-			snsArn = *c.TopicArn
-			break
+		if arn := aws.ToString(c.TopicArn); arn != "" {
+			topics = append(topics, arn)
 		}
 	}
-	return lambdaArn, sqsArn, snsArn, nil
+	return strings.Join(lambdas, ","), strings.Join(queues, ","), strings.Join(topics, ","), nil
 }
 
 // FetchS3Objects calls the S3 ListObjectsV2 API with the given bucket and prefix.

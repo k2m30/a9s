@@ -183,6 +183,8 @@ var databasesTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 			"notification_lambda",
 			"notification_sqs",
 			"notification_sns",
+			"notification_error",
+			"notification_truncated",
 		},
 		Related: []domain.RelatedDef{
 			{TargetType: "trail", DisplayName: "CloudTrail Trails", Checker: checkS3Trail, NeedsTargetCache: true, Truncated: true},
@@ -205,7 +207,7 @@ var databasesTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 		IssueEnricherFieldKeys: []string{"status"},
 		Findings: []catalog.FindingDef{
 			{Code: s3CodePublicAccessBlockIncomplete, Phrase: "public access block incomplete", Severity: domain.SevWarn, Source: "wave2", Detail: "This bucket does not set all four public-access settings, so it relies on the account-level block to stop a future policy or ACL from making it public, and that block may not be set either. Turn on all four settings on the bucket itself so it is safe regardless of the account."},
-			{Code: s3CodePublic, Phrase: "publicly accessible", Severity: domain.SevBroken, Source: "wave2", Detail: "AWS reports this bucket's policy as public, so anyone on the internet can reach its objects. Remove the wildcard-principal statements from the bucket policy, or block them with a public access block."},
+			{Code: s3CodePublic, Phrase: "publicly accessible", Severity: domain.SevBroken, Source: "wave2", Detail: "Anyone on the internet can reach this bucket's objects — either AWS reports its policy as public, or its access control list grants a permission to one of the two public groups, every AWS user or every signed-in AWS user. Remove the wildcard-principal statements from the bucket policy and the public grants from the access control list, or turn on all four public access block settings."},
 			{Code: s3CodeVersioningOff, Phrase: "versioning off", Severity: domain.SevWarn, Source: "wave2", Detail: "Overwritten and deleted objects are gone for good — there is no previous version to restore. Enable versioning on the bucket."},
 			{Code: s3CodeMFADeleteOff, Phrase: "MFA delete off", Severity: domain.SevWarn, Source: "wave2", Detail: "Versioning is on, but anyone holding the delete permission can still remove versions permanently. Enable MFA delete so destroying a version needs a second factor."},
 			{Code: s3CodeAccessLoggingOff, Phrase: "access logging off", Severity: domain.SevWarn, Source: "wave2", Detail: "Nothing records who read or wrote objects here, so an incident leaves no trail to follow. Point server access logging at a log destination bucket."},

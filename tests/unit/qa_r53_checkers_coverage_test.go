@@ -318,8 +318,12 @@ func TestRelated_R53_APIGW_CacheNilList(t *testing.T) {
 // checkR53S3 tests
 // ---------------------------------------------------------------------------
 
-// TestRelated_R53_S3_Match verifies that alias records for an S3 website endpoint
-// (<bucket>.s3-website-<region>.amazonaws.com) resolve to the bucket name in cache.
+// TestRelated_R53_S3_Match verifies that an alias record pointing at the
+// legacy S3 website endpoint resolves to the bucket named by the RECORD.
+//
+// Spec row s3-0916/3: an S3 website alias target is the bare regional
+// endpoint and never carries the bucket, so the join key is the record name.
+// A bucket-prefixed target is not a shape AWS returns and is not matched.
 func TestRelated_R53_S3_Match(t *testing.T) {
 	const bucketName = "my-website-bucket"
 
@@ -327,10 +331,10 @@ func TestRelated_R53_S3_Match(t *testing.T) {
 		listRecordSetsOutput: &route53.ListResourceRecordSetsOutput{
 			ResourceRecordSets: []r53types.ResourceRecordSet{
 				{
-					Name: aws.String("www.example.com."),
+					Name: aws.String(bucketName + "."),
 					Type: r53types.RRTypeA,
 					AliasTarget: &r53types.AliasTarget{
-						DNSName:              aws.String(bucketName + ".s3-website-us-east-1.amazonaws.com"),
+						DNSName:              aws.String("s3-website-us-east-1.amazonaws.com"),
 						EvaluateTargetHealth: false,
 					},
 				},
@@ -365,6 +369,7 @@ func TestRelated_R53_S3_Match(t *testing.T) {
 
 // TestRelated_R53_S3_NewStyleEndpoint verifies alias records using the newer
 // "s3-website.<region>" (no hyphen between s3-website and region) style.
+// Spec row s3-0916/3 applies here too: the bucket is the record's own name.
 func TestRelated_R53_S3_NewStyleEndpoint(t *testing.T) {
 	const bucketName = "another-bucket-2024"
 
@@ -372,11 +377,11 @@ func TestRelated_R53_S3_NewStyleEndpoint(t *testing.T) {
 		listRecordSetsOutput: &route53.ListResourceRecordSetsOutput{
 			ResourceRecordSets: []r53types.ResourceRecordSet{
 				{
-					Name: aws.String("site.example.com."),
+					Name: aws.String(bucketName + "."),
 					Type: r53types.RRTypeA,
 					AliasTarget: &r53types.AliasTarget{
 						// Newer endpoint style: s3-website.<region>.amazonaws.com
-						DNSName:              aws.String(bucketName + ".s3-website.us-west-2.amazonaws.com"),
+						DNSName:              aws.String("s3-website.us-west-2.amazonaws.com"),
 						EvaluateTargetHealth: false,
 					},
 				},

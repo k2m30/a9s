@@ -262,27 +262,14 @@ var sharedR53Fixtures = sync.OnceValue(func() *R53Fixtures {
 			// NAME (FQDN) is exactly the bucket name (S3 website aliases
 			// require bucket-name==FQDN), and AliasTarget.DNSName is the
 			// regional s3-website endpoint WITHOUT any bucket segment.
-			// checkS3R53 joins on the record name.
+			// Both r53↔s3 directions join on the record name, so this one
+			// record is the witness for the pivot each way.
 			"/hostedzone/Z4567890123ABCDEFGHIJ": {
 				{
 					Name: aws.String(HealthyBucketName + "."),
 					Type: r53types.RRTypeA,
 					AliasTarget: &r53types.AliasTarget{
 						DNSName:              aws.String("s3-website-us-east-1.amazonaws.com."),
-						HostedZoneId:         aws.String("Z3AQBSTGFYJSTF"),
-						EvaluateTargetHealth: false,
-					},
-				},
-				// downloads.demo.acme-corp.com — required for the r53:s3
-				// related-panel pivot (checkR53S3, the forward r53→s3
-				// direction). Uses the bucket-prefixed DNS-name alias style
-				// (record name != bucket name, so the S3-website endpoint
-				// itself carries the bucket segment).
-				{
-					Name: aws.String("downloads.demo.acme-corp.com."),
-					Type: r53types.RRTypeA,
-					AliasTarget: &r53types.AliasTarget{
-						DNSName:              aws.String(HealthyBucketName + ".s3-website-us-east-1.amazonaws.com."),
 						HostedZoneId:         aws.String("Z3AQBSTGFYJSTF"),
 						EvaluateTargetHealth: false,
 					},
