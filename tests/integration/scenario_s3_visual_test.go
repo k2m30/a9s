@@ -23,22 +23,25 @@ import (
 )
 
 const (
-	// Bucket IDs for the 4 PAB-finding fixtures. No constants were exported
-	// from fixtures/s3.go for these names, so the test pins them locally.
-	s3NoPABBucketID  = "a9s-demo-nopab"
+	// Bucket IDs for the 4 PAB-finding fixtures. Only the no-PAB bucket has an
+	// exported name, under the role that made it exported — it is also the
+	// witness for the access-control-list route into s3.public. The other
+	// three are pinned locally.
+	s3NoPABBucketID  = demofixtures.S3BucketPublicByACL
 	s3PartialPABID   = "a9s-demo-partial-pab"
 	s3MultiFailPABID = "a9s-demo-multifail-pab"
 	s3NilCfgPABID    = "a9s-demo-nilcfg"
 	// S1 rule: the badge counts rows whose Wave-1-only colour IsIssue, plus
 	// Healthy rows carrying a Wave-2 `!`. s3 has no Wave-1 signals at all, so
-	// only the second clause can fire. Of the 42 bucket fixtures exactly one
-	// carries a `!`: acme-public-datasets, whose bucket policy status is
-	// public (s3.public, `!`), added by the databases batch.
-	// Every other s3 finding — the four PAB fixtures and that batch's
+	// only the second clause can fire. Two of the 42 bucket fixtures carry a
+	// `!`, one for each route into s3.public (spec row s3-0916/1):
+	// acme-public-datasets, whose bucket policy status is public, and
+	// a9s-demo-nopab, whose access control list grants AllUsers read with no
+	// public access block to disregard it.
+	// Every other s3 finding — the three remaining PAB fixtures and the
 	// versioning, MFA-delete, access-logging, lifecycle and object-lock
-	// witnesses — is Wave-2 `~` and never bumps the badge. Six new findings,
-	// badge moves by one.
-	s3ExpectedIssueBkt = 1
+	// witnesses — is Wave-2 `~` and never bumps the badge.
+	s3ExpectedIssueBkt = 2
 
 	// Wave-2 Rows row labels/values emitted by EnrichS3Posture.
 	s3Row_BlockPublicAcls    = "BlockPublicAcls"
@@ -48,6 +51,14 @@ const (
 	s3Row_NoPABStatusValue   = "no public access block configuration"
 	s3S4Phrase               = "public access block incomplete"
 	s3DetailPhraseCapitalize = "Public access block incomplete"
+
+	// s3ACLPublicStatus is the no-PAB bucket's Status cell. That bucket is
+	// also the witness for the access-control-list route into s3.public
+	// (spec row s3-0916/1), so it carries two findings: the broken-tier
+	// phrase takes the cell and "(+1)" stands for the warn-tier public
+	// access block finding beside it. The other three PAB fixtures carry
+	// one finding each and still render s3S4Phrase alone.
+	s3ACLPublicStatus = "publicly accessible (+1)"
 )
 
 func TestScenario_S3Visual(t *testing.T) {
@@ -80,8 +91,9 @@ func TestScenario_S3Visual(t *testing.T) {
 	// Healthy baseline — graph root. Single healthy bucket with all-true PAB.
 	scenario.ExpectRowStatusBlank(demofixtures.HealthyBucketName)
 
-	// The 4 finding fixtures render the stable spec §4 phrase in S4.
-	scenario.ExpectRowStatusEquals(s3NoPABBucketID, s3S4Phrase)
+	// The 4 finding fixtures render the stable spec §4 phrase in S4; the
+	// no-PAB one leads with its broken-tier finding and counts this one.
+	scenario.ExpectRowStatusEquals(s3NoPABBucketID, s3ACLPublicStatus)
 	scenario.ExpectRowStatusEquals(s3PartialPABID, s3S4Phrase)
 	scenario.ExpectRowStatusEquals(s3MultiFailPABID, s3S4Phrase)
 	scenario.ExpectRowStatusEquals(s3NilCfgPABID, s3S4Phrase)
