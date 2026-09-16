@@ -132,7 +132,7 @@ func apigwHTTPRow(ctx context.Context, clients *ServiceClients, r resource.Resou
 	}
 
 	stagesCountStr := resource.FormatExact(len(stages))
-	if stagesTruncated {
+	if stagesTruncated || fetchErr != nil {
 		stagesCountStr = resource.FormatTruncated(len(stages))
 	}
 	var rows []domain.DetailRow

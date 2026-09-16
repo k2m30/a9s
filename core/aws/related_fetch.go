@@ -21,6 +21,7 @@ const DefaultPageSize = resource.DefaultPageSize
 //
 // Returns (resources, isTruncated, error):
 //   - cache hit: returns cached resources and IsTruncated state, no AWS call.
+//   - cache entry marked FieldsOnly (disk-restored rows, no RawStruct): a miss.
 //   - cache miss + registered fetcher: fetches first page only, returns IsTruncated from pagination.
 //   - cache miss + no fetcher: returns nil, false, nil (graceful no-op).
 //
@@ -30,7 +31,7 @@ const DefaultPageSize = resource.DefaultPageSize
 // real, and zero matches is a real zero so far, so callers carry isTruncated
 // through and the row renders "(N+)".
 func FetchRelatedTarget(ctx context.Context, clients any, cache resource.ResourceCache, target string) ([]resource.Resource, bool, error) {
-	if entry, ok := cache[target]; ok {
+	if entry, ok := cache[target]; ok && !entry.FieldsOnly {
 		// A present entry is a complete answer even when it holds nothing:
 		// the executor seeds it straight from a fetcher that found zero
 		// resources, and nil there would be indistinguishable from "no entry".

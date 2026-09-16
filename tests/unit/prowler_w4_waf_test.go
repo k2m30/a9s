@@ -138,14 +138,22 @@ func TestW4WAFNoRules(t *testing.T) {
 }
 
 // TestW4WAFNoRulesUnknownWhenGetWebACLFails pins that a Web ACL whose rules
-// could not be read is not reported as empty. Unknown is not zero.
+// could not be read is not reported as empty. Unknown is not zero: the row
+// is uninspected and the failed read is reported, not swallowed.
 func TestW4WAFNoRulesUnknownWhenGetWebACLFails(t *testing.T) {
 	fake := &w4WAFFake{
 		rules:     map[string][]wafv2types.Rule{"acme-denied-acl": nil},
 		getACLErr: map[string]error{"acme-denied-acl": errors.New("WAFInvalidParameterException")},
 	}
-	res := w4EnrichWAF(t, fake, []resource.Resource{w4WAFResource("acme-denied-acl")})
+	clients := &awsclient.ServiceClients{WAFv2: fake, Region: "us-east-1"}
+	res, err := awsclient.EnrichWAFLogging(context.Background(), clients, []resource.Resource{w4WAFResource("acme-denied-acl")}, nil)
+	if err == nil {
+		t.Fatal("EnrichWAFLogging: a failed GetWebACL must be reported")
+	}
 	w4AssertNoCode(t, res.Findings[w4WAFARN("acme-denied-acl")], w4CodeWAFNoRules)
+	if _, marked := res.TruncatedIDs[w4WAFARN("acme-denied-acl")]; !marked {
+		t.Errorf("TruncatedIDs[acme-denied-acl] missing — the ACL was not read")
+	}
 }
 
 // TestW4WAFNilClient pins the nil-client contract.

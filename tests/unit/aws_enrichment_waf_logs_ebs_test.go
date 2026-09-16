@@ -942,3 +942,31 @@ func TestEnrichEBSVolumeStatus_NilVolumeIdSkipped(t *testing.T) {
 		t.Errorf("len(Findings) = %d, want 1 (nil VolumeId entry must be skipped, not written under an empty-string key)", len(result.Findings))
 	}
 }
+
+// TestEnrichWAFLogging_GetWebACLFails_RowSkippedNotZeroRules: a WebACL whose
+// rules could not be read (missing wafv2:GetWebACL, a timeout) is unread, not
+// empty. The row is marked uninspected and the failure is aggregated instead
+// of persisting "0 rules" as if the ACL had been inspected.
+func TestEnrichWAFLogging_GetWebACLFails_RowSkippedNotZeroRules(t *testing.T) {
+	fake := &wafFullFake{
+		loggingResults: map[string]*wafv2svc.GetLoggingConfigurationOutput{
+			wafACLARN1: {LoggingConfiguration: &wafv2types.LoggingConfiguration{ResourceArn: aws.String(wafACLARN1)}},
+		},
+		resourcesResults: map[string]*wafv2svc.ListResourcesForWebACLOutput{
+			wafACLARN1: {ResourceArns: []string{"arn:aws:elasticloadbalancing:us-east-1:123456789012:loadbalancer/app/x/y"}},
+		},
+		getACLErr: errors.New("AccessDeniedException: wafv2:GetWebACL"),
+	}
+	resources := []resource.Resource{wafWebACLResourceWithNameID(wafACLARN1, "webacl-1", "aaaabbbb-1111-2222-3333-444444444444", "")}
+
+	result, err := awsclient.EnrichWAFLogging(context.Background(), &awsclient.ServiceClients{WAFv2: fake}, resources, nil)
+	if err == nil {
+		t.Fatal("expected the failed GetWebACL to surface as an enricher error")
+	}
+	if _, marked := result.TruncatedIDs[wafACLARN1]; !marked {
+		t.Errorf("TruncatedIDs[%q] missing — the ACL was not read", wafACLARN1)
+	}
+	if fu := result.FieldUpdates[wafACLARN1]; fu["rules_summary"] != "" {
+		t.Errorf("rules_summary = %q on an unread ACL, want no update", fu["rules_summary"])
+	}
+}

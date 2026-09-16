@@ -70,6 +70,11 @@ type ResourceCacheEntry struct {
 	Resources   []Resource
 	IsTruncated bool
 	Pagination  *PaginationMeta
+	// FieldsOnly marks rows restored from the disk cache, which carry ID,
+	// Name and Fields but no RawStruct. A reader that matches on the SDK
+	// struct treats such an entry as absent and fetches the type live; a
+	// reader that matches on Fields uses it as is.
+	FieldsOnly bool
 }
 
 // ResourceCache is a read-only snapshot of already-loaded resource lists,

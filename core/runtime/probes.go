@@ -1067,7 +1067,10 @@ func (c *Core) probeEnrichmentRows(ctx context.Context, clients *awsclient.Servi
 // Pagination.IsTruncated carries through unchanged — first-page-only
 // probe/disk rows are marked truncated so the orphan rule in cross-ref
 // enrichers treats parent-not-found as "unknown, skip" rather than
-// "definitively deleted" per spec §3.1.
+// "definitively deleted" per spec §3.1. A disk-seeded entry is also marked
+// FieldsOnly: its rows render and answer Fields lookups, but carry no
+// RawStruct (core/cache C6), so FetchRelatedTarget fetches the type live
+// for a checker that matches on the SDK struct.
 //
 // A type observed with a zero-length Rows slice (Gen != 0, e.g. a live
 // checker's CachedPages write-back reporting a genuinely empty-but-truncated
@@ -1090,9 +1093,12 @@ func (c *Core) BuildResourceCacheSnapshot() resource.ResourceCache {
 			continue
 		}
 		isTruncated := tr.Partial || (tr.Pagination != nil && tr.Pagination.IsTruncated)
+		// A Partial entry on a never-observed type also reports OriginDisk
+		// (the zero value), but its rows came from FetchByIDs and are whole.
 		snap[shortName] = resource.ResourceCacheEntry{
 			Resources:   tr.Rows,
 			IsTruncated: isTruncated,
+			FieldsOnly:  tr.Origin == session.OriginDisk && !tr.Partial,
 		}
 	}
 	return snap

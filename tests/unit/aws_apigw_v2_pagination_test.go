@@ -14,6 +14,7 @@ package unit
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"sync"
@@ -46,6 +47,8 @@ type apigwPaginatedFake struct {
 	mu sync.Mutex
 	// callCounts tracks how many times GetStages was called per API ID.
 	callCounts map[string]int
+	// failAt maps apiID → the zero-based call index that returns an error.
+	failAt map[string]int
 }
 
 // GetAuthorizers answers empty rather than leaving the call to the embedded
@@ -88,6 +91,9 @@ func (f *apigwPaginatedFake) GetStages(
 	f.callCounts[apiID] = idx + 1
 	f.mu.Unlock()
 
+	if at, ok := f.failAt[apiID]; ok && at == idx {
+		return nil, errors.New("GetStages: throttled")
+	}
 	pages := f.pages[apiID]
 	if idx >= len(pages) {
 		return &apigatewayv2.GetStagesOutput{
@@ -289,5 +295,30 @@ func TestEnrichAPIGatewayStage_ZeroStagesAcrossPages(t *testing.T) {
 		if !strings.Contains(strings.ToLower(f.Phrase), "no deployed") {
 			t.Errorf("finding Summary = %q, must contain \"no deployed\"", f.Phrase)
 		}
+	}
+}
+
+// TestEnrichAPIGatewayStage_FailedLaterPage_CountsAsLowerBound: a GetStages
+// walk that fails on its second page has read a prefix of the stages, so the
+// count it persists must say so with a "+" and the row must be marked
+// uninspected — an exact "100" would present the partial walk as the total.
+func TestEnrichAPIGatewayStage_FailedLaterPage_CountsAsLowerBound(t *testing.T) {
+	const apiID = "half-read-api"
+
+	fake := newAPiGWPaginatedFake()
+	fake.pages[apiID] = []*apigatewayv2.GetStagesOutput{
+		{Items: makeStagesGood(100), NextToken: aws.String("page-2")},
+	}
+	fake.failAt = map[string]int{apiID: 1}
+
+	result, err := awsclient.EnrichAPIGatewayStage(context.Background(), &awsclient.ServiceClients{APIGatewayV2: fake}, apigwResources(apiID), nil)
+	if err == nil {
+		t.Fatal("expected the failed page to surface as an enricher error")
+	}
+	if got := result.FieldUpdates[apiID]["stages_count"]; got != "100+" {
+		t.Errorf("stages_count = %q, want %q", got, "100+")
+	}
+	if _, marked := result.TruncatedIDs[apiID]; !marked {
+		t.Errorf("TruncatedIDs[%q] missing — the row was not fully read", apiID)
 	}
 }

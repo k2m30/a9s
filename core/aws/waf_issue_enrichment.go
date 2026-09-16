@@ -122,7 +122,13 @@ func EnrichWAFLogging(ctx context.Context, clients *ServiceClients, resources []
 					Scope: wafv2types.Scope(scope),
 				})
 			})
-			if gerr == nil && getOut.WebACL != nil {
+			if gerr != nil {
+				mu.Lock()
+				MarkSkipped(&result, r.ID, &failures, gerr)
+				mu.Unlock()
+				return
+			}
+			if getOut.WebACL != nil {
 				blockCount := 0
 				for _, rule := range getOut.WebACL.Rules {
 					if rule.Action != nil && rule.Action.Block != nil {
