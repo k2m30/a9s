@@ -19,9 +19,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   a9s now prefers an ARN, then an id, then a name, so a call carrying both a
   role name and a role ARN always shows the ARN.
 
-- A CloudTrail event restored from the on-disk cache keeps the colour and the
-  cause it had when it was fetched. The cause the row was flagged for is now
-  stored with it, so a red row does not come back as a generic one.
+- The reason a CloudTrail event was flagged (a failed call, a destructive or
+  modifying action, root or cross-account activity) is now stored on the row
+  and declared in its field list, so it travels with the event instead of
+  being recomputed from the severity tier alone.
 
 - Two clusters that each own a node group of the same name now show two node
   group rows. The list identifies a node group by its cluster and its name, so
