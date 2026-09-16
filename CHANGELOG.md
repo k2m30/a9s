@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.57.2] - 2026-09-16
+
 ### Added
 
 - A bucket whose access control list grants a permission to anyone at all, or
@@ -21,7 +23,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The Principal row of a CloudTrail event opens the IAM role when the caller
   arrived as the role itself, not only through an assumed-role session. A role
   or user that lives under an IAM path opens by its own name instead of
-  failing to resolve; the row still shows the full ARN.
+  failing to resolve; the row still shows the full ARN. An ARN that names no
+  principal is shown but not offered to open.
 
 - The TARGET of a CloudTrail event whose record names no resource no longer
   changes between two viewings of the same event. Among the request parameters
