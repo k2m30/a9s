@@ -495,6 +495,13 @@ func checkLambdaS3(ctx context.Context, clients any, res resource.Resource, cach
 	}
 	var ids []string
 	for _, bRes := range s3List {
+		// A bucket whose notification lookup was refused or could not be made
+		// from its region may well notify this function. Nothing here can tell,
+		// so the count is a lower bound — the same thing the three forward
+		// pivots render for that bucket.
+		if bRes.Fields["notification_error"] != "" || bRes.Fields["notification_truncated"] == "true" {
+			truncated = true
+		}
 		// The field is the bucket's whole comma-joined destination list; a
 		// bucket that notifies this function second is still this function's
 		// bucket.

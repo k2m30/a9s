@@ -416,6 +416,13 @@ func checkS3R53(ctx context.Context, clients any, res resource.Resource, cache r
 	}
 	var ids []string
 	for _, zone := range zoneList {
+		// The zone fetcher reads one page of record sets. When more remain,
+		// this bucket's alias record may be on one of them, so the answer is a
+		// lower bound — which is what r53 → s3 already renders for the same
+		// zone, and the two directions of one relationship have to agree.
+		if zone.Fields["records_truncated"] == "true" {
+			truncated = true
+		}
 		names := zone.Fields["s3website_alias_names"]
 		if names == "" {
 			continue

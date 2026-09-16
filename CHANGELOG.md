@@ -36,7 +36,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   of each kind, so the Lambda, SNS and SQS rows of a bucket that fans one event
   out to several targets list all of them. A lookup that was refused reports
   the refusal instead of an empty list, and a bucket in another region shows
-  "0+" rather than a confident zero.
+  "0+" rather than a confident zero. The S3 Buckets row of a Lambda function
+  shows "N+" when any bucket's notification lookup did not answer, since one of
+  those buckets may be notifying the function.
+
+- The Route 53 row of a bucket, and the S3 Buckets row of a hosted zone, now
+  agree when a zone has more DNS records than a9s reads in one page: both show
+  "N+" instead of a count that silently omits the records nobody fetched.
 
 - The S3 Buckets row of a hosted zone now finds the buckets its website alias
   records point at. The bucket is taken from the record's own name, which is
