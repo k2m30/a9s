@@ -60,7 +60,7 @@ var sharedSSMFixtures = sync.OnceValue(func() *SSMFixtures {
 			ARN:              aws.String("arn:aws:ssm:us-east-1:123456789012:parameter/acme/prod/app/config"),
 			Type:             ssmtypes.ParameterTypeString,
 			Version:          12,
-			LastModifiedDate: aws.Time(mustParseSSMTime("2026-03-15T14:30:00+00:00")),
+			LastModifiedDate: aws.Time(time.Now().AddDate(0, 0, -40).Truncate(time.Hour)),
 			Description:      aws.String("Production application configuration"),
 			DataType:         aws.String("text"),
 			AllowedPattern:   aws.String(".*"),
@@ -73,7 +73,7 @@ var sharedSSMFixtures = sync.OnceValue(func() *SSMFixtures {
 			ARN:              aws.String("arn:aws:ssm:us-east-1:123456789012:parameter/acme/prod/db/connection-string"),
 			Type:             ssmtypes.ParameterTypeSecureString,
 			Version:          5,
-			LastModifiedDate: aws.Time(mustParseSSMTime("2026-02-20T09:15:00+00:00")),
+			LastModifiedDate: aws.Time(time.Now().AddDate(0, 0, -63).Truncate(time.Hour)),
 			Description:      aws.String("Encrypted database connection string"),
 			KeyId:            aws.String("alias/acme-prod-key"),
 			DataType:         aws.String("text"),
@@ -83,7 +83,7 @@ var sharedSSMFixtures = sync.OnceValue(func() *SSMFixtures {
 			ARN:              aws.String("arn:aws:ssm:us-east-1:123456789012:parameter/acme/prod/feature-flags"),
 			Type:             ssmtypes.ParameterTypeStringList,
 			Version:          28,
-			LastModifiedDate: aws.Time(mustParseSSMTime("2026-03-20T11:45:00+00:00")),
+			LastModifiedDate: aws.Time(time.Now().AddDate(0, 0, -35).Truncate(time.Hour)),
 			Description:      aws.String("Feature flag list for production"),
 			DataType:         aws.String("text"),
 		},
@@ -92,7 +92,7 @@ var sharedSSMFixtures = sync.OnceValue(func() *SSMFixtures {
 			ARN:              aws.String("arn:aws:ssm:us-east-1:123456789012:parameter/acme/staging/ami-id"),
 			Type:             ssmtypes.ParameterTypeString,
 			Version:          3,
-			LastModifiedDate: aws.Time(mustParseSSMTime("2026-01-10T16:00:00+00:00")),
+			LastModifiedDate: aws.Time(time.Now().AddDate(0, 0, -104).Truncate(time.Hour)),
 			Description:      aws.String("Latest approved AMI for staging"),
 			DataType:         aws.String("aws:ec2:image"),
 		},
@@ -116,7 +116,7 @@ var sharedSSMFixtures = sync.OnceValue(func() *SSMFixtures {
 			ARN:              aws.String("arn:aws:ssm:us-east-1:123456789012:parameter/acme/shared/thirdparty_api_token"),
 			Type:             ssmtypes.ParameterTypeString,
 			Version:          2,
-			LastModifiedDate: aws.Time(mustParseSSMTime("2025-11-20T14:00:00+00:00")),
+			LastModifiedDate: aws.Time(time.Now().AddDate(0, 0, -155).Truncate(time.Hour)),
 			Description:      aws.String("Third-party API token stored as plaintext — should be SecureString"),
 			DataType:         aws.String("text"),
 		},
@@ -129,7 +129,7 @@ var sharedSSMFixtures = sync.OnceValue(func() *SSMFixtures {
 			ARN:              aws.String("arn:aws:ssm:us-east-1:123456789012:parameter/acme/shared/legacy_service_password"),
 			Type:             ssmtypes.ParameterTypeString,
 			Version:          1,
-			LastModifiedDate: aws.Time(mustParseSSMTime("2026-01-05T10:00:00+00:00")),
+			LastModifiedDate: aws.Time(time.Now().AddDate(0, 0, -109).Truncate(time.Hour)),
 			Description:      aws.String("Legacy service password stored in plaintext String parameter — should be SecureString"),
 			DataType:         aws.String("text"),
 		},
@@ -139,14 +139,14 @@ var sharedSSMFixtures = sync.OnceValue(func() *SSMFixtures {
 		name := ssmNamePool[i]
 		paramType := ssmTypePool[i]
 		version := int64(1 + (i * 3 % 20))
-		lastMod := fmt.Sprintf("2026-%02d-%02dT%02d:00:00+00:00", 1+(i%3), 1+i, 8+(i%12))
+		lastMod := time.Now().AddDate(0, -(4 - i%3), -i).Truncate(time.Hour)
 		desc := fmt.Sprintf("Parameter %s", name)
 		params = append(params, ssmtypes.ParameterMetadata{
 			Name:             aws.String(name),
 			ARN:              aws.String("arn:aws:ssm:us-east-1:123456789012:parameter" + name),
 			Type:             ssmTypeMap[paramType],
 			Version:          version,
-			LastModifiedDate: aws.Time(mustParseSSMTime(lastMod)),
+			LastModifiedDate: aws.Time(lastMod),
 			Description:      aws.String(desc),
 			DataType:         aws.String("text"),
 		})

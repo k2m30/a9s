@@ -3391,7 +3391,7 @@ func buildVolumeStatuses() []ec2types.VolumeStatusItem {
 // ---------------------------------------------------------------------------
 
 func buildSnapshots() []ec2types.Snapshot {
-	t1 := time.Date(2025, 9, 1, 2, 0, 0, 0, time.UTC)
+	t1 := time.Now().UTC().AddDate(0, 0, -235).Truncate(time.Hour)
 	t2 := time.Date(2026, 1, 1, 3, 0, 0, 0, time.UTC)
 	t3 := time.Date(2026, 3, 21, 4, 0, 0, 0, time.UTC)
 	t4 := time.Date(2026, 3, 28, 4, 0, 0, 0, time.UTC)
@@ -3668,7 +3668,7 @@ func buildImages() []ec2types.Image {
 func init() {
 	Register(Pin{ShortName: "ec2", Rows: 41, Issues: 16})
 	Register(Pin{ShortName: "ebs", Rows: 9, Issues: 6, CoverageGaps: []string{"dim"}})
-	Register(Pin{ShortName: "ebs-snap", Rows: 9, Issues: 5, CoverageGaps: []string{"dim"}})
+	Register(Pin{ShortName: "ebs-snap", Rows: 9, Issues: 4, CoverageGaps: []string{"dim"}})
 	Register(Pin{ShortName: "ami", Rows: 9, Issues: 4})
 	Register(Pin{ShortName: "eip", Rows: 9, Issues: 4, CoverageGaps: []string{"broken", "dim"}})
 	Register(Pin{ShortName: "eni", Rows: 48, Issues: 3, CoverageGaps: []string{"broken", "dim"}})
