@@ -372,24 +372,39 @@ func extractInstancesSetEvent(eventName string, params map[string]any, cleanedPa
 	return rows, removeKeys(cleanedParams, "instancesSet")
 }
 
-// catchAllScan scans top-level params for keys ending in Id, Name, or Arn.
-// Returns at most one Row for the first match found. ARN values are stripped.
+// catchAllScan scans top-level params for keys ending in Arn, Id or Name and
+// returns at most one Row for the most specific of them: an ARN names the
+// subject exactly, an id next, a name least. Ties inside a rank go to the key
+// that sorts first, so two renders of one event pick the same key — a Go map
+// yields its keys in a different order every time. ARN values are stripped.
 func catchAllScan(params map[string]any, cleanedParams map[string]any) ([]Row, map[string]any) {
-	if params == nil {
-		return nil, cleanedParams
-	}
+	bestKey, bestVal, bestRank := "", "", 0
 	for k, v := range params {
 		s, ok := v.(string)
 		if !ok || s == "" {
 			continue
 		}
-		if strings.HasSuffix(k, "Id") || strings.HasSuffix(k, "Name") || strings.HasSuffix(k, "Arn") {
-			val := FormatCTTarget(s, "")
-			if val == "" {
-				val = s
-			}
-			return []Row{{Key: "Resource", Value: val}}, removeKeys(cleanedParams, k)
+		rank := 0
+		switch {
+		case strings.HasSuffix(k, "Arn"):
+			rank = 3
+		case strings.HasSuffix(k, "Id"):
+			rank = 2
+		case strings.HasSuffix(k, "Name"):
+			rank = 1
+		default:
+			continue
+		}
+		if rank > bestRank || (rank == bestRank && k < bestKey) {
+			bestKey, bestVal, bestRank = k, s, rank
 		}
 	}
-	return nil, cleanedParams
+	if bestRank == 0 {
+		return nil, cleanedParams
+	}
+	val := FormatCTTarget(bestVal, "")
+	if val == "" {
+		val = bestVal
+	}
+	return []Row{{Key: "Resource", Value: val}}, removeKeys(cleanedParams, bestKey)
 }

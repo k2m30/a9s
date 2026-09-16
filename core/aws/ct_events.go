@@ -292,6 +292,7 @@ func buildCTResource(event cloudtrailtypes.Event) resource.Resource {
 			"_ct.target":            target,
 			"_ct.target_raw":        targetRaw,
 			"_ct.outcome":           outcome,
+			"_ct.cause":             cause,
 			"_ct.error_code":        errorCode,
 			"_ct.account_id":        accountID,
 			"_ct.recipient_account": recipientAccount,

@@ -50,7 +50,7 @@ func colorCTEvents(r domain.Resource) domain.Color {
 	// Every event carries a finding, including the routine tier that colours
 	// the row dim — so the fallback never returns healthy here.
 	return colorFromFindings(ctEventFindings(
-		r.Fields["status"], r.Fields["cause"], r.Fields["error_code"], r.Name))
+		r.Fields["status"], r.Fields["_ct.cause"], r.Fields["_ct.error_code"], r.Name))
 }
 
 var monitoringTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static catalog: intentional package-level var
@@ -254,7 +254,7 @@ var monitoringTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 		FilteredFetcher: filteredFetcherWithClients(func(ctx context.Context, c *ServiceClients, filter map[string]string, continuationToken string) (resource.FetchResult, error) {
 			return FetchCloudTrailEventsPageFiltered(ctx, c.CloudTrail, filter, continuationToken)
 		}),
-		FieldKeys: []string{"event_name", "time", "event_time", "user", "source", "resource_type", "resource_name", "read_only", "role_name", "status", "_ct.verb", "_ct.actor", "_ct.origin", "_ct.target", "_ct.target_raw", "_ct.outcome"},
+		FieldKeys: []string{"event_name", "time", "event_time", "user", "source", "resource_type", "resource_name", "read_only", "role_name", "status", "_ct.verb", "_ct.actor", "_ct.origin", "_ct.target", "_ct.target_raw", "_ct.outcome", "_ct.cause", "_ct.error_code"},
 		Related: []domain.RelatedDef{
 			{TargetType: "role", DisplayName: "IAM Roles", Checker: checkCtEventsRole, NeedsTargetCache: false},
 			{TargetType: "iam-user", DisplayName: "IAM Users", Checker: checkCtEventsUser, NeedsTargetCache: false},

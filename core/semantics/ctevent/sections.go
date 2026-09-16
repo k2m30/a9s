@@ -149,9 +149,9 @@ func buildActorRows(event *Event) []Row {
 }
 
 // arnTargetType derives the navigable resource type from an ARN.
-// Returns "role" for assumed-role ARNs, "iam-user" for :user/ ARNs, "" otherwise.
+// Returns "role" for assumed-role and role ARNs, "iam-user" for :user/ ARNs, "" otherwise.
 func arnTargetType(arn string) string {
-	if strings.Contains(arn, ":assumed-role/") {
+	if strings.Contains(arn, ":assumed-role/") || strings.Contains(arn, ":role/") {
 		return "role"
 	}
 	if strings.Contains(arn, ":user/") {
@@ -164,10 +164,13 @@ func arnTargetType(arn string) string {
 // The display Value remains the full ARN; NavID is used only for navigation dispatch.
 //
 //   - arn:aws:sts::*:assumed-role/<role>/<session> → <role>
-//   - arn:aws:iam::*:role/<name>                   → <name>
-//   - arn:aws:iam::*:user/<name>                   → <name>
+//   - arn:aws:iam::*:role/<path>/<name>            → <name>
+//   - arn:aws:iam::*:user/<path>/<name>            → <name>
 //   - arn:aws:iam::*:root                          → "" (not navigable by name)
 //   - anything else                                → "" (falls back to Value)
+//
+// An IAM name cannot contain "/", so everything ahead of the last one is the
+// IAM path, which the catalogue does not key on.
 func arnNavID(arn string) string {
 	if _, after, ok := strings.Cut(arn, ":assumed-role/"); ok {
 		rest := after
@@ -178,10 +181,10 @@ func arnNavID(arn string) string {
 		return rest
 	}
 	if _, after, ok := strings.Cut(arn, ":role/"); ok {
-		return after
+		return after[strings.LastIndex(after, "/")+1:]
 	}
 	if _, after, ok := strings.Cut(arn, ":user/"); ok {
-		return after
+		return after[strings.LastIndex(after, "/")+1:]
 	}
 	return ""
 }

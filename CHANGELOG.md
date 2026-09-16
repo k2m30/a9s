@@ -9,6 +9,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- The Principal row of a CloudTrail event opens the IAM role when the caller
+  arrived as the role itself, not only through an assumed-role session. A role
+  or user that lives under an IAM path opens by its own name instead of
+  failing to resolve; the row still shows the full ARN.
+
+- The TARGET of a CloudTrail event whose record names no resource no longer
+  changes between two viewings of the same event. Among the request parameters
+  a9s now prefers an ARN, then an id, then a name, so a call carrying both a
+  role name and a role ARN always shows the ARN.
+
+- A CloudTrail event restored from the on-disk cache keeps the colour and the
+  cause it had when it was fetched. The cause the row was flagged for is now
+  stored with it, so a red row does not come back as a generic one.
+
 - Two clusters that each own a node group of the same name now show two node
   group rows. The list identifies a node group by its cluster and its name, so
   the second "workers" is no longer dropped or shown as the first cluster's
