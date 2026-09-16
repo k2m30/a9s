@@ -282,6 +282,9 @@ func buildCTResource(event cloudtrailtypes.Event) resource.Resource {
 			"resource_name": resourceName,
 			"read_only":     readOnly,
 			"role_name":     roleName,
+			// CloudTrail has no LookupAttributeKey for the shared event id, so
+			// the SharedEventId pivot filters on this field locally instead.
+			"shared_event_id": strFromMap(parsed, "sharedEventID"),
 			// New _ct.* keys.
 			"_ct.verb":              verb,
 			"_ct.actor":             actor,

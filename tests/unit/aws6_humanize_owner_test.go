@@ -55,7 +55,8 @@ var humanizedDetailWitnesses = []struct {
 	{"apigw", "efg567hij8", "protocol", "WEBSOCKET", "websocket", false},
 	{"ecs-svc", "api-gateway", "LaunchType", "FARGATE", "fargate", false},
 	{"ecs-svc", "api-gateway", "status", "ACTIVE", "active", true},
-	{"ng", "acme-prod-degraded-pool", "status", "DEGRADED", "degraded", false},
+	// row 4 (codex-0916): a node group's row id is "<cluster>/<nodegroup>".
+	{"ng", "acme-prod/acme-prod-degraded-pool", "status", "DEGRADED", "degraded", false},
 }
 
 // TestDemoDetailShowsWordsNotConstants pins each named field on the demo

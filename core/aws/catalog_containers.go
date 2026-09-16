@@ -111,14 +111,16 @@ var containersTypes = []catalog.ResourceTypeDef{
 		HumanizeFields: []string{"status"},
 		Aliases:        []string{"ng", "nodegroups", "node-groups"},
 		Category:       "CONTAINERS",
-		CloudTrailKey:  "ResourceName:ID",
-		LifecycleKey:   "status",
+		// The row id is "<cluster>/<nodegroup>"; both the console path and
+		// CloudTrail's ResourceName know the node group by its bare name.
+		CloudTrailKey: "ResourceName:Fields.nodegroup_name",
+		LifecycleKey:  "status",
 		ConsoleURL: func(r domain.Resource, region, _ string) string {
-			cluster := r.Fields["cluster_name"]
-			if cluster == "" {
+			cluster, ngName := r.Fields["cluster_name"], r.Fields["nodegroup_name"]
+			if cluster == "" || ngName == "" {
 				return ""
 			}
-			return consolelink.Regional(region, "eks/home?region="+region+"#/clusters/"+url.PathEscape(cluster)+"/nodegroups/"+url.PathEscape(r.ID))
+			return consolelink.Regional(region, "eks/home?region="+region+"#/clusters/"+url.PathEscape(cluster)+"/nodegroups/"+url.PathEscape(ngName))
 		},
 		Columns: []domain.Column{
 			{Key: "nodegroup_name", Title: "Node Group", Path: "NodegroupName", Width: 28},

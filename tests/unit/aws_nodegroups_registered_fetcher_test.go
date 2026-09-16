@@ -357,14 +357,19 @@ func TestRegisteredNGFetcher_NilNodegroup_KeepsDegradedRow(t *testing.T) {
 	if len(result.Resources) != 2 {
 		t.Fatalf("expected 2 rows (1 full + 1 degraded), got %d", len(result.Resources))
 	}
+	// row 4 (codex-0916): a node-group row is identified by "<cluster>/<name>",
+	// degraded rows included. The bare name is Fields["nodegroup_name"].
 	var ghost *resource.Resource
 	for i := range result.Resources {
-		if result.Resources[i].ID == "ng-ghost" {
+		if result.Resources[i].ID == "prod/ng-ghost" {
 			ghost = &result.Resources[i]
 		}
 	}
 	if ghost == nil {
-		t.Fatalf("degraded row ng-ghost must remain, got %v", result.Resources)
+		t.Fatalf("degraded row prod/ng-ghost must remain, got %v", result.Resources)
+	}
+	if got := ghost.Fields["nodegroup_name"]; got != "ng-ghost" {
+		t.Errorf("degraded row Fields[\"nodegroup_name\"] = %q, want %q", got, "ng-ghost")
 	}
 	if ghost.Fields["status"] != "details unavailable" {
 		t.Errorf("degraded row status = %q, want %q", ghost.Fields["status"], "details unavailable")

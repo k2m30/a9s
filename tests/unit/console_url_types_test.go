@@ -172,9 +172,11 @@ func TestConsoleURL_PerType(t *testing.T) {
 			},
 		},
 		{
-			name: "ng", shortName: "ng", pickID: "general-pool",
+			// row 4 (codex-0916): the row id is "<cluster>/<nodegroup>"; the
+			// console addresses the node group by its bare name.
+			name: "ng", shortName: "ng", pickID: "acme-prod/general-pool",
 			want: func(row resource.Resource) string {
-				return fmt.Sprintf("https://%s.console.aws.amazon.com/eks/home?region=%s#/clusters/%s/nodegroups/%s", r, r, url.PathEscape(row.Fields["cluster_name"]), url.PathEscape(row.ID))
+				return fmt.Sprintf("https://%s.console.aws.amazon.com/eks/home?region=%s#/clusters/%s/nodegroups/%s", r, r, url.PathEscape(row.Fields["cluster_name"]), url.PathEscape(row.Fields["nodegroup_name"]))
 			},
 		},
 		{

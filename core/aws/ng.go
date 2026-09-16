@@ -101,7 +101,7 @@ func buildNodeGroupResource(clusterName, ngName string, ng *ekstypes.Nodegroup) 
 	findings, issueRows := ngFindings(status, "", healthIssuesCount, issueCodes)
 
 	r := resource.Resource{
-		ID:   nodegroupName,
+		ID:   ngRowID(ngClusterName, nodegroupName),
 		Name: nodegroupName,
 		Fields: map[string]string{
 			"nodegroup_name":      nodegroupName,
@@ -125,13 +125,26 @@ func buildNodeGroupResource(clusterName, ngName string, ng *ekstypes.Nodegroup) 
 	return r
 }
 
+// ngRowID is the identity of a node-group row. EKS scopes a node-group name to
+// its cluster, so two clusters may each own a "workers"; the ng list is one
+// flat list keyed by ID, where a bare name would drop the second one. The bare
+// name stays in Fields["nodegroup_name"] for everything that addresses the node
+// group by the name AWS knows it by (the console link, the CloudTrail filter).
+func ngRowID(clusterName, ngName string) string {
+	return clusterName + "/" + ngName
+}
+
 // degradedNodeGroup is the name-only row for a node group DescribeNodegroup
 // would not answer for. It writes the two identity fields buildNodeGroupResource
 // writes, because those are what the related checkers filter on and, unlike
 // RawStruct, they survive the disk cache: without them a warm row makes
 // ng→eks, ng→ec2 and ng→ebs answer a confident zero instead of "not read".
 func degradedNodeGroup(clusterName, ngName string, err error) resource.Resource {
-	r := DegradedDetails("ng", ngName, err)
+	r := DegradedDetails("ng", ngRowID(clusterName, ngName), err)
+	// DegradedDetails names the row after its id; a node group displays under
+	// the bare name, exactly as a full row does.
+	r.Name = ngName
+	r.Fields["name"] = ngName
 	r.Fields["cluster_name"] = clusterName
 	r.Fields["nodegroup_name"] = ngName
 	return r

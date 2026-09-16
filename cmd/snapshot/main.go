@@ -1,6 +1,7 @@
 // Command snapshot downloads raw resource facts for EVERY resource type a9s
 // can display, from a real read-only AWS account, into one big JSON file. It
-// uses nothing but the AWS SDK — no a9s packages, no a9s binary involvement.
+// uses nothing but the AWS SDK and the cache package's path encoding — no
+// other a9s packages, no a9s binary involvement.
 // The output is the comparison baseline the checklist generator (cmd/checklist) turns into
 // expected screen checklists; refresh it any time by re-running this command.
 //
@@ -24,6 +25,8 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	awscfg "github.com/aws/aws-sdk-go-v2/config"
+
+	"github.com/k2m30/a9s/v3/core/cache"
 )
 
 // captureFunc downloads the raw facts for one resource type. Implementations
@@ -79,7 +82,10 @@ func main() {
 		}
 	}
 
-	dir := filepath.Join(*out, *profile+"--"+cfg.Region)
+	dir, err := snapshotDir(*out, *profile, cfg.Region)
+	if err != nil {
+		log.Fatalf("snapshot: %v", err)
+	}
 	path := filepath.Join(dir, "snapshot.json")
 
 	snap := snapshotFile{
@@ -138,6 +144,31 @@ func main() {
 	fmt.Printf("snapshot: wrote %s (%d types, %d errors)\n", path, len(snap.Types), failed)
 }
 
+// snapshotDir returns the output directory for one profile+region pair under
+// out. Profile and region are user input; cache.DirIn escapes each into one
+// path element (a separator becomes "%2F") and returns "" for a pair it cannot
+// place under out, which is refused here before any directory is created.
+func snapshotDir(out, profile, region string) (string, error) {
+	root := out
+	if root != "" {
+		// Containment compares the pair directory against the root, and
+		// filepath.Join drops the leading "./" — "--out ." would otherwise
+		// never contain anything. An empty --out is left alone: it is the
+		// pair-does-not-resolve sentinel, and Abs would turn it into the
+		// working directory.
+		abs, err := filepath.Abs(root)
+		if err != nil {
+			return "", err
+		}
+		root = abs
+	}
+	dir := cache.DirIn(root, profile, region)
+	if dir == "" {
+		return "", fmt.Errorf("--out %q cannot contain profile %q and region %q", out, profile, region)
+	}
+	return dir, nil
+}
+
 // mergeSnapshotFile loads the existing snapshot at path (if any) and returns
 // the sections to carry over for a partial run: every type section EXCEPT
 // those in selected, preserved byte-for-byte, plus prior errors minus selected.
@@ -174,15 +205,30 @@ func mergeSnapshotFile(path string, selected []string) (map[string]json.RawMessa
 	return types, errs
 }
 
+// writeJSON writes v to path atomically: the bytes go to a temp file beside
+// the target and are renamed over it, so a write that fails or is interrupted
+// leaves the previous snapshot byte-identical instead of truncated — the
+// partial-run merge reads that file back for every section it does not
+// refresh. CreateTemp's 0600 travels with the rename, which also tightens a
+// target left wider by an older binary.
 func writeJSON(path string, v any) error {
 	data, err := json.MarshalIndent(v, "", "  ")
 	if err != nil {
 		return err
 	}
-	if err := os.WriteFile(path, data, 0o600); err != nil {
+	tmp, err := os.CreateTemp(filepath.Dir(path), ".snapshot-*.json")
+	if err != nil {
 		return err
 	}
-	// WriteFile applies the mode only on creation — chmod pre-existing files
-	// written by older binaries down to owner-only.
-	return os.Chmod(path, 0o600)
+	// Harmless once the rename has consumed the temp file.
+	defer func() { _ = os.Remove(tmp.Name()) }()
+
+	if _, err := tmp.Write(data); err != nil {
+		_ = tmp.Close()
+		return err
+	}
+	if err := tmp.Close(); err != nil {
+		return err
+	}
+	return os.Rename(tmp.Name(), path)
 }

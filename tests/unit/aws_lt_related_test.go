@@ -238,8 +238,9 @@ func TestRelated_LT_EKSNodeRootCounts(t *testing.T) {
 		if result.Count() != 1 {
 			t.Errorf("Count = %d, want 1", result.Count())
 		}
-		if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "general-pool" {
-			t.Errorf("ResourceIDs = %v, want [general-pool]", result.ResourceIDs())
+		// row 4 (codex-0916): a node group's row id is "<cluster>/<nodegroup>".
+		if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "acme-prod/general-pool" {
+			t.Errorf("ResourceIDs = %v, want [acme-prod/general-pool]", result.ResourceIDs())
 		}
 	})
 }

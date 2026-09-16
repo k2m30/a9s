@@ -5,7 +5,7 @@ package aws
 
 import (
 	"context"
-	"strings"
+	"slices"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	autoscalingPkg "github.com/aws/aws-sdk-go-v2/service/autoscaling"
@@ -92,14 +92,45 @@ func checkEKSCTEvents(ctx context.Context, clients any, res resource.Resource, c
 		if !ok {
 			continue
 		}
-		for _, r := range ev.Resources {
-			if r.ResourceName != nil && strings.Contains(*r.ResourceName, clusterName) {
+		// Cluster names routinely share a prefix ("prod", "prod-blue"), and an
+		// event's Resources slice carries every service's entries — a substring
+		// test attributes a sibling's events to this cluster. Each group holds
+		// the event's resource name as written and its forms stripped back to
+		// the cluster name, so the comparison is an equality.
+		for _, group := range extractCTResourceIDs(ev, "AWS::EKS::Cluster") {
+			if slices.Contains(group, clusterName) {
 				ids = append(ids, evRes.ID)
 				break
 			}
 		}
 	}
 	return relatedResultTrunc("ct-events", ids, truncated)
+}
+
+// listClusterNodegroups walks every ListNodegroups page for one cluster. A
+// cluster whose node groups do not fit in one page is exactly the cluster whose
+// related panel matters, and a single unpaged call reports the first page as
+// the whole truth.
+func listClusterNodegroups(ctx context.Context, api EKSAPI, clusterName string) ([]string, error) {
+	var names []string
+	var token *string
+	for {
+		out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*eks.ListNodegroupsOutput, error) {
+			return api.ListNodegroups(ctx, &eks.ListNodegroupsInput{
+				ClusterName: aws.String(clusterName),
+				NextToken:   token,
+			})
+		})
+		if err != nil {
+			return nil, err
+		}
+		names = append(names, out.Nodegroups...)
+		if aws.ToString(out.NextToken) == "" {
+			break
+		}
+		token = out.NextToken
+	}
+	return names, nil
 }
 
 // checkEKSAMI resolves the AMI(s) used by all node groups in this EKS cluster.
@@ -124,18 +155,14 @@ func checkEKSAMI(ctx context.Context, clients any, res resource.Resource, _ reso
 		return resource.UnknownRelated("ami")
 	}
 
-	ngOut, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*eks.ListNodegroupsOutput, error) {
-		return c.EKS.ListNodegroups(ctx, &eks.ListNodegroupsInput{
-			ClusterName: aws.String(clusterName),
-		})
-	})
+	ngNames, err := listClusterNodegroups(ctx, c.EKS, clusterName)
 	if err != nil {
 		return resource.ErrorRelated("ami", err)
 	}
 
 	amiSet := make(map[string]struct{})
 	var failures []Failure
-	for _, ngName := range ngOut.Nodegroups {
+	for _, ngName := range ngNames {
 		descOut, descErr := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*eks.DescribeNodegroupOutput, error) {
 			return c.EKS.DescribeNodegroup(ctx, &eks.DescribeNodegroupInput{
 				ClusterName:   aws.String(clusterName),
@@ -191,7 +218,7 @@ func checkEKSAMI(ctx context.Context, clients any, res resource.Resource, _ reso
 		// itself failed — that does not establish "the population is larger
 		// than what we saw" (Truncated's contract); it establishes nothing.
 		// Surface it as an error, not a lower bound of zero.
-		if aggErr := AggregateFailures("eks-related: DescribeNodegroup/DescribeLaunchTemplateVersions", failures, len(ngOut.Nodegroups)); aggErr != nil {
+		if aggErr := AggregateFailures("eks-related: DescribeNodegroup/DescribeLaunchTemplateVersions", failures, len(ngNames)); aggErr != nil {
 			return resource.ErrorRelated("ami", aggErr)
 		}
 		return relatedResultTrunc("ami", nil, false)
@@ -202,6 +229,11 @@ func checkEKSAMI(ctx context.Context, clients any, res resource.Resource, _ reso
 	// matches as a dead end.
 	return relatedResultTrunc("ami", ids, len(failures) > 0)
 }
+
+// asgNamesPerDescribe is the maximum number of names DescribeAutoScalingGroups
+// accepts in one request; a longer list is refused outright, which would turn a
+// large cluster's whole EC2 row into an error.
+const asgNamesPerDescribe = 50
 
 // checkEKSEC2 resolves EC2 instances running in this EKS cluster via node group ASGs.
 // For each node group: get Resources.AutoScalingGroups, then call
@@ -224,19 +256,15 @@ func checkEKSEC2(ctx context.Context, clients any, res resource.Resource, _ reso
 		return resource.UnknownRelated("ec2")
 	}
 
-	ngOut, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*eks.ListNodegroupsOutput, error) {
-		return c.EKS.ListNodegroups(ctx, &eks.ListNodegroupsInput{
-			ClusterName: aws.String(clusterName),
-		})
-	})
+	ngNames, err := listClusterNodegroups(ctx, c.EKS, clusterName)
 	if err != nil {
 		return resource.ErrorRelated("ec2", err)
 	}
 
 	var asgNames []string
 	var ngFailures []Failure
-	ngTotal := len(ngOut.Nodegroups)
-	for _, ngName := range ngOut.Nodegroups {
+	ngTotal := len(ngNames)
+	for _, ngName := range ngNames {
 		descOut, descErr := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*eks.DescribeNodegroupOutput, error) {
 			return c.EKS.DescribeNodegroup(ctx, &eks.DescribeNodegroupInput{
 				ClusterName:   aws.String(clusterName),
@@ -272,20 +300,21 @@ func checkEKSEC2(ctx context.Context, clients any, res resource.Resource, _ reso
 		return resource.UnknownRelated("ec2")
 	}
 
-	asgOut, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*autoscalingPkg.DescribeAutoScalingGroupsOutput, error) {
-		return c.AutoScaling.DescribeAutoScalingGroups(ctx, &autoscalingPkg.DescribeAutoScalingGroupsInput{
-			AutoScalingGroupNames: asgNames,
-		})
-	})
-	if err != nil {
-		return resource.ErrorRelated("ec2", err)
-	}
-
 	seen := make(map[string]struct{})
-	for _, asg := range asgOut.AutoScalingGroups {
-		for _, inst := range asg.Instances {
-			if inst.InstanceId != nil && *inst.InstanceId != "" {
-				seen[*inst.InstanceId] = struct{}{}
+	for batch := range slices.Chunk(asgNames, asgNamesPerDescribe) {
+		asgOut, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*autoscalingPkg.DescribeAutoScalingGroupsOutput, error) {
+			return c.AutoScaling.DescribeAutoScalingGroups(ctx, &autoscalingPkg.DescribeAutoScalingGroupsInput{
+				AutoScalingGroupNames: batch,
+			})
+		})
+		if err != nil {
+			return resource.ErrorRelated("ec2", err)
+		}
+		for _, asg := range asgOut.AutoScalingGroups {
+			for _, inst := range asg.Instances {
+				if inst.InstanceId != nil && *inst.InstanceId != "" {
+					seen[*inst.InstanceId] = struct{}{}
+				}
 			}
 		}
 	}

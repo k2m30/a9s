@@ -1429,18 +1429,19 @@ func TestFetchNodeGroups_Pagination(t *testing.T) {
 		}
 	})
 
+	// row 4 (codex-0916): node-group ids are "<cluster>/<nodegroup>".
 	t.Run("cluster_A_nodegroups", func(t *testing.T) {
-		if resources[0].ID != "ng-a1" {
-			t.Errorf("expected %q, got %q", "ng-a1", resources[0].ID)
+		if resources[0].ID != "cluster-A/ng-a1" {
+			t.Errorf("expected %q, got %q", "cluster-A/ng-a1", resources[0].ID)
 		}
-		if resources[1].ID != "ng-a2" {
-			t.Errorf("expected %q, got %q", "ng-a2", resources[1].ID)
+		if resources[1].ID != "cluster-A/ng-a2" {
+			t.Errorf("expected %q, got %q", "cluster-A/ng-a2", resources[1].ID)
 		}
 	})
 
 	t.Run("cluster_B_nodegroup", func(t *testing.T) {
-		if resources[2].ID != "ng-b1" {
-			t.Errorf("expected %q, got %q", "ng-b1", resources[2].ID)
+		if resources[2].ID != "cluster-B/ng-b1" {
+			t.Errorf("expected %q, got %q", "cluster-B/ng-b1", resources[2].ID)
 		}
 	})
 
@@ -1565,7 +1566,8 @@ func TestFetchNodeGroups_MultiPageClusterLosesNoNodeGroups(t *testing.T) {
 			}
 			seen[r.ID] = r
 		}
-		for _, wantID := range []string{"ng-s1", "ng-s2", "ng-s3", "ng-s4", "ng-s5"} {
+		// row 4 (codex-0916): node-group ids are "<cluster>/<nodegroup>".
+		for _, wantID := range []string{"cluster-solo/ng-s1", "cluster-solo/ng-s2", "cluster-solo/ng-s3", "cluster-solo/ng-s4", "cluster-solo/ng-s5"} {
 			if _, ok := seen[wantID]; !ok {
 				t.Errorf("node group %q missing from accumulated result — page-2 node groups must not be lost", wantID)
 			}
@@ -1573,7 +1575,7 @@ func TestFetchNodeGroups_MultiPageClusterLosesNoNodeGroups(t *testing.T) {
 
 		// c) DescribeNodegroup enrichment must reach the late-page node
 		// groups too — they must not come back as bare/degraded rows.
-		if late, ok := seen["ng-s4"]; ok {
+		if late, ok := seen["cluster-solo/ng-s4"]; ok {
 			if got := late.Fields["status"]; got != "UPDATING" {
 				t.Errorf("ng-s4 (page-2 node group) status = %q, want %q — DescribeNodegroup enrichment not applied", got, "UPDATING")
 			}
@@ -1647,15 +1649,16 @@ func TestFetchNodeGroups_MultiPageClusterLosesNoNodeGroups(t *testing.T) {
 			seen[r.ID] = true
 		}
 
-		if !seen["ng-a3"] {
+		// row 4 (codex-0916): node-group ids are "<cluster>/<nodegroup>".
+		if !seen["cluster-A/ng-a3"] {
 			ids := make([]string, len(resources))
 			for i, r := range resources {
 				ids[i] = r.ID
 			}
 			t.Fatalf("cluster-A's second-page node group %q is missing from the accumulated result (got %v) — "+
-				"lost once the outer ListClusters pagination advanced to cluster-B", "ng-a3", ids)
+				"lost once the outer ListClusters pagination advanced to cluster-B", "cluster-A/ng-a3", ids)
 		}
-		for _, wantID := range []string{"ng-a1", "ng-a2", "ng-b1"} {
+		for _, wantID := range []string{"cluster-A/ng-a1", "cluster-A/ng-a2", "cluster-B/ng-b1"} {
 			if !seen[wantID] {
 				t.Errorf("node group %q missing from accumulated result", wantID)
 			}
@@ -1803,7 +1806,9 @@ func TestFetchNodeGroups_ResultCapLosesContinuation(t *testing.T) {
 			}
 			seen[r.ID] = true
 		}
-		for _, wantID := range allNames {
+		// row 4 (codex-0916): node-group ids are "<cluster>/<nodegroup>".
+		for _, name := range allNames {
+			wantID := "cluster-mega/" + name
 			if !seen[wantID] {
 				t.Errorf("node group %q missing from accumulated result — capped cluster's remaining node groups must be reachable", wantID)
 			}
@@ -1856,13 +1861,14 @@ func TestFetchNodeGroups_ResultCapLosesContinuation(t *testing.T) {
 			}
 			seen[r.ID] = true
 		}
-		if !seen[secondClusterNG] {
+		// row 4 (codex-0916): node-group ids are "<cluster>/<nodegroup>".
+		if !seen["cluster-b/"+secondClusterNG] {
 			t.Errorf("cluster-b's node group %q never appears in the accumulated result — "+
 				"resume skipped past the capped cluster instead of returning to it", secondClusterNG)
 		}
-		for _, wantID := range megaNames {
-			if !seen[wantID] {
-				t.Errorf("cluster-mega node group %q missing from accumulated result", wantID)
+		for _, name := range megaNames {
+			if !seen["cluster-mega/"+name] {
+				t.Errorf("cluster-mega node group %q missing from accumulated result", name)
 			}
 		}
 	})

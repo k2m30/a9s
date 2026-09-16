@@ -670,18 +670,18 @@ func checkCtEventsPivotBySharedEventId(_ context.Context, _ any, res resource.Re
 		return resource.KnownRelated("ct-events", nil, false)
 	}
 	parsed := parseCTEventJSON(event.CloudTrailEvent)
-	sharedEventID, _ := parsed["sharedEventID"].(string)
-	if sharedEventID == "" {
-		// Cross-account event without a sharedEventID in the JSON — use the eventID as
-		// a best-effort fallback so the pivot is still offered to the user.
-		if event.EventId != nil && *event.EventId != "" {
-			sharedEventID = *event.EventId
-		}
+	if sharedEventID, _ := parsed["sharedEventID"].(string); sharedEventID != "" {
+		// LookupEvents has no SharedEventId attribute key — sending one fails
+		// the call — so the drill filters on the built row's field instead.
+		return resource.DeferredRelated("ct-events",
+			map[string]string{ctLocalFieldPrefix + "shared_event_id": sharedEventID})
 	}
-	if sharedEventID == "" {
-		return resource.KnownRelated("ct-events", nil, false)
+	// Cross-account event without a sharedEventID in the JSON — scope the drill
+	// by the event's own id so the pivot is still offered to the user.
+	if event.EventId != nil && *event.EventId != "" {
+		return resource.DeferredRelated("ct-events", map[string]string{"EventId": *event.EventId})
 	}
-	return resource.DeferredRelated("ct-events", map[string]string{"SharedEventId": sharedEventID})
+	return resource.KnownRelated("ct-events", nil, false)
 }
 
 // checkCtEventsTrail extracts CloudTrail trail identifiers from the CloudTrail

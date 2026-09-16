@@ -7,6 +7,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Two clusters that each own a node group of the same name now show two node
+  group rows. The list identifies a node group by its cluster and its name, so
+  the second "workers" is no longer dropped or shown as the first cluster's
+  node group. The Node Group column, the console link and the CloudTrail pivot
+  still use the bare name.
+
+- The "CT events by SharedEventId" pivot on a cross-account CloudTrail event
+  now returns the sibling events instead of an error. CloudTrail cannot filter
+  on the shared event id, so a9s fetches the page and keeps the events whose
+  shared event id matches. An event whose record carries no shared event id
+  scopes the drill by its own event id.
+
+- A cluster whose node groups do not fit in one page now contributes all of
+  them to the EKS cluster's AMI and EC2 Instances rows; previously only the
+  first page counted. A cluster with more than fifty node group scaling groups
+  no longer turns its EC2 Instances row into an error.
+
+- The CloudTrail Events row of an EKS cluster counts only that cluster's own
+  events. Events belonging to a cluster whose name merely contains this one's
+  ("prod" inside "prod-blue"), and events about other kinds of resource that
+  happen to share the name, are no longer counted.
+
+- The snapshot tool writes its JSON file atomically and places its output
+  directory under `--out` with the same escaping the on-disk cache uses. An
+  interrupted write leaves the previous snapshot intact, so a later partial
+  refresh still carries every other section.
+
 ## [3.57.1] - 2026-09-15
 
 ### Fixed
