@@ -100,14 +100,7 @@ func (f *w2S3Posture) GetBucketAcl(_ context.Context, in *s3.GetBucketAclInput, 
 	if err := f.fail(aws.ToString(in.Bucket)); err != nil {
 		return nil, err
 	}
-	owner := &s3types.Owner{ID: aws.String("acme000000000000000000000000000000000000000000000000000000000ow")}
-	return &s3.GetBucketAclOutput{
-		Owner: owner,
-		Grants: []s3types.Grant{{
-			Grantee:    &s3types.Grantee{Type: s3types.TypeCanonicalUser, ID: owner.ID},
-			Permission: s3types.PermissionFullControl,
-		}},
-	}, nil
+	return w2HealthyACL(), nil
 }
 
 func (f *w2S3Posture) GetBucketVersioning(_ context.Context, in *s3.GetBucketVersioningInput, _ ...func(*s3.Options)) (*s3.GetBucketVersioningOutput, error) {
