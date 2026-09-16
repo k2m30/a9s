@@ -192,7 +192,7 @@ var replayShadowedCells = []replayShadowedCell{
 	// timestamp: the fetcher writes a date and no time of day, and the cell
 	// says exactly that, with no "00:00" the fetcher never reported.
 	{"secrets", "prod/app/long-lived-signing-key", "Last Changed", "2024-12-01"},
-	{"secrets", "prod/payments/stripe-webhook-secret", "Last Accessed", "2026-04-28"},
+	{"secrets", "prod/legacy/archive-decrypt-key", "Last Accessed", "2025-09-01"},
 	// The identifier column: the defaults read the fetcher's task_id, so a
 	// column headed "Task ID" and 38 wide shows the ID rather than a
 	// 78-character ARN cut in half.

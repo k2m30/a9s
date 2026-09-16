@@ -54,6 +54,11 @@ var secretDescPool = []string{
 
 // NewSecretsFixtures constructs SecretsFixtures from the canonical demo data.
 var sharedSecretsFixtures = sync.OnceValue(func() *SecretsFixtures {
+	// The fetcher judges LastAccessedDate, LastChangedDate and
+	// NextRotationDate against the wall clock (dormant after 180 days, stale
+	// after 365, overdue once past). A date meant to sit on the fresh side of
+	// a rule is an offset from now, so the calendar cannot carry it across the
+	// line; a date meant to be past a rule already is a literal.
 	secrets := []smtypes.SecretListEntry{
 		// RDS-managed secret for prod-dbi-1 — required for dbi→secrets related-panel pivot.
 		// ARN matches DBIFixtures.ProdDbiMasterSecretARN (MasterUserSecret.SecretArn on prod-dbi-1).
@@ -61,8 +66,8 @@ var sharedSecretsFixtures = sync.OnceValue(func() *SecretsFixtures {
 			Name:             aws.String("rds!db-prod-dbi-1-ABCDEF"),
 			ARN:              aws.String(ProdDbiMasterSecretARN),
 			Description:      aws.String("RDS-managed master user password for prod-dbi-1"),
-			LastAccessedDate: aws.Time(time.Date(2026, 4, 20, 0, 0, 0, 0, time.UTC)),
-			LastChangedDate:  aws.Time(time.Date(2026, 4, 15, 12, 0, 0, 0, time.UTC)),
+			LastAccessedDate: aws.Time(time.Now().AddDate(0, 0, -11)),
+			LastChangedDate:  aws.Time(time.Now().AddDate(0, 0, -16)),
 			RotationEnabled:  aws.Bool(true),
 			CreatedDate:      aws.Time(time.Date(2025, 6, 1, 9, 0, 0, 0, time.UTC)),
 			KmsKeyId:         aws.String("arn:aws:kms:us-east-1:123456789012:key/a1b2c3d4-5678-90ab-cdef-111111111111"),
@@ -75,8 +80,8 @@ var sharedSecretsFixtures = sync.OnceValue(func() *SecretsFixtures {
 			Name:             aws.String("rds!db-prod-dbi-aurora-1-GHIJKL"),
 			ARN:              aws.String(ProdDbiAuroraMasterSecretARN),
 			Description:      aws.String("RDS-managed master user password for prod-dbi-aurora-1"),
-			LastAccessedDate: aws.Time(time.Date(2026, 4, 20, 0, 0, 0, 0, time.UTC)),
-			LastChangedDate:  aws.Time(time.Date(2026, 4, 15, 12, 0, 0, 0, time.UTC)),
+			LastAccessedDate: aws.Time(time.Now().AddDate(0, 0, -11)),
+			LastChangedDate:  aws.Time(time.Now().AddDate(0, 0, -16)),
 			RotationEnabled:  aws.Bool(true),
 			CreatedDate:      aws.Time(time.Date(2025, 6, 1, 9, 0, 0, 0, time.UTC)),
 			KmsKeyId:         aws.String("arn:aws:kms:us-east-1:123456789012:key/a1b2c3d4-5678-90ab-cdef-111111111111"),
@@ -90,8 +95,8 @@ var sharedSecretsFixtures = sync.OnceValue(func() *SecretsFixtures {
 			Name:             aws.String("rds!cluster-prod-aurora-cluster-MNOPQR"),
 			ARN:              aws.String(ProdDbcAuroraMasterSecretARN),
 			Description:      aws.String("RDS-managed master user password for prod-aurora-cluster"),
-			LastAccessedDate: aws.Time(time.Date(2026, 4, 20, 0, 0, 0, 0, time.UTC)),
-			LastChangedDate:  aws.Time(time.Date(2026, 4, 15, 12, 0, 0, 0, time.UTC)),
+			LastAccessedDate: aws.Time(time.Now().AddDate(0, 0, -11)),
+			LastChangedDate:  aws.Time(time.Now().AddDate(0, 0, -16)),
 			RotationEnabled:  aws.Bool(true),
 			CreatedDate:      aws.Time(time.Date(2025, 3, 1, 9, 0, 0, 0, time.UTC)),
 			KmsKeyId:         aws.String("arn:aws:kms:us-east-1:123456789012:key/a1b2c3d4-5678-90ab-cdef-111111111111"),
@@ -102,8 +107,8 @@ var sharedSecretsFixtures = sync.OnceValue(func() *SecretsFixtures {
 			Name:              aws.String("prod/docdb/acme-docdb-prod"),
 			ARN:               aws.String("arn:aws:secretsmanager:us-east-1:123456789012:secret:prod/docdb/acme-docdb-prod-XyZaBc"),
 			Description:       aws.String("DocumentDB cluster credentials for acme-docdb-prod"),
-			LastAccessedDate:  aws.Time(time.Date(2026, 3, 21, 0, 0, 0, 0, time.UTC)),
-			LastChangedDate:   aws.Time(time.Date(2026, 2, 20, 0, 0, 0, 0, time.UTC)),
+			LastAccessedDate:  aws.Time(time.Now().AddDate(0, 0, -41)),
+			LastChangedDate:   aws.Time(time.Now().AddDate(0, 0, -70)),
 			RotationEnabled:   aws.Bool(true),
 			CreatedDate:       aws.Time(time.Date(2025, 2, 5, 9, 0, 0, 0, time.UTC)),
 			KmsKeyId:          aws.String("arn:aws:kms:us-east-1:123456789012:key/a1b2c3d4-5678-90ab-cdef-111111111111"),
@@ -117,8 +122,8 @@ var sharedSecretsFixtures = sync.OnceValue(func() *SecretsFixtures {
 			Name:              aws.String("prod/database/primary"),
 			ARN:               aws.String("arn:aws:secretsmanager:us-east-1:123456789012:secret:prod/database/primary-AbCdEf"),
 			Description:       aws.String("Aurora PostgreSQL primary connection string"),
-			LastAccessedDate:  aws.Time(time.Date(2026, 3, 21, 0, 0, 0, 0, time.UTC)),
-			LastChangedDate:   aws.Time(time.Date(2026, 2, 15, 0, 0, 0, 0, time.UTC)),
+			LastAccessedDate:  aws.Time(time.Now().AddDate(0, 0, -41)),
+			LastChangedDate:   aws.Time(time.Now().AddDate(0, 0, -75)),
 			RotationEnabled:   aws.Bool(true),
 			CreatedDate:       aws.Time(time.Date(2025, 1, 10, 8, 0, 0, 0, time.UTC)),
 			KmsKeyId:          aws.String("arn:aws:kms:us-east-1:123456789012:key/a1b2c3d4-5678-90ab-cdef-111111111111"),
@@ -138,8 +143,8 @@ var sharedSecretsFixtures = sync.OnceValue(func() *SecretsFixtures {
 			Name:             aws.String("prod/api/gateway-key"),
 			ARN:              aws.String("arn:aws:secretsmanager:us-east-1:123456789012:secret:prod/api/gateway-key-XyZ123"),
 			Description:      aws.String("API Gateway shared secret key for the api-gateway ECS service"),
-			LastAccessedDate: aws.Time(time.Date(2026, 3, 20, 0, 0, 0, 0, time.UTC)),
-			LastChangedDate:  aws.Time(time.Date(2026, 2, 1, 0, 0, 0, 0, time.UTC)),
+			LastAccessedDate: aws.Time(time.Now().AddDate(0, 0, -42)),
+			LastChangedDate:  aws.Time(time.Now().AddDate(0, 0, -89)),
 			RotationEnabled:  aws.Bool(false),
 			CreatedDate:      aws.Time(time.Date(2025, 4, 1, 9, 0, 0, 0, time.UTC)),
 			KmsKeyId:         aws.String("arn:aws:kms:us-east-1:123456789012:key/a1b2c3d4-5678-90ab-cdef-111111111111"),
@@ -153,8 +158,8 @@ var sharedSecretsFixtures = sync.OnceValue(func() *SecretsFixtures {
 			Name:             aws.String("prod/api/stripe-key"),
 			ARN:              aws.String("arn:aws:secretsmanager:us-east-1:123456789012:secret:prod/api/stripe-key-GhIjKl"),
 			Description:      aws.String("Stripe API secret key for payment processing"),
-			LastAccessedDate: aws.Time(time.Date(2026, 3, 20, 0, 0, 0, 0, time.UTC)),
-			LastChangedDate:  aws.Time(time.Date(2026, 1, 5, 0, 0, 0, 0, time.UTC)),
+			LastAccessedDate: aws.Time(time.Now().AddDate(0, 0, -42)),
+			LastChangedDate:  aws.Time(time.Now().AddDate(0, 0, -116)),
 			RotationEnabled:  aws.Bool(false),
 			CreatedDate:      aws.Time(time.Date(2025, 4, 22, 14, 30, 0, 0, time.UTC)),
 		},
@@ -162,8 +167,8 @@ var sharedSecretsFixtures = sync.OnceValue(func() *SecretsFixtures {
 			Name:             aws.String("prod/redis/auth-token"),
 			ARN:              aws.String("arn:aws:secretsmanager:us-east-1:123456789012:secret:prod/redis/auth-token-MnOpQr"),
 			Description:      aws.String("ElastiCache Redis AUTH token"),
-			LastAccessedDate: aws.Time(time.Date(2026, 3, 19, 0, 0, 0, 0, time.UTC)),
-			LastChangedDate:  aws.Time(time.Date(2026, 3, 1, 0, 0, 0, 0, time.UTC)),
+			LastAccessedDate: aws.Time(time.Now().AddDate(0, 0, -43)),
+			LastChangedDate:  aws.Time(time.Now().AddDate(0, 0, -61)),
 			RotationEnabled:  aws.Bool(true),
 			CreatedDate:      aws.Time(time.Date(2025, 6, 1, 10, 0, 0, 0, time.UTC)),
 		},
@@ -174,8 +179,8 @@ var sharedSecretsFixtures = sync.OnceValue(func() *SecretsFixtures {
 			Name:             aws.String(ProdRedisSecretName),
 			ARN:              aws.String("arn:aws:secretsmanager:us-east-1:123456789012:secret:" + ProdRedisSecretName + "-AbCdEf"),
 			Description:      aws.String("AUTH token for prod-redis-sessions ElastiCache cluster"),
-			LastAccessedDate: aws.Time(time.Date(2026, 4, 20, 0, 0, 0, 0, time.UTC)),
-			LastChangedDate:  aws.Time(time.Date(2026, 4, 1, 0, 0, 0, 0, time.UTC)),
+			LastAccessedDate: aws.Time(time.Now().AddDate(0, 0, -11)),
+			LastChangedDate:  aws.Time(time.Now().AddDate(0, 0, -30)),
 			RotationEnabled:  aws.Bool(true),
 			LastRotatedDate:  aws.Time(time.Date(2026, 4, 1, 3, 0, 0, 0, time.UTC)),
 			CreatedDate:      aws.Time(time.Date(2025, 3, 15, 10, 0, 0, 0, time.UTC)),
@@ -191,8 +196,8 @@ var sharedSecretsFixtures = sync.OnceValue(func() *SecretsFixtures {
 			Name:             aws.String("redshift!acme-warehouse-AbCdEf"),
 			ARN:              aws.String(AcmeWarehouseSecretARN),
 			Description:      aws.String("Redshift-managed master user password for acme-warehouse"),
-			LastAccessedDate: aws.Time(time.Date(2026, 4, 20, 0, 0, 0, 0, time.UTC)),
-			LastChangedDate:  aws.Time(time.Date(2026, 4, 15, 12, 0, 0, 0, time.UTC)),
+			LastAccessedDate: aws.Time(time.Now().AddDate(0, 0, -11)),
+			LastChangedDate:  aws.Time(time.Now().AddDate(0, 0, -16)),
 			RotationEnabled:  aws.Bool(true),
 			CreatedDate:      aws.Time(time.Date(2025, 3, 10, 9, 0, 0, 0, time.UTC)),
 			KmsKeyId:         aws.String(RedshiftKMSKeyARN1),
@@ -203,8 +208,8 @@ var sharedSecretsFixtures = sync.OnceValue(func() *SecretsFixtures {
 			Name:             aws.String("redshift!acme-reporting-XxYyZz"),
 			ARN:              aws.String(AcmeReportingSecretARN),
 			Description:      aws.String("Redshift-managed master user password for acme-reporting"),
-			LastAccessedDate: aws.Time(time.Date(2026, 4, 20, 0, 0, 0, 0, time.UTC)),
-			LastChangedDate:  aws.Time(time.Date(2026, 4, 15, 12, 0, 0, 0, time.UTC)),
+			LastAccessedDate: aws.Time(time.Now().AddDate(0, 0, -11)),
+			LastChangedDate:  aws.Time(time.Now().AddDate(0, 0, -16)),
 			RotationEnabled:  aws.Bool(true),
 			CreatedDate:      aws.Time(time.Date(2025, 7, 22, 9, 0, 0, 0, time.UTC)),
 			KmsKeyId:         aws.String(RedshiftKMSKeyARN2),
@@ -214,8 +219,8 @@ var sharedSecretsFixtures = sync.OnceValue(func() *SecretsFixtures {
 			Name:             aws.String("staging/database/mysql"),
 			ARN:              aws.String("arn:aws:secretsmanager:us-east-1:123456789012:secret:staging/database/mysql-StUvWx"),
 			Description:      aws.String("Staging MySQL connection credentials"),
-			LastAccessedDate: aws.Time(time.Date(2026, 3, 18, 0, 0, 0, 0, time.UTC)),
-			LastChangedDate:  aws.Time(time.Date(2025, 12, 10, 0, 0, 0, 0, time.UTC)),
+			LastAccessedDate: aws.Time(time.Now().AddDate(0, 0, -44)),
+			LastChangedDate:  aws.Time(time.Now().AddDate(0, 0, -142)),
 			RotationEnabled:  aws.Bool(false),
 			CreatedDate:      aws.Time(time.Date(2025, 3, 15, 9, 0, 0, 0, time.UTC)),
 		},
@@ -224,8 +229,8 @@ var sharedSecretsFixtures = sync.OnceValue(func() *SecretsFixtures {
 			Name:              aws.String("prod/app/rotation-broken"),
 			ARN:               aws.String("arn:aws:secretsmanager:us-east-1:123456789012:secret:prod/app/rotation-broken-YzAbCd"),
 			Description:       aws.String("API key with broken automatic rotation"),
-			LastAccessedDate:  aws.Time(time.Date(2026, 4, 10, 0, 0, 0, 0, time.UTC)),
-			LastChangedDate:   aws.Time(time.Date(2025, 9, 1, 0, 0, 0, 0, time.UTC)),
+			LastAccessedDate:  aws.Time(time.Now().AddDate(0, 0, -21)),
+			LastChangedDate:   aws.Time(time.Now().AddDate(0, 0, -242)),
 			RotationEnabled:   aws.Bool(true),
 			LastRotatedDate:   aws.Time(time.Date(2025, 9, 1, 0, 0, 0, 0, time.UTC)),
 			RotationLambdaARN: aws.String("arn:aws:lambda:us-east-1:123456789012:function:rotate-api-key"),
@@ -241,8 +246,8 @@ var sharedSecretsFixtures = sync.OnceValue(func() *SecretsFixtures {
 			Name:             aws.String("prod/codeartifact/npm-publish-token"),
 			ARN:              aws.String("arn:aws:secretsmanager:us-east-1:123456789012:secret:prod/codeartifact/npm-publish-token-QwErTy"),
 			Description:      aws.String("CodeArtifact publish token for the acme-npm repository"),
-			LastAccessedDate: aws.Time(time.Date(2026, 3, 20, 0, 0, 0, 0, time.UTC)),
-			LastChangedDate:  aws.Time(time.Date(2026, 1, 10, 0, 0, 0, 0, time.UTC)),
+			LastAccessedDate: aws.Time(time.Now().AddDate(0, 0, -42)),
+			LastChangedDate:  aws.Time(time.Now().AddDate(0, 0, -111)),
 			RotationEnabled:  aws.Bool(false),
 			CreatedDate:      aws.Time(time.Date(2025, 5, 1, 9, 0, 0, 0, time.UTC)),
 			Tags:             []smtypes.Tag{{Key: aws.String("Environment"), Value: aws.String("production")}},
@@ -253,7 +258,7 @@ var sharedSecretsFixtures = sync.OnceValue(func() *SecretsFixtures {
 			ARN:              aws.String("arn:aws:secretsmanager:us-east-1:123456789012:secret:dev/deprecated/old-webhook-key-EfGhIj"),
 			Description:      aws.String("Deprecated webhook key scheduled for deletion"),
 			LastAccessedDate: aws.Time(time.Date(2025, 10, 15, 0, 0, 0, 0, time.UTC)),
-			LastChangedDate:  aws.Time(time.Date(2025, 10, 1, 0, 0, 0, 0, time.UTC)),
+			LastChangedDate:  aws.Time(time.Now().AddDate(0, 0, -212)),
 			RotationEnabled:  aws.Bool(false),
 			CreatedDate:      aws.Time(time.Date(2024, 3, 1, 8, 0, 0, 0, time.UTC)),
 			DeletedDate:      aws.Time(time.Date(2026, 4, 15, 12, 0, 0, 0, time.UTC)),
@@ -267,7 +272,7 @@ var sharedSecretsFixtures = sync.OnceValue(func() *SecretsFixtures {
 			ARN:              aws.String("arn:aws:secretsmanager:us-east-1:123456789012:secret:prod/legacy/archive-decrypt-key-LmNoPq"),
 			Description:      aws.String("Decryption key for legacy archive exports, rarely used"),
 			LastAccessedDate: aws.Time(time.Date(2025, 9, 1, 0, 0, 0, 0, time.UTC)),
-			LastChangedDate:  aws.Time(time.Date(2026, 2, 1, 0, 0, 0, 0, time.UTC)),
+			LastChangedDate:  aws.Time(time.Now().AddDate(0, 0, -89)),
 			RotationEnabled:  aws.Bool(true),
 			RotationRules:    &smtypes.RotationRulesType{AutomaticallyAfterDays: aws.Int64(90)},
 			CreatedDate:      aws.Time(time.Date(2024, 6, 1, 9, 0, 0, 0, time.UTC)),
@@ -279,7 +284,7 @@ var sharedSecretsFixtures = sync.OnceValue(func() *SecretsFixtures {
 			Name:             aws.String("prod/app/long-lived-signing-key"),
 			ARN:              aws.String("arn:aws:secretsmanager:us-east-1:123456789012:secret:prod/app/long-lived-signing-key-RsTuVw"),
 			Description:      aws.String("Message-signing key, actively read but never rotated"),
-			LastAccessedDate: aws.Time(time.Date(2026, 4, 25, 0, 0, 0, 0, time.UTC)),
+			LastAccessedDate: aws.Time(time.Now().AddDate(0, 0, -6)),
 			LastChangedDate:  aws.Time(time.Date(2024, 12, 1, 0, 0, 0, 0, time.UTC)),
 			RotationEnabled:  aws.Bool(true),
 			RotationRules:    &smtypes.RotationRulesType{AutomaticallyAfterDays: aws.Int64(180)},
@@ -292,8 +297,8 @@ var sharedSecretsFixtures = sync.OnceValue(func() *SecretsFixtures {
 			Name:             aws.String("prod/payments/stripe-webhook-secret"),
 			ARN:              aws.String("arn:aws:secretsmanager:us-east-1:123456789012:secret:prod/payments/stripe-webhook-secret-NpQrSt"),
 			Description:      aws.String("Stripe webhook signing secret — automatic rotation is past due"),
-			LastAccessedDate: aws.Time(time.Date(2026, 4, 28, 0, 0, 0, 0, time.UTC)),
-			LastChangedDate:  aws.Time(time.Date(2025, 10, 1, 0, 0, 0, 0, time.UTC)),
+			LastAccessedDate: aws.Time(time.Now().AddDate(0, 0, -3)),
+			LastChangedDate:  aws.Time(time.Now().AddDate(0, 0, -212)),
 			RotationEnabled:  aws.Bool(true),
 			NextRotationDate: aws.Time(time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)),
 			RotationRules:    &smtypes.RotationRulesType{AutomaticallyAfterDays: aws.Int64(90)},
@@ -338,8 +343,8 @@ var sharedSecretsFixtures = sync.OnceValue(func() *SecretsFixtures {
 		name := secretNamePool[i]
 		desc := secretDescPool[i]
 		rotation := i%3 == 0
-		lastAccessed := time.Date(2026, 3, 15+i%7, 0, 0, 0, 0, time.UTC)
-		lastChanged := time.Date(2026, time.Month(1+i%3), 1+i, 0, 0, 0, 0, time.UTC)
+		lastAccessed := time.Now().AddDate(0, 0, -(47 - i%7))
+		lastChanged := time.Now().AddDate(0, -(4 - i%3), -i)
 		created := time.Date(2025, time.Month(1+i%12), 1+i, 10, 0, 0, 0, time.UTC)
 		suffix := fmt.Sprintf("%06x", i+1000)
 		secrets = append(secrets, smtypes.SecretListEntry{
@@ -376,5 +381,5 @@ func NewSecretsFixtures() *SecretsFixtures {
 }
 
 func init() {
-	Register(Pin{ShortName: "secrets", Rows: 38, Issues: 26, CoverageGaps: []string{"dim"}})
+	Register(Pin{ShortName: "secrets", Rows: 38, Issues: 20, CoverageGaps: []string{"dim"}})
 }
