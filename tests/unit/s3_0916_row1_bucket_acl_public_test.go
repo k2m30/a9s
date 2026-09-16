@@ -202,8 +202,8 @@ func TestS3_0916_Row1_AllUsersGrantMakesTheBucketPublic(t *testing.T) {
 	if f.Severity != domain.SevBroken {
 		t.Errorf("Severity = %v, want SevBroken", f.Severity)
 	}
-	if v, found := row1RowValue(got, row1CodePublic, row1ACLLabel); !found || v != "AllUsers READ" {
-		t.Errorf("row %q = %q (found=%v), want %q", row1ACLLabel, v, found, "AllUsers READ")
+	if v, found := row1RowValue(got, row1CodePublic, row1ACLLabel); !found || v != "AllUsers read" {
+		t.Errorf("row %q = %q (found=%v), want %q", row1ACLLabel, v, found, "AllUsers read")
 	}
 	if _, ok := row1Finding(got, row1CodePAB); !ok {
 		t.Error("the public-access-block finding disappeared; the ACL route is an addition, not a replacement")
@@ -220,8 +220,8 @@ func TestS3_0916_Row1_AuthenticatedUsersGrantMakesTheBucketPublic(t *testing.T) 
 	if _, ok := row1Finding(got, row1CodePublic); !ok {
 		t.Fatalf("findings = %v, want one carrying %s", got.Findings[row1Bucket], row1CodePublic)
 	}
-	if v, found := row1RowValue(got, row1CodePublic, row1ACLLabel); !found || v != "AuthenticatedUsers WRITE" {
-		t.Errorf("row %q = %q (found=%v), want %q", row1ACLLabel, v, found, "AuthenticatedUsers WRITE")
+	if v, found := row1RowValue(got, row1CodePublic, row1ACLLabel); !found || v != "AuthenticatedUsers write" {
+		t.Errorf("row %q = %q (found=%v), want %q", row1ACLLabel, v, found, "AuthenticatedUsers write")
 	}
 }
 
@@ -304,8 +304,8 @@ func TestS3_0916_Row1_PublicByPolicyAndByACLFiresOnceWithBothRows(t *testing.T) 
 	if v, found := row1RowValue(got, row1CodePublic, row1PolicyRow); !found || v != "public" {
 		t.Errorf("row %q = %q (found=%v), want %q", row1PolicyRow, v, found, "public")
 	}
-	if v, found := row1RowValue(got, row1CodePublic, row1ACLLabel); !found || v != "AllUsers READ" {
-		t.Errorf("row %q = %q (found=%v), want %q", row1ACLLabel, v, found, "AllUsers READ")
+	if v, found := row1RowValue(got, row1CodePublic, row1ACLLabel); !found || v != "AllUsers read" {
+		t.Errorf("row %q = %q (found=%v), want %q", row1ACLLabel, v, found, "AllUsers read")
 	}
 }
 

@@ -400,7 +400,7 @@ func s3ACLPublicRows(out *s3.GetBucketAclOutput, ignorePublicACLs bool) []domain
 		}
 		rows = append(rows, domain.DetailRow{
 			Label: "Access control list",
-			Value: group + " " + string(g.Permission),
+			Value: group + " " + domain.HumanizeStatusPhrase(string(g.Permission)),
 			Tier:  "!",
 		})
 	}
