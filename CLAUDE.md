@@ -1,6 +1,6 @@
 # a9s Development Guidelines
 
-Your work will be review by Codex.
+Your work will be reviewed by `a9s-reviewer` (Claude Opus, xhigh effort).
 
 ## Process — single source of truth
 
@@ -38,10 +38,9 @@ Applies to every defect — one you found, one a review reported, one a test cau
 
 ## External Review Protocol
 
-**Nothing merges to `main` without an external pass resolved.** Local gates prove the code runs; they do not prove it is right. Three independent reviewers are available and they find different classes of defect:
+**Nothing merges to `main` without an external pass resolved.** Local gates prove the code runs; they do not prove it is right. Three independent reviewers are available and they find different classes of defect. The `a9s-reviewer` agent (Opus, xhigh effort, read-only) is dispatched with the committed range `<base>..<head>`; CodeRabbit runs from the shell:
 
 ```bash
-codex exec --skip-git-repo-check "<review prompt naming the range and the production files>"
 coderabbit review --plain --type committed --base-commit <base>
 ```
 
@@ -49,12 +48,12 @@ Plus `/ponytail-review` for over-engineering (delete/simplify only — it does n
 
 Rules:
 
-- **Once per task, before its commits fast-forward into main.** Codex is expensive: one pass per task on the task's committed range, never per fix, and only when the task's production diff (`core/`, `internal/`, `cmd/`, `scripts/`, tests excluded) is at least 100 changed lines or touches 3 or more production files. One-liners, wording, docs and test-only changes are not reviewed.
-- **Code review only.** Every Codex prompt opens with: "DO NOT run build, make, go test or any gate — this is a code review only. Ignore tests/ entirely; review the production code in the range." The loop has already run the gates; paying Codex to run them again buys nothing.
-- **Review the committed range**, not the working tree — `--base-commit <base>` for CodeRabbit, an explicit range for Codex.
+- **Once per task, before its commits fast-forward into main.** `a9s-reviewer` at xhigh is expensive: one pass per task on the task's committed range, never per fix, and only when the task's production diff (`core/`, `internal/`, `cmd/`, `scripts/`, tests excluded) is at least 100 changed lines or touches 3 or more production files. One-liners, wording, docs and test-only changes are not reviewed.
+- **Code review only.** Every `a9s-reviewer` dispatch states: "DO NOT run build, make, go test or any gate — this is a code review only. Ignore tests/ entirely; review the production code in the range." The loop has already run the gates; paying the reviewer to run them again buys nothing. The agent definition enforces the same rule.
+- **Review the committed range**, not the working tree — `--base-commit <base>` for CodeRabbit, an explicit `<base>..<head>` range for `a9s-reviewer`.
 - **A reviewer's suggested patch is a proposal, not verified code.** Read every snippet against the actual file before applying it; patches routinely reference helpers that do not exist in that file's package. The finding can be correct while the patch does not compile.
 - **Point reviewers at production code.** A large mechanical test migration will drown the signal otherwise.
-- Never tag a release without CodeRabbit and Codex resolved on the range.
+- Never tag a release without CodeRabbit and `a9s-reviewer` resolved on the range.
 
 On PRs: `@coderabbitai ignore` where no further review is wanted; `[skip ci]` for trivial follow-ups; reviews trigger per-push, so batch small fixes into one push.
 
@@ -101,6 +100,7 @@ On PRs: `@coderabbitai ignore` where no further review is wanted; `[skip ci]` fo
 | `a9s-acceptance` | Skeptical end user — final acceptance on rendered surfaces, docs, gates; blind to the log until verdict | `TASKDIR/` only | Criteria + integrated worktree |
 | `a9s-qa-stories` | Given/when/then stories from design spec (no source code) | Nothing (read-only) | N/A |
 | `a9s-devops` | AWS practitioner — resource priorities, feature advice | All | N/A |
+| `a9s-reviewer` | External pass — Opus at xhigh effort reviews a task's committed range before it fast-forwards into main, and the tag range before a release | Nothing (read-only) | A committed `<base>..<head>` range |
 | `a9s-consistency-checker` | Verifies consistency across code, tests, README, website, config | Nothing (read-only) | N/A |
 | `tui-designer` | TUI wireframes, color schemes, preview mockups | Design artifacts | N/A |
 
@@ -113,7 +113,7 @@ On PRs: `@coderabbitai ignore` where no further review is wanted; `[skip ci]` fo
 - NEVER delete code, tests, or helpers just to make a linter happy. Understand WHY the code exists first. If it's genuinely dead, remove it. If it serves a purpose (scaffolding, crash-verification tests), use a targeted `//nolint` with a reason comment. If a linter rule produces widespread false positives, fix the rule in `.golangci.yml`.
 - NEVER make multiple push-and-check cycles. Get it right locally, push once.
 - NEVER commit real environment identifiers — real AWS account IDs, profile names, secret/bucket/DNS names, personal emails. Use synthetic values (`123456789012`, `example-readonly`) or `<placeholders>`. Enforced by `scripts/check-no-real-data.sh`: a generic account-ID-in-ARN heuristic (committed — a pattern, no real value stored) plus the exact terms from the local, git-ignored `.githooks/sensitive_patterns.txt` (never committed — not even hashed; a 12-digit ID or short name is brute-forced from a hash in seconds). Term enforcement is on NEW content only. Modes: tree (`make ready-to-push`), `--staged` (`.githooks/pre-commit`), `--diff` (`.githooks/pre-push`, aborts the push before it reaches the remote), `--audit` (hunt existing leaks). CI is deliberately NOT used — it runs after the push, and a push to a public repo exposes the data immediately. Run `make install-hooks` once per clone. New real term → add it to your local `.githooks/sensitive_patterns.txt`.
-- BEFORE any push, the canonical gate is **`make ready-to-push`** — see [`docs/development-process.md`](docs/development-process.md) §"Stage 6 — Pre-push Validation" for the gate contents and the `core/aws/` live-integration sub-rule. Review the diff first (Stage 5): `a9s-consistency-checker` for cross-file drift, direct BT v2 / security / coverage review, and CodeRabbit / Codex as external passes.
+- BEFORE any push, the canonical gate is **`make ready-to-push`** — see [`docs/development-process.md`](docs/development-process.md) §"Stage 6 — Pre-push Validation" for the gate contents and the `core/aws/` live-integration sub-rule. Review the diff first (Stage 5): `a9s-consistency-checker` for cross-file drift, direct BT v2 / security / coverage review, and CodeRabbit / `a9s-reviewer` as external passes.
 - BEFORE any release, the canonical gate is **`make ready-to-release`** — see [`docs/development-process.md`](docs/development-process.md) §"Stage 7 — Merge & Release" for the manual checklist (`CHANGELOG.md`, `releases/vX.Y.Z.md`, `docs/architecture.md` alignment, busywork audit on tests added/modified in the release).
 - **Exception**: Docs-only changes (`*.md`, `docs/`, `website/`, `specs/`, `.claude/`, `LICENSE`) skip `ready-to-push`; `make mdlint` is required.
 
