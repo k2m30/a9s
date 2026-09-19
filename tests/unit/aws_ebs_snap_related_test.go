@@ -180,14 +180,16 @@ func TestRelated_EBSSnap_EBS_NoVolume(t *testing.T) {
 	}
 }
 
+// The CreateImage instance counts only when the loaded ec2 list holds it.
 func TestRelated_EBSSnap_EC2_Found(t *testing.T) {
 	source := resource.Resource{
 		ID:     "snap-abc",
 		Fields: map[string]string{"description": "Created by CreateImage(i-0a1b2c3d4e5f60001) for ami-xxx"},
 	}
+	cache := resource.ResourceCache{"ec2": resource.ResourceCacheEntry{Resources: []resource.Resource{{ID: "i-0a1b2c3d4e5f60001"}}}}
 
 	checker := ebsSnapCheckerByTarget(t, "ec2")
-	result := checker(context.Background(), nil, source, resource.ResourceCache{})
+	result := checker(context.Background(), nil, source, cache)
 
 	if result.Count() != 1 {
 		t.Errorf("Count = %d, want 1", result.Count())

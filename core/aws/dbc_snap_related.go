@@ -11,23 +11,15 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// checkDbcSnapDBC extracts DBClusterIdentifier from the DBClusterSnapshot RawStruct
-// and searches the dbc cache for the parent cluster.
-// Handles both docdbtypes.DBClusterSnapshot and rdstypes.DBClusterSnapshot shapes.
+// checkDbcSnapDBC searches the dbc cache for the cluster the snapshot was
+// taken from (dbcSnapTakenFrom).
 func checkDbcSnapDBC(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
-	var clusterID string
-	if snap, ok := assertStruct[docdbtypes.DBClusterSnapshot](res.RawStruct); ok {
-		if snap.DBClusterIdentifier == nil || *snap.DBClusterIdentifier == "" {
-			return resource.KnownRelated("dbc", nil, false)
-		}
-		clusterID = *snap.DBClusterIdentifier
-	} else if snap, ok := assertStruct[rdstypes.DBClusterSnapshot](res.RawStruct); ok {
-		if snap.DBClusterIdentifier == nil || *snap.DBClusterIdentifier == "" {
-			return resource.KnownRelated("dbc", nil, false)
-		}
-		clusterID = *snap.DBClusterIdentifier
-	} else {
+	p, ok := dbcSnapParentOf(res.RawStruct)
+	if !ok {
 		return resource.UnknownRelated("dbc")
+	}
+	if p.cluster == "" || !p.local() {
+		return resource.KnownRelated("dbc", nil, false)
 	}
 
 	dbcList, truncated, err := relatedResourcesFor(ctx, clients, cache, "dbc")
@@ -40,7 +32,7 @@ func checkDbcSnapDBC(ctx context.Context, clients any, res resource.Resource, ca
 
 	var ids []string
 	for _, dbcRes := range dbcList {
-		if dbcRes.Name == clusterID || dbcRes.ID == clusterID {
+		if dbcSnapTakenFrom(res.RawStruct, dbcRes) {
 			ids = append(ids, dbcRes.ID)
 		}
 	}
@@ -109,38 +101,32 @@ func checkDbcSnapVPC(_ context.Context, _ any, res resource.Resource, _ resource
 // cannot be resolved from the visible window, we cannot determine whether
 // the parent is in a later page — return UnknownRelated rather than Count:0.
 func checkDbcSnapBackup(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
-	parentName, parentARN := dbcSnapParentRefs(res.RawStruct)
-	if parentName == "" {
-		// No parent reference — can't pivot.
+	p, ok := dbcSnapParentOf(res.RawStruct)
+	if !ok || p.cluster == "" || !p.local() {
 		return unreadZero(res, resource.KnownRelated("backup", nil, false))
 	}
 
 	// Neither snapshot shape carries the parent cluster ARN, so it is
 	// resolved through the dbc cache.
-	if parentARN == "" {
-		dbcList, dbcTruncated, err := relatedResourcesFor(ctx, clients, cache, "dbc")
-		if err != nil {
-			return resource.ErrorRelated("backup", err)
-		}
-		if dbcList == nil {
-			return resource.UnknownRelated("backup")
-		}
-		for _, dbcRes := range dbcList {
-			if dbcRes.ID != parentName && dbcRes.Name != parentName {
-				continue
-			}
+	dbcList, dbcTruncated, err := relatedResourcesFor(ctx, clients, cache, "dbc")
+	if err != nil {
+		return resource.ErrorRelated("backup", err)
+	}
+	if dbcList == nil {
+		return resource.UnknownRelated("backup")
+	}
+	parentARN := ""
+	for _, dbcRes := range dbcList {
+		if dbcSnapTakenFrom(res.RawStruct, dbcRes) {
 			parentARN = dbcResourceARN(dbcRes.RawStruct)
 			break
 		}
-		if parentARN == "" {
-			// Parent not found in visible window.
-			if dbcTruncated {
-				// Cache is truncated — parent may be in a later page; answer is unknown.
-				return resource.UnknownRelated("backup")
-			}
-			// Cache is complete — parent is genuinely absent (orphan or no ARN field).
-			return unreadZeroScanned(res, len(dbcList), resource.KnownRelated("backup", nil, false))
+	}
+	if parentARN == "" {
+		if dbcTruncated {
+			return resource.UnknownRelated("backup")
 		}
+		return unreadZeroScanned(res, len(dbcList), resource.KnownRelated("backup", nil, false))
 	}
 
 	planList, truncated, err := relatedResourcesFor(ctx, clients, cache, "backup")
@@ -152,26 +138,6 @@ func checkDbcSnapBackup(ctx context.Context, clients any, res resource.Resource,
 	}
 
 	return unreadZeroScanned(res, len(planList), backupPivot(planList, truncated, backupTarget{arn: parentARN, engine: res.Fields["engine"], unread: "ListTagsForResource"}))
-}
-
-// dbcSnapParentRefs extracts (parentClusterName, parentClusterARN) from a
-// DBClusterSnapshot. Neither docdbtypes.DBClusterSnapshot nor
-// rdstypes.DBClusterSnapshot carries the parent cluster ARN on the snapshot
-// shape — callers fall back to a dbc-cache lookup in both cases.
-func dbcSnapParentRefs(raw any) (name, arn string) {
-	if snap, ok := assertStruct[docdbtypes.DBClusterSnapshot](raw); ok {
-		if snap.DBClusterIdentifier != nil {
-			name = *snap.DBClusterIdentifier
-		}
-		return name, ""
-	}
-	if snap, ok := assertStruct[rdstypes.DBClusterSnapshot](raw); ok {
-		if snap.DBClusterIdentifier != nil {
-			name = *snap.DBClusterIdentifier
-		}
-		return name, ""
-	}
-	return "", ""
 }
 
 // dbcResourceARN extracts DBClusterArn from a dbc Resource's RawStruct.

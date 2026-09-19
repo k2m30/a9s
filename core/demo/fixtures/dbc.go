@@ -100,6 +100,11 @@ const (
 	WarnDBCSnapManualUnusedID  = "manual-forgotten-dbc-snap"
 	WarnDBCSnapManualUnusedARN = "arn:aws:rds:us-east-1:123456789012:cluster-snapshot:manual-forgotten-dbc-snap"
 
+	// DBCSnapCrossRegionCopyID — manual copy of a snapshot from a us-west-2
+	// cluster that has no counterpart in this region's dbc list.
+	DBCSnapCrossRegionCopyID  = "acme-docdb-west-dr-copy"
+	DBCSnapCrossRegionCopyARN = "arn:aws:rds:us-east-1:123456789012:cluster-snapshot:acme-docdb-west-dr-copy"
+
 	dbcKMSKeyID = "arn:aws:kms:us-east-1:123456789012:key/a1b2c3d4-5678-90ab-cdef-111111111111"
 	dbcSGID     = "sg-0ccc333333333333c"
 	dbcVPCID    = "vpc-0abc123def456789a"
@@ -272,12 +277,11 @@ func buildDBCSnapshots() []docdbtypes.DBClusterSnapshot {
 			EngineVersion:               aws.String("5.0.0"),
 			SnapshotType:                aws.String("automated"),
 			SnapshotCreateTime:          aws.Time(mustTime("2026-03-20T04:00:00Z")),
-			ClusterCreateTime:           aws.Time(mustTime("2025-01-10T09:00:00Z")),
+			ClusterCreateTime:           aws.Time(mustTime("2025-04-15T10:20:00Z")),
 			MasterUsername:              aws.String("docdbadmin"),
 			Port:                        aws.Int32(27017),
 			KmsKeyId:                    aws.String(dbcKMSKeyID),
 			PercentProgress:             aws.Int32(100),
-			SourceDBClusterSnapshotArn:  aws.String("arn:aws:rds:us-east-1:123456789012:cluster-snapshot:rds:acme-docdb-prod-2026-03-19"),
 			AvailabilityZones:           []string{"us-east-1a", "us-east-1b", "us-east-1c"},
 			StorageType:                 aws.String("standard"),
 			StorageEncrypted:            aws.Bool(true),
@@ -433,6 +437,21 @@ func buildDBCSnapshots() []docdbtypes.DBClusterSnapshot {
 			EngineVersion:               aws.String("5.0.0"),
 			SnapshotType:                aws.String("manual"),
 			SnapshotCreateTime:          aws.Time(time.Now().UTC().Add(-400 * 24 * time.Hour)),
+			KmsKeyId:                    aws.String(dbcKMSKeyID),
+			StorageType:                 aws.String("standard"),
+			StorageEncrypted:            aws.Bool(true),
+			VpcId:                       aws.String(dbcVPCID),
+		},
+		{
+			DBClusterSnapshotIdentifier: aws.String(DBCSnapCrossRegionCopyID),
+			DBClusterIdentifier:         aws.String("acme-docdb-west"),
+			DBClusterSnapshotArn:        aws.String(DBCSnapCrossRegionCopyARN),
+			SourceDBClusterSnapshotArn:  aws.String("arn:aws:rds:us-west-2:123456789012:cluster-snapshot:acme-docdb-west-2026-09-01"),
+			Status:                      aws.String("available"),
+			Engine:                      aws.String("docdb"),
+			EngineVersion:               aws.String("5.0.0"),
+			SnapshotType:                aws.String("manual"),
+			SnapshotCreateTime:          aws.Time(time.Now().UTC().Add(-6 * 24 * time.Hour)),
 			KmsKeyId:                    aws.String(dbcKMSKeyID),
 			StorageType:                 aws.String("standard"),
 			StorageEncrypted:            aws.Bool(true),

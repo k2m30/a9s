@@ -58,7 +58,7 @@ Expected targets from `docs/related-resources.md` § Per-type contract: `alarm`,
 ### `dbi-snap`
 
 - **Why related**: Snapshots of this instance — operators pivot here to verify recent backup success or to plan a restore.
-- **How discovered**: `DescribeDBSnapshots(DBInstanceIdentifier=<id>)` (server-side filter) — a9s-devops: this is the documented RDS lookup; possible=yes, worth=yes because snapshot health is part of every DB incident post-mortem.
+- **How discovered**: cross-reference the already-loaded `dbi-snap` list with the same parent match as `dbi-snap` §2 `dbi`: `DBSnapshot.DbiResourceId == DBInstance.DbiResourceId` when the snapshot carries one, `DBSnapshot.DBInstanceIdentifier` otherwise. A cross-region or cross-account copy (`SourceDBSnapshotIdentifier` set) never counts. No extra API call.
 - **Count shown**: yes.
 
 ### `role`

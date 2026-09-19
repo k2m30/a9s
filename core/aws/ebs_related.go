@@ -37,7 +37,7 @@ func checkEBSSnap(ctx context.Context, clients any, res resource.Resource, cache
 
 	var ids []string
 	for _, r := range snapList {
-		if r.Fields["volume_id"] == volID {
+		if r.Fields["volume_id"] == volID && ebsSnapParentIsLocal(r.RawStruct) {
 			ids = append(ids, r.ID)
 		}
 	}

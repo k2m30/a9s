@@ -34,9 +34,9 @@ const (
 	ProdDBISnapID  = "rds:prod-dbi-1-2026-04-15"
 	ProdDBISnapARN = "arn:aws:rds:us-east-1:123456789012:snapshot:rds:prod-dbi-1-2026-04-15"
 
-	// WarnDBISnapCopyingID carries dbi-snap.warn.transitional. Its
-	// parent must stay a canonical dbi fixture and the snapshot manual, or a
-	// wave-2 cross-ref outranks the state it exists to show.
+	// WarnDBISnapCopyingID carries dbi-snap.warn.transitional: a cross-Region
+	// copy from us-west-2 still being copied, whose source instance is not in
+	// this Region's dbi list.
 	WarnDBISnapCopyingID  = "cross-region-copy-snap"
 	WarnDBISnapCopyingARN = "arn:aws:rds:us-east-1:123456789012:snapshot:cross-region-copy-snap"
 
@@ -168,23 +168,24 @@ func buildDBISnapInstances() []rdstypes.DBSnapshot {
 		// Status=copying is a state the predicate does not name. Encrypted
 		// so it carries the transitional finding alone.
 		{
-			DBSnapshotIdentifier: aws.String(WarnDBISnapCopyingID),
-			DBSnapshotArn:        aws.String(WarnDBISnapCopyingARN),
-			DBInstanceIdentifier: aws.String(ProdDbiID),
-			Status:               aws.String("copying"),
-			Engine:               aws.String("aurora-postgresql"),
-			EngineVersion:        aws.String("16.4"),
-			SnapshotType:         aws.String("manual"),
-			SnapshotCreateTime:   aws.Time(mustTime("2026-04-26T09:00:00Z")),
-			AllocatedStorage:     aws.Int32(20),
-			StorageType:          aws.String("aurora"),
-			Encrypted:            aws.Bool(true),
-			KmsKeyId:             aws.String(dbiKMSKeyID),
-			AvailabilityZone:     aws.String("us-east-1a"),
-			MasterUsername:       aws.String("pgadmin"),
-			LicenseModel:         aws.String("postgresql-license"),
-			PercentProgress:      aws.Int32(70),
-			SourceRegion:         aws.String("us-east-1"),
+			DBSnapshotIdentifier:       aws.String(WarnDBISnapCopyingID),
+			DBSnapshotArn:              aws.String(WarnDBISnapCopyingARN),
+			DBInstanceIdentifier:       aws.String(ProdDbiID),
+			Status:                     aws.String("copying"),
+			Engine:                     aws.String("aurora-postgresql"),
+			EngineVersion:              aws.String("16.4"),
+			SnapshotType:               aws.String("manual"),
+			SnapshotCreateTime:         aws.Time(mustTime("2026-04-26T09:00:00Z")),
+			AllocatedStorage:           aws.Int32(20),
+			StorageType:                aws.String("aurora"),
+			Encrypted:                  aws.Bool(true),
+			KmsKeyId:                   aws.String(dbiKMSKeyID),
+			AvailabilityZone:           aws.String("us-east-1a"),
+			MasterUsername:             aws.String("pgadmin"),
+			LicenseModel:               aws.String("postgresql-license"),
+			PercentProgress:            aws.Int32(70),
+			SourceRegion:               aws.String("us-west-2"),
+			SourceDBSnapshotIdentifier: aws.String("arn:aws:rds:us-west-2:123456789012:snapshot:prod-dbi-1-2026-04-26"),
 		},
 
 		{

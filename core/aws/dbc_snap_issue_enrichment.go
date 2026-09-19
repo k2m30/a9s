@@ -32,6 +32,7 @@ import (
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/aws/arn"
 	"github.com/aws/aws-sdk-go-v2/service/docdb"
 	docdbtypes "github.com/aws/aws-sdk-go-v2/service/docdb/types"
 	"github.com/aws/aws-sdk-go-v2/service/rds"
@@ -52,10 +53,13 @@ const (
 var enrichDBCSnapCrossRef = EnrichSnapshotCrossRef(SnapshotCrossRefConfig{
 	ParentShortName:    "dbc",
 	GetParentID:        dbcSnapParentID,
+	ParentIsLocal:      dbcSnapParentIsLocal,
+	IsParent:           dbcSnapTakenFrom,
 	GetCreatedAt:       dbcSnapCreatedAt,
 	GetSnapshotType:    dbcSnapType,
 	GetParentRetention: dbcParentRetention,
 	ParentRowLabel:     "Source Cluster",
+	ParentNoun:         "cluster",
 	RetentionEnabled:   true,
 	OrphanCode:         dbcSnapOrphanCode,
 	PastRetentionCode:  dbcSnapPastRetentionCode,
@@ -109,22 +113,91 @@ func dbcSnapShareAttributes(ctx context.Context, clients *ServiceClients, snap r
 	return attrs, nil
 }
 
-// dbcSnapParentID extracts DBClusterIdentifier from either a
-// docdbtypes.DBClusterSnapshot or rdstypes.DBClusterSnapshot.
+// dbcSnapParent is what a cluster snapshot records about the cluster it was
+// taken from, read from the DocumentDB or the RDS snapshot shape. Only the RDS
+// shape carries DbClusterResourceId.
+type dbcSnapParent struct {
+	cluster    string
+	resourceID string
+	created    *time.Time
+	arn        string
+	sourceARN  string
+}
+
+func dbcSnapParentOf(raw any) (dbcSnapParent, bool) {
+	if s, ok := assertStruct[docdbtypes.DBClusterSnapshot](raw); ok {
+		return dbcSnapParent{
+			cluster:   aws.ToString(s.DBClusterIdentifier),
+			created:   s.ClusterCreateTime,
+			arn:       aws.ToString(s.DBClusterSnapshotArn),
+			sourceARN: aws.ToString(s.SourceDBClusterSnapshotArn),
+		}, true
+	}
+	if s, ok := assertStruct[rdstypes.DBClusterSnapshot](raw); ok {
+		return dbcSnapParent{
+			cluster:    aws.ToString(s.DBClusterIdentifier),
+			resourceID: aws.ToString(s.DbClusterResourceId),
+			created:    s.ClusterCreateTime,
+			arn:        aws.ToString(s.DBClusterSnapshotArn),
+			sourceARN:  aws.ToString(s.SourceDBClusterSnapshotArn),
+		}, true
+	}
+	return dbcSnapParent{}, false
+}
+
+// local reports whether the snapshot's cluster can be in the dbc list. AWS
+// sets SourceDBClusterSnapshotArn on every copy, same-Region ones included.
+// The dbc-snap list holds only this account's snapshots in this Region, so
+// the snapshot's own ARN names the session's Region and account, and a copy
+// whose source ARN names another Region or account has its cluster elsewhere.
+func (p dbcSnapParent) local() bool {
+	src, err := arn.Parse(p.sourceARN)
+	if err != nil {
+		return true
+	}
+	own, err := arn.Parse(p.arn)
+	return err != nil || (src.Region == own.Region && src.AccountID == own.AccountID)
+}
+
 func dbcSnapParentID(raw any) (string, bool) {
-	if snap, ok := assertStruct[docdbtypes.DBClusterSnapshot](raw); ok {
-		if snap.DBClusterIdentifier == nil || *snap.DBClusterIdentifier == "" {
-			return "", false
-		}
-		return *snap.DBClusterIdentifier, true
+	p, _ := dbcSnapParentOf(raw)
+	return p.cluster, p.cluster != ""
+}
+
+func dbcSnapParentIsLocal(raw any) bool {
+	p, _ := dbcSnapParentOf(raw)
+	return p.local()
+}
+
+// dbcSnapTakenFrom reports whether cluster is the cluster snap was taken
+// from. A cluster deleted and created again under the same name gets a new
+// DbClusterResourceId and ClusterCreateTime. DbClusterResourceId also stays
+// with a cluster through a rename, so a snapshot that carries it is matched
+// on it alone; otherwise the name is matched, and ClusterCreateTime too when
+// both sides carry it.
+func dbcSnapTakenFrom(snapRaw any, cluster resource.Resource) bool {
+	p, ok := dbcSnapParentOf(snapRaw)
+	if !ok || !p.local() {
+		return false
 	}
-	if snap, ok := assertStruct[rdstypes.DBClusterSnapshot](raw); ok {
-		if snap.DBClusterIdentifier == nil || *snap.DBClusterIdentifier == "" {
-			return "", false
-		}
-		return *snap.DBClusterIdentifier, true
+	resourceID, created := dbcClusterGeneration(cluster.RawStruct)
+	if p.resourceID != "" {
+		return p.resourceID == resourceID
 	}
-	return "", false
+	if p.cluster == "" || (p.cluster != cluster.ID && p.cluster != cluster.Name) {
+		return false
+	}
+	return p.created == nil || created == nil || p.created.Equal(*created)
+}
+
+func dbcClusterGeneration(raw any) (resourceID string, created *time.Time) {
+	if c, ok := assertStruct[docdbtypes.DBCluster](raw); ok {
+		return aws.ToString(c.DbClusterResourceId), c.ClusterCreateTime
+	}
+	if c, ok := assertStruct[rdstypes.DBCluster](raw); ok {
+		return aws.ToString(c.DbClusterResourceId), c.ClusterCreateTime
+	}
+	return "", nil
 }
 
 // dbcSnapCreatedAt extracts SnapshotCreateTime from either a

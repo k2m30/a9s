@@ -76,11 +76,10 @@ func checkDbiAlarm(ctx context.Context, clients any, res resource.Resource, cach
 	return alarmIDsByDimension(ctx, clients, cache, "", "DBInstanceIdentifier", res.ID)
 }
 
-// checkDbiDBISnap searches the dbi-snap cache for snapshots whose DBInstanceIdentifier
-// matches this DB instance's identifier.
+// checkDbiDBISnap searches the dbi-snap cache for snapshots taken from this
+// DB instance.
 func checkDbiDBISnap(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
-	dbIdentifier := res.ID
-	if dbIdentifier == "" {
+	if res.ID == "" {
 		return resource.KnownRelated("dbi-snap", nil, false)
 	}
 
@@ -98,7 +97,7 @@ func checkDbiDBISnap(ctx context.Context, clients any, res resource.Resource, ca
 		if !ok {
 			continue
 		}
-		if snap.DBInstanceIdentifier != nil && *snap.DBInstanceIdentifier == dbIdentifier {
+		if dbiSnapTakenFrom(snap, res) {
 			ids = append(ids, snapRes.ID)
 		}
 	}

@@ -46,7 +46,7 @@ Expected targets from `docs/related-resources.md` § Per-type contract: `alarm`,
 ### `ebs-snap`
 
 - **Why related**: Snapshots of this volume — the recovery pivot. Cited in `docs/related-resources.md` §`ebs` as "Snapshots of this volume."
-- **How discovered**: cross-reference the already-loaded `ebs-snap` list by `Snapshot.VolumeId == Volume.VolumeId`. The snapshot list-response carries `VolumeId` directly (`AWS SDK Go v2 — ec2/types.Snapshot § VolumeId`), so no extra API call.
+- **How discovered**: cross-reference the already-loaded `ebs-snap` list by `Snapshot.VolumeId == Volume.VolumeId`. The snapshot list-response carries `VolumeId` directly (`AWS SDK Go v2 — ec2/types.Snapshot § VolumeId`), so no extra API call. A snapshot made by `CopySnapshot` carries the placeholder `vol-ffffffff` and never counts.
 - **Count shown**: yes.
 
 ### `ec2`

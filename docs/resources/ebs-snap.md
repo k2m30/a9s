@@ -40,13 +40,13 @@ Expected targets from `docs/related-resources.md` § Per-type contract: `ami`, `
 ### `ebs`
 
 - **Why related**: source volume. Every snapshot is born from an EBS volume; the operator jumps here to see whether the source still exists (orphan-snapshot workflow) or inspect the live volume's current state.
-- **How discovered**: forward reference on `Snapshot.VolumeId` (AWS SDK Go v2 — `ec2/types.Snapshot § VolumeId`). Cross-reference the already-loaded `ebs` list by `VolumeId`; no extra API call. If the list lacks it, the source volume is deleted — this is exactly the orphan signal in §3.1.
+- **How discovered**: forward reference on `Snapshot.VolumeId` (AWS SDK Go v2 — `ec2/types.Snapshot § VolumeId`). Cross-reference the already-loaded `ebs` list by `VolumeId`; no extra API call. A snapshot made by `CopySnapshot` carries the placeholder `vol-ffffffff` and resolves a known 0. Otherwise, if the list lacks it, the source volume is deleted — this is exactly the orphan signal in §3.1.
 - **Count shown**: unknown — `docs/related-resources.md` § `ebs-snap` does not specify.
 
 ### `ec2`
 
 - **Why related**: instances that could be restored from this snapshot. Rollback / forensic workflow — "which running instance did this snapshot belong to, and could I restore it?"
-- **How discovered**: indirect; `Snapshot` has no direct EC2 field. Two reverse-lookup paths, both against already-loaded lists: (a) find the `ebs` volume where `Volume.SnapshotId == Snapshot.SnapshotId` and then that volume's `Attachments[].InstanceId`; (b) find AMIs derived from the snapshot (see `ami` above), then instances with those AMI IDs. Golden doc is silent on which a9s uses — `a9s-devops: not specified in docs/related-resources.md § ebs-snap; path (a) is cheaper and more accurate for the restore workflow`.
+- **How discovered**: `Snapshot` has no direct EC2 field. A snapshot made by `CreateImage` carries `Created by CreateImage(<instance-id>) for <ami-id>` in its `Description`; that instance ID is resolved against the already-loaded `ec2` list, because the instance is often terminated since. The count is 1 when the list holds it, a known 0 when a complete list does not, a lower bound `(0+)` when the list was cut short, and unknown when no `ec2` list is loaded. No extra API call.
 - **Count shown**: unknown — `docs/related-resources.md` § `ebs-snap` does not specify.
 
 ### `kms`
@@ -93,7 +93,7 @@ One bullet per distinct signal. Each runs on the type's bounded second pass, aft
 
 - **Signal**: source volume deleted — orphan snapshot. Cross-reference `ebs`.
   - **State bucket**: Warning.
-  - **How obtained**: `Snapshot.VolumeId` not present in the already-loaded `ebs` list (rule skipped when the `ebs` list was not loaded in this sweep).
+  - **How obtained**: `Snapshot.VolumeId` not present in the already-loaded `ebs` list (rule skipped when the `ebs` list was not loaded in this sweep, and for a snapshot made by `CopySnapshot`, whose `VolumeId` is the placeholder `vol-ffffffff`).
 
 - **Signal**: restorable by every AWS account (`DescribeSnapshots(RestorableByUserIds=[all])`).
   - **State bucket**: Broken.
@@ -178,7 +178,7 @@ ebs-snap — COMPUTE. Status key: `state` — the key the status cell reads, and
 | --- | --- | --- |
 | ami | AMIs | yes |
 | ebs | EBS Volume | no |
-| ec2 | EC2 Instance | no |
+| ec2 | EC2 Instance | yes |
 | kms | KMS Key | no |
 | backup | Backup | yes |
 | ct-events | CloudTrail Events | no |

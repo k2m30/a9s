@@ -28,7 +28,7 @@ Expected targets from `docs/related-resources.md` § Per-type contract: `backup`
 ### `dbi`
 
 - **Why related**: the source DB instance this snapshot was taken from — the operator's first question ("where did this come from, is it still alive?") is always about the parent instance. Citation: `docs/related-resources.md § dbi-snap` ("Source DB instance").
-- **How discovered**: read `DBSnapshot.DBInstanceIdentifier` from the list response, then cross-reference the already-loaded `dbi` list by that identifier. No extra API call. Citation: `AWS SDK Go v2 — rds/types.DBSnapshot § DBInstanceIdentifier`.
+- **How discovered**: when the snapshot carries `DBSnapshot.DbiResourceId`, the parent is the loaded `dbi` row with the same `DBInstance.DbiResourceId` (it survives an instance rename and is never reused); otherwise the parent is matched by `DBSnapshot.DBInstanceIdentifier`. A cross-region or cross-account copy (`SourceDBSnapshotIdentifier` set) matches no local row and resolves a known 0, as does its `backup` pivot. The detail view's `DBInstanceIdentifier` field opens the same row, and is not navigable when this pivot resolves 0. No extra API call. Citation: `AWS SDK Go v2 — rds/types.DBSnapshot § DbiResourceId, DBInstanceIdentifier`.
 - **Count shown**: yes (0 or 1 — a snapshot has exactly one source instance; 0 when the parent has been deleted, which is itself the orphan signal in §3.1).
 
 ### `kms`
@@ -92,7 +92,7 @@ list is on screen, so they are Wave 2 like the attribute read.
 
 - **Signal**: cross-ref `dbi` — source DB instance no longer present in the already-loaded `dbi` list (orphan snapshot whose parent was deleted).
   - **State bucket**: Broken.
-  - **How obtained**: read `DBSnapshot.DBInstanceIdentifier`; treat as orphan when the identifier is absent from the loaded `dbi` list. Skip the rule when the `dbi` list has not been loaded in this session (avoids false-positive orphan flags).
+  - **How obtained**: resolve the parent as in §2 `dbi` (`DbiResourceId` when present, else `DBInstanceIdentifier`); treat as orphan when no loaded `dbi` row matches. Skip the rule when the `dbi` list has not been loaded in this session (avoids false-positive orphan flags), and for a cross-region or cross-account copy (`SourceDBSnapshotIdentifier` set), whose parent never appears in this region's list.
 
 - **Signal**: cross-ref `dbi` — when the parent DB is present in the already-loaded `dbi` list, `SnapshotCreateTime` older than the parent `DBInstance.BackupRetentionPeriod` (in days) AND `SnapshotType == "automated"` (automated snapshot kept past its retention window — retention-policy drift or a stuck automated cycle).
   - **State bucket**: Broken.

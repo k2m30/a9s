@@ -671,7 +671,7 @@ var databasesTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 			{TargetType: "ct-events", DisplayName: "CloudTrail Events", Checker: checkDBISnapCTEvents, NeedsTargetCache: true},
 		},
 		Navigable: []domain.NavigableField{
-			{FieldPath: "DBInstanceIdentifier", TargetType: "dbi"},
+			{FieldPath: "DBInstanceIdentifier", TargetType: "dbi", Resolve: dbiSnapParentRow},
 			{FieldPath: "KmsKeyId", TargetType: "kms"},
 		},
 		Findings: []catalog.FindingDef{

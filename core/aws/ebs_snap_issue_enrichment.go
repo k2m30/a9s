@@ -113,7 +113,16 @@ var ebsSnapOrphanCrossRef = EnrichSnapshotCrossRef(SnapshotCrossRefConfig{
 		}
 		return *snap.VolumeId, true
 	},
+	ParentIsLocal:    ebsSnapParentIsLocal,
 	ParentRowLabel:   "Source Volume",
 	RetentionEnabled: false,
 	OrphanCode:       CodeEBSSnapOrphan,
 })
+
+// ebsSnapParentIsLocal reports whether the snapshot names a real volume: a
+// snapshot made by CopySnapshot carries the arbitrary volume ID vol-ffffffff,
+// which names no volume.
+func ebsSnapParentIsLocal(raw any) bool {
+	snap, ok := assertStruct[ec2types.Snapshot](raw)
+	return !ok || aws.ToString(snap.VolumeId) != "vol-ffffffff"
+}

@@ -60,7 +60,7 @@ Expected targets from `docs/related-resources.md` § Per-type contract: `alarm`,
 ### `dbc-snap`
 
 - **Why related**: Cluster snapshots — point-in-time backups the operator may need to restore or audit.
-- **How discovered**: call `DescribeDBClusterSnapshots(DBClusterIdentifier=<cluster-id>)`, or cross-reference the already-loaded `dbc-snap` list by `DBClusterIdentifier`.
+- **How discovered**: cross-reference the already-loaded `dbc-snap` list with the same parent match as `dbc-snap` §2 `dbc` (`DbClusterResourceId` when the snapshot carries it, otherwise `DBClusterIdentifier` plus `ClusterCreateTime` when both carry it), so a snapshot of an earlier cluster of the same name never counts. A copy whose `SourceDBClusterSnapshotArn` names another Region or account never counts; a same-Region, same-account copy counts like a native snapshot.
 - **Count shown**: yes.
 
 ### `kms`

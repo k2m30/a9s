@@ -711,5 +711,5 @@ func init() {
 	// dbc issues counts Wave 1 only: healthy-dbc-maint-overdue's finding
 	// arrives in Wave 2.
 	Register(Pin{ShortName: "dbc", Rows: 17, Issues: 14, CoverageGaps: []string{"dim"}})
-	Register(Pin{ShortName: "dbc-snap", Rows: 13, Issues: 6, CoverageGaps: []string{"dim"}})
+	Register(Pin{ShortName: "dbc-snap", Rows: 14, Issues: 6, CoverageGaps: []string{"dim"}})
 }

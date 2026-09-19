@@ -157,7 +157,7 @@ func TestCheckDbcSnapBackup_TruncatedDBCCacheButParentResolved(t *testing.T) {
 }
 
 // TestDbcSnapHelpers_DualShape pins the dual-shape dispatch in checkDbcSnapDBC,
-// checkDbcSnapKMS, checkDbcSnapVPC, dbcSnapParentRefs, and dbcResourceARN
+// checkDbcSnapKMS, checkDbcSnapVPC and dbcResourceARN
 // for both docdbtypes and rdstypes inputs.
 func TestDbcSnapHelpers_DualShape(t *testing.T) {
 	const kmsARN = "arn:aws:kms:us-east-1:123456789012:key/abcdef12-0000-0000-0000-000000000000"
@@ -259,28 +259,6 @@ func TestDbcSnapHelpers_DualShape(t *testing.T) {
 		}
 		if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != vpcID {
 			t.Errorf("IDs = %v, want [%s]", result.ResourceIDs(), vpcID)
-		}
-	})
-
-	t.Run("dbcSnapParentRefs_docdb", func(t *testing.T) {
-		snap := docdbtypes.DBClusterSnapshot{DBClusterIdentifier: aws.String(parentID)}
-		name, arn := dbcSnapParentRefs(snap)
-		if name != parentID {
-			t.Errorf("name = %q, want %q", name, parentID)
-		}
-		if arn != "" {
-			t.Errorf("arn = %q, want empty (no ARN on snapshot shape)", arn)
-		}
-	})
-
-	t.Run("dbcSnapParentRefs_rds", func(t *testing.T) {
-		snap := rdstypes.DBClusterSnapshot{DBClusterIdentifier: aws.String(parentID)}
-		name, arn := dbcSnapParentRefs(snap)
-		if name != parentID {
-			t.Errorf("name = %q, want %q", name, parentID)
-		}
-		if arn != "" {
-			t.Errorf("arn = %q, want empty (no ARN on snapshot shape)", arn)
 		}
 	})
 

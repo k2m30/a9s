@@ -50,7 +50,7 @@ Expected targets from `docs/related-resources.md` § Per-type contract: `backup`
 ### `dbc`
 
 - **Why related**: the source cluster this snapshot was taken from — the operator's first question ("where did this come from, is it still alive?") is always about the parent cluster. Citation: `docs/related-resources.md § dbc-snap` ("Source cluster").
-- **How discovered**: read `DBClusterSnapshot.DBClusterIdentifier` from the list response, then cross-reference the already-loaded `dbc` list by that identifier. No extra API call. Citation: `AWS SDK Go v2 — docdb/types.DBClusterSnapshot § DBClusterIdentifier`.
+- **How discovered**: cross-reference the already-loaded `dbc` list for the cluster the snapshot was taken from. An Aurora or Multi-AZ snapshot (RDS shape) carrying `DbClusterResourceId` matches the cluster with the same `DbClusterResourceId`, which survives a rename and changes when a cluster is deleted and created again under its name. A DocumentDB snapshot, or one without that ID, matches by `DBClusterIdentifier`, and also by `ClusterCreateTime` when both the snapshot and the cluster carry it. AWS sets `SourceDBClusterSnapshotArn` on every copy; a copy whose source ARN names another Region or account than the snapshot's own ARN (this session's) has its cluster outside the local list, while a same-Region, same-account copy resolves its cluster like a native snapshot. A foreign copy resolves a known 0 here and on its `backup` pivot. No extra API call. Citation: `AWS SDK Go v2 — rds/types.DBClusterSnapshot § DbClusterResourceId, ClusterCreateTime, SourceDBClusterSnapshotArn`.
 - **Count shown**: yes (0 or 1 — a snapshot has exactly one source cluster; 0 when the parent has been deleted, which is itself the orphan signal in §3.1).
 
 ### `kms`
@@ -122,7 +122,7 @@ list is on screen, so they are Wave 2 like the attribute read.
 
 - **Signal**: cross-ref `dbc` — source cluster no longer present in the already-loaded `dbc` list (orphan snapshot whose parent was deleted).
   - **State bucket**: Broken.
-  - **How obtained**: read `DBClusterSnapshot.DBClusterIdentifier`; treat as orphan when the identifier is absent from the loaded `dbc` list. Skip the rule when the `dbc` list has not been loaded in this session (avoids false-positive orphan flags).
+  - **How obtained**: resolve the parent as in §2 `dbc`; treat as orphan when no loaded `dbc` row matches, including when a cluster of the same name was created after the snapshot's cluster was deleted. Skip the rule when the `dbc` list has not been loaded in this session (avoids false-positive orphan flags), and for a copy whose source ARN names another Region or account.
 
 - **Signal**: cross-ref `dbc` — when the parent cluster is present in the already-loaded `dbc` list, `SnapshotCreateTime` older than `DBCluster.BackupRetentionPeriod` AND `SnapshotType == "automated"` (automated snapshot kept past its retention window — retention-policy drift or a stuck automated cycle).
   - **State bucket**: Broken.

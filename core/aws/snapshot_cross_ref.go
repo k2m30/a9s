@@ -54,6 +54,16 @@ type SnapshotCrossRefConfig struct {
 	// helper skips the row in that case (no orphan, no retention).
 	GetParentID func(snapRaw any) (string, bool)
 
+	// ParentIsLocal reports whether the snapshot's parent belongs in this
+	// account and region's parent list. A copy from another region or account
+	// names a parent that list never holds, so its absence proves nothing.
+	// Nil means every parent is local.
+	ParentIsLocal func(snapRaw any) bool
+
+	// IsParent reports whether parent is the snapshot's parent. Nil matches
+	// parent.ID against GetParentID.
+	IsParent func(snapRaw any, parent resource.Resource) bool
+
 	// GetCreatedAt extracts the snapshot creation time from RawStruct.
 	// Returns (zero, false) if absent — past-retention rule skips this row.
 	// Required when RetentionEnabled is true; may be nil otherwise.
@@ -75,6 +85,11 @@ type SnapshotCrossRefConfig struct {
 	// Cluster" for dbc). It is reused for both the orphan citation row AND
 	// the past-retention parent-cite row.
 	ParentRowLabel string
+
+	// ParentNoun names the parent kind in the orphan row when IsParent
+	// rejects a loaded row that carries the snapshot's parent name: that row
+	// is a later instance or cluster created under the name.
+	ParentNoun string
 
 	// RetentionEnabled gates the past-retention rule. Set false for snapshot
 	// types whose parent has no retention concept (e.g. future ebs-snap, where
@@ -143,31 +158,50 @@ func EnrichSnapshotCrossRef(cfg SnapshotCrossRefConfig) IssueEnricherFunc {
 
 		publicErr := enrichSnapshotPublicShare(ctx, cfg, clients, resources, &result)
 
+		localParentID := func(raw any) string {
+			parentID, ok := cfg.GetParentID(raw)
+			if !ok || (cfg.ParentIsLocal != nil && !cfg.ParentIsLocal(raw)) {
+				return ""
+			}
+			return parentID
+		}
+
 		// The cross-ref enricher requires the parent
 		// list to be loaded. If absent, both rules skip, and every snapshot
 		// with a parent is marked: neither rule was judged for it.
 		parentEntry, parentLoaded := cache[cfg.ParentShortName]
 		if !parentLoaded {
 			for _, res := range resources {
-				if parentID, ok := cfg.GetParentID(res.RawStruct); ok && parentID != "" {
+				if localParentID(res.RawStruct) != "" {
 					markUninspected(&result, res.ID, checkListIncomplete(cfg.ParentShortName))
 				}
 			}
 			return result, publicErr
 		}
 
-		parentByID := make(map[string]any, len(parentEntry.Resources))
+		parentByID := make(map[string]resource.Resource, len(parentEntry.Resources))
 		for _, p := range parentEntry.Resources {
-			parentByID[p.ID] = p.RawStruct
+			parentByID[p.ID] = p
+		}
+		findParent := func(raw any, parentID string) (resource.Resource, bool) {
+			if cfg.IsParent == nil {
+				p, ok := parentByID[parentID]
+				return p, ok
+			}
+			i := slices.IndexFunc(parentEntry.Resources, func(p resource.Resource) bool { return cfg.IsParent(raw, p) })
+			if i < 0 {
+				return resource.Resource{}, false
+			}
+			return parentEntry.Resources[i], true
 		}
 
 		for _, res := range resources {
-			parentID, ok := cfg.GetParentID(res.RawStruct)
-			if !ok || parentID == "" {
+			parentID := localParentID(res.RawStruct)
+			if parentID == "" {
 				continue
 			}
 
-			parentRaw, parentFound := parentByID[parentID]
+			parent, parentFound := findParent(res.RawStruct, parentID)
 
 			var code domain.FindingCode
 			var values []string
@@ -183,9 +217,13 @@ func EnrichSnapshotCrossRef(cfg SnapshotCrossRefConfig) IssueEnricherFunc {
 					continue
 				}
 				code = cfg.OrphanCode
+				suffix := " (not in loaded list)"
+				if _, named := parentByID[parentID]; named {
+					suffix = " (a newer " + cfg.ParentNoun + " has this name)"
+				}
 				rows = append(rows, domain.DetailRow{
 					Label: cfg.ParentRowLabel,
-					Value: parentID + " (not in loaded list)",
+					Value: parentID + suffix,
 					Tier:  tierOf(code),
 				})
 			case cfg.RetentionEnabled:
@@ -193,7 +231,7 @@ func EnrichSnapshotCrossRef(cfg SnapshotCrossRefConfig) IssueEnricherFunc {
 				// parent has a positive BackupRetentionPeriod.
 				snapType, hasType := cfg.GetSnapshotType(res.RawStruct)
 				createdAt, hasCreated := cfg.GetCreatedAt(res.RawStruct)
-				retention, hasRetention := cfg.GetParentRetention(parentRaw)
+				retention, hasRetention := cfg.GetParentRetention(parent.RawStruct)
 				if !hasType || !hasCreated || !hasRetention {
 					continue
 				}
@@ -209,7 +247,7 @@ func EnrichSnapshotCrossRef(cfg SnapshotCrossRefConfig) IssueEnricherFunc {
 				code, values = cfg.PastRetentionCode, []string{strconv.Itoa(overD)}
 				rows = append(rows, domain.DetailRow{
 					Label: cfg.ParentRowLabel,
-					Value: parentID,
+					Value: parent.ID,
 					Tier:  tierOf(code),
 				})
 				rows = append(rows, domain.DetailRow{

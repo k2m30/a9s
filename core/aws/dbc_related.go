@@ -200,16 +200,10 @@ func checkDbcDBI(ctx context.Context, clients any, res resource.Resource, cache 
 	return relatedResultTrunc("dbi", ids, truncated)
 }
 
-// checkDbcDbcSnap does a reverse lookup — scans the dbc-snap cache for
-// snapshots whose DBClusterIdentifier matches this cluster's identifier.
-// Handles both docdb_types.DBCluster and rdstypes.DBCluster parent shapes, and
-// both docdb_types.DBClusterSnapshot and rdstypes.DBClusterSnapshot snapshot shapes.
+// checkDbcDbcSnap scans the dbc-snap cache for snapshots taken from this
+// cluster (dbcSnapTakenFrom).
 func checkDbcDbcSnap(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
-	clusterID := res.ID
-	if id := dbcClusterIdentifier(res.RawStruct); id != "" {
-		clusterID = id
-	}
-	if clusterID == "" {
+	if res.ID == "" {
 		return resource.KnownRelated("dbc-snap", nil, false)
 	}
 
@@ -223,14 +217,7 @@ func checkDbcDbcSnap(ctx context.Context, clients any, res resource.Resource, ca
 
 	var ids []string
 	for _, snapRes := range snapList {
-		// The dbc-snap cache contains a mix of docdbtypes and rdstypes snapshots.
-		snapClusterID := ""
-		if snap, ok := assertStruct[docdb_types.DBClusterSnapshot](snapRes.RawStruct); ok && snap.DBClusterIdentifier != nil {
-			snapClusterID = *snap.DBClusterIdentifier
-		} else if snap, ok := assertStruct[rdstypes.DBClusterSnapshot](snapRes.RawStruct); ok && snap.DBClusterIdentifier != nil {
-			snapClusterID = *snap.DBClusterIdentifier
-		}
-		if snapClusterID == clusterID {
+		if dbcSnapTakenFrom(snapRes.RawStruct, res) {
 			ids = append(ids, snapRes.ID)
 		}
 	}

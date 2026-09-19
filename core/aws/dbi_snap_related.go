@@ -11,8 +11,8 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// checkDBISnapDBI extracts DBInstanceIdentifier from the DBSnapshot RawStruct
-// and searches the dbi cache for a matching instance name.
+// checkDBISnapDBI searches the dbi cache for the instance the snapshot was
+// taken from.
 func checkDBISnapDBI(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	snap, ok := assertStruct[rdstypes.DBSnapshot](res.RawStruct)
 	if !ok {
@@ -21,7 +21,6 @@ func checkDBISnapDBI(ctx context.Context, clients any, res resource.Resource, ca
 	if snap.DBInstanceIdentifier == nil || *snap.DBInstanceIdentifier == "" {
 		return resource.KnownRelated("dbi", nil, false)
 	}
-	dbName := *snap.DBInstanceIdentifier
 
 	dbiList, truncated, err := relatedResourcesFor(ctx, clients, cache, "dbi")
 	if err != nil {
@@ -33,7 +32,7 @@ func checkDBISnapDBI(ctx context.Context, clients any, res resource.Resource, ca
 
 	var ids []string
 	for _, dbiRes := range dbiList {
-		if dbiRes.Name == dbName || dbiRes.ID == dbName {
+		if dbiSnapTakenFrom(snap, dbiRes) {
 			ids = append(ids, dbiRes.ID)
 		}
 	}
@@ -61,7 +60,7 @@ func checkDBISnapKMS(ctx context.Context, clients any, res resource.Resource, ca
 // not a snapshot ARN. For each cached plan we test whether its Fields[resources]
 // patterns cover the snapshot's parent DBInstanceArn.
 //
-// The parent DB ARN is resolved via the dbi cache (snap.DBInstanceIdentifier
+// The parent DB ARN is resolved via the dbi cache (dbiSnapTakenFrom
 // → DBInstance.DBInstanceArn). When the parent has been deleted (orphan) or
 // the dbi cache is not loaded yet, we cannot identify the parent and return
 // UnknownRelated rather than a misleading Count=0.
@@ -95,7 +94,7 @@ func checkDBISnapBackup(ctx context.Context, clients any, res resource.Resource,
 	}
 	parentARN := ""
 	for _, dbiRes := range dbiList {
-		if dbiRes.ID != parentName && dbiRes.Name != parentName {
+		if !dbiSnapTakenFrom(snap, dbiRes) {
 			continue
 		}
 		if db, ok := assertStruct[rdstypes.DBInstance](dbiRes.RawStruct); ok && db.DBInstanceArn != nil {

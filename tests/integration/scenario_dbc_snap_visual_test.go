@@ -98,7 +98,7 @@ func selectDBCSnapByID(t *testing.T, s *fullIntegrationScenario, id string) reso
 // DBClusterSnapshot whose parent cluster is "prod-aurora-cluster". The backup
 // fixture (ProdDatabasePlanID) includes the Aurora cluster ARN in its
 // resources selection. checkDbcSnapBackup must:
-//  1. extract the parent name via dbcSnapParentRefs (rdstypes shape),
+//  1. extract the parent name via dbcSnapParentOf (rdstypes shape),
 //  2. locate the parent in the dbc cache (rdstypes.DBCluster),
 //  3. extract the cluster ARN via dbcResourceARN,
 //  4. scan the backup plan cache for plans covering that ARN.

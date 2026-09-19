@@ -19,6 +19,7 @@ package aws
 
 import (
 	"context"
+	"slices"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -48,6 +49,14 @@ var enrichDBISnapCrossRef = EnrichSnapshotCrossRef(SnapshotCrossRefConfig{
 		}
 		return *snap.DBInstanceIdentifier, true
 	},
+	ParentIsLocal: func(raw any) bool {
+		snap, ok := assertStruct[rdstypes.DBSnapshot](raw)
+		return !ok || dbiSnapParentIsLocal(snap)
+	},
+	IsParent: func(raw any, parent resource.Resource) bool {
+		snap, ok := assertStruct[rdstypes.DBSnapshot](raw)
+		return ok && dbiSnapTakenFrom(snap, parent)
+	},
 	GetCreatedAt: func(raw any) (time.Time, bool) {
 		snap, ok := assertStruct[rdstypes.DBSnapshot](raw)
 		if !ok || snap.SnapshotCreateTime == nil {
@@ -70,6 +79,7 @@ var enrichDBISnapCrossRef = EnrichSnapshotCrossRef(SnapshotCrossRefConfig{
 		return *db.BackupRetentionPeriod, true
 	},
 	ParentRowLabel:    "Source DB",
+	ParentNoun:        "instance",
 	RetentionEnabled:  true,
 	OrphanCode:        dbiSnapOrphanCode,
 	PastRetentionCode: dbiSnapPastRetentionCode,
@@ -98,4 +108,43 @@ func dbiSnapShareAttributes(ctx context.Context, clients *ServiceClients, snap r
 		attrs = append(attrs, snapshotAttribute{Name: aws.ToString(a.AttributeName), Values: a.AttributeValues})
 	}
 	return attrs, nil
+}
+
+// dbiSnapTakenFrom reports whether db is the instance snap was taken from.
+// DbiResourceId stays with an instance through a rename and is never given to
+// another instance, so a snapshot that carries one is matched on it alone.
+func dbiSnapTakenFrom(snap rdstypes.DBSnapshot, db resource.Resource) bool {
+	if !dbiSnapParentIsLocal(snap) {
+		return false
+	}
+	if rid := aws.ToString(snap.DbiResourceId); rid != "" {
+		inst, ok := assertStruct[rdstypes.DBInstance](db.RawStruct)
+		return ok && aws.ToString(inst.DbiResourceId) == rid
+	}
+	name := aws.ToString(snap.DBInstanceIdentifier)
+	return name != "" && (db.ID == name || db.Name == name)
+}
+
+// dbiSnapParentIsLocal reports whether the snapshot's instance can be in this
+// region's dbi list: SourceDBSnapshotIdentifier has a value only on a
+// cross-account or cross-region copy.
+func dbiSnapParentIsLocal(snap rdstypes.DBSnapshot) bool {
+	return aws.ToString(snap.SourceDBSnapshotIdentifier) == ""
+}
+
+// dbiSnapParentRow is the dbi row the snapshot was taken from, the one the
+// DB Instances related row counts. With no dbi list loaded, a local
+// snapshot's DBInstanceIdentifier is the only name there is.
+func dbiSnapParentRow(src resource.Resource, dbis []resource.Resource) string {
+	snap, ok := assertStruct[rdstypes.DBSnapshot](src.RawStruct)
+	if !ok || !dbiSnapParentIsLocal(snap) {
+		return ""
+	}
+	if dbis == nil {
+		return aws.ToString(snap.DBInstanceIdentifier)
+	}
+	if i := slices.IndexFunc(dbis, func(db resource.Resource) bool { return dbiSnapTakenFrom(snap, db) }); i >= 0 {
+		return dbis[i].ID
+	}
+	return ""
 }

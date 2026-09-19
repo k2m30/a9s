@@ -5,6 +5,7 @@ package aws
 import (
 	"context"
 	"regexp"
+	"slices"
 	"strings"
 
 	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
@@ -47,17 +48,29 @@ func checkEBSSnapAMI(ctx context.Context, clients any, res resource.Resource, ca
 
 // checkEBSSnapEBS reads the source volume ID from Fields["volume_id"] (Pattern F).
 func checkEBSSnapEBS(_ context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
+	if !ebsSnapParentIsLocal(res.RawStruct) {
+		return resource.KnownRelated("ebs", nil, false)
+	}
 	return relatedRefs("ebs", []string{res.Fields["volume_id"]}, refContext(clients, cache, "ebs"))
 }
 
-// checkEBSSnapEC2 parses the snapshot Description for "Created by CreateImage(i-xxx)" (Pattern F).
-func checkEBSSnapEC2(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-	description := res.Fields["description"]
-	matches := ebsSnapCreateImageRe.FindStringSubmatch(description)
+// checkEBSSnapEC2 parses the snapshot Description for "Created by
+// CreateImage(i-xxx)" and resolves that instance against the loaded ec2 list:
+// the instance is often terminated since the image was made.
+func checkEBSSnapEC2(_ context.Context, _ any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
+	matches := ebsSnapCreateImageRe.FindStringSubmatch(res.Fields["description"])
 	if len(matches) < 2 {
 		return resource.KnownRelated("ec2", nil, false)
 	}
-	return relatedResult("ec2", []string{matches[1]})
+	entry, ok := cache["ec2"]
+	if !ok {
+		return resource.UnknownRelated("ec2")
+	}
+	var ids []string
+	if slices.ContainsFunc(entry.Resources, func(r resource.Resource) bool { return r.ID == matches[1] }) {
+		ids = []string{matches[1]}
+	}
+	return relatedResultTrunc("ec2", ids, entry.IsTruncated)
 }
 
 // checkEBSSnapKMS reads the KMS key from RawStruct.KmsKeyId (Pattern F).

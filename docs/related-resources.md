@@ -1364,7 +1364,7 @@ AWS API: <https://docs.aws.amazon.com/waf/latest/APIReference/API_WebACL.html>
 | ebs | ct-events | CloudTrail Events | no |
 | ebs-snap | ami | AMIs | yes |
 | ebs-snap | ebs | EBS Volume | no |
-| ebs-snap | ec2 | EC2 Instance | no |
+| ebs-snap | ec2 | EC2 Instance | yes |
 | ebs-snap | kms | KMS Key | no |
 | ebs-snap | backup | Backup | yes |
 | ebs-snap | ct-events | CloudTrail Events | no |

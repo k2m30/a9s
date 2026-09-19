@@ -9,6 +9,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- A DB, cluster or EBS snapshot copied from another region or account is no
+  longer flagged "orphan: source ... deleted": its parent was never in this
+  region's list, and its source pivot no longer points at a local volume,
+  instance or cluster that happens to share the source's name. A cluster
+  snapshot copied within the same region and account still resolves its
+  cluster. DB and cluster snapshots are matched to the instance or cluster
+  they were taken from by its resource ID (by name and creation time for
+  DocumentDB), so a snapshot of a renamed instance keeps its parent, and a new
+  instance or cluster that reuses a deleted one's name no longer claims its
+  snapshots, its retention check or its Backup plans; the orphan's Source row
+  then says a newer cluster or instance has that name. The DB snapshot's
+  instance field opens the instance its DB Instances row names, and an EBS
+  snapshot's EC2 Instance row counts the CreateImage instance only while it
+  is still in the loaded instance list.
 - Resource and trust policies are read the way IAM applies them: an explicit
   Deny that takes a grant from everyone, or fences it to an account,
   organisation, VPC endpoint, address range or the principals a NotPrincipal
