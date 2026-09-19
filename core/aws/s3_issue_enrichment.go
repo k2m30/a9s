@@ -44,22 +44,7 @@ const (
 //   - Severity is always "~" (a missing/partial bucket-level PAB is a risk,
 //     not a certainty — account-level PAB may still apply — so this signal
 //     never paints a row Broken).
-//   - Summary is always "public access block incomplete" — stable across all instances.
 //   - Rows carry the per-case detail (never duplicated in Summary).
-//
-// On NoSuchPublicAccessBlockConfiguration:
-//
-//	Rows: {Label:"Status", Value:"no public access block configuration"},
-//	      {Label:"Account-level PAB", Value:"may still apply"}
-//
-// On out.PublicAccessBlockConfiguration == nil (no API error):
-//
-//	Same Rows as above.
-//
-// On partial PAB (one or more flags false):
-//
-//	Rows: one entry per unset flag: {Label:"<FlagName>", Value:"off (<FlagName>)"},
-//	      plus {Label:"Account-level PAB", Value:"may still apply"}
 //
 // On PermanentRedirect (301) / IllegalLocationConstraintException (400):
 //

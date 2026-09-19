@@ -19,8 +19,7 @@ import (
 //
 // Wave2 carries the Wave 2 issue-enricher for this type. The concrete type is
 // core/aws.IssueEnricher (a struct with Fn + Priority), stored as `any`
-// here to avoid an import cycle. Per-category PRs (04b–04m) will cast to the
-// concrete type when populating catalog entries.
+// here to avoid an import cycle.
 type ResourceTypeDef struct {
 	// ─── Identity ──────────────────────────────────────────────────────────
 
@@ -62,9 +61,8 @@ type ResourceTypeDef struct {
 	// column: the one naming this key, and no other (config.IsStatusColumn).
 	// A type whose state is a computed verdict rather than an API field names
 	// that verdict's key — tg's health_summary, sg's risk_summary, cb's
-	// last_build — and the cell reads exactly it. Nothing infers a status
-	// column from a title any more, so a type that renames this key renames
-	// its column's Key in the same literal or loses the column.
+	// last_build — and the cell reads exactly it. A type that renames this key
+	// renames its column's Key in the same literal or loses the column.
 	LifecycleKey string
 	// IdentityKey optionally names the column key used to position the
 	// enrichment-finding row marker. When empty, the row-marker resolver
@@ -203,8 +201,8 @@ type ResourceTypeDef struct {
 
 // ResolveColor classifies r using d.Color, defaulting to a generic
 // status-based color when d.Color is nil, reading Fields["status"]. All
-// registered types have non-nil Color (invariant #7); the fallback exists
-// only for ad-hoc test doubles.
+// registered types have non-nil Color; the fallback exists only for ad-hoc
+// test doubles.
 func (d ResourceTypeDef) ResolveColor(r domain.Resource) domain.Color {
 	if d.Color != nil {
 		return d.Color(r)
@@ -224,14 +222,14 @@ func (d ResourceTypeDef) ResolveColor(r domain.Resource) domain.Color {
 type FindingDef struct {
 	// Code is the machine-readable finding code (e.g., "ec2.impaired").
 	Code domain.FindingCode
-	// Phrase is the human-readable §4 display phrase (e.g., "impaired").
+	// Phrase is the human-readable display phrase (e.g., "impaired").
 	Phrase string
 	// Severity classifies the finding for coloring and badge counting.
 	Severity domain.Severity
 	// Source is the provenance class: "wave1" (emitted by the fetcher)
 	// or "wave2" (emitted by the Wave 2 enricher).
 	Source string
-	// Detail is the S5 operator sentence the finding renders in the
+	// Detail is the operator sentence the finding renders in the
 	// detail-view Attention section, and the sentence catalogen writes into
 	// the docs. Empty means the finding renders its Phrase alone and the doc
 	// cell reads "—". The emitter copies it from here; nothing else declares it.
@@ -270,9 +268,8 @@ func HumanizeFieldKey(s string) string {
 // about which fields the type wants in words.
 // StatusKey is the Fields key this type's status cell reads, and so the key
 // its status column names: LifecycleKey, or "state" when the type declares
-// none. The default was written out at every caller — the render cascade, the
-// decorator lookup, the status-column resolver, the docs generator — which is
-// four places to change the day it is not "state".
+// none. The render cascade, the decorator lookup, the status-column resolver
+// and the docs generator all read the default here.
 func (d ResourceTypeDef) StatusKey() string {
 	if d.LifecycleKey != "" {
 		return d.LifecycleKey

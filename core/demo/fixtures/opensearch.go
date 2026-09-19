@@ -10,7 +10,7 @@ import (
 	ostypes "github.com/aws/aws-sdk-go-v2/service/opensearch/types"
 )
 
-// Exported stable identifiers — referenced by sibling fixture files and QA tests.
+// Exported stable identifiers — referenced by sibling fixture files and tests.
 const (
 	// GraphRootDomain is the primary demo showroom domain (acme-logs).
 	GraphRootDomain = "acme-logs"
@@ -95,11 +95,10 @@ type OpenSearchFixtures struct {
 	UnavailableNames []string
 }
 
-// WarnOpenSearchDetailsUnavailableID is the listed-but-absent-from-response
-// coverage-gate witness.
+// WarnOpenSearchDetailsUnavailableID is the listed-but-absent-from-response domain.
 const WarnOpenSearchDetailsUnavailableID = "warn-os-details-unavailable"
 
-// One witness per opensearch network-posture finding. Every other domain
+// One carrier per opensearch network-posture finding. Every other domain
 // enforces HTTPS, encrypts node-to-node traffic, and has no access policy
 // that lets anyone in.
 const (
@@ -112,10 +111,6 @@ const (
 )
 
 // NewOpenSearchFixtures constructs OpenSearchFixtures from the canonical demo data.
-// Fixture order matches the spec §2.1 list exactly:
-// 1. healthy_baseline, 2. graph_root, 3. update_available_bang,
-// 4. encryption_off_tilde, 5. multi_background, 6. processing_warning,
-// 7. processing_plus_update, 8. isolated_broken, 9. deleting_dim.
 var sharedOpenSearchFixtures = sync.OnceValue(func() *OpenSearchFixtures {
 	return &OpenSearchFixtures{
 		Domains: []ostypes.DomainStatus{
@@ -128,7 +123,6 @@ var sharedOpenSearchFixtures = sync.OnceValue(func() *OpenSearchFixtures {
 			osProcessingPlusUpdate(),
 			osIsolatedBroken(),
 			osDeletingDim(),
-			// One witness per network-posture finding.
 			osPostureWitness(OpenSearchPublic, func(d *ostypes.DomainStatus) {
 				d.VPCOptions = nil
 				d.AccessPolicies = aws.String(`{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":{"AWS":"*"},"Action":"es:*","Resource":"arn:aws:es:us-east-1:123456789012:domain/` + OpenSearchPublic + `/*"}]}`)
@@ -147,10 +141,6 @@ var sharedOpenSearchFixtures = sync.OnceValue(func() *OpenSearchFixtures {
 func NewOpenSearchFixtures() *OpenSearchFixtures {
 	return sharedOpenSearchFixtures()
 }
-
-// ---------------------------------------------------------------------------
-// Baseline helper — fields shared by every non-specialised fixture.
-// ---------------------------------------------------------------------------
 
 func osBaseDomain(name, domainID, arn, engineVersion, endpoint string) ostypes.DomainStatus {
 	return ostypes.DomainStatus{
@@ -207,10 +197,6 @@ func osPostureWitness(name string, defect func(*ostypes.DomainStatus)) ostypes.D
 	return d
 }
 
-// ---------------------------------------------------------------------------
-// Fixture 1 — healthy_baseline (staging-analytics)
-// ---------------------------------------------------------------------------
-
 func osHealthyBaseline() ostypes.DomainStatus {
 	d := osBaseDomain(
 		HealthyBaselineDomain,
@@ -226,10 +212,6 @@ func osHealthyBaseline() ostypes.DomainStatus {
 	return d
 }
 
-// ---------------------------------------------------------------------------
-// Fixture 2 — graph_root (acme-logs) — full §9.3 showroom
-// ---------------------------------------------------------------------------
-
 func osGraphRoot() ostypes.DomainStatus {
 	d := osBaseDomain(
 		GraphRootDomain,
@@ -242,7 +224,6 @@ func osGraphRoot() ostypes.DomainStatus {
 	d.ClusterConfig.InstanceCount = aws.Int32(3)
 	d.EBSOptions.VolumeSize = aws.Int32(100)
 
-	// Encryption at rest with customer KMS key.
 	d.EncryptionAtRestOptions = &ostypes.EncryptionAtRestOptions{
 		Enabled:  aws.Bool(true),
 		KmsKeyId: aws.String(OpenSearchKMSKeyARN),
@@ -283,10 +264,6 @@ func osGraphRoot() ostypes.DomainStatus {
 	return d
 }
 
-// ---------------------------------------------------------------------------
-// Fixture 3 — update_available_bang (acme-product-search)
-// ---------------------------------------------------------------------------
-
 func osUpdateAvailableBang() ostypes.DomainStatus {
 	d := osBaseDomain(
 		UpdateAvailableDomain,
@@ -298,7 +275,7 @@ func osUpdateAvailableBang() ostypes.DomainStatus {
 	d.ClusterConfig.InstanceType = ostypes.OpenSearchPartitionInstanceTypeR6gXlargeSearch
 	d.ClusterConfig.InstanceCount = aws.Int32(2)
 	d.EBSOptions.VolumeSize = aws.Int32(200)
-	// AutomatedUpdateDate in the past (2026-04-20 < 2026-04-24 today).
+	// AutomatedUpdateDate in the past.
 	d.ServiceSoftwareOptions = &ostypes.ServiceSoftwareOptions{
 		UpdateAvailable:     aws.Bool(true),
 		AutomatedUpdateDate: aws.Time(time.Date(2026, 4, 20, 0, 0, 0, 0, time.UTC)),
@@ -307,10 +284,6 @@ func osUpdateAvailableBang() ostypes.DomainStatus {
 	}
 	return d
 }
-
-// ---------------------------------------------------------------------------
-// Fixture 4 — encryption_off_tilde (legacy-analytics)
-// ---------------------------------------------------------------------------
 
 func osEncryptionOffTilde() ostypes.DomainStatus {
 	d := osBaseDomain(
@@ -329,11 +302,6 @@ func osEncryptionOffTilde() ostypes.DomainStatus {
 	}
 	return d
 }
-
-// ---------------------------------------------------------------------------
-// Fixture 5 — multi_background (acme-metrics)
-// UpdateAvailable (past auto-update date 2026-04-10) AND EncryptionOff.
-// ---------------------------------------------------------------------------
 
 func osMultiBackground() ostypes.DomainStatus {
 	d := osBaseDomain(
@@ -358,10 +326,6 @@ func osMultiBackground() ostypes.DomainStatus {
 	return d
 }
 
-// ---------------------------------------------------------------------------
-// Fixture 6 — processing_warning (acme-events)
-// ---------------------------------------------------------------------------
-
 func osProcessingWarning() ostypes.DomainStatus {
 	d := osBaseDomain(
 		ProcessingDomain,
@@ -376,11 +340,6 @@ func osProcessingWarning() ostypes.DomainStatus {
 	d.DomainProcessingStatus = ostypes.DomainProcessingStatusTypeModifying
 	return d
 }
-
-// ---------------------------------------------------------------------------
-// Fixture 7 — processing_plus_update (acme-search-alpha)
-// UpgradeProcessing=true AND UpdateAvailable (past date).
-// ---------------------------------------------------------------------------
 
 func osProcessingPlusUpdate() ostypes.DomainStatus {
 	d := osBaseDomain(
@@ -403,10 +362,6 @@ func osProcessingPlusUpdate() ostypes.DomainStatus {
 	return d
 }
 
-// ---------------------------------------------------------------------------
-// Fixture 8 — isolated_broken (legacy-search-isolated)
-// ---------------------------------------------------------------------------
-
 func osIsolatedBroken() ostypes.DomainStatus {
 	d := osBaseDomain(
 		IsolatedDomain,
@@ -422,10 +377,6 @@ func osIsolatedBroken() ostypes.DomainStatus {
 	d.DomainProcessingStatus = ostypes.DomainProcessingStatusTypeIsolated
 	return d
 }
-
-// ---------------------------------------------------------------------------
-// Fixture 9 — deleting_dim (obsolete-tenant-logs)
-// ---------------------------------------------------------------------------
 
 func osDeletingDim() ostypes.DomainStatus {
 	d := osBaseDomain(
@@ -445,7 +396,6 @@ func osDeletingDim() ostypes.DomainStatus {
 func init() {
 	// details_denied: DescribeDomains is one batched call, so a denial degrades
 	// every listed domain at once and cannot stand beside healthy rows. The
-	// demo witnesses the absent-from-response case (details_unavailable); the
-	// AUTH path is covered by the batch-denial stub in the unit tests.
+	// demo shows the absent-from-response case (details_unavailable) instead.
 	Register(Pin{ShortName: "opensearch", Rows: 13, Issues: 10, CoverageGaps: []string{"opensearch.warn.details_denied"}})
 }

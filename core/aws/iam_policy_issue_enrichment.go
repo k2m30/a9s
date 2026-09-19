@@ -30,7 +30,6 @@ const (
 //   - Policy document contains Statement with Effect=Allow, Action=*, Resource=* → "!" finding "admin star (allows * on *)"
 //
 // AWS-managed policies (account "aws", resource under "policy/") are skipped.
-// Skip when clients.IAM == nil.
 func EnrichIAMPolicy(ctx context.Context, clients *ServiceClients, resources []resource.Resource, _ resource.ResourceCache) (IssueEnricherResult, error) {
 	result := IssueEnricherResult{
 		Findings:     make(map[string][]domain.Finding),
@@ -123,10 +122,9 @@ func extractIAMPolicyARN(r resource.Resource) (string, bool) {
 
 // parsePolicyDoc runs a decoded policy document through the one policy
 // engine. FetchManagedPolicyDocument hands back the unmarshalled document, so
-// the round trip is what keeps every question about it — admin, privilege
-// escalation — on iampolicy instead of a second ad-hoc walk of the map that
-// drifts (finding 6: the local admin detector read only an array Statement,
-// while AWS accepts a bare object and iampolicy.Parse always did).
+// the round trip keeps every question about it — admin, privilege
+// escalation — on iampolicy, which accepts both a Statement array and the
+// bare Statement object AWS allows.
 func parsePolicyDoc(doc any) (iampolicy.Document, bool) {
 	if doc == nil {
 		return iampolicy.Document{}, false

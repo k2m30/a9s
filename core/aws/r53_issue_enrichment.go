@@ -82,10 +82,8 @@ func R53AddressOwnership(addr string, cache resource.ResourceCache) string {
 // one address, being attached to a running instance is the stronger evidence
 // and must not be overwritten by an idle-elastic-IP verdict.
 //
-// The eni cache is deliberately not consulted: the eni fetcher writes no
-// public_ip, so requiring it voided the verdict without contributing a single
-// address. An address carried only by a network interface therefore reads as
-// outside the account, which under this rule emits nothing.
+// An address carried only by a network interface reads as outside the
+// account and emits nothing: the eni cache carries no public_ip.
 func heldPublicAddresses(cache resource.ResourceCache) map[string]string {
 	held := make(map[string]string)
 	for _, name := range []string{"eip", "ec2"} {
@@ -140,7 +138,7 @@ func r53DanglingRecords(records []r53types.ResourceRecordSet, held map[string]st
 //   - HostedZone.Config.PrivateZone == true AND VPCs[] empty → "~" finding
 //     "private zone with no VPC associations (orphan)"
 //
-// Skip if clients.Route53 == nil. Per-zone errors → Truncated.
+// Per-zone errors → Truncated.
 func EnrichRoute53Zone(ctx context.Context, clients *ServiceClients, resources []resource.Resource, cache resource.ResourceCache) (IssueEnricherResult, error) {
 	result := IssueEnricherResult{
 		Findings:     make(map[string][]domain.Finding),
@@ -212,10 +210,10 @@ func r53ZoneRow(ctx context.Context, clients *ServiceClients, r resource.Resourc
 // r53PublicZoneFindings evaluates the two public-zone rows: query logging, and
 // records pointing at addresses the account has released.
 //
-// The dangling check does not run when held is nil — an absent or truncated
-// address cache cannot distinguish a released address from an unloaded page,
-// and calling that a takeover sends an operator chasing a healthy record — and
-// the zone is marked not inspected for it. A zone whose records cannot be
+// When held is nil the zone is marked not inspected for the dangling check:
+// an absent or truncated address cache cannot distinguish a released
+// address from an unloaded page, and calling that a takeover sends an
+// operator chasing a healthy record. A zone whose records cannot be
 // listed is marked the same way rather than reported clean.
 func r53PublicZoneFindings(ctx context.Context, clients *ServiceClients, result *IssueEnricherResult, failures *[]Failure, r resource.Resource, zoneID string, held map[string]string) {
 	r53QueryLoggingFinding(ctx, clients, result, failures, r, zoneID)

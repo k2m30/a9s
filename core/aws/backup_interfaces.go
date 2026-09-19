@@ -63,9 +63,9 @@ type BackupGetBackupSelectionAPI interface {
 
 // BackupAPI is the aggregate interface covering all Backup operations used by
 // a9s fetchers. *backup.Client structurally satisfies this interface.
-// Note: BackupGetBackupSelectionAPI is NOT included here — fetchers that need
-// it type-assert on the concrete client at call time, so existing test fakes
-// that only implement a subset don't need mass updating.
+// BackupGetBackupSelectionAPI sits outside the aggregate: fetchers that need
+// it type-assert on the concrete client at call time, so a fake implementing
+// only the aggregate still satisfies it.
 type BackupAPI interface {
 	BackupListBackupPlansAPI
 	BackupListBackupJobsAPI

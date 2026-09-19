@@ -45,7 +45,6 @@ func (c *Controller) buildDetailBody(ds *DetailState) (*DetailBody, detailLayout
 	built := c.buildDetailFieldItems(ds)
 	items := built.items
 
-	// Convert []fieldpath.FieldItem → []FieldRow for the body.
 	fields := fieldItemsToFieldRows(items)
 
 	// Build RelatedBlocks. When ds.RelatedRows is nil/empty but the resource
@@ -67,7 +66,6 @@ func (c *Controller) buildDetailBody(ds *DetailState) (*DetailBody, detailLayout
 		layout.CursorKey = built.keys[fc]
 	}
 
-	// Clamp RelatedCursor.
 	rc := ds.RelatedCursor
 	if len(related) > 0 && rc >= len(related) {
 		rc = len(related) - 1
@@ -76,7 +74,6 @@ func (c *Controller) buildDetailBody(ds *DetailState) (*DetailBody, detailLayout
 		rc = 0
 	}
 
-	// Clamp RelatedScroll.
 	rs := max(ds.RelatedScroll, 0)
 	if len(related) > 0 && rs >= len(related) {
 		rs = len(related) - 1
@@ -209,8 +206,7 @@ func (c *Controller) buildDetailFieldItems(ds *DetailState) detailItems {
 	}
 	// The fields whose readable wording the TYPE declares. It lives on neither
 	// surface: a field no column happens to show — mwaa's EndpointManagement
-	// is one — has no column to carry a flag, so while the opt-in lived on the
-	// column the detail had no way to ask and rendered the constant verbatim.
+	// is one — has no column to carry a flag.
 	var humanized map[string]bool
 	if td != nil {
 		humanized = td.HumanizedFields()
@@ -458,7 +454,7 @@ type attentionEntry struct {
 	// between the two the moment one outranked the other.
 	code    string
 	primary string
-	// detailLines is the S5 operator sentence (Finding.Detail) already
+	// detailLines is the operator sentence (Finding.Detail) already
 	// wrapped to the panel, one rendered line per element; empty ⇒
 	// Phrase-only, no extra line.
 	detailLines   []string
@@ -549,10 +545,8 @@ func buildAttentionEntries(findings []domain.Finding, attentionDetails map[domai
 		if attentionDetails != nil {
 			if det, ok := attentionDetails[f.Code]; ok {
 				// An attention row's value is row text, so it reads the way the
-				// field rows one section below it read — those go through
-				// CanonicalValue in buildDetailItems and these did not, which
-				// is how an SDK timestamp reached the block verbatim while the
-				// same instant one section down showed as the day.
+				// field rows one section below it read — through CanonicalValue, so an
+				// SDK timestamp shows as the same day the field rows show.
 				rows = make([]domain.DetailRow, len(det.Rows))
 				for i, row := range det.Rows {
 					row.Value = config.CanonicalValue(row.Value)
@@ -588,7 +582,7 @@ func buildAttentionSectionDetail(ds *DetailState, td *resource.ResourceTypeDef, 
 	if len(entries) == 0 {
 		return nil, nil
 	}
-	// Resolve S2 color bucket for the cap invariant.
+	// Resolve the row color bucket for the cap invariant.
 	var rowBucket resource.Color
 	if td != nil {
 		rowBucket = td.ResolveColor(ds.Resource)
@@ -645,7 +639,7 @@ func buildAttentionSectionDetail(ds *DetailState, td *resource.ResourceTypeDef, 
 			Path:        "Attention",
 			ColorTier:   entryColor,
 		}, stem)
-		// S5 operator sentence, one item per wrapped line. The wrap lives here
+		// Operator sentence, one item per wrapped line. The wrap lives here
 		// rather than in the renderer so the body and the screen carry the same
 		// rows.
 		for i, dl := range e.detailLines {
@@ -685,7 +679,7 @@ func buildAttentionSectionDetail(ds *DetailState, td *resource.ResourceTypeDef, 
 }
 
 // capTierToRowBucketDetail returns the effective color tier for an Attention
-// entry: "!" is permitted only on a row whose own S2 bucket is Broken, so the
+// entry: "!" is permitted only on a row whose own bucket is Broken, so the
 // detail view never shows severity the list row did not. The glyph still
 // carries severity; only the colour is capped.
 func capTierToRowBucketDetail(tier string, rowBucket resource.Color) string {

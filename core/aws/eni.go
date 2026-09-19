@@ -85,7 +85,6 @@ func FetchNetworkInterfacesPage(ctx context.Context, api EC2DescribeNetworkInter
 		r := resource.Resource{
 			ID:   eniID,
 			Name: name,
-			// Status intentionally unset — lifecycle state is emitted as a Finding.
 			Fields: map[string]string{
 				"eni_id":            eniID,
 				"name":              name,
@@ -107,10 +106,6 @@ func FetchNetworkInterfacesPage(ctx context.Context, api EC2DescribeNetworkInter
 			RawStruct: eni,
 		}
 
-		// emit canonical Findings for non-healthy ENI states.
-		// in-use → healthy (no Finding). available → SevWarn (potential cost waste,
-		// except for requester-managed which are managed by AWS services).
-		// attaching / detaching → SevWarn (transitional).
 		r.Findings = eniFindings(status, requesterManaged)
 
 		resources = append(resources, r)

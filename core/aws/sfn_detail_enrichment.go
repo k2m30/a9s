@@ -38,8 +38,8 @@ type sfnDetailPayload struct {
 // exactly while an operator is watching a deploy — the one moment this
 // detail view matters most. DescribeStateMachine is a single cheap call
 // (the same reasoning that keeps lambda's GetFunction uncached), so paying
-// it on every detail open is the right trade (docs/architecture.md
-// §On-Demand detail enrichment).
+// it on every detail open is the right trade (docs/architecture.md, On-Demand
+// detail enrichment).
 func enrichSfn(ctx context.Context, clients any, res resource.Resource) (resource.Resource, error) {
 	return enrichDetail(ctx, clients, res, detailEnrichSpec[sfntypes.StateMachineListItem, sfnDetailPayload]{
 		unwrap: unwrapEnriched(func(w StateMachineEnriched) sfntypes.StateMachineListItem { return w.StateMachineListItem }),

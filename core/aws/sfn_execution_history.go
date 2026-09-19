@@ -169,12 +169,10 @@ func ClassifyEventStatus(eventType string) string {
 // It checks failure details, state I/O, execution I/O, and task details.
 // Newlines are stripped from the result.
 func ExtractEventDetail(event sfntypes.HistoryEvent) string {
-	// Check all *FailedEventDetails for Error/Cause
 	if detail := extractFailedDetail(event); detail != "" {
 		return sanitizeDetail(detail)
 	}
 
-	// Check state entered/exited I/O
 	if event.StateEnteredEventDetails != nil && event.StateEnteredEventDetails.Input != nil {
 		return sanitizeDetail(*event.StateEnteredEventDetails.Input)
 	}
@@ -182,7 +180,6 @@ func ExtractEventDetail(event sfntypes.HistoryEvent) string {
 		return sanitizeDetail(*event.StateExitedEventDetails.Output)
 	}
 
-	// Check execution started/succeeded I/O
 	if event.ExecutionStartedEventDetails != nil && event.ExecutionStartedEventDetails.Input != nil {
 		return sanitizeDetail(*event.ExecutionStartedEventDetails.Input)
 	}
@@ -190,7 +187,6 @@ func ExtractEventDetail(event sfntypes.HistoryEvent) string {
 		return sanitizeDetail(*event.ExecutionSucceededEventDetails.Output)
 	}
 
-	// Check task scheduled/submitted details
 	if event.TaskScheduledEventDetails != nil && event.TaskScheduledEventDetails.Resource != nil {
 		return sanitizeDetail(*event.TaskScheduledEventDetails.Resource)
 	}
@@ -198,7 +194,6 @@ func ExtractEventDetail(event sfntypes.HistoryEvent) string {
 		return sanitizeDetail(*event.TaskSubmittedEventDetails.Output)
 	}
 
-	// Check task succeeded output
 	if event.TaskSucceededEventDetails != nil && event.TaskSucceededEventDetails.Output != nil {
 		return sanitizeDetail(*event.TaskSucceededEventDetails.Output)
 	}

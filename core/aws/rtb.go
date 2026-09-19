@@ -63,7 +63,6 @@ func FetchRouteTablesPage(ctx context.Context, api EC2DescribeRouteTablesAPI, co
 		routesCount := fmt.Sprintf("%d", len(rtb.Routes))
 		associationsCount := fmt.Sprintf("%d", len(rtb.Associations))
 
-		// Determine if this is the main route table
 		isMain := "false"
 		for _, assoc := range rtb.Associations {
 			if assoc.Main != nil && *assoc.Main {
@@ -72,7 +71,6 @@ func FetchRouteTablesPage(ctx context.Context, api EC2DescribeRouteTablesAPI, co
 			}
 		}
 
-		// Count blackhole routes (target deleted)
 		blackholeCount := 0
 		for _, route := range rtb.Routes {
 			if route.State == ec2types.RouteStateBlackhole {

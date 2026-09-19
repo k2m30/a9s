@@ -12,16 +12,16 @@ import (
 	s3types "github.com/aws/aws-sdk-go-v2/service/s3/types"
 )
 
-// Exported constants — referenced by sibling fixture files and QA tests.
+// Exported constants — referenced by sibling fixture files and tests.
 const (
-	// HealthyBucketName is the graph-root bucket used in related-panel tests.
+	// HealthyBucketName is the graph-root bucket.
 	HealthyBucketName = "a9s-demo-healthy"
 	// HealthyBucketARN is the ARN for the healthy bucket.
 	HealthyBucketARN = "arn:aws:s3:::a9s-demo-healthy"
 	// PartnerSharedBucketName is a bucket in ANOTHER account. It is
 	// deliberately absent from Buckets — ListBuckets returns only this
 	// account's — and present in CrossAccountBuckets, so HeadBucket confirms
-	// it exists. It is the witness that absence from the list is not deletion.
+	// it exists: absence from the list is not deletion.
 	PartnerSharedBucketName = "partner-shared-assets"
 	// LogsBucketName is the access-log target bucket for the healthy bucket.
 	LogsBucketName = "a9s-demo-logs"
@@ -44,7 +44,7 @@ const (
 	// AWSManagedS3KeyAlias is the account's default S3-managed key alias.
 	AWSManagedS3KeyAlias = "alias/aws/s3"
 
-	// One witness bucket per EnrichS3Posture condition. Every other bucket in
+	// One carrier bucket per EnrichS3Posture condition. Every other bucket in
 	// the fixture set is healthy for all six, so the demo bench shows exactly
 	// one row per finding.
 
@@ -52,7 +52,7 @@ const (
 	S3BucketPublic = "acme-public-datasets"
 	// S3BucketPublicByACL is the bucket that is public the other way: no
 	// policy at all, a legacy ACL grant to AllUsers, and no public access
-	// block to disregard it. It doubles as the no-PAB witness, which is what
+	// block to disregard it. It doubles as the no-PAB bucket, which is what
 	// leaves the grant live.
 	S3BucketPublicByACL = "a9s-demo-nopab"
 	// S3BucketVersioningOff is the bucket that has never had versioning enabled.
@@ -152,7 +152,7 @@ var sharedS3Fixtures = sync.OnceValue(func() *S3Fixtures {
 	}
 	f.Buckets = buildS3Buckets()
 	// Access logging and lifecycle rules are healthy for every bucket except
-	// their own witness: EnrichS3Posture reports their absence, so leaving
+	// the one carrying each finding: EnrichS3Posture reports their absence, so leaving
 	// the rest of the fixture set unconfigured would light up the whole list.
 	f.LoggingConfigs = buildS3LoggingConfigs(f.Buckets)
 	f.LifecycleConfigs = buildS3LifecycleConfigs(f.Buckets)
@@ -162,10 +162,6 @@ var sharedS3Fixtures = sync.OnceValue(func() *S3Fixtures {
 func NewS3Fixtures() *S3Fixtures {
 	return sharedS3Fixtures()
 }
-
-// ---------------------------------------------------------------------------
-// Bucket list
-// ---------------------------------------------------------------------------
 
 var s3NamePool = []string{
 	"acme-logs-archive", "acme-static-assets-staging",
@@ -179,7 +175,7 @@ var s3NamePool = []string{
 }
 
 func buildS3Buckets() []s3types.Bucket {
-	// Spec-defined fixture buckets (graph root + issue variants).
+	// Graph-root and issue-variant buckets.
 	specBuckets := []struct {
 		name, arn, region, created string
 	}{
@@ -205,7 +201,6 @@ func buildS3Buckets() []s3types.Bucket {
 		// full alias ARN — the shape a naive last-"/" split gets wrong
 		// (checkS3KMS / kmsKeyIDFromField).
 		{ManagedKeyBucketName, "arn:aws:s3:::" + ManagedKeyBucketName, "us-east-1", "2025-08-01T09:00:00+00:00"},
-		// One witness per EnrichS3Posture condition.
 		{S3BucketPublic, "arn:aws:s3:::" + S3BucketPublic, "us-east-1", "2025-02-14T08:00:00+00:00"},
 		{S3BucketVersioningOff, "arn:aws:s3:::" + S3BucketVersioningOff, "us-east-1", "2025-02-15T08:00:00+00:00"},
 		{S3BucketMFADeleteOff, "arn:aws:s3:::" + S3BucketMFADeleteOff, "us-east-1", "2025-02-16T08:00:00+00:00"},
@@ -214,7 +209,7 @@ func buildS3Buckets() []s3types.Bucket {
 		{S3BucketNoObjectLock, "arn:aws:s3:::" + S3BucketNoObjectLock, "us-east-1", "2025-02-19T08:00:00+00:00"},
 	}
 
-	// Named legacy buckets with objects.
+	// Named buckets with objects.
 	namedBuckets := []struct {
 		name, arn, region, created string
 	}{
@@ -278,10 +273,6 @@ func buildS3Buckets() []s3types.Bucket {
 	return buckets
 }
 
-// ---------------------------------------------------------------------------
-// Public Access Block configs
-// ---------------------------------------------------------------------------
-
 // buildS3PublicAccessBlockConfigs returns per-bucket PAB configuration.
 // Semantics:
 //   - Key present, non-nil value → return that config.
@@ -324,10 +315,6 @@ func buildS3PublicAccessBlockConfigs() map[string]*s3.GetPublicAccessBlockOutput
 		},
 	}
 }
-
-// ---------------------------------------------------------------------------
-// Encryption configs
-// ---------------------------------------------------------------------------
 
 func buildS3EncryptionConfigs() map[string]*s3.GetBucketEncryptionOutput {
 	keyARN := "arn:aws:kms:us-east-1:123456789012:key/" + S3BucketKMSKeyID
@@ -376,10 +363,6 @@ func buildS3EncryptionConfigs() map[string]*s3.GetBucketEncryptionOutput {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// Logging configs
-// ---------------------------------------------------------------------------
-
 func buildS3LoggingConfigs(buckets []s3types.Bucket) map[string]*s3.GetBucketLoggingOutput {
 	logToCentral := &s3.GetBucketLoggingOutput{
 		LoggingEnabled: &s3types.LoggingEnabled{
@@ -398,10 +381,6 @@ func buildS3LoggingConfigs(buckets []s3types.Bucket) map[string]*s3.GetBucketLog
 	return out
 }
 
-// ---------------------------------------------------------------------------
-// Tagging configs (for CFN stack-name lookup)
-// ---------------------------------------------------------------------------
-
 func buildS3TaggingConfigs() map[string]*s3.GetBucketTaggingOutput {
 	cfnTagged := &s3.GetBucketTaggingOutput{
 		TagSet: []s3types.Tag{
@@ -416,7 +395,7 @@ func buildS3TaggingConfigs() map[string]*s3.GetBucketTaggingOutput {
 		},
 	}
 	return map[string]*s3.GetBucketTaggingOutput{
-		// All spec buckets (healthy + PAB-issue) are CloudFormation-managed
+		// The healthy and PAB-issue buckets are CloudFormation-managed
 		// by the same stack so the CFN pivot resolves on issue buckets too.
 		// An operator chasing a public-access finding wants to reach the
 		// stack template to see the policy as declared.
@@ -432,7 +411,7 @@ func buildS3TaggingConfigs() map[string]*s3.GetBucketTaggingOutput {
 // The healthy bucket grants GetObject/ListBucket to the
 // a9s-demo-s3-access-role IAM role — this is the join key the s3→role
 // pivot resolves via checkS3Role (s3:GetBucketPolicy →
-// Statement[].Principal.AWS). Other spec buckets have no policy; their
+// Statement[].Principal.AWS). Other buckets have no policy; their
 // GetBucketPolicy calls return NoSuchBucketPolicy (an honest 0).
 func buildS3BucketPolicies() map[string]string {
 	return map[string]string{
@@ -474,7 +453,7 @@ func buildS3CORSConfigs() map[string][]s3types.CORSRule {
 }
 
 // buildS3LifecycleConfigs returns per-bucket lifecycle rules. Every bucket
-// except the no-lifecycle witness carries one enabled rule; that witness has
+// except S3BucketNoLifecycle carries one enabled rule; that bucket has
 // none, so GetBucketLifecycleConfiguration returns
 // NoSuchLifecycleConfiguration for it.
 func buildS3LifecycleConfigs(buckets []s3types.Bucket) map[string][]s3types.LifecycleRule {
@@ -499,8 +478,8 @@ func buildS3LifecycleConfigs(buckets []s3types.Bucket) map[string][]s3types.Life
 	return out
 }
 
-// buildS3PolicyStatuses returns the GetBucketPolicyStatus verdicts. Only the
-// public witness is public; every other bucket has no entry, and the fake
+// buildS3PolicyStatuses returns the GetBucketPolicyStatus verdicts. Only
+// S3BucketPublic is public; every other bucket has no entry, and the fake
 // answers "not public" for those.
 func buildS3PolicyStatuses() map[string]*s3.GetBucketPolicyStatusOutput {
 	return map[string]*s3.GetBucketPolicyStatusOutput{
@@ -511,7 +490,7 @@ func buildS3PolicyStatuses() map[string]*s3.GetBucketPolicyStatusOutput {
 }
 
 // buildS3BucketACLs returns the ACL grant overrides. Only the ACL-public
-// witness carries a grant; every other bucket has no entry, and the fake
+// bucket carries a grant; every other bucket has no entry, and the fake
 // answers with the default owner-only ACL.
 func buildS3BucketACLs() map[string][]s3types.Grant {
 	return map[string][]s3types.Grant{
@@ -548,10 +527,6 @@ func buildS3ObjectLockConfigs() map[string]*s3.GetObjectLockConfigurationOutput 
 		S3BucketNoObjectLock: nil,
 	}
 }
-
-// ---------------------------------------------------------------------------
-// Notification configs (for GetBucketNotificationConfiguration)
-// ---------------------------------------------------------------------------
 
 func buildS3NotificationConfigs() map[string]*s3.GetBucketNotificationConfigurationOutput {
 	return map[string]*s3.GetBucketNotificationConfigurationOutput{
@@ -600,10 +575,6 @@ func buildS3NotificationConfigs() map[string]*s3.GetBucketNotificationConfigurat
 		},
 	}
 }
-
-// ---------------------------------------------------------------------------
-// S3 Objects (files) per bucket → prefix
-// ---------------------------------------------------------------------------
 
 func buildS3Objects() map[string]map[string][]s3types.Object {
 	return map[string]map[string][]s3types.Object{
@@ -769,10 +740,6 @@ func buildS3Objects() map[string]map[string][]s3types.Object {
 		},
 	}
 }
-
-// ---------------------------------------------------------------------------
-// S3 CommonPrefixes (folders) per bucket → prefix
-// ---------------------------------------------------------------------------
 
 func buildS3CommonPrefixes() map[string]map[string][]s3types.CommonPrefix {
 	return map[string]map[string][]s3types.CommonPrefix{

@@ -34,7 +34,7 @@ const (
 //
 // Also writes FieldUpdates["rules_summary"] = "<N> rules BLOCK" or "0 rules ALLOW".
 // Skip if clients.WAFv2 == nil. Per-WebACL errors (other than WAFNonexistentItemException) are
-// aggregated and returned as a composite error alongside partial findings (E3, E4, E5).
+// aggregated and returned as a composite error alongside partial findings.
 func EnrichWAFLogging(ctx context.Context, clients *ServiceClients, resources []resource.Resource, _ resource.ResourceCache) (IssueEnricherResult, error) {
 	result := IssueEnricherResult{
 		Findings:     make(map[string][]domain.Finding),
@@ -62,7 +62,6 @@ func EnrichWAFLogging(ctx context.Context, clients *ServiceClients, resources []
 		mu.Unlock()
 		var loggingRows, orphanRows []domain.DetailRow
 
-		// Check logging configuration.
 		_, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*wafv2svc.GetLoggingConfigurationOutput, error) {
 			return clients.WAFv2.GetLoggingConfiguration(ctx, &wafv2svc.GetLoggingConfigurationInput{
 				ResourceArn: aws.String(arn),
@@ -84,7 +83,6 @@ func EnrichWAFLogging(ctx context.Context, clients *ServiceClients, resources []
 			}
 		}
 
-		// Check resource associations.
 		assocOut, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*wafv2svc.ListResourcesForWebACLOutput, error) {
 			return clients.WAFv2.ListResourcesForWebACL(ctx, &wafv2svc.ListResourcesForWebACLInput{
 				WebACLArn: aws.String(arn),
@@ -104,9 +102,8 @@ func EnrichWAFLogging(ctx context.Context, clients *ServiceClients, resources []
 			})
 		}
 
-		// Compute rules_summary by fetching the full WebACL (optional — only if the
-		// client implements WAFv2GetWebACLAPI, which production clients do but test
-		// fakes focused on logging may not).
+		// Compute rules_summary by fetching the full WebACL when the client
+		// implements WAFv2GetWebACLAPI.
 		rulesSummary := "0 rules"
 		noRules := false
 		if getACLAPI, ok := clients.WAFv2.(WAFv2GetWebACLAPI); ok && r.Fields["name"] != "" && r.Fields["id"] != "" {

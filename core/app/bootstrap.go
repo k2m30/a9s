@@ -81,7 +81,7 @@ func (c *Controller) BootstrapLive(_, _ string) []runtime.TaskRequest {
 // HandleClientsReady sees the real screen stack, not a hardcoded
 // StackDepth: 1 that would make maybeRefreshIntents think no active list
 // existed and drop a pre-connect navigation's replay on the web/headless
-// lane (C10). Shared by both the success and failure
+// lane. Shared by both the success and failure
 // paths of BootstrapLive so a failed connect gets identical treatment to a
 // successful one instead of being silently dropped.
 func (c *Controller) routeClientsReady(ev runtime.ClientsReadyEvent) []runtime.TaskRequest {

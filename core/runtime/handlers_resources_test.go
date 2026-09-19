@@ -1,9 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
 
-// handlers_resources_test.go — Core-direct unit tests for the five h4-b
-// Handle* methods (HandleResourcesLoaded, HandleEnrichDetailResult,
-// HandleRelatedCheckResult, HandleIdentityLoaded, HandleIdentityError)
-// plus the two utility methods (AllRegions, ResetRuleSets).
+// handlers_resources_test.go — Core-direct unit tests for the resource/detail
+// Handle* methods, AllRegions and ResetRuleSets.
 //
 // Tests live in package runtime so they can exercise private fields
 // (canonShortName, deriveFindingsForType internal helpers) without going
@@ -22,7 +20,7 @@ import (
 )
 
 // findIntent returns the first intent of type T in xs, or the zero value
-// and false. Helper avoids repeating the type-assert loop across tests.
+// and false.
 func findIntent[T UIIntent](xs []UIIntent) (T, bool) {
 	var zero T
 	for _, x := range xs {
@@ -54,11 +52,6 @@ func hasTask(xs []TaskRequest, k TaskKind, scope string) bool {
 	return false
 }
 
-// TestHandleResourcesLoaded_NotCachedYet_EmitsPatchResourceCache covers the
-// cross-view cache fill: when the type is not yet present in
-// ResourceCache and the message is not an Append page, Core emits
-// PatchResourceCache so cross-view related-navigation finds an entry on
-// the next lookup.
 func TestHandleResourcesLoaded_NotCachedYet_EmitsPatchResourceCache(t *testing.T) {
 	sess := session.New()
 	c := New(sess, catalog.All())
@@ -85,10 +78,8 @@ func TestHandleResourcesLoaded_NotCachedYet_EmitsPatchResourceCache(t *testing.T
 	}
 }
 
-// TestHandleResourcesLoaded_AlreadyCached_SkipsPatch verifies the
-// !alreadyCached guard preserves the existing entry. Critical so a stale
-// later message (Append=false re-fetch) does not evict a richer entry
-// the view-side cacheTopLevelResourceList just wrote.
+// A later message (Append=false re-fetch) must not evict the richer entry
+// the view-side cacheTopLevelResourceList wrote.
 func TestHandleResourcesLoaded_AlreadyCached_SkipsPatch(t *testing.T) {
 	sess := session.New()
 	sess.RowStore.Observe("ec2", []resource.Resource{{ID: "pre-existing"}}, nil, session.OriginFetch, false)
@@ -105,10 +96,6 @@ func TestHandleResourcesLoaded_AlreadyCached_SkipsPatch(t *testing.T) {
 	}
 }
 
-// TestHandleResourcesLoaded_PartialError_EmitsFlash verifies the
-// partial-success path: Err non-nil with Resources present surfaces a
-// FlashIntent (which the adapter re-emits as messages.Flash so the `!`
-// log records the failure).
 func TestHandleResourcesLoaded_PartialError_EmitsFlash(t *testing.T) {
 	sess := session.New()
 	c := New(sess, catalog.All())
@@ -131,10 +118,6 @@ func TestHandleResourcesLoaded_PartialError_EmitsFlash(t *testing.T) {
 	}
 }
 
-// TestHandleResourcesLoaded_RerunTokenMatches_EmitsProbeTask verifies
-// the enrichment-rerun path: when TypeGen is non-zero AND matches the
-// per-type gen captured at Ctrl+R dispatch, Core seeds RowStore (OriginFetch,
-// wholesale replace) and emits a TaskKindProbeEnrich task.
 func TestHandleResourcesLoaded_RerunTokenMatches_EmitsProbeTask(t *testing.T) {
 	sess := session.New()
 	sess.EnrichmentTypeGen["ec2"] = 7
@@ -160,10 +143,6 @@ func TestHandleResourcesLoaded_RerunTokenMatches_EmitsProbeTask(t *testing.T) {
 	}
 }
 
-// TestHandleResourcesLoaded_RerunTokenStale_NoProbeTask verifies stale
-// rerun tokens are silently dropped: when TypeGen does not match the
-// per-type gen, no probe task fires and RowStore is never observed for
-// this type (Gen stays 0).
 func TestHandleResourcesLoaded_RerunTokenStale_NoProbeTask(t *testing.T) {
 	sess := session.New()
 	sess.EnrichmentTypeGen["ec2"] = 7
@@ -183,9 +162,7 @@ func TestHandleResourcesLoaded_RerunTokenStale_NoProbeTask(t *testing.T) {
 	}
 }
 
-// TestHandleEnrichDetailResult_Err_EmitsFlash verifies that an
-// enrichment failure surfaces as a single FlashIntent describing the
-// error. The adapter shim short-circuits on Err so the view-side
+// The adapter shim short-circuits on Err so the view-side
 // derive + updateActiveView never sees a half-populated EnrichedRes.
 func TestHandleEnrichDetailResult_Err_EmitsFlash(t *testing.T) {
 	sess := session.New()
@@ -206,17 +183,13 @@ func TestHandleEnrichDetailResult_Err_EmitsFlash(t *testing.T) {
 	if !flashes[0].IsError {
 		t.Errorf("FlashIntent.IsError = false, want true")
 	}
-	// INVERTED by spec row 6 (task "errors"): the site went through the one
-	// formatter, so it names what failed the way every other failed call does
-	// and drops the redundant "failed" — the cause already says it failed.
+	// The one formatter names what failed the way every other failed call
+	// does, without a redundant "failed" — the cause already says it failed.
 	if got, want := flashes[0].Text, "enrich ec2: AccessDenied: iam:GetPolicyVersion"; got != want {
 		t.Errorf("FlashIntent.Text = %q, want %q", got, want)
 	}
 }
 
-// TestHandleEnrichDetailResult_NoErr_NoIntents verifies the success path
-// is a Core no-op — the adapter shim does the wave-1 derive +
-// updateActiveView, Core just decides whether to flash.
 func TestHandleEnrichDetailResult_NoErr_NoIntents(t *testing.T) {
 	sess := session.New()
 	c := New(sess, catalog.All())
@@ -229,9 +202,6 @@ func TestHandleEnrichDetailResult_NoErr_NoIntents(t *testing.T) {
 	}
 }
 
-// TestHandleRelatedCheckResult_AppendsRelatedCache verifies the
-// RelatedCache append path: when SourceResourceID is non-empty, Core
-// emits PatchRelatedCache so applyIntents performs the cache append.
 func TestHandleRelatedCheckResult_AppendsRelatedCache(t *testing.T) {
 	sess := session.New()
 	c := New(sess, catalog.All())
@@ -255,9 +225,6 @@ func TestHandleRelatedCheckResult_AppendsRelatedCache(t *testing.T) {
 	}
 }
 
-// TestHandleRelatedCheckResult_LazyAddError_EmitsFlash verifies the
-// LazyAddError surface: the adapter receives a FlashIntent describing
-// the fetch failure even when partial results are present.
 func TestHandleRelatedCheckResult_LazyAddError_EmitsFlash(t *testing.T) {
 	sess := session.New()
 	c := New(sess, catalog.All())
@@ -277,10 +244,6 @@ func TestHandleRelatedCheckResult_LazyAddError_EmitsFlash(t *testing.T) {
 	}
 }
 
-// TestHandleRelatedCheckResult_CachedPagesMerge verifies CachedPages
-// canonicalisation + the !alreadyCached / !lazyExists guards. The first
-// entry is merged into the emitted intents; the second (whose key
-// canonicalises to a type already in LazyResourceCache) is skipped.
 func TestHandleRelatedCheckResult_CachedPagesMerge(t *testing.T) {
 	sess := session.New()
 	// Pre-seed a Partial RowStore entry for "kms" so the matching CachedPages
@@ -306,11 +269,6 @@ func TestHandleRelatedCheckResult_CachedPagesMerge(t *testing.T) {
 	}
 }
 
-// TestHandleIdentityLoaded_EmitsSetIdentityAndHeaderInvalidate verifies
-// the identity-resolved happy path: session.Identity is set, the
-// IdentityFetching latch clears, and the adapter receives both
-// SetIdentityIntent (carrying the domain mirror) and
-// HeaderInvalidateIntent (so the next View() recomputes the badge / role).
 func TestHandleIdentityLoaded_EmitsSetIdentityAndHeaderInvalidate(t *testing.T) {
 	sess := session.New()
 	sess.IdentityFetching = true
@@ -348,9 +306,6 @@ func TestHandleIdentityLoaded_EmitsSetIdentityAndHeaderInvalidate(t *testing.T) 
 	}
 }
 
-// TestHandleIdentityLoaded_WrongType_OnlyClearsFetching covers the
-// defensive path: a wrong-typed Identity value clears IdentityFetching
-// (matching the pre-h4-b inline guard) but emits no intents.
 func TestHandleIdentityLoaded_WrongType_OnlyClearsFetching(t *testing.T) {
 	sess := session.New()
 	sess.IdentityFetching = true
@@ -369,9 +324,6 @@ func TestHandleIdentityLoaded_WrongType_OnlyClearsFetching(t *testing.T) {
 	}
 }
 
-// TestHandleIdentityError_ClearsFetching covers the error path: the
-// IdentityFetching latch clears so the header drops the spinner; the
-// adapter shim handles the IdentityModel.SetError view-side note.
 func TestHandleIdentityError_ClearsFetching(t *testing.T) {
 	sess := session.New()
 	sess.IdentityFetching = true
@@ -387,11 +339,6 @@ func TestHandleIdentityError_ClearsFetching(t *testing.T) {
 	}
 }
 
-// TestResetRuleSets_SwapsStoreAndRewiresClients verifies the SES-refresh
-// helper: a fresh RuleSetStore replaces the session field, and the
-// retained ServiceClients transport (when present) gets the new store
-// wired in so in-flight blocked DescribeActiveReceiptRuleSet calls
-// write to the orphaned store on completion.
 func TestResetRuleSets_SwapsStoreAndRewiresClients(t *testing.T) {
 	sess := session.New()
 	oldStore := sess.RuleSets
@@ -407,9 +354,6 @@ func TestResetRuleSets_SwapsStoreAndRewiresClients(t *testing.T) {
 	}
 }
 
-// TestAllRegions_ReturnsCommercialPartition verifies the call-through
-// helper: Core exposes the awsclient region catalogue so the adapter
-// can drop its core/aws import in h4-c.
 func TestAllRegions_ReturnsCommercialPartition(t *testing.T) {
 	sess := session.New()
 	c := New(sess, catalog.All())

@@ -32,8 +32,8 @@ func (m *ResourceListModel) handleSortByCol(msg tea.KeyMsg) bool {
 }
 
 // SetPendingFilter stores filter text to be applied when resources are loaded.
-// In the controller-driven path this applies the filter immediately (there is no
-// pending state — the controller owns the filter).
+// In the controller-driven path this applies the filter immediately (the
+// controller owns the filter).
 func (m *ResourceListModel) SetPendingFilter(text string) {
 	if text != "" {
 		m.ctrl.Apply(app.Action{Kind: app.ActionSetFilter, Arg: text})

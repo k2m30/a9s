@@ -4,8 +4,8 @@ import (
 	"encoding/json"
 )
 
-// s3StatusIncomplete is the S4 Status-column text for a PAB-incomplete bucket
-// (docs/resources/s3.md §4). Must match what the list row renders.
+// s3StatusIncomplete is the Status-column text for a PAB-incomplete bucket
+// (docs/resources/s3.md). Must match what the list row renders.
 const s3StatusIncomplete = "public access block incomplete"
 
 // mirror of cmd/snapshot's normalized s3 data (the data contract, redeclared so
@@ -27,8 +27,8 @@ type s3Data struct {
 // checklistS3 derives the expected s3 root+list checklist from raw bucket facts.
 //
 // docs/resources/s3.md rules applied here:
-//   - §3.1 no Wave-1 signal → every row is Healthy (green), never warning/broken/dim.
-//   - §3.2 Wave-2 PAB: a bucket with no PAB config, or any of the four flags
+//   - no Wave-1 signal → every row is Healthy (green), never warning/broken/dim.
+//   - Wave-2 PAB: a bucket with no PAB config, or any of the four flags
 //     false, is flagged with a "!" glyph on its Healthy row + Status
 //     "public access block incomplete". A per-bucket call error (e.g. a
 //     cross-region PermanentRedirect) is data-incomplete ("?" marker), NOT a
@@ -78,8 +78,6 @@ func checklistS3(section json.RawMessage) (Checklist, error) {
 			IssuesTruncated: total > enrichmentCap,
 		},
 		List: ChecklistList{
-			// impl-plan §4 gap table + U10: the Status column replaced the old
-			// jargon "Public Access" column; these headers, no others.
 			Columns:    []string{"Bucket Name", "Region", "Creation Date", "Status"},
 			Jargon:     []string{"Public Access", "CIS", "Flags", "Policy", "Issues", "NOBKP", "UNENC", "PUB", "NOPROT"},
 			Shown:      shown,

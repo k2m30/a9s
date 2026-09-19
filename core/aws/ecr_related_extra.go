@@ -211,7 +211,6 @@ func ecrPolicyRoleARNs(policyText string) []string {
 		if stmt.Principal == nil {
 			continue
 		}
-		// Try as object {"AWS": ...}
 		var principalObj map[string]json.RawMessage
 		if err := json.Unmarshal(stmt.Principal, &principalObj); err == nil {
 			if awsRaw, ok := principalObj["AWS"]; ok {
@@ -229,7 +228,6 @@ func ecrPolicyRoleARNs(policyText string) []string {
 // addRoleARNs extracts role ARNs from a JSON value that is either a string or
 // []string and adds any matching arn:aws:iam::*:role/* entries to seen.
 func addRoleARNs(raw json.RawMessage, seen map[string]struct{}) {
-	// Try single string
 	var single string
 	if err := json.Unmarshal(raw, &single); err == nil {
 		if isRoleARN(single) {
@@ -237,7 +235,6 @@ func addRoleARNs(raw json.RawMessage, seen map[string]struct{}) {
 		}
 		return
 	}
-	// Try array of strings
 	var multi []string
 	if err := json.Unmarshal(raw, &multi); err == nil {
 		for _, s := range multi {

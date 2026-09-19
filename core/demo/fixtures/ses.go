@@ -17,10 +17,10 @@ import (
 // (ses.dkim-off). Every other domain identity signs its outbound mail.
 const SESDKIMOff = "nodkim.acme-corp.com"
 
-// Exported ID/ARN constants — referenced by this file, sibling fixtures, and QA tests.
+// Exported ID/ARN constants — referenced by this file, sibling fixtures, and tests.
 const (
 	// SESGraphRootIdentity is the domain identity used as the demo graph-root.
-	// It resolves every §2 related-panel pivot for "ses" in the scenario harness.
+	// It resolves every ses related-panel pivot.
 	SESGraphRootIdentity = "acme-corp.com"
 
 	// SESConfigSetName is the configuration set that wires SES events to EB/Kinesis/SNS.
@@ -72,8 +72,6 @@ type SESFixtures struct {
 	Identities []sesv2types.IdentityInfo
 
 	// GetAccountDefault is the HEALTHY account shape used by ./a9s --demo.
-	// Account-level distress shapes (PROBATION/SHUTDOWN/over-quota) are constructed
-	// inline in QA tests and are NOT in this fixture file.
 	GetAccountDefault *sesv2.GetAccountOutput
 
 	// GetEmailIdentityByName maps identity name → GetEmailIdentity response.
@@ -87,7 +85,7 @@ type SESFixtures struct {
 
 	// ActiveReceiptRuleSet is the SES v1 active rule set used by the demo fake.
 	// It contains one rule with S3Action (acme-inbound-mail) and LambdaAction
-	// (acme-inbound-parser) to satisfy the lambda and s3 §2 related-panel pivots.
+	// (acme-inbound-parser) to satisfy the lambda and s3 related-panel pivots.
 	ActiveReceiptRuleSet *ses.DescribeActiveReceiptRuleSetOutput
 }
 
@@ -106,23 +104,17 @@ func NewSESFixtures() *SESFixtures {
 	return sharedSESFixtures()
 }
 
-// ---------------------------------------------------------------------------
-// Identity list (§2.1)
-// ---------------------------------------------------------------------------
-
 func buildSESIdentities() []sesv2types.IdentityInfo {
 	return []sesv2types.IdentityInfo{
-		// FIXTURE: healthy-domain / graph-root-mailer
 		// Verified domain; sending enabled; no glyph. This is also the graph-root —
 		// GetEmailIdentity returns ConfigurationSetName = "es-events-prod" so every
-		// §2 pivot resolves ≥ 1 in the scenario harness.
+		// ses pivot resolves ≥ 1.
 		{
 			IdentityName:       aws.String(SESGraphRootIdentity),
 			IdentityType:       sesv2types.IdentityTypeDomain,
 			SendingEnabled:     true,
 			VerificationStatus: sesv2types.VerificationStatusSuccess,
 		},
-		// FIXTURE: healthy-email
 		// Verified transactional sender; Healthy.
 		{
 			IdentityName:       aws.String("noreply@acme-corp.com"),
@@ -130,40 +122,35 @@ func buildSESIdentities() []sesv2types.IdentityInfo {
 			SendingEnabled:     true,
 			VerificationStatus: sesv2types.VerificationStatusSuccess,
 		},
-		// FIXTURE: warn-pending-email — covers §3.1 PENDING
-		// Yellow row, S4 "pending verification".
+		// Yellow row, "pending verification".
 		{
 			IdentityName:       aws.String("alerts@acme-corp.com"),
 			IdentityType:       sesv2types.IdentityTypeEmailAddress,
 			SendingEnabled:     true,
 			VerificationStatus: sesv2types.VerificationStatusPending,
 		},
-		// FIXTURE: broken-failed-domain — covers §3.1 FAILED
-		// Hard DNS failure. Red row, S4 "verification failed".
+		// Hard DNS failure. Red row, "verification failed".
 		{
 			IdentityName:       aws.String("ses-failed.acme-corp.com"),
 			IdentityType:       sesv2types.IdentityTypeDomain,
 			SendingEnabled:     true,
 			VerificationStatus: sesv2types.VerificationStatusFailed,
 		},
-		// FIXTURE: broken-temp-failure-domain — covers §3.1 TEMPORARY_FAILURE
-		// Red row, S4 "verify: temp failure".
+		// Red row, "verify: temp failure".
 		{
 			IdentityName:       aws.String("temp.acme-corp.com"),
 			IdentityType:       sesv2types.IdentityTypeDomain,
 			SendingEnabled:     true,
 			VerificationStatus: sesv2types.VerificationStatusTemporaryFailure,
 		},
-		// FIXTURE: broken-not-started-domain — covers §3.1 NOT_STARTED
-		// Red row, S4 "verification not started".
+		// Red row, "verification not started".
 		{
 			IdentityName:       aws.String("notstarted.acme-corp.com"),
 			IdentityType:       sesv2types.IdentityTypeDomain,
 			SendingEnabled:     true,
 			VerificationStatus: sesv2types.VerificationStatusNotStarted,
 		},
-		// FIXTURE: warn-sending-disabled — covers §3.1 SendingEnabled==false on verified
-		// Verified but sending paused. Yellow, S4 "sending disabled".
+		// Verified but sending paused. Yellow, "sending disabled".
 		{
 			IdentityName:       aws.String("suppressed@acme-corp.com"),
 			IdentityType:       sesv2types.IdentityTypeEmailAddress,
@@ -178,7 +165,6 @@ func buildSESIdentities() []sesv2types.IdentityInfo {
 			SendingEnabled:     true,
 			VerificationStatus: sesv2types.VerificationStatusSuccess,
 		},
-		// FIXTURE: warn-ses-multi — U7a: multi-W1 suffix test vehicle
 		// Both FAILED verification AND sending disabled. Fetcher produces
 		// Status = "verification failed (+1)", Issues = ["verification failed", "sending disabled"].
 		{
@@ -189,10 +175,6 @@ func buildSESIdentities() []sesv2types.IdentityInfo {
 		},
 	}
 }
-
-// ---------------------------------------------------------------------------
-// Account-level GetAccount (§2.2 — demo default shape)
-// ---------------------------------------------------------------------------
 
 func buildSESAccountHealthy() *sesv2.GetAccountOutput {
 	return &sesv2.GetAccountOutput{
@@ -205,10 +187,6 @@ func buildSESAccountHealthy() *sesv2.GetAccountOutput {
 		},
 	}
 }
-
-// ---------------------------------------------------------------------------
-// Per-identity GetEmailIdentity map (§2.1 graph-root wiring)
-// ---------------------------------------------------------------------------
 
 func buildSESEmailIdentityMap() map[string]*sesv2.GetEmailIdentityOutput {
 	m := map[string]*sesv2.GetEmailIdentityOutput{
@@ -255,10 +233,6 @@ func sesSigningDkim(signing bool) *sesv2types.DkimAttributes {
 		SigningAttributesOrigin: sesv2types.DkimSigningAttributesOriginAwsSes,
 	}
 }
-
-// ---------------------------------------------------------------------------
-// Event destinations (§2.1 graph-root wiring)
-// ---------------------------------------------------------------------------
 
 func buildSESEventDestinations() map[string]*sesv2.GetConfigurationSetEventDestinationsOutput {
 	// All SES event types that make sense to route.
@@ -309,10 +283,6 @@ func buildSESEventDestinations() map[string]*sesv2.GetConfigurationSetEventDesti
 	}
 }
 
-// ---------------------------------------------------------------------------
-// SES v1 active receipt rule set (§2.3)
-// ---------------------------------------------------------------------------
-
 func buildSESActiveReceiptRuleSet() *ses.DescribeActiveReceiptRuleSetOutput {
 	return &ses.DescribeActiveReceiptRuleSetOutput{
 		Metadata: &sestypes.ReceiptRuleSetMetadata{
@@ -350,6 +320,6 @@ func init() {
 	// The three account codes: SES exposes one GetAccount-shaped Wave-2 signal
 	// per account with no per-resource dimension to vary, and the demo account
 	// is modeled healthy so the rest of the fleet has a working sending
-	// identity to reference. The distress shapes are built inline in QA tests.
+	// identity to reference.
 	Register(Pin{ShortName: "ses", Rows: 9, Issues: 6, CoverageGaps: []string{"dim", "ses.account-shutdown", "ses.account-probation", "ses.quota-high"}})
 }

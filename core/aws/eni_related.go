@@ -26,7 +26,6 @@ func checkENIEC2(_ context.Context, _ any, res resource.Resource, _ resource.Res
 	if raw.Attachment == nil || raw.Attachment.InstanceId == nil || *raw.Attachment.InstanceId == "" {
 		return resource.KnownRelated("ec2", nil, false)
 	}
-	// In-body: the ENI's Attachment.InstanceId IS the related instance.
 	return relatedResult("ec2", []string{*raw.Attachment.InstanceId})
 }
 
@@ -40,7 +39,6 @@ func checkENISG(_ context.Context, _ any, res resource.Resource, _ resource.Reso
 		}
 		return resource.KnownRelated("sg", nil, false)
 	}
-	// In-body: the ENI's own Groups[].GroupId are the related security groups.
 	var ids []string
 	for _, g := range raw.Groups {
 		if g.GroupId != nil && *g.GroupId != "" {
@@ -133,7 +131,6 @@ func checkENILambda(_ context.Context, _ any, res resource.Resource, _ resource.
 	if raw.Description != nil {
 		desc = *raw.Description
 	}
-	// Not Lambda-owned → no relationship.
 	if !isLambdaENI(reqID, desc) {
 		return resource.KnownRelated("lambda", nil, false)
 	}

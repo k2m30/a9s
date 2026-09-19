@@ -42,8 +42,8 @@ func mustParseCFNTime(s string) time.Time {
 
 // minimalCreateEventSequence returns the 4 canonical CREATE events for a stack:
 // stack-create-in-progress, primary-resource-create-in-progress,
-// primary-resource-create-complete, stack-create-complete. Used to satisfy the
-// cfn_events child view for every graph-root stack without hand-coding each.
+// primary-resource-create-complete, stack-create-complete, so every graph-root
+// stack has a non-empty cfn_events child view.
 // startTime is the ISO-8601 timestamp of the first event; subsequent events are
 // spaced 15/45/48 minutes apart.
 func minimalCreateEventSequence(stackName, startTime, primaryResLogicalID, primaryResType string) []cfntypes.StackEvent {
@@ -133,7 +133,7 @@ var sharedCFNFixtures = sync.OnceValue(func() *CFNFixtures {
 			Description:                 aws.String("Aurora PostgreSQL cluster for API backend"),
 			StackId:                     aws.String("arn:aws:cloudformation:us-east-1:123456789012:stack/acme-rds-aurora/33333333-3333-3333-3333-333333333333"),
 			RoleARN:                     aws.String(prodCIDeployRoleARN),
-			// CFNOutputSecret witness: the master password was exported as a
+			// CFNOutputSecret: the master password was exported as a
 			// plain stack output, readable by anyone who can describe the
 			// stack. The endpoint output beside it is the healthy shape.
 			Outputs: []cfntypes.Output{
@@ -416,12 +416,7 @@ var sharedCFNFixtures = sync.OnceValue(func() *CFNFixtures {
 		// fetches DescribeStackEvents and gets nothing back.
 		OpenSearchCFNStackName: minimalCreateEventSequence(OpenSearchCFNStackName, "2026-02-10T09:00:00+00:00", "SearchDomain", "AWS::OpenSearchService::Domain"),
 		// All other graph-root CFN stacks — required so every parent→cfn drill
-		// lands on a non-empty cfn_events child view. These cover:
-		//   s3/healthy           → cfn=a9s-demo-stack
-		//   redis/prod-redis     → cfn=acme-prod-redis
-		//   efs/prod-app-data    → cfn=acme-efs-app-data
-		//   redshift/warehouse   → cfn=acme-warehouse-stack
-		//   redshift/reporting   → cfn=acme-reporting-stack
+		// lands on a non-empty cfn_events child view.
 		S3CFNStackName:         minimalCreateEventSequence(S3CFNStackName, "2025-01-10T10:00:00+00:00", "DemoBucket", "AWS::S3::Bucket"),
 		ProdRedisCFNStack:      minimalCreateEventSequence(ProdRedisCFNStack, "2025-07-04T12:00:00+00:00", "RedisCluster", "AWS::ElastiCache::ReplicationGroup"),
 		ProdEFSCFNStackName:    minimalCreateEventSequence(ProdEFSCFNStackName, "2025-09-01T08:00:00+00:00", "AppDataFS", "AWS::EFS::FileSystem"),
@@ -536,7 +531,7 @@ func NewCFNFixtures() *CFNFixtures {
 	return sharedCFNFixtures()
 }
 
-// Witness stacks for the cfn posture findings. Each names the ONE demo stack
+// Stacks carrying the cfn posture findings. Each names the ONE demo stack
 // that carries its finding; every other non-nested stack is set to the
 // healthy value for that condition.
 const (

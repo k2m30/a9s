@@ -21,7 +21,7 @@ func checkMSKAlarms(ctx context.Context, clients any, res resource.Resource, cac
 }
 
 // checkMSKSG returns the security groups associated with the MSK cluster's broker nodes.
-// It reads the SecurityGroups field from the Provisioned.BrokerNodeGroupInfo struct (Pattern F).
+// It reads the SecurityGroups field from the Provisioned.BrokerNodeGroupInfo struct.
 func checkMSKSG(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	cluster, ok := assertStruct[kafkatypes.Cluster](res.RawStruct)
 	if !ok {
@@ -38,8 +38,8 @@ func checkMSKSG(_ context.Context, _ any, res resource.Resource, _ resource.Reso
 }
 
 // checkMSKLambda calls lambda:ListEventSourceMappings with the EventSourceArn
-// filter set to this cluster's ARN (one call per open cluster — budget rule 7
-// in docs/related-resources.md) and maps the returned FunctionArn entries
+// filter set to this cluster's ARN (one call per open cluster — the per-open
+// call budget in docs/related-resources.md) and maps the returned FunctionArn entries
 // against the lambda cache. MSK → Lambda triggers use the cluster ARN as the
 // event source.
 func checkMSKLambda(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
@@ -54,7 +54,7 @@ func checkMSKLambda(ctx context.Context, clients any, res resource.Resource, cac
 }
 
 // checkMSKCFN matches the MSK cluster's aws:cloudformation:stack-name tag to
-// a CFN stack (Pattern C). kafkatypes.Cluster.Tags is a map[string]string
+// a CFN stack. kafkatypes.Cluster.Tags is a map[string]string
 // populated at list time (ListClustersV2). Returns Count: 0 when no tag is set.
 func checkMSKCFN(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	cluster, ok := assertStruct[kafkatypes.Cluster](res.RawStruct)
@@ -89,7 +89,7 @@ func checkMSKCFN(ctx context.Context, clients any, res resource.Resource, cache 
 }
 
 // checkMSKSubnet returns the subnets the cluster's broker nodes run in
-// (Provisioned.BrokerNodeGroupInfo.ClientSubnets). Pattern F — no cache needed.
+// (Provisioned.BrokerNodeGroupInfo.ClientSubnets).
 func checkMSKSubnet(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	cluster, ok := assertStruct[kafkatypes.Cluster](res.RawStruct)
 	if !ok {
@@ -104,7 +104,6 @@ func checkMSKSubnet(_ context.Context, _ any, res resource.Resource, _ resource.
 
 // checkMSKVPC returns the VPC that hosts the cluster's broker subnets by
 // looking up the first ClientSubnet in the subnet cache and reading its VpcId.
-// Pattern F + C.
 func checkMSKVPC(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	cluster, ok := assertStruct[kafkatypes.Cluster](res.RawStruct)
 	if !ok {
@@ -145,7 +144,7 @@ func checkMSKVPC(ctx context.Context, clients any, res resource.Resource, cache 
 	return resource.KnownRelated("vpc", nil, false)
 }
 
-// checkMSKLogs would resolve the CloudWatch log group configured for broker
+// checkMSKLogs resolves the CloudWatch log group configured for broker
 // logs in LoggingInfo.BrokerLogs.CloudWatchLogs.LogGroup. ListClustersV2
 // returns kafkatypes.Cluster that carries LoggingInfo when set on the cluster;
 // when unset, Count: 0. This is a forward lookup.
@@ -189,7 +188,6 @@ func checkMSKS3(_ context.Context, _ any, res resource.Resource, _ resource.Reso
 
 // checkMSKSecrets calls kafka:ListScramSecrets(clusterArn) and returns the
 // Secrets Manager secret names associated with this cluster's SCRAM auth.
-// Pattern C — single API call per checker.
 func checkMSKSecrets(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	cluster, ok := assertStruct[kafkatypes.Cluster](res.RawStruct)
 	if !ok || cluster.ClusterArn == nil || *cluster.ClusterArn == "" {

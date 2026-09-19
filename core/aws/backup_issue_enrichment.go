@@ -27,9 +27,6 @@ const (
 // EnrichBackupJobs calls ListBackupJobs (account-wide, paginated) and returns a Finding
 // for each BackupPlanId that has a failed/aborted/expired/partial job in the last 24h.
 // Severity "!" for FAILED/ABORTED/EXPIRED, "~" for PARTIAL.
-//
-// Rule-7 (+N) stacking is N/A for backup — spec §3.1 has zero Wave-1 signals so
-// there are no coexisting Wave-1 warnings to stack with the Wave-2 finding.
 func EnrichBackupJobs(ctx context.Context, clients *ServiceClients, resources []resource.Resource, _ resource.ResourceCache) (IssueEnricherResult, error) {
 	result := IssueEnricherResult{
 		Findings:     make(map[string][]domain.Finding),
@@ -41,7 +38,7 @@ func EnrichBackupJobs(ctx context.Context, clients *ServiceClients, resources []
 	}
 
 	var failures []Failure
-	// Spec §3.2 — filter to the 24h window server-side so AWS returns only
+	// The 24h window is filtered server-side so AWS returns only
 	// the jobs we care about. Without this, accounts with months of job
 	// history scan far more pages than needed and hit EnrichmentCap early,
 	// reporting a cut walk even when zero issues exist in the window.
@@ -69,7 +66,6 @@ func EnrichBackupJobs(ctx context.Context, clients *ServiceClients, resources []
 		failures = append(failures, FailedOnPage(pages, walkErr))
 	}
 
-	// Bucket jobs by plan ID. Each plan tracks all in-window jobs.
 	type planBucket struct {
 		failedJobs  []backuptypes.BackupJob
 		partialJobs []backuptypes.BackupJob
@@ -168,7 +164,6 @@ func EnrichBackupJobs(ctx context.Context, clients *ServiceClients, resources []
 			}
 			result.FieldUpdates[planID]["status"] = summary
 		}
-		// Else: only COMPLETED jobs — no finding, no FieldUpdate.
 	}
 
 	SetTruncated(&result, cut)

@@ -167,12 +167,11 @@ var containersTypes = []catalog.ResourceTypeDef{
 
 // ngResumeTokenPrefix marks a fetchNodeGroupsPage continuation token as the
 // versioned composite resume format below, as opposed to a plain EKS
-// ListClusters NextToken — the only format this token held before the
-// result-cap-loses-continuation fix, and still the format returned whenever
-// the cap isn't hit. EKS's own NextToken opaque strings are not documented to
-// ever take this shape, so any token lacking the prefix — old or freshly
-// minted — falls through decodeNGResumeToken's ok=false path and is used
-// exactly as before: a plain ListClusters continuation.
+// ListClusters NextToken, which is what the token holds whenever the cap
+// isn't hit. EKS's own NextToken opaque strings are not documented to ever
+// take this shape, so any token lacking the prefix falls through
+// decodeNGResumeToken's ok=false path and is used as a plain ListClusters
+// continuation.
 const ngResumeTokenPrefix = "ng-resume/v1?" //nolint:gosec // not a credential — a fixed marker prefix for the composite pagination resume token format
 
 // ngResumeState is the parsed form of a composite fetchNodeGroupsPage resume
@@ -219,8 +218,8 @@ func encodeNGResumeToken(s ngResumeState) string {
 
 // decodeNGResumeToken reports ok=false for any token not carrying
 // ngResumeTokenPrefix (including a malformed query or one missing the
-// required resume-cluster field), which is the compatibility path for a
-// plain ListClusters token minted before this composite format existed.
+// required resume-cluster field), which is the path for a plain
+// ListClusters token.
 func decodeNGResumeToken(token string) (ngResumeState, bool) {
 	if !strings.HasPrefix(token, ngResumeTokenPrefix) {
 		return ngResumeState{}, false
@@ -248,7 +247,7 @@ func decodeNGResumeToken(token string) (ngResumeState, bool) {
 // stopped, instead of the outer ListClusters token alone — which cannot
 // represent a paused per-cluster drain and, on a single-page cluster list,
 // would come back empty even though the result is truncated. If the resume
-// cluster no longer exists by the time the token is redeemed, its
+// cluster is gone by the time the token is redeemed, its
 // ListNodegroups/DescribeNodegroup calls fail like any other AWS error:
 // recorded via AggregateFailures, not a hard error, and every other cluster
 // named in the token is still visited.

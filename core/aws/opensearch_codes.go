@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
 
-// opensearch_codes.go — canonical FindingCodes and S5 operator sentences for
+// opensearch_codes.go — canonical FindingCodes and operator sentences for
 // the opensearch resource type. Every signal is wave 1: DescribeDomains is the
 // fetcher's own call and DomainStatus carries all of them, so opensearch
 // registers no wave-2 enricher.

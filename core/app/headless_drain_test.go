@@ -2,16 +2,6 @@
 
 // headless_drain_test.go — end-to-end gate: DrainSync populates list rows
 // without the manual ApplyResourcesLoaded seam.
-//
-// P1#1 acceptance test: proves that Apply→DrainSync (ExecuteTask+Handle)
-// populates Body.List.Rows through the real task-result lane:
-//
-//	Apply(ActionCommand "ec2") → []TaskRequest{KindFetchResources/ec2}
-//	DrainSync → ExecuteTask → messages.ResourcesLoaded → Handle →
-//	  handleResourcesLoadedEvent → applyResourcesLoaded → rows appear
-//
-// If this test fails with empty rows it is a production gap in the headless
-// path — not a test defect.
 package app_test
 
 import (
@@ -43,17 +33,9 @@ func newDemoController() (*runtime.Core, *app.Controller) {
 	return core, app.New(core)
 }
 
-// TestHeadless_FetchPopulatesListRows is the P1#1 acceptance test.
-//
-// It drives the controller the same way the web host does:
-//  1. Apply(ActionCommand) to navigate to a resource list — returns pending tasks
-//  2. DrainSync(pending) — executes each task via Core.ExecuteTask, routes the
-//     messages.ResourcesLoaded result through Handle → handleResourcesLoadedEvent
-//     → applyResourcesLoaded, collecting follow-up tasks until none remain.
-//  3. Snapshot().Body.List.Rows must be non-empty (real data flowed in).
-//
-// ApplyResourcesLoaded (the manual test seam) is deliberately NOT called.
-// If rows are empty the test reports exactly where the chain broke.
+// TestHeadless_FetchPopulatesListRows drives the controller the same way the
+// web host does — Apply(ActionCommand), DrainSync, Snapshot — through the real
+// task-result lane, never the ApplyResourcesLoaded seam.
 func TestHeadless_FetchPopulatesListRows(t *testing.T) {
 	tests := []struct {
 		resourceType    string
@@ -73,7 +55,6 @@ func TestHeadless_FetchPopulatesListRows(t *testing.T) {
 		t.Run(tc.resourceType, func(t *testing.T) {
 			_, c := newDemoController()
 
-			// Step 1: navigate to the resource list. Apply returns the pending fetch task.
 			vs, tasks := c.Apply(app.Action{Kind: app.ActionCommand, Arg: tc.resourceType})
 
 			if vs.Body.Kind != app.BodyKindList {
@@ -83,14 +64,8 @@ func TestHeadless_FetchPopulatesListRows(t *testing.T) {
 				t.Fatalf("Apply(%q): returned 0 tasks — no fetch task was enqueued; check HandleNavigate task generation", tc.resourceType)
 			}
 
-			// Step 2: execute all tasks synchronously via the headless lane.
-			// DrainSync calls Core.ExecuteTask for each task, then routes the
-			// resulting messages.ResourcesLoaded event through c.Handle —
-			// which dispatches to handleResourcesLoadedEvent → applyResourcesLoaded.
-			// NO call to ApplyResourcesLoaded (the manual seam) is made here.
 			app.DrainSync(c, tasks)
 
-			// Step 3: assert rows populated.
 			snap := c.Snapshot()
 			if snap.Body.List == nil {
 				t.Fatalf("%s: Snapshot().Body.List is nil after DrainSync — controller lost the list screen", tc.resourceType)
@@ -103,8 +78,6 @@ func TestHeadless_FetchPopulatesListRows(t *testing.T) {
 					"(c) handleResourcesLoadedEvent type-mismatch on screen stack", tc.resourceType)
 			}
 
-			// Step 4: assert real fixture data flowed through — at least one row
-			// must carry the expected fixture ID prefix.
 			found := false
 			for _, row := range rows {
 				if strings.Contains(row.ResourceID, tc.wantIDSubstring) {
@@ -148,8 +121,6 @@ func TestHeadless_RowCellsArePopulated(t *testing.T) {
 				t.Fatalf("%s: no rows after DrainSync — prerequisite for cell check not met", tc.resourceType)
 			}
 
-			// Check first row: must have at least wantMinCells and at least one
-			// non-empty cell.
 			firstRow := snap.Body.List.Rows[0]
 			if len(firstRow.Cells) < tc.wantMinCells {
 				t.Fatalf("%s: first row has %d cells, want >= %d", tc.resourceType, len(firstRow.Cells), tc.wantMinCells)

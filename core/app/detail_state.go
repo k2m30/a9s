@@ -98,9 +98,8 @@ func (c *Controller) ApplyDetailFinding(f *domain.Finding, ad *domain.AttentionD
 // singleFindingSlice converts a single *domain.Finding into the
 // []domain.Finding slice applyFindingToState's plural contract needs, for
 // callers (ApplyDetailFinding, applyDetailFindingForResource,
-// ApplyDetailEnrichmentForResource) that still carry only one finding at a
-// time. Returns nil (clear-only) for a nil finding or an empty Phrase —
-// mirrors applyFindingToState's own former f != nil && f.Phrase != "" guard.
+// ApplyDetailEnrichmentForResource) that carry one finding. Returns nil
+// (clear-only) for a nil finding or an empty Phrase.
 func singleFindingSlice(f *domain.Finding) []domain.Finding {
 	if f == nil || f.Phrase == "" {
 		return nil
@@ -223,7 +222,7 @@ func (c *Controller) applyDetailEnrichmentForResourceLocked(resourceType, resour
 	// The detail enricher's own read of AWS: one resource, so the boundary is
 	// affordable here under the lock, unlike a page of rows.
 	enriched = enriched.Sanitized()
-	// Universal rule 7 / S5: every issue-severity finding the enricher found
+	// Every issue-severity finding the enricher found
 	// must reach ds.Findings, not just the caller-folded (f, ad) pair —
 	// primaryWave2Finding only recognizes "wave2:"-sourced findings and folds
 	// them to a single worst-severity one, so a wave1-sourced finding set an
@@ -347,8 +346,8 @@ func (c *Controller) foldEnrichDetailResultLocked(msg messages.EnrichDetailResul
 // invalidating the YAML operation's own in-flight enrich result, so only the
 // JSON operation's result ever folds. Both screens describe the SAME
 // underlying resource, so that one result is valid content for both; without
-// this, popping back to the buried YAML screen revealed it permanently
-// unenriched, since nothing else ever regenerates a non-top screen. No-op
+// this, popping back to the buried YAML screen would reveal it permanently
+// unenriched, since nothing else regenerates a non-top screen. No-op
 // for a stack with no matching text screen.
 //
 // Only Lines and Resource are touched — Search/SearchCursor/Wrap/ScrollY are
@@ -592,7 +591,7 @@ func (c *Controller) SetDetailViewportHeight(h int) {
 // ResetDetailRelatedRows unconditionally resets RelatedRows to loading state
 // from the registered related defs, discarding any loaded counts. Called by
 // handleRefresh so stale counts are cleared before the new checker results
-// arrive — mirrors ResetRightColumn() on the TUI side.
+// arrive.
 // No-op when the top screen is not ScreenDetail.
 func (c *Controller) ResetDetailRelatedRows(resourceType string) {
 	c.mu.Lock()

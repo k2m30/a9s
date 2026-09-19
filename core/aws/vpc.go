@@ -20,9 +20,8 @@ import (
 // asking only about the VPC's own id calls a fully covered VPC uncovered.
 //
 // One DescribeSubnets for the page, not one per VPC. Reached by type assertion
-// so the narrow DescribeVpcs fakes this fetcher is exercised with keep working
-// — they simply produce no subnet ids, and the check then reads what it read
-// before. A failure is silent for the same reason: the subnet list is context
+// so a client with only DescribeVpcs still lists VPCs, with no subnet ids
+// stamped. A failure is silent for the same reason: the subnet list is context
 // for another check, not a fact this page promises.
 func stampVPCSubnetIDs(ctx context.Context, api EC2DescribeVpcsAPI, resources []resource.Resource) {
 	subnetAPI, ok := api.(EC2DescribeSubnetsAPI)
@@ -77,13 +76,11 @@ func FetchVPCsPage(ctx context.Context, api EC2DescribeVpcsAPI, continuationToke
 	var resources []resource.Resource
 
 	for _, vpc := range output.Vpcs {
-		// Extract VPC ID
 		vpcID := ""
 		if vpc.VpcId != nil {
 			vpcID = *vpc.VpcId
 		}
 
-		// Extract Name from Tags
 		name := ""
 		for _, tag := range vpc.Tags {
 			if tag.Key != nil && *tag.Key == "Name" {
@@ -94,16 +91,13 @@ func FetchVPCsPage(ctx context.Context, api EC2DescribeVpcsAPI, continuationToke
 			}
 		}
 
-		// Extract CIDR Block
 		cidrBlock := ""
 		if vpc.CidrBlock != nil {
 			cidrBlock = *vpc.CidrBlock
 		}
 
-		// Extract State
 		state := string(vpc.State)
 
-		// Extract IsDefault
 		isDefault := "false"
 		if vpc.IsDefault != nil && *vpc.IsDefault {
 			isDefault = "true"

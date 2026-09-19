@@ -79,7 +79,7 @@ func computeRDSDBClusterFindings(cluster rdstypes.DBCluster) ([]domain.Finding, 
 		return append(lead, postureFindings...), postureDetails
 	}
 
-	// Healthy available — collect Wave-1 warnings in spec §4 table order.
+	// Healthy available — collect Wave-1 warnings.
 	if status == "available" {
 		var findings []domain.Finding
 		if cluster.DeletionProtection != nil && !*cluster.DeletionProtection {

@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-// coverage_live_gaps_whitebox_test.go — white-box tests for live,
-// production-reachable functions that carried low coverage: styleForCostCell,
+// coverage_live_gaps_whitebox_test.go — white-box tests for styleForCostCell,
 // decodeRune, searchReadClipboard, enterChildFor, and the three
 // refreshViewportContent methods (DetailModel/YAMLModel/JSONModel). All are
 // unexported, so they are exercised directly from package views.
@@ -217,10 +216,7 @@ func livegapFindLine(content, substr string) int {
 // TestLiveGap_DetailModel_RenderDetail_SearchActiveScrollsToMatch drives the
 // search-scroll-to-match behavior through the LIVE RenderDetail method — which
 // calls the (live) DetailModel.refreshViewportContent internally — via a
-// hand-built app.DetailBody + NewTransientDetail. This replaces the retired
-// stateful NewDetail(...) lifecycle constructor (deleted in
-// specs/022-codebase-cleanup/wave3), matching RenderDetail's own
-// body.Search/body.SearchCursor handling (detail_helpers.go).
+// hand-built app.DetailBody + NewTransientDetail.
 func TestLiveGap_DetailModel_RenderDetail_SearchActiveScrollsToMatch(t *testing.T) {
 	// 3 fields sorted alphabetically by key so the marker lands on the
 	// middle line (index 1) — a viewport height of 1 (< 3 total lines)
@@ -253,8 +249,7 @@ func TestLiveGap_DetailModel_RenderDetail_SearchActiveScrollsToMatch(t *testing.
 
 // TestLiveGap_DetailModel_RenderDetail_SearchActiveNoMatch_LeavesScrollAtZero
 // drives the no-match case through the LIVE RenderDetail seam (which uses the
-// live DetailModel.refreshViewportContent), replacing the retired stateful
-// NewDetail(...) path.
+// live DetailModel.refreshViewportContent).
 func TestLiveGap_DetailModel_RenderDetail_SearchActiveNoMatch_LeavesScrollAtZero(t *testing.T) {
 	body := app.DetailBody{
 		Fields: []app.FieldRow{{Key: "Other", Value: "value"}},

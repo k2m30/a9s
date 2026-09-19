@@ -140,7 +140,6 @@ func FetchDynamoDBTablesPage(ctx context.Context, listAPI DDBListTablesAPI, desc
 		resources = append(resources, r)
 	}
 
-	// Build pagination metadata
 	nextToken := ""
 	isTruncated := false
 	if listOutput.LastEvaluatedTableName != nil {

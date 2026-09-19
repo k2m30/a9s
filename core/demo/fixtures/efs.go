@@ -103,13 +103,10 @@ const (
 	// ProdEFSBackupBRecoveryARN is the ARN of the second recovery point for this EFS.
 	ProdEFSBackupBRecoveryARN = "arn:aws:backup:us-east-1:123456789012:recovery-point:rp-efs-prod-daily-20260415"
 
-	// updatingMTDownMountTargetBID is the MountTargetId for the creating MT in warn-efs-updating-mt-down.
-	// Exported so QA tests can assert on it.
+	// UpdatingMTDownMountTargetBID is the MountTargetId for the creating MT in warn-efs-updating-mt-down.
 	UpdatingMTDownMountTargetBID = "fsmt-0warnupdmtdown001b"
 
-	// Warn / Broken / Healthy-MTdown fixture FileSystemIds — exported so
-	// integration tests can reference them without hardcoding the literal,
-	// avoiding silent drift if this file is regenerated or renamed.
+	// Warn / Broken / Healthy-MTdown fixture FileSystemIds.
 	WarnEFSCreatingID         = "fs-0warncreating0001"
 	WarnEFSUpdatingID         = "fs-0warnupdating0001"
 	WarnEFSDeletingID         = "fs-0warndeleting0001"
@@ -119,7 +116,7 @@ const (
 	WarnEFSUpdatingMTDownID   = "fs-0warnupdmtdown001"
 	HealthyEFSMTDownID        = "fs-0healthymtdown001"
 
-	// One witness per new efs finding. Every other file system is encrypted,
+	// One carrier per efs posture finding. Every other file system is encrypted,
 	// has no file system policy, and has its backup policy enabled.
 
 	// EFSUnencrypted is the file system stored without encryption at rest.
@@ -165,7 +162,7 @@ func NewEFSFixtures() *EFSFixtures {
 
 func buildEFSFileSystems() []efstypes.FileSystemDescription {
 	return []efstypes.FileSystemDescription{
-		// 1. prod-efs-app-data — graph-root, healthy.
+		// prod-efs-app-data — graph-root, healthy.
 		{
 			FileSystemId:         aws.String(ProdEFSID),
 			FileSystemArn:        aws.String(ProdEFSARN),
@@ -190,7 +187,7 @@ func buildEFSFileSystems() []efstypes.FileSystemDescription {
 			},
 		},
 
-		// 2. warn-efs-creating — Wave-1 Warning: creating.
+		// warn-efs-creating — Wave-1 Warning: creating.
 		{
 			FileSystemId:         aws.String("fs-0warncreating0001"),
 			FileSystemArn:        aws.String("arn:aws:elasticfilesystem:us-east-1:123456789012:file-system/fs-0warncreating0001"),
@@ -211,7 +208,7 @@ func buildEFSFileSystems() []efstypes.FileSystemDescription {
 			},
 		},
 
-		// 3. warn-efs-updating — Wave-1 Warning: updating (MTs both available).
+		// warn-efs-updating — Wave-1 Warning: updating (MTs both available).
 		{
 			FileSystemId:         aws.String("fs-0warnupdating0001"),
 			FileSystemArn:        aws.String("arn:aws:elasticfilesystem:us-east-1:123456789012:file-system/fs-0warnupdating0001"),
@@ -232,7 +229,7 @@ func buildEFSFileSystems() []efstypes.FileSystemDescription {
 			},
 		},
 
-		// 4. warn-efs-deleting — Wave-1 Warning: deleting.
+		// warn-efs-deleting — Wave-1 Warning: deleting.
 		{
 			FileSystemId:         aws.String("fs-0warndeleting0001"),
 			FileSystemArn:        aws.String("arn:aws:elasticfilesystem:us-east-1:123456789012:file-system/fs-0warndeleting0001"),
@@ -253,7 +250,7 @@ func buildEFSFileSystems() []efstypes.FileSystemDescription {
 			},
 		},
 
-		// 5. broken-efs-error — Wave-1 Broken: error.
+		// broken-efs-error — Wave-1 Broken: error.
 		{
 			FileSystemId:         aws.String("fs-0brokenerror00001"),
 			FileSystemArn:        aws.String("arn:aws:elasticfilesystem:us-east-1:123456789012:file-system/fs-0brokenerror00001"),
@@ -274,7 +271,7 @@ func buildEFSFileSystems() []efstypes.FileSystemDescription {
 			},
 		},
 
-		// 6. broken-efs-no-mount-targets — Wave-1 Broken: no mount targets.
+		// broken-efs-no-mount-targets — Wave-1 Broken: no mount targets.
 		{
 			FileSystemId:         aws.String("fs-0brokennomt000001"),
 			FileSystemArn:        aws.String("arn:aws:elasticfilesystem:us-east-1:123456789012:file-system/fs-0brokennomt000001"),
@@ -295,7 +292,7 @@ func buildEFSFileSystems() []efstypes.FileSystemDescription {
 			},
 		},
 
-		// 7. warn-efs-multi — U7a: deleting + no mount targets (multi W1, Broken wins).
+		// warn-efs-multi — deleting + no mount targets (multi W1, Broken wins).
 		{
 			FileSystemId:         aws.String("fs-0warnmulti0000001"),
 			FileSystemArn:        aws.String("arn:aws:elasticfilesystem:us-east-1:123456789012:file-system/fs-0warnmulti0000001"),
@@ -316,7 +313,7 @@ func buildEFSFileSystems() []efstypes.FileSystemDescription {
 			},
 		},
 
-		// 8. warn-efs-updating-mt-down — U7b/U7c/U7e: W1 updating + W2 mount-target down.
+		// warn-efs-updating-mt-down — W1 updating + W2 mount-target down.
 		{
 			FileSystemId:         aws.String("fs-0warnupdmtdown001"),
 			FileSystemArn:        aws.String("arn:aws:elasticfilesystem:us-east-1:123456789012:file-system/fs-0warnupdmtdown001"),
@@ -337,7 +334,7 @@ func buildEFSFileSystems() []efstypes.FileSystemDescription {
 			},
 		},
 
-		// 9. healthy-efs-with-mt-down — W2 on Healthy: available FS but MT-B creating.
+		// healthy-efs-with-mt-down — W2 on Healthy: available FS but MT-B creating.
 		{
 			FileSystemId:         aws.String("fs-0healthymtdown001"),
 			FileSystemArn:        aws.String("arn:aws:elasticfilesystem:us-east-1:123456789012:file-system/fs-0healthymtdown001"),
@@ -358,7 +355,6 @@ func buildEFSFileSystems() []efstypes.FileSystemDescription {
 			},
 		},
 
-		// 10-12. One witness per new posture finding.
 		efsPostureWitness(EFSUnencrypted, "unencrypted-legacy-efs", false),
 		efsPostureWitness(EFSPublicPolicy, "public-policy-efs", true),
 		efsPostureWitness(EFSNoBackupPolicy, "no-backup-policy-efs", true),
@@ -367,7 +363,7 @@ func buildEFSFileSystems() []efstypes.FileSystemDescription {
 
 // efsPostureWitness builds an available file system with one healthy mount
 // target, differing only in whether it is encrypted. The policy and backup
-// witnesses stay encrypted so each carries exactly its own finding.
+// file systems stay encrypted so each carries exactly its own finding.
 func efsPostureWitness(id, name string, encrypted bool) efstypes.FileSystemDescription {
 	fs := efstypes.FileSystemDescription{
 		FileSystemId:         aws.String(id),
@@ -395,7 +391,7 @@ func efsPostureWitness(id, name string, encrypted bool) efstypes.FileSystemDescr
 
 func buildEFSMountTargets() map[string][]efstypes.MountTargetDescription {
 	return map[string][]efstypes.MountTargetDescription{
-		// 1. prod-efs-app-data — 3 MTs, all available.
+		// prod-efs-app-data — 3 MTs, all available.
 		ProdEFSID: {
 			{
 				MountTargetId:        aws.String(ProdEFSMountTargetAID),
@@ -432,7 +428,7 @@ func buildEFSMountTargets() map[string][]efstypes.MountTargetDescription {
 			},
 		},
 
-		// 2. warn-efs-creating — 1 MT in creating state.
+		// warn-efs-creating — 1 MT in creating state.
 		"fs-0warncreating0001": {
 			{
 				MountTargetId:        aws.String("fsmt-0warncreating001a"),
@@ -445,7 +441,7 @@ func buildEFSMountTargets() map[string][]efstypes.MountTargetDescription {
 			},
 		},
 
-		// 3. warn-efs-updating — 2 MTs both available.
+		// warn-efs-updating — 2 MTs both available.
 		"fs-0warnupdating0001": {
 			{
 				MountTargetId:        aws.String("fsmt-0warnupdating001a"),
@@ -469,7 +465,7 @@ func buildEFSMountTargets() map[string][]efstypes.MountTargetDescription {
 			},
 		},
 
-		// 4. warn-efs-deleting — 1 MT in deleting state.
+		// warn-efs-deleting — 1 MT in deleting state.
 		"fs-0warndeleting0001": {
 			{
 				MountTargetId:        aws.String("fsmt-0warndeleting001a"),
@@ -482,7 +478,7 @@ func buildEFSMountTargets() map[string][]efstypes.MountTargetDescription {
 			},
 		},
 
-		// 5. broken-efs-error — 1 MT in error state.
+		// broken-efs-error — 1 MT in error state.
 		"fs-0brokenerror00001": {
 			{
 				MountTargetId:        aws.String("fsmt-0brokenerror001a"),
@@ -495,13 +491,13 @@ func buildEFSMountTargets() map[string][]efstypes.MountTargetDescription {
 			},
 		},
 
-		// 6. broken-efs-no-mount-targets — empty list.
+		// broken-efs-no-mount-targets — empty list.
 		"fs-0brokennomt000001": {},
 
-		// 7. warn-efs-multi — empty list.
+		// warn-efs-multi — empty list.
 		"fs-0warnmulti0000001": {},
 
-		// 8. warn-efs-updating-mt-down — MT-A available, MT-B creating.
+		// warn-efs-updating-mt-down — MT-A available, MT-B creating.
 		"fs-0warnupdmtdown001": {
 			{
 				MountTargetId:        aws.String("fsmt-0warnupdmtdown001a"),
@@ -524,7 +520,7 @@ func buildEFSMountTargets() map[string][]efstypes.MountTargetDescription {
 			},
 		},
 
-		// 9. healthy-efs-with-mt-down — MT-A available, MT-B creating.
+		// healthy-efs-with-mt-down — MT-A available, MT-B creating.
 		"fs-0healthymtdown001": {
 			{
 				MountTargetId:        aws.String("fsmt-0healthymtdown001a"),
@@ -580,7 +576,7 @@ func buildEFSAccessPoints() map[string][]efstypes.AccessPointDescription {
 }
 
 func init() {
-	// efs issues is 8 here and 10 in scenario_efs_visual_test.go:
-	// fs-0healthymtdown001 and fs-0publicpolicy0001 are Wave-2 only.
+	// efs issues counts Wave-1 findings only: fs-0healthymtdown001 and
+	// fs-0publicpolicy0001 raise Wave-2 findings alone.
 	Register(Pin{ShortName: "efs", Rows: 12, Issues: 8, CoverageGaps: []string{"dim"}})
 }

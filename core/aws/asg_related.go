@@ -17,7 +17,6 @@ import (
 )
 
 // checkASGEC2 reads Instances[] from the ASG RawStruct and returns their IDs.
-// Pattern F — no cache needed.
 func checkASGEC2(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	asg, ok := assertStruct[asgtypes.AutoScalingGroup](res.RawStruct)
 	if !ok {
@@ -37,14 +36,12 @@ func checkASGEC2(_ context.Context, _ any, res resource.Resource, _ resource.Res
 
 // checkASGAlarm searches the alarm cache for alarms with an "AutoScalingGroupName" dimension
 // matching this ASG's name.
-// Pattern D — dimension-based lookup.
 func checkASGAlarm(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	return alarmIDsByDimension(ctx, clients, cache, "", "AutoScalingGroupName", res.ID)
 }
 
 // checkASGNG searches the node group cache for EKS node groups whose AutoScalingGroups
 // include this ASG by name.
-// Pattern C — reverse cache lookup.
 func checkASGNG(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	asgName := res.ID
 	if asgName == "" {
@@ -92,7 +89,6 @@ func checkASGAMI(ctx context.Context, clients any, res resource.Resource, _ reso
 		return resource.UnknownRelated("ami")
 	}
 
-	// LaunchConfigurationName path
 	if asg.LaunchConfigurationName != nil && *asg.LaunchConfigurationName != "" {
 		out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*autoscaling.DescribeLaunchConfigurationsOutput, error) {
 			return c.AutoScaling.DescribeLaunchConfigurations(ctx, &autoscaling.DescribeLaunchConfigurationsInput{
@@ -111,7 +107,6 @@ func checkASGAMI(ctx context.Context, clients any, res resource.Resource, _ reso
 		return resource.KnownRelated("ami", nil, false)
 	}
 
-	// LaunchTemplate path (direct or via MixedInstancesPolicy)
 	ltSpec := asg.LaunchTemplate
 	if ltSpec == nil && asg.MixedInstancesPolicy != nil && asg.MixedInstancesPolicy.LaunchTemplate != nil {
 		ltSpec = asg.MixedInstancesPolicy.LaunchTemplate.LaunchTemplateSpecification
@@ -224,7 +219,6 @@ func checkASGRole(ctx context.Context, clients any, res resource.Resource, cache
 // an ASG that names no instance profile: the first leaves the role pivot's
 // count a lower bound, the second makes it exact.
 func asgResolveInstanceProfile(ctx context.Context, c *ServiceClients, asg asgtypes.AutoScalingGroup) (profile string, checked bool) {
-	// Launch configuration path
 	if asg.LaunchConfigurationName != nil && *asg.LaunchConfigurationName != "" {
 		out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*autoscaling.DescribeLaunchConfigurationsOutput, error) {
 			return c.AutoScaling.DescribeLaunchConfigurations(ctx, &autoscaling.DescribeLaunchConfigurationsInput{
@@ -245,7 +239,6 @@ func asgResolveInstanceProfile(ctx context.Context, c *ServiceClients, asg asgty
 		return "", true
 	}
 
-	// Launch template path
 	ltSpec := asg.LaunchTemplate
 	if ltSpec == nil && asg.MixedInstancesPolicy != nil && asg.MixedInstancesPolicy.LaunchTemplate != nil {
 		ltSpec = asg.MixedInstancesPolicy.LaunchTemplate.LaunchTemplateSpecification

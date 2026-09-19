@@ -15,7 +15,6 @@ import (
 )
 
 // checkSGVPC reads the vpc_id field directly from the SG resource.
-// No cache access needed — the field is populated by the SG fetcher.
 func checkSGVPC(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	vpcID := res.Fields["vpc_id"]
 	if vpcID == "" {
@@ -118,7 +117,6 @@ func checkSGELB(ctx context.Context, clients any, res resource.Resource, cache r
 }
 
 // checkSGCFN checks the SG's tags for aws:cloudformation:stack-name.
-// No cache access needed — the tag carries the stack name directly.
 func checkSGCFN(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	raw, ok := assertStruct[ec2types.SecurityGroup](res.RawStruct)
 	if !ok {

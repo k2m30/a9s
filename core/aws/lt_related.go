@@ -2,9 +2,9 @@
 
 // lt_related.go contains Launch Template related-resource checker functions.
 //
-// Four checkers (ami, kms, sg, subnet) are Pattern F: the fetcher's
+// Four checkers (ami, kms, sg, subnet) read the RawStruct: the fetcher's
 // DescribeLaunchTemplateVersions("$Default") pass already carries every
-// field they read, via assertStruct[LTRaw] — zero extra AWS calls, mirroring
+// field they read, via assertStruct[LTRaw] — zero extra AWS calls, as in
 // transfer_related.go. A degraded row's zero DefaultVersion reads as empty
 // fields (never a panic), reported as unknown per checker.
 //
@@ -14,7 +14,7 @@
 // (related_common.go): cache absent → unknown ("?"), cache present with rows
 // that don't assert to the expected type (disk-seeded, no RawStruct) →
 // unknown, cache present and typed → scan. Never a live AWS call, never a
-// fake zero. docs/resources/lt.md §2.
+// fake zero. See docs/resources/lt.md.
 package aws
 
 import (
@@ -29,10 +29,9 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// checkLTAMI reads DefaultVersion.LaunchTemplateData.ImageId directly
-// (Pattern F); pivots only when the value matches "ami-" — a
-// "resolve:ssm:" reference is a display fact, not a pivot
-// (docs/resources/lt.md §2 ami bullet).
+// checkLTAMI reads DefaultVersion.LaunchTemplateData.ImageId directly;
+// pivots only when the value matches "ami-" — a "resolve:ssm:" reference
+// is a display fact, not a pivot (docs/resources/lt.md).
 func checkLTAMI(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	raw, ok := assertStruct[LTRaw](res.RawStruct)
 	if !ok || raw.DefaultVersion.LaunchTemplateData == nil {
@@ -46,8 +45,8 @@ func checkLTAMI(_ context.Context, _ any, res resource.Resource, _ resource.Reso
 }
 
 // checkLTKMS reads DefaultVersion.LaunchTemplateData.BlockDeviceMappings[].Ebs.KmsKeyId
-// directly (Pattern F); key-id/ARN forms only — alias forms are detail-only
-// (docs/resources/lt.md §2 kms bullet), so an "alias/..." or ":alias/..."
+// directly; key-id/ARN forms only — alias forms are detail-only
+// (docs/resources/lt.md), so an "alias/..." or ":alias/..."
 // reference is skipped rather than extracted.
 func checkLTKMS(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	raw, ok := assertStruct[LTRaw](res.RawStruct)
@@ -68,9 +67,9 @@ func checkLTKMS(ctx context.Context, clients any, res resource.Resource, cache r
 	return kmsRelated(ctx, clients, cache, ids)
 }
 
-// checkLTSG unions SecurityGroupIds and NetworkInterfaces[].Groups (Pattern
-// F) — mutually exclusive by API design (docs/resources/lt.md §2 sg
-// bullet); SecurityGroups (legacy EC2-Classic names) are detail-only.
+// checkLTSG unions SecurityGroupIds and NetworkInterfaces[].Groups —
+// mutually exclusive by API design (docs/resources/lt.md); SecurityGroups
+// (EC2-Classic names) are detail-only.
 func checkLTSG(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	raw, ok := assertStruct[LTRaw](res.RawStruct)
 	if !ok || raw.DefaultVersion.LaunchTemplateData == nil {
@@ -86,8 +85,8 @@ func checkLTSG(_ context.Context, _ any, res resource.Resource, _ resource.Resou
 }
 
 // checkLTSubnet reads DefaultVersion.LaunchTemplateData.NetworkInterfaces[].SubnetId
-// directly (Pattern F); usually empty by design (docs/resources/lt.md §2
-// subnet bullet — the subnet normally comes from the ASG/NG side).
+// directly; usually empty by design (docs/resources/lt.md — the subnet
+// normally comes from the ASG/NG side).
 func checkLTSubnet(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	raw, ok := assertStruct[LTRaw](res.RawStruct)
 	if !ok || raw.DefaultVersion.LaunchTemplateData == nil {
@@ -105,8 +104,8 @@ func checkLTSubnet(_ context.Context, _ any, res resource.Resource, _ resource.R
 // checkLTASG scans the already-loaded "asg" cache for groups referencing
 // this template by id, via LaunchTemplate.LaunchTemplateId,
 // MixedInstancesPolicy.LaunchTemplate.LaunchTemplateSpecification, or any
-// per-Overrides[] LaunchTemplateSpecification (docs/resources/lt.md §2 asg
-// bullet). Zero extra API calls.
+// per-Overrides[] LaunchTemplateSpecification (docs/resources/lt.md).
+// Zero extra API calls.
 func checkLTASG(_ context.Context, _ any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	asgList, truncated, ok := cachedTypedRows[asgtypes.AutoScalingGroup](cache, "asg")
 	if !ok {
@@ -145,7 +144,7 @@ func ltReferencedByASG(asg asgtypes.AutoScalingGroup, ltID string) bool {
 
 // checkLTNG scans the already-loaded "ng" cache for node groups pinning this
 // template via Nodegroup.LaunchTemplate.Id or .Name
-// (docs/resources/lt.md §2 ng bullet). Zero extra API calls.
+// (docs/resources/lt.md). Zero extra API calls.
 func checkLTNG(_ context.Context, _ any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	ngList, truncated, ok := cachedTypedRows[ekstypes.Nodegroup](cache, "ng")
 	if !ok {
@@ -167,7 +166,7 @@ func checkLTNG(_ context.Context, _ any, res resource.Resource, cache resource.R
 // checkLTEC2 scans the already-loaded "ec2" cache for instances tagged with
 // this template's id via the AWS auto-tag "aws:ec2launchtemplate:id" —
 // catches direct, ASG-launched, and NG-launched instances alike
-// (docs/resources/lt.md §2 ec2 bullet). Zero extra API calls.
+// (docs/resources/lt.md). Zero extra API calls.
 func checkLTEC2(_ context.Context, _ any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	ec2List, truncated, ok := cachedTypedRows[ec2types.Instance](cache, "ec2")
 	if !ok {

@@ -2,29 +2,8 @@
 
 // handlers_resources.go — Update()-switch session-mutation handlers.
 //
-// Platform-agnostic (c *Core) Handle* methods for the five resource/detail
-// mutation events the TUI adapter forwards from its Update() switch:
-//
-//	HandleResourcesLoaded     — ResourceCache write-through + Wave-2 probe
-//	                            re-dispatch on enrichment-rerun token match.
-//	HandleEnrichDetailResult  — detail-view enrichment error surface.
-//	HandleRelatedCheckResult  — RelatedCache append; CachedPages and
-//	                            LazyAddedResources merge; flash on errors.
-//	HandleIdentityLoaded      — session.Identity write + domain-mirror emit
-//	                            (renderer reads the mirror, not awsclient).
-//	HandleIdentityError       — fetch-flag clear; adapter handles view note.
-//
-// Plus two utility methods used by the adapter:
-//
-//	(*Core).AllRegions        — call-through to awsclient.AllRegions so the
-//	                            adapter need not import core/aws.
-//	(*Core).ResetRuleSets     — session.RuleSets swap + Clients rewire (used
-//	                            by SES refresh paths in handleRefresh).
-//
-// Companion file: handlers.go owns the flash / session / view-stack
-// handlers. Each shell-level concern lives in its own file (alongside
-// handlers_availability.go / handlers_navigate.go / handlers_related.go)
-// so a Core handler grep stays narrow.
+// Platform-agnostic (c *Core) Handle* methods for the resource/detail
+// mutation events the TUI adapter forwards from its Update() switch.
 package runtime
 
 import (
@@ -80,7 +59,7 @@ type ResourcesLoadedEvent struct {
 
 // HandleResourcesLoaded owns the session-state portion of the post-fetch
 // processing for a top-level resource list. It does NOT touch the view
-// stack — the adapter still routes the message through updateActiveView
+// stack — the adapter routes the message through updateActiveView
 // for view-side processing (ResourceListModel.Update absorbs Resources
 // and writes the rich entry back via cacheTopLevelResourceList).
 //
@@ -90,8 +69,7 @@ type ResourcesLoadedEvent struct {
 //   - When the loaded type is not yet cached (and the message is not an
 //     Append page), emits PatchResourceCache so cross-view navigation
 //     (e.g. related-navigate to a not-yet-visited type) finds an entry.
-//     The !alreadyCached guard mirrors the original case body — the
-//     view-side cacheTopLevelResourceList write wins when both run.
+//     The view-side cacheTopLevelResourceList write wins when both run.
 //   - On a paginated partial-success (Err non-nil with Resources present)
 //     emits a FlashIntent so the `!` log records the failure.
 //   - On enrichment-rerun match (TypeGen non-zero AND matches the per-type
@@ -107,9 +85,7 @@ type ResourcesLoadedEvent struct {
 //     the menu issue badge unset until the user happens to hit Ctrl+R.
 //     Gated OFF on Append (a load-more page must not re-trigger the probe —
 //     already enriched/queued on page 1) and on Err != nil (a failed load
-//     has nothing new and reliable to enrich). See
-//     tests/unit/runtime_list_open_enrich_dispatch_test.go for the pinned
-//     contract this branch satisfies.
+//     has nothing new and reliable to enrich).
 func (c *Core) HandleResourcesLoaded(ev ResourcesLoadedEvent) ([]UIIntent, []TaskRequest) {
 	// Canonicalize once at the chokepoint: an alias-opened list ("buckets",
 	// "workgroups") must key the gen-guard map, RowStore reseed, task scope,
@@ -209,7 +185,7 @@ func (c *Core) HandleResourcesLoaded(ev ResourcesLoadedEvent) ([]UIIntent, []Tas
 		// recognizes resType already has an outstanding probe if it later
 		// pops the same type off session.EnrichQueue, and absorbs it into
 		// the sweep instead of dispatching a second, redundant
-		// TaskKindProbeEnrich for it (#462/#463 defect 2b).
+		// TaskKindProbeEnrich for it.
 		if c.session.EnrichListOpenPending == nil {
 			c.session.EnrichListOpenPending = make(map[string]bool)
 		}
@@ -419,7 +395,7 @@ type RelatedCheckResultEvent struct {
 // so applyIntents is the single locus of session-cache mutation; this
 // keeps the handler-result graph diff-able and keeps session-cache
 // mutation in one place. The adapter shim
-// still routes the message through updateActiveView after applying the
+// routes the message through updateActiveView after applying the
 // returned intents so the detail view's right-column model receives
 // the result.
 //
@@ -573,7 +549,7 @@ func (c *Core) HandleIdentityError(ev IdentityErrorEvent) ([]UIIntent, []TaskReq
 	c.session.IdentityFetching = false
 	hadIdentity := c.session.Identity != nil
 	c.session.Identity = nil
-	_ = ev.Err // not surfaced as a flash today; reserved for future hook
+	_ = ev.Err
 	if hadIdentity {
 		return []UIIntent{ClearIdentityIntent{}}, nil
 	}
@@ -602,9 +578,7 @@ func (c *Core) ResetRuleSets() {
 }
 
 // domainCallerIdentityFrom converts an *awsclient.CallerIdentity to the
-// renderer-shaped *domain.CallerIdentity mirror. UserID is intentionally
-// dropped — only ARN-parser internals use it and the adapter never
-// reads it.
+// renderer-shaped *domain.CallerIdentity mirror.
 func domainCallerIdentityFrom(id *awsclient.CallerIdentity) *domain.CallerIdentity {
 	if id == nil {
 		return nil

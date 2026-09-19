@@ -19,9 +19,9 @@ import (
 
 // handleCostsKeyMsg routes key events on the Cost Explorer screen. Pivot,
 // metric, zoom, and drill (Enter) can each surface a TaskRequest from
-// Controller.Apply — usually KindFetchCosts on a query-shape miss (FR-017),
+// Controller.Apply — usually KindFetchCosts on a query-shape miss,
 // but a RESOURCE_ID leaf's Enter can also surface KindFetchByIDDetail
-// (navigate to the resource's own a9s detail view, FR-008). Every kind but
+// (navigate to the resource's own a9s detail view). Every kind but
 // KindFetchByIDDetail goes through m.dispatchTaskRequests, the shared switch
 // every screen's adapter uses; KindFetchByIDDetail is routed by
 // dispatchCostsByIDTask instead (see its own doc for why).

@@ -69,8 +69,8 @@ func (c *Controller) ensureSelectorState(items []string, activeItem, title strin
 	}
 }
 
-// selectorVisibleItems applies the filter from ss to ss.Items and returns the
-// visible subset, mirroring selector.go applyFilter semantics exactly.
+// selectorVisibleItems returns the items of ss that contain ss.Filter,
+// case-insensitively.
 func selectorVisibleItems(ss *SelectorState) []string {
 	if ss.Filter == "" {
 		return ss.Items
@@ -85,8 +85,7 @@ func selectorVisibleItems(ss *SelectorState) []string {
 	return result
 }
 
-// buildSelectorBody constructs a SelectorBody from SelectorState, mirroring
-// the data that selector.go View() and FrameTitle() consume.
+// buildSelectorBody constructs a SelectorBody from SelectorState.
 func buildSelectorBody(ss *SelectorState) *SelectorBody {
 	visible := selectorVisibleItems(ss)
 
@@ -108,7 +107,7 @@ func buildSelectorBody(ss *SelectorState) *SelectorBody {
 	}
 }
 
-// selectorFrameTitle mirrors selector.go FrameTitle(), producing e.g.
+// selectorFrameTitle returns the selector's frame title, e.g.
 // "aws-profiles(6)" or "aws-regions(3/17)".
 func selectorFrameTitle(ss *SelectorState) string {
 	total := len(ss.Items)

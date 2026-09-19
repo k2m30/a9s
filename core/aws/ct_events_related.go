@@ -15,7 +15,6 @@ import (
 )
 
 // checkCtEventsUser matches the event username against the iam-user cache.
-// Pattern C — cache lookup by name/ID.
 func checkCtEventsUser(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	username := res.Fields["user"]
 	if username == "" {
@@ -44,7 +43,6 @@ func checkCtEventsUser(ctx context.Context, clients any, res resource.Resource, 
 
 // checkCtEventsRole extracts role information from the CloudTrail event's
 // Resources slice (AWS::IAM::Role) and matches against the role cache.
-// Pattern C — cache lookup by name extracted from ARN.
 func checkCtEventsRole(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	candidates := ctEventsRoleCandidates(res, refContext(clients, cache, "role"))
 	if len(candidates) == 0 {
@@ -57,8 +55,8 @@ func checkCtEventsRole(ctx context.Context, clients any, res resource.Resource, 
 // event names, in the order the four sources are trusted: the target roleArn in
 // requestParameters, an AWS::IAM::Role entry in Resources, a Username carrying a
 // service-role path, then the event JSON. Each source's raw value goes through
-// ctRoleAlternatives, so the candidates follow row 11's id rule rather than any
-// role-specific trim.
+// ctRoleAlternatives, so the candidates follow the shared id rule rather than
+// any role-specific trim.
 func ctEventsRoleCandidates(res resource.Resource, rc domain.RefContext) []string {
 	event, ok := assertStruct[cloudtrailtypes.Event](res.RawStruct)
 	// Authoritative for AssumeRole* events: requestParameters.roleArn is the
@@ -142,7 +140,7 @@ func ctEventsRelatedResources(_ context.Context, _ any, cache resource.ResourceC
 // exists now — so only the list can turn it into a count:
 //
 //   - nil list (nothing cached, nothing to call): Unknown. Trusting the ids
-//     here offered a row that navigates to a resource that may be long gone.
+//     here would offer a row that navigates to a resource that may be long gone.
 //   - proven list: the ids the list confirms, by ID or Name.
 //   - truncated list: still only the confirmed ids, because an unread page
 //     cannot confirm anything, and the truncation flag carries the rest — none
@@ -259,7 +257,7 @@ func ctJSONStringSlice(m map[string]any, itemKey string, keys ...string) []strin
 }
 
 // ---------------------------------------------------------------------------
-// §7b.10 typed related-resource checkers
+// Typed related-resource checkers
 // ---------------------------------------------------------------------------
 
 // checkCtEventsEC2 extracts EC2 instance IDs from the CloudTrail event.
@@ -539,7 +537,7 @@ func checkCtEventsDDB(ctx context.Context, clients any, res resource.Resource, c
 }
 
 // ---------------------------------------------------------------------------
-// §7b.10 self-pivot checkers (ct-events → ct-events)
+// Self-pivot checkers (ct-events → ct-events)
 // ---------------------------------------------------------------------------
 
 // checkCtEventsPivotByAccessKeyId returns a self-pivot FetchFilter for the

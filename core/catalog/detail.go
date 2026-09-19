@@ -36,7 +36,7 @@ func indexDetails(types []ResourceTypeDef) {
 	}
 }
 
-// Detail returns the S5 sentence the installed catalog declares for code, or
+// Detail returns the operator sentence the installed catalog declares for code, or
 // "" when no definition carries one. Emitters read the sentence here so it
 // has exactly one owner. Unlike Find it does not panic on an uninstalled
 // catalog: a fetcher under a narrow unit test has nothing to decorate.
@@ -58,8 +58,7 @@ func Phrase(code domain.FindingCode) string {
 // emitter whose condition picks between two tiers picks between two codes and
 // reads each one's severity here, so a row's colour and the severity the
 // generated signals page prints cannot come apart. Like Detail it does not
-// panic on an uninstalled catalog; the zero Severity is what an unknown code
-// has always meant.
+// panic on an uninstalled catalog; an unknown code has the zero Severity.
 func Severity(code domain.FindingCode) domain.Severity {
 	return severityByCode[code]
 }

@@ -1,36 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
 
-// list_test.go — contract tests for the controller-side list machinery.
-//
-// Behaviors covered:
-//
-//  1. applyResourcesLoaded stores rows: N resources → N rows in Snapshot body;
-//     cells extracted per type columns; ResourceID set; append mode appends;
-//     replace mode replaces.
-//  2. buildListBody filter: ListState.Filter → only matching rows; Selected
-//     reset to 0.
-//  3. buildListBody sort: SortCol/SortDir → rows in correct order; Body.Sort
-//     reflects the spec; resets SelectedRow.
-//  4. buildListBody attention: AttentionOnly=true → only rows with issue findings;
-//     toggle restores; resets SelectedRow.
-//  5. relatedIDSet prefilter: PatchListRelatedIDSet → only those IDs visible;
-//     nil clears the filter.
-//  6. List actions mutate ListState correctly: MoveDown/Up clamped,
-//     MoveTop/Bottom jump, PageDown/Up page, ScrollLeft/Right clamped ≥0,
-//     SetFilter resets Selected, Sort toggles col/dir, ToggleAttention flips flag.
-//  7. ListSelected: returns resource at cursor; safe on empty / non-list screen.
-//  8. Pagination: truncated PaginationMeta → Body.Truncated / Pagination.HasMore;
-//     append accumulates; nil meta clears.
-//  9. Enrichment: ApplyEnrichmentState → EnrichmentFindings populated; rows
-//     get correct Decorator for SevBroken/SevWarn; attention filter picks up
-//     enrichment-only rows.
-//  10. ListFrameTitle: returns type name while loading; includes count after load;
-//     returns "" on non-list screen.
-//  11. Edge cases: empty list, single item, 1000-item list, actions on non-list
-//     screen don't panic.
-//
-// All test data uses synthetic fake values — no real AWS account IDs, ARNs,
-// or profile names.
 package app_test
 
 import (
@@ -45,23 +14,16 @@ import (
 	"github.com/k2m30/a9s/v3/core/session"
 )
 
-// ─────────────────────────────────────────────────────────────────────────────
-// helpers
-// ─────────────────────────────────────────────────────────────────────────────
-
 // newListController builds a Controller and navigates to a ScreenResourceList
 // for typeName via ActionCommand. After this call topListState() is non-nil.
 //
 // A9S_CONFIG_FOLDER is redirected to a fresh t.TempDir() per call (not just
-// per test binary run) so the disk-store fallback HandleNavigate now
-// consults (the post-sweep disk-store fallback) cannot leak rows between tests that share the same
-// "demo"/"us-east-1" profile/region pair — a per-package-run shared temp dir
-// was tried and rejected: every newListController(t, "ec2") call in the package
-// would still read/write the SAME demo--us-east-1/ec2.yaml file, so an
-// earlier test's persisted rows silently seeded a later test's supposedly
-// pristine "fresh list, still Loading" precondition (observed as
-// TestController_APIErrorClearsListLoadingAndFlashes' precondition check
-// failing only in a full-package run, never in isolation).
+// per test binary run) so the disk-store fallback HandleNavigate consults
+// cannot leak rows between tests that share the same "demo"/"us-east-1"
+// profile/region pair: with a shared folder every newListController(t,
+// "ec2") call reads and writes the SAME demo--us-east-1/ec2.yaml file, and
+// one test's persisted rows seed another test's "fresh list, still
+// Loading" precondition.
 func newListController(t *testing.T, typeName string) *app.Controller {
 	t.Helper()
 	t.Setenv("A9S_CONFIG_FOLDER", t.TempDir())
@@ -245,10 +207,6 @@ func pad4(n int) string {
 	return s[len(s)-4:]
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// 1. applyResourcesLoaded stores rows
-// ─────────────────────────────────────────────────────────────────────────────
-
 func TestApplyResourcesLoaded_EC2_StoresNRows(t *testing.T) {
 	c := newListController(t, "ec2")
 	resources := fakeEC2Resources()
@@ -327,10 +285,6 @@ func TestApplyResourcesLoaded_CellCountMatchesColumns(t *testing.T) {
 	}
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// 2. buildListBody filter
-// ─────────────────────────────────────────────────────────────────────────────
-
 func TestListFilter_MatchingRowsOnly(t *testing.T) {
 	c := newListController(t, "ec2")
 	c.ApplyResourcesLoaded("ec2", fakeEC2Resources(), nil, false)
@@ -402,10 +356,6 @@ func TestListFilter_S3_MatchesBucketName(t *testing.T) {
 	}
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// 3. buildListBody sort
-// ─────────────────────────────────────────────────────────────────────────────
-
 func TestListSort_FirstSortSetsAsc(t *testing.T) {
 	c := newListController(t, "ec2")
 	c.ApplyResourcesLoaded("ec2", fakeEC2Resources(), nil, false)
@@ -470,7 +420,6 @@ func TestListSort_RowsOrderedAscByName(t *testing.T) {
 	if len(lb.Rows) != 3 {
 		t.Fatalf("sort asc: Rows count: got %d want 3", len(lb.Rows))
 	}
-	// cache-node < db-server < web-server
 	wantOrder := []string{"i-0ccc333333333333c", "i-0bbb222222222222b", "i-0aaa111111111111a"}
 	for i, want := range wantOrder {
 		if lb.Rows[i].ResourceID != want {
@@ -489,7 +438,6 @@ func TestListSort_RowsOrderedDescByName(t *testing.T) {
 	if len(lb.Rows) != 3 {
 		t.Fatalf("sort desc: Rows count: got %d want 3", len(lb.Rows))
 	}
-	// web-server > db-server > cache-node
 	wantOrder := []string{"i-0aaa111111111111a", "i-0bbb222222222222b", "i-0ccc333333333333c"}
 	for i, want := range wantOrder {
 		if lb.Rows[i].ResourceID != want {
@@ -529,10 +477,6 @@ func TestListSort_EmptyArgIsNoop(t *testing.T) {
 	}
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// 4. buildListBody attention filter
-// ─────────────────────────────────────────────────────────────────────────────
-
 func TestListAttention_OnlyRowsWithIssueFindingsVisible(t *testing.T) {
 	c := newListController(t, "ec2")
 	resources := []resource.Resource{
@@ -571,7 +515,6 @@ func TestListAttention_OnlyRowsWithIssueFindingsVisible(t *testing.T) {
 
 func TestListAttention_EmptyWhenNoIssues(t *testing.T) {
 	c := newListController(t, "ec2")
-	// All running — no issue color, no findings.
 	resources := []resource.Resource{
 		{ID: "i-x1", Fields: map[string]string{"instance_id": "i-x1", "state": "running"}},
 		{ID: "i-x2", Fields: map[string]string{"instance_id": "i-x2", "state": "running"}},
@@ -628,10 +571,6 @@ func TestListAttention_ResetsSelectedRow(t *testing.T) {
 	}
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// 5. relatedIDSet prefilter
-// ─────────────────────────────────────────────────────────────────────────────
-
 func TestRelatedIDSet_FiltersToMatchingIDs(t *testing.T) {
 	c := newListController(t, "ec2")
 	c.ApplyResourcesLoaded("ec2", fakeEC2Resources(), nil, false)
@@ -671,10 +610,6 @@ func TestRelatedIDSet_NilClearsFilter(t *testing.T) {
 		t.Errorf("after nil relatedIDSet: Rows count: got %d want %d", len(lb.Rows), len(resources))
 	}
 }
-
-// ─────────────────────────────────────────────────────────────────────────────
-// 6. List actions
-// ─────────────────────────────────────────────────────────────────────────────
 
 func TestListAction_MoveDown_IncrementsCursor(t *testing.T) {
 	c := newListController(t, "ec2")
@@ -860,10 +795,6 @@ func TestListAction_ToggleAttention_FlipsFlag(t *testing.T) {
 	}
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// 7. ListSelected
-// ─────────────────────────────────────────────────────────────────────────────
-
 func TestListSelected_ReturnsResourceAtCursor(t *testing.T) {
 	c := newListController(t, "ec2")
 	resources := fakeEC2Resources()
@@ -923,10 +854,6 @@ func TestListSelected_NoListScreen_ReturnsFalse(t *testing.T) {
 		t.Errorf("ListSelected on menu screen: ok should be false, got %q", r.ID)
 	}
 }
-
-// ─────────────────────────────────────────────────────────────────────────────
-// 8. Pagination
-// ─────────────────────────────────────────────────────────────────────────────
 
 func TestPagination_TruncatedFlagPropagates(t *testing.T) {
 	c := newListController(t, "ec2")
@@ -989,10 +916,6 @@ func TestPagination_AppendAccumulatesCount(t *testing.T) {
 		t.Error("after final page: Truncated should be false")
 	}
 }
-
-// ─────────────────────────────────────────────────────────────────────────────
-// 9. Enrichment
-// ─────────────────────────────────────────────────────────────────────────────
 
 func TestEnrichment_FindingsInBody(t *testing.T) {
 	c := newListController(t, "ec2")
@@ -1062,13 +985,8 @@ func TestEnrichment_TypeIsolation(t *testing.T) {
 	}
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// 10. ListFrameTitle
-// ─────────────────────────────────────────────────────────────────────────────
-
 func TestListFrameTitle_LoadingState_NonEmpty(t *testing.T) {
 	c := newListController(t, "ec2")
-	// No resources loaded — Loading=true.
 	title := c.ListFrameTitle()
 	if title == "" {
 		t.Error("ListFrameTitle should not be empty while loading")
@@ -1082,7 +1000,6 @@ func TestListFrameTitle_ShowsCountAfterLoad(t *testing.T) {
 	if title == "" {
 		t.Error("ListFrameTitle should not be empty after loading")
 	}
-	// The count "3" must appear somewhere in the title.
 	found := false
 	needle := "3"
 	for i := 0; i <= len(title)-len(needle); i++ {
@@ -1102,10 +1019,6 @@ func TestListFrameTitle_NoListScreen_ReturnsEmpty(t *testing.T) {
 		t.Errorf("ListFrameTitle on menu screen: got %q want empty", title)
 	}
 }
-
-// ─────────────────────────────────────────────────────────────────────────────
-// 11. Edge cases
-// ─────────────────────────────────────────────────────────────────────────────
 
 func TestListBody_EmptyCache_NoPanic(t *testing.T) {
 	c := newListController(t, "ec2")
@@ -1203,31 +1116,16 @@ func TestGetters_NoListScreen_ReturnZeroValues(t *testing.T) {
 	}
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Regression tests for the three list-path bugs
-// ─────────────────────────────────────────────────────────────────────────────
-
 // TestBug1_PerScreenRowStorage_SameTypeStackedScreensAreIndependent tests that
 // two stacked list screens of the same resource type each hold their own row
 // set, so navigating back to the first screen shows the original rows (not the
 // second screen's filtered/related rows).
-//
-// NOTE: this test drives the ApplyResourcesLoaded test-helper path. The
-// companion test TestHandleResourcesLoaded_StackedSameType_DoesNotCorruptUnderlyingList
-// covers the real c.Handle(messages.ResourcesLoaded{...}) event path and is
-// the actual regression guard for the "fan-out to every same-type list" bug.
-//
-// Scenario:
-//   - Push list screen 1 for "ec2" → load rows A (3 instances).
-//   - Push list screen 2 for "ec2" (simulates a filtered/related pivot) → load
-//     rows B (1 instance).
-//   - Assert: top screen (screen 2) shows rows B only.
-//   - Pop back to screen 1.
-//   - Assert: top screen (screen 1) shows rows A (not B), with correct count.
+// It drives the ApplyResourcesLoaded test-helper path;
+// TestHandleResourcesLoaded_StackedSameType_DoesNotCorruptUnderlyingList
+// covers the real c.Handle(messages.ResourcesLoaded{...}) event path.
 func TestBug1_PerScreenRowStorage_SameTypeStackedScreensAreIndependent(t *testing.T) {
 	c := newListController(t, "ec2")
 
-	// Screen 1: load full row set A.
 	rowsA := fakeEC2Resources() // 3 items
 	c.ApplyResourcesLoaded("ec2", rowsA, nil, false)
 
@@ -1239,7 +1137,6 @@ func TestBug1_PerScreenRowStorage_SameTypeStackedScreensAreIndependent(t *testin
 	// Push screen 2 for same type "ec2" (simulates a related/filtered child list).
 	c.PushChildListScreen("ec2")
 
-	// Screen 2: load a smaller row set B (1 item).
 	rowsB := fakeEC2Resources()[:1] // 1 item
 	c.ApplyResourcesLoaded("ec2", rowsB, nil, false)
 
@@ -1251,10 +1148,8 @@ func TestBug1_PerScreenRowStorage_SameTypeStackedScreensAreIndependent(t *testin
 		t.Errorf("screen 2 row ID: got %q want %q", lb2.Rows[0].ResourceID, rowsB[0].ID)
 	}
 
-	// Pop back to screen 1.
 	c.Apply(app.Action{Kind: app.ActionBack})
 
-	// Screen 1 must still show rows A — not rows B.
 	lb1After := listBodyOrFail(t, c)
 	if len(lb1After.Rows) != 3 {
 		t.Fatalf("screen 1 after pop: want 3 rows (original A), got %d — screen 2's rows corrupted screen 1", len(lb1After.Rows))
@@ -1265,7 +1160,6 @@ func TestBug1_PerScreenRowStorage_SameTypeStackedScreensAreIndependent(t *testin
 		}
 	}
 
-	// Pagination on screen 1 must also be clean (no bleed from screen 2).
 	if lb1After.Truncated {
 		t.Error("screen 1 after pop: Truncated should be false (not bled from screen 2)")
 	}
@@ -1273,25 +1167,21 @@ func TestBug1_PerScreenRowStorage_SameTypeStackedScreensAreIndependent(t *testin
 
 // TestBug2_ListSelected_ClampsWhenVisibleShrinks tests that ListSelected
 // returns the clamped visible row (not false/zero-value) when a refresh shrinks
-// the list below the stored SelectedRow index.  Before the fix, the cursor
-// pointed past the end and ListSelected returned (Resource{}, false) even
-// though buildListBody rendered a highlighted last row.
+// the list below the stored SelectedRow index, matching the highlighted
+// last row buildListBody renders.
 func TestBug2_ListSelected_ClampsWhenVisibleShrinks(t *testing.T) {
 	c := newListController(t, "ec2")
 	resources := fakeEC2Resources() // 3 rows
 	c.ApplyResourcesLoaded("ec2", resources, nil, false)
 
-	// Move cursor to row 2 (last row in the 3-item list).
 	c.Apply(app.Action{Kind: app.ActionMoveDown})
 	c.Apply(app.Action{Kind: app.ActionMoveDown})
 	if got := c.GetListSelectedRow(); got != 2 {
 		t.Fatalf("precondition: SelectedRow should be 2, got %d", got)
 	}
 
-	// Replace the cache with only 1 item — cursor is now out-of-range.
 	c.ApplyResourcesLoaded("ec2", resources[:1], nil, false)
 
-	// ListSelected must return the clamped last visible row, not false.
 	r, ok := c.ListSelected()
 	if !ok {
 		t.Fatal("ListSelected after shrink: ok should be true (clamped to last row), got false — cursor stuck past end")
@@ -1300,7 +1190,6 @@ func TestBug2_ListSelected_ClampsWhenVisibleShrinks(t *testing.T) {
 		t.Errorf("ListSelected after shrink: got ID %q want %q (clamped to row 0)", r.ID, resources[0].ID)
 	}
 
-	// buildListBody must also reflect the clamp.
 	lb := listBodyOrFail(t, c)
 	if lb.Selected != 0 {
 		t.Errorf("buildListBody after shrink: Selected=%d want 0", lb.Selected)
@@ -1314,8 +1203,8 @@ func TestBug2_ListSelected_ClampsWhenVisibleShrinks(t *testing.T) {
 func TestBug3_SortUsesViewConfig_CustomSortKeyApplied(t *testing.T) {
 	// Build a ViewsConfig that overrides the ec2 column set with a "Score"
 	// column whose sort_key maps to a numeric "score" field.  The built-in
-	// ec2 defaults do not have this column, so without the Bug 3 fix the sort
-	// falls back to lexicographic string comparison on the wrong key.
+	// ec2 defaults do not have this column, so a sort that ignored viewConfig
+	// would compare lexicographically on the wrong key.
 	vc := &config.ViewsConfig{
 		Views: map[string]config.ViewDef{
 			"ec2": {
@@ -1339,7 +1228,6 @@ func TestBug3_SortUsesViewConfig_CustomSortKeyApplied(t *testing.T) {
 	}
 	c.ApplyResourcesLoaded("ec2", resources, nil, false)
 
-	// Sort ascending by the custom "score" column.
 	c.Apply(app.Action{Kind: app.ActionSort, Arg: "score"})
 
 	lb := listBodyOrFail(t, c)
@@ -1347,7 +1235,6 @@ func TestBug3_SortUsesViewConfig_CustomSortKeyApplied(t *testing.T) {
 		t.Fatalf("sort by viewConfig score: want 3 rows, got %d", len(lb.Rows))
 	}
 
-	// Numeric ascending: 2, 9, 10.
 	wantOrder := []string{"i-score-02", "i-score-09", "i-score-10"}
 	for i, want := range wantOrder {
 		if lb.Rows[i].ResourceID != want {
@@ -1355,7 +1242,6 @@ func TestBug3_SortUsesViewConfig_CustomSortKeyApplied(t *testing.T) {
 		}
 	}
 
-	// Now descending: 10, 9, 2.
 	c.Apply(app.Action{Kind: app.ActionSort, Arg: "score"})
 	lb = listBodyOrFail(t, c)
 	wantDesc := []string{"i-score-10", "i-score-09", "i-score-02"}
@@ -1366,32 +1252,18 @@ func TestBug3_SortUsesViewConfig_CustomSortKeyApplied(t *testing.T) {
 	}
 }
 
-// TestHandleResourcesLoaded_StackedSameType_DoesNotCorruptUnderlyingList is the
-// regression test for the P1 bug where handleResourcesLoadedEvent applied a
-// ResourcesLoaded result to EVERY same-type list on the stack, overwriting a
-// stacked filtered/child list's rows onto the underlying list beneath it.
+// TestHandleResourcesLoaded_StackedSameType_DoesNotCorruptUnderlyingList checks
+// that a ResourcesLoaded result reaches only the list screen that asked for it,
+// never a stacked same-type list beneath it, through the real
+// c.Handle(messages.ResourcesLoaded{...}) event path.
 //
-// The fix restricts delivery to the TOPMOST matching list only. This test drives
-// the real c.Handle(messages.ResourcesLoaded{...}) event path — unlike the
-// companion TestBug1 which uses the ApplyResourcesLoaded test-helper shortcut
-// and therefore could not catch this bug.
-//
-// Why Gen=0 is correct: ResourcesLoaded.AcceptZeroGen() returns true, so a zero
-// Gen always passes the session-staleness guard in core.HandleEvent. Test and
-// demo callers that do not set Gen always proceed through to handleResourcesLoadedEvent.
-//
-// If handleResourcesLoadedEvent fanned out to every same-type list on the
-// stack, step 3's 1-row result would overwrite both screen 2 (correct) AND
-// screen 1 (wrong), and after the pop screen 1 would show 1 row instead of 3.
+// Gen=0 is correct: ResourcesLoaded.AcceptZeroGen() returns true, so a zero
+// Gen always passes the session-staleness guard in core.HandleEvent.
 func TestHandleResourcesLoaded_StackedSameType_DoesNotCorruptUnderlyingList(t *testing.T) {
-	// Step 1: build controller on an ec2 list screen (screen 1) and give it
-	// 3 rows via the real Handle path.
 	c := newListController(t, "ec2")
 
 	rowsA := fakeEC2Resources() // 3 distinct instances
 
-	// Seed screen 1 via c.Handle so we also exercise the real path on the first load.
-	// Gen=0 passes AcceptZeroGen guard; ResourceType="ec2" routes to the single list.
 	_, _ = c.Handle(messages.ResourcesLoaded{ //nolint:ineffassign,staticcheck // return values not needed here
 		ResourceType: "ec2",
 		Resources:    rowsA, Provenance: messages.FetchProvenanceCanonicalList,
@@ -1402,17 +1274,11 @@ func TestHandleResourcesLoaded_StackedSameType_DoesNotCorruptUnderlyingList(t *t
 		t.Fatalf("screen 1 after initial Handle: want 3 rows, got %d", len(lb1.Rows))
 	}
 
-	// Step 2: push a second, same-type ec2 list on top (simulates a
-	// filtered/child list — same mechanism used by the related-resource panel).
-	// After this call the stack has two ec2 list screens. The child screen's
-	// ListState.Rows is nil, so listScreenResources falls back to the shared
-	// type-keyed cache and shows the same 3 rows — that is expected and correct
-	// while the child's own fetch hasn't landed yet.
+	// A second same-type ec2 list on top, as the related-resource panel pushes
+	// one. Its ListState.Rows is nil, so listScreenResources falls back to the
+	// shared type-keyed cache until its own fetch lands.
 	c.PushChildListScreen("ec2")
 
-	// Step 3: drive the REAL event path with exactly 1 row, distinct from rowsA.
-	// Pre-fix: this 1-row result would be applied to BOTH screen 2 and screen 1.
-	// Post-fix: it is applied to the topmost matching list only (screen 2).
 	singleRow := []resource.Resource{
 		{
 			ID:   "i-0fff999999999999f",
@@ -1427,12 +1293,11 @@ func TestHandleResourcesLoaded_StackedSameType_DoesNotCorruptUnderlyingList(t *t
 			},
 		},
 	}
-	// Step 4: assert the TOP list (screen 2) now has exactly the 1 row we sent.
 	// ScreenID names screen 2, which is the whole of what routes this event:
 	// a real child-list fetch is stamped with the instance of the screen that
 	// issued it (core/runtime/executor.go's TaskKindFetchChildResources case),
-	// and the result reaches that screen and no other. Provenance still
-	// matches what such a fetch carries.
+	// and the result reaches that screen and no other. Provenance matches what
+	// such a fetch carries.
 	_, _ = c.Handle(messages.ResourcesLoaded{ //nolint:ineffassign,staticcheck // return values not needed here
 		ResourceType: "ec2",
 		Resources:    singleRow, Provenance: messages.FetchProvenanceChild,
@@ -1447,22 +1312,18 @@ func TestHandleResourcesLoaded_StackedSameType_DoesNotCorruptUnderlyingList(t *t
 		t.Errorf("screen 2 row ID: got %q want %q", lb2.Rows[0].ResourceID, singleRow[0].ID)
 	}
 
-	// Step 5: pop back to the underlying list (screen 1) and assert it was NOT
-	// overwritten. Pre-fix this assertion fails: screen 1 would have 1 row.
 	c.Apply(app.Action{Kind: app.ActionBack})
 
 	lb1After := listBodyOrFail(t, c)
 	if len(lb1After.Rows) != 3 {
 		t.Fatalf("screen 1 after pop: want 3 rows (original), got %d — handleResourcesLoadedEvent fan-out bug: 1-row result from screen 2 corrupted screen 1", len(lb1After.Rows))
 	}
-	// Each row must match the original rowsA IDs — not the single filtered row.
 	for i, want := range rowsA {
 		if lb1After.Rows[i].ResourceID != want.ID {
 			t.Errorf("screen 1 after pop row[%d]: got %q want %q (original rowsA corrupted by screen 2 result)", i, lb1After.Rows[i].ResourceID, want.ID)
 		}
 	}
 
-	// The single filtered row must not appear anywhere in screen 1's rows.
 	for _, row := range lb1After.Rows {
 		if row.ResourceID == singleRow[0].ID {
 			t.Errorf("screen 1 after pop: filtered-node %q leaked into underlying list — fan-out bug not fixed", singleRow[0].ID)
@@ -1470,8 +1331,7 @@ func TestHandleResourcesLoaded_StackedSameType_DoesNotCorruptUnderlyingList(t *t
 	}
 }
 
-// fakeRDSResource returns a single synthetic RDS instance resource, confirming
-// that the stacked-same-type bug is type-agnostic (not ec2-specific).
+// fakeRDSResource returns a single synthetic RDS instance resource.
 func fakeRDSResource() resource.Resource {
 	return resource.Resource{
 		ID:   "db-acme-prod-0001",
@@ -1487,8 +1347,8 @@ func fakeRDSResource() resource.Resource {
 	}
 }
 
-// TestHandleResourcesLoaded_StackedSameType_RDS confirms the fix is not
-// ec2-specific: the same topmost-only delivery must hold for rds lists.
+// TestHandleResourcesLoaded_StackedSameType_RDS checks the same
+// screen-scoped delivery for rds lists.
 func TestHandleResourcesLoaded_StackedSameType_RDS(t *testing.T) {
 	c := newListController(t, "rds")
 
@@ -1519,7 +1379,6 @@ func TestHandleResourcesLoaded_StackedSameType_RDS(t *testing.T) {
 		t.Fatalf("screen 2 after Handle (empty): want 0 rows, got %d", len(lb2.Rows))
 	}
 
-	// Pop back — screen 1 must still hold its 1 row.
 	c.Apply(app.Action{Kind: app.ActionBack})
 
 	lb1After := listBodyOrFail(t, c)

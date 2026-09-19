@@ -83,7 +83,6 @@ func computeDefaultViews() map[string]ViewDef {
 				{Path: "AutoScalingGroupName"}, {Path: "AutoScalingGroupARN"}, {Path: "AutoScalingGroupState"},
 			},
 		},
-		// Child views for compute resources
 		"ecs_tasks": {
 			Detail: []DetailField{
 				{Path: "TaskArn"}, {Path: "ClusterArn"}, {Path: "LastStatus"}, {Path: "DesiredStatus"},

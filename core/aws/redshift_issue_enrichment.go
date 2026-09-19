@@ -77,7 +77,7 @@ func EnrichRedshiftPosture(ctx context.Context, clients *ServiceClients, resourc
 			MarkSkipped(&result, r.ID, &failures, logErr)
 		case !aws.ToBool(logging.LoggingEnabled):
 			// No supporting row: "Audit logging: off" is the phrase split on a
-			// colon, and U11 forbids restating it under the finding it belongs to.
+			// colon, and a row restating the phrase says one fact twice.
 			setWave2Finding(&result, r.ID, redshiftCodeAuditLoggingOff, nil)
 
 		}

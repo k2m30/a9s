@@ -11,7 +11,7 @@ import (
 	smtypes "github.com/aws/aws-sdk-go-v2/service/secretsmanager/types"
 )
 
-// Witness secrets for the resource-policy findings. Every other demo secret
+// Secrets carrying the resource-policy findings. Every other demo secret
 // has no resource policy attached at all, which is the healthy default.
 const (
 	// SecretPublicPolicy has a resource policy granting a wildcard principal
@@ -135,10 +135,10 @@ var sharedSecretsFixtures = sync.OnceValue(func() *SecretsFixtures {
 		},
 		{
 			// prod/api/gateway-key — required for the ecs-task:secrets
-			// related-panel pivot witness. Referenced by the api-gateway
+			// related-panel pivot. Referenced by the api-gateway
 			// task definition's API_KEY container secret (ecs.go). The
 			// aws:cloudformation:stack-name tag is required for the
-			// secrets:cfn related-panel pivot witness (checkSecretsCFN);
+			// secrets:cfn related-panel pivot (checkSecretsCFN);
 			// acme-eks-cluster is a real cfn.go stack fixture.
 			Name:             aws.String("prod/api/gateway-key"),
 			ARN:              aws.String("arn:aws:secretsmanager:us-east-1:123456789012:secret:prod/api/gateway-key-XyZ123"),
@@ -172,9 +172,9 @@ var sharedSecretsFixtures = sync.OnceValue(func() *SecretsFixtures {
 			RotationEnabled:  aws.Bool(true),
 			CreatedDate:      aws.Time(time.Date(2025, 6, 1, 10, 0, 0, 0, time.UTC)),
 		},
-		// Redis prod auth token — required for redis→secrets related-panel pivot (phase-7).
+		// Redis prod auth token — required for redis→secrets related-panel pivot.
 		// Name matches ProdRedisSecretName; tag elasticache:replication-group-id enables
-		// tag-based matching once checkRedisSecrets is implemented in phase-7.
+		// tag-based matching in checkRedisSecrets.
 		{
 			Name:             aws.String(ProdRedisSecretName),
 			ARN:              aws.String("arn:aws:secretsmanager:us-east-1:123456789012:secret:" + ProdRedisSecretName + "-AbCdEf"),
@@ -239,7 +239,7 @@ var sharedSecretsFixtures = sync.OnceValue(func() *SecretsFixtures {
 			Tags:              []smtypes.Tag{{Key: aws.String("Environment"), Value: aws.String("production")}},
 		},
 		// prod/codeartifact/npm-publish-token — required for secrets:codeartifact
-		// related-panel pivot witness. checkSecretsCodeArtifact matches secret
+		// related-panel pivot. checkSecretsCodeArtifact matches secret
 		// names/tags containing "codeartifact" (no cache lookup — Wave1
 		// name/tag heuristic only, no cross-reference to a specific repo id).
 		{
@@ -312,7 +312,7 @@ var sharedSecretsFixtures = sync.OnceValue(func() *SecretsFixtures {
 		crossAcctSecretARN    = "arn:aws:secretsmanager:us-east-1:123456789012:secret:" + SecretCrossAccountPolicy + "-XaCcTn"
 	)
 	secrets = append(secrets,
-		// Witness: resource policy open to every AWS principal.
+		// Resource policy open to every AWS principal.
 		smtypes.SecretListEntry{
 			Name:             aws.String(SecretPublicPolicy),
 			ARN:              aws.String(publicPolicySecretARN),
@@ -323,7 +323,7 @@ var sharedSecretsFixtures = sync.OnceValue(func() *SecretsFixtures {
 			RotationRules:    &smtypes.RotationRulesType{AutomaticallyAfterDays: aws.Int64(90)},
 			CreatedDate:      aws.Time(time.Now().AddDate(0, 0, -200)),
 		},
-		// Witness: resource policy naming a principal in another account.
+		// Resource policy naming a principal in another account.
 		smtypes.SecretListEntry{
 			Name:             aws.String(SecretCrossAccountPolicy),
 			ARN:              aws.String(crossAcctSecretARN),

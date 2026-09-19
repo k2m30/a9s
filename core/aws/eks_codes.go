@@ -24,15 +24,14 @@ const (
 	CodeEKSStateFailed domain.FindingCode = "eks.state.failed"
 
 	// CodeEKSHealthIssue — Health.Issues[] is non-empty on an otherwise-healthy
-	// (non-FAILED/CREATING/UPDATING) cluster (docs/resources/eks.md §3.2).
+	// (non-FAILED/CREATING/UPDATING) cluster (docs/resources/eks.md).
 	// Health is tracked independently of lifecycle state. Severity: SevWarn —
 	// colorEKSCluster (catalog_containers.go) ranks a bare health issue below
-	// the FAILED/CREATING/UPDATING lifecycle states, matching
-	// qa_eks_color_test.go's active_with_issues -> ColorWarning contract.
+	// the FAILED/CREATING/UPDATING lifecycle states.
 	CodeEKSHealthIssue domain.FindingCode = "eks.health-issue"
 )
 
-// Wave-1 posture findings (Prowler gap closure). eks.go's fetcher calls
+// Wave-1 posture findings. eks.go's fetcher calls
 // DescribeCluster per cluster, so all four read data already held.
 const (
 	// CodeEKSPublicEndpoint — ResourcesVpcConfig.EndpointPublicAccess is
@@ -52,9 +51,7 @@ const (
 	//nolint:gosec // G101 false positive: a finding code, not a credential
 	CodeEKSSecretsNotKMS domain.FindingCode = "eks.secrets-not-kms"
 
-	// CodeEKSVersionUnsupported — the cluster's Kubernetes minor is older
-	// than eksOldestStandardSupport (eks.go).
+	// CodeEKSVersionUnsupported — AWS's version catalogue puts the cluster's
+	// Kubernetes minor outside standard support.
 	CodeEKSVersionUnsupported domain.FindingCode = "eks.version-unsupported"
 )
-
-// S5 operator sentences.

@@ -6,12 +6,11 @@
 // session.Session owns the cache instance (RelatedCacheLRU field). The
 // RelatedCacheKey free helper lives in core/runtime so renderer adapters
 // can resolve cache keys without importing core/session; tests and runtime
-// code reach it via runtime.RelatedCacheKey. There is no session-side
-// re-export, so the two copies can never drift.
+// code reach it via runtime.RelatedCacheKey.
 //
-// Replaying cached entries back into a detail view is NOT done here or in
-// core/runtime: core/app owns it (mergeRelatedCacheIntoDetail), merging
-// straight into the DetailState the screen renders from.
+// core/app replays cached entries into a detail view
+// (mergeRelatedCacheIntoDetail), merging straight into the DetailState the
+// screen renders from.
 package session
 
 import (

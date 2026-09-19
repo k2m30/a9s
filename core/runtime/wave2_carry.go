@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
 
-// wave2_carry.go — C6b Wave-2 carry: when a rows-carrying write lacks the
+// wave2_carry.go — Wave-2 carry: when a rows-carrying write lacks the
 // Wave-2 data that the rows it replaces already have, this file's helpers
 // carry that data forward per row ID so a bare Wave-1 refresh (a sweep
 // completion save, or the in-memory ProbeResources write a fresh Wave-1
 // probe result performs) cannot strip Findings/Fields a prior enrichment
 // pass wrote.
 //
-// See docs/design/cache-requirements.md C6b and defect D17.
+// See docs/design/cache-requirements.md.
 package runtime
 
 import (
@@ -25,7 +25,7 @@ import (
 // Findings and shortName's registered enricher Fields keys merged in. A row
 // present in newRows but absent from oldRows passes through unchanged (no
 // prior observation to carry from). Wave-1 findings never carry — their
-// absence in a fresh fetch means resolved (C6b) — so only entries where
+// absence in a fresh fetch means resolved — so only entries where
 // domain.Finding.IsWave2Sourced is true are ever copied forward.
 //
 // A row that ALREADY carries its own Wave-2 Finding is left untouched: the
@@ -85,8 +85,8 @@ func carryWave2ForResources(oldResources, newResources []resource.Resource, fiel
 		r.Findings = findings
 		r.Fields = fields
 		// The carried Wave-2 Findings above are meaningless in the detail view's
-		// Attention section without their companion AttentionDetail rows (same
-		// D17/C6b class as the Findings themselves) — carry the matching
+		// Attention section without their companion AttentionDetail rows —
+		// carry the matching
 		// FindingCode entries too, into a fresh map so neither side's backing
 		// map can be mutated through the other (carryWave2's own no-alias
 		// discipline, extended to AttentionDetails).
@@ -187,13 +187,13 @@ func wave2FindingsOf(findings []domain.Finding) []domain.Finding {
 }
 
 // stampFindingFirstSeen returns newRows with FindingFirstSeen populated for
-// every finding code each row currently carries (#463).
+// every finding code each row currently carries.
 //
 // A code already present on the matching oldRows
 // entry (by row ID) carries its FirstSeen forward unchanged; a code with no
 // match in oldRows — because the row is new, or the code is new on an
 // existing row, or the code previously resolved and has now reappeared — is
-// stamped now and counted as new. A code no longer present in newRows simply
+// stamped now and counted as new. A code absent from newRows simply
 // has no entry (resolved findings drop out). A row with no findings gets a
 // nil FindingFirstSeen map, not an empty one.
 //

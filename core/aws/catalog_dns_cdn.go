@@ -121,9 +121,6 @@ var dnsCdnTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static
 			{TargetType: "lambda", DisplayName: "Lambda@Edge", Checker: checkCfLambda},
 			{TargetType: "ct-events", DisplayName: "CloudTrail Events", Checker: ctEventsCheckerFor("cf")},
 		},
-		// cftypes.DistributionSummary: no NavigableFields — Origins[].DomainName is a hostname
-		// (e.g. bucket.s3.amazonaws.com), not a bucket name ID; all relationships handled by
-		// checkCf* related checkers at runtime. WebACLId is on GetDistributionConfig, not the summary.
 		Findings: []catalog.FindingDef{
 			{Code: cfCodeDisabled, Phrase: "disabled (admin-off)", Severity: domain.SevDim, Source: "wave1"},
 			{Code: cfCodeInProgress, Phrase: "deploying: config propagating", Severity: domain.SevWarn, Source: "wave1", Detail: "A configuration change is still reaching the edge locations, so viewers may get the old behaviour or the new one depending on where they are. Wait for it to finish before judging anything else about the distribution."},
@@ -173,7 +170,6 @@ var dnsCdnTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static
 			{TargetType: "r53", DisplayName: "Route 53 Zones", Checker: checkACMR53, Truncated: true},
 			{TargetType: "ct-events", DisplayName: "CloudTrail Events", Checker: ctEventsCheckerFor("acm")},
 		},
-		// No NavigableFields — CertificateSummary has no forward refs to other resource types
 		Findings: []catalog.FindingDef{
 			{Code: acmCodeExpired, Phrase: "expired", Severity: domain.SevBroken, Source: "wave1", Detail: "The certificate has already expired, so every client reaching a listener that serves it refuses the connection. Replace it and confirm the listeners have picked up the new one."},
 			{Code: acmCodeExpiresCritical, Phrase: "expires in <N day(s)> — renew now", Severity: domain.SevBroken, Source: "wave1", Detail: "The certificate expires within a week and every client reaching a listener that serves it will then refuse the connection. Renew or replace it now and confirm the listeners have picked up the new one."},
@@ -220,8 +216,8 @@ var dnsCdnTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static
 			{TargetType: "alarm", DisplayName: "CloudWatch Alarms", Checker: checkApigwAlarm, NeedsTargetCache: true, Truncated: true},
 			{TargetType: "cf", DisplayName: "CloudFront", Checker: checkApigwCF, Truncated: true},
 			{TargetType: "elb", DisplayName: "Load Balancers", Checker: checkApigwELB, Truncated: true},
-			// Weak pair (3-sometimes/2-no consensus). API Gateway has no direct KMS field;
-			// we follow Lambda integrations as a best effort.
+			// API Gateway has no direct KMS field; Lambda integrations are followed
+			// as a best effort.
 			{TargetType: "kms", DisplayName: "KMS Keys", Checker: checkApigwKMS, NeedsTargetCache: false},
 			{TargetType: "role", DisplayName: "IAM Role", Checker: checkApigwRole},
 			{TargetType: "ct-events", DisplayName: "CloudTrail Events", Checker: ctEventsCheckerFor("apigw")},

@@ -96,7 +96,7 @@ type cellAgg struct {
 
 // BuildGrid aggregates recs into the requested window's columns (summing
 // daily records into ISO weeks and monthly records into years as needed —
-// one canonical data source per FR-005, no independently fetched
+// one canonical data source, no independently fetched
 // aggregates), computes per-row period-over-period deltas, sorts rows desc
 // by absolute row total, and drops rows whose every cell is zero or has no
 // data — a net-zero row with offsetting non-zero cells stays.
@@ -232,9 +232,9 @@ func ApplyRowAttrs(g Grid, attrs map[string]string) Grid {
 
 // ApplyAnomalies marks every grid cell whose row matches an AnomalyMark's
 // g.RowDim dimension value and whose column CONTAINS the mark's Period.Start
-// with that mark (FR-014). Matching keys off Start containment rather than
+// with that mark. Matching keys off Start containment rather than
 // full-Period containment: a month-long anomaly drilled into week/day
-// columns no longer fits inside any single finer column, but its Start day
+// columns fits inside no single finer column, but its Start day
 // still does, and that is the column the overlay belongs on.
 func ApplyAnomalies(g Grid, marks []AnomalyMark) Grid {
 	if len(marks) == 0 {
@@ -316,9 +316,9 @@ func buildCellValues(cells []cellAgg) []CellValue {
 }
 
 // buildTotalsCellValues derives the Totals row's cells through SumCells —
-// BuildGrid's own Seam 5 wiring: a column whose contributing rows spanned
-// more than one currency reports Mixed instead of a naive numeric sum
-// (X8). Delta is computed against the previous NON-MIXED column's total
+// a column whose contributing rows spanned more than one currency reports
+// Mixed instead of a naive numeric sum. Delta is computed against the
+// previous NON-MIXED column's total
 // only — a Mixed column breaks the period-over-period baseline for the
 // column after it, exactly as a missing-data column already does.
 func buildTotalsCellValues(cells []cellAgg, money [][]Money) []CellValue {

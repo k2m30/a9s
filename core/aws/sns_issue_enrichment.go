@@ -25,9 +25,6 @@ const (
 	snsCodeNoKMS         domain.FindingCode = "sns.no-kms"
 )
 
-// S5 operator sentences for the topic codes. The subscriber ones carry no
-// supporting row: the phrase is the whole fact and a row repeating it is the
-// detail block printing one thing twice.
 // EnrichSNSSubscriptions calls ListSubscriptionsByTopic per topic (cap EnrichmentCap)
 // to surface orphan topics and topics with all-pending-confirmation subscribers.
 // Per-topic errors are treated as truncated (skip silently).

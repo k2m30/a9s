@@ -136,7 +136,7 @@ func listClusterNodegroups(ctx context.Context, api EKSAPI, clusterName string) 
 // checkEKSAMI resolves the AMI(s) used by all node groups in this EKS cluster.
 // For each node group: if LaunchTemplate is set, call ec2:DescribeLaunchTemplateVersions
 // to get LaunchTemplateData.ImageId. Managed NGs without a LT use AmiType+ReleaseVersion
-// — SSM resolution is deferred; those return no AMI. Returns distinct AMI IDs.
+// — those return no AMI, since resolving them needs SSM. Returns distinct AMI IDs.
 func checkEKSAMI(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	cluster, ok := assertStruct[ekstypes.Cluster](res.RawStruct)
 	if !ok {
@@ -178,7 +178,7 @@ func checkEKSAMI(ctx context.Context, clients any, res resource.Resource, _ reso
 		}
 		ng := descOut.Nodegroup
 		if ng.LaunchTemplate == nil || ng.LaunchTemplate.Id == nil || *ng.LaunchTemplate.Id == "" {
-			// Managed NG without custom LT — AMI resolution via SSM deferred.
+			// Managed NG without custom LT: its AMI is only resolvable via SSM.
 			continue
 		}
 
@@ -329,5 +329,5 @@ func checkEKSEC2(ctx context.Context, clients any, res resource.Resource, _ reso
 	return relatedResultTrunc("ec2", ids, ngAggErr != nil)
 }
 
-// autoscalingEC2InstanceID is a local type helper to keep ec2types in scope.
+// Keeps the ec2types import in use.
 var _ ec2types.Instance

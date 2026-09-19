@@ -207,7 +207,7 @@ var sharedACMFixtures = sync.OnceValue(func() *ACMFixtures {
 			},
 			// Issue: ISSUED, NotAfter 3 days out → Broken (acm.expires-critical).
 			// Relative to time.Now() so the fixture stays inside the 7d window
-			// however long after it was written the demo runs.
+			// whenever the demo runs.
 			{
 				DomainName:     aws.String(ACMExpiresCritical),
 				CertificateArn: aws.String("arn:aws:acm:us-east-1:123456789012:certificate/d0e1f2a3-4567-89ab-cdef-aaaaaaaaaaaa"),
@@ -296,8 +296,8 @@ func NewACMFixtures() *ACMFixtures {
 	return sharedACMFixtures()
 }
 
-// ACMWeakKey is the ONE demo certificate with an RSA key below 2048 bits for
-// the w6a batch. Every other certificate fixture carries RSA 2048 or an
+// ACMWeakKey is the ONE demo certificate with an RSA key below 2048 bits.
+// Every other certificate fixture carries RSA 2048 or an
 // elliptic-curve algorithm.
 const ACMWeakKey = "acme-corp.com"
 

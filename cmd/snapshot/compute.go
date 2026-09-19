@@ -42,8 +42,7 @@ type lambdaFunction struct {
 }
 
 // captureLambda lists every function (ListFunctions, all pages) and captures
-// the Wave 1 fields already present on FunctionConfiguration. No Wave 2 per
-// docs/resources/lambda.md §3.2.
+// the Wave 1 fields already present on FunctionConfiguration.
 func captureLambda(ctx context.Context, cfg aws.Config) (any, error) {
 	client := lambda.NewFromConfig(cfg)
 
@@ -93,7 +92,7 @@ type ecsCluster struct {
 
 // captureECS lists every cluster (ListClusters, all pages) then batches
 // DescribeClusters(include=STATISTICS) to capture status + task/instance
-// counts in one describe pass per docs/resources/ecs.md §1/§3.2.
+// counts in one describe pass per docs/resources/ecs.md.
 func captureECS(ctx context.Context, cfg aws.Config) (any, error) {
 	client := ecs.NewFromConfig(cfg)
 
@@ -165,7 +164,7 @@ type ecsSvcService struct {
 }
 
 // captureECSSvc lists every cluster's services via ListServices+DescribeServices
-// (batched 10 per call, per docs/resources/ecs-svc.md §1 — the same wire call
+// (batched 10 per call, per docs/resources/ecs-svc.md — the same wire call
 // carries both list and Wave 1/Wave 2 fields).
 func captureECSSvc(ctx context.Context, cfg aws.Config) (any, error) {
 	client := ecs.NewFromConfig(cfg)
@@ -251,7 +250,7 @@ type ecsTaskTask struct {
 }
 
 // captureECSTask lists every cluster's tasks via ListTasks+DescribeTasks (up
-// to 100 IDs per describe call per docs/resources/ecs-task.md §1). Container
+// to 100 IDs per describe call per docs/resources/ecs-task.md). Container
 // Essential is resolved per distinct TaskDefinitionArn via DescribeTaskDefinition,
 // cached to collapse repeated revisions to one call, satisfying Wave 2's
 // "essential=true + ExitCode!=0" signal.
@@ -399,7 +398,7 @@ type ecrLatestImage struct {
 
 // captureECR lists every repository (DescribeRepositories, all pages) and
 // captures the Wave 1 scanOnPush flag plus the Wave 2 latest-image scan
-// summary per docs/resources/ecr.md §3.
+// summary per docs/resources/ecr.md.
 func captureECR(ctx context.Context, cfg aws.Config) (any, error) {
 	client := ecr.NewFromConfig(cfg)
 
@@ -489,7 +488,7 @@ type eksCluster struct {
 
 // captureEKS lists every cluster name (ListClusters, all pages) then fans out
 // DescribeCluster per cluster to capture Status + Health.Issues[] per
-// docs/resources/eks.md §1/§3.2 (Wave 1 is None — ListClusters returns names only).
+// docs/resources/eks.md (ListClusters returns names only).
 func captureEKS(ctx context.Context, cfg aws.Config) (any, error) {
 	client := eks.NewFromConfig(cfg)
 
@@ -554,7 +553,7 @@ type ngNodegroup struct {
 
 // captureNG lists every EKS cluster's node groups via ListNodegroups then
 // fans out DescribeNodegroup per group to capture Status + Health.Issues[]
-// per docs/resources/ng.md §1/§3.2 (Wave 1 is None).
+// per docs/resources/ng.md.
 func captureNG(ctx context.Context, cfg aws.Config) (any, error) {
 	eksClient := eks.NewFromConfig(cfg)
 
@@ -649,7 +648,7 @@ type asgScalingActivity struct {
 
 // captureASG lists every group (DescribeAutoScalingGroups, all pages) and
 // captures Wave 1 fields plus the Wave 2 latest-scaling-activity per group
-// per docs/resources/asg.md §3.
+// per docs/resources/asg.md.
 func captureASG(ctx context.Context, cfg aws.Config) (any, error) {
 	client := autoscaling.NewFromConfig(cfg)
 
@@ -730,13 +729,13 @@ type ebEnvironment struct {
 
 // captureEB lists every environment (DescribeEnvironments, all pages) and
 // captures Wave 1 Health/Status plus the Wave 2 DescribeEnvironmentHealth
-// Causes[] per docs/resources/eb.md §3.
+// Causes[] per docs/resources/eb.md.
 func captureEB(ctx context.Context, cfg aws.Config) (any, error) {
 	client := elasticbeanstalk.NewFromConfig(cfg)
 
-	// No SDK paginator exists for DescribeEnvironments (elasticbeanstalk's
-	// generated paginators cover DescribeEvents/ManagedActionHistory/Platform*
-	// only) — hand-rolled NextToken loop retained.
+	// elasticbeanstalk's generated paginators cover
+	// DescribeEvents/ManagedActionHistory/Platform* only, so the
+	// DescribeEnvironments NextToken loop is hand-rolled.
 	var envs []ebtypes.EnvironmentDescription
 	var nextToken *string
 	for {
@@ -797,7 +796,7 @@ type elbLoadBalancer struct {
 
 // captureELB lists every ELBv2 load balancer (DescribeLoadBalancers, all
 // pages) and captures the Wave 1 State.Code/State.Reason fields per
-// docs/resources/elb.md §3.1 (Wave 2 is None).
+// docs/resources/elb.md.
 func captureELB(ctx context.Context, cfg aws.Config) (any, error) {
 	client := elasticloadbalancingv2.NewFromConfig(cfg)
 
@@ -853,7 +852,7 @@ type tgTargetGroup struct {
 
 // captureTG lists every target group (DescribeTargetGroups, all pages) and
 // captures the Wave 1 orphan signal (LoadBalancerArns) plus the Wave 2
-// DescribeTargetHealth raw per-target state per docs/resources/tg.md §3.
+// DescribeTargetHealth raw per-target state per docs/resources/tg.md.
 func captureTG(ctx context.Context, cfg aws.Config) (any, error) {
 	client := elasticloadbalancingv2.NewFromConfig(cfg)
 

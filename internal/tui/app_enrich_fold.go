@@ -3,9 +3,9 @@
 package tui
 
 // app_enrich_fold.go — Wave-2 enrichment helpers that mutate cached row
-// Findings/AttentionDetails directly (no parallel findings map).
+// Findings/AttentionDetails directly.
 //
-// The Wave-2 fold itself lives on runtime.Core.applyEnrichment (internal/
+// The Wave-2 fold itself lives on runtime.Core.applyEnrichment (core/
 // runtime/helpers.go); Model.applyEnrichment here is CLEAR-only, stripping
 // wave2 findings from one type's cached rows ahead of a rerun.
 // wave2FindingsByID and wave2DetailsByID rebuild list-view input from the
@@ -42,9 +42,8 @@ import (
 // once the fresh EnrichmentChecked result lands.
 //
 // Folds into RowStore's retained rows for canon via m.core.AmendRows'
-// copy-on-write mutation (a type's rows live in exactly one RowStore entry,
-// so this is the only per-type-row
-// destination left). See RowStore.Amend's doc comment for why in-place
+// copy-on-write mutation (a type's rows live in exactly one RowStore entry).
+// See RowStore.Amend's doc comment for why in-place
 // mutation is not valid here.
 func (m *Model) applyEnrichment(resourceType string) {
 	canon := resourceType

@@ -16,12 +16,6 @@ import (
 // survive that list being popped: a later NORMAL list of type T must not
 // inherit the stale checker and get a RelatedIDSet imposed on it (which would
 // hide rows the normal list should show).
-//
-// Pre-fix failure: the checker was stored in a per-type controller map, never
-// cleared when the related list was popped, so reapplyCheckerAgainst re-ran the
-// old checker against the normal list's page and created a RelatedIDSet on it —
-// e.g. after VPC -> Security Groups, opening the plain sg list filtered it to
-// the old VPC's SGs.
 func TestReapplyChecker_NotLeakedToNormalListAfterPop(t *testing.T) {
 	c := New(runtime.New(session.New(), nil))
 
@@ -37,10 +31,8 @@ func TestReapplyChecker_NotLeakedToNormalListAfterPop(t *testing.T) {
 	}
 	c.PatchListReapplyChecker(subset, resource.Resource{ID: "vpc-1"})
 
-	// Leave that related list (mimics Esc / pop).
 	c.stack = c.stack[:len(c.stack)-1]
 
-	// A fresh NORMAL list of the same type.
 	c.ApplyIntents([]runtime.UIIntent{runtime.PushScreen{
 		ID:      runtime.ScreenResourceList,
 		Context: runtime.ScreenContext{ResourceType: "sg"},

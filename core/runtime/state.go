@@ -8,8 +8,8 @@ import (
 
 // RuntimeState is the view-ready snapshot that adapters render from when
 // they need a one-shot read of runtime state (initial mount, debug
-// overlays, future IPC bridges). It is a snapshot, not a live handle —
-// adapters should still react to UIIntent for incremental updates.
+// overlays). It is a snapshot, not a live handle — adapters react to
+// UIIntent for incremental updates.
 type RuntimeState struct {
 	// ResourceCache mirrors RowStore's retained full (non-Partial) entries
 	// for the active session: per-resource-type cached list state.

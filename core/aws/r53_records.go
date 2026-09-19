@@ -113,7 +113,6 @@ func convertR53Record(record r53types.ResourceRecordSet, hostedZoneId string) re
 		ttl = fmt.Sprintf("%d", *record.TTL)
 	}
 
-	// Compute values: join ResourceRecords or use AliasTarget
 	var values string
 	if record.AliasTarget != nil && record.AliasTarget.DNSName != nil {
 		values = "ALIAS: " + *record.AliasTarget.DNSName
@@ -127,7 +126,6 @@ func convertR53Record(record r53types.ResourceRecordSet, hostedZoneId string) re
 		values = strings.Join(vals, ", ")
 	}
 
-	// ID = Name|Type, appending |SetIdentifier if non-empty
 	id := name + "|" + recType
 	if record.SetIdentifier != nil && *record.SetIdentifier != "" {
 		id += "|" + *record.SetIdentifier

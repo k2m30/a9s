@@ -36,7 +36,6 @@ func FetchTransitGatewaysPage(ctx context.Context, api EC2DescribeTransitGateway
 			tgwID = *tgw.TransitGatewayId
 		}
 
-		// Extract Name from Tags
 		name := ""
 		for _, tag := range tgw.Tags {
 			if tag.Key != nil && *tag.Key == "Name" {

@@ -10,8 +10,7 @@ import "github.com/aws/aws-sdk-go-v2/aws"
 //
 // Answering an empty result instead turns a fixture gap into a confident zero:
 // a pivot to a resource nobody modelled renders "none", which is the exact
-// class of lie demo mode exists to disprove, and the reason the IAM fake grew
-// this rule first.
+// class of lie demo mode exists to disprove.
 //
 // Two constraints on the refusal. The code is the SERVICE's own spelling, not
 // a uniform one — AWS spells this differently per API, and a fake answering a

@@ -55,7 +55,6 @@ const (
 	ecsBatchContainerInstanceArn = "arn:aws:ecs:us-east-1:123456789012:container-instance/acme-batch/e1f2a3b4c5d6e1f2a3b4c5d6"
 )
 
-// ECS posture witnesses.
 const (
 	// ECSServicePublicIP — the only service whose awsvpc configuration
 	// assigns public IPs; every other service leaves AssignPublicIp unset.
@@ -87,7 +86,7 @@ const (
 	ECSTaskSpotReclaimed = "0a1b2c3d4e5f60010001000100010006"
 )
 
-// Superseded revisions the witness tasks above still run.
+// Superseded revisions the posture tasks above still run.
 const (
 	ecsDefOrderWorkerOld    = "arn:aws:ecs:us-east-1:123456789012:task-definition/order-worker:4"
 	ecsDefWebFrontendOld    = "arn:aws:ecs:us-east-1:123456789012:task-definition/web-frontend:6"
@@ -97,17 +96,17 @@ const (
 )
 
 const (
-	// ECSServiceNoTasksRunning is the witness for ecs-svc.tasks.none-running,
-	// and for the placement branch of the service event scan: it has no tasks
+	// ECSServiceNoTasksRunning raises ecs-svc.tasks.none-running and the
+	// placement branch of the service event scan: it has no tasks
 	// running because none can be placed, and its event says so.
 	ECSServiceNoTasksRunning = "acme-svc-stalled"
 
-	// ECSServiceBelowDesiredCount runs under its desired count, and is the
-	// witness for the load-balancer branch of the event scan: the tasks that
+	// ECSServiceBelowDesiredCount runs under its desired count and raises
+	// the load-balancer branch of the event scan: the tasks that
 	// did start are failing their health checks.
 	ECSServiceBelowDesiredCount = "acme-svc-degraded"
 
-	// Neither witness dates its own event. The enricher reads a ten-minute
+	// Neither service dates its own event. The enricher reads a ten-minute
 	// window and these fixtures are built once per process, so a stored date
 	// ages out of a session; the fake stamps them against the call instead
 	// (core/demo/fakes/ecs.go, stampEvents).
@@ -283,7 +282,7 @@ func buildECSServices() []ecstypes.Service {
 				AwsvpcConfiguration: &ecstypes.AwsVpcConfiguration{
 					SecurityGroups: []string{"sg-0bbb222222222222b"},
 					Subnets:        []string{"subnet-0aaa111111111111a"},
-					// The ecs-svc.public-ip witness — the only demo service
+					// Raises ecs-svc.public-ip — the only demo service
 					// that hands its tasks routable addresses.
 					AssignPublicIp: ecstypes.AssignPublicIpEnabled,
 				},
@@ -425,7 +424,7 @@ func buildECSServices() []ecstypes.Service {
 	// Issue: ACTIVE, wants tasks, none running → Broken. The only demo service
 	// with RunningCount 0 against a non-zero DesiredCount; every other service
 	// is either at its desired count, deliberately scaled to zero, or the
-	// below-desired witness above.
+	// below-desired service above.
 	named = append(named, ecstypes.Service{
 		ServiceName:        aws.String(ECSServiceNoTasksRunning),
 		ServiceArn:         aws.String("arn:aws:ecs:us-east-1:123456789012:service/acme-services/" + ECSServiceNoTasksRunning),
@@ -832,7 +831,7 @@ func buildECSTaskDefinitions() map[string]*ecstypes.TaskDefinition {
 			Cpu:               aws.String("512"),
 			Memory:            aws.String("1024"),
 			// TaskRoleArn/ExecutionRoleArn — required for the ecs-task:role
-			// related-panel pivot witness (checkECSTaskRole, Count:2).
+			// related-panel pivot (checkECSTaskRole, Count:2).
 			// acme-lambda-execution and acme-ci-deploy-role are real iam.go
 			// role fixtures.
 			TaskRoleArn:      aws.String("arn:aws:iam::123456789012:role/service-role/acme-lambda-execution"),
@@ -846,7 +845,7 @@ func buildECSTaskDefinitions() map[string]*ecstypes.TaskDefinition {
 						{ContainerPort: aws.Int32(8080), Protocol: ecstypes.TransportProtocolTcp},
 					},
 					// Secrets — required for the ecs-task:secrets and
-					// ecs-task:ssm related-panel pivot witnesses. DB_PASSWORD
+					// ecs-task:ssm related-panel pivots. DB_PASSWORD
 					// injects the "password" JSON key of the Secrets Manager
 					// secret prod/database/primary (the ARN carries a
 					// ":<json-key>:<stage>:<version>" tail); API_KEY is the
@@ -959,7 +958,7 @@ func buildECSTaskDefinitions() map[string]*ecstypes.TaskDefinition {
 		},
 	}
 
-	// The four superseded revisions the posture witness tasks still run —
+	// The four superseded revisions the posture tasks still run —
 	// each carries exactly one of the task-definition signals, so no signal
 	// ever lands on more than the one task pinned to that revision.
 	defs[ecsDefOrderWorkerSecret] = &ecstypes.TaskDefinition{
@@ -975,7 +974,7 @@ func buildECSTaskDefinitions() map[string]*ecstypes.TaskDefinition {
 				Name:  aws.String("worker"),
 				Image: aws.String("123456789012.dkr.ecr.us-east-1.amazonaws.com/acme/order-worker:1.3.0"),
 				Cpu:   1024,
-				// The ecs-task.env-secret witness: revision 5 moved this
+				// Raises ecs-task.env-secret: revision 5 moved this
 				// token into the Secrets block, revision 3 still pastes it.
 				Environment: []ecstypes.KeyValuePair{
 					{Name: aws.String("LOG_LEVEL"), Value: aws.String("info")},
@@ -997,7 +996,7 @@ func buildECSTaskDefinitions() map[string]*ecstypes.TaskDefinition {
 				Name:  aws.String("web"),
 				Image: aws.String("123456789012.dkr.ecr.us-east-1.amazonaws.com/acme/web-frontend:1.7.0"),
 				Cpu:   256,
-				// The ecs-task.privileged witness: revision 7 was rolled back
+				// Raises ecs-task.privileged: revision 7 was rolled back
 				// to a privileged sidecar-debugging image.
 				Privileged: aws.Bool(true),
 			},
@@ -1024,7 +1023,7 @@ func buildECSTaskDefinitions() map[string]*ecstypes.TaskDefinition {
 		Family:            aws.String("order-worker"),
 		Revision:          4,
 		Status:            ecstypes.TaskDefinitionStatusActive,
-		// The ecs-task.host-namespace witness.
+		// Raises ecs-task.host-namespace.
 		NetworkMode: ecstypes.NetworkModeHost,
 		PidMode:     ecstypes.PidModeHost,
 		Cpu:         aws.String("1024"),
@@ -1119,7 +1118,7 @@ func buildECSTaskDefinitions() map[string]*ecstypes.TaskDefinition {
 }
 
 // applyECSContainerDefaults gives every container a read-only root filesystem
-// and an awslogs driver, leaving exactly one witness definition without each:
+// and an awslogs driver, leaving exactly one definition without each:
 // web-frontend:6 keeps a writable root, batch-etl-runner:2 keeps a container
 // with no log driver. Applied here rather than inline so the healthy default
 // can never be forgotten on a definition added later.
@@ -1150,8 +1149,8 @@ func applyECSContainerDefaults(defs map[string]*ecstypes.TaskDefinition) {
 
 func init() {
 	Register(Pin{ShortName: "ecs", Rows: 7, Issues: 4, CoverageGaps: []string{"dim"}})
-	// acme-svc-stalled is the witness for a service that wants tasks and runs
-	// none; it carries one of the 26 rows and one of the 7 Broken badges.
+	// acme-svc-stalled wants tasks and runs none, so it is one of the 26 rows
+	// and one of the 7 Broken badges.
 	Register(Pin{ShortName: "ecs-svc", Rows: 26, Issues: 7, CoverageGaps: []string{"dim"}})
 	Register(Pin{ShortName: "ecs-task", Rows: 18, Issues: 8})
 }

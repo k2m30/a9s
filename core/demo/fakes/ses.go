@@ -34,7 +34,7 @@ func (f *SESFake) GetAccount(_ context.Context, _ *sesv2.GetAccountInput, _ ...f
 
 // GetEmailIdentity returns the configured output for the requested identity, or an empty
 // output when the identity has no configuration set. This satisfies the eb-rule, kinesis,
-// and sns related-panel pivots for the graph-root identity "acme-corp.com".
+// and sns related-panel pivots for the identity "acme-corp.com".
 func (f *SESFake) GetEmailIdentity(_ context.Context, in *sesv2.GetEmailIdentityInput, _ ...func(*sesv2.Options)) (*sesv2.GetEmailIdentityOutput, error) {
 	if in == nil || in.EmailIdentity == nil {
 		return &sesv2.GetEmailIdentityOutput{}, nil
@@ -74,7 +74,7 @@ func NewSESV1() *SESV1Fake {
 }
 
 // DescribeActiveReceiptRuleSet returns the demo active receipt rule set, which contains
-// one rule with S3Action and LambdaAction wired to the graph-root identity.
+// one rule with S3Action and LambdaAction wired to the "acme-corp.com" identity.
 func (f *SESV1Fake) DescribeActiveReceiptRuleSet(_ context.Context, _ *ses.DescribeActiveReceiptRuleSetInput, _ ...func(*ses.Options)) (*ses.DescribeActiveReceiptRuleSetOutput, error) {
 	return f.fix.ActiveReceiptRuleSet, nil
 }

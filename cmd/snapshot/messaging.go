@@ -235,8 +235,8 @@ type ebRuleTarget struct {
 func captureEBRule(ctx context.Context, cfg aws.Config) (any, error) {
 	client := eventbridge.NewFromConfig(cfg)
 
-	// No SDK paginator exists for eventbridge — the service ships none at all
-	// (its api_op_*.go files define no NewXxxPaginator) — hand-rolled loop retained.
+	// The eventbridge SDK ships no paginators (its api_op_*.go files define no
+	// NewXxxPaginator), so the loop is hand-rolled.
 	var rules []ebRule
 	var nextToken *string
 	for {
@@ -274,8 +274,8 @@ func captureEBRuleTargets(ctx context.Context, client *eventbridge.Client, ruleN
 		in.EventBusName = aws.String(eventBusName)
 	}
 
-	// No SDK paginator exists for eventbridge (see captureEBRule) — hand-rolled
-	// loop retained.
+	// The eventbridge SDK ships no paginators (see captureEBRule), so the loop is
+	// hand-rolled.
 	var items []ebRuleTarget
 	var nextToken *string
 	for {
@@ -623,8 +623,8 @@ func captureAPIGW(ctx context.Context, cfg aws.Config) (any, error) {
 	v2Client := apigatewayv2.NewFromConfig(cfg)
 	v1Client := apigateway.NewFromConfig(cfg)
 
-	// No SDK paginator exists for apigatewayv2 GetApis (the package only
-	// generates NewListRoutingRulesPaginator) — hand-rolled loop retained.
+	// apigatewayv2 generates only NewListRoutingRulesPaginator, so the GetApis
+	// loop is hand-rolled.
 	var v2APIs []apigwV2API
 	var v2NextToken *string
 	for {

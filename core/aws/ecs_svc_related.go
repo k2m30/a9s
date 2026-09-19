@@ -144,7 +144,6 @@ func checkECSSvcELB(ctx context.Context, clients any, res resource.Resource, cac
 		return resource.KnownRelated("elb", nil, false)
 	}
 
-	// Collect TG ARNs from the service definition.
 	tgARNs := make(map[string]struct{})
 	for _, lb := range raw.LoadBalancers {
 		if lb.TargetGroupArn != nil && *lb.TargetGroupArn != "" {
@@ -155,7 +154,6 @@ func checkECSSvcELB(ctx context.Context, clients any, res resource.Resource, cac
 		return resource.KnownRelated("elb", nil, false)
 	}
 
-	// Step 2: scan TG cache for matching target groups.
 	tgList, truncatedTG, err := relatedResourcesFor(ctx, clients, cache, "tg")
 	if err != nil {
 		return resource.ErrorRelated("elb", err)
@@ -164,7 +162,6 @@ func checkECSSvcELB(ctx context.Context, clients any, res resource.Resource, cac
 		return resource.UnknownRelated("elb")
 	}
 
-	// Step 3: collect ELB ARNs from matched TGs.
 	elbARNs := make(map[string]struct{})
 	for _, tgRes := range tgList {
 		tg, tgOk := assertStruct[elbv2types.TargetGroup](tgRes.RawStruct)
@@ -190,12 +187,11 @@ func checkECSSvcELB(ctx context.Context, clients any, res resource.Resource, cac
 		return resource.KnownRelated("elb", nil, false)
 	}
 
-	// Step 4: match ELB ARNs against the ELB cache. LoadBalancerArn — not the
-	// LB name (res.ID) — is the join key: elbTargetGroup.LoadBalancerArns[]
-	// carries full ARNs, so matching against elbRes.ID (the LB name) never
-	// hits. The elb fetcher populates Fields["load_balancer_arn"]; RawStruct
-	// is the fallback for cache-restored rows that predate the field or lost
-	// it to a stale replay.
+	// LoadBalancerArn — not the LB name (res.ID) — is the join key:
+	// elbTargetGroup.LoadBalancerArns[] carries full ARNs, so matching against
+	// elbRes.ID (the LB name) never hits. The elb fetcher populates
+	// Fields["load_balancer_arn"]; RawStruct is the fallback for cache-restored
+	// rows without the field.
 	elbList, truncatedELB, err := relatedResourcesFor(ctx, clients, cache, "elb")
 	if err != nil {
 		return resource.ErrorRelated("elb", err)

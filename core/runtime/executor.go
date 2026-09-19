@@ -2,7 +2,7 @@
 
 // executor.go — renderer-neutral task executor for runtime.Core.
 //
-// PR-B0 Pass A: adds Core.ExecuteTask as the single entry point for a
+// Core.ExecuteTask is the single entry point for a
 // non-Bubble-Tea host (web, CLI, test harness) to run a TaskRequest
 // synchronously and receive the result as a messages.Event.
 //
@@ -16,7 +16,7 @@
 //   - save-theme-config : persists a theme choice with no data event result.
 //   - fetch-profiles    : result is a TUI-private profilesLoadedMsg type.
 //
-// All other TaskKinds call the existing Core methods and wrap their output
+// All other TaskKinds call Core methods and wrap their output
 // in the appropriate messages.Event.
 package runtime
 
@@ -90,12 +90,9 @@ func (c *Core) CaptureDispatch() DispatchSnapshot {
 // in the order the fetches were requested, which the goroutines that later run
 // them do not preserve.
 //
-// The lane a task's result will carry is not consulted. It had to be while the
-// counter was per type, because a child list's load-more drawing a number
-// there superseded an in-flight verification of the list beneath it; keyed by
-// the issuing screen, a drill's sequence orders the drill's own requests and
-// reaches no other screen, so every lane is stamped and every list screen
-// guards itself.
+// Every lane is stamped: the counter is keyed by the issuing screen, so a
+// drill's sequence orders the drill's own requests and reaches no other
+// screen, and every list screen guards itself.
 //
 // A task no list screen owns (ScreenID zero) keeps ListSeq zero: there is no
 // screen whose requests it could be ordered against, and a zero sequence
@@ -126,7 +123,7 @@ func (c *Core) LatestListFetchSeq(screen domain.Gen) domain.Gen {
 
 // ListResultSuperseded reports whether a list result dispatched by screen at
 // sequence seq has been overtaken by a later request from that same screen —
-// seq is no longer the newest value StampListFetchSeq handed it. The single
+// seq is not the newest value StampListFetchSeq handed it. The single
 // ordering rule for list results, and it is asked once per
 // message: Core.HandleResourcesLoaded is the seam every lane routes a
 // messages.ResourcesLoaded through, and its answer travels on the message
@@ -152,7 +149,7 @@ func (c *Core) ExecuteTask(ctx context.Context, req TaskRequest) (messages.Event
 	return c.ExecuteTaskAt(ctx, req, c.CaptureDispatch())
 }
 
-// ExecuteTaskAt executes req synchronously using the existing Core methods and
+// ExecuteTaskAt executes req synchronously using Core methods and
 // returns the result as a messages.Event. snap must be captured at dispatch
 // time via CaptureDispatch so that a concurrent session.Rotate cannot corrupt
 // the generation/client values read during execution.
@@ -166,7 +163,6 @@ func (c *Core) ExecuteTask(ctx context.Context, req TaskRequest) (messages.Event
 func (c *Core) ExecuteTaskAt(ctx context.Context, req TaskRequest, snap DispatchSnapshot) (messages.Event, error) {
 	switch req.Key.Kind {
 
-	// --- availability probe ---
 	case TaskKindProbeAvailability:
 		shortName := req.Key.Scope
 		gen := snap.AvailabilityGen
@@ -184,7 +180,6 @@ func (c *Core) ExecuteTaskAt(ctx context.Context, req TaskRequest, snap Dispatch
 			Duration:     time.Since(start),
 		}, nil
 
-	// --- enrichment probe (Wave 2) ---
 	// Demo clients are real *awsclient.ServiceClients backed by typed fakes
 	// (core/demo.NewServiceClients), so Wave-2 enrichers run against them
 	// exactly as they run against live AWS clients — no demo-mode skip here.
@@ -210,7 +205,6 @@ func (c *Core) ExecuteTaskAt(ctx context.Context, req TaskRequest, snap Dispatch
 			Duration:         time.Since(start),
 		}, nil
 
-	// --- save availability cache ---
 	// Single save path for both renderers: TUI and web both route
 	// TaskKindSaveCache through this executor case, so availability counts
 	// and per-type rows/findings persist identically regardless of host.
@@ -220,20 +214,20 @@ func (c *Core) ExecuteTaskAt(ctx context.Context, req TaskRequest, snap Dispatch
 		if snap.NoCache {
 			return nil, nil
 		}
-		// C9: this save answers for the pair that dispatched it. Carried down
+		// This save answers for the pair that dispatched it. Carried down
 		// to the one save chokepoint, which drops it if the operator has
 		// switched pairs in the meantime — a queued save must never write one
 		// account's rows into another's directory.
 		dispatchPair := session.Pair{Profile: snap.Profile, Region: snap.Region, Gen: snap.PairGen}
 		var flashErr error
-		// Per C7/C8: an availability-sweep + Wave-2 enrichment completion
+		// An availability-sweep + Wave-2 enrichment completion
 		// must persist that type's per-row rows/findings (SaveResourceListCache)
 		// WITHOUT requiring any list screen to have been opened — mirrors the
 		// list-open persistence path (app.Controller.maybeSaveResourceListCache)
 		// but is driven from the dispatch-time snapshot the caller captured via
 		// SaveCachePayload (see its doc comment for why dispatch-time capture,
 		// not a live session read, is required), falling back to a live
-		// RowStore read for any nil-Payload dispatch. C6 scope: RowStore's retained rows ARE this
+		// RowStore read for any nil-Payload dispatch. RowStore's retained rows ARE this
 		// session's canonical top-level population for each type — the same
 		// rows a fresh list-open would seed from.
 		//
@@ -243,8 +237,8 @@ func (c *Core) ExecuteTaskAt(ctx context.Context, req TaskRequest, snap Dispatch
 		// aggregate — it must run second so it either overwrites with that
 		// exact aggregate (issueKnown) or carries forward the rows/issues this
 		// call just persisted via existing.Issues/existing.Rows (not known).
-		// The reverse order let the row-derived, potentially-incomplete count
-		// computed here unconditionally clobber a more accurate aggregate.
+		// In the reverse order the row-derived, potentially-incomplete count
+		// computed here would clobber a more accurate aggregate.
 		saveResources, saveTruncated := c.rowStoreResourcesAndTruncated()
 		saveGens := c.rowStoreGens()
 		var wave2Answered map[string]bool
@@ -253,7 +247,7 @@ func (c *Core) ExecuteTaskAt(ctx context.Context, req TaskRequest, snap Dispatch
 			saveResources, saveTruncated, saveGens = p.Resources, p.Truncated, p.Gens
 			wave2Answered, uninspected = p.Wave2Answered, p.Uninspected
 		}
-		// A nil-Payload dispatch answers for no type (C6b): only
+		// A nil-Payload dispatch answers for no type: only
 		// handleEnrichmentChecked's "all done" branch names Wave-2-answered
 		// types, and it always carries a SaveCachePayload.
 		if err := c.saveProbeResourcesToTypeFiles(dispatchPair, saveResources, saveTruncated, wave2Answered, uninspected, saveGens); err != nil {
@@ -267,7 +261,6 @@ func (c *Core) ExecuteTaskAt(ctx context.Context, req TaskRequest, snap Dispatch
 		}
 		return nil, nil
 
-	// --- AWS connect ---
 	case TaskKindConnect:
 		p, ok := req.Payload.(ConnectPayload)
 		if !ok {
@@ -281,7 +274,6 @@ func (c *Core) ExecuteTaskAt(ctx context.Context, req TaskRequest, snap Dispatch
 			Err:     err,
 		}, nil
 
-	// --- fetch caller identity ---
 	case TaskKindFetchIdentity:
 		gen := snap.ConnectGen
 		identity, err := c.FetchIdentity(ctx, snap.Clients)
@@ -290,7 +282,6 @@ func (c *Core) ExecuteTaskAt(ctx context.Context, req TaskRequest, snap Dispatch
 		}
 		return messages.IdentityLoaded{Identity: identity, Gen: gen}, nil
 
-	// --- load on-disk availability cache ---
 	case TaskKindLoadAvailCache:
 		store := c.LoadAvailabilityCache()
 		if store == nil {
@@ -300,7 +291,6 @@ func (c *Core) ExecuteTaskAt(ctx context.Context, req TaskRequest, snap Dispatch
 		}
 		return cacheStoreToEvent(store), nil
 
-	// --- demo prefetch ---
 	case TaskKindDemoPrefetchCounts:
 		gen := snap.AvailabilityGen
 		r := c.DemoPrefetchCounts(ctx, snap.Clients)
@@ -316,7 +306,6 @@ func (c *Core) ExecuteTaskAt(ctx context.Context, req TaskRequest, snap Dispatch
 			PrefetchSoftErr: r.PrefetchSoftErr,
 		}, nil
 
-	// --- related-check fan-out ---
 	// Bounded concurrent fan-out (MaxConcurrentProbes) over RunRelatedDef —
 	// the exact per-def logic the TUI's own fan-out uses
 	// (internal/tui/runtime_adapter_related.go), so the two lanes can never
@@ -345,7 +334,6 @@ func (c *Core) ExecuteTaskAt(ctx context.Context, req TaskRequest, snap Dispatch
 		}
 		return c.runRelatedCheckers(ctx, op, cacheSnap, mainCacheKeys, defs), nil
 
-	// --- enrich detail ---
 	case KindEnrichDetail:
 		p, ok := req.Payload.(EnrichDetailPayload)
 		if !ok {
@@ -396,7 +384,6 @@ func (c *Core) ExecuteTaskAt(ctx context.Context, req TaskRequest, snap Dispatch
 		}
 		return msg, nil
 
-	// --- fetch resources (top-level) ---
 	case KindFetchResources:
 		resourceType := req.Key.Scope
 		gen := snap.AvailabilityGen
@@ -416,8 +403,8 @@ func (c *Core) ExecuteTaskAt(ctx context.Context, req TaskRequest, snap Dispatch
 		if err != nil && len(res.Resources) == 0 {
 			return out.Msg(res, err), nil
 		}
-		// C1: a verify-refetch must verify the content actually being shown,
-		// not just page 1 — so page up to the cached depth. C5: a
+		// A verify-refetch must verify the content actually being shown,
+		// not just page 1 — so page up to the cached depth. A
 		// truncated first page must never downgrade a stored exact total;
 		// without this loop a 55-row cached/exact list would silently swap
 		// down to a 50-row truncated one. Bounded by CachedListDepth so this
@@ -445,7 +432,6 @@ func (c *Core) ExecuteTaskAt(ctx context.Context, req TaskRequest, snap Dispatch
 		}
 		return out.Msg(res, err), nil
 
-	// --- fetch filtered resources ---
 	case KindFetchFiltered:
 		p, ok := req.Payload.(FetchFilteredPayload)
 		if !ok {
@@ -460,7 +446,6 @@ func (c *Core) ExecuteTaskAt(ctx context.Context, req TaskRequest, snap Dispatch
 		}
 		return out.Msg(c.FetchResourcesFiltered(ctx, snap.Clients, resourceType, p.Filter)), nil
 
-	// --- fetch more (pagination) ---
 	case KindFetchMore:
 		p, ok := req.Payload.(FetchMorePayload)
 		if !ok {
@@ -480,7 +465,6 @@ func (c *Core) ExecuteTaskAt(ctx context.Context, req TaskRequest, snap Dispatch
 			FetchFilter:  p.FetchFilter,
 		})), nil
 
-	// --- fetch child resources ---
 	case TaskKindFetchChildResources:
 		p, ok := req.Payload.(FetchChildResourcesPayload)
 		if !ok {
@@ -494,7 +478,6 @@ func (c *Core) ExecuteTaskAt(ctx context.Context, req TaskRequest, snap Dispatch
 		}
 		return out.Msg(c.FetchChildResources(ctx, snap.Clients, p.ChildType, p.ParentContext)), nil
 
-	// --- fetch reveal value ---
 	case KindFetchReveal:
 		p, ok := req.Payload.(FetchRevealPayload)
 		if !ok {
@@ -510,7 +493,6 @@ func (c *Core) ExecuteTaskAt(ctx context.Context, req TaskRequest, snap Dispatch
 			Gen:          gen,
 		}, nil
 
-	// --- fetch-by-id-detail ---
 	// The TUI adapter navigates directly to the detail view after fetching.
 	// The executor returns the resource as ResourcesLoaded so non-TUI callers
 	// can observe the fetched data; navigation is a renderer concern.
@@ -537,7 +519,6 @@ func (c *Core) ExecuteTaskAt(ctx context.Context, req TaskRequest, snap Dispatch
 		}
 		return out.Msg(resource.FetchResult{Resources: res}, nil), nil
 
-	// --- fetch costs (Cost Explorer) ---
 	case KindFetchCosts:
 		p, ok := req.Payload.(FetchCostsPayload)
 		if !ok {
@@ -552,26 +533,25 @@ func (c *Core) ExecuteTaskAt(ctx context.Context, req TaskRequest, snap Dispatch
 			}, nil
 		}
 		// Unlike every other case in this switch, KindFetchCosts is not
-		// dispatched through a Core.Fetch* method in fetchers.go, so it never
-		// inherited fetchTimeout's 30s backstop — it ran on the caller's raw
-		// ctx (the TUI's own m.pairCtx, cancelled only on profile/region
-		// switch or quit) with nothing to stop a stalled call from hanging
-		// until the user quits. costsFetchTimeout is longer than fetchTimeout
+		// dispatched through a Core.Fetch* method in fetchers.go, so
+		// fetchTimeout's 30s backstop does not cover it, and the caller's ctx
+		// (the TUI's m.pairCtx) is cancelled only on profile/region switch or
+		// quit. costsFetchTimeout is longer than fetchTimeout
 		// because a grid fetch can legitimately issue up to costsGridPageCap
 		// sequential, billed GetCostAndUsage requests before the page cap
 		// alone would end it.
 		var cancel context.CancelFunc
 		ctx, cancel = context.WithTimeout(ctx, costsFetchTimeout)
 		defer cancel()
-		// The grid query and the anomaly overlay (FR-014) depend only on the
+		// The grid query and the anomaly overlay depend only on the
 		// payload, never on each other's result — they run concurrently
 		// rather than back to back. Joined below: the grid's own error wins
 		// (Err), an anomaly-fetch failure degrades to no marks rather than
 		// failing the grid data it accompanies. Each half is independently
 		// skippable — SkipAnomalies when the store's cached anomaly snapshot
 		// is still within its TTL, SkipGrid when the grid shape is already
-		// fully covered and only the anomaly slot needs refreshing (X3,
-		// screen.FetchPlan's two independent booleans) — so neither a
+		// fully covered and only the anomaly slot needs refreshing
+		// (screen.FetchPlan's two independent booleans) — so neither a
 		// grid-only nor an anomalies-only dispatch ever bills for the half
 		// it doesn't need. Each half's own request count folds into
 		// Requests: a separate billed CE call, not free.
@@ -636,7 +616,6 @@ func (c *Core) ExecuteTaskAt(ctx context.Context, req TaskRequest, snap Dispatch
 			Gen:                snap.ConnectGen,
 		}, nil
 
-	// --- adapter-only kinds ---
 	case TaskKindFlashTick,
 		TaskKindEmitNavigate,
 		TaskKindEmitAPIError,
@@ -685,19 +664,18 @@ func (c *Core) availabilityFromResourceCache() (
 	issueTruncated = make(map[string]bool)
 	issueKnown = make(map[string]bool)
 	for rt, tr := range all {
-		// C6a: the type's population is its authoritative total, which may
+		// The type's population is its authoritative total, which may
 		// exceed the rows in hand (a counts-only observation never touches
-		// Rows). Reporting row depth here is what let a valid count:55 file
-		// be re-saved as 50.
+		// Rows).
 		entries[rt] = max(tr.TotalCount, len(tr.Rows))
-		// C5: a nil Pagination means this entry's truncation state was never
-		// observed (e.g. a partial/legacy cache write) — treat as unknown,
+		// A nil Pagination means this entry's truncation state was never
+		// observed (e.g. a partial cache write) — treat as unknown,
 		// which must NOT be conflated with a genuine "not truncated"
 		// observation. Unknown truncation is conservatively truncated so a
 		// downstream Exact-count derivation (SaveAvailabilityCache) never
-		// promotes an unobserved page-1-shaped count to Exact (the
-		// false-exact half of D14: a false Exact=true would downgrade a real
-		// exact 55 to a false exact 50 and drop the stored Rows).
+		// promotes an unobserved page-1-shaped count to Exact (a false
+		// Exact=true would downgrade a real exact 55 to a false exact 50 and
+		// drop the stored Rows).
 		isTrunc := tr.Pagination == nil || tr.Pagination.IsTruncated
 		if isTrunc {
 			truncated[rt] = true
@@ -738,7 +716,7 @@ func (c *Core) typeIssueBadge(rt string, rows []resource.Resource, pageTruncated
 // saveProbeResourcesToTypeFiles persists probeResources — a snapshot (or, for
 // a nil-Payload dispatch, a live read) of the availability sweep's (and
 // Wave-2 enrichment's) retained per-type rows, findings included — to each
-// type's on-disk file via SaveResourceListCache. Per C7/C8: this is the
+// type's on-disk file via SaveResourceListCache. This is the
 // sweep-completion counterpart to app.Controller.maybeSaveResourceListCache,
 // which only runs when a list screen has been opened; this path lets that
 // same per-type persistence happen from a background sweep alone, so a
@@ -753,7 +731,7 @@ func (c *Core) typeIssueBadge(rt string, rows []resource.Resource, pageTruncated
 // best-effort posture.
 //
 // wave2Answered names the types whose rows carry a fresh Wave-2 answer
-// (C6b). For those the write supersedes carried Wave-2 data wholesale, so a
+// For those the write supersedes carried Wave-2 data wholesale, so a
 // healed or resolved issue clears. Every other type — the whole map is empty
 // for the Wave-1 sweep-completion save, and a type whose enrichment probe
 // failed is absent from it — is a bare rows-carrying observation that must
@@ -822,7 +800,7 @@ func cacheStoreToEvent(store *cache.Store) messages.AvailabilityCacheLoaded {
 		// A completely zero-value TypeFile (never Put with any real
 		// probe/fetch data — HasResources false, Count 0, no issues known, no
 		// rows) carries no observation to report. Excluding it here follows
-		// C1's "never 0" placeholder rule: a genuinely-observed empty type still reports
+		// the "never 0" placeholder rule: a genuinely-observed empty type still reports
 		// Count=0 through this same path, but only once something has
 		// actually Put it (HasResources/Count/Exact/IssuesKnown/Rows all zero
 		// at once is the "nothing was ever recorded" signature). An Exact
@@ -938,7 +916,7 @@ func RunRelatedDef(ctx context.Context, op DetailOperation, cacheSnap resource.R
 				fr, err := pf(checkCtx, op.Clients, "")
 				switch {
 				case err == nil || len(fr.Resources) > 0:
-					// E5 partial success: rows may arrive alongside a composite
+					// Partial success: rows may arrive alongside a composite
 					// error (listed-but-denied resources). Seed whatever rows
 					// came — a partially-visible target cache beats an unknown
 					// "?" row.

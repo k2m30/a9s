@@ -40,7 +40,6 @@ func FetchCallerIdentity(ctx context.Context, stsClient STSGetCallerIdentityAPI,
 
 	parseARN(id)
 
-	// Best-effort account alias lookup
 	if iamClient != nil {
 		aliasOut, aliasErr := iamClient.ListAccountAliases(ctx, &iam.ListAccountAliasesInput{})
 		if aliasErr == nil && aliasOut != nil && len(aliasOut.AccountAliases) > 0 {

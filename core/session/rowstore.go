@@ -8,14 +8,10 @@
 // seed, top-level fetch, or a sparse FetchByIDs drill) — see Origin/Partial
 // below for how that entry distinguishes those roles.
 //
-// Semantics mirror the two in-memory reconciliation rules that already exist
-// independently for the per-screen ListState (core/app/list_body.go:
-// dedupAgainstExisting) and the on-disk TypeFile
-// (core/runtime/probes.go: reconcileTypeFile, rowIDsAreSubset) so a
-// future caller can safely retire either without behavior drift. RowStore
-// does not implement C6b Wave-2 carry — that remains reconcileTypeFile's
-// concern at the disk chokepoint; a bare Observe/Amend here never inspects
-// Finding.Source prefixes.
+// Semantics mirror the reconciliation rules for the per-screen ListState
+// (core/app/list_body.go: dedupAgainstExisting) and the on-disk TypeFile
+// (core/runtime/probes.go: reconcileTypeFile, rowIDsAreSubset). Wave-2
+// finding carry is reconcileTypeFile's concern at the disk chokepoint.
 package session
 
 import (
@@ -32,8 +28,8 @@ import (
 type Origin int
 
 const (
-	// OriginDisk marks rows seeded from the on-disk per-type cache file (C1:
-	// cached content renders before any AWS activity). A Disk-origin
+	// OriginDisk marks rows seeded from the on-disk per-type cache file
+	// (cached content renders before any AWS activity). A Disk-origin
 	// observation is rejected when it would overwrite rows already carrying
 	// Probe or Fetch origin — a stale disk seed arriving after a live result
 	// has already landed must not regress the session's live knowledge.
@@ -64,10 +60,10 @@ type TypeRows struct {
 	Rows []resource.Resource
 	// Pagination is the most recent pagination state observed for this type's
 	// canonical list. nil means unknown (conservatively treated as truncated
-	// by callers per C5 — nil pagination is never exact).
+	// by callers — nil pagination is never exact).
 	Pagination *resource.PaginationMeta
 	// TotalCount is the authoritative total known for this type, which may
-	// exceed len(Rows) (C6a: a counts-only observation updates TotalCount
+	// exceed len(Rows) (a counts-only observation updates TotalCount
 	// without touching Rows).
 	TotalCount int
 	// Origin records which lane most recently accepted a rows-carrying
@@ -106,8 +102,8 @@ type TypeRows struct {
 }
 
 // Population is how many resources the session knows this type has: its
-// TotalCount, which is authoritative and may exceed the rows retained (C6a —
-// a counts-only observation never touches Rows), or the row depth when that
+// TotalCount, which is authoritative and may exceed the rows retained (a
+// counts-only observation never touches Rows), or the row depth when that
 // is larger. The in-memory counterpart of cache.TypeFile.Population, so a
 // seed built from the session and one built from the file cannot disagree
 // about how big the type is.
@@ -217,16 +213,12 @@ func cloneRows(rows []resource.Resource) []resource.Resource {
 // with populated Fields maps is cloned and then immediately discarded) for a
 // clone nothing keeps.
 //
-// Every row set the store hands BACK is likewise a deep copy — with one
-// exception that costs nothing to state and saved the largest thing left on
-// the controller lock: an accepted REPLACE returns the caller's own slice
-// verbatim. The rows it accepted are the rows the caller passed, the store
-// kept its own deep clone of them a few lines above, and the two arrays are
-// already independent — so cloning here produced a third copy of the same
-// content for a caller that already had one. A 6000-row list result paid that
-// clone on the controller lock every time it landed. Append and the rejection
-// gates still clone: what they return comes out of the store, not out of the
-// caller's hand.
+// Every row set the store hands BACK is likewise a deep copy, except an
+// accepted REPLACE, which returns the caller's own slice verbatim: the store
+// kept its own deep clone of those rows, the two arrays are independent, and
+// a third copy would cost a per-row allocation on the controller lock for a
+// caller that already has the content. Append and the rejection gates clone:
+// what they return comes out of the store, not out of the caller's hand.
 //
 // Semantics, applied in order:
 //
@@ -252,7 +244,7 @@ func cloneRows(rows []resource.Resource) []resource.Resource {
 //     of two accepted results is older would only disagree with it.
 //  4. TotalCount shrink guard (applies to both append and replace): a
 //     non-exact incoming pagination (IsTruncated=true, or nil — nil is never
-//     exact per C5/D14) only ever RAISES TotalCount to at least len(newRows);
+//     exact) only ever RAISES TotalCount to at least len(newRows);
 //     it never shrinks a wider TotalCount already known (e.g. seeded by an
 //     earlier ObserveCount or a wider prior Observe), since a truncated page
 //     explicitly does not claim to be the whole list. Only an EXACT
@@ -293,7 +285,7 @@ func (s *RowStore) Observe(canon string, rows []resource.Resource, pagination *r
 		newRows = rows
 	}
 
-	// TotalCount shrink guard: nil pagination is never exact (C5/D14), and an
+	// TotalCount shrink guard: nil pagination is never exact, and an
 	// IsTruncated=true page explicitly does not claim to be the whole list —
 	// neither is authoritative proof the total shrank, so both only ever
 	// raise TotalCount to at least len(newRows), never below the existing
@@ -326,7 +318,7 @@ func (s *RowStore) Observe(canon string, rows []resource.Resource, pagination *r
 	return cloneRows(next.Rows), next.Gen
 }
 
-// ObserveCount applies a counts-only observation for canon (C6a: a
+// ObserveCount applies a counts-only observation for canon (a
 // counts-only observation — e.g. the availability-sweep-to-menu sync-back,
 // or a disk-cache-loaded seed with no per-type disk row data — updates
 // TotalCount only and never touches Rows, even when this leaves TotalCount
@@ -474,9 +466,9 @@ func (s *RowStore) SnapshotMeta(canon string) (domain.Gen, bool) {
 
 // SnapshotAll returns a snapshot of every retained type's TypeRows, keyed by
 // canonical short name. When includePartial is false, types whose current
-// entry is Partial-only are omitted — mirrors the target design's "canonical
-// seeds/enrich/saves never see Partial data" scope boundary (C6 scope:
-// Partial/lazy entries must never poison a type's canonical persisted list).
+// entry is Partial-only are omitted — canonical seeds, enrichment and saves
+// never see Partial data, so a lazy entry cannot poison a type's canonical
+// persisted list.
 // The returned map and each TypeRows.Rows slice are defensive copies (same
 // immunity as Snapshot).
 func (s *RowStore) SnapshotAll(includePartial bool) map[string]TypeRows {
@@ -507,7 +499,7 @@ func (s *RowStore) Delete(canon string) {
 	delete(s.types, canon)
 }
 
-// Clear drops every retained type entry. Called from Session.Rotate (C9:
+// Clear drops every retained type entry. Called from Session.Rotate (a
 // pair switch discards in-memory state atomically) so a stale pair's rows
 // can never leak into the next session.
 func (s *RowStore) Clear() {

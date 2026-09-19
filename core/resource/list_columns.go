@@ -16,14 +16,6 @@ import (
 // widths, because that file is the thing an operator edits. The CATALOG owns
 // what each cell reads: its Key is merged onto every title both declare.
 //
-// It was two paths. A loaded file came back verbatim, so the catalog's Key was
-// dropped for anyone who had ever started a9s (EnsureViewsDir writes those
-// files, and internal/tui/app.go falls back to config.SharedDefaultConfig()
-// when it finds none), while a nil config got the merged set. The demo bench
-// and the account an operator actually looks at therefore resolved cells by
-// different rules, and a cell could be right on the bench acceptance reviews
-// and wrong on every screen — which is what cb's Source Type was.
-//
 // The only resolver of the column-set cascade. core/app's
 // resolveListColumnsForBuild (session-view-config-aware, used for rendering,
 // for the sort comparator and for the cache-save projection) and
@@ -45,7 +37,7 @@ func ResolveListColumnCascade(vc *config.ViewsConfig, typeName string, td *Resou
 	// says about that very column.
 
 	// No view declares this type at all — a type registered by a test is the
-	// only such case left — so the catalog is the whole declaration and there
+	// only such case — so the catalog is the whole declaration and there
 	// is nothing to merge onto it. It goes through the SAME translation the
 	// built-in views are derived from, so a type the catalog registers and one
 	// a test registers resolve their columns by one rule; building the columns

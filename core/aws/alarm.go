@@ -86,7 +86,6 @@ func FetchCloudWatchAlarmsPage(ctx context.Context, api CloudWatchDescribeAlarms
 		resources = append(resources, r)
 	}
 
-	// Build pagination metadata
 	nextToken := ""
 	isTruncated := false
 	if output.NextToken != nil {

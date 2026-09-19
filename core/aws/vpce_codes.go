@@ -19,5 +19,5 @@ const (
 	CodeVPCEPolicyOpen domain.FindingCode = "vpce.policy-open"
 )
 
-// VPCEPolicyOpenPhrase is the S4 status phrase for CodeVPCEPolicyOpen.
+// VPCEPolicyOpenPhrase is the status phrase for CodeVPCEPolicyOpen.
 const VPCEPolicyOpenPhrase = "endpoint policy open to anyone"

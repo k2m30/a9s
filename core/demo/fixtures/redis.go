@@ -36,8 +36,6 @@ const (
 	ProdRedisMemberClusterID = "prod-redis-sessions-001"
 
 	// ProdRedisMemberClusterARN is the ARN of the primary member CacheCluster.
-	// checkRedisCFN calls ListTagsForResource on this ARN (the CacheCluster ARN, not the RG ARN),
-	// so the TagLists map must carry an entry keyed on this value.
 	ProdRedisMemberClusterARN = "arn:aws:elasticache:us-east-1:123456789012:cluster:prod-redis-sessions-001"
 
 	// ProdRedisSGID is the security group attached to the primary member cluster.
@@ -83,18 +81,17 @@ const (
 	// ProdRedisSubnetGroup is the CacheSubnetGroup name for the graph-root RG.
 	ProdRedisSubnetGroup = "prod-redis-subnet-group"
 
-	// WarnRedisMultiID is the ReplicationGroupId of the multi-W1 fixture (U7a).
+	// WarnRedisMultiID is the ReplicationGroupId of the multi-W1 fixture.
 	WarnRedisMultiID = "legacy-redis-billing"
 
 	// ValkeyEngineID is the ReplicationGroupId of the Valkey fixture.
-	// Used as a regression pin to verify the engine filter correctly excludes
-	// non-Redis engines from the redis fetcher (P2-1).
+	// The redis fetcher's engine filter excludes it from the redis list.
 	ValkeyEngineID = "prod-valkey"
 
 	// MultiShardHealthyID is the ReplicationGroupId of the multi-shard healthy fixture.
 	// ClusterEnabled=true, 3 NodeGroups all available.
 	// Carries full graph-connectivity tags matching the prod-redis-sessions fixture
-	// so related-pivot scenario tests can exercise multi-shard groups.
+	// so related pivots resolve on a multi-shard group.
 	MultiShardHealthyID = "multi-shard-healthy"
 
 	// MultiShardOneModifyingID is the ReplicationGroupId of the multi-shard one-modifying fixture.
@@ -108,7 +105,7 @@ const (
 	// Value kept short (≤ 27 chars) so the rendered Cluster ID column does not truncate.
 	MultiShardTwoTransitioningID = "multi-shard-2-transitioning"
 
-	// One witness per redis security-posture finding. Every other replication
+	// One carrier per redis security-posture finding. Every other replication
 	// group is normalized to the healthy value for all four.
 
 	// RedisAtRestOff stores its data unencrypted.
@@ -142,8 +139,8 @@ type RedisFixtures struct {
 }
 
 // NewRedisFixtures constructs a fully-populated RedisFixtures instance.
-// Fixtures cover every §3.1 signal from docs/resources/redis.md plus the
-// multi-W1 case (U7a). The graph-root (prod-redis-sessions) carries matching
+// Fixtures cover every signal in docs/resources/redis.md plus the
+// multi-W1 case. The graph-root (prod-redis-sessions) carries matching
 // sibling entries for all 10 registered related-panel pivots.
 var sharedRedisFixtures = sync.OnceValue(func() *RedisFixtures {
 	groups := normalizeRedisPosture(buildRedisReplicationGroups())
@@ -159,12 +156,8 @@ func NewRedisFixtures() *RedisFixtures {
 	return sharedRedisFixtures()
 }
 
-// ---------------------------------------------------------------------------
-// ReplicationGroups
-// ---------------------------------------------------------------------------
-
-// normalizeRedisPosture forces every replication group except the row that
-// witnesses a given posture finding to that finding's healthy value, so
+// normalizeRedisPosture forces every replication group except the one that
+// carries a given posture finding to that finding's healthy value, so
 // exactly one demo row carries each.
 func normalizeRedisPosture(rgs []elasticachetypes.ReplicationGroup) []elasticachetypes.ReplicationGroup {
 	out := make([]elasticachetypes.ReplicationGroup, len(rgs))
@@ -178,7 +171,7 @@ func normalizeRedisPosture(rgs []elasticachetypes.ReplicationGroup) []elasticach
 			out[i].TransitEncryptionEnabled = aws.Bool(true)
 		}
 		// AUTH is only reportable when in-transit encryption is on, so the
-		// in-transit witness legitimately carries no AUTH token either.
+		// in-transit-off group legitimately carries no AUTH token either.
 		if id != RedisNoAuth && id != RedisTransitOff {
 			out[i].AuthTokenEnabled = aws.Bool(true)
 		}
@@ -231,9 +224,9 @@ func buildRedisReplicationGroups() []elasticachetypes.ReplicationGroup {
 		redisPostureWitness(RedisNoBackup, "Unbacked-up Redis", func(rg *elasticachetypes.ReplicationGroup) {
 			rg.SnapshotRetentionLimit = aws.Int32(0)
 		}),
-		// GRAPH ROOT — every §2 related pivot resolves non-zero here.
+		// GRAPH ROOT — every related pivot resolves non-zero here.
 		// Healthy: Status=available, MultiAZ=enabled, AutomaticFailover=enabled.
-		// Expected Fields["status"] == "" (Healthy silence per §4).
+		// Expected Fields["status"] == "" (Healthy silence).
 		{
 			ReplicationGroupId:       aws.String(ProdRedisID),
 			Description:              aws.String("Prod sessions Redis"),
@@ -270,7 +263,7 @@ func buildRedisReplicationGroups() []elasticachetypes.ReplicationGroup {
 		},
 
 		// Healthy, single-AZ — Status=available, MultiAZ=disabled, AutomaticFailover=disabled.
-		// Single-AZ groups do not trigger multi-AZ-without-auto-failover finding (§4 note).
+		// Single-AZ groups do not trigger multi-AZ-without-auto-failover finding.
 		// Expected Fields["status"] == "".
 		{
 			ReplicationGroupId:       aws.String("staging-redis"),
@@ -310,7 +303,7 @@ func buildRedisReplicationGroups() []elasticachetypes.ReplicationGroup {
 			SnapshotRetentionLimit:   aws.Int32(0),
 		},
 
-		// Healthy, and the witness for the subnet/vpc pivots' proven zero: its
+		// Healthy, and the subnet/vpc pivots resolve a proven zero on it: its
 		// member cluster names no subnet group, so there is none to resolve.
 		{
 			ReplicationGroupId:       aws.String(RedisNoSubnetGroupID),
@@ -432,8 +425,8 @@ func buildRedisReplicationGroups() []elasticachetypes.ReplicationGroup {
 			SnapshotRetentionLimit: aws.Int32(1),
 		},
 
-		// Multi-W1 fixture (U7a): Status=modifying + multi-AZ without auto-failover.
-		// Two coexisting §3.1 Warnings in the same row.
+		// Multi-W1 fixture: Status=modifying + multi-AZ without auto-failover.
+		// Two coexisting Warnings in the same row.
 		// Expected Fields["status"] == "modifying — config change (+1)".
 		// Expected Findings (wave1) phrases == ["modifying — config change", "multi-AZ without auto-failover"].
 		{
@@ -456,8 +449,8 @@ func buildRedisReplicationGroups() []elasticachetypes.ReplicationGroup {
 			SnapshotRetentionLimit: aws.Int32(1),
 		},
 
-		// Valkey fixture — Engine="valkey", exists solely to prove the engine filter
-		// (P2-1) excludes non-Redis engines. Must NOT appear in the redis resource list.
+		// Valkey fixture — Engine="valkey"; the engine filter
+		// excludes non-Redis engines, so it must NOT appear in the redis resource list.
 		{
 			ReplicationGroupId: aws.String(ValkeyEngineID),
 			Description:        aws.String("Prod Valkey (should be filtered out by redis fetcher)"),
@@ -477,7 +470,7 @@ func buildRedisReplicationGroups() []elasticachetypes.ReplicationGroup {
 
 		// Multi-shard healthy — ClusterEnabled=true, 3 NodeGroups all available.
 		// Graph-connectivity fixture: carries the same tag set as prod-redis-sessions
-		// so related-pivot scenario tests can exercise multi-shard groups.
+		// so related pivots resolve on a multi-shard group.
 		// Expected Fields["status"] == "" (Healthy silence).
 		{
 			ReplicationGroupId: aws.String(MultiShardHealthyID),
@@ -711,10 +704,6 @@ func buildRedisReplicationGroups() []elasticachetypes.ReplicationGroup {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// CacheClusters
-// ---------------------------------------------------------------------------
-
 // withRedisMemberClusters appends the member cluster every replication group
 // names but the hand-written list above does not define.
 //
@@ -857,10 +846,6 @@ func buildRedisCacheClusters() []elasticachetypes.CacheCluster {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// CacheSubnetGroups
-// ---------------------------------------------------------------------------
-
 func buildRedisCacheSubnetGroups() []elasticachetypes.CacheSubnetGroup {
 	return []elasticachetypes.CacheSubnetGroup{
 		{
@@ -886,10 +871,6 @@ func buildRedisCacheSubnetGroups() []elasticachetypes.CacheSubnetGroup {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// TagLists
-// ---------------------------------------------------------------------------
-
 // buildRedisTagLists returns per-ARN tag lists returned by ListTagsForResource.
 // The graph-root ARN carries the aws:cloudformation:stack-name tag so the cfn
 // related checker resolves the matching stack in cfn.go.
@@ -909,14 +890,12 @@ func buildRedisTagLists() map[string][]elasticachetypes.Tag {
 		},
 	}
 	return map[string][]elasticachetypes.Tag{
-		// RG ARN — checkRedisCFN (post-spec-rewrite) calls
-		// ListTagsForResource(ResourceName=rg.ARN) per docs/resources/redis.md §2
+		// RG ARN — checkRedisCFN calls
+		// ListTagsForResource(ResourceName=rg.ARN), per docs/resources/redis.md
 		// (cfn pivot discovery reads the AWS-managed tag off the replication group,
-		// not the member cluster). This is the entry the demo actually resolves.
+		// not the member cluster).
 		ProdRedisARN: cfnTag,
-		// Member cluster ARN — retained for backward compatibility with any
-		// fake / test that still expects the tag on the CacheCluster ARN. Not
-		// the primary path.
+		// The member cluster carries the same stack tag.
 		ProdRedisMemberClusterARN: cfnTag,
 	}
 }
@@ -924,7 +903,6 @@ func buildRedisTagLists() map[string][]elasticachetypes.Tag {
 func init() {
 	// dim: colorRedis (core/aws/catalog_databases.go) has no Dim branch, and a
 	// torn-down replication group stops appearing in DescribeReplicationGroups
-	// rather than reporting a deleted status — see docs/resources/redis.md
-	// §3.1/§3.2/§5 and the Bug 4 pin in aws_classifier_fivepack_test.go.
+	// rather than reporting a deleted status (docs/resources/redis.md).
 	Register(Pin{ShortName: "redis", Rows: 17, Issues: 13, CoverageGaps: []string{"dim"}})
 }

@@ -37,7 +37,6 @@ func FetchEcsSvcLogs(
 	cluster, serviceName, taskDefinition string,
 	continuationToken string,
 ) (resource.FetchResult, error) {
-	// Step 1: DescribeTaskDefinition to get log configuration
 	tdOutput, err := taskDefAPI.DescribeTaskDefinition(ctx, &ecs.DescribeTaskDefinitionInput{
 		TaskDefinition: &taskDefinition,
 	})
@@ -49,7 +48,6 @@ func FetchEcsSvcLogs(
 		return resource.FetchResult{}, fmt.Errorf("no containers in task definition for %s", serviceName)
 	}
 
-	// Find the first container with awslogs driver
 	var logGroup string
 	var found bool
 
@@ -69,7 +67,6 @@ func FetchEcsSvcLogs(
 		return resource.FetchResult{}, fmt.Errorf("no container with awslogs log driver in task definition for %s", serviceName)
 	}
 
-	// Step 2: FilterLogEvents on the extracted log group
 	var resources []resource.Resource
 	var nextToken *string
 	if continuationToken != "" {

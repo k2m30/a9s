@@ -37,14 +37,13 @@ type wafMergedCursor struct {
 // this fetcher, via strictDecodeCursor. An empty token legitimately means
 // "first page" and returns the zero cursor. A token that fails the
 // underlying json.Decode outright (strictDecodeCursor's decodeErr) is a bare
-// REGIONAL NextMarker — the pre-existing external format for the common
+// REGIONAL NextMarker — the external format for the common
 // case where CLOUDFRONT needed no resuming (folded in once on page 1 and
 // never touched again), round-tripped by the caller with no wrapping — and
 // is treated as "resume REGIONAL from this marker, CLOUDFRONT already
 // done". A token that DOES decode as JSON but fails strictDecodeCursor's
-// other checks — unknown fields, trailing bytes after the JSON value (a
-// syntactically valid prefix followed by garbage no longer slips through
-// unnoticed), or a decode that lands on the exact zero value (encode()
+// other checks — unknown fields, trailing bytes after the JSON value, or a
+// decode that lands on the exact zero value (encode()
 // never itself produces one, since a token is only ever encoded when there
 // is real state — a non-empty next-token or a Done flag — to resume from)
 // — has no legitimate origin other than this same encoder, so it is
@@ -139,7 +138,7 @@ func FetchWAFWebACLsPageWithCloudFront(ctx context.Context, api WAFv2ListWebACLs
 	case cfDone:
 		// CLOUDFRONT needs no more resuming: round-trip the bare REGIONAL
 		// marker directly, matching decodeWAFMergedCursor's bare-marker
-		// fallback and the pre-existing external format for this common
+		// fallback, the external format for this common
 		// case.
 		nextToken = regionalNext
 	default:
@@ -242,8 +241,7 @@ func fetchWAFWebACLsScopePage(ctx context.Context, api WAFv2ListWebACLsAPI, scop
 	// same nil-or-empty contract every AWS-generated paginator in this SDK
 	// enforces (wafv2 ListWebACLs has no generated paginator of its own to
 	// inherit it from). Read by both the caller's own load-more pagination
-	// (REGIONAL scope) and the CLOUDFRONT full-walk loop above, so fixing it
-	// here fixes both call sites at once.
+	// (REGIONAL scope) and the CLOUDFRONT full-walk loop above.
 	nextToken := ""
 	isTruncated := false
 	if output.NextMarker != nil && *output.NextMarker != "" {

@@ -197,13 +197,13 @@ func TestPolicyStore_ClearIdempotent(t *testing.T) {
 
 	fresh := session.NewPolicyStore()
 	fresh.Clear()
-	fresh.Clear() // must not panic
+	fresh.Clear()
 
 	populated := session.NewPolicyStore()
 	populated.Set("k", resource.Resource{ID: "k"})
 	populated.MarkManagedBuilt()
 	populated.Clear()
-	populated.Clear() // must not panic
+	populated.Clear()
 }
 
 // TestPolicyStore_ConcurrentSetLookup verifies race-free concurrent access:
@@ -282,7 +282,6 @@ func TestPolicyStore_PartialFailureContract_InlineBuiltStaysFalseOnError(t *test
 
 	store := session.NewPolicyStore()
 
-	// Phase 1 completes successfully.
 	managed := resource.Resource{ID: "arn:aws:iam::123456789012:policy/Managed", Name: "Managed"}
 	store.Set("Managed", managed)
 	store.Set("arn:aws:iam::123456789012:policy/Managed", managed)
@@ -292,12 +291,9 @@ func TestPolicyStore_PartialFailureContract_InlineBuiltStaysFalseOnError(t *test
 		t.Fatal("expected ManagedBuilt=true after phase 1")
 	}
 
-	// Phase 2 partial failure: some inline entries are written but the build
-	// aborts before completion — MarkInlineBuilt is intentionally NOT called.
 	partial := resource.Resource{ID: "arn:aws:iam::123456789012:policy/InlinePartial", Name: "InlinePartial"}
 	store.Set("InlinePartial", partial)
 
-	// Contract: InlineBuilt must remain false so callers know to retry phase 2.
 	if store.InlineBuilt() {
 		t.Error("InlineBuilt must be false when inline build did not complete — production must retry")
 	}

@@ -41,7 +41,7 @@ func TestFillPhraseSubstitutesEachSlotOnce(t *testing.T) {
 	}
 }
 
-// TestFindingSlotRefusesAnEmptyValue pins spec row 2 (task aws3): a slot
+// TestFindingSlotRefusesAnEmptyValue: a slot
 // filled with an empty value renders a sentence with a hole in it
 // ("failed: "). The filler refuses it rather than each emitter guarding.
 func TestFindingSlotRefusesAnEmptyValue(t *testing.T) {
@@ -53,23 +53,20 @@ func TestFindingSlotRefusesAnEmptyValue(t *testing.T) {
 	fillPhrase("failed: <error>", "")
 }
 
-// TestSlotPluralsComeFromTheDeclaration pins spec row 3 (task aws3): number
+// TestSlotPluralsComeFromTheDeclaration: number
 // agreement is the filler's, read off the declared phrase, so an emit site
 // passes the number or the list and never a noun it inflected itself.
 func TestSlotPluralsComeFromTheDeclaration(t *testing.T) {
 	for _, tc := range []struct{ phrase, value, want string }{
-		// A counted noun: the value is the count.
 		{"expires in <N day(s)>", "1", "expires in 1 day"},
 		{"expires in <N day(s)>", "2", "expires in 2 days"},
 		{"expires in <N day(s)>", "0", "expires in 0 days"},
 		{"<N job(s)> failed", "1", "1 job failed"},
 		{"<N job(s)> failed", "3", "3 jobs failed"},
-		// A listed noun: the value is the list, and its length agrees.
 		{"<port(s) LIST> in the clear", "80", "port 80 in the clear"},
 		{"<port(s) LIST> in the clear", "80, 8080", "ports 80, 8080 in the clear"},
 		{"weak TLS policy on <port(s) LIST>", "443", "weak TLS policy on port 443"},
 		{"weak TLS policy on <port(s) LIST>", "443, 8443", "weak TLS policy on ports 443, 8443"},
-		// A slot with neither token is the whole value, unchanged.
 		{"failed: <error>", "AccessDenied", "failed: AccessDenied"},
 		{"<N> of <M> unhealthy", "2", "2 of <M> unhealthy"},
 	} {
@@ -79,7 +76,7 @@ func TestSlotPluralsComeFromTheDeclaration(t *testing.T) {
 	}
 }
 
-// TestSlotWithAnAgreeingNounNeverEatsItsValue pins what a probe found: a slot
+// TestSlotWithAnAgreeingNounNeverEatsItsValue: a slot
 // that marks a noun for agreement but names no token for the value has no
 // place to put it, and the value would vanish into the inflected noun
 // ("<port(s)>" with "80" rendering "ports"). The value is what the reader is
@@ -120,10 +117,9 @@ func TestEveryAgreeingSlotNamesItsToken(t *testing.T) {
 	}
 }
 
-// TestDeclaredPhrasesCarryNoBareCountedNoun pins the other half of row 3: a
+// TestDeclaredPhrasesCarryNoBareCountedNoun: a
 // declaration that puts a bare plural noun next to a count slot cannot agree,
-// so the emit site would have to. Scanning the registered wordings is what
-// keeps the rule from being re-broken by the next declaration.
+// so the emit site would have to.
 func TestDeclaredPhrasesCarryNoBareCountedNoun(t *testing.T) {
 	for _, td := range catalog.All() {
 		for _, def := range td.Findings {

@@ -79,7 +79,6 @@ func EnrichEBSVolumeStatus(ctx context.Context, clients *ServiceClients, resourc
 		rows := []domain.DetailRow{
 			{Label: "I/O State", Value: ioState, Tier: "!"},
 		}
-		// Most recent event (if any).
 		if len(v.Events) > 0 {
 			ev := v.Events[0]
 			eventVal := ""
@@ -93,7 +92,6 @@ func EnrichEBSVolumeStatus(ctx context.Context, clients *ServiceClients, resourc
 				rows = append(rows, domain.DetailRow{Label: "Event", Value: eventVal, Tier: "~"})
 			}
 		}
-		// Most recent action code (if any).
 		if len(v.Actions) > 0 {
 			ac := v.Actions[0]
 			if ac.Code != nil && *ac.Code != "" {
@@ -125,7 +123,7 @@ func ebsVolumeARN(r resource.Resource, region, account string) string {
 }
 
 // ebsVolumeTags reads the volume's own tags, which a backup selection may
-// choose it by. ebs is the only type in this batch whose row carries them.
+// choose it by.
 //
 // They live on RawStruct, which the disk cache does not persist, so a row
 // replayed from disk has no tags to read. The second return says whether they

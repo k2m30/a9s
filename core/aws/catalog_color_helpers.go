@@ -49,10 +49,8 @@ func colorFromFindings(findings []domain.Finding) domain.Color {
 
 // colorAnyFindingOrHealthy classifies r from colorFromAnyFinding, defaulting
 // to healthy when no Finding is present. Shared by the mwaa/transfer/vpc-peer/
-// lt catalog entries: every signal on these types is color-bearing — no
-// glyph-on-green case exists (docs/resources/mwaa.md §4, transfer.md §4,
-// vpc-peer.md §4, lt.md §4) — and real fetched resources always carry a
-// Finding when off-Healthy, so there is no raw-field fallback to keep.
+// lt catalog entries: every signal on these types is color-bearing, and real
+// fetched resources always carry a Finding when off-Healthy.
 func colorAnyFindingOrHealthy(r domain.Resource) domain.Color {
 	if c, ok := colorFromAnyFinding(r); ok {
 		return c

@@ -32,17 +32,13 @@ const sgCodeDangerousPorts domain.FindingCode = "sg.ingress.dangerous-ports"
 // resources nobody chose to put there.
 const sgCodeDefaultWithRules domain.FindingCode = "sg.default-with-rules"
 
-// sgDefaultWithRulesPhrase is the S4 status phrase for sgCodeDefaultWithRules.
+// sgDefaultWithRulesPhrase is the status phrase for sgCodeDefaultWithRules.
 const sgDefaultWithRulesPhrase = "default group allows traffic"
 
 // sensitivePorts is the set of ports that are considered security-sensitive
 // when exposed to the internet (0.0.0.0/0 or ::/0). Single source: both the
 // finding and the risk_summary display phrase enumerate this map, so a port
 // added here is exposed on every surface at once.
-//
-// 8080 and 8443 are deliberately absent: they front ordinary public HTTP(S)
-// applications far more often than anything worth paging on, and adding them
-// turns the signal into noise.
 var sensitivePorts = map[int32]bool{
 	20:    true, // FTP data
 	21:    true, // FTP control
@@ -109,7 +105,7 @@ func isInternetFacing(p ec2types.IpPermission) bool {
 // computeSGRiskFields inspects the ingress rules of a security group and
 // returns (dangerous_open_count, wide_open, open_ports). All three are machine
 // fields: the ec2 internet-exposure signal reads wide_open and open_ports
-// through the sg cache, and no consumer reads a rendered sentence.
+// through the sg cache.
 //
 // open_ports is the sorted, comma-separated list of sensitive ports the group
 // leaves open to the internet, empty when it leaves none. A wide-open group
@@ -131,7 +127,6 @@ func computeSGRiskFields(perms []ec2types.IpPermission) (string, string, string)
 		}
 		if coversSensitivePort(p) {
 			dangerousCount++
-			// Capture the specific port(s) covered.
 			if p.FromPort != nil && p.ToPort != nil {
 				from, to := *p.FromPort, *p.ToPort
 				// Always enumerate the dangerous ports that fall inside [from, to].
@@ -229,25 +224,21 @@ func FetchSecurityGroupsPage(ctx context.Context, api EC2DescribeSecurityGroupsA
 
 	var resources []resource.Resource
 	for _, sg := range output.SecurityGroups {
-		// Extract GroupId
 		groupID := ""
 		if sg.GroupId != nil {
 			groupID = *sg.GroupId
 		}
 
-		// Extract GroupName
 		groupName := ""
 		if sg.GroupName != nil {
 			groupName = *sg.GroupName
 		}
 
-		// Extract VpcId
 		vpcID := ""
 		if sg.VpcId != nil {
 			vpcID = *sg.VpcId
 		}
 
-		// Extract Description
 		description := ""
 		if sg.Description != nil {
 			description = *sg.Description
@@ -293,7 +284,6 @@ func FetchSecurityGroupsPage(ctx context.Context, api EC2DescribeSecurityGroupsA
 		resources = append(resources, r)
 	}
 
-	// Build pagination metadata
 	nextToken := ""
 	isTruncated := false
 	if output.NextToken != nil {

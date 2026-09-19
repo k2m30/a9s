@@ -16,7 +16,6 @@ import (
 )
 
 // checkASGSubnets parses VPCZoneIdentifier (comma-separated subnet IDs) from the ASG.
-// Pattern F — no cache needed.
 func checkASGSubnets(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	asg, ok := assertStruct[asgtypes.AutoScalingGroup](res.RawStruct)
 	if !ok {
@@ -40,7 +39,6 @@ func checkASGSubnets(_ context.Context, _ any, res resource.Resource, _ resource
 }
 
 // checkASGTG checks the cache for target groups referencing this ASG via TargetGroupARNs.
-// Pattern C: ASG RawStruct has TargetGroupARNs; match against tg cache by ARN from RawStruct.
 func checkASGTG(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	asg, ok := assertStruct[asgtypes.AutoScalingGroup](res.RawStruct)
 	if !ok {
@@ -90,7 +88,6 @@ func checkASGSG(ctx context.Context, clients any, res resource.Resource, _ resou
 
 	var ids []string
 
-	// Launch configuration path
 	if asg.LaunchConfigurationName != nil && *asg.LaunchConfigurationName != "" {
 		out, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*autoscaling.DescribeLaunchConfigurationsOutput, error) {
 			return c.AutoScaling.DescribeLaunchConfigurations(ctx, &autoscaling.DescribeLaunchConfigurationsInput{
@@ -106,7 +103,6 @@ func checkASGSG(ctx context.Context, clients any, res resource.Resource, _ resou
 		return relatedResult("sg", ids)
 	}
 
-	// Launch template path
 	ltSpec := asg.LaunchTemplate
 	if ltSpec == nil && asg.MixedInstancesPolicy != nil && asg.MixedInstancesPolicy.LaunchTemplate != nil {
 		ltSpec = asg.MixedInstancesPolicy.LaunchTemplate.LaunchTemplateSpecification
@@ -166,7 +162,6 @@ func checkASGSNS(ctx context.Context, clients any, res resource.Resource, _ reso
 
 	var ids []string
 
-	// Notification configurations
 	notifOut, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*autoscaling.DescribeNotificationConfigurationsOutput, error) {
 		return c.AutoScaling.DescribeNotificationConfigurations(ctx, &autoscaling.DescribeNotificationConfigurationsInput{
 			AutoScalingGroupNames: []string{asgName},
@@ -181,7 +176,6 @@ func checkASGSNS(ctx context.Context, clients any, res resource.Resource, _ reso
 		}
 	}
 
-	// Lifecycle hooks
 	hookOut, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*autoscaling.DescribeLifecycleHooksOutput, error) {
 		return c.AutoScaling.DescribeLifecycleHooks(ctx, &autoscaling.DescribeLifecycleHooksInput{
 			AutoScalingGroupName: aws.String(asgName),

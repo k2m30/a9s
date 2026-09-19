@@ -14,7 +14,7 @@ import (
 )
 
 // checkBackupRole resolves the IAM roles used by this plan's selections via
-// a single backup:ListBackupSelections call (Pattern C). Each
+// a single backup:ListBackupSelections call. Each
 // BackupSelectionsListMember exposes IamRoleArn directly — the role the
 // Backup service assumes to protect the selection's resources.
 func checkBackupRole(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
@@ -44,8 +44,8 @@ func checkBackupRole(ctx context.Context, clients any, res resource.Resource, ca
 }
 
 // checkBackupKMS resolves the KMS key(s) encrypting this plan's target
-// vaults via backup:GetBackupPlan → backup:DescribeBackupVault (Pattern C,
-// bounded N+1 where N = unique vaults referenced by plan rules, typically 1).
+// vaults via backup:GetBackupPlan → backup:DescribeBackupVault (bounded
+// N+1 where N = unique vaults referenced by plan rules, typically 1).
 func checkBackupKMS(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	vaults := backupPlanVaults(ctx, clients, res)
 	if vaults == nil {
@@ -79,7 +79,7 @@ func checkBackupKMS(ctx context.Context, clients any, res resource.Resource, cac
 
 // checkBackupSNS resolves the SNS topic(s) configured for this plan's target
 // vaults via backup:GetBackupPlan → backup:GetBackupVaultNotifications
-// (Pattern C, bounded N+1 where N = unique vaults).
+// (bounded N+1 where N = unique vaults).
 func checkBackupSNS(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	vaults := backupPlanVaults(ctx, clients, res)
 	if vaults == nil {

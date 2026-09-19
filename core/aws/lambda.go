@@ -84,7 +84,7 @@ func FetchLambdaFunctionsPage(ctx context.Context, api LambdaListFunctionsAPI, c
 		r := resource.Resource{
 			ID:   functionName,
 			Name: functionName,
-			// Status intentionally unset — lifecycle state is emitted as a Finding.
+			// Lifecycle state goes into Findings.
 			Fields: map[string]string{
 				"function_name":      functionName,
 				"runtime":            runtime,
@@ -132,7 +132,6 @@ func FetchLambdaFunctionsPage(ctx context.Context, api LambdaListFunctionsAPI, c
 		resources = append(resources, r)
 	}
 
-	// Build pagination metadata
 	nextToken := ""
 	isTruncated := false
 	if output.NextMarker != nil {

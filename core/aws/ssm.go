@@ -93,7 +93,6 @@ func FetchSSMParametersPage(ctx context.Context, api SSMDescribeParametersAPI, c
 		resources = append(resources, r)
 	}
 
-	// Build pagination metadata
 	nextToken := ""
 	isTruncated := false
 	if output.NextToken != nil {

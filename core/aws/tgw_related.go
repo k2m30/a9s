@@ -16,8 +16,7 @@ import (
 
 // checkTGWVPC calls ec2:DescribeTransitGatewayVpcAttachments filtered by the
 // TGW id and collects the VpcId of each returned attachment (Pattern A —
-// direct API call). DevOps consensus (5/5 reviewers) agrees this is the
-// canonical API for tgw→vpc.
+// direct API call).
 func checkTGWVPC(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	raw, ok := assertStruct[ec2types.TransitGateway](res.RawStruct)
 	if !ok {

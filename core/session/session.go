@@ -8,8 +8,7 @@
 // Session is held as Session *session.Session on tui.Model. Access sites use
 // m.Session.DetailOpGen etc. directly for scalar fields; every cached
 // resource-list row (top-level fetch, Wave-1 probe, disk seed, or sparse
-// FetchByIDs drill) goes through RowStore (see rowstore.go) rather than a
-// session map — there is no separate ResourceCache/LazyResourceCache field.
+// FetchByIDs drill) goes through RowStore (see rowstore.go).
 //
 // Rules of ownership:
 //
@@ -19,8 +18,7 @@
 //     EnrichmentTypeGen, EnrichmentTruncatedIDs) MUST be constructed by
 //     New(). The availability/enrich queues stay nil until a probe retains
 //     its first batch — they are built in place.
-//   - There is no parallel EnrichmentFindings map on tui.Model or on Session;
-//     Wave 2 findings are written directly onto each cached
+//   - Wave 2 findings are written directly onto each cached
 //     `resource.Resource.Findings` slice
 //     (Source = "wave2:<short>") and r.AttentionDetails, via applyEnrichment
 //     in internal/tui/app_enrich_fold.go. The cached rows are the authority;
@@ -43,7 +41,7 @@ import (
 )
 
 // ProbeStatusRecord is the session-scoped record of one resource type's
-// most recent scan outcome (#462 — per-probe status + duration). Plain
+// most recent scan outcome (per-probe status + duration). Plain
 // fields only: session must not import core/runtime (runtime already
 // imports session, the reverse would cycle), so runtime.Core.ScanStatus
 // converts these into the runtime-owned ProbeStatus/ProbeOutcome types.
@@ -63,8 +61,7 @@ type ProbeStatusRecord struct {
 	// from whatever aggregate a PRIOR enrichment rerun already folded in —
 	// without this, re-running enrichment (list-open / Ctrl+R ProbeEnrich
 	// without a fresh availability probe) would re-accumulate Duration and
-	// keep a stale partial/Err from an earlier failed enrichment (#462/#463
-	// external review, defect 1).
+	// keep a stale partial/Err from an earlier failed enrichment.
 	AvailOutcome  string
 	AvailDuration time.Duration
 	AvailErr      string
@@ -91,8 +88,7 @@ type Session struct {
 	// availability-save goroutine from a never-Closed Controller) can never
 	// follow a since-changed A9S_CONFIG_FOLDER into a directory that has
 	// nothing to do with the session it belongs to. Not recaptured by
-	// Rotate() — the root is process-stable in production, and recapturing it
-	// would reintroduce the exact test-isolation leak this field closes.
+	// Rotate() — the root is process-stable in production.
 	cacheRoot string
 
 	// Session-scoped AWS transport. Set by handleClientsReady; cleared
@@ -123,7 +119,7 @@ type Session struct {
 	// PendingRefresh marks that a successful ClientsReady should re-fetch the
 	// active resource list (set by profile/region switch handlers, and true
 	// by default from New() so a navigation issued before the first connect
-	// replays once connected — C10). Cleared by Rotate; re-set to true after
+	// replays once connected). Cleared by Rotate; re-set to true after
 	// Rotate in the switch handlers.
 	PendingRefresh bool
 
@@ -144,8 +140,8 @@ type Session struct {
 	// the one-shot -c navigation for PendingCommand is eligible to fire
 	// (Command was set and StackDepth==1 at ClientsReady time), but must wait
 	// for handleAvailabilityCacheLoaded to seed RowStore's disk-cached rows
-	// first so the navigation never races the availability-cache seed
-	// (the deferred -c navigation, D11). Consumed (cleared) by handleAvailabilityCacheLoaded; not
+	// first so the navigation never races the availability-cache seed.
+	// Consumed (cleared) by handleAvailabilityCacheLoaded; not
 	// cleared by Rotate for the same reason Command survives it.
 	CommandArmed bool
 
@@ -183,10 +179,9 @@ type Session struct {
 	// own callers. A caller that reads c.session.Profile/Region at the Core
 	// accessor call site BEFORE entering this lock races a profile switch's
 	// field write — the detached availability-cache-save writer goroutine
-	// against HandleProfileSelected is the reachable pairing, and -race
-	// caught it. EnsureCacheStore/WithCacheStoreSave/ReadCacheStore therefore
-	// read the pair via CurrentPair while already holding pairMu, closing
-	// that gap for every caller in one place rather than one at a time.
+	// against HandleProfileSelected is the reachable pairing.
+	// EnsureCacheStore/WithCacheStoreSave/ReadCacheStore therefore read the
+	// pair via CurrentPair while already holding pairMu.
 	//
 	// TUI tea.Cmd goroutines and concurrent web drains both reach
 	// EnsureCacheStore/CacheStore, and Rotate clears CacheStore from the
@@ -215,14 +210,14 @@ type Session struct {
 	// Guarded by pairMu, like the pair itself.
 	pairGen domain.Gen
 
-	// CacheStore is the loaded per-type disk cache (C7) for the pair recorded
+	// CacheStore is the loaded per-type disk cache for the pair recorded
 	// in cacheStoreProfile/cacheStoreRegion. nil until LoadDirIn has run for a
 	// pair (either at startup via TaskKindLoadAvailCache, or after a pair
-	// switch). The HARD INVARIANT (C7 "load before save") is structural:
+	// switch). The invariant "load before save" is structural:
 	// Put/SaveType are methods on *cache.Store, and the only way to obtain
 	// one is cache.LoadDirIn — so no save can happen for a pair before its own
 	// load. Cleared (set to nil) by Rotate so a pair switch never lets writes
-	// for the OLD pair's Store race a save for the NEW pair (C9). Access only
+	// for the OLD pair's Store race a save for the NEW pair. Access only
 	// through EnsureCacheStore — never read/write this field directly
 	// outside pairMu.
 	CacheStore *cache.Store
@@ -245,8 +240,8 @@ type Session struct {
 	// AvailQueue (menu/RowStore already seeded from disk) but held back the
 	// first probe-dispatch batch because Clients was still nil at that
 	// instant — the disk-cache load races ahead of the AWS connect on
-	// startup (Init fires both concurrently via tea.Batch for instant-paint,
-	// C1), so dispatching probes here would run them against a nil
+	// startup (Init fires both concurrently via tea.Batch for instant-paint),
+	// so dispatching probes here would run them against a nil
 	// transport and fail every one with "AWS clients not initialized"
 	// instead of actually probing. Consumed by the next successful
 	// HandleClientsReady, which drains AvailQueue's first batch now that a
@@ -273,7 +268,7 @@ type Session struct {
 	// member type frees its slot and drives the sweep's refill + EnrichChecked
 	// bookkeeping; a completion for a non-member (e.g. a list-open probe,
 	// core/runtime/handlers_resources.go) applies its payload but never
-	// touches EnrichQueue or this counter (#462/#463 defect 2). Rebuilt
+	// touches EnrichQueue or this counter. Rebuilt
 	// (not appended) every time a fresh sweep starts. Only touched from
 	// Core.HandleEvent's serial dispatch loop — no mutex, same convention
 	// as EnrichQueue.
@@ -285,18 +280,15 @@ type Session struct {
 	// EnrichQueue, it finds this flag, skips issuing a second physical
 	// dispatch, and folds the type into EnrichSweepMembers instead — so the
 	// list-open probe's own completion later drives the sweep's refill/
-	// counter bookkeeping in its place (#462/#463 defect 2b: a list-open
-	// probe racing a queued sweep entry must not be physically dispatched
-	// twice). Only touched from Core.HandleEvent's serial dispatch loop — no
+	// counter bookkeeping in its place (a list-open probe racing a queued
+	// sweep entry must not be physically dispatched twice). Only touched from
+	// Core.HandleEvent's serial dispatch loop — no
 	// mutex, same convention as EnrichQueue.
 	EnrichListOpenPending map[string]bool
 
-	// Per-type Wave 2 finding state (feature 018-enrichment-visibility).
-	// NOTE: there is no parallel EnrichmentFindings map;
+	// Per-type Wave 2 progress/control state, cleared on Session.Rotate().
 	// Wave 2 findings live on each cached resource.Resource.Findings slice
-	// (see internal/tui/app_enrich_fold.go applyEnrichment). The Wave-2 progress
-	// / control maps below remain here because they are session-scoped and are
-	// cleared on Session.Rotate() — they are not the authority for finding data.
+	// (see internal/tui/app_enrich_fold.go applyEnrichment).
 	// EnrichmentRan is the per-type "the Wave-2 enricher has answered"
 	// latch, guarded by enrichmentRanMu. The availability-cache producer
 	// (Core.availabilityFromResourceCache) reads it from the menu-badge
@@ -360,7 +352,7 @@ type Session struct {
 	RelatedCache *RelatedCacheLRU
 
 	// FilteredRows is the session home for server-side-filtered related-drill
-	// results (C6). Kept outside RowStore because a filtered subset stored
+	// results. Kept outside RowStore because a filtered subset stored
 	// under the type's canonical row-store key would poison that type's
 	// global row set for every other consumer.
 	FilteredRows *FilteredRowsLRU
@@ -420,7 +412,7 @@ type Session struct {
 	// checkSESS3 see a session-scoped cache rather than a process-global map.
 	RuleSets *ruleSetStore
 
-	// ProbeStatus is the per-type most-recent-scan-outcome record (#462),
+	// ProbeStatus is the per-type most-recent-scan-outcome record,
 	// keyed by resource short name. Guarded by probeStatusMu — unlike
 	// AvailChecked/EnrichChecked and the rest of the Wave-1/Wave-2
 	// bookkeeping above, which is single-goroutine (written only from the
@@ -435,9 +427,8 @@ type Session struct {
 	// partial Wave-1 probe has already added its scan-health entry to the
 	// `!` error log THIS sweep — handleAvailabilityChecked's dedup guard
 	// (core/runtime/handlers_availability.go): a type's AvailabilityChecked
-	// message can be delivered more than once within one sweep (a
-	// pre-existing double-delivery path elsewhere in dispatch), and without
-	// this guard each delivery independently re-adds the entry. Cleared at
+	// message can be delivered more than once within one sweep, and each
+	// delivery would otherwise re-add the entry. Cleared at
 	// sweep start (handleAvailabilityCacheLoaded, mirrors AvailQueue's own
 	// reset) and by Rotate() — same per-sweep lifetime as EnrichmentRan.
 	// Single-goroutine: written only from the handler loop, no mutex.
@@ -451,7 +442,7 @@ type Session struct {
 func New() *Session {
 	return &Session{
 		cacheRoot: cache.Root(),
-		// C10: a navigation issued before the first connect must trigger the
+		// A navigation issued before the first connect must trigger the
 		// active-list re-fetch once connected, exactly like a post-switch
 		// reconnect. On a menu-only startup, maybeRefreshIntents consumes this
 		// flag harmlessly via the HasActiveRL gate.
@@ -508,8 +499,7 @@ func (s *Session) CurrentPair() (profile, region string) {
 // and a save prepared then answers for no visit once one has been entered. The
 // first resolved visit is generation 1. There is no "unset" reading — a zero
 // that meant "do not check" would be a second answer to the question this
-// field exists to settle, and the guard would have an escape hatch shaped
-// exactly like the defect it closes.
+// field exists to settle.
 type Pair struct {
 	Profile string
 	Region  string
@@ -528,8 +518,8 @@ func (s *Session) CurrentPairValue() Pair {
 // Every write to Session.Profile/Session.Region MUST go through this method
 // (never a direct field assignment) so a concurrent EnsureCacheStore/
 // WithCacheStoreSave/ReadCacheStore call on another goroutine
-// can never observe a torn or half-written pair, and never races the write itself (see pairMu's
-// doc comment for the CI-caught race this closes).
+// can never observe a torn or half-written pair, and never races the write
+// itself (see pairMu's doc comment).
 func (s *Session) SetProfileRegion(profile, region string) {
 	s.pairMu.Lock()
 	defer s.pairMu.Unlock()
@@ -557,7 +547,7 @@ func sweptPairKey(profile, region string) string {
 
 // PairSwept reports whether the CURRENT profile/region pair's Wave-1
 // availability sweep has already run to completion. It is a
-// completion latch, not a permission to skip: C1 re-verifies on every pair
+// completion latch, not a permission to skip: every pair entry re-verifies,
 // entry, and the entry point that starts a sweep clears the memo first, so
 // what this guards is a duplicate/redelivered probe result re-running one
 // sweep's completion. Reads Profile/Region under pairMu, same discipline as
@@ -622,12 +612,9 @@ func (s *Session) EnsureCacheStore() *cache.Store {
 // half untouched. It is the session's single resolution point: the cache-load
 // lane calls it before it reads a pair's directory, so every later answer
 // stamped with a pair has a resolved session pair to be compared against.
-//
-// Without it the C9 pair guard had a window it could only skip: the load lane
-// resolved a region from local config to decide which directory to read and
-// deliberately did not write it back, so between boot and the first
-// ClientsReady the session's own region was still empty and a load answering
-// for a different pair had nothing to be rejected by.
+// Between boot and the first ClientsReady the session's own region would
+// otherwise be empty, and a load answering for a different pair would have
+// nothing to be rejected by.
 func (s *Session) ResolvePair(profile, region string) {
 	s.pairMu.Lock()
 	defer s.pairMu.Unlock()
@@ -676,15 +663,15 @@ func (s *Session) ensureCacheStoreLocked(profile, region string) *cache.Store {
 // WithCacheStoreSave commits each one via store.CommitSave AFTER pairMu is
 // released, so a save's disk I/O (MkdirAll/temp-write/rename) never blocks a
 // concurrent pairMu-guarded reader (CurrentPair, ReadCacheStore, ...) behind
-// file I/O. It holds pairMu across only the read/mutate/marshal part of the former
-// store.Type(read)/mutate/store.Put+SaveType(write) sequence, not the write.
+// file I/O. It holds pairMu across the read/mutate/marshal part of a save,
+// not the disk write.
 //
-// Store-lock serialization (D13) still holds for the part that matters to
+// Store-lock serialization holds for the part that matters to
 // every OTHER pairMu-guarded caller: SaveResourceListCache and
 // SaveAvailabilityCache's own store.Type read and store.Put write for a type
 // file are still fully serialized against each other and against any
 // concurrent profile/region switch, because both still run inside fn under
-// pairMu. What moved outside the lock is only the disk write, which
+// pairMu. Only the disk write runs outside the lock, and
 // store.CommitSave's own saveMu (scoped to this *cache.Store, i.e. this pair)
 // still serializes against a sibling commit for the SAME pair — see
 // cache.Store's saveMu doc comment for what CommitSave's serialization does
@@ -699,7 +686,7 @@ func (s *Session) ensureCacheStoreLocked(profile, region string) *cache.Store {
 // (runtime/probes.go) but does not reflect either write in full.
 // WithCacheStoreSave accepts that a losing commit's
 // stale bytes could transiently be what's on disk for that type until its
-// next save — which, given no cache entry has a TTL (C1) and every save lane
+// next save — which, given no cache entry has a TTL and every save lane
 // here runs on a recurring sweep/list-refresh cadence rather than a
 // one-shot, self-corrects on the next save rather than persisting
 // indefinitely — in exchange for pairMu never blocking on file I/O, which is
@@ -709,7 +696,7 @@ func (s *Session) ensureCacheStoreLocked(profile, region string) *cache.Store {
 // synchronous caller, the pair it just read; for a save frozen and handed to
 // another goroutine, the pair current at the freeze. When it no longer
 // matches the session's, fn is not called at all: one account's rows must
-// never land in another's directory (C9).
+// never land in another's directory.
 //
 // fn must not call back into WithCacheStoreSave/
 // EnsureCacheStore/CurrentPair/SetProfileRegion (Session's mutex is not
@@ -724,7 +711,7 @@ func (s *Session) ensureCacheStoreLocked(profile, region string) *cache.Store {
 func (s *Session) WithCacheStoreSave(pair Pair, fn func(store *cache.Store) ([]cache.WritePlan, error)) error {
 	s.pairMu.Lock()
 	if pair.Profile != s.Profile || pair.Region != s.Region || pair.Gen != s.pairGen {
-		// C9: this save was prepared for a visit the session has since left —
+		// This save was prepared for a visit the session has since left —
 		// including one to the pair it is on again, which the names alone
 		// cannot tell apart, and including the pre-visit state a pair read
 		// before the first SetProfileRegion carries (see Pair.Gen). Rejected
@@ -750,7 +737,7 @@ func (s *Session) WithCacheStoreSave(pair Pair, fn func(store *cache.Store) ([]c
 // ReadCacheStore runs fn against the current Profile/Region pair's
 // *cache.Store while holding pairMu, for callers that only read
 // (store.Type/store.Types) and never Put/PrepareSave/SaveType. Pairs with
-// WithCacheStoreSave (the store-lock serialization, D13): a
+// WithCacheStoreSave (the store-lock serialization): a
 // reader that bypassed the lock could observe cache.Store's internal map mid-write from a concurrent
 // WithCacheStoreSave call's fn (the in-memory store.Put half, which always
 // runs under pairMu) — a data race
@@ -979,7 +966,7 @@ func (s *Session) Rotate() {
 	// for setting Profile/Region to the new target, and for capturing rollback
 	// state via local vars BEFORE Rotate (so the rapid A→B→C case keeps A as
 	// the rollback target).
-	// C9: drop the old pair's Store atomically, under the same lock
+	// Drop the old pair's Store atomically, under the same lock
 	// EnsureCacheStore uses, so a concurrent EnsureCacheStore call cannot
 	// observe a torn state (old Store with a stale/zeroed pair stamp, or
 	// vice versa). The new pair's Store is re-obtained via a fresh
@@ -1022,7 +1009,7 @@ func (s *Session) Rotate() {
 	s.EnrichListOpenPending = nil
 
 	// ProbeStatus: a prior profile/region's scan-status records must not
-	// leak into the next pair's scan (#462) — same rationale as the
+	// leak into the next pair's scan — same rationale as the
 	// EnrichmentRan/EnrichmentTypeGen resets just above.
 	s.probeStatusMu.Lock()
 	s.ProbeStatus = nil
@@ -1048,8 +1035,6 @@ func (s *Session) Rotate() {
 	// prior session cannot leak into the next.
 	s.RuleSets = NewRuleSetStore()
 
-	// SweptPairs: deliberately NOT cleared — session-lifetime by design, see
-	// SweptPairs doc.
 }
 
 // AcceptTypeSave reports whether a save carrying observation generation gen
@@ -1060,8 +1045,7 @@ func (s *Session) Rotate() {
 // against a foreground save that landed while it was queued.
 //
 // gen == 0 means the caller has no observation generation to offer (a
-// hand-built save, a lane that predates this) and is accepted as before,
-// without moving the recorded generation.
+// hand-built save); it is accepted without moving the recorded generation.
 func (s *Session) AcceptTypeSave(shortName string, gen domain.Gen) bool {
 	if gen == 0 {
 		return true

@@ -29,7 +29,7 @@ type TransferFixtures struct {
 
 	// ListedAgreementsByServer backs transfer:ListAgreements(ServerId), keyed
 	// by ServerId — Agreements are the only server-scoped child view
-	// (docs/resources/transfer.md §2.1).
+	// (docs/resources/transfer.md).
 	ListedAgreementsByServer map[string][]transfertypes.ListedAgreement
 	// Agreements backs transfer:DescribeAgreement, keyed by AgreementId
 	// (agreement ids are unique across the whole demo account).
@@ -38,7 +38,7 @@ type TransferFixtures struct {
 	// Profiles backs transfer:DescribeProfile, keyed by ProfileId. Profiles
 	// are account-scoped (ListedProfile/DescribedProfile carry no ServerId)
 	// — deliberately not a server child; resolved inline from an agreement's
-	// LocalProfileId/PartnerProfileId (docs/resources/transfer.md §2.1).
+	// LocalProfileId/PartnerProfileId (docs/resources/transfer.md).
 	Profiles map[string]transfertypes.DescribedProfile
 	// Certificates backs transfer:DescribeCertificate, keyed by
 	// CertificateId — resolved inline from a profile's CertificateIds.
@@ -46,7 +46,7 @@ type TransferFixtures struct {
 }
 
 // Exported server-id constants — referenced by sibling fixture files (ec2.go's
-// VpcEndpoint entry, cwlogs.go's log groups) and by QA tests.
+// VpcEndpoint entry, cwlogs.go's log groups) and by tests.
 const (
 	ProdAS2GatewayID            = "prod-as2-gateway"
 	SftpUsersProdID             = "sftp-users-prod"
@@ -71,9 +71,9 @@ const (
 const ProdAS2GatewayVpcEndpointID = "vpce-0transfer1111a"
 
 // Agreement, profile, and certificate constants — agr-old-partner is
-// INACTIVE (§4 "inactive: partner traffic rejected" child-row finding); the
+// INACTIVE ("inactive: partner traffic rejected" child-row finding); the
 // two profiles and three certificates back the agreement-detail inline
-// resolution (docs/resources/transfer.md §3.2).
+// resolution (docs/resources/transfer.md).
 const (
 	AgreementProdPartnerID = "agr-prod-partner"
 	AgreementOldPartnerID  = "agr-old-partner"
@@ -95,9 +95,8 @@ const (
 
 	// transferLogGroupPrimaryName / transferLogGroupPartnerAuditName are the
 	// graph root's two structured-log destinations — required so the logs
-	// related-panel pivot counts ≥2 (transfer-impl-plan.md §2: subnet+logs
-	// are the only list-valued pivot fields on this server; the rest are 1:1
-	// by API shape, a documented structural ceiling).
+	// related-panel pivot counts ≥2 (subnet and logs are the only list-valued
+	// pivot fields on this server; the rest are 1:1 by API shape).
 	transferLogGroupPrimaryName      = "/aws/transfer/prod-as2-gateway"
 	transferLogGroupPartnerAuditName = "/aws/transfer/prod-as2-gateway/partner-audit"
 )
@@ -128,7 +127,7 @@ func transferCertificateArn(certID string) string {
 // transferBaseServer returns the common healthy-shape DescribedServer;
 // callers override the fields that vary per fixture. Defaults model an SFTP,
 // service-managed, publicly-reachable server on a current security policy
-// with logging configured — the "no signal fires" baseline (§3 wave3_anti).
+// with logging configured — the "no signal fires" baseline.
 func transferBaseServer(id string, state transfertypes.State, hostKeyFingerprint string) transfertypes.DescribedServer {
 	return transfertypes.DescribedServer{
 		Arn:                  aws.String(transferServerArn(id)),
@@ -205,8 +204,8 @@ var sharedTransferFixtures = sync.OnceValue(func() *TransferFixtures {
 
 	// GRAPH ROOT — AS2+FTPS gateway. Countable pivots: role 1, vpc 1,
 	// subnet 3, vpce 1, logs 2, acm 1, eip 3 = 7, with ≥2 on subnet+logs+eip
-	// (3/7 — VpcId/VpcEndpointId/Certificate/LoggingRole are 1:1 by API shape;
-	// documented structural ceiling, transfer-impl-plan.md §2). AllocationIds
+	// (VpcId/VpcEndpointId/Certificate/LoggingRole are 1:1 by API shape).
+	// AllocationIds
 	// match ec2.go's buildAddresses eipalloc-0a1b2c3d4e5f60a1{a,b,c} entries.
 	gateway := transferBaseServer(ProdAS2GatewayID, transfertypes.StateOnline, "SHA256:6b1f9c9e2a4d4e8f91a37d5c8e2f4b6a70c1d2e3f4a5")
 	gateway.EndpointType = transfertypes.EndpointTypeVpc
@@ -226,7 +225,7 @@ var sharedTransferFixtures = sync.OnceValue(func() *TransferFixtures {
 	addServer(gateway)
 
 	// PUBLIC endpoint (EndpointDetails nil, the transferBaseServer default)
-	// — proves conditional pivots absent cleanly.
+	// — the conditional pivots resolve to none.
 	sftpUsers := transferBaseServer(SftpUsersProdID, transfertypes.StateOnline, "SHA256:8b2d4f6a1c3e4a7b9d5f2e4c6a8b0d1f2a3b4c5d6e7f")
 	sftpUsers.UserCount = aws.Int32(12)
 	addServer(sftpUsers)
@@ -257,7 +256,7 @@ var sharedTransferFixtures = sync.OnceValue(func() *TransferFixtures {
 	))
 
 	// OFFLINE + legacy policy + no logging — three findings stack on one row
-	// (§4 "offline: not accepting transfers (+2)").
+	// ("offline: not accepting transfers (+2)").
 	multi := transferBaseServer(WarnTransferMultiID, transfertypes.StateOffline, "SHA256:9c0d1e2f3a4b4c5d6e7f8091a2b3c4d5e6f7a8b9c0d1")
 	multi = withSecurityPolicy(multi, transferLegacyPolicy)
 	multi = withNoLogging(multi)
@@ -312,7 +311,7 @@ var sharedTransferFixtures = sync.OnceValue(func() *TransferFixtures {
 	}
 
 	// Profiles — account-scoped; certificates are split across both so the
-	// agreement detail's inline profile/cert resolution witnesses all three.
+	// agreement detail's inline profile/cert resolution covers all three.
 	profiles := map[string]transfertypes.DescribedProfile{
 		LocalProfileID: {
 			Arn:            aws.String(transferProfileArn(LocalProfileID)),
@@ -332,7 +331,7 @@ var sharedTransferFixtures = sync.OnceValue(func() *TransferFixtures {
 
 	// Certificates — InactiveDate anchored relative to time.Now() so the
 	// expiry findings (Broken "expired" / Warning "expires in <N>d") stay
-	// witnessable deterministically regardless of when the demo/tests run
+	// hold regardless of when the demo/tests run
 	// (mirrors dbi-snap.go/redshift.go's now-relative date pattern).
 	certificates := map[string]transfertypes.DescribedCertificate{
 		certFreshID: {

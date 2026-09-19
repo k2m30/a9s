@@ -58,7 +58,7 @@ func buildASGNotificationConfigurations() map[string][]asgtypes.NotificationConf
 }
 
 // buildASGLifecycleHooks provides a lifecycle hook targeting the shared
-// ops-alerts SNS topic — an alternate asg:sns witness path via
+// ops-alerts SNS topic — an alternate asg:sns pivot path via
 // NotificationTargetARN, mirroring the real AWS lifecycle-hook shape.
 func buildASGLifecycleHooks() map[string][]asgtypes.LifecycleHook {
 	return map[string][]asgtypes.LifecycleHook{
@@ -79,7 +79,6 @@ func NewASGFixtures() *ASGFixtures {
 	return sharedASGFixtures()
 }
 
-// ASG posture witnesses — one demo group per Prowler-derived finding.
 const (
 	// ASGLegacyLaunchConfig is the only group still launching from a launch
 	// configuration; every other group uses a launch template. It is
@@ -107,7 +106,7 @@ const (
 
 // asgAZsFor maps a group's VPCZoneIdentifier to the availability zones its
 // subnets sit in, so AvailabilityZones can never drift from the subnet list.
-// asg-staging is the single-AZ witness purely because it has one subnet.
+// asg-staging is single-AZ purely because it has one subnet.
 func asgAZsFor(vpcZoneIdentifier string) []string {
 	azBySubnet := map[string]string{
 		asgSubnetA: "us-east-1a",
@@ -218,7 +217,7 @@ func buildASGGroupsRaw() []asgtypes.AutoScalingGroup {
 			MinSize:              aws.Int32(1),
 			MaxSize:              aws.Int32(4),
 			DesiredCapacity:      aws.Int32(2),
-			// The asg.no-elb-health-check witness: registered behind the api
+			// Raises asg.no-elb-health-check: registered behind the api
 			// target group yet still deciding health from EC2 status checks.
 			// Healthy on every other signal so its phrase renders alone.
 			HealthCheckType:        aws.String("EC2"),
@@ -266,7 +265,6 @@ func buildASGGroupsRaw() []asgtypes.AutoScalingGroup {
 			HealthCheckGracePeriod: aws.Int32(300),
 			VPCZoneIdentifier:      aws.String(asgSubnetA + "," + asgSubnetB),
 			CreatedTime:            aws.Time(mustTime("2025-06-01T10:00:00Z")),
-			// Only 2 instances running while MinSize=5
 			Instances: []asgtypes.Instance{
 				{InstanceId: aws.String("i-0aaa111111111111a"), HealthStatus: aws.String("Healthy"), LifecycleState: asgtypes.LifecycleStateInService},
 				{InstanceId: aws.String("i-0bbb222222222222b"), HealthStatus: aws.String("Healthy"), LifecycleState: asgtypes.LifecycleStateInService},
@@ -412,18 +410,17 @@ func buildLaunchConfigurations() map[string]asgtypes.LaunchConfiguration {
 			// asgInstanceProfileToRoles → iam:GetInstanceProfile). Resolves to
 			// acme-ec2-instance-role via fixtures/iam.go's InstanceProfiles map.
 			IamInstanceProfile: aws.String("acme-ec2-instance-profile"),
-			// The three launch-configuration witnesses. MetadataOptions is
-			// deliberately absent: a launch configuration without it defaults
-			// to IMDSv1-permitted, and launch configurations cannot be edited
-			// to add it — that immutability is the point of the finding.
+			// Raises the three launch-configuration findings. A launch
+			// configuration without MetadataOptions defaults to IMDSv1-permitted,
+			// and launch configurations cannot be edited to add it.
 			AssociatePublicIpAddress: aws.Bool(true),
 			UserData:                 aws.String(base64.StdEncoding.EncodeToString([]byte(asgLegacyUserData))),
 		},
 	}
 }
 
-// asgLegacyUserData is the acme-web-prod-lc bootstrap script — the
-// asg.launch-config.secret witness, with the database password pasted in
+// asgLegacyUserData is the acme-web-prod-lc bootstrap script. It raises
+// asg.launch-config.secret: the database password is pasted in
 // rather than resolved from Secrets Manager at boot.
 const asgLegacyUserData = `#!/bin/bash
 set -euo pipefail
@@ -469,10 +466,9 @@ func buildActivitiesFor(asgName string) []asgtypes.Activity {
 			StartTime:            aws.Time(mustTime("2026-03-22T07:45:00Z")),
 			Progress:             aws.Int32(50),
 		},
-		// Cancelled — required for asg_activities' Findings-based coloring
-		// witness (asgActivityFindings, core/aws/asg_activities.go): a
-		// StatusCode=Cancelled activity is the only demo witness of this
-		// branch.
+		// Cancelled — the only demo activity with StatusCode=Cancelled,
+		// which drives asg_activities' Findings-based coloring
+		// (asgActivityFindings, core/aws/asg_activities.go).
 		{
 			ActivityId:           aws.String("act-demo-005"),
 			AutoScalingGroupName: aws.String(asgName),

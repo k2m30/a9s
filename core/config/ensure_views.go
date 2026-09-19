@@ -78,8 +78,8 @@ func yamlKey(s string) string {
 // A file already stamped with this build is left byte for byte alone: whatever
 // the operator did to it is theirs.
 //
-// A file with an older stamp (or none, which is every file written before the
-// stamp existed) is first read for evidence of an edit. One whose every column
+// A file with an older stamp (or none) is first read for evidence of an
+// edit. One whose every column
 // is still the source and width the build at its stamp generated has never been
 // touched: it takes this build's column set and order wholesale, which is the
 // only way a corrected default order reaches an installation that already
@@ -136,13 +136,12 @@ func EnsureViewsDir(dir string) error {
 }
 
 // viewColumnChange records one built-in column this build has corrected, and
-// the whole column the build before Version generated for it. What it is
-// corrected TO is deliberately not recorded: that is whatever the defaults now
-// say, which is the one place a built-in column is defined.
+// the whole column the build before Version generated for it. The corrected
+// value is whatever the defaults say, the one place a built-in column is
+// defined.
 //
 // A corrected column keeps its title, so the missing-title rule below never
-// sees it and an operator who had run a9s once kept the column the correction
-// moved away from — a cell that looks like it works and is wrong. Matching on
+// sees it. Matching on
 // the whole column the previous build generated is what separates a column
 // nobody has touched from one the operator set themselves: theirs differs in
 // at least the field they changed, and is left exactly as it is.
@@ -165,27 +164,14 @@ var viewColumnChanges = []viewColumnChange{
 	{Version: 3, View: "secrets", Was: ListColumn{Title: "Last Accessed", Path: "LastAccessedDate", Width: 18}},
 	{Version: 3, View: "secrets", Was: ListColumn{Title: "Last Changed", Path: "LastChangedDate", Width: 18}},
 	{Version: 3, View: "sns-sub", Was: ListColumn{Title: "Subscription ARN", Path: "SubscriptionArn", Width: 60}},
-	// The two columns that gained humanize: the cell showed a raw AWS constant.
 	{Version: 4, View: "ecs-task", Was: ListColumn{Title: "Stop Code", Path: "StopCode", Width: 24}},
 	{Version: 4, View: "nat", Was: ListColumn{Title: "Failure", Path: "FailureCode", Width: 22}},
-	// Version 5 regenerates every file: the humanize flag stopped being a
-	// column field at all and became the type's own declaration
-	// (ResourceTypeDef.HumanizeFields), so the key a v4 file carries for it is
-	// read by nothing. The Retention entry is renewed at this stamp because it
-	// is the one column here whose older spelling still differs from what this
-	// build generates, so it is what the carry has to deliver.
+	// An entry only carries while its Version is above the stamp the file was
+	// written at, so the Retention entry repeats at every stamp a file still
+	// carrying its pre-correction spelling can have; keyMoveVersion's class
+	// rule cannot deliver it because that spelling differs in more than the key.
 	{Version: 5, View: "logs", Was: ListColumn{Title: "Retention", Path: "RetentionInDays", Width: 10}},
-	// Version 6 moves the column list itself onto the resource type, which
-	// keyMoveVersion below records as a class. The Retention entry is renewed
-	// at this stamp for the same reason it was renewed at 5: it is the one
-	// column whose older spelling still differs from what this build generates
-	// in more than the key, so the class rule cannot deliver it and only a row
-	// naming that whole spelling can.
 	{Version: 6, View: "logs", Was: ListColumn{Title: "Retention", Path: "RetentionInDays", Width: 10}},
-	// Renewed again at 7 for the reason it was renewed at 5 and 6: a file
-	// still carrying the pre-correction Retention column is a file this stamp
-	// must reach, and an entry only carries while its Version is above the
-	// stamp the file was written at.
 	{Version: 7, View: "logs", Was: ListColumn{Title: "Retention", Path: "RetentionInDays", Width: 10}},
 }
 
@@ -197,10 +183,6 @@ var viewColumnChanges = []viewColumnChange{
 // every frame. A file written before the move therefore differs from this
 // build's column in Key and in no other field, and that difference is this
 // build's own doing rather than an edit.
-//
-// It is one rule and not the 325 viewColumnChanges rows the same migration
-// would need column by column, because every one of those rows would say this
-// same sentence about a different column.
 //
 // It matches whole columns rather than the key alone, so a column the operator
 // touched at all — a width they set — keeps no key at this migration. That
@@ -215,14 +197,11 @@ const keyMoveVersion = 6
 // keyMoveVersion generated for this column: its title, path, width and sort
 // key, and NO key where this build declares one.
 //
-// The empty key is the load-bearing half. The move only ever added keys — 325
-// of them across 77 files, and not one column's key was replaced — so the
+// The empty key is the load-bearing half. The move only added keys, so the
 // previous generated form of a moved column is this build's column with the
-// key taken off, and that is what "untouched" has to mean. Asking merely
-// whether the key DIFFERS from this build's reads an operator's own key as the
-// generator's output, and since generatedAsIs asks this same question of every
-// column to decide whether the file was ever edited, one such key made the
-// whole file look untouched and be replaced wholesale.
+// key taken off. A key merely DIFFERING from this build's may be the
+// operator's own, and generatedAsIs asks this question of every column to
+// decide whether the file was ever edited.
 func keyMovedOnly(on, now ListColumn, stamp int) bool {
 	return stamp < keyMoveVersion &&
 		on.Key == "" && now.Key != "" &&
@@ -234,7 +213,7 @@ func keyMovedOnly(on, now ListColumn, stamp int) bool {
 
 // statusKeyMoveVersion is the stamp at which the status column stopped being
 // the one a TITLE said was the status column, or the one whose key was spelled
-// "status" whatever the type calls its own key. The type declares it now
+// "status" whatever the type calls its own key. The type declares it
 // (catalog.ResourceTypeDef.LifecycleKey), so a file written before this stamp
 // carries columns the replaced rule treated as the status and this build does
 // not — a renamed Status column above all, which is the one the renderer's
@@ -242,7 +221,7 @@ func keyMovedOnly(on, now ListColumn, stamp int) bool {
 //
 // A migration encodes the rule it replaced. movedStatusKey is that rule,
 // written out once: it is what config.IsStatusColumn said before this build,
-// and every column it recognises takes the key the type now declares.
+// and every column it recognises takes the key the type declares.
 const statusKeyMoveVersion = 7
 
 // movedStatusKey returns the key a column the REPLACED status rule recognised
@@ -251,9 +230,8 @@ func movedStatusKey(view string, col ListColumn, stamp int) (string, bool) {
 	if stamp >= statusKeyMoveVersion {
 		return "", false
 	}
-	// catalog.FindAny and not Find: a child type has a view file, an operator
-	// and a lifecycle key of its own, and looking only among the parents
-	// stamped every child file as migrated while migrating nothing.
+	// catalog.FindAny: a child type has a view file, an operator and a
+	// lifecycle key of its own.
 	td := catalog.FindAny(view)
 	if td == nil {
 		return "", false
@@ -273,11 +251,9 @@ func movedStatusKey(view string, col ListColumn, stamp int) (string, bool) {
 	return statusKey, true
 }
 
-// viewFileRenames records a type this build has RENAMED, old name to new.
-// The generator wrote a file under the old name, the rename landed, and the
-// file stayed behind naming nothing: docdb-snap became dbc-snap and
-// rds-snap became dbi-snap, so an installation that ran an older build
-// still has both on disk.
+// viewFileRenames records a type this build has RENAMED, old name to new. An
+// installation that ran an older build may carry a file under the old name,
+// which names no type.
 //
 // Same shape and same bargain as viewColumnAdditions: the migration owns what
 // the generator wrote, and a file it wrote is not the operator's mistake to be
@@ -414,8 +390,7 @@ func mergeGeneratedColumns(name string, onDisk []byte, def ViewDef) ([]byte, boo
 	// takes the current default's value, and one the operator changed is
 	// theirs. Comparing whole columns instead would let a single edit freeze
 	// every other field, and comparing only the fields a given correction
-	// happens to change would leave the next kind of correction stranded —
-	// which is how the humanize flag reached new installations alone.
+	// happens to change would leave the next kind of correction stranded.
 	for i, on := range vd.List {
 		if moved, ok := movedStatusKey(name, on, vd.Generated); ok {
 			vd.List[i].Key = moved

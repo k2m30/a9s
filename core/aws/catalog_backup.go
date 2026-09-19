@@ -12,8 +12,7 @@ import (
 )
 
 // colorBackup classifies a Backup plan. All signals come from
-// EnrichBackupJobs (backup_issue_enrichment.go, Source: "wave2:backup") —
-// spec §3.1 has zero Wave 1 signals for this resource.
+// EnrichBackupJobs (backup_issue_enrichment.go, Source: "wave2:backup").
 func colorBackup(r domain.Resource) domain.Color {
 	if c, ok := colorFromAnyFinding(r); ok {
 		return c

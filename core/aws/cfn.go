@@ -107,8 +107,7 @@ func FetchCloudFormationStacksPage(ctx context.Context, api CFNDescribeStacksAPI
 
 // cfnStatusWords renders a stack status as the words an operator says.
 // "UPDATE_ROLLBACK_FAILED" is the SDK's spelling; "update rollback failed" is
-// the sentence, and the rendered-surface rulings ban the former from the list
-// status cell every cfn finding draws in.
+// the sentence the list status cell of every cfn finding shows.
 func cfnStatusWords(status string) string {
 	return strings.ToLower(domain.HumanizeStatusPhrase(status))
 }
@@ -182,8 +181,8 @@ func cfnStackOutputs(stack cfntypes.Stack) map[string]string {
 	return outputs
 }
 
-// cfnPostureFindings returns the two w6b signals. Each is independent of the
-// other and of the lifecycle finding (contract rule 4).
+// cfnPostureFindings returns the two posture signals. Each is independent of
+// the other and of the lifecycle finding.
 func cfnPostureFindings(protection, outputSecret string) []domain.Finding {
 	var out []domain.Finding
 	if protection == cfnProtectionOff {

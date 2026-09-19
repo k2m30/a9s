@@ -24,7 +24,7 @@ const (
 )
 
 // ProbeStatus is one resource type's most recent scan outcome, returned by
-// Core.ScanStatus for hosts that surface per-type scan health (#462).
+// Core.ScanStatus for hosts that surface per-type scan health.
 type ProbeStatus struct {
 	ShortName string
 	Outcome   ProbeOutcome
@@ -89,7 +89,7 @@ func probeHasNoRules(c *Core, shortName string) bool {
 }
 
 // availabilityOutcome classifies a single Wave-1 AvailabilityChecked result
-// per the #462 outcome-mapping contract: failed (error, no resources
+// per the outcome-mapping contract: failed (error, no resources
 // returned) beats partial (truncated, or error with resources present)
 // beats skipped-no-rules (probe succeeded on a type with no findings rules
 // and no Wave-2 enricher) beats ok.
@@ -133,7 +133,7 @@ func degradeForEnrichment(prev ProbeOutcome, err error, truncated bool) ProbeOut
 // values for both (a fresh probe IS the new baseline), while
 // handleEnrichmentChecked passes through the baseline it read from the PRIOR
 // record, unchanged, so a later enrichment rerun folds from the same
-// baseline rather than the previous rerun's aggregate (#462/#463 defect 1).
+// baseline rather than the previous rerun's aggregate.
 func (c *Core) setProbeStatus(shortName string, outcome ProbeOutcome, duration time.Duration, errClass string, at time.Time, availOutcome ProbeOutcome, availDuration time.Duration, availErr string) {
 	c.session.SetProbeStatus(shortName, session.ProbeStatusRecord{
 		Outcome:       string(outcome),

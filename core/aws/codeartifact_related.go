@@ -7,7 +7,7 @@
 // KMS, Lambda triggers, CloudWatch Logs, ACM certs, Route 53 endpoints, WAF,
 // IAM role bindings, or Kinesis feeds. Resolving these relationships would
 // require DescribeRepository + DescribeDomain + GetRepositoryPermissionsPolicy
-// calls (N+1 per repo). The KMS checker below uses DescribeDomain (Pattern C)
+// calls (N+1 per repo). The KMS checker below uses DescribeDomain
 // to resolve the domain's encryption key.
 package aws
 
@@ -21,7 +21,7 @@ import (
 )
 
 // checkCodeartifactKMS resolves the KMS encryption key for this repository's
-// domain via codeartifact:DescribeDomain (Pattern C: 1 API call).
+// domain via codeartifact:DescribeDomain (1 API call).
 // RepositorySummary.DomainName is used as the domain identifier.
 // DomainDescription.EncryptionKey holds the KMS key ARN.
 func checkCodeartifactKMS(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {

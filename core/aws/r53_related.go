@@ -66,7 +66,7 @@ func r53RelatedResult(target string, ids []string, recordsTruncated, targetTrunc
 }
 
 // checkR53ELB reports load balancers referenced by AliasTarget.DNSName in
-// this zone's records. Pattern C: one ListResourceRecordSets call per zone,
+// this zone's records. One ListResourceRecordSets call per zone,
 // then cross-check the DNS names against the ELB cache.
 func checkR53ELB(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	zoneID := res.ID
@@ -123,7 +123,7 @@ func checkR53ELB(ctx context.Context, clients any, res resource.Resource, cache 
 }
 
 // checkR53CF reports CloudFront distributions referenced by AliasTarget.DNSName
-// in this zone's records. Pattern C: one ListResourceRecordSets call, match
+// in this zone's records. One ListResourceRecordSets call, match
 // against CF domain names in the cf cache.
 func checkR53CF(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	zoneID := res.ID
@@ -174,7 +174,7 @@ func checkR53CF(ctx context.Context, clients any, res resource.Resource, cache r
 }
 
 // checkR53APIGW reports API Gateways fronted by AliasTarget.DNSName in this
-// zone's records. Pattern C: one ListResourceRecordSets call, look for alias
+// zone's records. One ListResourceRecordSets call, look for alias
 // DNS names of form "<api-id>.execute-api.<region>.amazonaws.com".
 func checkR53APIGW(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	zoneID := res.ID
@@ -253,7 +253,7 @@ func checkR53S3(ctx context.Context, clients any, res resource.Resource, cache r
 }
 
 // checkR53ACM reports ACM certificates whose DNS validation CNAME records
-// (pattern "_<token>.<domain>") live in this zone. Pattern C: one
+// (pattern "_<token>.<domain>") live in this zone. One
 // ListResourceRecordSets call; a CNAME whose name starts with "_" and whose
 // value ends with ".acm-validations.aws." — the ACM validation record
 // contract — validates <domain>, and a certificate in the acm list whose
@@ -309,7 +309,7 @@ func checkR53ACM(ctx context.Context, clients any, res resource.Resource, cache 
 }
 
 // checkR53Logs reports CloudWatch log groups receiving query-log traffic for
-// this zone. Pattern C: one route53:ListQueryLoggingConfigs call filtered by
+// this zone. One route53:ListQueryLoggingConfigs call filtered by
 // HostedZoneId; match CloudWatchLogsLogGroupArn against the logs cache.
 func checkR53Logs(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	zoneID := res.ID
@@ -356,7 +356,7 @@ func checkR53Logs(ctx context.Context, clients any, res resource.Resource, cache
 }
 
 // checkR53VPC reports VPCs associated with a private hosted zone.
-// Pattern C: one route53:GetHostedZone call returns HostedZone + VPCs list
+// One route53:GetHostedZone call returns HostedZone + VPCs list
 // for private zones.
 func checkR53VPC(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	if res.Fields["private_zone"] != "true" {

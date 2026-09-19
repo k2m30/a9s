@@ -114,7 +114,7 @@ var sharedR53Fixtures = sync.OnceValue(func() *R53Fixtures {
 					},
 				},
 				{
-					// R53ForeignA: the falsifier. Its address belongs to no
+					// R53ForeignA: its address belongs to no
 					// inventory this account can read, which is the ordinary
 					// case for a name served by a CDN. It must stay clean.
 					Name: aws.String(R53ForeignA),
@@ -263,7 +263,7 @@ var sharedR53Fixtures = sync.OnceValue(func() *R53Fixtures {
 			// require bucket-name==FQDN), and AliasTarget.DNSName is the
 			// regional s3-website endpoint WITHOUT any bucket segment.
 			// Both r53↔s3 directions join on the record name, so this one
-			// record is the witness for the pivot each way.
+			// record backs the pivot each way.
 			"/hostedzone/Z4567890123ABCDEFGHIJ": {
 				{
 					Name: aws.String("demo.acme-corp.com."),
@@ -314,7 +314,7 @@ var sharedR53Fixtures = sync.OnceValue(func() *R53Fixtures {
 				CloudWatchLogsLogGroupArn: aws.String(PublicZoneQueryLogGroupARN),
 			},
 			// Every public zone but R53QueryLoggingOff carries a config, so
-			// that zone is the single witness for r53.query-logging-off.
+			// that zone is the only one raising r53.query-logging-off.
 			"/hostedzone/Z2345678901ABCDEFGHIJ": {
 				Id:                        aws.String("qlc-acme-corp-002"),
 				HostedZoneId:              aws.String("Z2345678901ABCDEFGHIJ"),
@@ -333,7 +333,7 @@ func NewR53Fixtures() *R53Fixtures {
 	return sharedR53Fixtures()
 }
 
-// Witness zones and records for the w6a Prowler batch.
+// Zones and records carrying the r53 posture findings.
 const (
 	// R53QueryLoggingOff is the public zone with no query-logging config.
 	R53QueryLoggingOff = "unused-zone.example.com."

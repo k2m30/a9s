@@ -13,9 +13,6 @@ import (
 // The input is the value of cloudtrailtypes.Event.CloudTrailEvent from
 // github.com/aws/aws-sdk-go-v2/service/cloudtrail/types.
 //
-// See specs/013-ct-event-detail-v2/contracts/ctevent-api.md for the full contract,
-// and specs/013-ct-event-detail-v2/data-model.md for the Event type definition.
-//
 // Guarantees:
 //   - Returns a non-nil *Event and nil error for any well-formed CloudTrail JSON.
 //   - Returns (nil, error) for empty input or malformed JSON.
@@ -55,13 +52,11 @@ func Parse(rawJSON string) (*Event, error) {
 		}
 	}
 
-	// Parse UserIdentity
 	ev.UserIdentity = parseUserIdentity(raw.UserIdentity)
 
-	// AccountID comes from userIdentity.accountId per data-model.md
+	// AccountID comes from userIdentity.accountId
 	ev.AccountID = ev.UserIdentity.AccountID
 
-	// Parse RequestParameters and ResponseElements
 	if raw.RequestParameters != nil {
 		var m map[string]any
 		if err := json.Unmarshal(raw.RequestParameters, &m); err == nil {
@@ -75,17 +70,14 @@ func Parse(rawJSON string) (*Event, error) {
 		}
 	}
 
-	// Parse resources[]
 	for _, r := range raw.Resources {
 		ev.Resources = append(ev.Resources, ResourceRef(r))
 	}
 
-	// Parse InsightDetails only when eventCategory == "Insight"
 	if ev.EventCategory == "Insight" && raw.InsightDetails != nil {
 		ev.InsightDetails = parseInsightDetails(raw.InsightDetails)
 	}
 
-	// Classify verb via existing function
 	ev.Verb = ClassifyCTVerb(ev.EventName, ev.EventCategory, ev.EventType)
 
 	return ev, nil
@@ -193,7 +185,6 @@ func parseSessionContext(r *rawSessionContext) *SessionContext {
 		SourceIdentity: r.SourceIdentity,
 	}
 
-	// Attributes
 	sc.Attributes.MFAAuthenticated = r.Attributes.MFAAuthenticated == "true"
 	if r.Attributes.CreationDate != "" {
 		if t, err := time.Parse(time.RFC3339, r.Attributes.CreationDate); err == nil {
@@ -201,7 +192,6 @@ func parseSessionContext(r *rawSessionContext) *SessionContext {
 		}
 	}
 
-	// SessionIssuer
 	if r.SessionIssuer != nil {
 		sc.SessionIssuer = &SessionIssuer{
 			Type:        r.SessionIssuer.Type,
@@ -212,7 +202,6 @@ func parseSessionContext(r *rawSessionContext) *SessionContext {
 		}
 	}
 
-	// WebIDFederationData
 	if r.WebIDFederationData != nil {
 		sc.WebIDFederationData = &WebIDFederationData{
 			FederatedProvider: r.WebIDFederationData.FederatedProvider,

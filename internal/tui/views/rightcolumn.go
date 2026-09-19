@@ -14,9 +14,9 @@ import (
 )
 
 // RightColumnModel tracks interaction state (focus, cursor, filter query,
-// scroll offset) for the RELATED panel next to a detail view. It does not
-// render the panel: row facts (state/count/actionability/navigation IDs)
-// live in the controller-assembled app.DetailBody.Related, read directly by
+// scroll offset) for the RELATED panel next to a detail view. Row facts
+// (state/count/actionability/navigation IDs) live in the controller-assembled
+// app.DetailBody.Related, read directly by
 // RenderDetail (detail_helpers.go) via a transient DetailModel built fresh
 // each frame — see renderer.go's renderDetail(). RightColumnModel is the
 // long-lived half that Bubble Tea key routing (app_stack.go) needs between
@@ -154,9 +154,8 @@ func (m RightColumnModel) HasFilter() bool {
 	return strings.TrimSpace(m.filterQuery) != ""
 }
 
-// moveCursor adjusts the cursor by dir, floored at zero. The widget holds no
-// row facts, so it has no upper bound or actionable-row skip to apply here —
-// the RELATED panel's actual cursor position, scroll window, and
+// moveCursor adjusts the cursor by dir, floored at zero. The RELATED panel's
+// actual cursor position, scroll window, and
 // skip-to-actionable behavior are owned by the controller
 // (core/app/detail_cursor.go) and rendered from
 // app.DetailBody.RelatedCursor/RelatedScroll.

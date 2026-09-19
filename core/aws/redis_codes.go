@@ -14,7 +14,7 @@ const (
 	CodeRedisMultiAZWithoutAutoFailover domain.FindingCode = "redis.warn.multiaz_without_auto_failover"
 )
 
-// Security-posture findings (Prowler gap closure), all evaluated in
+// Security-posture findings, all evaluated in
 // computeRedisFindings from the ReplicationGroup the fetcher already holds.
 const (
 	CodeRedisAtRestOff  domain.FindingCode = "redis.encryption-at-rest-off"

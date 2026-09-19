@@ -25,17 +25,17 @@ type ListViewCacheEntry struct {
 	Resources     []Resource
 	Pagination    *PaginationMeta
 	FilterText    string
-	AttentionOnly bool // §7.3: ctrl+z toggle persisted across view re-entry
+	AttentionOnly bool // ctrl+z toggle persisted across view re-entry
 	SortColIdx    int
 	SortAsc       bool
 	CursorPos     int
 	HScrollOffset int
 	// TotalCount is the authoritative total known for this list at seed time,
-	// when it may exceed len(Resources) (the seed-time provisional total, #17 wave 2: the C6a
+	// when it may exceed len(Resources) (the seed-time provisional total: the
 	// reconstructable disk pair can hold Count > len(Rows) — Rows are only the
 	// last-known pages, Count is the authoritative total). Zero means
 	// "unknown/not applicable" — len(Resources) IS the authoritative count for
-	// every seed source except the on-disk C6a fallback, so callers only set
+	// every seed source except the on-disk fallback, so callers only set
 	// this in that one branch. The seeded list's title prefers TotalCount over
 	// len(Rows) until the next real fetch result lands and clears it.
 	TotalCount int

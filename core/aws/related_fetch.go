@@ -10,9 +10,7 @@ import (
 )
 
 // DefaultPageSize is the number of resources fetched per paginated API call.
-// Re-exported from the resource package so existing aws.DefaultPageSize call
-// sites keep working without churn. The single source of truth is
-// resource.DefaultPageSize.
+// It aliases resource.DefaultPageSize, the single source of truth.
 const DefaultPageSize = resource.DefaultPageSize
 
 // FetchRelatedTarget returns the resource list for the given target type.

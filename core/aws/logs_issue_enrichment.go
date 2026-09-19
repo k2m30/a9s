@@ -30,8 +30,6 @@ const (
 // Findings:
 //   - CloudTrail log group (prefix "/aws/cloudtrail/") with no metric filters → "~"
 //     finding "audit log group missing metric filters"
-//
-// Skip when clients.CloudWatchLogs == nil or does not implement CWLogsDescribeMetricFiltersAPI.
 func EnrichLogsMetricFilters(ctx context.Context, clients *ServiceClients, resources []resource.Resource, _ resource.ResourceCache) (IssueEnricherResult, error) {
 	result := IssueEnricherResult{
 		Findings:     make(map[string][]domain.Finding),

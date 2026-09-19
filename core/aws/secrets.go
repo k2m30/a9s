@@ -85,7 +85,6 @@ func FetchSecretsPage(ctx context.Context, api SecretsManagerListSecretsAPI, con
 		resources = append(resources, r)
 	}
 
-	// Build pagination metadata
 	nextToken := ""
 	isTruncated := false
 	if output.NextToken != nil {

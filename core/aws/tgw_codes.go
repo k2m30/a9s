@@ -16,5 +16,5 @@ const (
 	CodeTGWAutoAccept domain.FindingCode = "tgw.auto-accept-attachments"
 )
 
-// TGWAutoAcceptPhrase is the S4 status phrase for CodeTGWAutoAccept.
+// TGWAutoAcceptPhrase is the status phrase for CodeTGWAutoAccept.
 const TGWAutoAcceptPhrase = "auto-accepts shared attachments"

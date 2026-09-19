@@ -14,13 +14,11 @@ import (
 )
 
 // RelatedDef defines one related resource class for a given resource type.
-// Declaration lives in core/domain/contracts.go; this alias keeps
-// existing consumers compiling.
+// Declaration lives in core/domain/contracts.go; this alias re-exports it.
 type RelatedDef = domain.RelatedDef
 
 // NavigableField associates a detail view field path with a target resource type.
-// Declaration lives in core/domain/contracts.go; this alias keeps
-// existing consumers compiling.
+// Declaration lives in core/domain/contracts.go; this alias re-exports it.
 type NavigableField = domain.NavigableField
 
 // ResolveRef reads ref — any AWS reference to targetType — as the ID the
@@ -46,10 +44,9 @@ func NavIDFromValue(targetType, value string, rc domain.RefContext) string {
 
 // RelatedCheckResult is returned by a RelatedChecker and carries all state
 // needed by the right-column panel to display a row and navigate on Enter.
-// Declaration lives in core/domain/contracts.go; this alias keeps
-// existing consumers compiling.
+// Declaration lives in core/domain/contracts.go; this alias re-exports it.
 //
-// Semantics (FR-008 / FR-014):
+// Semantics:
 //
 //   - State == RelatedResolved (zero value): Count (0..N) is authoritative.
 //   - State == RelatedUnknown: the checker could not determine a count.
@@ -65,17 +62,16 @@ type RelatedCheckResult = domain.RelatedCheckResult
 
 // ResourceCacheEntry holds a snapshot of one resource type's list plus
 // truncation state. Declaration lives in core/domain/contracts.go; this
-// alias keeps existing consumers compiling.
+// alias re-exports it.
 type ResourceCacheEntry = domain.ResourceCacheEntry
 
 // ResourceCache is a read-only snapshot of already-loaded resource lists,
 // keyed by resource short name. Declaration lives in core/domain/contracts.go;
-// this alias keeps existing consumers compiling.
+// this alias re-exports it.
 type ResourceCache = domain.ResourceCache
 
 // RelatedChecker returns a count of related resources of a specific type.
-// Declaration lives in core/domain/contracts.go; this alias keeps
-// existing consumers compiling.
+// Declaration lives in core/domain/contracts.go; this alias re-exports it.
 type RelatedChecker = domain.RelatedChecker
 
 // ValidateRelatedResult sanity-checks that a checker's result is internally
@@ -116,7 +112,7 @@ func ValidateRelatedResult(r RelatedCheckResult) error {
 }
 
 // ValidateRelatedResultAgainstCacheForTest enforces the canonical-target-identity
-// contract (#279): every ResourceID returned by a checker for a given
+// contract: every ResourceID returned by a checker for a given
 // TargetType MUST match the canonical Resource.ID that the TargetType's
 // fetcher emits. We prove this by cross-checking the returned IDs against the
 // target-type's cache entry.
@@ -129,15 +125,12 @@ func ValidateRelatedResult(r RelatedCheckResult) error {
 // regardless.
 //
 // This is the hard contract that catches bugs where a checker returns an ARN,
-// name, or adjacent ID kind instead of the target type's canonical Resource.ID
-// — the class of drill-in regressions called out in the architecture audit.
+// name, or adjacent ID kind instead of the target type's canonical Resource.ID.
 //
-// Test-only: no production caller. Production has no runtime call to
-// ValidateRelatedResult either; the shape invariants it checks are instead
-// structurally enforced by construction — see the constructors in
+// Test-only. In production the shape invariants ValidateRelatedResult checks
+// are enforced by construction — see the constructors in
 // core/domain/related_result.go and the RelatedDef.TargetType guard in
-// core/catalog/catalog.go. This cache cross-check runs only from test
-// invariants today.
+// core/catalog/catalog.go.
 func ValidateRelatedResultAgainstCacheForTest(r RelatedCheckResult, cache ResourceCache) error {
 	if err := ValidateRelatedResult(r); err != nil {
 		return err
@@ -184,7 +177,7 @@ func UnknownRelated(targetType string) RelatedCheckResult {
 // is forbidden) AND dimmed: unlike UnknownRelated it is a dead end, not
 // navigable, because drilling into data that never resolved is misleading.
 // The failure is surfaced separately through a Flash{IsError:true} + the "!"
-// error log (Golden Contract rule 6); the user retries with Ctrl+R.
+// error log; the user retries with Ctrl+R.
 func ErrorRelated(targetType string, err error) RelatedCheckResult {
 	return domain.ErrorRelated(targetType, err)
 }
@@ -222,7 +215,7 @@ func KnownRelated(targetType string, ids []string, truncated bool) RelatedCheckR
 //  5. blank dimmed — the checker errored                (NOT actionable — dead end)
 //
 // RelatedError is a dead end like a proven zero: an error is surfaced through a
-// Flash{IsError:true} + the "!" error log (Golden Contract rule 6), and the user
+// Flash{IsError:true} + the "!" error log, and the user
 // retries with Ctrl+R rather than drilling into data that never resolved.
 // RelatedLoading is the transient in-progress spinner and resolves into one of
 // the above.
@@ -343,9 +336,8 @@ var relatedTestOverrides = map[string][]RelatedDef{}
 // relatedTestOverridesPrev is a stack (per short name) of registration snapshots
 // saved before each SetRelatedForTest / AppendRelated call. CleanupRelatedForTest pops
 // the top entry to restore the previous state. Using a stack (instead of a single
-// slot) prevents nested Register calls — typical when production init() registers
-// once and a test then re-registers — from losing the original production
-// registration past the second Unregister.
+// slot) keeps nested Register calls from losing the original registration past
+// the second Unregister.
 //
 // A nil entry on the stack means "no previous registration existed" and Unregister
 // should delete the active entry rather than restore.
@@ -373,8 +365,8 @@ var navigableFieldPrevious = map[string][][]NavigableField{}
 // any goroutine after startup.
 var defaultNavFieldMu sync.RWMutex
 
-// defaultNavFieldRegistry is an immutable-by-convention registry, currently
-// always empty (nothing writes to it). GetDefaultNavFields falls through to
+// defaultNavFieldRegistry is an immutable-by-convention registry, always
+// empty (nothing writes to it). GetDefaultNavFields falls through to
 // the catalog Navigable defaults below. NavFieldsProvider (used by
 // projection.GenericWithConfig) reads from this registry. DetailModel reads
 // from the mutable navigableFieldRegistry so that tests can construct
@@ -389,10 +381,7 @@ var defaultNavFieldRegistry = map[string][]NavigableField{}
 //
 // The current value for shortName (which may be nil) is pushed onto a per-key
 // stack in relatedTestOverridesPrev so that subsequent CleanupRelatedForTest calls
-// restore the previous registration instead of destroying it. This is critical
-// for tests: production init() registers production defs once, and tests that
-// override-then-cleanup must not nuke the production registration for the rest
-// of the test process.
+// restore the previous registration instead of destroying it.
 func SetRelatedForTest(shortName string, defs []RelatedDef) {
 	if !testing.Testing() {
 		panic("SetRelatedForTest called outside a test binary — relatedTestOverrides is test-only; register production RelatedDefs in the catalog instead")
@@ -440,9 +429,9 @@ func GetRelated(shortName string) []RelatedDef {
 // relatedTestOverridesPrev. If the popped snapshot is nil (the key had no entry
 // before the most recent Register/Append call), the active-registry entry is
 // deleted entirely. If the stack is empty (Unregister called without a matching
-// Register/Append), the entry is deleted as a safe fallback — preserving the
-// historical destructive semantics for test-only types like `test_append`,
-// `srcType`, and `resizeTestType` that were never registered before the test.
+// Register/Append), the entry is deleted as a safe fallback — the case for
+// test-only types like `test_append`, `srcType`, and `resizeTestType` that
+// were never registered before the test.
 func CleanupRelatedForTest(shortName string) {
 	relatedTestOverridesMu.Lock()
 	defer relatedTestOverridesMu.Unlock()
@@ -462,8 +451,7 @@ func CleanupRelatedForTest(shortName string) {
 
 // FetchByIDsFunc fetches specific resource instances by ID, bypassing any
 // filter the top-level paginated fetcher applies.
-// Declaration lives in core/domain/contracts.go; this alias keeps
-// existing consumers compiling.
+// Declaration lives in core/domain/contracts.go; this alias re-exports it.
 type FetchByIDsFunc = domain.FetchByIDsFunc
 
 // fetchByIDsRegistry maps target resource short name to its FetchByIDs helper.
@@ -477,10 +465,8 @@ func SetFetchByIDsForTest(shortName string, fn FetchByIDsFunc) {
 }
 
 // GetFetchByIDs returns the FetchByIDs helper for the target short name.
-// Catalog-backed: falls through to the legacy map (catalog does not carry
-// FetchByIDs separately). Legacy-first:
-// test overrides via SetFetchByIDsForTest take effect; otherwise reads the
-// catalog FetchByIDs field.
+// Test overrides via SetFetchByIDsForTest take effect first; otherwise reads
+// the catalog FetchByIDs field.
 func GetFetchByIDs(shortName string) FetchByIDsFunc {
 	if fn, ok := fetchByIDsRegistry[shortName]; ok {
 		return fn
@@ -534,7 +520,6 @@ func GetNavigableFields(shortName string) []NavigableField {
 		return fields
 	}
 	navigableFieldMu.RUnlock()
-	// Catalog fallback — active during 04b–04m for migrated types.
 	if ct := TypeDef(shortName); ct != nil && len(ct.Navigable) > 0 {
 		return ct.Navigable
 	}

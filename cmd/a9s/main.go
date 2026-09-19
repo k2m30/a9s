@@ -40,8 +40,6 @@ func init() {
 }
 
 // renameHints maps deprecated resource aliases to their current short names.
-// Breaking renames introduced in commits 4b5175b/2ac417f (dbc-snap) and the
-// corresponding dbi-snap rename from rds-snap.
 var renameHints = map[string]string{
 	"rds-snap":   "dbi-snap",
 	"docdb-snap": "dbc-snap",
@@ -257,10 +255,9 @@ func main() {
 			region = demo.DemoRegion
 		}
 		// Demo mode supplies the clients; whether the app keeps a cache is
-		// --no-cache's answer here as everywhere else. Forcing it off meant
-		// the demo ran a lane the installed app does not: no cache load on
-		// start, and therefore no cache-load-then-sweep chain — the path the
-		// main menu's issue badges are written on for a real operator.
+		// --no-cache's answer here as everywhere else, so the demo runs the
+		// cache-load-then-sweep chain the main menu's issue badges are written
+		// on for a real operator.
 		extraOpts = append(extraOpts, tui.WithClients(demo.NewServiceClients()), tui.WithNoCache(noCache), tui.WithIsDemo(true))
 	} else if noCache {
 		extraOpts = append(extraOpts, tui.WithNoCache(true))

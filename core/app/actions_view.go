@@ -11,14 +11,12 @@ import (
 	"github.com/k2m30/a9s/v3/core/runtime"
 )
 
-// handleActionOpenHelp handles ActionOpenHelp.
 func (c *Controller) handleActionOpenHelp(a Action) (ViewState, []runtime.TaskRequest) {
 	res, tasks := c.core.HandleNavigate(runtime.NavigateEvent{Target: runtime.NavigateTargetHelp})
 	tasks = append(tasks, c.applyNavResult(res)...)
 	return c.snapshot(), tasks
 }
 
-// handleActionOpenIdentity handles ActionOpenIdentity.
 func (c *Controller) handleActionOpenIdentity(_ Action) (ViewState, []runtime.TaskRequest) {
 	// The runtime has no NavigateTargetIdentity: the TUI opens the identity
 	// screen via direct key-handling (not HandleNavigate). The headless
@@ -36,7 +34,6 @@ func (c *Controller) handleActionOpenIdentity(_ Action) (ViewState, []runtime.Ta
 	return c.snapshot(), []runtime.TaskRequest{fetchTask}
 }
 
-// handleActionOpenErrorLog handles ActionOpenErrorLog.
 func (c *Controller) handleActionOpenErrorLog(_ Action) (ViewState, []runtime.TaskRequest) {
 	// Mirror the TUI's '!' key: flash when no errors recorded; otherwise push
 	// a text screen with the log entries newest-first.
@@ -61,7 +58,6 @@ func (c *Controller) handleActionOpenErrorLog(_ Action) (ViewState, []runtime.Ta
 	return c.snapshot(), nil
 }
 
-// handleActionSelectProfile handles ActionSelectProfile.
 func (c *Controller) handleActionSelectProfile(a Action) (ViewState, []runtime.TaskRequest) {
 	// ConnectGen is read pre-Rotate; HandleProfileSelected calls Rotate internally.
 	// NewGen is passed as the bumped flash gen for the "Switching to …" tick.
@@ -75,7 +71,6 @@ func (c *Controller) handleActionSelectProfile(a Action) (ViewState, []runtime.T
 	return c.snapshot(), tasks
 }
 
-// handleActionSelectRegion handles ActionSelectRegion.
 func (c *Controller) handleActionSelectRegion(a Action) (ViewState, []runtime.TaskRequest) {
 	intents, tasks := c.core.HandleRegionSelected(runtime.RegionSelectedEvent{
 		Region: a.Arg,
@@ -85,7 +80,6 @@ func (c *Controller) handleActionSelectRegion(a Action) (ViewState, []runtime.Ta
 	return c.snapshot(), tasks
 }
 
-// handleActionSelectTheme handles ActionSelectTheme.
 func (c *Controller) handleActionSelectTheme(a Action) (ViewState, []runtime.TaskRequest) {
 	intents, tasks := c.core.HandleThemeSelected(runtime.ThemeSelectedEvent{
 		Theme: a.Arg,
@@ -94,11 +88,10 @@ func (c *Controller) handleActionSelectTheme(a Action) (ViewState, []runtime.Tas
 	return c.snapshot(), tasks
 }
 
-// handleActionCommand handles ActionCommand.
 func (c *Controller) handleActionCommand(a Action) (ViewState, []runtime.TaskRequest) {
 	// Arg carries a colon-command token (mirrors executeCommand in app_input.go).
 	// Arg-driven tokens (navigate to a resource type, profile, region, etc.) are
-	// dispatched here; "q"/"quit" is intentionally left to the renderer.
+	// dispatched here; quitting ("q"/"quit") belongs to the renderer.
 	switch a.Arg {
 	case "root", "main":
 		res, tasks := c.core.HandleNavigate(runtime.NavigateEvent{Target: runtime.NavigateTargetMainMenu})
@@ -147,14 +140,12 @@ func (c *Controller) handleActionCommand(a Action) (ViewState, []runtime.TaskReq
 			tasks = append(tasks, c.applyNavResult(res)...)
 			return c.snapshot(), tasks
 		}
-		// "q"/"quit" is intentionally not handled here: quitting requires tea.Quit,
-		// a renderer concern the controller cannot (and must not) own. Unknown
-		// command tokens are silently dropped at this layer; the renderer flashes.
+		// Quitting requires tea.Quit, a renderer concern. An unknown token
+		// returns the unchanged snapshot; the renderer flashes.
 	}
 	return c.snapshot(), nil
 }
 
-// handleActionOpenYAML handles ActionOpenYAML.
 func (c *Controller) handleActionOpenYAML(_ Action) (ViewState, []runtime.TaskRequest) {
 	r, typeName, ok := c.selectedResourceForAction()
 	if !ok {
@@ -169,7 +160,6 @@ func (c *Controller) handleActionOpenYAML(_ Action) (ViewState, []runtime.TaskRe
 	return c.snapshot(), tasks
 }
 
-// handleActionOpenJSON handles ActionOpenJSON.
 func (c *Controller) handleActionOpenJSON(_ Action) (ViewState, []runtime.TaskRequest) {
 	r, typeName, ok := c.selectedResourceForAction()
 	if !ok {
@@ -184,7 +174,6 @@ func (c *Controller) handleActionOpenJSON(_ Action) (ViewState, []runtime.TaskRe
 	return c.snapshot(), tasks
 }
 
-// handleActionReveal handles ActionReveal.
 func (c *Controller) handleActionReveal(_ Action) (ViewState, []runtime.TaskRequest) {
 	// Resolve the resource from the active list or detail screen.
 	var revealRes *resource.Resource
@@ -210,13 +199,12 @@ func (c *Controller) handleActionReveal(_ Action) (ViewState, []runtime.TaskRequ
 		ResourceType: revealType,
 		Resource:     revealRes,
 	})
-	// KindFetchReveal: no stack push yet — the push happens when
-	// Handle receives messages.ValueRevealed and calls HandleValueRevealed.
+	// KindFetchReveal: the push happens when Handle receives
+	// messages.ValueRevealed and calls HandleValueRevealed.
 	_ = res
 	return c.snapshot(), tasks
 }
 
-// handleActionChildView handles ActionChildView.
 func (c *Controller) handleActionChildView(a Action) (ViewState, []runtime.TaskRequest) {
 	// Arg carries the trigger key (e, L, R, r, s, Enter, t …).
 	triggerKey := a.Arg
@@ -262,10 +250,8 @@ func (c *Controller) handleActionChildView(a Action) (ViewState, []runtime.TaskR
 	if childTD := resource.GetChildType(matchedChild.ChildType); childTD != nil {
 		c.registerFallbackTypeDefLocked(*childTD)
 	}
-	// The one resolver. A copy of this switch here dropped the "@parent."
-	// source, so a grandchild view read its grandparent's context as a Fields
-	// key no row carries; core/resource/types.go says in so many words that
-	// every path entering a child view calls this rather than re-deriving it.
+	// The one resolver: core/resource/types.go requires every path entering
+	// a child view to call it rather than re-derive the context.
 	var grandparentCtx map[string]string
 	if ls := c.topListState(); ls != nil {
 		grandparentCtx = ls.ParentContext
@@ -297,7 +283,6 @@ func (c *Controller) handleActionChildView(a Action) (ViewState, []runtime.TaskR
 	return c.snapshot(), tasks
 }
 
-// handleActionCloudTrail handles ActionCloudTrail.
 func (c *Controller) handleActionCloudTrail(_ Action) (ViewState, []runtime.TaskRequest) {
 	// Navigate to the CloudTrail Events ("ct-events") list filtered to the
 	// active resource. Mirrors the TUI's 't' key: BuildCloudTrailFilter →

@@ -145,7 +145,6 @@ type IAMAPI interface {
 	IAMGetPolicyAPI
 	IAMGetPolicyVersionAPI
 	IAMGetRolePolicyAPI
-	// Wave 2 enrichment interfaces.
 	IAMGetLoginProfileAPI
 	IAMListMFADevicesAPI
 	IAMListAccessKeysAPI

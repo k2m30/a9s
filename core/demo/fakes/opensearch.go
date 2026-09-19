@@ -32,7 +32,7 @@ func (f *OpenSearchFake) ListDomainNames(_ context.Context, _ *opensearch.ListDo
 			EngineType: ostypes.EngineTypeOpenSearch,
 		})
 	}
-	// Unavailable witnesses are listed but omitted from DescribeDomains — the
+	// Unavailable domains are listed but absent from DescribeDomains — the
 	// batched API's absent-from-response shape.
 	for i := range f.fix.UnavailableNames {
 		domainNames = append(domainNames, ostypes.DomainInfo{
@@ -50,7 +50,7 @@ func (f *OpenSearchFake) DescribeDomains(_ context.Context, _ *opensearch.Descri
 }
 
 // ListTags returns demo tags for the given domain ARN.
-// For the graph-root domain (acme-logs) it returns the aws:cloudformation:stack-name tag
+// For acme-logs it returns the aws:cloudformation:stack-name tag
 // so that checkOpenSearchCFN resolves the acme-search-stack CFN stack.
 func (f *OpenSearchFake) ListTags(_ context.Context, in *opensearch.ListTagsInput, _ ...func(*opensearch.Options)) (*opensearch.ListTagsOutput, error) {
 	if in == nil || in.ARN == nil {
@@ -77,7 +77,7 @@ func (f *OpenSearchFake) ListTags(_ context.Context, in *opensearch.ListTagsInpu
 }
 
 // DescribeDomainConfig returns demo domain config for the given domain name.
-// For the graph-root domain (acme-logs) it returns a CustomEndpointCertificateArn
+// For acme-logs it returns a CustomEndpointCertificateArn
 // so that checkOpenSearchACM resolves the acme-logs.internal.com ACM certificate.
 func (f *OpenSearchFake) DescribeDomainConfig(_ context.Context, in *opensearch.DescribeDomainConfigInput, _ ...func(*opensearch.Options)) (*opensearch.DescribeDomainConfigOutput, error) {
 	if in == nil || in.DomainName == nil {

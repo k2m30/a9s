@@ -16,7 +16,7 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// role trust-policy FindingCodes and their S5 detail sentences.
+// role trust-policy FindingCodes and their detail sentences.
 const (
 	// roleCodeWildcardTrust — the trust policy lets any AWS principal assume
 	// the role with nothing scoping the grant.
@@ -176,7 +176,6 @@ func FetchIAMRolesPage(ctx context.Context, api IAMListRolesAPI, continuationTok
 		resources = append(resources, r)
 	}
 
-	// Build pagination metadata — IAM uses IsTruncated bool + Marker *string
 	nextToken := ""
 	isTruncated := output.IsTruncated
 	if isTruncated && output.Marker != nil {
@@ -345,10 +344,6 @@ type inlinePolicyScan struct {
 // policy_resources is emitted as a Field so sibling pivots (s3, kms,
 // secrets, …) can scan the list and match by ARN substring.
 // Cost: 1 ListRolePolicies + N GetRolePolicy per role.
-// Attached (managed) policies require a separate walk via
-// ListAttachedRolePolicies + GetPolicyVersion and are not enumerated here
-// yet; inline policies cover the s3-access-role case and are the minimum
-// needed to make the s3→role pivot resolve.
 func enumerateRoleInlinePolicies(
 	ctx context.Context,
 	listAPI IAMListRolePoliciesAPI,
@@ -387,10 +382,8 @@ func enumerateRoleInlinePolicies(
 			scan.failures = append(scan.failures, UnusableAnswer(roleName, "unreadable inline policy "+policyName))
 			continue
 		}
-		// Read off the document the escalation check below reads. A second
-		// walk of the same JSON is a second answer waiting to disagree — the
-		// one this replaced bound Statement to an array and so lost every
-		// resource of a policy written with a bare Statement object.
+		// Read off the document the escalation check below reads, so a policy
+		// written with a bare Statement object yields its resources too.
 		for _, st := range parsed.Statement {
 			allResources = append(allResources, st.Resource...)
 		}

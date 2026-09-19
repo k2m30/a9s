@@ -26,15 +26,12 @@ const (
 	mskCodeUnauthenticated  domain.FindingCode = "msk.unauthenticated"
 )
 
-// S5 operator sentences for the broker exposure codes above. Neither carries
-// a supporting row: the phrase is the whole fact.
 // EnrichMSKCluster calls DescribeClusterV2 per provisioned MSK cluster (cap EnrichmentCap)
 // and raises findings for:
 //   - Broker software version below 2.8 (major.minor) → "~" "broker software outdated"
 //   - EncryptionInTransit.ClientBroker not "TLS" → "~" "encryption in transit not enforced"
 //
-// Serverless clusters (Provisioned==nil) are skipped.
-// Skip if clients.MSK == nil. Per-cluster errors → Truncated.
+// Serverless clusters (Provisioned==nil) are skipped. Per-cluster errors → Truncated.
 func EnrichMSKCluster(ctx context.Context, clients *ServiceClients, resources []resource.Resource, _ resource.ResourceCache) (IssueEnricherResult, error) {
 	result := IssueEnricherResult{
 		Findings:     make(map[string][]domain.Finding),
@@ -75,10 +72,8 @@ func EnrichMSKCluster(ctx context.Context, clients *ServiceClients, resources []
 		}
 		prov := out.ClusterInfo.Provisioned
 		if prov == nil {
-			// Serverless cluster — skip checks.
 			return
 		}
-		// Check broker software version.
 		if prov.CurrentBrokerSoftwareInfo != nil && prov.CurrentBrokerSoftwareInfo.KafkaVersion != nil {
 			if isMSKVersionOutdated(*prov.CurrentBrokerSoftwareInfo.KafkaVersion) {
 				setWave2Finding(&result, r.ID, mskCodeBrokerOutdated, nil)
@@ -92,7 +87,7 @@ func EnrichMSKCluster(ctx context.Context, clients *ServiceClients, resources []
 			prov.EncryptionInfo.EncryptionInTransit.ClientBroker != kafkatypes.ClientBrokerTls {
 			setWave2Finding(&result, r.ID, mskCodeEncryptionNotTLS, nil)
 		}
-		// Rule 4: a cluster being torn down, or already broken beyond use,
+		// A cluster being torn down, or already broken beyond use,
 		// has no posture worth reporting. The two checks above describe the
 		// software it is running; the two below describe how it is reachable,
 		// which is what stops mattering when it is going away.
@@ -137,7 +132,6 @@ func isMSKVersionOutdated(version string) bool {
 	if err != nil {
 		return false
 	}
-	// Current cutoff: 2.8. Anything with major < 2 or (major == 2 && minor < 8) is outdated.
 	return major < 2 || (major == 2 && minor < 8)
 }
 

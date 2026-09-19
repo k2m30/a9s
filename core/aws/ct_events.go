@@ -39,7 +39,6 @@ func FetchCloudTrailEventsPage(ctx context.Context, api CloudTrailLookupEventsAP
 		resources = append(resources, r)
 	}
 
-	// Build pagination metadata
 	nextToken := ""
 	isTruncated := false
 	if output.NextToken != nil {
@@ -188,10 +187,8 @@ func buildCTResource(event cloudtrailtypes.Event) resource.Resource {
 		readOnly = *event.ReadOnly
 	}
 
-	// Parse the CloudTrailEvent JSON blob once.
 	parsed := parseCTEventJSON(event.CloudTrailEvent)
 
-	// Compute _ct.* fields.
 	eventCategory := strFromMap(parsed, "eventCategory")
 	eventType := strFromMap(parsed, "eventType")
 	verb := ctevent.ClassifyCTVerb(eventName, eventCategory, eventType)
@@ -239,8 +236,6 @@ func buildCTResource(event cloudtrailtypes.Event) resource.Resource {
 	origin := computeCTOrigin(parsed)
 	target := ExtractCTTarget(parsed)
 	if target == "(none)" || target == "" {
-		// Step 1.5: per-event-name fallback table (§4).
-		// Only fires when resources[] is empty and event is a management event.
 		eventNameForTarget, _ := parsed["eventName"].(string)
 		if t := extractTargetByEventName(eventNameForTarget, parsed); t != "" {
 			target = t
@@ -260,7 +255,7 @@ func buildCTResource(event cloudtrailtypes.Event) resource.Resource {
 	sourceIP := strFromMap(parsed, "sourceIPAddress")
 	region := strFromMap(parsed, "awsRegion")
 
-	// Compute the §1.2 severity tier ("ct-info" | "ct-attention" | "ct-danger")
+	// The severity tier ("ct-info" | "ct-attention" | "ct-danger")
 	// and the cause that earned it. The tier is written below to Fields["status"]
 	// (branching/color); the cause drives the finding phrase so the operator
 	// sees WHY the row is flagged, not just its severity name.
@@ -271,7 +266,6 @@ func buildCTResource(event cloudtrailtypes.Event) resource.Resource {
 		Name:     eventName,
 		Findings: ctEventFindings(status, cause, errorCode, eventName),
 		Fields: map[string]string{
-			// Existing keys (kept for backwards compat with related-checkers and tests).
 			"event_name":    eventName,
 			"status":        status,
 			"time":          eventTimeDisplay,
@@ -285,7 +279,7 @@ func buildCTResource(event cloudtrailtypes.Event) resource.Resource {
 			// CloudTrail has no LookupAttributeKey for the shared event id, so
 			// the SharedEventId pivot filters on this field locally instead.
 			"shared_event_id": strFromMap(parsed, "sharedEventID"),
-			// New _ct.* keys.
+			// _ct.* keys carry the computed display values.
 			"_ct.verb":              verb,
 			"_ct.actor":             actor,
 			"_ct.origin":            origin,
@@ -332,7 +326,7 @@ func strFromMap(m map[string]any, key string) string {
 
 // computeCTActor computes the _ct.actor string from parsed JSON and the top-level Username.
 // Never returns blank — falls back to "-" if no identity can be determined.
-// When crossAccount is true, the result is prefixed with "<counterpartyAccountID>/" per §1.4
+// When crossAccount is true, the result is prefixed with "<counterpartyAccountID>/"
 // (except for "-", which indicates no actor was identified). counterpartyAccount is the
 // userIdentity.accountId. Note: ROOT actors DO receive the prefix — the counterparty account
 // identity is exactly the high-signal information the user needs for cross-account root events.
@@ -376,7 +370,6 @@ func computeCTActorInner(parsed map[string]any, topLevelUser string) string {
 		if sc, ok := ui["sessionContext"].(map[string]any); ok {
 			if si, ok := sc["sessionIssuer"].(map[string]any); ok {
 				if roleName, _ := si["userName"].(string); roleName != "" {
-					// Append session name if available.
 					if arn, _ := ui["arn"].(string); arn != "" {
 						// Extract session name from arn: arn:aws:sts::…:assumed-role/<role>/<session>
 						parts := strings.Split(arn, "/")
@@ -529,7 +522,6 @@ func ExtractCTTarget(parsed map[string]any) string {
 		vpce, _ := parsed["vpcEndpointId"].(string)
 		svc := ""
 		if src, _ := parsed["eventSource"].(string); src != "" {
-			// Strip .amazonaws.com suffix to get short service name.
 			svc = strings.TrimSuffix(src, ".amazonaws.com")
 			if idx := strings.Index(svc, "."); idx > 0 {
 				svc = svc[:idx]
@@ -585,14 +577,13 @@ func extractInsightRatio(parsed map[string]any) string {
 		return ""
 	}
 	ratio := insightAvg / baseAvg
-	// Format to 1 decimal place.
 	formatted := fmt.Sprintf("%.1f", ratio)
 	formatted = strings.TrimSuffix(formatted, ".0")
 	return formatted
 }
 
 // ctEvent cause tags — the reason computeCTStatus assigned a given tier.
-// Each maps 1:1 to a branch in the §1.2 ladder; ctCauseNone marks the
+// Each maps 1:1 to a branch in computeCTStatus's ladder; ctCauseNone marks the
 // ct-info default (no branch matched).
 const (
 	ctCauseError         = "error"
@@ -642,7 +633,7 @@ func ctErrorWord(errorCode string) string {
 	return "unknown error"
 }
 
-// computeCTStatus implements the §1.2 severity ladder, returning the tier
+// computeCTStatus implements the severity ladder, returning the tier
 // and the cause that earned it. Precedence: danger > attention > info.
 // Highest match wins, top to bottom, within each tier.
 func computeCTStatus(verb, eventName, eventSource, errorCode, userIdentityType, accountID, recipientAccountID string) (tier, cause string) {
@@ -670,10 +661,9 @@ func computeCTStatus(verb, eventName, eventSource, errorCode, userIdentityType, 
 	return "ct-info", ctCauseNone
 }
 
-// isSensitiveRead reports whether an event is in the §1.3 hard-coded
+// isSensitiveRead reports whether an event is in the hard-coded
 // sensitive-reads allowlist. Match is exact "<service>:<eventName>" where
 // service is derived from eventSource by stripping ".amazonaws.com".
-// KMS is deliberately excluded.
 func isSensitiveRead(eventSource, eventName string) bool {
 	svc := eventSource
 	if idx := strings.Index(svc, "."); idx > 0 {
@@ -693,7 +683,7 @@ func isSensitiveRead(eventSource, eventName string) bool {
 		"ssm:DescribeParameters":
 		return true
 
-	// STS session vending (AssumeRole* deliberately excluded — too noisy via IRSA/SSO)
+	// STS session vending
 	case "sts:GetSessionToken",
 		"sts:GetFederationToken":
 		return true

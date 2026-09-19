@@ -23,10 +23,9 @@ func detailPageSizeFor(a Action) int {
 }
 
 // reconcileDetailScrollToCursor keeps ds.FieldCursor within the visible
-// window [ScrollY, ScrollY+height) by adjusting ds.ScrollY. Mirrors the
-// proven legacy syncViewportToCursor (internal/tui/views/detail_helpers.go:250).
+// window [ScrollY, ScrollY+height) by adjusting ds.ScrollY.
 // height is the usable viewport height supplied by the renderer via Action.N;
-// when height<=0 (unknown) it is a no-op, preserving prior behavior.
+// when height<=0 (unknown) it is a no-op.
 func reconcileDetailScrollToCursor(ds *DetailState, height int) {
 	if height <= 0 {
 		return
@@ -56,7 +55,7 @@ func (c *Controller) applyDetailActions(a Action) (ViewState, []runtime.TaskRequ
 		if !ds.RelatedFocus {
 			if ds.FieldCursor > 0 {
 				ds.FieldCursor--
-				// Skip section headers and spacers — mirrors the TUI legacy path.
+				// Skip section headers and spacers.
 				items := c.buildDetailFieldItems(ds).items
 				for ds.FieldCursor > 0 && ds.FieldCursor < len(items) &&
 					(items[ds.FieldCursor].IsSection || items[ds.FieldCursor].IsSpacer) {
@@ -78,7 +77,7 @@ func (c *Controller) applyDetailActions(a Action) (ViewState, []runtime.TaskRequ
 			fieldCount := len(items)
 			if ds.FieldCursor < fieldCount-1 {
 				ds.FieldCursor++
-				// Skip section headers and spacers — mirrors the TUI legacy path.
+				// Skip section headers and spacers.
 				for ds.FieldCursor < fieldCount-1 &&
 					(items[ds.FieldCursor].IsSection || items[ds.FieldCursor].IsSpacer) {
 					ds.FieldCursor++
@@ -269,9 +268,9 @@ func isSelfPivotZeroDetailRow(row DetailRelatedRow, sourceType string) bool {
 // isActionableDetailRow delegates to the single shared predicate
 // resource.IsRelatedActionable so the actionability rule is defined once. It
 // is also the renderer's dim predicate: buildDetailRelatedBlocks sets
-// RelatedBlock.Actionable from this same call, and both the TUI
-// (rightcolumn.go isRowActionable) and the web template (detail.html's
-// "dead-end" class) render a row dim exactly when this is false. Cursor
+// RelatedBlock.Actionable from this same call, and both the TUI and the
+// web template (detail.html's "dead-end" class) render a row dim exactly
+// when this is false. Cursor
 // movement (detailSkipUnselectableRelated) skips a row under the identical
 // condition so the highlighted row and the dimmed row can never diverge.
 func isActionableDetailRow(row DetailRelatedRow) bool {

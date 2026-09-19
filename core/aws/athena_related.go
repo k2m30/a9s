@@ -13,8 +13,8 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// athenaWorkGroupConfig fetches Configuration for a workgroup by name (Pattern
-// C helper). Returns nil on any failure so callers can emit an unknown result.
+// athenaWorkGroupConfig fetches Configuration for a workgroup by name.
+// Returns nil on any failure so callers can emit an unknown result.
 func athenaWorkGroupConfig(ctx context.Context, clients any, wgName string) *athenatypes.WorkGroupConfiguration {
 	if wgName == "" {
 		return nil
@@ -36,7 +36,6 @@ func athenaWorkGroupConfig(ctx context.Context, clients any, wgName string) *ath
 
 // checkAthenaS3 calls athena:GetWorkGroup and extracts the result-output bucket
 // from Configuration.ResultConfiguration.OutputLocation (form: s3://bucket/prefix).
-// Pattern C — single API call per checker.
 func checkAthenaS3(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	cfg := athenaWorkGroupConfig(ctx, clients, res.ID)
 	if cfg == nil {
@@ -49,7 +48,7 @@ func checkAthenaS3(ctx context.Context, clients any, res resource.Resource, cach
 }
 
 // checkAthenaKMS calls athena:GetWorkGroup and extracts the KMS key ID from
-// Configuration.ResultConfiguration.EncryptionConfiguration.KmsKey. Pattern C.
+// Configuration.ResultConfiguration.EncryptionConfiguration.KmsKey.
 func checkAthenaKMS(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	cfg := athenaWorkGroupConfig(ctx, clients, res.ID)
 	if cfg == nil {
@@ -84,7 +83,7 @@ func checkAthenaLogs(ctx context.Context, clients any, res resource.Resource, _ 
 }
 
 // checkAthenaRole calls athena:GetWorkGroup and extracts the ExecutionRole for
-// Spark workgroups from Configuration.ExecutionRole. Pattern C.
+// Spark workgroups from Configuration.ExecutionRole.
 func checkAthenaRole(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	cfg := athenaWorkGroupConfig(ctx, clients, res.ID)
 	if cfg == nil {

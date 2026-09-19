@@ -103,12 +103,9 @@ type ViewsConfig struct {
 // correction moved away from, which is worse than a missing column because it
 // looks like it works.
 //
-// Those two are its whole reach. REMOVING a built-in column and RENAMING one
-// are NOT handled, and bumping the stamp does not deliver them: the merge only
-// ever adds and re-sources, so a removed column stays on the operator's disk,
-// and a rename arrives as a title the file has never heard of — the operator
-// keeps the old column beside the new one. Shipping either needs a migration
-// this file does not have.
+// The merge only adds and re-sources: a removed built-in column stays on the
+// operator's disk, and a renamed one arrives as a new title beside the old
+// column.
 const GeneratedViewsVersion = 7
 
 // ViewDef defines the list and detail view configuration for a single resource type.
@@ -116,7 +113,7 @@ type ViewDef struct {
 	List   []ListColumn  `yaml:"-"`
 	Detail []DetailField `yaml:"-"`
 	// Generated is the GeneratedViewsVersion the file on disk was written with,
-	// zero for a file written before the stamp existed.
+	// zero for an unstamped file.
 	Generated int `yaml:"-"`
 }
 
@@ -159,11 +156,9 @@ func TitleFieldKey(title string) string {
 // TitleFieldKeys are the spellings a column title answers to when it has to
 // read a value back, most preferred first.
 //
-// The spaced spelling leads because of what is already on disk: a type file
-// an older build wrote carries BOTH, the spaced one holding the value that
-// build's screen showed and the underscored one holding the raw scalar its
-// fetcher stored. A file this build writes carries the underscored key only,
-// so the spaced lookup misses and costs nothing.
+// The spaced spelling leads: a cache file may carry BOTH, the spaced one
+// holding the value the screen showed and the underscored one holding the
+// raw scalar the fetcher stored.
 func TitleFieldKeys(title string) [2]string {
 	return [2]string{strings.ToLower(title), TitleFieldKey(title)}
 }
@@ -309,9 +304,8 @@ func LoadFromDirs(dirs []string) (*ViewsConfig, error) {
 
 			// The file's name is the type it configures, resolved the way
 			// every other lookup resolves one — parents and children, and the
-			// canonical spelling whatever case or alias the file used. Storing
-			// the file's own spelling meant "EC2.yaml" validated at load and
-			// was then never read, because the runtime asks for "ec2".
+			// canonical spelling whatever case or alias the file used, because
+			// the runtime asks for "ec2" whatever the file is called.
 			// Resolved after the parse so a malformed file is still a parse
 			// error, whatever its name says.
 			td := catalog.FindAny(resourceName)
@@ -387,9 +381,7 @@ func loadReport(cfg *ViewsConfig, unresolved, collisions []string) error {
 //
 // A Path is a producer: the cascade
 // reads the struct live, and MaterializeListFields writes that same value
-// under the column's key for the row a restart replays. So a column naming
-// both was reported as filled by nothing while rendering correctly on both
-// lanes.
+// under the column's key for the row a restart replays.
 //
 // The load's report and the producers gate ask here, so a column the gate
 // accepts is never one the operator is told is broken.
@@ -487,7 +479,6 @@ func GetViewDef(cfg *ViewsConfig, shortName string) ViewDef {
 		return def
 	}
 
-	// Merge: user-provided fields override defaults; empty fields fall back.
 	if len(userDef.List) > 0 {
 		def.List = userDef.List
 	}
@@ -541,12 +532,10 @@ func ConfigFilePath(filename string) string {
 func lookupDirs() []string {
 	var dirs []string
 
-	// 1. Global config directory (env var or ~/.a9s/)
 	if dir := ConfigDir(); dir != "" {
 		dirs = append(dirs, filepath.Join(dir, "views"))
 	}
 
-	// 2. CWD .a9s/views/ directory (per-project overrides)
 	dirs = append(dirs, filepath.Join(".a9s", "views"))
 
 	return dirs

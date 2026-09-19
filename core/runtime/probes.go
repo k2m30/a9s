@@ -72,7 +72,7 @@ type DemoPrefetchResult struct {
 	// rows) — surfaced as a blocking flash banner.
 	PrefetchErr error
 	// PrefetchSoftErr aggregates PARTIAL failures (the type still yielded
-	// rows alongside a composite per-item error — the E5 contract, e.g. a
+	// rows alongside a composite per-item error, e.g. a
 	// details-denied environment). Recorded in the `!` error log only; the
 	// rows already carry their degraded-state findings on screen.
 	PrefetchSoftErr error
@@ -87,12 +87,12 @@ type DemoPrefetchResult struct {
 // When session.Region is still unresolved ("", e.g. cold boot with no -r
 // flag before the AWS connect settles it), the profile's default region is
 // resolved synchronously from the local AWS config file so the disk seed
-// does not have to wait on a live connection (C1: cached data renders
+// does not have to wait on a live connection (cached data renders
 // before any AWS activity). This mirrors the resolution
 // handleClientsReadySuccess performs post-connect. The resolved region is
 // stamped onto the session (Session.ResolvePair) rather
 // than kept local to this call: it is the pair every answer this lane
-// produces will be stamped with, so the C9 guard that compares the two needs
+// produces will be stamped with, so the pair guard that compares the two needs
 // the session to already carry it. Connect still resolves the same region
 // from the same config and finds the pair already filled. The stamp precedes
 // the NoCache short circuit so a no-cache session carries the same resolved
@@ -131,7 +131,7 @@ func (c *Core) LoadAvailabilityCache() *cache.Store {
 //   - Rule 1 (non-exact subset): a rows-carrying write that is itself NOT
 //     exact (a truncated page) never loses rows it already had, even when
 //     its own row set is a shallower subset of the stored rows — Count/Exact
-//     may still advance (C5), but Rows is untouched.
+//     may still advance, but Rows is untouched.
 //   - Rule 2 (counts-only): Rows is never inspected or touched — Count may
 //     exceed len(Rows) indefinitely; this is the only rule allowed to leave
 //     that pair mismatched.
@@ -139,7 +139,7 @@ func (c *Core) LoadAvailabilityCache() *cache.Store {
 //     observation that is itself exact is authoritative proof of the live
 //     population and replaces stored Rows wholesale, including shrinking
 //     them when the exact incoming row set is a strict subset — a
-//     genuinely deleted resource's row does not outlive its deletion. C6b
+//     genuinely deleted resource's row does not outlive its deletion.
 //     Wave-2 carry (carryWave2ForRows) still backfills the SURVIVING rows'
 //     Wave-2 Findings/Fields, and FirstSeen stamping
 //     (stampFindingFirstSeen) applies to survivors exactly as on any other
@@ -161,7 +161,7 @@ func (c *Core) LoadAvailabilityCache() *cache.Store {
 //
 // Rules, applied in order:
 //
-//  0. Contradiction (false-exact self-heal, D14/D7): the write carries an
+//  0. Contradiction (false-exact self-heal): the write carries an
 //     observation of its own (NOT Derived — a write that only reads the row
 //     store back has nothing to contradict the file with), existing.Exact is
 //     stored true, but the CURRENT observation is itself truncated (rawTruncated)
@@ -174,21 +174,21 @@ func (c *Core) LoadAvailabilityCache() *cache.Store {
 //     stays exact-zero — so rule 0 does not fire for that shape. A truncated
 //     fetch cannot, by construction, have exhausted a list that is genuinely
 //     done at existing.Count — either a continuation token still exists past
-//     that depth, or the verify-depth walk (D7) reached the stored-exact
+//     that depth, or the verify-depth walk reached the stored-exact
 //     depth and AWS still reports more. The stored Exact was therefore never
 //     true for the CURRENT population (a shrink/growth since it was set, or
-//     it was poisoned by an old build's false-exact bug) — live contradiction
+//     a false-exact write) — live contradiction
 //     beats a stored claim, so Exact is dropped and the deeper truncated
 //     observation's own count/rows become the new (lower-bound) truth. This
 //     is the one case where a truncated observation is allowed to REGRESS a
 //     stored Exact — every other rule below assumes exactness, once true,
-//     only advances (C5), which is the assumption rule 0 exists to correct
-//     when it demonstrably no longer holds.
+//     only advances, which is the assumption rule 0 exists to correct
+//     when it demonstrably does not hold.
 //  1. Rows-carrying, incoming NOT itself exact (a truncated page), shallower
 //     than existing AND incoming's IDs are a subset of existing's (a
 //     shallower page of the same list): existing Rows are kept in full — a
 //     truncated observation never regresses a deeper one. Count/Exact still
-//     advance per C5 (a new EXACT count wins even off a thinner row set).
+//     advance (a new EXACT count wins even off a thinner row set).
 //     When incoming IS itself exact despite being a shallower subset, it is
 //     authoritative proof of the live population instead (falls to the
 //     default branch below, rules 3/4's shape) — a genuine deletion between
@@ -197,19 +197,19 @@ func (c *Core) LoadAvailabilityCache() *cache.Store {
 //     Rows (if any) are carried forward untouched regardless of whether
 //     Count now disagrees with len(Rows). The pair is reconstructable: the
 //     row set is the last-known page(s), Count is the authoritative total,
-//     and the renderer already treats Rows as stale-until-verified (C1).
+//     and the renderer already treats Rows as stale-until-verified.
 //     Only Count/Exact/HasResources/Issues* are written.
 //  3. Rows-carrying, incoming has MORE rows than existing: incoming's rows
-//     always win (deeper knowledge) — but see the C6b carry note below.
+//     always win (deeper knowledge) — but see the Wave-2 carry note below.
 //  4. Rows-carrying, same depth but different content (non-subset — a
-//     genuine refresh): incoming wins by recency — but see the C6b carry
+//     genuine refresh): incoming wins by recency — but see the Wave-2 carry
 //     note below.
 //
-// C6b Wave-2 carry: rules 3 and 4 let incoming's rows replace existing's
+// Wave-2 carry: rules 3 and 4 let incoming's rows replace existing's
 // wholesale, which — for a bare Wave-1 rows-carrying observation (e.g. the
 // sweep-completion save) — would silently drop any Wave-2-sourced Findings
 // and registered enricher Fields a prior enrichment pass wrote onto
-// existing's rows (D17). Unless wave2Authoritative is true (this write IS
+// existing's rows. Unless wave2Authoritative is true (this write IS
 // the Wave-2-completion save for shortName, which must supersede carried
 // data so healed/resolved issues clear), every row incoming replaces under
 // rules 3/4 carries forward its existing counterpart's Wave-2 Findings and
@@ -254,7 +254,7 @@ type saveObservation struct {
 // third time. Rows are the caller's to attach: they are the one thing the two
 // lanes genuinely differ about.
 //
-// C5, exactness sticks: a truncated observation never downgrades a stored
+// Exactness sticks: a truncated observation never downgrades a stored
 // exact total — Exact advances only on an observation that is itself
 // untruncated. reconcileTypeFile's rule 0 overrides that stickiness when the
 // raw (truncated, count) observation CONTRADICTS the stored exactness, which
@@ -316,7 +316,7 @@ func reconcileTypeFile(existing cache.TypeFile, in reconcileInput) cache.TypeFil
 	case in.RawTruncated && len(incoming.Rows) < len(existing.Rows) && rowIDsAreSubset(incoming.Rows, existing.Rows):
 		// Rule 1: a non-exact (truncated) shallower page of the same list —
 		// keep the deeper rows. Gated on in.RawTruncated (the untouched raw
-		// signal, not incoming.Exact, which a caller's C5 stickiness may
+		// signal, not incoming.Exact, which a caller's exactness stickiness may
 		// already have forced true) so a genuinely EXACT observation that
 		// happens to be a strict subset falls through to the default branch
 		// instead — an exact subset is authoritative proof of a deletion,
@@ -331,7 +331,7 @@ func reconcileTypeFile(existing cache.TypeFile, in reconcileInput) cache.TypeFil
 		// is itself exact (authoritative proof of the live population, even
 		// when shallower than existing), or is a same/differing-depth
 		// non-subset refresh — incoming's rows win wholesale, carrying
-		// forward any Wave-2 data (C6b) the replaced rows have that incoming
+		// forward any Wave-2 data the replaced rows have that incoming
 		// itself lacks, unless this write is itself the Wave-2-completion
 		// save (which must supersede carried data wholesale so
 		// healed/resolved issues clear).
@@ -346,7 +346,7 @@ func reconcileTypeFile(existing cache.TypeFile, in reconcileInput) cache.TypeFil
 // superset — used by reconcileTypeFile's rule 1 to detect "a shallower page
 // of the same list" (e.g. a truncated first-page refetch over an
 // already-exact, fuller stored list) as opposed to a genuine content change
-// that merely happens to be no longer.
+// that merely happens not to be longer.
 func rowIDsAreSubset(candidate, superset []cache.Row) bool {
 	if len(candidate) == 0 {
 		return true
@@ -373,17 +373,17 @@ func rowIDsAreSubset(candidate, superset []cache.Row) bool {
 // sync-back and the in-list Wave-2 badge).
 //
 // pair is carried through to the save chokepoint, which refuses it when the
-// operator has since switched (C9). Best-effort like every other cache write.
+// operator has since switched. Best-effort like every other cache write.
 func (c *Core) SaveAvailabilityFromRows(pair session.Pair) error {
 	entries, truncated, issueCounts, issueTruncated, issueKnown := c.availabilityFromResourceCache()
 	return c.saveAvailabilityCache(pair, entries, truncated, issueCounts, issueTruncated, issueKnown, true)
 }
 
 // SaveAvailabilityCache persists the supplied availability state to disk, one
-// type file per resource type (C7: per-type files, no merge logic). Returns
+// type file per resource type (per-type files, no merge logic). Returns
 // nil immediately when entries is nil or caching is disabled (NoCache). The
-// per-type read-modify-marshal sequence runs inside WithCacheStoreSave (the
-// store-lock serialization, D13) so the in-memory half can never interleave
+// per-type read-modify-marshal sequence runs inside WithCacheStoreSave so
+// the in-memory half can never interleave
 // with a concurrent SaveResourceListCache/SaveAvailabilityCache call for the
 // same type file dispatched from another tea.Cmd goroutine (e.g. a
 // background availability sweep's save racing a list screen's own
@@ -391,15 +391,14 @@ func (c *Core) SaveAvailabilityFromRows(pair session.Pair) error {
 // can land in the same on-disk TypeFile as a mismatched pair, even though
 // each call's own write is individually consistent. The actual
 // disk write happens after WithCacheStoreSave releases pairMu — see its doc
-// comment for what changed and the trade-off that split accepts.
-// WithCacheStoreSave also covers the initial load (C7 hard invariant: a save
+// comment for the trade-off that split accepts.
+// WithCacheStoreSave also covers the initial load (hard invariant: a save
 // can never precede that pair's own load).
 //
-// Row/Findings persistence (C6, all loaded pages) is intentionally NOT done
-// here — this method only carries the counts-only availability-probe shape
-// callers historically populated it with. Full-row persistence for a type's
-// canonical top-level list happens via Core.SaveResourceListCache, called
-// from the list-fetch-completion seam (applyResourcesLoaded). Every write
+// This method writes the counts-only availability-probe shape. Full-row
+// persistence for a type's canonical top-level list happens via
+// Core.SaveResourceListCache, called from the list-fetch-completion seam
+// (applyResourcesLoaded). Every write
 // this method stages goes through reconcileTypeFile (rule 2: a counts-only
 // write never touches existing Rows).
 func (c *Core) SaveAvailabilityCache(
@@ -603,14 +602,14 @@ func saveFieldKey(col config.ListColumn, fields map[string]string) (string, bool
 }
 
 // SaveResourceListCache persists rows for one resource type's canonical
-// top-level, unfiltered list (C6): every loaded page's rows (ID/Name/Fields/
+// top-level, unfiltered list: every loaded page's rows (ID/Name/Fields/
 // Findings — colors/glyphs/status are derived at render time and never
 // persisted), the current count, and the exact flag. Callers are responsible
-// for the C6 scope gate (only calling this for a top-level unfiltered list,
+// for the scope gate (only calling this for a top-level unfiltered list,
 // never a child/related/filtered view).
 //
-// The read-modify-marshal sequence runs inside WithCacheStoreSave (the
-// store-lock serialization, D13) — see SaveAvailabilityCache's doc comment
+// The read-modify-marshal sequence runs inside WithCacheStoreSave — see
+// SaveAvailabilityCache's doc comment
 // for why obtaining the store via EnsureCacheStore and mutating it
 // afterward is not sufficient: that shape only serializes the pointer
 // lookup, not the store.Type/Put/PrepareSave sequence, letting two
@@ -622,7 +621,7 @@ func saveFieldKey(col config.ListColumn, fields map[string]string) (string, bool
 //
 // This is the list-open save lane (app.Controller.maybeSaveResourceListCache
 // and the executor's per-type sweep loop) — never the Wave-2-completion save,
-// so it always runs reconcileTypeFile with wave2Authoritative=false (C6b: a
+// so it always runs reconcileTypeFile with wave2Authoritative=false (a
 // bare rows-carrying write here carries forward any Wave-2 data the replaced
 // rows have that rows itself lacks). The Wave-2-completion save
 // (handleEnrichmentChecked's "all done" branch, via the TaskKindSaveCache
@@ -645,7 +644,7 @@ func (c *Core) SaveResourceListCache(pair session.Pair, shortName string, rows [
 // persisted), and writes through saveResourceListCache/
 // saveResourceListCacheWave2Complete depending on wave2Authoritative.
 //
-// Callers own the C6 scope gate (only a top-level, unfiltered list may call
+// Callers own the scope gate (only a top-level, unfiltered list may call
 // this) and the issue-count computation — the list-open lane
 // (app.Controller.maybeSaveResourceListCache) and the sweep lane
 // (saveProbeResourcesToTypeFiles) each aggregate issues from different
@@ -736,7 +735,7 @@ func (c *Core) saveResourceListCache(target SaveTarget, rows []cache.Row, conten
 			ShortName:          canon,
 			Wave2Authoritative: content.Wave2Authoritative,
 		})
-		// #463: the FirstSeen diff runs unconditionally, after
+		// The FirstSeen diff runs unconditionally, after
 		// reconcileTypeFile (including any Wave-2 carry it performed), against
 		// the pre-save on-disk generation (existing.Rows) — the single
 		// chokepoint both save lanes share. A finding the earlier generation
@@ -772,8 +771,8 @@ func (c *Core) saveResourceListCache(target SaveTarget, rows []cache.Row, conten
 // 55, or the verify walk stops one page short and the list regresses to
 // "50+" — so a background verify-refetch
 // (KindFetchResources) can be bounded to at most the depth already shown to
-// the user (C1: re-verify must verify the content being shown, not just page
-// 1; C5: a truncated first-page fetch must never downgrade a stored exact
+// the user (re-verify must verify the content being shown, not just page
+// 1; a truncated first-page fetch must never downgrade a stored exact
 // total — paginating up to the prior depth keeps the refetch from silently
 // shrinking a wider cached list back to a single page). Returns 0 when
 // caching is disabled or no stored rows exist for shortName, in which case
@@ -812,7 +811,7 @@ func (c *Core) ProbeResourceAvailability(ctx context.Context, clients *awsclient
 	// is materially more expensive to resolve than an availability/count
 	// signal needs (e.g. "policy" skips IAM's per-group inline-policy
 	// sweep) — every other type falls back to its ordinary paginated
-	// fetcher, unchanged.
+	// fetcher.
 	pf := resource.GetAvailabilityFetcher(shortName)
 	if pf == nil {
 		pf = resource.GetPaginatedFetcher(shortName)
@@ -963,14 +962,13 @@ func (c *Core) DemoPrefetchCounts(ctx context.Context, clients *awsclient.Servic
 // Deliberately uses tr.Gen != 0 (observed-at-all), NOT ProbeOriginTypeNames'
 // len(Rows)>0 gate: an explicitly-retained, observed-EMPTY slice counts as
 // observed (a live Wave-1 probe
-// confirming zero resources still ran that type's Wave-2 enricher). Reusing
-// ProbeOriginTypeNames here would silently skip Wave-2 enrichment for every
-// observed-empty type, a real behavior regression this membership test must
-// not introduce.
+// confirming zero resources still ran that type's Wave-2 enricher).
+// ProbeOriginTypeNames would skip Wave-2 enrichment for every
+// observed-empty type.
 //
 // tr.Partial additionally excludes a type that has ONLY ever received a
 // lazy related-add (ObservePartial) and no canonical Observe/ObserveCount
-// (C6 scope boundary): ObservePartial always bumps Gen even for a
+// ObservePartial always bumps Gen even for a
 // never-canonically-observed type, so the Gen!=0 check alone is not
 // sufficient to keep a lazy-add-only type out of the Wave-2 queue.
 func (c *Core) BuildEnrichQueue() []string {
@@ -998,7 +996,6 @@ func (c *Core) BuildEnrichQueue() []string {
 // startup path no list has been opened yet, so building from full-only
 // entries would leave the first enrichment pass blind to siblings the
 // probe alone has retained.
-// Regression pin: TestProbeEnrichment_CacheSnapshotMergesProbeResources.
 func (c *Core) ProbeEnrichment(ctx context.Context, clients *awsclient.ServiceClients, shortName string) ProbeEnrichmentResult {
 	resources, _ := c.ProbeResources(shortName)
 	return c.probeEnrichmentRows(ctx, clients, shortName, resources)
@@ -1114,9 +1111,9 @@ func prefetchDeclaredRead(ctx context.Context, clients *awsclient.ServiceClients
 // Pagination.IsTruncated carries through unchanged — first-page-only
 // probe/disk rows are marked truncated so the orphan rule in cross-ref
 // enrichers treats parent-not-found as "unknown, skip" rather than
-// "definitively deleted" per spec §3.1. A disk-seeded entry is also marked
+// "definitively deleted". A disk-seeded entry is also marked
 // FieldsOnly: its rows render and answer Fields lookups, but carry no
-// RawStruct (core/cache C6), so FetchRelatedTarget fetches the type live
+// RawStruct, so FetchRelatedTarget fetches the type live
 // for a checker that matches on the SDK struct.
 //
 // A type observed with a zero-length Rows slice (Gen != 0, e.g. a live
@@ -1125,8 +1122,7 @@ func prefetchDeclaredRead(ctx context.Context, clients *awsclient.ServiceClients
 // only a never-observed type (Gen == 0) is skipped. Dropping an
 // observed-empty entry here would make FetchRelatedTarget's `cache[target]`
 // lookup miss and fall through to its own live re-fetch, discarding the
-// exact IsTruncated signal this method exists to carry — the #233
-// regression this comment documents against reintroduction.
+// exact IsTruncated signal this method exists to carry.
 //
 // Every RunRelatedDef caller — the TUI's per-def fan-out
 // (runtime_adapter_related.go) and the executor's KindRelatedCheck case

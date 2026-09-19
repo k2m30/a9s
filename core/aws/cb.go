@@ -178,10 +178,9 @@ func cbSourceLocationCredential(src *cbtypes.ProjectSource) (string, bool) {
 	return u.String(), true
 }
 
-// addCBPostureFindings evaluates the four w6b posture signals against the
-// BatchGetProjects response the fetcher already holds. Each is independent
-// (contract rule 4), so a project that is wrong four ways carries four
-// findings.
+// addCBPostureFindings evaluates the four posture signals against the
+// BatchGetProjects response the fetcher already holds. Each is independent,
+// so a project that is wrong four ways carries four findings.
 func addCBPostureFindings(r *resource.Resource, project cbtypes.Project) {
 	if project.ProjectVisibility == cbtypes.ProjectVisibilityTypePublicRead {
 		addWave1Finding(r, CodeCBPublicBuilds)

@@ -146,7 +146,7 @@ func FetchHostedZonesPage(ctx context.Context, api Route53ListHostedZonesAPI, co
 //  2. s3WebsiteAliasNames — record FQDNs (trailing dot stripped) whose
 //     AliasTarget.DNSName matches the S3-website regional endpoint
 //     (s3-website-<region>.amazonaws.com or s3-website.<region>.
-//     amazonaws.com). Used by checkS3R53 per spec §2 — Route 53 alias
+//     amazonaws.com). Used by checkS3R53 — Route 53 alias
 //     to S3 requires bucket-name == FQDN, so the join key is the record
 //     name, NOT a substring of DNSName (which never contains the bucket
 //     name in real AWS).
@@ -209,8 +209,8 @@ func r53S3WebsiteBucketNames(sets []r53types.ResourceRecordSet) []string {
 
 // isS3WebsiteEndpoint reports whether a Route 53 AliasTarget DNSName is
 // an S3 static-website regional endpoint. AWS returns one of:
-//   - s3-website-<region>.amazonaws.com.   (legacy hyphen form)
-//   - s3-website.<region>.amazonaws.com.   (newer dot form)
+//   - s3-website-<region>.amazonaws.com.   (hyphen form)
+//   - s3-website.<region>.amazonaws.com.   (dot form)
 //
 // The bucket name is NEVER part of this DNSName — the join to a specific
 // bucket is by record name (FQDN) which per AWS must equal the bucket name.

@@ -14,7 +14,6 @@ import (
 // checkDbcSnapDBC extracts DBClusterIdentifier from the DBClusterSnapshot RawStruct
 // and searches the dbc cache for the parent cluster.
 // Handles both docdbtypes.DBClusterSnapshot and rdstypes.DBClusterSnapshot shapes.
-// Pattern C — needs target cache.
 func checkDbcSnapDBC(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	var clusterID string
 	if snap, ok := assertStruct[docdbtypes.DBClusterSnapshot](res.RawStruct); ok {
@@ -51,7 +50,6 @@ func checkDbcSnapDBC(ctx context.Context, clients any, res resource.Resource, ca
 // checkDbcSnapKMS reads KmsKeyId from the DBClusterSnapshot RawStruct.
 // Extracts UUID after last '/' from the ARN.
 // Handles both docdbtypes.DBClusterSnapshot and rdstypes.DBClusterSnapshot shapes.
-// Pattern F — no cache needed.
 func checkDbcSnapKMS(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	var keyID string
 	if snap, ok := assertStruct[docdbtypes.DBClusterSnapshot](res.RawStruct); ok {
@@ -94,7 +92,7 @@ func checkDbcSnapVPC(_ context.Context, _ any, res resource.Resource, _ resource
 
 // checkDbcSnapBackup resolves AWS Backup PLANS that cover this DocumentDB or
 // Aurora cluster snapshot's PARENT CLUSTER by reverse-scanning the already-
-// loaded backup PLAN cache (Pattern C — cache scan, zero extra API calls).
+// loaded backup PLAN cache (cache scan, zero extra API calls).
 //
 // AWS Backup tracks the parent cluster, not individual snapshots — a
 // BackupSelection.Resources entry matches an `arn:aws:rds:…:cluster:<name>`
@@ -117,9 +115,8 @@ func checkDbcSnapBackup(ctx context.Context, clients any, res resource.Resource,
 		return unreadZero(res, resource.KnownRelated("backup", nil, false))
 	}
 
-	// If the snapshot's RawStruct already exposes the parent cluster ARN we
-	// can skip the dbc-cache lookup. rdstypes.DBClusterSnapshot carries
-	// DBClusterArn directly; docdbtypes does not.
+	// Neither snapshot shape carries the parent cluster ARN, so it is
+	// resolved through the dbc cache.
 	if parentARN == "" {
 		dbcList, dbcTruncated, err := relatedResourcesFor(ctx, clients, cache, "dbc")
 		if err != nil {
@@ -197,11 +194,11 @@ func dbcResourceARN(raw any) string {
 
 // checkDbcSnapCTEvents looks up cached CloudTrail events for the snapshot's
 // DBClusterSnapshotIdentifier. Universal pivot — every registered type gets one;
-// see docs/related-resources.md §Policy. FetchFilter["ResourceName"] is always
+// see the Policy section of docs/related-resources.md. FetchFilter["ResourceName"] is always
 // set so the caller can do a filtered re-fetch; Count is "unknown" (windowed)
-// per the spec — the panel renders the visible page count rather than a total.
+// — the panel renders the visible page count rather than a total.
 // ResourceType is "AWS::RDS::DBClusterSnapshot" — both DocDB and Aurora cluster
-// snapshots share this CloudTrail resource type (docs/resources/dbc-snap.md §2 ct-events).
+// snapshots share this CloudTrail resource type (docs/resources/dbc-snap.md).
 // Built via BuildCTEventsPivotChecker — see ct_events_pivot.go for the shared logic.
 var checkDbcSnapCTEvents = BuildCTEventsPivotChecker(CTEventsPivotConfig{
 	IDExtractor: func(res resource.Resource) string { return res.ID },

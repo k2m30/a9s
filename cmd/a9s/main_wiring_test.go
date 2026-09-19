@@ -9,13 +9,8 @@ import (
 	"testing"
 )
 
-// Regression guard: main must import core/aws AND call aws.Install() so
-// the catalog (and any remaining init()-driven registry side effects) is wired
-// before the TUI starts.
-//
-// Before AS-795a this test asserted a blank import (side-effect-only). After
-// AS-795a the import is named so main() can call aws.Install(); we verify both
-// the import and the explicit call to keep the wiring honest.
+// main must import core/aws AND call aws.Install() so the catalog is wired
+// before the TUI starts; both the import and the explicit call are checked.
 func TestMain_ImportsAWSRegistrySideEffects(t *testing.T) {
 	fset := token.NewFileSet()
 	file, err := parser.ParseFile(fset, "main.go", nil, parser.ParseComments)

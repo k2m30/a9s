@@ -4,7 +4,7 @@
 // checker functions. Every checker here is zero-extra-API-call: the
 // fetcher's DescribeServer pass already carries every field these checkers
 // read, so each one is a Pattern F (RawStruct read) — never a new AWS call,
-// mirroring mwaa_related.go. docs/resources/transfer.md §2.
+// mirroring mwaa_related.go.
 package aws
 
 import (
@@ -83,8 +83,7 @@ func checkTransferSubnet(_ context.Context, _ any, res resource.Resource, _ reso
 // checkTransferEIP reads EndpointDetails.AddressAllocationIds directly
 // (Pattern F); present only when EndpointType == VPC on an internet-facing
 // server. AllocationIds already match the eip type's canonical Resource.ID
-// (eip.go's FetchElasticIPs sets Resource.ID = AllocationId directly), so no
-// ARN extraction is needed.
+// (eip.go's FetchElasticIPs sets Resource.ID = AllocationId directly).
 func checkTransferEIP(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	server, ok := assertStruct[transfertypes.DescribedServer](res.RawStruct)
 	if !ok {
@@ -111,8 +110,7 @@ func checkTransferVPC(_ context.Context, _ any, res resource.Resource, _ resourc
 
 // checkTransferVPCE reads EndpointDetails.VpcEndpointId directly (Pattern
 // F); present only when EndpointType == VPC — the hop that carries the
-// security groups (docs/resources/transfer.md §2 — sg is NOT registered,
-// reached via this vpce pivot instead).
+// security groups.
 func checkTransferVPCE(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	server, ok := assertStruct[transfertypes.DescribedServer](res.RawStruct)
 	if !ok {

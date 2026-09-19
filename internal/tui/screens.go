@@ -9,7 +9,6 @@
 // core/runtime).
 //
 // The registered builders cover the profile selector, reveal, and child list.
-// Capability screens (logs, ct.scan, cost) are not yet built here.
 package tui
 
 import (
@@ -144,8 +143,7 @@ func readThemeFileCmd(p runtime.ReadThemePayload) tea.Cmd {
 // config.SaveTheme. On error the adapter surfaces a flash; on success
 // no message fires (the user already saw the success flash emitted by
 // HandleThemeFileRead's intent slice). Decoupled from the apply step so
-// a save failure does not roll back the in-memory theme change —
-// matching the documented Option B trade-off.
+// a save failure does not roll back the in-memory theme change.
 func saveThemeConfigCmd(p runtime.SaveThemeConfigPayload) tea.Cmd {
 	theme := p.Theme
 	return func() tea.Msg {

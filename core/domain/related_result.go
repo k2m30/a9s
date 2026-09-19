@@ -57,7 +57,7 @@ func UnknownRelated(targetType string) RelatedCheckResult {
 // is forbidden) AND dimmed: unlike UnknownRelated it is a dead end, not
 // navigable, because drilling into data that never resolved is misleading.
 // The failure is surfaced separately through a Flash{IsError:true} + the "!"
-// error log (Golden Contract rule 6); the user retries with Ctrl+R.
+// error log; the user retries with Ctrl+R.
 func ErrorRelated(targetType string, err error) RelatedCheckResult {
 	return RelatedCheckResult{targetType: targetType, state: RelatedError, err: err}
 }

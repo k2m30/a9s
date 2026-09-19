@@ -179,7 +179,6 @@ func checkSubnetRTB(ctx context.Context, clients any, res resource.Resource, cac
 }
 
 // checkSubnetCFN checks the subnet's tags for aws:cloudformation:stack-name.
-// No cache access needed — the tag carries the stack name directly.
 func checkSubnetCFN(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	raw, ok := assertStruct[ec2types.Subnet](res.RawStruct)
 	if !ok {

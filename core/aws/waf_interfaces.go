@@ -42,7 +42,4 @@ type WAFv2API interface {
 	WAFv2ListWebACLsAPI
 	WAFv2ListResourcesForWebACLAPI
 	WAFGetLoggingConfigurationAPI // Wave 2 enrichment
-	// WAFv2GetWebACLAPI is intentionally excluded from the aggregate — EnrichWAFLogging
-	// calls GetWebACL via type assertion so test fakes that only cover logging do not
-	// need to implement it.
 }

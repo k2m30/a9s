@@ -13,17 +13,15 @@ import (
 )
 
 // apiCostPerCall is the CE API pricing used to compute the session cost
-// estimate shown in the footer (FR-013: calls x $0.01).
+// estimate shown in the footer (calls x $0.01).
 const apiCostPerCall = 0.01
 
 // costsDeltaNeutralThreshold is the |delta| fraction below which a cell's
-// period-over-period change is rendered neutral rather than growth/drop
-// (wireframe.md: "|delta| < threshold neutral").
+// period-over-period change is rendered neutral rather than growth/drop.
 const costsDeltaNeutralThreshold = 0.05
 
 // costsDeltaStrongThreshold is the |delta| fraction at and above which a
-// non-neutral cell is tagged "-strong" rather than "-soft" (wireframe.md:
-// "growth red shades, drop green shades").
+// non-neutral cell is tagged "-strong" rather than "-soft".
 const costsDeltaStrongThreshold = 0.25
 
 // buildCostsBody assembles a CostsBody from cs, pre-resolving every display
@@ -56,7 +54,7 @@ func buildCostsBody(cs *CostsState) *CostsBody {
 	top := cs.DrillStack[len(cs.DrillStack)-1]
 	grid, vm := costsViewModelForFrame(cs, top)
 
-	// D4/D5: vm.VisibleCols is already the renderer-reported-viewport
+	// vm.VisibleCols is already the renderer-reported-viewport
 	// slice, anchored at top.ScrollX (reconciled against the cursor by
 	// applyCostsMoveCol/reconcileCostsScrollToCursor) — ViewportCols<=0
 	// (renderer hasn't reported a width yet, or every column already fits)
@@ -64,8 +62,8 @@ func buildCostsBody(cs *CostsState) *CostsBody {
 	columns := make([]CostColumn, len(vm.VisibleCols))
 	for i, p := range vm.VisibleCols {
 		// Open marks the current period; RenderCosts appends the "*" suffix
-		// (wireframe.md) — Label stays the bare period text so a renderer
-		// never needs to strip a baked-in marker back out.
+		// — Label stays the bare period text so a renderer never needs to strip
+		// a baked-in marker back out.
 		columns[i] = CostColumn{Label: PeriodLabel(p, top.Granularity), Open: !p.Closed(cs.Now)}
 	}
 
@@ -80,8 +78,7 @@ func buildCostsBody(cs *CostsState) *CostsBody {
 		rows[ri] = CostRow{Label: gr.Label, Cells: cells}
 	}
 
-	// grid.Totals is not part of ViewModel (Seam 8 names Rows/Cursor/
-	// VisibleCols/Note only) — sliced to the identical visible window
+	// grid.Totals is not part of ViewModel — sliced to the identical visible window
 	// costsVisibleColumnRange computes the same way BuildViewModel did
 	// internally for VisibleCols.
 	visibleStart, _ := costsVisibleColumnRange(cs, top, len(grid.Columns))
@@ -94,7 +91,7 @@ func buildCostsBody(cs *CostsState) *CostsBody {
 	_, anomaliesPartial := cs.Store.AnomalyOverlay(top.Window, cs.Now)
 	switch {
 	case cs.Store.Partial(costsQueryForFrame(top, cs.Metric), top.Window, cs.Now):
-		// FR-017: partial dollars rendered as complete dollars is a
+		// Partial dollars rendered as complete dollars is a
 		// correctness defect, not a cosmetic one — the cached records this
 		// frame is built from were fetched under the CE pagination cap, so
 		// Rows/Totals are a lower bound. Read from the store rather than
@@ -110,14 +107,14 @@ func buildCostsBody(cs *CostsState) *CostsBody {
 		// overlay on them is not.
 		footerNote = "partial anomaly data — CE pagination cap reached, more anomalies may exist than are marked"
 	case cs.DrillRefusedReason != "":
-		// The most recent refused drill attempt's honest reason (FR-007)
+		// The most recent refused drill attempt's reason
 		// takes priority over the cursor cell's own delta/anomaly note —
 		// it is the more relevant, more recent user-facing feedback.
 		footerNote = cs.DrillRefusedReason
 	case cs.ResourceRowNote != "":
 		footerNote = cs.ResourceRowNote
 	case footerNote == "" && top.Fallback.Fired && len(vm.Rows) > 0:
-		// N3: this frame's own fetch genuinely returned zero records at the
+		// This frame's own fetch genuinely returned zero records at the
 		// drilled granularity, so the granularity-fallback re-plan already
 		// substituted the parent's own coarser granularity/period — Rows is
 		// non-empty here precisely because that substitution succeeded;
@@ -125,19 +122,19 @@ func buildCostsBody(cs *CostsState) *CostsBody {
 		// re-fetch ALSO coming back empty.
 		footerNote = fmt.Sprintf("showing %s data — no records at the drilled granularity for the selected period", top.Granularity)
 	case footerNote == "" && vm.Note != "" && !cs.Loading && len(cs.DrillStack) > 1:
-		// X11: a legitimately empty finer-grain drill — the fetch genuinely
+		// A legitimately empty finer-grain drill — the fetch genuinely
 		// completed (not Loading) with zero records at this granularity
 		// (e.g. a charge billed only monthly, so its weekly/daily window
 		// has nothing) — must explain itself, never render a silent empty
 		// grid indistinguishable from "still loading" or "genuinely no
 		// spend." vm.Note is the ViewModel's own (depth-agnostic) honesty
-		// note (Seam 8, one source); root-level (DrillStack depth 1) stays
+		// note; root-level (DrillStack depth 1) stays
 		// silent here: an empty pivot view is ordinary (a fresh account,
 		// or every row filtered to zero), not evidence of a granularity
 		// mismatch.
 		footerNote = vm.Note
 	case footerNote == "" && costsAnyTotalMixed(totals):
-		// X8 (body-level acceptance): the domain layer already refuses a
+		// The domain layer already refuses a
 		// bare cross-currency TOTAL (costs.SumCells/buildCostCell's Mixed
 		// cells); this is the explanatory note the suppressed "—" cells
 		// need, shown only as a fallback so it never masks a more
@@ -173,7 +170,7 @@ func buildCostsBody(cs *CostsState) *CostsBody {
 // spend simply ending.
 func buildCostCell(cv costs.CellValue) CostCell {
 	if cv.Mixed {
-		// X8: a USD+EUR (or any other cross-currency) sum never renders as
+		// A USD+EUR (or any other cross-currency) sum never renders as
 		// a bare number — "—" is not a formatted zero, it is an explicit
 		// suppression marker (buildCostsBody's footer note explains why).
 		return CostCell{Amount: "—", DeltaTag: "neutral", Estimated: cv.Estimated, Mixed: true}
@@ -191,7 +188,7 @@ func buildCostCell(cv costs.CellValue) CostCell {
 	}
 }
 
-// costsAnyTotalMixed reports whether any visible Totals cell is Mixed (X8).
+// costsAnyTotalMixed reports whether any visible Totals cell is Mixed.
 func costsAnyTotalMixed(totals []CostCell) bool {
 	for _, c := range totals {
 		if c.Mixed {
@@ -215,7 +212,7 @@ func stripCostsServiceVendorPrefix(label string) string {
 	return label
 }
 
-// fmtCostAmount formats v as wireframe.md's grid amounts: comma-grouped
+// fmtCostAmount formats v as a grid amount: comma-grouped
 // thousands, exactly one decimal place, no currency symbol
 // ("1,204.1", "2,971.3").
 func fmtCostAmount(v float64) string {
@@ -247,9 +244,8 @@ func fmtCostAmount(v float64) string {
 	return out
 }
 
-// deltaTag buckets a period-over-period fraction into the five-way tag
-// wireframe.md describes ("growth red shades, drop green shades, |delta| <
-// threshold neutral"): "neutral" below costsDeltaNeutralThreshold, then
+// deltaTag buckets a period-over-period fraction into a five-way tag:
+// "neutral" below costsDeltaNeutralThreshold, then
 // "growth"/"drop" each split into "-soft" (below costsDeltaStrongThreshold)
 // and "-strong" (at or above it) — or "" when there is no prior-column
 // baseline (NaN — first column or missing prior data).
@@ -272,14 +268,14 @@ func deltaTag(delta float64) string {
 }
 
 // formatAPICost renders the session CE-call counter's estimated dollar cost
-// (FR-013: calls x $0.01).
+// (calls x $0.01).
 func formatAPICost(calls int) string {
 	return fmt.Sprintf("$%.2f", float64(calls)*apiCostPerCall)
 }
 
 // PeriodLabel formats p for column headers / breadcrumbs at granularity g:
 // "Jul'26" (month), "2026" (year), "Jan 1-4" (week, clipped to month
-// boundary per wireframe.md), "Jan 5" (day).
+// boundary), "Jan 5" (day).
 func PeriodLabel(p costs.Period, g costs.Granularity) string {
 	start, err := costs.ParseDate(p.Start)
 	if err != nil {
@@ -305,7 +301,7 @@ func PeriodLabel(p costs.Period, g costs.Granularity) string {
 	}
 }
 
-// costsFrameTitle builds the Cost Explorer breadcrumb title (wireframe.md:
+// costsFrameTitle builds the Cost Explorer breadcrumb title (e.g.
 // "Costs: by service · invoice · monthly · Aug'25-Jul'26" at the root,
 // "Costs: EC2 - Compute ▸ May'26 · by usage type · daily · invoice" when
 // drilled) — the single source Snapshot() feeds into ViewState.FrameTitle,
@@ -362,8 +358,8 @@ func buildCostsBreadcrumb(stack []costs.DrillLevel) []string {
 // costsFooterNote is the footer's first slot: the cursor cell's anomaly
 // root cause when flagged, else its period-over-period delta
 // ("Δ vs prev: +12.4%"), else empty (no baseline). vm.Cursor already
-// indexes vm.Rows[*].Cells validly (screen.BuildViewModel's clamp, Seam
-// 8) — the only remaining guard is vm.Rows being empty (nothing to
+// indexes vm.Rows[*].Cells validly (screen.BuildViewModel's clamp) —
+// the only remaining guard is vm.Rows being empty (nothing to
 // index), which the clamp intentionally leaves Cursor pointing at 0 for.
 func costsFooterNote(vm screen.ViewModel) string {
 	if len(vm.Rows) == 0 || vm.Cursor.Row >= len(vm.Rows) {

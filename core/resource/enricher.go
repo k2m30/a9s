@@ -9,8 +9,7 @@ import (
 )
 
 // DetailEnricher is the function signature for on-demand detail enrichers.
-// Declaration lives in core/domain/contracts.go; this alias keeps
-// existing consumers compiling.
+// Declaration lives in core/domain/contracts.go; this alias re-exports it.
 type DetailEnricher = domain.DetailEnricher
 
 var detailEnricherRegistry = map[string]DetailEnricher{}
@@ -32,8 +31,8 @@ func SetDetailEnricherForTest(shortName string, f DetailEnricher) {
 
 // GetDetailEnricher returns the detail enricher for the given resource short name.
 // Catalog-backed: checks the catalog (both top-level and child types) first;
-// falls through to the legacy map so test overrides via SetDetailEnricherForTest
-// continue to work for synthetic short names.
+// falls through to the runtime map so test overrides via SetDetailEnricherForTest
+// work for synthetic short names.
 func GetDetailEnricher(shortName string) DetailEnricher {
 	if ct := TypeDef(shortName); ct != nil && ct.DetailEnrich != nil {
 		return ct.DetailEnrich
@@ -43,7 +42,7 @@ func GetDetailEnricher(shortName string) DetailEnricher {
 
 // HasDetailEnricher returns true if a detail enricher is registered for the given short name.
 // Catalog-backed: checks the catalog (both top-level and child) first; falls
-// through to the legacy map.
+// through to the runtime map.
 func HasDetailEnricher(shortName string) bool {
 	if ct := TypeDef(shortName); ct != nil && ct.DetailEnrich != nil {
 		return true

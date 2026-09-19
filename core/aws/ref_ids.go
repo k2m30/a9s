@@ -239,7 +239,6 @@ func kmsRefToID(ref string, rc domain.RefContext) (string, bool) {
 		return res, !isARN && isKMSKeyID(res)
 	}
 	for _, t := range rc.Targets {
-		// "alias" alone is what a row cached before "aliases" existed carries.
 		if t.Fields["alias"] == res || slices.Contains(strings.Split(t.Fields["aliases"], ","), res) {
 			return t.ID, true
 		}

@@ -15,9 +15,9 @@ const KindRelatedCheck TaskKind = "related-check"
 const MaxConcurrentProbes = 4
 
 // RelatedCheckerTimeout bounds a single RelatedDef checker call (including
-// its NeedsTargetCache prefetch and lazy-add FetchByIDs call, if any) — the
-// same per-checker budget the TUI's fan-out has always used, now shared with
-// the headless executor's fan-out via RunRelatedDef (executor.go).
+// its NeedsTargetCache prefetch and lazy-add FetchByIDs call, if any) — one
+// per-checker budget shared by the TUI's fan-out and the headless executor's
+// fan-out via RunRelatedDef (executor.go).
 const RelatedCheckerTimeout = 10 * time.Second
 
 // RelatedTitleSuffix returns the " -- id (name)" suffix for list titles.

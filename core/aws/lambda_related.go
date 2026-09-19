@@ -27,9 +27,9 @@ func checkLambdaRole(_ context.Context, clients any, res resource.Resource, cach
 	if fn.Role == nil || *fn.Role == "" {
 		return resource.KnownRelated("role", nil, false)
 	}
-	// In-body: the execution Role ARN normalizes to the role name, which IS the
-	// role's Resource.ID (roles keyed by name; role FetchByIDs drives the drill).
-	// Resolve by identity — no role-list fetch.
+	// The execution Role ARN normalizes to the role name, which is the role's
+	// Resource.ID (roles keyed by name; role FetchByIDs drives the drill), so
+	// it resolves by identity.
 	return relatedRefs("role", []string{*fn.Role}, refContext(clients, cache, "role"))
 }
 
@@ -44,7 +44,7 @@ func checkLambdaAlarms(ctx context.Context, clients any, res resource.Resource, 
 }
 
 // checkLambdaLogs searches the logs cache for the CloudWatch log group for this function.
-// Pattern N — default: /aws/lambda/{function-name}, with custom override via LoggingConfig.
+// Default: /aws/lambda/{function-name}, with custom override via LoggingConfig.
 func checkLambdaLogs(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	functionName := res.ID
 	if functionName == "" {
@@ -54,7 +54,6 @@ func checkLambdaLogs(ctx context.Context, clients any, res resource.Resource, ca
 		return resource.KnownRelated("logs", nil, false)
 	}
 
-	// Check for custom log group via LoggingConfig
 	expectedLogGroup := "/aws/lambda/" + functionName
 	fn, ok := assertStruct[lambdatypes.FunctionConfiguration](res.RawStruct)
 	if ok && fn.LoggingConfig != nil && fn.LoggingConfig.LogGroup != nil && *fn.LoggingConfig.LogGroup != "" {
@@ -80,7 +79,6 @@ func checkLambdaLogs(ctx context.Context, clients any, res resource.Resource, ca
 
 // checkLambdaSG extracts security group IDs from the Lambda FunctionConfiguration's
 // VpcConfig.SecurityGroupIds (only present for VPC-attached functions).
-// Pattern F — no cache needed.
 func checkLambdaSG(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	fn, ok := assertStruct[lambdatypes.FunctionConfiguration](res.RawStruct)
 	if !ok {
@@ -98,7 +96,7 @@ func checkLambdaSG(_ context.Context, _ any, res resource.Resource, _ resource.R
 	return relatedResult("sg", ids)
 }
 
-// checkLambdaVPC returns the VPC this Lambda function runs in (Pattern R).
+// checkLambdaVPC returns the VPC this Lambda function runs in.
 // Reads FunctionConfiguration.VpcConfig.VpcId from the RawStruct.
 // Returns Count: 0 for functions not attached to a VPC.
 func checkLambdaVPC(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
@@ -113,8 +111,8 @@ func checkLambdaVPC(_ context.Context, _ any, res resource.Resource, _ resource.
 }
 
 // checkLambdaKMS extracts the KMS key ARN from the Lambda FunctionConfiguration
-// KMSKeyArn field (used for environment variable encryption). Pattern F — no
-// cache needed. The ARN last segment after "/" is used as the key ID.
+// KMSKeyArn field (used for environment variable encryption). The ARN last
+// segment after "/" is used as the key ID.
 func checkLambdaKMS(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	fn, ok := assertStruct[lambdatypes.FunctionConfiguration](res.RawStruct)
 	if !ok || fn.KMSKeyArn == nil || *fn.KMSKeyArn == "" {
@@ -127,8 +125,8 @@ func checkLambdaKMS(ctx context.Context, clients any, res resource.Resource, cac
 	return kmsRelated(ctx, clients, cache, []string{keyID})
 }
 
-// checkLambdaSQS finds SQS queues wired to this Lambda as event sources
-// (Pattern A — live API). Calls lambda:ListEventSourceMappings scoped to the
+// checkLambdaSQS finds SQS queues wired to this Lambda as event sources.
+// Calls lambda:ListEventSourceMappings scoped to the
 // function and extracts SQS queue names from the returned EventSourceArn values.
 // Returns an unknown result when no live clients are available, since the
 // Lambda FunctionConfiguration struct does not embed event source mappings.
@@ -156,8 +154,8 @@ func checkLambdaSQS(ctx context.Context, clients any, res resource.Resource, cac
 }
 
 // checkLambdaCFN finds the CloudFormation stack that owns this Lambda by reading
-// the function's tags (Pattern A — live API). FunctionConfiguration does NOT
-// embed tags, so this calls lambda:ListTags on the function ARN and then matches
+// the function's tags. FunctionConfiguration carries no tags, so this calls
+// lambda:ListTags on the function ARN and then matches
 // the aws:cloudformation:stack-name tag against the cfn cache.
 // Returns an unknown result when neither clients nor a usable ARN are available.
 func checkLambdaCFN(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
@@ -232,7 +230,7 @@ func checkLambdaECR(ctx context.Context, clients any, res resource.Resource, cac
 }
 
 // checkLambdaEBRule finds EventBridge rules that target this Lambda
-// (Pattern A — live API). There is no field on FunctionConfiguration that
+// There is no field on FunctionConfiguration that
 // enumerates incoming rules, and scanning the eb-rule cache alone is
 // insufficient because Rule structs do not include targets — each would require
 // a separate events:ListTargetsByRule call. We iterate the cached rules and

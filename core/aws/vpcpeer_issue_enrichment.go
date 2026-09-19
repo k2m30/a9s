@@ -2,11 +2,8 @@
 
 // vpcpeer_issue_enrichment.go — Wave 2 cache-scan enrichment for vpc-peer.
 //
-// Mirrors lt_issue_enrichment.go's EnrichLTDeprecatedAMI layer: zero AWS API
-// calls, scanning the already-loaded "rtb" cache instead of the fetcher's own
-// client. Both derived signals ship as "~" background checks per the
-// established Wave-2 `~`-on-Healthy treatment (the dbi maintenance-scheduled
-// / lt deprecated-AMI precedent) — docs/resources/vpc-peer.md §4 note.
+// Zero AWS API calls: scans the already-loaded "rtb" cache instead of the
+// fetcher's own client. Both derived signals are "~" background checks.
 package aws
 
 import (
@@ -19,7 +16,7 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// vpc-peer.* Wave 2 FindingCodes — docs/resources/vpc-peer.md §3.2/§4.
+// vpc-peer.* Wave 2 FindingCodes.
 const (
 	vpcPeerCodeNoLocalRoute    domain.FindingCode = "vpc-peer.warn.no_local_route"
 	vpcPeerCodeRouteBlackholed domain.FindingCode = "vpc-peer.warn.route_blackholed"
@@ -31,8 +28,7 @@ const (
 // fires "route to peer blackholed" (blackhole takes precedence when a
 // connection has both a blackholed route and no other route). Zero AWS API
 // calls. Guards: the rtb cache must be present AND not truncated — otherwise
-// every active connection is marked not inspected, never guessed
-// (docs/resources/vpc-peer.md §3.2).
+// every active connection is marked not inspected, never guessed.
 func EnrichVpcPeerRoutes(_ context.Context, _ *ServiceClients, resources []resource.Resource, cache resource.ResourceCache) (IssueEnricherResult, error) {
 	result := IssueEnricherResult{
 		Findings:         make(map[string][]domain.Finding),

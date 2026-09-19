@@ -3,7 +3,7 @@
 // Package runtime owns the platform-agnostic app core: session ownership,
 // app-core dispatch, fetcher invocation, selectors, queries, tasks, and
 // generation stamping. It MUST NOT import Bubble Tea, Lipgloss, Bubbles, or
-// any other renderer toolkit. Renderer adapters (today: internal/tui)
+// any other renderer toolkit. Renderer adapters (internal/tui)
 // translate runtime events/intents to and from their native message types.
 //
 // This file defines the screen-descriptor contract used by adapters to

@@ -38,7 +38,7 @@ import (
 //
 // Handle releases the lock BETWEEN its mutations and its snapshot, to build
 // the list body for a freshly absorbed result outside it (captureTopListBodyBuild
-// -> listBodyBuild.run -> installListBodyMemo, C4's absorb half). Everything
+// -> listBodyBuild.run -> installListBodyMemo). Everything
 // that build reads is frozen under the lock first, and the memo it produces is
 // installed only while it still describes the screen — so the lock is held for
 // the swap, never for the row pass. That is why a row's contents are replaced
@@ -75,7 +75,7 @@ type Controller struct {
 	// enrichmentTruncated: applyEnrichmentState's write and the profile/
 	// region-rotation reset in intents.go's MenuClearAvailabilityIntent case.
 	// buildListBody's memo (list_body.go) includes this in its cache key
-	// because resolveListRowSeverity and the S4 status-cell override read
+	// because resolveListRowSeverity and the status-cell override read
 	// these maps directly — a change invisible to a ListState's own
 	// rowsVersion, since the maps are controller-level, not per-screen.
 	enrichmentGen uint64
@@ -114,7 +114,7 @@ type Controller struct {
 	// availability save both stage here, so the two writers of a type file
 	// land in the order they were decided rather than racing (a restart would
 	// otherwise read whichever finished last). Inputs are frozen under c.mu;
-	// the write runs on the cache writer's goroutine (C4) — the same handoff
+	// the write runs on the cache writer's goroutine — the same handoff
 	// costsDirtyStore performs for the costs cache. Staged by stageCacheWrite
 	// (both lanes), performed by runCacheWriteLoop.
 	// Guarded by cacheWriteMu, not c.mu.
@@ -189,7 +189,7 @@ type Controller struct {
 	// cacheWriteWG counts staged-but-unwritten cache writes: Add(1) when one
 	// is queued, Done when it has run. WaitForCacheWrites (testing.go) is the
 	// only reader — a test that reads the file a call it just made produces
-	// needs a barrier, since the write no longer happens on its goroutine.
+	// needs a barrier, since the write runs on the cache writer's goroutine.
 	cacheWriteWG sync.WaitGroup
 
 	// availSaveWG is Add(1)-ed when the writer goroutine starts and Done on
@@ -252,22 +252,21 @@ func New(core *runtime.Core) *Controller {
 // its own resolved column, so carrying it on the persisted shape would give a
 // replayed cell a second, staler source for the same decision.
 //
-// Exported so the save lane's answer is readable beside the render lane's; it
-// is lock-free by contract (below), so a caller outside the lock is safe.
+// Exported so the save lane's answer is readable beside the render lane's.
+// It takes the read lock, so a caller must not hold c.mu.
 //
 // Reads c.viewConfig/c.fallbackTypeDefs live (not a value captured at
 // construction time) since SetViewConfig/RegisterFallbackTypeDef are called
 // after New returns.
 //
-// Locking: Go's sync.RWMutex is not reentrant, and every production call to
-// It reads c.viewConfig and c.fallbackTypeDefs, and it takes the read lock to
-// do it: neither caller of Core.SaveTypeRows holds c.mu. The list-open lane
-// queues its save with frozen inputs and the cache writer performs it on its
-// own goroutine (stageCacheWrite/runCacheWriteLoop), and the executor's sweep
-// lane never touches Controller at all. Without the lock, a save running there
-// reads those maps while RegisterFallbackTypeDef or SetViewConfig writes them —
-// a concurrent map read that took the whole process down once the writer moved
-// off the caller's goroutine.
+// Locking: it takes the read lock to read c.viewConfig and
+// c.fallbackTypeDefs, because neither caller of Core.SaveTypeRows holds c.mu.
+// The list-open lane queues its save with frozen inputs and the cache writer
+// performs it on its own goroutine (stageCacheWrite/runCacheWriteLoop), and
+// the executor's sweep lane never touches Controller at all. Without the
+// lock, a save running there reads those maps while RegisterFallbackTypeDef
+// or SetViewConfig writes them — a concurrent map read that crashes the
+// process.
 func (c *Controller) SaveColumnsForType(shortName string) []config.ListColumn {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
@@ -339,9 +338,7 @@ func (c *Controller) captureDispatch() runtime.DispatchSnapshot {
 // goroutine reaches it — the same race captureDispatch's own doc comment
 // describes for the drain side, closed here at the producing end instead.
 //
-// A task that already carries a Snap (none do today, but a future producer
-// might pre-stamp one — e.g. a follow-up re-queued from within a drain that
-// already resolved its own snapshot) is left untouched.
+// A task that already carries a Snap is left untouched.
 //
 // Callers must hold c.mu.
 func (c *Controller) stampDispatchSnapshotLocked(tasks []runtime.TaskRequest) []runtime.TaskRequest {
@@ -382,8 +379,8 @@ func (c *Controller) stampListDispatchLocked(task *runtime.TaskRequest, top *Lis
 	}
 	c.core.StampListFetchSeq(task)
 	// The flag this dispatch raised on the screen belongs to this request:
-	// record which, so a completion that no longer owns it leaves it up
-	// (a Ctrl+R issued while an earlier refresh is still out).
+	// record which, so only the completion that owns it lowers it (a Ctrl+R
+	// issued while an earlier refresh is still out).
 	if top != nil && task.ListSeq != 0 && runtime.TaskProducesListResult(task.Key.Kind) {
 		if task.Key.Kind == runtime.KindFetchMore {
 			top.loadingMoreSeq = task.ListSeq
@@ -462,14 +459,13 @@ func (c *Controller) registerFallbackTypeDefLocked(td resource.ResourceTypeDef) 
 // and returns the updated ViewState plus newly-enqueued TaskRequests.
 //
 // USER-INTENT lane: each Action.Kind maps to a specific Core.HandleX method.
-// All navigate/session actions and row-dependent actions are fully wired.
 func (c *Controller) Apply(a Action) (ViewState, []runtime.TaskRequest) {
 	c.mu.Lock()
 	vs, tasks := c.applyLocked(a)
 	tasks = c.stampDispatchSnapshotLocked(tasks)
 	c.mu.Unlock()
-	// Whatever applyLocked staged is handed to the writer only now: a marshal
-	// started while the lock was still held competes with the hold itself (C4).
+	// Whatever applyLocked staged is handed to the writer only after the
+	// unlock: a marshal started while the lock is held competes with the hold.
 	c.wakeCacheWriter()
 	return vs, tasks
 }
@@ -534,7 +530,6 @@ func (c *Controller) openSelectedListDetail() (ViewState, []runtime.TaskRequest)
 }
 
 // applyLocked is the lock-free thin dispatcher of Apply. Callers must hold c.mu (write).
-// Each case delegates to a handleActionX method in actions.go; 1-2 line cases stay inline.
 func (c *Controller) applyLocked(a Action) (ViewState, []runtime.TaskRequest) {
 	// A new user action supersedes any prior transient flash (e.g. a stale
 	// API error). Clear it up front; a FlashIntent applied later in this action
@@ -633,12 +628,8 @@ func (c *Controller) applyLocked(a Action) (ViewState, []runtime.TaskRequest) {
 		return c.handleActionCostPivot(a)
 	case ActionCopy:
 		// Copy is renderer-only (clipboard access is a renderer concern).
-		// The controller has no clipboard; the web/TUI renderer handles this
-		// directly without routing through Apply.
 		return c.snapshot(), nil
 	}
 
-	// All remaining actions (sort, search, quit) are either renderer-only
-	// or require state not yet lifted here.
 	return c.snapshot(), nil
 }

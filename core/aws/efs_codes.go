@@ -13,5 +13,5 @@ const (
 )
 
 // CodeEFSUnencrypted is the wave-1 posture finding read from the
-// DescribeFileSystems output the fetcher already holds (Prowler gap closure).
+// DescribeFileSystems output the fetcher already holds.
 const CodeEFSUnencrypted domain.FindingCode = "efs.unencrypted"

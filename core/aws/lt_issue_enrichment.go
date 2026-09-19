@@ -3,22 +3,20 @@
 // Package aws — lt_issue_enrichment.go: deprecated-AMI cross-cache signal
 // for Launch Templates.
 //
-// Mirrors snapshot_cross_ref.go's layer: a Wave 2 IssueEnricher that makes
-// ZERO AWS API calls, scanning the already-loaded "ami" ResourceCache entry
-// instead of the fetcher's own client. The cache-scan layer, the
-// IssueEnricherFunc registration shape, and the idempotency contract are
-// mirrored verbatim.
+// A Wave 2 IssueEnricher that makes zero AWS API calls, scanning the
+// already-loaded "ami" ResourceCache entry instead of the fetcher's own
+// client, in the same cache-scan layer as snapshot_cross_ref.go.
 //
-// docs/resources/lt.md §3.2 deprecated-ami signal:
+// The deprecated-ami signal (docs/resources/lt.md):
 //   - fires only when the "$Default" version's ImageId is ami-prefixed AND
 //     present in the loaded "ami" cache AND that AMI's DeprecationTime is
 //     past.
 //   - NOT-in-cache (a public/marketplace AMI, or a resolve:ssm: reference,
 //     which never matches the ami- prefix) is never a signal — absence is
 //     non-definitive, not "deregistered".
-//   - Idempotent per the layer contract: ApplyWave2ToRow
-//     (core/runtime/helpers.go) strips prior wave2: findings before
-//     merging fresh ones, so repeated runs never double-append.
+//   - Idempotent: ApplyWave2ToRow (core/runtime/helpers.go) strips prior
+//     wave2: findings before merging fresh ones, so repeated runs never
+//     double-append.
 package aws
 
 import (
@@ -37,10 +35,9 @@ import (
 // EnrichLTDeprecatedAMI cross-references each Launch Template's "$Default"
 // ImageId against the already-loaded "ami" cache: an ami-prefixed id whose
 // cached AMI has a past DeprecationTime is a "deprecated AMI" Warning. Zero
-// AWS API calls. Skip rule: when the "ami" list has not been loaded this
-// session, the check does not run and every template on an ami- image is
-// marked not inspected — EnrichSnapshotCrossRef's "requires the parent list to
-// be loaded" contract.
+// AWS API calls. When the "ami" list has not been loaded this session,
+// every template on an ami- image is marked not inspected, as
+// EnrichSnapshotCrossRef requires its parent list to be loaded.
 func EnrichLTDeprecatedAMI(_ context.Context, _ *ServiceClients, resources []resource.Resource, cache resource.ResourceCache) (IssueEnricherResult, error) {
 	result := IssueEnricherResult{
 		Findings:         make(map[string][]domain.Finding),

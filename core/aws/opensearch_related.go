@@ -21,7 +21,6 @@ func checkOpenSearchAlarms(ctx context.Context, clients any, res resource.Resour
 }
 
 // checkOpenSearchLogs extracts CloudWatch log group ARNs from the domain's LogPublishingOptions.
-// Pattern F — reads from RawStruct, no cache needed.
 func checkOpenSearchLogs(_ context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	domain, ok := assertStruct[opensearchtypes.DomainStatus](res.RawStruct)
 	if !ok {
@@ -42,7 +41,6 @@ func checkOpenSearchLogs(_ context.Context, clients any, res resource.Resource, 
 
 // checkOpenSearchSG extracts security group IDs from the OpenSearch Domain's
 // VPCOptions.SecurityGroupIds slice (only present for VPC-attached domains).
-// Pattern F — no cache needed.
 func checkOpenSearchSG(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	domain, ok := assertStruct[opensearchtypes.DomainStatus](res.RawStruct)
 	if !ok {
@@ -60,7 +58,7 @@ func checkOpenSearchSG(_ context.Context, _ any, res resource.Resource, _ resour
 	return relatedResult("sg", ids)
 }
 
-// checkOpenSearchVPC returns the VPC this OpenSearch domain is attached to (Pattern R).
+// checkOpenSearchVPC returns the VPC this OpenSearch domain is attached to.
 // Reads VPCOptions.VPCId from the DomainStatus RawStruct.
 // Returns Count: 0 for public domains not attached to a VPC.
 func checkOpenSearchVPC(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
@@ -75,14 +73,14 @@ func checkOpenSearchVPC(_ context.Context, _ any, res resource.Resource, _ resou
 }
 
 // checkOpenSearchKMS extracts the KMS key ID from the OpenSearch domain's
-// EncryptionAtRestOptions.KmsKeyId field. Pattern F — no cache needed.
+// EncryptionAtRestOptions.KmsKeyId field.
 func checkOpenSearchKMS(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	domain, ok := assertStruct[opensearchtypes.DomainStatus](res.RawStruct)
 	if !ok {
 		// Structural assertion failure — RawStruct isn't a DomainStatus. This
-		// is "unknown" (cannot determine), not "no KMS key". Pattern-F
-		// contract: return -1 so the UI renders "?" rather than falsely
-		// reporting 0. Matches checkOpenSearchCFN / VPC / Subnet / SG / Logs.
+		// is "unknown" (cannot determine), not "no KMS key": return -1 so the
+		// UI renders "?" rather than falsely reporting 0. Matches
+		// checkOpenSearchCFN / VPC / Subnet / SG / Logs.
 		return resource.UnknownRelated("kms")
 	}
 	if domain.EncryptionAtRestOptions == nil ||
@@ -96,7 +94,7 @@ func checkOpenSearchKMS(ctx context.Context, clients any, res resource.Resource,
 }
 
 // checkOpenSearchCFN calls opensearch:ListTags(ARN=DomainStatus.ARN) and
-// looks up the aws:cloudformation:stack-name tag in the cfn cache. Pattern C.
+// looks up the aws:cloudformation:stack-name tag in the cfn cache.
 func checkOpenSearchCFN(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	domain, ok := assertStruct[opensearchtypes.DomainStatus](res.RawStruct)
 	if !ok {
@@ -151,7 +149,7 @@ func checkOpenSearchCFN(ctx context.Context, clients any, res resource.Resource,
 }
 
 // checkOpenSearchSubnet returns the subnets the VPC-attached domain is deployed
-// into (VPCOptions.SubnetIds). Pattern F — no cache needed.
+// into (VPCOptions.SubnetIds).
 func checkOpenSearchSubnet(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	domain, ok := assertStruct[opensearchtypes.DomainStatus](res.RawStruct)
 	if !ok {
@@ -171,13 +169,11 @@ func checkOpenSearchSubnet(_ context.Context, _ any, res resource.Resource, _ re
 
 // checkOpenSearchACM calls opensearch:DescribeDomainConfig and returns the
 // ACM certificate attached to the domain's custom endpoint
-// (DomainEndpointOptions.Options.CustomEndpointCertificateArn). Pattern C.
+// (DomainEndpointOptions.Options.CustomEndpointCertificateArn).
 //
 // The ACM fetcher (acm.go) indexes Resource.ID by DomainName. So this
 // checker looks up the cert ARN against the acm cache and returns the
 // matching Resource.ID (DomainName) so drill-through lands on it.
-// Returning the bare cert ID (last segment of the ARN) — as the original
-// implementation did — produces an unnavigable ID-format mismatch.
 func checkOpenSearchACM(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	domainName := res.ID
 	if domainName == "" {

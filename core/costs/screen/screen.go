@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
 
-// Package screen is the Cost Explorer screen's pure state machine
-// (specs/021-cost-explorer/architecture.md): the "what should happen"
+// Package screen is the Cost Explorer screen's pure state machine: the "what should happen"
 // decisions, kept apart from session bookkeeping. Every function here is pure — inputs are values, outputs are
 // typed outcomes; no session, no controller, no clocks except an injected
 // now. Imports core/costs only; core/app imports this package, so
@@ -21,9 +20,9 @@ import (
 // FetchPlan is what ensureCostsShapeFetched needs to know before dispatching
 // a KindFetchCosts task. Grid and Anomalies are computed independently —
 // cost coverage and anomaly freshness have different lifecycles and never
-// gate each other (the doc's own named bug classes: a grid-missing shape
-// must not re-request still-fresh anomalies, and a fully warm grid must not
-// suppress a genuinely stale anomaly slot).
+// gate each other: a grid-missing shape must not re-request still-fresh
+// anomalies, and a fully warm grid must not suppress a genuinely stale
+// anomaly slot.
 type FetchPlan struct {
 	Grid      bool
 	Anomalies bool
@@ -45,7 +44,7 @@ func PlanFetch(store *costs.Store, q costs.Query, window []costs.Period, now tim
 
 // DrillPath owns the pinned dimensions accumulated by a drill chain, in the
 // order they were pinned. NextDim is derived from what is already pinned —
-// a dimension in the filter can never be offered again (X5): from the
+// a dimension in the filter can never be offered again: from the
 // USAGE_TYPE pivot, drilling to SERVICE and pinning that too still advances
 // to RESOURCE_ID, never a redundant USAGE_TYPE level.
 type DrillPath struct {
@@ -127,11 +126,10 @@ type SelectOutcome interface{ isSelectOutcome() }
 
 // NoSelection is returned whenever there is nothing to descend into: the
 // frame's own shape is still in flight (state.Loading — unconditional, even
-// a resolvable row must not bypass it, X7), or the frame is fully covered
+// a resolvable row must not bypass it), or the frame is fully covered
 // but the cursor's row does not resolve against the live grid. The sole
-// consumer (applyCostsSelect) always treated the two cases identically (a
-// strict no-op), so they collapse into one outcome rather than two
-// zero-field types with no distinct handling.
+// consumer (applyCostsSelect) treats both as a strict no-op, so they are
+// one outcome.
 type NoSelection struct{}
 
 func (NoSelection) isSelectOutcome() {}
@@ -183,7 +181,7 @@ type ResourceLocator struct {
 }
 
 // Select decides the outcome of one Enter press against state, row, cell.
-// Loading gates unconditionally first (X7); an unresolved row is a strict
+// Loading gates unconditionally first; an unresolved row is a strict
 // no-op; a resolved row either descends (PushDrill, gated by the
 // resource-drill window/service check when the NEXT dimension is
 // RESOURCE_ID) or, when state.RowDim is already the chain's leaf
@@ -301,8 +299,7 @@ type Viewport struct {
 }
 
 // ViewModel is the one clamped view the renderer and the Enter handler
-// both read (architecture.md Seam 8: "the renderer and Enter handler share
-// one clamped view-model") — Rows is the display-filtered, viewport-sliced
+// both read — Rows is the display-filtered, viewport-sliced
 // row set; Cursor already indexes it validly; VisibleCols is the same
 // column window; Note is the empty-finer-grain honesty explanation when
 // Rows is empty.
@@ -314,10 +311,8 @@ type ViewModel struct {
 }
 
 // emptyFinerGrainNote is BuildViewModel's own honesty note for a
-// zero-row result — the single source of the text (costs_codex_test.go's
-// X11 controller-level pin stays as the full-stack acceptance test for the
-// depth-gated ("not at root") refinement the adapter applies on top of
-// this).
+// zero-row result — the single source of the text; the adapter applies a
+// depth-gated ("not at root") refinement on top of it.
 const emptyFinerGrainNote = "no records at this granularity for the selected period — this charge may be billed at a coarser granularity"
 
 // costsAmountRoundsToZero reports whether v rounds to "0.0" under the
@@ -380,12 +375,10 @@ func clampIndex(v, lo, hi int) int {
 }
 
 // BuildViewModel derives the one clamped, viewport-sliced view of g that
-// both rendering and Enter-handling read (architecture.md Seam 8). Pure:
+// both rendering and Enter-handling read. Pure:
 // g/rowDim/cursor/vp are the whole input; revision is carried only as a
 // black-box memoization hint for callers that choose to cache around this
-// call (this implementation does not cache internally — every call
-// recomputes fresh from g, which is itself already the caller's own
-// current, correct data).
+// call.
 //
 // rowDim==DimensionLinkedAccount is exempt from the sub-cent display
 // filter (ApplyRowAttrs already relabels those rows upstream; hiding a
@@ -414,11 +407,11 @@ func BuildViewModel(g costs.Grid, rowDim costs.Dimension, cursor CursorPos, vp V
 			Cells: append([]costs.CellValue(nil), visible...),
 		})
 	}
-	// data-model.md/spec.md: row sort is descending by row total over the
+	// Row sort is descending by row total over the
 	// VISIBLE window, not BuildGrid's own full-window ordering — a row
 	// whose spend lands entirely in a scrolled-out column must not
 	// outrank one whose spend is entirely on-screen. Re-sort here, the one
-	// place both rendering and Enter-handling read (Seam 8), rather than
+	// place both rendering and Enter-handling read, rather than
 	// each consumer re-deriving its own visible-window ranking.
 	sort.SliceStable(out, func(i, j int) bool {
 		ti, tj := math.Abs(visibleRowTotal(out[i].Cells)), math.Abs(visibleRowTotal(out[j].Cells))
@@ -448,10 +441,9 @@ func BuildViewModel(g costs.Grid, rowDim costs.Dimension, cursor CursorPos, vp V
 }
 
 // unblendedExcludedRecordTypes are the RECORD_TYPE values the unblended
-// display metric's fetch excludes via Filter.NotEquals — data-model.md's
-// display mapping: "unblended -> UnblendedCost (filter excludes Tax/
-// Credit/Refund)". A distinct Query/CacheKey from the unfiltered invoice
-// shape.
+// display metric's fetch excludes via Filter.NotEquals: unblended reads
+// UnblendedCost without Tax/Credit/Refund. A distinct Query/CacheKey from
+// the unfiltered invoice shape.
 var unblendedExcludedRecordTypes = []string{"Tax", "Credit", "Refund"}
 
 // QueryForFrame returns the CE query shape that must be cached/fetched to

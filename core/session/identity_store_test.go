@@ -84,7 +84,7 @@ func TestIdentityStore_OverwriteSet(t *testing.T) {
 }
 
 // TestIdentityStore_FailureDoesNotPoisonSuccess pins the anti-poison
-// contract (P2 finding): when a successful AccountID is already cached, a
+// contract: when a successful AccountID is already cached, a
 // subsequent failure-flavored Set("", err) is silently DROPPED.
 //
 // Scenario: handleRelatedCheckStarted runs Pattern-C probes concurrently.
@@ -159,8 +159,6 @@ func TestIdentityStore_Clear(t *testing.T) {
 	}
 }
 
-// TestIdentityStore_ClearIdempotent pins that Clear() on a fresh store and
-// twice in a row do not panic.
 func TestIdentityStore_ClearIdempotent(t *testing.T) {
 	t.Parallel()
 

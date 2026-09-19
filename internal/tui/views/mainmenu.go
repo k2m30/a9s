@@ -96,8 +96,7 @@ func (m MainMenuModel) Update(msg tea.Msg) (MainMenuModel, tea.Cmd) {
 }
 
 // adjustScrollForBody ensures the cursor is visible within the viewport,
-// accounting for category header lines. Mirrors old adjustScroll but uses
-// controller-supplied body data.
+// accounting for category header lines, using controller-supplied body data.
 func (m *MainMenuModel) adjustScrollForBody(body app.MenuBody) {
 	if m.height <= 0 {
 		return
@@ -237,7 +236,6 @@ func buildRenderLinesFromEntries(entries []app.MenuEntry) []renderLine {
 // entry, only when the count is positive. A truncated count is a lower bound
 // (the list has unfetched pages, so more issue rows may exist) and gets a "+"
 // suffix — mirroring the availability "(N+)" marker and the web menu template.
-// The list-view ⓘ banner stays forbidden; that is a separate mechanism.
 func entryIssueBadge(e app.MenuEntry) string {
 	if e.IssueBadge.Count <= 0 {
 		return ""

@@ -178,7 +178,6 @@ func ecsSvcEbRuleMatches(pattern, svcName, clusterName string) bool {
 		return false
 	}
 
-	// Check source includes "aws.ecs"
 	if src, ok := p["source"]; ok {
 		var sources []string
 		if err := json.Unmarshal(src, &sources); err != nil || !slices.Contains(sources, "aws.ecs") {
@@ -188,13 +187,10 @@ func ecsSvcEbRuleMatches(pattern, svcName, clusterName string) bool {
 		return false
 	}
 
-	// Check detail for service/cluster name match.
-	// If a filter key is present but doesn't match, return false.
 	hasFilter := false
 	if detail, ok := p["detail"]; ok {
 		var d map[string]json.RawMessage
 		if err := json.Unmarshal(detail, &d); err == nil {
-			// Check group field ("service:{svcName}")
 			if grp, ok := d["group"]; ok {
 				hasFilter = true
 				var groups []string
@@ -206,7 +202,6 @@ func ecsSvcEbRuleMatches(pattern, svcName, clusterName string) bool {
 					}
 				}
 			}
-			// Check clusterArn field
 			if carn, ok := d["clusterArn"]; ok {
 				hasFilter = true
 				var carns []string
@@ -221,7 +216,6 @@ func ecsSvcEbRuleMatches(pattern, svcName, clusterName string) bool {
 		}
 	}
 	if hasFilter {
-		// A filter existed but didn't match — not related.
 		return false
 	}
 	// Source matches aws.ecs with no narrowing filter — treat as broad match.
@@ -300,7 +294,7 @@ func checkECSSvcSecrets(ctx context.Context, clients any, res resource.Resource,
 			TaskDefinition: &taskDefARN,
 		})
 	})
-	// As in checkEcsSvcECR above, the pivot is told the call refused rather
+	// As in checkECSSvcECR above, the pivot is told the call refused rather
 	// than shown a count.
 	// no finding: this arm already answers with the error result.
 	if err != nil || out.TaskDefinition == nil {
@@ -309,7 +303,6 @@ func checkECSSvcSecrets(ctx context.Context, clients any, res resource.Resource,
 
 	var refs []string
 	for _, cd := range out.TaskDefinition.ContainerDefinitions {
-		// Secrets[].ValueFrom — secretsmanager ARNs
 		for _, s := range cd.Secrets {
 			if s.ValueFrom == nil || *s.ValueFrom == "" {
 				continue
@@ -414,10 +407,8 @@ func sfnASLHasECSFamily(definition, family string) bool {
 			}
 			return
 		}
-		// Check if this node is an ECS runTask state
 		if res, ok := m["Resource"].(string); ok {
 			if a, ok := ARNForService(res, "states"); ok && strings.HasPrefix(a.Resource, "ecs:runTask") {
-				// Check Parameters.TaskDefinition
 				if params, ok := m["Parameters"].(map[string]any); ok {
 					if td, ok := params["TaskDefinition"].(string); ok {
 						if strings.Contains(td, family) {
@@ -425,7 +416,6 @@ func sfnASLHasECSFamily(definition, family string) bool {
 							return
 						}
 					}
-					// Also check "TaskDefinition.$" (reference)
 					if td, ok := params["TaskDefinition.$"].(string); ok {
 						if strings.Contains(td, family) {
 							found = true

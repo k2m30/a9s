@@ -13,17 +13,14 @@ import (
 // slices get "[]" suffix, and leaf types (string, int, bool, time.Time,
 // named string types) terminate recursion.
 func EnumeratePaths(t reflect.Type, prefix string) []string {
-	// Unwrap pointer
 	for t.Kind() == reflect.Pointer {
 		t = t.Elem()
 	}
 
-	// Must be a struct to enumerate
 	if t.Kind() != reflect.Struct {
 		return nil
 	}
 
-	// time.Time is a leaf
 	if t == reflect.TypeFor[time.Time]() {
 		if prefix != "" {
 			return []string{prefix}
@@ -33,7 +30,6 @@ func EnumeratePaths(t reflect.Type, prefix string) []string {
 
 	var paths []string
 	for field := range t.Fields() {
-		// Skip unexported fields
 		if !field.IsExported() {
 			continue
 		}
@@ -59,18 +55,15 @@ func EnumeratePaths(t reflect.Type, prefix string) []string {
 		}
 
 		ft := field.Type
-		// Unwrap pointer
 		for ft.Kind() == reflect.Pointer {
 			ft = ft.Elem()
 		}
 
-		// Check if leaf type
 		if isLeafType(ft) {
 			paths = append(paths, fullPath)
 			continue
 		}
 
-		// Slice: recurse into element type with [] suffix
 		if ft.Kind() == reflect.Slice {
 			elemType := ft.Elem()
 			for elemType.Kind() == reflect.Pointer {
@@ -85,14 +78,12 @@ func EnumeratePaths(t reflect.Type, prefix string) []string {
 			continue
 		}
 
-		// Struct: recurse
 		if ft.Kind() == reflect.Struct {
 			sub := EnumeratePaths(ft, fullPath)
 			paths = append(paths, sub...)
 			continue
 		}
 
-		// Map or other: just add the path
 		paths = append(paths, fullPath)
 	}
 	return paths

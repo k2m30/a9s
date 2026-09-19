@@ -2,19 +2,18 @@
 
 // Package aws — transfer.go: AWS Transfer Family server fetcher.
 //
-// docs/resources/transfer.md §0/§3: ListServers is informative for the
-// Wave-1 State signal, but every §2 related-panel field (EndpointDetails,
-// StructuredLogDestinations, Certificate, IdentityProviderDetails) and both
-// §3.2 config signals (SecurityPolicyName, the logging gap) live only on
-// DescribedServer, and pivots must resolve on the FIRST detail open — so
-// this fetcher does ListServers + DescribeServer per id (in-fetcher N+1,
-// the mwaa.go/eks.go pattern), all findings fetcher-written (Source:
-// "wave1"). NO transfer_issue_enrichment.go, NO Wave2 catalog field.
+// ListServers carries the Wave-1 State signal, but every related-panel field
+// (EndpointDetails, StructuredLogDestinations, Certificate,
+// IdentityProviderDetails) and both config signals (SecurityPolicyName, the
+// logging gap) live only on DescribedServer, and pivots must resolve on the
+// first detail open — so this fetcher does ListServers + DescribeServer per
+// id (in-fetcher N+1, the mwaa.go/eks.go pattern), and every finding is
+// fetcher-written (Source: "wave1").
 //
 // Degraded rows are RICH here (unlike mwaa's name-only degradation): a
 // denied DescribeServer still has the full ListedServer, so the row is
 // built from list fields (including the state finding) and then the shared
-// details-denied code is appended with transfer's own §4 sentence — a
+// details-denied code is appended with transfer's own sentence — a
 // listed server never vanishes and never loses the data the list already
 // gave us.
 package aws
@@ -31,7 +30,7 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// transfer.* FindingCodes — docs/resources/transfer.md §3/§4.
+// transfer.* FindingCodes — docs/resources/transfer.md.
 const (
 	transferCodeOffline      domain.FindingCode = "transfer.warn.offline"
 	transferCodeStarting     domain.FindingCode = "transfer.warn.starting"
@@ -43,7 +42,7 @@ const (
 )
 
 // transferLegacySecurityPolicies is the denylist of known-weak security
-// policy names (docs/resources/transfer.md §3.2/§4) — a denylist rather
+// policy names — a denylist rather
 // than latest-chasing so FIPS/PQ/restricted policy variants never
 // false-positive.
 var transferLegacySecurityPolicies = map[string]bool{ //nolint:gochecknoglobals // static denylist
@@ -52,14 +51,12 @@ var transferLegacySecurityPolicies = map[string]bool{ //nolint:gochecknoglobals 
 }
 
 // FetchTransferServersPage fetches a single page of Transfer Family
-// servers. ListServers carries the Wave-1 State signal but none of the §2
+// servers. ListServers carries the Wave-1 State signal but none of the
 // related-panel fields, so every row gets a per-id DescribeServer call
-// (in-fetcher N+1, the mwaa/eks pattern — no separate
-// transfer_issue_enrichment.go). Per-id DescribeServer failures are
-// aggregated (E3/E5) rather than dropping the row: the row is kept,
-// built from the ListedServer fields, with the details-denied finding
-// appended. A ListServers failure returns an error, never an empty success
-// (AccessDenied contract).
+// (in-fetcher N+1, the mwaa/eks pattern). Per-id DescribeServer failures
+// are aggregated rather than dropping the row: the row is kept, built from
+// the ListedServer fields, with the details-denied finding appended. A
+// ListServers failure returns an error, never an empty success.
 func FetchTransferServersPage(ctx context.Context, c *ServiceClients, continuationToken string) (resource.FetchResult, error) {
 	input := &transfer.ListServersInput{
 		MaxResults: aws.Int32(DefaultPageSize),
@@ -142,7 +139,7 @@ func buildTransferResource(server *transfertypes.DescribedServer) resource.Resou
 
 // computeTransferFindings builds the ordered Finding slice for one server:
 // the state-bucket finding (if any), then legacy-policy, then no-logging —
-// docs/resources/transfer.md §4 precedence order.
+// the precedence order in docs/resources/transfer.md.
 func computeTransferFindings(server *transfertypes.DescribedServer) []domain.Finding {
 	var findings []domain.Finding
 
@@ -162,7 +159,7 @@ func computeTransferFindings(server *transfertypes.DescribedServer) []domain.Fin
 }
 
 // transferStateFindings maps ListedServer/DescribedServer.State to its
-// docs/resources/transfer.md §4 state-bucket code. ONLINE has no entry
+// docs/resources/transfer.md state-bucket code. ONLINE has no entry
 // (Healthy — no finding).
 var transferStateFindings = map[transfertypes.State]domain.FindingCode{ //nolint:gochecknoglobals // static lookup table, the transferLegacySecurityPolicies precedent
 	transfertypes.StateOffline:     transferCodeOffline,
@@ -173,7 +170,7 @@ var transferStateFindings = map[transfertypes.State]domain.FindingCode{ //nolint
 }
 
 // transferStateFinding maps ListedServer/DescribedServer.State to its
-// docs/resources/transfer.md §4 state-bucket Finding. ok is false for
+// docs/resources/transfer.md state-bucket Finding. ok is false for
 // ONLINE (Healthy — no finding). Shared by the healthy-row and degraded-row
 // builders since State is present on both ListedServer and DescribedServer.
 func transferStateFinding(state transfertypes.State) (domain.Finding, bool) {
@@ -191,8 +188,8 @@ func transferStateFinding(state transfertypes.State) (domain.Finding, bool) {
 // authorization failure, the neutral "details unavailable" one otherwise —
 // never the generic degraded_resource.go denied text, since this row keeps
 // far more than just the name. err is the DescribeServer call's error (nil
-// for a nil Server body). RawStruct is the *ListedServer pointer (the
-// fallback shape §0 specifies), so every related checker's Pattern F read
+// for a nil Server body). RawStruct is the *ListedServer pointer, so every
+// related checker's Pattern F read
 // against *DescribedServer type-asserts cleanly to "not found" here rather
 // than panicking.
 func buildTransferDegradedResource(listed transfertypes.ListedServer, err error) resource.Resource {

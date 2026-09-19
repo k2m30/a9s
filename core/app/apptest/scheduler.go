@@ -5,9 +5,8 @@
 // make "action B lands while action A is still in flight" reachable by a
 // test: core/app's Drain* variants (drainsync.go) always execute the front
 // of a FIFO queue, so a task dispatched earlier can never be observed
-// completing AFTER one dispatched later — precisely the shape of the ~50
-// defects the ten detail-enrichment review rounds found. This package adds
-// the seam Drain* deliberately does not: a Scheduler that lets a caller
+// completing AFTER one dispatched later. This package adds the seam Drain*
+// deliberately lacks: a Scheduler that lets a caller
 // choose which pending task completes next, and an Explorer that enumerates
 // every legal choice up to a bounded depth.
 //
@@ -18,8 +17,7 @@
 // ordering, a timeout, or acceptance — the only time.Now() reads anywhere
 // near this path (core/runtime/executor.go's availability-probe cases, and
 // costs' ensureCostsState) are metrics or an unrelated domain, never branched
-// on. Ordering here is entirely which TaskRequest a caller executes next, so
-// no clock injection exists in this package.
+// on. Ordering here is entirely which TaskRequest a caller executes next.
 //
 // This package lives outside core/app (rather than in a non-test file in
 // package app, where DrainSync and testing.go's ApplyResourcesLoaded already

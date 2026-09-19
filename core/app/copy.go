@@ -16,10 +16,8 @@ import (
 
 // CopyContent resolves the (content, label) pair for the copy action ('c' in
 // the TUI, the web copy button) from the controller's current screen — the
-// single source of truth both renderers delegate to, so a resolution fix
-// (e.g. consulting the child-type registry for CopyField) lands for both at
-// once instead of drifting between a TUI-local implementation and a web
-// no-op.
+// single source of truth both renderers delegate to, so the two cannot
+// drift.
 func (c *Controller) CopyContent() (content, label string) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -131,7 +129,7 @@ func detailResourceRawYAML(res resource.Resource) string {
 // copyContentText resolves copy content for a text screen (YAML, JSON, or
 // error log): every line joined with newlines, ANSI escape codes stripped.
 // The label is screen-exact — BodyKindText covers all three screen IDs
-// (bodyKindForScreen), so a bare "YAML" label was wrong for JSON/error-log.
+// (bodyKindForScreen), so a bare "YAML" label would be wrong for JSON/error-log.
 func copyContentText(id runtime.ScreenID, ts *TextState) (string, string) {
 	if ts == nil || len(ts.Lines) == 0 {
 		return "", ""

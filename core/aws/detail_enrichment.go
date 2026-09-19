@@ -17,7 +17,7 @@ import "github.com/k2m30/a9s/v3/core/domain"
 // both the transport and any session caches they need.
 //
 // Why the split:
-//   - *ServiceClients now carries only AWS transport objects (no session state).
+//   - *ServiceClients carries only AWS transport objects (no session state).
 //   - *PolicyDocumentCache (and any future feature-specific caches) are owned
 //     by the session runtime, so their lifetime is explicitly tied to
 //     profile/region rotations rather than implicit via ServiceClients

@@ -92,9 +92,7 @@ func (m YAMLModel) Viewport() viewport.Model {
 // ── JSONModel ─────────────────────────────────────────────────────────────────
 
 // NewTransientJSON creates a JSONModel whose viewport is pre-initialised from
-// vp. ready is set to true so RenderText does not return early. The JSON lane
-// paints a body the same way the YAML lane does, and without this it was the
-// one text lane no test could drive.
+// vp. ready is set to true so RenderText does not return early.
 func NewTransientJSON(w, h int, vp viewport.Model) JSONModel {
 	return JSONModel{
 		width:    w,
@@ -125,9 +123,7 @@ func NewTransientSelector(w, h int) SelectorModel {
 // ── DetailModel helpers ────────────────────────────────────────────────────────
 
 // RawYAMLFromResource converts a resource.Resource to a YAML string for
-// clipboard copy. Exported for use by the tui package's handleCopy dispatcher
-// which can no longer call DetailModel.RawYAML() because no DetailModel is
-// stored on the rendererState stack.
+// clipboard copy. Exported for use by the tui package's handleCopy dispatcher.
 func RawYAMLFromResource(res resource.Resource) string {
 	m := DetailModel{res: res}
 	return m.RawYAML()
@@ -137,8 +133,7 @@ func RawYAMLFromResource(res resource.Resource) string {
 
 // NewRightColumn creates a RightColumnModel from related definitions and a
 // parent resource. Exported so the tui package can reset the right-column
-// widget on a rendererState (e.g. on Ctrl+R while a detail view is active)
-// without an indirect round-trip through DetailModel.ResetRightColumn.
+// widget on a rendererState (e.g. on Ctrl+R while a detail view is active).
 func NewRightColumn(defs []resource.RelatedDef, parentRes resource.Resource, sourceType string) RightColumnModel {
 	return newRightColumn(defs, parentRes, sourceType)
 }

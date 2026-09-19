@@ -12,7 +12,7 @@ import (
 )
 
 // checkAMIEC2 checks the cache for EC2 instances launched from this AMI.
-// Pattern C: matches ec2.Fields["image_id"] against the AMI's ID.
+// Matches ec2.Fields["image_id"] against the AMI's ID.
 func checkAMIEC2(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	amiID := res.ID
 	if amiID == "" {
@@ -37,7 +37,7 @@ func checkAMIEC2(ctx context.Context, clients any, res resource.Resource, cache 
 }
 
 // checkAMIEBSSnaps reads the backing snapshot IDs from the AMI's block device mappings.
-// Pattern F: data is in RawStruct, no cache lookup needed.
+// The data is in RawStruct.
 func checkAMIEBSSnaps(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	img, ok := assertStruct[ec2types.Image](res.RawStruct)
 	if !ok {
@@ -84,7 +84,6 @@ func checkAMIASG(ctx context.Context, clients any, res resource.Resource, cache 
 	// ec2List may be nil when no ec2 cache entry is present (secondary lookup).
 	// Continue with an empty map — results will be based on asg cache alone.
 
-	// Build map: instanceID -> image_id from the EC2 cache.
 	ec2Image := make(map[string]string, len(ec2List))
 	for _, ec2Res := range ec2List {
 		if id := ec2Res.Fields["image_id"]; id != "" {

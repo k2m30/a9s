@@ -53,7 +53,6 @@ func FetchCloudFrontDistributionsPage(ctx context.Context, api CloudFrontListDis
 				enabled = "true"
 			}
 
-			// Extract aliases
 			aliases := ""
 			if dist.Aliases != nil && len(dist.Aliases.Items) > 0 {
 				aliases = strings.Join(dist.Aliases.Items, ", ")

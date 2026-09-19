@@ -62,8 +62,8 @@ type APIGatewayV2GetAuthorizersAPI interface {
 // The two Wave 2 interfaces below are deliberately NOT folded into
 // APIGatewayV1API. The enricher type-asserts for them off clients.APIGatewayV1
 // the way EnrichCodeArtifactRepository does for CodeArtifactListPackagesAPI,
-// so a client or fake that predates these calls keeps satisfying the
-// aggregate instead of failing to compile.
+// so a client or fake that implements only the aggregate keeps satisfying it
+// instead of failing to compile.
 
 // APIGatewayV1GetAuthorizersAPI lists the authorizers configured for a REST
 // API. Used by Wave 2 enrichment to tell an unauthenticated API from one

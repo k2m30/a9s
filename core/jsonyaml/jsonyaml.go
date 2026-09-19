@@ -3,7 +3,7 @@
 // Package jsonyaml holds renderer-free JSON→YAML text helpers shared by the
 // app core (core/semantics/projection) and the TUI views. It lives outside
 // internal/tui so shared-core packages can use it without transitively pulling
-// in lipgloss (SC-009): the lipgloss-dependent text helpers stay in
+// in lipgloss: the lipgloss-dependent text helpers stay in
 // internal/tui/text.
 package jsonyaml
 
@@ -107,12 +107,11 @@ func TryJSONToYAMLLines(s string) []string {
 //     Float64() succeeds AND the decimal string's exact rational value
 //     (big.Rat.SetString(s)) equals the float64's own exact rational value
 //     (big.Rat.SetFloat64(f)) -> float64. NUMERIC equality, not a lexical
-//     re-formatting comparison: the prior FormatFloat-string-equality check
-//     rejected exact values whose canonical 'g' formatting merely looked
-//     different from the source digits (e.g. "1.0" or "1e3" reformat to "1"
-//     / "1000"), which is a formatting mismatch, not a precision loss. A
+//     re-formatting comparison: an exact value whose canonical 'g' formatting
+//     looks different from the source digits (e.g. "1.0" or "1e3" reformat
+//     to "1" / "1000") is a formatting mismatch, not a precision loss. A
 //     decimal fraction float64 cannot hold exactly (0.1, most non-power-of-
-//     two fractions) still falls through to case 4, same as before.
+//     two fractions) falls through to case 4.
 //  4. Else left as json.Number: a bare integer with more significant digits
 //     than int64/uint64 can hold (regardless of whether that particular
 //     value happens to be float64-exact, e.g. 2^64 — promoting only the
@@ -138,9 +137,8 @@ func NormalizeJSONNumbers(v any) any {
 		// here already overflowed both Int64 and ParseUint above — per JSON
 		// grammar, the absence of '.'/'e'/'E' means s IS a bare integer, so
 		// this is tier 4 material regardless of float64 exactness. Skipping
-		// the float attempt for this shape preserves the pre-existing
-		// contract that any integer beyond uint64 range survives as
-		// json.Number uniformly — including the rare case where the value
+		// the float attempt for this shape keeps any integer beyond uint64
+		// range as json.Number uniformly — including the rare case where the value
 		// happens to be a power of two and would otherwise round-trip
 		// exactly (e.g. 2^64), which would make otherwise-identical-looking
 		// big integers render inconsistently (sometimes plain, sometimes

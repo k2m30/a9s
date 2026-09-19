@@ -14,7 +14,6 @@ import (
 )
 
 // EC2Fixtures holds all EC2 domain objects served by the fake.
-// Data is populated from the existing demo category files via demo/client.go.
 type EC2Fixtures struct {
 	Reservations      []ec2types.Reservation
 	InstanceStatuses  []ec2types.InstanceStatus
@@ -48,11 +47,10 @@ type EC2Fixtures struct {
 	PublicSnapshotIDs []string
 	// UserDataByInstanceID overrides the fake's default bootstrap script for
 	// the instances that need their own. Backs ec2:DescribeInstanceAttribute
-	// (userData) for the ec2.user-data-secret witness.
+	// (userData) for the ec2.user-data-secret finding.
 	UserDataByInstanceID map[string]string
 }
 
-// shared constants (mirrors core/demo/constants_shared.go — no import allowed)
 const (
 	fixtProdVPCID    = "vpc-0abc123def456789a"
 	fixtStagingVPCID = "vpc-0def456789abc123d"
@@ -87,8 +85,8 @@ const (
 	// names no sibling fixture defines.
 	fixtProdEKSClusterName      = "acme-prod"
 	fixtRelatedEC2NGNodeGroupID = "general-pool"
-	// EC2 posture witnesses — one demo instance per Prowler-derived finding,
-	// every other instance explicitly set to the healthy counterpart so the
+	// EC2 posture carriers — one demo instance per finding, every other
+	// instance explicitly set to the healthy counterpart so the
 	// demo bench shows exactly one row per signal.
 	//
 	// EC2InstanceIMDSv1 is the only instance whose MetadataOptions leave
@@ -116,9 +114,9 @@ const (
 	// It is the Name tag, not a tag beside it, because that is the value that
 	// reaches every surface an operator uses: the name field, the identity
 	// column, the filter typed against it, the frame title of its detail
-	// screen and the clipboard. A witness on any other tag would be visible
+	// screen and the clipboard. Any other tag would be visible
 	// only in the detail's Tags block, where YAML marshalling escapes a
-	// control byte anyway and the boundary is never the thing under test.
+	// control byte anyway.
 	EC2InstanceHostileTag = "i-0a1b2c3d4e5f60031"
 	// EC2HostileTagValue is that Name.
 	EC2HostileTagValue = "dev-sandbox\x1b[31m-02\x07"
@@ -140,7 +138,7 @@ const (
 	EC2InstanceUserDataSecret = "i-0a1b2c3d4e5f60002"
 
 	// HealthyTGWID is the only demo Transit Gateway with a single VPC
-	// attachment left in the Available state — the sole witness for the tgw
+	// attachment left in the Available state — the only demo TGW in the tgw
 	// Healthy color bucket.
 	HealthyTGWID = "tgw-0healthy11111111h"
 )
@@ -153,11 +151,11 @@ const (
 	AMIEBSKmsKeyARN = "arn:aws:kms:us-east-1:123456789012:key/" + AMIEBSKmsKeyID
 )
 
-// Prowler-gap witnesses for the networking types. Each names the ONE demo
+// Posture carriers for the networking types. Each names the ONE demo
 // resource that carries the corresponding finding; every other row of that
 // type is set to the healthy value for the same condition.
 const (
-	// SGDangerousFTP is the only demo group exposing a newly sensitive port
+	// SGDangerousFTP is the only demo group exposing a sensitive port
 	// (FTP control) to the internet.
 	SGDangerousFTP = "sg-0ftp00000000000001"
 	// SGDefaultWithRules is the only demo group named "default" that still
@@ -209,7 +207,7 @@ var sharedEC2Fixtures = sync.OnceValue(func() *EC2Fixtures {
 	// FlowLogsByResourceID — the prod S3 gateway endpoint has a flow log
 	// delivering to CloudWatch Logs, backing the vpce:logs related-panel
 	// pivot (checkVPCELogs via ec2:DescribeFlowLogs filtered by resource-id).
-	// The staging VPC's own ACTIVE flow log is the only demo witness for the
+	// The staging VPC's own ACTIVE flow log makes it the only demo VPC in the
 	// vpc Healthy color bucket (EnrichVPCFlowLogs raises vpc.no-flow-logs for
 	// every VPC without one).
 	f.PublicSnapshotIDs = []string{EBSSnapPublic}
@@ -266,10 +264,6 @@ export DB_PASSWORD=hunter2hunter2
 func NewEC2Fixtures() *EC2Fixtures {
 	return sharedEC2Fixtures()
 }
-
-// ---------------------------------------------------------------------------
-// EC2 Instances
-// ---------------------------------------------------------------------------
 
 type instExtras struct {
 	imageID        string
@@ -378,8 +372,8 @@ var namedExtras = map[string]instExtras{
 	// -unhealthy-instance/-scaling-failed Instances[] lists) — required for
 	// the ec2->asg related-panel pivot (checkEC2ASG matches by InstanceId
 	// against each ASG's own Instances[] list, so the graph edge is real
-	// once these instances exist) and for qa_demo_related_ids_resolve_test.go's
-	// asg:ec2 witness resolution. AZ/subnet mirror the owning ASG's own
+	// once these instances exist) and for the asg:ec2 pivot. AZ/subnet
+	// mirror the owning ASG's own
 	// VPCZoneIdentifier (asgSubnetA==fixtProdPublicSubnetA/us-east-1a,
 	// asgSubnetB==fixtProdPublicSubnetB/us-east-1b); AMI/keypair/SG mirror
 	// the same acme-prod profile every other prod worker instance in this
@@ -591,7 +585,7 @@ func makeInstance(
 			Value: aws.String("acme-web-prod-asg"),
 		})
 		// backup=daily tag — required for the ec2:backup related-panel pivot
-		// witness. Matches the ListOfTags condition on HealthyDailyPlanID's
+		// Matches the ListOfTags condition on HealthyDailyPlanID's
 		// selection (backup.go).
 		inst.Tags = append(inst.Tags, ec2types.Tag{
 			Key:   aws.String("backup"),
@@ -623,7 +617,7 @@ func makeInstance(
 	}
 	// aws:ecs:cluster-name tag — required for ecs→ec2 related-panel pivot.
 	// acme-services is a real ECS cluster fixture (ecs.go). StateReason.Code
-	// with a "Server." prefix is also this suite's only witness for the
+	// with a "Server." prefix also makes it the only demo instance in the
 	// broken (AWS-initiated stop) bucket of colorEC2/CodeEC2StateStoppedServer
 	// — this instance is stopped + spot lifecycle, a natural fit for a
 	// spot-interruption AWS-initiated stop.
@@ -649,7 +643,7 @@ func makeInstance(
 			ec2types.Tag{Key: aws.String("aws:ec2launchtemplate:id"), Value: aws.String(ProdWebLTID)},
 		)
 	}
-	// The bastion is the sole internet-exposure witness: a public address in
+	// The bastion is the only internet-exposed instance: a public address in
 	// front of public-ssh-bad, whose port 22 is open to 0.0.0.0/0.
 	if instanceID == EC2InstanceInternetExposed {
 		inst.SecurityGroups = append(inst.SecurityGroups, ec2types.GroupIdentifier{
@@ -754,8 +748,8 @@ func buildReservations() []ec2types.Reservation {
 		name := fmt.Sprintf("%s-%02d", namePool[i%len(namePool)], idx)
 		state := statePool[i%len(statePool)]
 		ip := fmt.Sprintf("10.0.%d.%d", (idx/10)+1, 10+idx)
-		// No generated instance carries a public address: ec2.public-ip and
-		// ec2.internet-exposed each keep a single named witness above.
+		// No generated instance carries a public address, so ec2.public-ip and
+		// ec2.internet-exposed each keep a single named carrier above.
 		publicIP := ""
 		instanceID := fmt.Sprintf("i-0a1b2c3d4e5f6%04d", idx)
 		inst := makeInstance(
@@ -787,11 +781,11 @@ func buildInstanceStatuses(reservations []ec2types.Reservation) []ec2types.Insta
 		"i-0a1b2c3d4e5f60003": {"ok", "impaired"},
 		"i-0a1b2c3d4e5f60005": {"ok", "ok"},
 		"i-0a1b2c3d4e5f60006": {"initializing", "initializing"},
-		// api-worker-01 — witness for ec2.instance-status.insufficient-data
+		// api-worker-01 raises ec2.instance-status.insufficient-data
 		// (AWS could not determine status from the hypervisor).
 		"i-0aaa111111111111a": {"ok", "insufficient-data"},
 	}
-	// eventInstanceID is the sole witness for ec2.scheduled-event: a running
+	// eventInstanceID is the only instance raising ec2.scheduled-event: a running
 	// instance with ok status checks but a AWS-scheduled reboot within the
 	// enricher's 7-day cutoff. Computed relative to time.Now() so the
 	// fixture stays inside the window regardless of when the demo runs.
@@ -836,10 +830,6 @@ func buildInstanceStatuses(reservations []ec2types.Reservation) []ec2types.Insta
 	}
 	return statuses
 }
-
-// ---------------------------------------------------------------------------
-// VPCs
-// ---------------------------------------------------------------------------
 
 func buildVpcs() []ec2types.Vpc {
 	return []ec2types.Vpc{
@@ -995,10 +985,6 @@ func buildVpcs() []ec2types.Vpc {
 		},
 	}
 }
-
-// ---------------------------------------------------------------------------
-// Security Groups
-// ---------------------------------------------------------------------------
 
 func buildSecurityGroups() []ec2types.SecurityGroup {
 	sgs := []ec2types.SecurityGroup{
@@ -1455,9 +1441,8 @@ func buildSecurityGroups() []ec2types.SecurityGroup {
 		},
 	})
 
-	// FTP control port open to the world — the witness for the widened
-	// sensitive-port set (sgCodeDangerousPorts). No other demo group opens
-	// any of the ports added alongside FTP.
+	// FTP control port open to the world, raising sgCodeDangerousPorts.
+	// No other demo group opens FTP.
 	sgs = append(sgs, ec2types.SecurityGroup{
 		GroupId:          aws.String(SGDangerousFTP),
 		GroupName:        aws.String("acme-legacy-ftp-sg"),
@@ -1483,7 +1468,7 @@ func buildSecurityGroups() []ec2types.SecurityGroup {
 	})
 
 	// The prod VPC's default group, still carrying the self-referencing
-	// ingress rule AWS creates it with — the witness for
+	// ingress rule AWS creates it with, raising sgCodeDefaultWithRules.
 	// sgCodeDefaultWithRules. It is the only demo group named "default", so
 	// every other row is healthy for that condition by construction.
 	sgs = append(sgs, ec2types.SecurityGroup{
@@ -1510,8 +1495,8 @@ func buildSecurityGroups() []ec2types.SecurityGroup {
 		},
 	})
 
-	// Left out of buildNetworkInterfaces' attachment pass — the single
-	// witness for sgCodeUnused.
+	// No network interface references this group, so it is the only
+	// carrier of sgCodeUnused.
 	sgs = append(sgs, ec2types.SecurityGroup{
 		GroupId:          aws.String(SGUnused),
 		GroupName:        aws.String("acme-decommissioned-batch-sg"),
@@ -1592,10 +1577,6 @@ func buildSecurityGroups() []ec2types.SecurityGroup {
 	}
 	return sgs
 }
-
-// ---------------------------------------------------------------------------
-// Subnets
-// ---------------------------------------------------------------------------
 
 func buildSubnets() []ec2types.Subnet {
 	named := []ec2types.Subnet{
@@ -2028,10 +2009,6 @@ func buildSubnets() []ec2types.Subnet {
 	return named
 }
 
-// ---------------------------------------------------------------------------
-// Route Tables
-// ---------------------------------------------------------------------------
-
 func buildRouteTables() []ec2types.RouteTable {
 	return []ec2types.RouteTable{
 		{
@@ -2091,7 +2068,7 @@ func buildRouteTables() []ec2types.RouteTable {
 				{DestinationCidrBlock: aws.String("0.0.0.0/0"), NatGatewayId: aws.String("nat-0aaa111111111111a"), State: ec2types.RouteStateActive, Origin: ec2types.RouteOriginCreateRoute},
 				// required for rtb→vpc-peer related-panel pivot (second of
 				// the two rtb fixtures routing into ProdPeerSharedID,
-				// vpcpeer.go — the rtb pivot's ≥2 witness).
+				// vpcpeer.go).
 				{DestinationCidrBlock: aws.String("192.168.0.0/16"), VpcPeeringConnectionId: aws.String(ProdPeerSharedID), State: ec2types.RouteStateActive, Origin: ec2types.RouteOriginCreateRoute},
 			},
 			Associations: []ec2types.RouteTableAssociation{
@@ -2114,7 +2091,7 @@ func buildRouteTables() []ec2types.RouteTable {
 				// required for rtb→vpc-peer related-panel pivot: the route to
 				// WarnPeerBlackholeID (vpcpeer.go) is blackholed even though
 				// the peering connection itself is Status.Code=active — the
-				// "route to peer blackholed" cache-scan witness.
+				// "route to peer blackholed" cache-scan case.
 				{DestinationCidrBlock: aws.String("10.30.0.0/16"), VpcPeeringConnectionId: aws.String(WarnPeerBlackholeID), State: ec2types.RouteStateBlackhole, Origin: ec2types.RouteOriginCreateRoute},
 			},
 			Associations: []ec2types.RouteTableAssociation{
@@ -2159,10 +2136,6 @@ func buildRouteTables() []ec2types.RouteTable {
 		},
 	}
 }
-
-// ---------------------------------------------------------------------------
-// NAT Gateways
-// ---------------------------------------------------------------------------
 
 func buildNatGateways() []ec2types.NatGateway {
 	t1 := aws.Time(time.Date(2025, 6, 1, 10, 0, 0, 0, time.UTC))
@@ -2262,10 +2235,6 @@ func buildNatGateways() []ec2types.NatGateway {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// Internet Gateways
-// ---------------------------------------------------------------------------
-
 func buildInternetGateways() []ec2types.InternetGateway {
 	return []ec2types.InternetGateway{
 		{
@@ -2326,10 +2295,6 @@ func buildInternetGateways() []ec2types.InternetGateway {
 		},
 	}
 }
-
-// ---------------------------------------------------------------------------
-// Elastic IPs
-// ---------------------------------------------------------------------------
 
 func buildAddresses() []ec2types.Address {
 	return []ec2types.Address{
@@ -2432,10 +2397,6 @@ func buildAddresses() []ec2types.Address {
 		},
 	}
 }
-
-// ---------------------------------------------------------------------------
-// Transit Gateways
-// ---------------------------------------------------------------------------
 
 func buildTransitGateways() []ec2types.TransitGateway {
 	t1 := aws.Time(time.Date(2025, 3, 1, 9, 0, 0, 0, time.UTC))
@@ -2558,10 +2519,6 @@ func buildTransitGateways() []ec2types.TransitGateway {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// Transit Gateway Attachments
-// ---------------------------------------------------------------------------
-
 // buildTGWAttachments creates VPC-type attachments for each active TGW.
 // The checkTGWVPC checker in tgw_related.go filters by transit-gateway-id and resource-type=vpc.
 func buildTGWAttachments() []ec2types.TransitGatewayAttachment {
@@ -2663,7 +2620,7 @@ func buildTGWAttachments() []ec2types.TransitGatewayAttachment {
 		},
 		// Hub TGW → attachment State=modifying → EnrichTGWAttachments emits
 		// tgw.attachment-transitional ("~") on tgw-0aaa111111111111a. Kept off
-		// the DR TGW so the "!" attachment-failed witness there does not mask
+		// the DR TGW so the "!" attachment-failed finding there does not mask
 		// this "~" finding under EnrichTGWAttachments's worst-wins precedence.
 		{
 			TransitGatewayAttachmentId: aws.String("tgw-attach-0fff666666666666f"),
@@ -2694,10 +2651,6 @@ func buildTGWAttachments() []ec2types.TransitGatewayAttachment {
 		},
 	}
 }
-
-// ---------------------------------------------------------------------------
-// VPC Endpoints
-// ---------------------------------------------------------------------------
 
 func buildVpcEndpoints() []ec2types.VpcEndpoint {
 	t1 := aws.Time(time.Date(2025, 6, 15, 12, 0, 0, 0, time.UTC))
@@ -2892,13 +2845,9 @@ func buildVpcEndpoints() []ec2types.VpcEndpoint {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// Network Interfaces
-// ---------------------------------------------------------------------------
-
 // buildNetworkInterfaces returns the hand-written interfaces plus one
 // attachment per security group that none of them already reference, so the
-// sg.unused signal has exactly one witness (SGUnused) instead of firing on
+// sg.unused signal has exactly one carrier (SGUnused) instead of firing on
 // every group whose owning service the fixtures model without its ENIs.
 // Default groups are skipped: AWS creates one per VPC and it is exempt from
 // the check. Every interface an endpoint names and no hand-written one is gets
@@ -3302,10 +3251,6 @@ func namedNetworkInterfaces() []ec2types.NetworkInterface {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// EBS Volumes
-// ---------------------------------------------------------------------------
-
 func buildVolumes() []ec2types.Volume {
 	t1 := time.Date(2025, 6, 1, 9, 0, 0, 0, time.UTC)
 	t2 := time.Date(2025, 11, 15, 8, 30, 0, 0, time.UTC)
@@ -3323,7 +3268,7 @@ func buildVolumes() []ec2types.Volume {
 			// aws:cloudformation:stack-name tag — required for ebs→cfn related-panel
 			// pivot. acme-eks-cluster is a real stack fixture (cfn.go).
 			// backup=daily tag — required for the ebs:backup related-panel
-			// pivot witness. Matches the ListOfTags condition on
+			// pivot. Matches the ListOfTags condition on
 			// HealthyDailyPlanID's selection (backup.go).
 			Tags: []ec2types.Tag{
 				{Key: aws.String("Name"), Value: aws.String("web-prod-01-root")},
@@ -3359,7 +3304,7 @@ func buildVolumes() []ec2types.Volume {
 			Attachments: []ec2types.VolumeAttachment{{InstanceId: aws.String("i-0a1b2c3d4e5f60006")}},
 			Tags:        []ec2types.Tag{{Key: aws.String("Name"), Value: aws.String("new-db-volume")}},
 		},
-		// Witness for ebs.state.deleting. Encrypted and attached so the state
+		// Raises ebs.state.deleting. Encrypted and attached so the state
 		// finding is the only one it carries.
 		{
 			VolumeId: aws.String("vol-0deleting0000000d4"), State: ec2types.VolumeStateDeleting,
@@ -3402,9 +3347,7 @@ func buildVolumes() []ec2types.Volume {
 
 // buildVolumeStatuses backs EC2:DescribeVolumeStatus for the Wave 2
 // ebs.volume-io-degraded enrichment (EnrichEBSVolumeStatus). Only
-// vol-0a1b2c3d4e5f60002 (api-staging-data, in-use) carries a non-ok status —
-// every other volume above is intentionally left off this list so the
-// enrichment's "skip on ok/absent" path also has fixture coverage.
+// vol-0a1b2c3d4e5f60002 (api-staging-data, in-use) carries a non-ok status.
 func buildVolumeStatuses() []ec2types.VolumeStatusItem {
 	return []ec2types.VolumeStatusItem{
 		{
@@ -3424,10 +3367,6 @@ func buildVolumeStatuses() []ec2types.VolumeStatusItem {
 		},
 	}
 }
-
-// ---------------------------------------------------------------------------
-// EBS Snapshots
-// ---------------------------------------------------------------------------
 
 func buildSnapshots() []ec2types.Snapshot {
 	t1 := time.Now().UTC().AddDate(0, 0, -235).Truncate(time.Hour)
@@ -3475,7 +3414,7 @@ func buildSnapshots() []ec2types.Snapshot {
 			Tags:     []ec2types.Tag{},
 		},
 		// AWS Backup-created snapshot — required for the ebs-snap:backup
-		// related-panel pivot witness. Description prefix + the
+		// related-panel pivot. Description prefix + the
 		// aws:backup:source-resource tag are the real AWS Backup signature;
 		// the tag value matches the volume ARN in HealthyDailyPlanID's
 		// selection (backup.go) so checkEBSSnapBackup resolves a specific plan.
@@ -3513,7 +3452,7 @@ func buildSnapshots() []ec2types.Snapshot {
 			Tags: []ec2types.Tag{{Key: aws.String("Name"), Value: aws.String("failed-backup-snap")}},
 		},
 		// Orphan snap: references a deleted volume (vol-deleted-original does
-		// not appear in buildVolumes) — required witness for the ebs-snap
+		// not appear in buildVolumes) — raises the ebs-snap
 		// cross-ref orphan Finding (enrichEBSSnapCrossRef).
 		{
 			SnapshotId: aws.String("snap-orphan00000000c"), State: ec2types.SnapshotStateCompleted,
@@ -3524,7 +3463,7 @@ func buildSnapshots() []ec2types.Snapshot {
 			KmsKeyId: aws.String("b2c3d4e5-6789-01ab-cdef-222222222222"),
 			Tags:     []ec2types.Tag{{Key: aws.String("Name"), Value: aws.String("orphan-snap")}},
 		},
-		// Completed + unencrypted → CIS EC2.1 violation witness (distinct
+		// Completed + unencrypted → CIS EC2.1 violation (distinct
 		// from snap-error000000000b, which is Error-state and never reaches
 		// the unencrypted structural check since Error already carries its
 		// own state Finding).
@@ -3538,10 +3477,6 @@ func buildSnapshots() []ec2types.Snapshot {
 		},
 	}
 }
-
-// ---------------------------------------------------------------------------
-// AMIs
-// ---------------------------------------------------------------------------
 
 func buildImages() []ec2types.Image {
 	return []ec2types.Image{
@@ -3685,7 +3620,7 @@ func buildImages() []ec2types.Image {
 				{Key: aws.String("Environment"), Value: aws.String("prod")},
 			},
 		},
-		// Public=true → the ami.public witness: an account-owned image whose
+		// Public=true → raises ami.public: an account-owned image whose
 		// launch permission was left open to every AWS account.
 		{
 			ImageId: aws.String(AMIPublic), Name: aws.String("acme-demo-appliance-public"),

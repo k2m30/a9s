@@ -4,8 +4,7 @@
 // resource-flow handlers.
 //
 //	handleResourcesLoaded     — wave-1 derive on msg.Resources, route through
-//	                            ctrl.HandleResourcesLoadedEvent (replaces the
-//	                            old updateActiveView path), then delegate
+//	                            ctrl.HandleResourcesLoadedEvent, then delegate
 //	                            cross-view cache write + rerun probe to Core.
 //	handleEnrichDetailResult  — calls Core.HandleEnrichDetailResult directly
 //	                            (not Controller.Handle) so the returned
@@ -48,22 +47,20 @@ import (
 )
 
 // handleResourcesLoaded is the adapter shim for messages.ResourcesLoaded.
-// Order is preserved 1:1 with the original case body:
+// Order:
 //
 //  1. Route the message through ctrl.HandleResourcesLoadedEvent so the
-//     controller list state absorbs Resources and pagination — replacing the
-//     old updateActiveView path where RL.Update wrote back via
-//     cacheTopLevelResourceList.
+//     controller list state absorbs Resources and pagination.
 //  2. Re-apply any active checker against the freshly-loaded page (for
 //     related-navigation lists with truncated ID sets).
-//  3. Delegate the cross-view cache write (Branch 2 in the original body),
+//  3. Delegate the cross-view cache write,
 //     the partial-success flash, and the enrichment-rerun probe dispatch
 //     to Core.HandleResourcesLoaded.
 func (m Model) handleResourcesLoaded(msg messages.ResourcesLoaded) (tea.Model, tea.Cmd) {
 	// Stale-gen drop: ResourcesLoaded is stamped against AspectAvailability.
 	// The shim performs the check up-front because Core.HandleResourcesLoaded is
 	// invoked directly (not via HandleEvent's central GenStamped gate) and the
-	// pre-Core view-side derive + updateActiveView would otherwise mutate state
+	// pre-Core view-side derive would otherwise mutate state
 	// from a previous profile/region rotation.
 	if messages.IsStale(msg, m.core) {
 		return m, nil
@@ -216,8 +213,7 @@ func (m Model) handleEnrichDetailResult(msg messages.EnrichDetailResult) (tea.Mo
 
 	// When the active screen is a YAML or JSON text viewer for this resource,
 	// regenerate the syntax-colored content lines from the enriched resource
-	// and push them into the controller's TextState. This mirrors the old
-	// YAMLModel.Update/JSONModel.View enrichment path.
+	// and push them into the controller's TextState.
 	if m.activeRS().kind == rsKindText {
 		screenID, ctx := m.ctrl.GetTextScreenContext()
 		if screenID != "" && ctx.ResourceType == msg.ResourceType && ctx.ResourceID == msg.ResourceID {
@@ -310,19 +306,17 @@ func (m Model) handleRelatedCheckResult(msg messages.RelatedCheckResult) (tea.Mo
 // whole slice to ctrl.ApplyIntents first — the PatchResourceCache /
 // PatchRelatedCache / PatchLazyResourceCache session writes either Core
 // method can emit (dispatchHandlerResult's applyIntent has no case for these
-// three and would silently drop them, since its only callers today — the 6
-// ported handlers in app_flash.go/app_session.go — never emit them).
+// three and would silently drop them).
 //
 // Any banner-raising FlashIntent present is withheld from that forward
 // (withoutBannerFlashes) and routed through the SAME path messages.Flash takes (handleFlash,
 // app_flash.go), not direct-mutated: this bumps m.flash.gen before rendering
 // the new text, so an auto-clear tick already in flight for a PREVIOUS flash
 // (which still carries the pre-bump gen) cannot match the new one and clear it
-// early, and it schedules this flash's own FlashTickPayload auto-clear tick,
-// both of which a direct field mutation skipped entirely — the two ported
-// handlers here are the only Handle* callers that construct a FlashIntent
-// without ever going through handleFlash, so this is the one seam that needs
-// to call out to it. That route applies the flash to the controller once,
+// early, and it schedules this flash's own FlashTickPayload auto-clear tick.
+// The two handlers here are the only Handle* callers that construct a
+// FlashIntent without going through handleFlash, so this is the one seam that
+// calls out to it. That route applies the flash to the controller once,
 // which is where the error-log entry is made. Calls the same helpers
 // handleFlash itself calls (Core.HandleFlash, dispatchHandlerResult) rather
 // than duplicating either body.

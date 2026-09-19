@@ -42,11 +42,7 @@ type SNSGetSubscriptionAttributesAPI interface {
 // SNSAPI is the aggregate interface covering SNS operations used by a9s
 // enrichers (GetTopicAttributes, ListSubscriptionsByTopic).
 //
-// Operations NOT in this aggregate that fetchers/enrichers may need:
-//   - ListTopics (paginated)         — used by SNS top-level fetcher
-//   - ListSubscriptions (paginated)  — used by sns-sub fetcher
-//
-// Fetchers that need those operations type-assert clients.SNS to
+// The ListTopics and ListSubscriptions fetchers type-assert clients.SNS to
 // SNSListTopicsAPI / SNSListSubscriptionsAPI at the call site.
 //
 // *sns.Client structurally satisfies all of the above.

@@ -140,8 +140,7 @@ func (m DetailModel) NeedsRelatedCheck() bool {
 // a thin adapter over renderRelatedPanel — the panel's one render
 // implementation, reading row facts from the controller-assembled
 // app.RelatedBlock slice verbatim. RightColumnModel (rightcolumn.go) holds
-// only the widget's key-routing/focus/filter interaction state; it carries
-// no row facts and has nothing to drift against.
+// only the widget's key-routing/focus/filter interaction state.
 // The panel visibility gate uses body.RelatedVisible (set by buildDetailBody
 // when the type has registered defs or ds.RelatedVisible is true), matching
 // the TUI's rightColShowing() auto-show behaviour.
@@ -154,7 +153,7 @@ func (m *DetailModel) RenderDetail(body app.DetailBody) string {
 	// the viewport — exactly as View() does via m.viewport.View(). This gives
 	// height-padding (blank lines to fill viewport height) and width-clipping,
 	// and ensures the cursor-row background highlight is embedded at the correct
-	// scroll-offset position (Bug 1 fix).
+	// scroll-offset position.
 	leftRaw := renderDetailFieldsFromBody(m, body)
 
 	// Apply search highlights when a query is active. Uses the same approach
@@ -241,7 +240,7 @@ func renderDetailRelatedFromBody(body app.DetailBody, w, h int) string {
 // renderRelatedPanel is the single pure renderer for the RELATED right
 // panel, called by RenderDetail via renderDetailRelatedFromBody with the
 // controller-assembled app.RelatedBlock slice. It is the one place this
-// rendering logic lives, so there is no second lane it can drift against.
+// rendering logic lives.
 //
 // rows is the visible, filtered, ordered list of related-panel entries.
 // cursor is an index into rows (-1 when no row is selected/highlighted).

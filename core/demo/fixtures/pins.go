@@ -11,7 +11,7 @@ import (
 // fixtures that produce it: the row count and the Wave-1 issue badge the main
 // menu shows, and the state-coverage gaps that type is still allowed to have.
 // It lives with the fixtures so a fixture change moves numbers in its own
-// file instead of in a table every task shares.
+// file instead of in one shared table.
 type Pin struct {
 	// ShortName is the resource type, e.g. "ec2".
 	ShortName string
@@ -25,15 +25,15 @@ type Pin struct {
 	// bounds rather than totals.
 	Truncated bool
 	// CoverageGaps are the "<bucket>" or "<finding code>" keys this type may
-	// still miss a fixture witness for. The ratchet only ever shrinks it: a
-	// gap that gains a witness fails until it is removed here.
+	// still lack a fixture for. The ratchet only ever shrinks it: a
+	// gap that gains a fixture fails until it is removed here.
 	//
 	// A bucket gap says no fixture of this type resolves to that
 	// domain.Color, and every one of them is there for one of two reasons.
 	// Either the classifier and the FindingDef table have no path to that
 	// color at all — most "dim" entries: the Color func has no Dim branch and
 	// no registered finding carries SevDim, so no fixture of any shape could
-	// witness it. Or AWS itself cannot present the state beside healthy rows —
+	// produce it. Or AWS itself cannot present the state beside healthy rows —
 	// a torn-down resource stops appearing in the list API rather than
 	// reporting a deleted status. A finding-code gap says no fixture produces
 	// that documented finding yet, which is fixture debt and is expected to

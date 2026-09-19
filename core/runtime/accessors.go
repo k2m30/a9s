@@ -6,7 +6,7 @@
 // mutation, so the renderer never reaches through Core into Session — the
 // accessors here, the ServiceClients alias in transport.go, and the
 // related-cache helpers in relatedcache.go are the entire renderer-facing
-// surface that replaces direct session-shape coupling.
+// surface.
 //
 // The accessor list covers the field set the renderer actually touches.
 // Convenience constructors that internalise session.New() also live here so
@@ -89,10 +89,10 @@ func (c *Core) CacheStore() *cache.Store { return c.EnsureCacheStore() }
 // EnsureCacheStore returns the current pair's *cache.Store, reloading via
 // cache.LoadDirIn(root, profile, region) whenever the memoized store (if any) was
 // not loaded for the CURRENT session.Profile/session.Region pair — this
-// covers both the first call since the last Rotate (C9) or process start,
+// covers both the first call since the last Rotate or process start,
 // and a pair switch that lands between two calls without an intervening
 // Rotate observation. NoCache=true always returns nil without ever calling
-// LoadDirIn (C7b: --no-cache disables persisted load entirely). An unresolved
+// LoadDirIn (--no-cache disables persisted load entirely). An unresolved
 // Profile or Region (pair not yet resolved) returns nil WITHOUT memoizing, so
 // a pre-connect call never pins the store to the wrong "<profile>--"
 // directory. Session.EnsureCacheStore reads the pair itself under
@@ -109,8 +109,8 @@ func (c *Core) EnsureCacheStore() *cache.Store {
 // WithCacheStoreSave runs fn against pair's *cache.Store with
 // session.pairMu held for the pair read, the store decision, and fn itself —
 // fn's own store.Type read and store.Put write for one type file can never
-// interleave with another such sequence running concurrently (the store-lock
-// serialization, D13), and the Profile/Region pair itself cannot be read torn
+// interleave with another such sequence running concurrently, and the
+// Profile/Region pair itself cannot be read torn
 // or racing a concurrent profile/region switch. fn stages its writes as
 // cache.WritePlan values instead of touching disk itself; the actual write
 // happens after pairMu is released — see Session.WithCacheStoreSave's doc
@@ -420,9 +420,9 @@ func (c *Core) ResourceCacheKeys() []string {
 // counts/availability sweep, not a verified-fresh target list, so treating it
 // as "already cached" here would silently suppress the live fetch and let
 // the pivot serve stale or incomplete rows. ResourceCacheKeys (which includes
-// Probe/Disk origins) remains the correct source for the enrichment-fold
-// consumer in app_enrich_fold.go, whose membership semantics are unrelated to
-// freshness-gating and must not change.
+// Probe/Disk origins) is the source for the enrichment-fold consumer in
+// app_enrich_fold.go, whose membership semantics are unrelated to
+// freshness-gating.
 func (c *Core) FetchOriginCacheKeys() []string {
 	all := c.session.RowStore.SnapshotAll(false)
 	keys := make([]string, 0, len(all))
@@ -496,7 +496,7 @@ func (c *Core) ProbeOriginTypeNames() []string {
 // for its type (one RowStore entry per type), so an origin gate here would
 // blind every probe-lane reader (ProbeEnrichment's enricher input,
 // handleEnrichmentChecked's unifiedIssueCount, handleAvailabilityChecked's
-// D17 Wave-2 carry) for exactly the type whose list is open on screen — the
+// Wave-2 carry) for exactly the type whose list is open on screen — the
 // open type's Wave-2 findings would silently vanish while every other type
 // enriches normally. Mirrors BuildEnrichQueue's observed-at-all membership
 // rule (see its Gen != 0 doc comment). Only a Partial (sparse lazy-add)
@@ -601,7 +601,7 @@ func (c *Core) ObserveRows(canon string, rows []resource.Resource, pagination *r
 }
 
 // ObserveCountRows is the dual-write chokepoint for a counts-only observation
-// (C6a: never touches Rows — e.g. the disk-cache-loaded seed when no
+// (never touches Rows — e.g. the disk-cache-loaded seed when no
 // per-type disk row data is available and placeholder rows stand in, which
 // must never be fed into RowStore).
 func (c *Core) ObserveCountRows(canon string, totalCount int) domain.Gen {

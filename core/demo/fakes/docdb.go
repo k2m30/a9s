@@ -61,8 +61,8 @@ func (f *DocDBFake) DescribePendingMaintenanceActions(_ context.Context, _ *docd
 }
 
 // DescribeDBClusterSnapshotAttributes reports the restore grant on a
-// DocumentDB cluster snapshot. No DocumentDB fixture snapshot is shared with
-// the "all" group — the dbc-snap public witness is the Aurora-side snapshot.
+// DocumentDB cluster snapshot. Every DocumentDB fixture snapshot is private;
+// the public dbc-snap row is the Aurora-side snapshot.
 func (f *DocDBFake) DescribeDBClusterSnapshotAttributes(_ context.Context, in *docdb.DescribeDBClusterSnapshotAttributesInput, _ ...func(*docdb.Options)) (*docdb.DescribeDBClusterSnapshotAttributesOutput, error) {
 	id := ""
 	if in != nil && in.DBClusterSnapshotIdentifier != nil {

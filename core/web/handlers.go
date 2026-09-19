@@ -82,21 +82,18 @@ func isLoopbackHost(h string) bool {
 //   - The host part of Host is not a loopback address.
 //   - Origin is present and its host part is not a loopback address.
 func hostOK(r *http.Request) bool {
-	// --- Host header ---
 	rawHost := r.Host // already stripped of port by Go's net/http for HTTP/1.1
 	if rawHost == "" {
 		return false
 	}
 	host, _, err := net.SplitHostPort(rawHost)
 	if err != nil {
-		// No port present — rawHost is the bare host.
 		host = rawHost
 	}
 	if !isLoopbackHost(host) {
 		return false
 	}
 
-	// --- Origin header (only checked when present) ---
 	origin := r.Header.Get("Origin")
 	if origin == "" {
 		return true
@@ -161,7 +158,7 @@ func (s *Server) handleIndex(w http.ResponseWriter, r *http.Request) {
 
 // isScreenRenderable reports whether vs's active body already has SOMETHING
 // to show a caller besides an empty screen: a list or costs body with rows
-// already on it, or an explicit Loading shell. Used to bind C4's
+// already on it, or an explicit Loading shell. Used to bind the
 // IsBackgroundFetchTask classifier to the post-Apply snapshot so a renderable
 // fetch screen defers its fetch task to the background, while a genuinely cold
 // open keeps it blocking so the response carries the shell itself.
@@ -204,7 +201,6 @@ func (s *Server) handleAction(w http.ResponseWriter, r *http.Request) {
 		action.Arg = r.FormValue("arg")
 	}
 
-	// Block ActionReveal unless --web-allow-reveal is set.
 	if action.Kind == app.ActionReveal && !s.allowReveal {
 		http.Error(w, "forbidden", http.StatusForbidden)
 		return
@@ -212,7 +208,7 @@ func (s *Server) handleAction(w http.ResponseWriter, r *http.Request) {
 
 	// Drain blocking tasks (the response body's own content) synchronously
 	// under entry.mu; partition off background tasks (related-check fan-out,
-	// detail enrichment, save-cache, and — per cache contract C4 — a KindFetchResources
+	// detail enrichment, save-cache, and a KindFetchResources
 	// task whose target screen is already renderable) so the response is not
 	// held hostage to them — they run in their own goroutine after the
 	// response is written.
@@ -232,7 +228,6 @@ func (s *Server) handleAction(w http.ResponseWriter, r *http.Request) {
 	vs := entry.ctrl.Snapshot()
 	entry.mu.Unlock()
 
-	// Notify SSE subscribers that state changed.
 	s.notifySubscribers(entry)
 
 	// Background tasks drain in their own goroutine, outside entry.mu and
@@ -322,7 +317,6 @@ func (s *Server) handleEvents(w http.ResponseWriter, r *http.Request) {
 	ch := s.subscribe(entry)
 	defer s.unsubscribe(entry, ch)
 
-	// Initial ping to confirm the connection is established.
 	_, _ = fmt.Fprintf(w, "event: ping\ndata: connected\n\n")
 	flusher.Flush()
 
@@ -343,15 +337,13 @@ func (s *Server) handleEvents(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// subscriber management — each session keeps a set of SSE listener channels.
+// Each session keeps a set of SSE listener channels.
 
 type subscriberSet struct {
 	mu   sync.Mutex
 	subs map[chan struct{}]struct{}
 }
 
-// We store a subscriber set per sessionEntry using a sync.Map on the server.
-// Use a separate map here keyed by entry pointer.
 var globalSubscribers sync.Map // key: *sessionEntry → *subscriberSet
 
 func (s *Server) subscribe(entry *sessionEntry) chan struct{} {

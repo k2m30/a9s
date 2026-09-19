@@ -23,11 +23,11 @@ type FindingCode string
 type Finding struct {
 	Code   FindingCode
 	Phrase string
-	// Detail is the S5 "concrete operator sentence" — a full remedy/context
+	// Detail is the concrete operator sentence — a full remedy/context
 	// sentence for the detail-view Attention section. Empty ⇒ callers fall
 	// back to rendering Phrase alone (no stray blank line). Distinct from
-	// Phrase (the short S4 cause shown in list/menu surfaces): Phrase is
-	// always populated, Detail is optional richer text for S5.
+	// Phrase (the short cause shown in list/menu surfaces): Phrase is
+	// always populated, Detail is optional richer text.
 	Detail   string
 	Severity Severity
 	Source   string // "wave1" | "wave2:<short>"

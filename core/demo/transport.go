@@ -63,7 +63,6 @@ func (t *Transport) RoundTrip(req *http.Request) (*http.Response, error) {
 // S3 path-style: "s3.us-east-1.amazonaws.com" → "s3"
 // ECR: "api.ecr.us-east-1.amazonaws.com" → "ecr"
 func serviceFromHost(host string) string {
-	// Strip port if present
 	if idx := strings.LastIndex(host, ":"); idx != -1 {
 		// Only strip if it looks like a port (all digits after last colon)
 		port := host[idx+1:]
@@ -89,7 +88,6 @@ func serviceFromHost(host string) string {
 		return "s3"
 	}
 
-	// Take the first segment before "."
 	if before, _, ok := strings.Cut(host, "."); ok {
 		return before
 	}

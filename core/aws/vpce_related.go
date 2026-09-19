@@ -15,7 +15,7 @@ import (
 )
 
 // checkVPCESubnet reads SubnetIds from the VpcEndpoint RawStruct directly.
-// Pattern F: all data is in RawStruct, no cache lookup needed.
+// Pattern F: all data is in RawStruct.
 func checkVPCESubnet(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	vpce, ok := assertStruct[ec2types.VpcEndpoint](res.RawStruct)
 	if !ok {
@@ -28,7 +28,7 @@ func checkVPCESubnet(_ context.Context, _ any, res resource.Resource, _ resource
 }
 
 // checkVPCESG reads Groups[].GroupId from the VpcEndpoint RawStruct directly.
-// Pattern F: all data is in RawStruct, no cache lookup needed.
+// Pattern F: all data is in RawStruct.
 func checkVPCESG(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	vpce, ok := assertStruct[ec2types.VpcEndpoint](res.RawStruct)
 	if !ok {
@@ -47,7 +47,7 @@ func checkVPCESG(_ context.Context, _ any, res resource.Resource, _ resource.Res
 }
 
 // checkVPCERTB reads RouteTableIds from the VpcEndpoint RawStruct directly.
-// Pattern F: all data is in RawStruct, no cache lookup needed (gateway-type endpoints).
+// Pattern F: all data is in RawStruct (gateway-type endpoints).
 func checkVPCERTB(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	vpce, ok := assertStruct[ec2types.VpcEndpoint](res.RawStruct)
 	if !ok {
@@ -60,7 +60,7 @@ func checkVPCERTB(_ context.Context, _ any, res resource.Resource, _ resource.Re
 }
 
 // checkVPCEENI reads NetworkInterfaceIds from the VpcEndpoint RawStruct directly.
-// Pattern F: all data is in RawStruct, no cache lookup needed (interface-type endpoints).
+// Pattern F: all data is in RawStruct (interface-type endpoints).
 func checkVPCEENI(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	vpce, ok := assertStruct[ec2types.VpcEndpoint](res.RawStruct)
 	if !ok {

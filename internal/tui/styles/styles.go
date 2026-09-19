@@ -92,8 +92,7 @@ func ColorStyle(c domain.Color) lipgloss.Style {
 
 // TierColorStyle maps a detail-view ColorTier string to a foreground style.
 // ColorTier is a free-form string used on FieldItem for detail-row coloring
-// (EC2 status checks, enrichment findings). The mapping preserves pre-refactor
-// behavior for the known tier values.
+// (EC2 status checks, enrichment findings).
 func TierColorStyle(tier string) lipgloss.Style {
 	if NoColorActive() {
 		return lipgloss.NewStyle()

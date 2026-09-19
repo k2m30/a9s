@@ -27,7 +27,7 @@ func (c *Controller) topListState() *ListState {
 }
 
 // topScreenID returns the ScreenID of the top-of-stack screen, or "" when the
-// stack is empty. Used by save-gating logic (C6 scope boundary) that needs to
+// stack is empty. Used by save-gating logic (the scope boundary) that needs to
 // distinguish ScreenResourceList (persist-eligible) from ScreenChildList
 // (never persisted) without a full Screen reference.
 func (c *Controller) topScreenID() runtime.ScreenID {
@@ -38,7 +38,7 @@ func (c *Controller) topScreenID() runtime.ScreenID {
 }
 
 // isTopLevelCanonicalList reports whether screenID/ls together identify the
-// canonical top-level, unfiltered resource list for its type — the C6 scope
+// canonical top-level, unfiltered resource list for its type — the scope
 // gate maybeSaveResourceListCache/syncExactTotalToMenu use to decide
 // disk-cache eligibility, and applyResourcesLoaded's callers use to decide
 // RowStore eligibility: a ScreenChildList, or a
@@ -276,8 +276,8 @@ func (c *Controller) PatchListRelatedIDSet(ids []string) {
 // filtered list renders immediately — no fetch, no spinner. Returns whether the
 // cache fully covers the requested IDs. Shared by both renderers (web
 // applyRelatedNavResult directly, TUI newRelatedList via SeedRelatedExactRows)
-// so the exact-filtered seed cannot diverge — the single fix for the Partial
-// (lazy) lane that render-time pull would otherwise miss. Callers hold c.mu.
+// so the exact-filtered seed cannot diverge, and so the Partial (lazy) lane
+// that render-time pull would miss is covered. Callers hold c.mu.
 func (c *Controller) seedRelatedExactRows(ls *ListState, targetType string, ids []string) bool {
 	set := make(map[string]struct{}, len(ids))
 	for _, id := range ids {
@@ -355,8 +355,8 @@ func (c *Controller) patchListReapplyChecker(checker resource.RelatedChecker, sr
 
 // ApplyReapplyCheckerAgainst re-runs the stored checker for the top list
 // screen's resource type against newPage and merges matched IDs into
-// RelatedIDSet. This is the public entry point called by
-// ResourceListModel.ReapplyCheckerAgainst — the controller owns the actual
+// RelatedIDSet. This is the public entry point the TUI's
+// runtime_adapter_resources.go calls — the controller owns the actual
 // merge logic in reapplyCheckerAgainst.
 func (c *Controller) ApplyReapplyCheckerAgainst(newPage []resource.Resource) {
 	c.mu.Lock()
@@ -489,7 +489,7 @@ func (c *Controller) SetListAutoOpenSingle(v bool) {
 }
 
 // GetListExactRelatedTargetID returns the single ID in RelatedIDSet when the
-// set has exactly one non-empty entry, mirroring exactRelatedTargetID in views.
+// set has exactly one non-empty entry.
 func (c *Controller) GetListExactRelatedTargetID() (string, bool) {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
@@ -535,8 +535,8 @@ func (c *Controller) SetListLoadingMore(v bool) {
 // has already cleared) — at most one of the pair is true for any given
 // non-append completion.
 // seq is the completing request's own list sequence; a completion whose
-// sequence is not the one that raised the flag leaves it alone (row 47). Zero
-// on either side means "no ordering claim" and retires the flag as before.
+// sequence is not the one that raised the flag leaves it alone. Zero
+// on either side means "no ordering claim" and retires the flag.
 func (ls *ListState) clearFetchInFlight(loadMore bool, seq domain.Gen) {
 	if loadMore {
 		if !ls.ownsFlag(ls.loadingMoreSeq, seq) {
@@ -555,8 +555,8 @@ func (ls *ListState) clearFetchInFlight(loadMore bool, seq domain.Gen) {
 }
 
 // ownsFlag reports whether a completion at seq may retire a flag raised at
-// owner. An unstamped completion, or a flag raised before sequences existed,
-// retires as it always did.
+// owner. An unstamped completion, or a flag raised without a sequence,
+// retires it.
 func (ls *ListState) ownsFlag(owner, seq domain.Gen) bool {
 	return owner == 0 || seq == 0 || owner == seq
 }
@@ -579,7 +579,7 @@ func (c *Controller) ClearListLoading(loadMore bool) {
 
 // SetListFetchError records a failed fetch's error text on the top list
 // screen, mirroring the headless ClearActiveListLoadingIntent application in
-// intents.go (cache contract C4): a fetch failure over cached content stops the
+// intents.go: a fetch failure over cached content stops the
 // refreshing marker and swaps in an error marker instead of leaving the list
 // with no error surfaced. No-op when err is empty.
 func (c *Controller) SetListFetchError(err string) {
@@ -598,7 +598,7 @@ func (c *Controller) SetListFetchError(err string) {
 
 // SetListRefreshing sets the Refreshing flag on the top list screen. Mirrors
 // SetListFetchError's locking/topListState pattern. Used by cache-first
-// seeding callers (C3: docs/design/cache-requirements.md) to mark a
+// seeding callers (docs/design/cache-requirements.md) to mark a
 // seeded-but-unverified list surface so the renderer's refreshing marker
 // (⟳ / "── refreshing... ──") distinguishes it from verified-fresh content —
 // renderers read this flag, they never compute it.

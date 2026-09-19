@@ -52,11 +52,9 @@ func TestDetailCell_DeclaredSentenceOrEmDash(t *testing.T) {
 			want: "An administrative or database port on this group accepts connections from any address on the internet.",
 		},
 		{
-			// Inverted with hubs row 4 finding 2: a Detail sentence is authored
-			// markdown, so its backticks are code spans it means to render and
-			// escaping them showed the reader a backslash. Only the pipe, which
-			// would end the table cell, is escaped. Do not restore the escaped
-			// form — TestAttentionSignals_CodeSpansAreNotEscaped fails on it.
+			// A Detail sentence is authored markdown, so its backticks are code
+			// spans it means to render. Only the pipe, which would end the table
+			// cell, is escaped.
 			name: "a declared sentence carrying markdown",
 			def: catalog.FindingDef{
 				Code:   "test.escape",
@@ -76,10 +74,8 @@ func TestDetailCell_DeclaredSentenceOrEmDash(t *testing.T) {
 }
 
 // TestDetailCell_ThroughGenerateResourceDoc pins the same contract one layer
-// up: the §4 findings table's Detail column, as generateResourceDoc actually
-// writes it, carries the declared sentence or the em dash — the acceptance
-// column's "298 cells are regenerated, not edited" requires this join to
-// hold end to end, not just at detailCell in isolation.
+// up: the findings table's Detail column, as generateResourceDoc actually
+// writes it, carries the declared sentence or the em dash.
 func TestDetailCell_ThroughGenerateResourceDoc(t *testing.T) {
 	rt := catalog.ResourceTypeDef{
 		Name:      "Security Groups",
@@ -102,10 +98,8 @@ func TestDetailCell_ThroughGenerateResourceDoc(t *testing.T) {
 }
 
 // The header sentence says what the key IS — the key the status cell reads,
-// and the mark of which column is the status column — so every expectation
-// below carries that wording. The "no fetcher writes it"
-// half replaces "none (the list API returns no lifecycle field)": the key is
-// named either way, because the column still reads it and the cell is the
+// and the mark of which column is the status column. A key no fetcher writes
+// is still named, because the column still reads it and the cell is the
 // type's finding phrase rather than nothing at all.
 func TestGenerateResourceDocStatusKeyHeader(t *testing.T) {
 	cases := []struct {

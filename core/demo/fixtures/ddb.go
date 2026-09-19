@@ -37,13 +37,13 @@ type DDBFixtures struct {
 	ResourcePolicies map[string]string
 }
 
-// WarnDDBDetailsDeniedID is the listed-but-denied coverage-gate witness.
+// WarnDDBDetailsDeniedID is the listed-but-denied table.
 const WarnDDBDetailsDeniedID = "warn-ddb-details-denied"
 
-// WarnDDBDetailsUnavailableID is the listed-but-not-describable coverage-gate witness.
+// WarnDDBDetailsUnavailableID is the listed-but-not-describable table.
 const WarnDDBDetailsUnavailableID = "warn-ddb-details-unavailable"
 
-// One witness per new ddb finding. Every other table keeps deletion
+// One carrier per ddb posture finding. Every other table keeps deletion
 // protection on and has no resource policy.
 const (
 	// DDBDeletionProtectionOff is the table without deletion protection.
@@ -128,7 +128,7 @@ var sharedDDBFixtures = sync.OnceValue(func() *DDBFixtures {
 })
 
 // normalizeDDBDeletionProtection turns deletion protection on for every table
-// except its dedicated witness, so exactly one demo row carries the
+// except DDBDeletionProtectionOff, so exactly one demo row carries the
 // deletion-protection-off finding.
 func normalizeDDBDeletionProtection(tables []*ddbtypes.TableDescription) []*ddbtypes.TableDescription {
 	for _, t := range tables {
@@ -141,7 +141,7 @@ func normalizeDDBDeletionProtection(tables []*ddbtypes.TableDescription) []*ddbt
 }
 
 // buildDDBResourcePolicies returns the per-table resource policies. One
-// witness grants a foreign account, one grants everyone; every other table has
+// table grants a foreign account, one grants everyone; every other table has
 // no policy at all.
 func buildDDBResourcePolicies() map[string]string {
 	return map[string]string{
@@ -231,9 +231,7 @@ func buildDDBKinesisDestinations() map[string][]ddbtypes.KinesisDataStreamDestin
 
 func buildDDBTables() []*ddbtypes.TableDescription {
 	return []*ddbtypes.TableDescription{
-		// -----------------------------------------------------------------------
 		// orders-prod — graph-root, Healthy, all pivots wired.
-		// -----------------------------------------------------------------------
 		{
 			TableName:        aws.String(OrdersProdID),
 			TableArn:         aws.String(OrdersProdARN),
@@ -275,9 +273,7 @@ func buildDDBTables() []*ddbtypes.TableDescription {
 				},
 			},
 		},
-		// -----------------------------------------------------------------------
 		// sessions-creating — CREATING transitional state (Warning).
-		// -----------------------------------------------------------------------
 		{
 			TableName:        aws.String(SessionsCreatingID),
 			TableArn:         aws.String(SessionsCreatingARN),
@@ -296,9 +292,7 @@ func buildDDBTables() []*ddbtypes.TableDescription {
 				{AttributeName: aws.String("SessionId"), KeyType: ddbtypes.KeyTypeHash},
 			},
 		},
-		// -----------------------------------------------------------------------
 		// sessions-updating — UPDATING transitional state (Warning).
-		// -----------------------------------------------------------------------
 		{
 			TableName:        aws.String(SessionsUpdatingID),
 			TableArn:         aws.String(SessionsUpdatingARN),
@@ -317,9 +311,7 @@ func buildDDBTables() []*ddbtypes.TableDescription {
 				{AttributeName: aws.String("SessionId"), KeyType: ddbtypes.KeyTypeHash},
 			},
 		},
-		// -----------------------------------------------------------------------
 		// analytics-deleting — DELETING transitional state (Warning).
-		// -----------------------------------------------------------------------
 		{
 			TableName:        aws.String(AnalyticsDeletingID),
 			TableArn:         aws.String(AnalyticsDeletingARN),
@@ -338,10 +330,8 @@ func buildDDBTables() []*ddbtypes.TableDescription {
 				{AttributeName: aws.String("EventId"), KeyType: ddbtypes.KeyTypeHash},
 			},
 		},
-		// -----------------------------------------------------------------------
 		// legacy-archiving — ARCHIVING transitional state (Warning).
 		// ArchivalSummary is nil (archival not yet finalized).
-		// -----------------------------------------------------------------------
 		{
 			TableName:        aws.String(LegacyArchivingID),
 			TableArn:         aws.String(LegacyArchivingARN),
@@ -359,12 +349,9 @@ func buildDDBTables() []*ddbtypes.TableDescription {
 			KeySchema: []ddbtypes.KeySchemaElement{
 				{AttributeName: aws.String("Id"), KeyType: ddbtypes.KeyTypeHash},
 			},
-			// ArchivalSummary intentionally nil — archival not yet finalized.
 		},
-		// -----------------------------------------------------------------------
 		// legacy-kms-lost — INACCESSIBLE_ENCRYPTION_CREDENTIALS broken state.
-		// SSEDescription points at a now-deleted CMK.
-		// -----------------------------------------------------------------------
+		// SSEDescription points at a deleted CMK.
 		{
 			TableName:        aws.String(LegacyKMSLostID),
 			TableArn:         aws.String(LegacyKMSLostARN),
@@ -388,10 +375,8 @@ func buildDDBTables() []*ddbtypes.TableDescription {
 				{AttributeName: aws.String("Id"), KeyType: ddbtypes.KeyTypeHash},
 			},
 		},
-		// -----------------------------------------------------------------------
 		// legacy-archived — ARCHIVED broken state + PITR DISABLED.
-		// Exercises multi-W2 stacking (+1 suffix) and U7c detail-view-shows-both.
-		// -----------------------------------------------------------------------
+		// Exercises multi-W2 stacking (+1 suffix); the detail view shows both.
 		{
 			TableName:        aws.String(LegacyArchivedID),
 			TableArn:         aws.String(LegacyArchivedARN),
@@ -420,10 +405,8 @@ func buildDDBTables() []*ddbtypes.TableDescription {
 				{AttributeName: aws.String("Id"), KeyType: ddbtypes.KeyTypeHash},
 			},
 		},
-		// -----------------------------------------------------------------------
 		// audit-pitr-off — ACTIVE, PITR DISABLED, PROVISIONED billing.
-		// Healthy row with ~ glyph (U3/U11). No streams, no CMK.
-		// -----------------------------------------------------------------------
+		// Healthy row with ~ glyph. No streams, no CMK.
 		{
 			TableName:        aws.String(AuditPITROffID),
 			TableArn:         aws.String(AuditPITROffARN),
@@ -456,8 +439,8 @@ func buildDDBTables() []*ddbtypes.TableDescription {
 	}
 }
 
-// ddbPostureWitnessTable builds a plain ACTIVE table for one posture witness.
-// deletionProtection is the only lever: the two policy witnesses keep it on so
+// ddbPostureWitnessTable builds a plain ACTIVE table for one posture finding.
+// deletionProtection is the only lever: the two policy tables keep it on so
 // they carry exactly their own finding.
 func ddbPostureWitnessTable(name, arn string, deletionProtection bool) *ddbtypes.TableDescription {
 	return &ddbtypes.TableDescription{

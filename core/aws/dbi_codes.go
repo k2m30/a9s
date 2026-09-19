@@ -26,7 +26,7 @@ const (
 	CodeDBIDeletionProtectionOff domain.FindingCode = "dbi.warn.deletion_protection_off"
 )
 
-// Security-posture findings (Prowler gap closure). Each is evaluated
+// Security-posture findings. Each is evaluated
 // independently by rdsPostureFindings / rdsCACertFinding in rds_posture.go.
 const (
 	CodeDBISingleAZ          domain.FindingCode = "dbi.single-az"

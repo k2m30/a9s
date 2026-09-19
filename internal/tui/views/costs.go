@@ -239,8 +239,7 @@ func clipCostsRows(lines []string, cursorRow, height int) []string {
 
 // renderCostsFooter assembles the footer slots: the anomaly/delta note,
 // then the grid's currency unit (omitted when the grid mixes currencies —
-// body.Currency == ""), then the data-through date (FR-013: the CE-call
-// counter is internal bookkeeping only, never rendered).
+// body.Currency == ""), then the data-through date.
 func renderCostsFooter(body app.CostsBody) string {
 	var parts []string
 	if body.FooterNote != "" {
@@ -255,7 +254,7 @@ func renderCostsFooter(body app.CostsBody) string {
 	return styles.DimText.Render(strings.Join(parts, " · "))
 }
 
-// renderCostsError renders the FR-017 explicit error state: a centered
+// renderCostsError renders the explicit error state: a centered
 // message block, never an empty grid. body.ErrorMsg is rendered verbatim —
 // classification into a user-facing sentence happens upstream.
 func renderCostsError(body app.CostsBody, width, height int) string {

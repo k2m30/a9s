@@ -109,7 +109,7 @@ var sharedCWLogsFixtures = sync.OnceValue(func() *CWLogsFixtures {
 			LogGroupName: aws.String("/app/custom/no-retention"),
 			Arn:          aws.String("arn:aws:logs:us-east-1:123456789012:log-group:/app/custom/no-retention:*"),
 			StoredBytes:  aws.Int64(5368709120),
-			// RetentionInDays intentionally omitted (nil) = "Never Expire"
+			// A nil RetentionInDays means "Never Expire".
 			CreationTime: aws.Int64(1672531200000), // 2023-01-01 — old, growing forever
 		},
 		// Issue: storedBytes=0 AND creationTime >90d ago → Warning (orphaned / stale log group)
@@ -376,8 +376,8 @@ var sharedCWLogsFixtures = sync.OnceValue(func() *CWLogsFixtures {
 	})
 
 	// The second page. Every other group in this file is the target of some
-	// pivot, so cutting the list anywhere inside them lowers a count a scenario
-	// pins; this one is named to match no pivot's convention and is appended
+	// pivot, so cutting the list anywhere inside them lowers a pivot count;
+	// this one is named to match no pivot's convention and is appended
 	// last, so LogGroupsPageSize can sit at len-1 and move only this row.
 	logGroups = append(logGroups, cwlogstypes.LogGroup{
 		LogGroupName:    aws.String(LogGroupSecondPageOnly),
@@ -387,7 +387,7 @@ var sharedCWLogsFixtures = sync.OnceValue(func() *CWLogsFixtures {
 		CreationTime:    aws.Int64(1756704000000),
 	})
 
-	// Row 6's witness is the only demo group without a customer key. Every
+	// LogGroupNoKMS is the only demo group without a customer key. Every
 	// other group is encrypted here rather than in forty literals, so a group
 	// added later cannot quietly become a second carrier of logs.no-kms.
 	for i := range logGroups {
@@ -495,10 +495,9 @@ var sharedCWLogsFixtures = sync.OnceValue(func() *CWLogsFixtures {
 			},
 			{
 				Timestamp: aws.Int64(1774253400000),
-				// The only demo witness of classifyLogEventStatus's warn class
-				// (core/aws/log_events.go) and of the cwlogs.log-warn finding it
-				// raises. Without it the class is a branch nothing on the bench
-				// ever shows.
+				// The only demo event in classifyLogEventStatus's warn class
+				// (core/aws/log_events.go), so the only carrier of the cwlogs.log-warn
+				// finding.
 				Message:       aws.String("WARN Token cache miss for issuer https://auth.acme-corp.example; falling back to a full JWKS fetch, added 180 ms to this authorization"),
 				IngestionTime: aws.Int64(1774253400100),
 			},
@@ -536,10 +535,9 @@ var sharedCWLogsFixtures = sync.OnceValue(func() *CWLogsFixtures {
 			},
 			{
 				Timestamp: aws.Int64(1774253400000),
-				// Status: timeout — required for lambda_invocations' Findings-based
-				// coloring witness (lambdaInvocationFindings, core/aws/
-				// lambda_invocations.go): a TIMEOUT REPORT line is the only demo
-				// witness of this branch.
+				// Status: timeout — the only demo TIMEOUT REPORT line, which drives
+				// lambda_invocations' Findings-based coloring (lambdaInvocationFindings,
+				// core/aws/lambda_invocations.go).
 				Message:       aws.String("REPORT RequestId: ord-897 Duration: 67.42 ms Billed Duration: 68 ms Memory Size: 128 MB Max Memory Used: 72 MB Status: timeout"),
 				IngestionTime: aws.Int64(1774253400100),
 			},
@@ -700,7 +698,7 @@ func minimalLogStreams(suffix string) []cwlogstypes.LogStream {
 // LogGroupNoKMS carries.
 const demoLogsKMSKeyARN = "arn:aws:kms:us-east-1:123456789012:key/a1b2c3d4-5678-90ab-cdef-111111111111"
 
-// LogGroupNoKMS is the ONE demo log group with no KMS key for the w6a batch.
+// LogGroupNoKMS is the ONE demo log group with no KMS key.
 // Every other log group fixture carries a synthetic KmsKeyId so the demo
 // bench shows exactly one row for logs.no-kms.
 const LogGroupNoKMS = "/app/acme-unencrypted-audit"

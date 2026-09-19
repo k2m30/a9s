@@ -83,10 +83,10 @@ func CostsAccountName(id string) string {
 // CostsDemoAccountIDAlt so the two always sum back to the original amount.
 const costsProdAccountShare = 0.6
 
-// Planted growth story (spec.md US1 independent test): a GPU-inference
+// Planted growth story: a GPU-inference
 // fleet under CostsGrowthService ramps up starting CostsGrowthMonth, driven
-// by usage type CostsGrowthUsageType. The anomaly overlay (spec.md US1,
-// FR-014) names the same service + usage type so the "why did my bill jump"
+// by usage type CostsGrowthUsageType. The anomaly overlay
+// names the same service + usage type so the "why did my bill jump"
 // flow resolves end to end. CostsGrowthService is the same string as
 // awsclient.CostExplorerServiceNameEC2 (a registered a9s detail-view
 // mapping, resolved by costsResourceRowTargetType) so the spike's own
@@ -104,7 +104,7 @@ var CostsGrowthMonth = CostsGrowthMonthAt(costsProcessNow)
 // CostsResourceRow is one (resource ID, daily amount) fact for the
 // GetCostAndUsageWithResources synthetic dataset — resource IDs reference
 // real fixture entities (core/demo/fixtures/ec2.go's EC2 instances) so
-// a future resource-detail jump lands on an entity that actually exists.
+// a resource-detail jump lands on an entity that actually exists.
 type CostsResourceRow struct {
 	ResourceID  string
 	DailyAmount float64
@@ -167,8 +167,8 @@ var (
 	ec2OtherDataXferMonthly   = [13]float64{40, 41, 39, 42, 40, 41, 43, 42, 41, 41, 40, 40, 20}
 )
 
-// ec2ComputeG5xlargeMonthly is the planted growth story (spec.md US1
-// independent test): a GPU-inference fleet (ec2.go's ml-inference-0{1,2,3},
+// ec2ComputeG5xlargeMonthly is the planted growth story: a
+// GPU-inference fleet (ec2.go's ml-inference-0{1,2,3},
 // instance type g5.xlarge) scales up starting CostsGrowthMonth and stays
 // elevated through the anchor month (a step change, not a spike that
 // reverts) — the last entry is lower because the anchor month is the open,
@@ -189,7 +189,7 @@ type costsServiceSpec struct {
 
 // costsServiceSpecs is every service's ordinary (non-growth-story) baseline
 // usage type — ~11 realistic services plus Tax so invoice totals include
-// tax (FR-003), plus "EC2 - Other" built separately below. The first entry
+// tax, plus "EC2 - Other" built separately below. The first entry
 // (Elastic Compute Cloud - Compute's own BoxUsage:m5.2xlarge baseline) sits
 // alongside the growth story's g5.xlarge usage type (also built separately
 // below) under the SAME service — a service can carry both an ordinary and

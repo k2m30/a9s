@@ -61,7 +61,6 @@ func EnrichEFSMountTargets(ctx context.Context, clients *ServiceClients, resourc
 			enrichEFSPolicies(ctx, clients, fsID, ownAccount, &result, &policyFailures, &mu)
 		}
 
-		// Paginate mount targets per file system using Marker/NextMarker.
 		var allMountTargets []efstypes.MountTargetDescription
 		var mtMarker *string
 		mtPages := 0
@@ -106,7 +105,6 @@ func EnrichEFSMountTargets(ctx context.Context, clients *ServiceClients, resourc
 			return
 		}
 
-		// Count unavailable mount targets (N) and total (M).
 		totalMT := len(allMountTargets)
 		var firstBad *efstypes.MountTargetDescription
 		unavailableCount := 0
@@ -121,7 +119,6 @@ func EnrichEFSMountTargets(ctx context.Context, clients *ServiceClients, resourc
 		}
 
 		if firstBad == nil {
-			// All mount targets healthy — no finding.
 			return
 		}
 
@@ -137,7 +134,7 @@ func EnrichEFSMountTargets(ctx context.Context, clients *ServiceClients, resourc
 
 		mu.Lock()
 		defer mu.Unlock()
-		// Summary must NOT embed any Row value (U11 contract).
+		// The Summary never embeds a Row value.
 		setWave2Finding(&result, fsID, efsCodeMountTargetDown, []domain.DetailRow{
 			{Label: "Mount Target", Value: mtID, Tier: "!"},
 			{Label: "AZ", Value: az},

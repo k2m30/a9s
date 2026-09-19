@@ -53,7 +53,6 @@ func EnrichVPCFlowLogs(ctx context.Context, clients *ServiceClients, resources [
 		// nothing. The subnet ids come off the row the fetcher built.
 		scopes := append([]string{vpcID}, splitCSV(r.Fields["subnet_ids"])...)
 
-		// Paginate through the flow logs covering this VPC.
 		var allFlowLogs []ec2types.FlowLog
 		var flNextToken *string
 		flPages := 0
@@ -92,7 +91,6 @@ func EnrichVPCFlowLogs(ctx context.Context, clients *ServiceClients, resources [
 			markUninspected(&result, r.ID, CheckCap)
 			return
 		}
-		// No flow logs at all, or none with ACTIVE status → finding.
 		hasActive := false
 		for _, fl := range allFlowLogs {
 			if fl.FlowLogStatus != nil && *fl.FlowLogStatus == "ACTIVE" {

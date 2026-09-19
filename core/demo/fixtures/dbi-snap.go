@@ -19,25 +19,22 @@ type DBISnapFixtures struct {
 
 // Stable IDs and ARNs for RDS Snapshot fixtures — imported by sibling fixture files.
 //
-// §9.3 structural cap: dbi-snap pivot data model is 1:1 for dbi, kms (a
+// dbi-snap pivots are 1:1 for dbi and kms (a
 // snapshot has exactly one source instance and one encryption key); the dbc
 // pivot has no realistic non-zero case for dbi-snap because Aurora cluster
 // snapshots live in dbc-snap (real AWS rejects CreateDBSnapshot on Aurora
-// cluster members). The universal "≥50% Count ≥ 2" rule is structurally
-// unsatisfiable for this resource type and is documented as an exemption
-// in docs/historical/resources-impl-plans/dbi-snap-impl-plan.md §9.3. The graph-root ProdDBISnapID
-// achieves Count ≥ 1 on every count-shown:yes pivot except dbc (which is
-// always Count=0 for dbi-snap by AWS-API contract).
+// cluster members). The graph-root ProdDBISnapID
+// achieves Count ≥ 1 on every counted pivot except dbc.
 const (
-	// ProdDBISnapID — graph-root for §9.3: Healthy non-Aurora automated snapshot of prod-dbi-1.
+	// ProdDBISnapID — graph root: Healthy non-Aurora automated snapshot of prod-dbi-1.
 	// dbi pivot: Count=1 (ProdDbiID). kms pivot: Count=1 (dbiKMSKeyID).
 	// dbc pivot: Count=0 (non-Aurora, no DBClusterIdentifier on parent — AWS-API truth).
 	// backup pivot: Count=1 (one recovery point in backup.go).
-	// ct-events pivot: count "unknown" (windowed) — exempt.
+	// ct-events pivot: count "unknown" (windowed).
 	ProdDBISnapID  = "rds:prod-dbi-1-2026-04-15"
 	ProdDBISnapARN = "arn:aws:rds:us-east-1:123456789012:snapshot:rds:prod-dbi-1-2026-04-15"
 
-	// WarnDBISnapCopyingID is the witness for dbi-snap.warn.transitional. Its
+	// WarnDBISnapCopyingID carries dbi-snap.warn.transitional. Its
 	// parent must stay a canonical dbi fixture and the snapshot manual, or a
 	// wave-2 cross-ref outranks the state it exists to show.
 	WarnDBISnapCopyingID  = "cross-region-copy-snap"
@@ -70,16 +67,16 @@ const (
 	WarnDBISnapPastRetentionID  = "rds:retention-test-2026-03-25"
 	WarnDBISnapPastRetentionARN = "arn:aws:rds:us-east-1:123456789012:snapshot:rds:retention-test-2026-03-25"
 
-	// MultiW1DBISnapID — U7a multi-W1: Encrypted=false + orphan (parent not in dbi list).
+	// MultiW1DBISnapID — Encrypted=false + orphan (parent not in dbi list).
 	// Expected Status: "unencrypted (+1)".
 	MultiW1DBISnapID  = "multi-orphan-unenc-snap"
 	MultiW1DBISnapARN = "arn:aws:rds:us-east-1:123456789012:snapshot:multi-orphan-unenc-snap"
 
-	// BackupCoveredDBISnapID — AWS Backup-prefixed identifier; backup pivot pivot target.
+	// BackupCoveredDBISnapID — AWS Backup-prefixed identifier; backup pivot target.
 	BackupCoveredDBISnapID  = "awsbackup:job-deadbeef-snap"
 	BackupCoveredDBISnapARN = "arn:aws:rds:us-east-1:123456789012:snapshot:awsbackup:job-deadbeef-snap"
 
-	// SeverityBrokenWarnDBISnapID — U8 severity: Broken beats Warning.
+	// SeverityBrokenWarnDBISnapID — Broken beats Warning.
 	// Status=failed + Encrypted=false → Status phrase = "failed" (Broken wins;
 	// Encrypted=false is suppressed when Status is a non-available end-state).
 	SeverityBrokenWarnDBISnapID  = "failed-with-unenc-snap"
@@ -87,9 +84,6 @@ const (
 )
 
 // NewDBISnapFixtures constructs DBISnapFixtures from the canonical demo data.
-// Every fixture in the impl-plan §2 is represented here; adversarial fixtures
-// (nil DBSnapshotIdentifier, nil Status, malformed ARN, nil SnapshotCreateTime)
-// stay inline in tests/unit/aws_rds_snap_test.go.
 var sharedDBISnapFixtures = sync.OnceValue(func() *DBISnapFixtures {
 	return &DBISnapFixtures{
 		Instances: buildDBISnapInstances(),
@@ -107,7 +101,7 @@ func buildDBISnapInstances() []rdstypes.DBSnapshot {
 	recentSnapTime := time.Now().UTC().Add(-3 * 24 * time.Hour)
 
 	return []rdstypes.DBSnapshot{
-		// 0. DBISnapPublic — witness for dbi-snap.public: the RDS fake reports
+		// DBISnapPublic carries dbi-snap.public: the RDS fake reports
 		// its restore attribute as granting the "all" group.
 		{
 			DBSnapshotIdentifier: aws.String(DBISnapPublic),
@@ -129,8 +123,8 @@ func buildDBISnapInstances() []rdstypes.DBSnapshot {
 			SourceRegion:         aws.String("us-east-1"),
 		},
 
-		// 1. ProdDBISnapID — Healthy non-Aurora automated snapshot of prod-dbi-1.
-		// SnapshotCreateTime is dynamic (now-3d) to stay within the parent's 7-day retention.
+		// ProdDBISnapID's SnapshotCreateTime is dynamic (now-3d) to stay within
+		// the parent's 7-day retention.
 		{
 			DBSnapshotIdentifier: aws.String(ProdDBISnapID),
 			DBSnapshotArn:        aws.String(ProdDBISnapARN),
@@ -151,7 +145,6 @@ func buildDBISnapInstances() []rdstypes.DBSnapshot {
 			SourceRegion:         aws.String("us-east-1"),
 		},
 
-		// 2. WarnDBISnapCreatingID — Wave-1 warning: Status=creating, PercentProgress=42.
 		{
 			DBSnapshotIdentifier: aws.String(WarnDBISnapCreatingID),
 			DBSnapshotArn:        aws.String(WarnDBISnapCreatingARN),
@@ -172,9 +165,8 @@ func buildDBISnapInstances() []rdstypes.DBSnapshot {
 			SourceRegion:         aws.String("us-east-1"),
 		},
 
-		// 3. WarnDBISnapCopyingID — Wave-1 warning: Status=copying, a state the
-		// predicate does not name. Encrypted so it carries the transitional
-		// finding alone.
+		// Status=copying is a state the predicate does not name. Encrypted
+		// so it carries the transitional finding alone.
 		{
 			DBSnapshotIdentifier: aws.String(WarnDBISnapCopyingID),
 			DBSnapshotArn:        aws.String(WarnDBISnapCopyingARN),
@@ -195,7 +187,6 @@ func buildDBISnapInstances() []rdstypes.DBSnapshot {
 			SourceRegion:         aws.String("us-east-1"),
 		},
 
-		// 4. BrokenDBISnapFailedID — Broken: Status=failed.
 		{
 			DBSnapshotIdentifier: aws.String(BrokenDBISnapFailedID),
 			DBSnapshotArn:        aws.String(BrokenDBISnapFailedARN),
@@ -216,7 +207,6 @@ func buildDBISnapInstances() []rdstypes.DBSnapshot {
 			SourceRegion:         aws.String("us-east-1"),
 		},
 
-		// 5. BrokenDBISnapIncompatibleID — Broken: Status=incompatible-restore.
 		{
 			DBSnapshotIdentifier: aws.String(BrokenDBISnapIncompatibleID),
 			DBSnapshotArn:        aws.String(BrokenDBISnapIncompatibleARN),
@@ -237,7 +227,6 @@ func buildDBISnapInstances() []rdstypes.DBSnapshot {
 			SourceRegion:         aws.String("us-east-1"),
 		},
 
-		// 6. WarnDBISnapUnencryptedID — Warning: Encrypted=false, parent ProdDbiID present.
 		{
 			DBSnapshotIdentifier: aws.String(WarnDBISnapUnencryptedID),
 			DBSnapshotArn:        aws.String(WarnDBISnapUnencryptedARN),
@@ -258,7 +247,6 @@ func buildDBISnapInstances() []rdstypes.DBSnapshot {
 			SourceRegion:         aws.String("us-east-1"),
 		},
 
-		// 7. WarnDBISnapOrphanID — Warning orphan: parent "deleted-legacy-db" NOT in dbi list.
 		{
 			DBSnapshotIdentifier: aws.String(WarnDBISnapOrphanID),
 			DBSnapshotArn:        aws.String(WarnDBISnapOrphanARN),
@@ -279,8 +267,6 @@ func buildDBISnapInstances() []rdstypes.DBSnapshot {
 			SourceRegion:         aws.String("us-east-1"),
 		},
 
-		// 8. WarnDBISnapPastRetentionID — Warning: automated, 30 days old,
-		// parent ProdDbiRetentionParentID with BackupRetentionPeriod=7.
 		// SnapshotCreateTime computed relative to time.Now() so the enricher
 		// always sees this as past-retention regardless of test date.
 		{
@@ -303,7 +289,6 @@ func buildDBISnapInstances() []rdstypes.DBSnapshot {
 			SourceRegion:         aws.String("us-east-1"),
 		},
 
-		// 9. MultiW1DBISnapID — U7a multi-W1: Encrypted=false + orphan.
 		// DBInstanceIdentifier="deleted-legacy-db" is NOT in the dbi list.
 		// Expected Status: "unencrypted (+1)".
 		{
@@ -326,9 +311,7 @@ func buildDBISnapInstances() []rdstypes.DBSnapshot {
 			SourceRegion:         aws.String("us-east-1"),
 		},
 
-		// 10. BackupCoveredDBISnapID — AWS Backup-prefixed identifier.
-		// Verifies that identifiers with the "awsbackup:" prefix are handled correctly.
-		// backup pivot: 2 recovery points added to backup.go pointing at BackupCoveredDBISnapARN.
+		// backup.go holds 2 recovery points for BackupCoveredDBISnapARN.
 		{
 			DBSnapshotIdentifier: aws.String(BackupCoveredDBISnapID),
 			DBSnapshotArn:        aws.String(BackupCoveredDBISnapARN),
@@ -349,7 +332,6 @@ func buildDBISnapInstances() []rdstypes.DBSnapshot {
 			SourceRegion:         aws.String("us-east-1"),
 		},
 
-		// 11. SeverityBrokenWarnDBISnapID — U8 severity: Broken beats Warning.
 		// Status=failed + Encrypted=false → phrase = "failed" (Broken wins;
 		// Encrypted=false suppressed when Status is a non-available end-state).
 		{

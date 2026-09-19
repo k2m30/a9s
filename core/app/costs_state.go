@@ -41,7 +41,7 @@ type CostsState struct {
 	// independent of what applyCostsSelect's own inputs can see.
 	AwaitedIdentity string `json:"-"`
 
-	// DrillRefusedReason is the honest FR-007 explanation for the most
+	// DrillRefusedReason is the explanation for the most
 	// recent refused resource drill (outside the 14-day retention window
 	// even after clamping) — set by applyCostsSelect, surfaced verbatim by
 	// buildCostsBody's footer, and cleared at the start of every Enter
@@ -49,7 +49,7 @@ type CostsState struct {
 	DrillRefusedReason string `json:"drill_refused_reason,omitempty"`
 
 	// ResourceRowNote is the observable result of Enter on a RESOURCE_ID
-	// row (the bottom of the drill chain, FR-008): the selected resource ID
+	// row (the bottom of the drill chain): the selected resource ID
 	// for a service with a mapped a9s detail view, an honest "unsupported"
 	// message otherwise. Set by applyCostsSelect, surfaced verbatim by
 	// buildCostsBody's footer (same seam as DrillRefusedReason), cleared at
@@ -66,8 +66,8 @@ type CostsState struct {
 	Now   time.Time    `json:"-"`
 }
 
-// metricCycle is the 'b' cycle order (data-model.md's display mapping list).
-// net-unblended is stored-only and never appears here.
+// metricCycle is the 'b' cycle order. net-unblended is stored-only and
+// never appears here.
 var metricCycle = []costs.Metric{
 	costs.MetricInvoice,
 	costs.MetricUnblended,
@@ -105,7 +105,7 @@ func (c *Controller) topCostsState() *CostsState {
 // fetch is dispatched while costs is the active screen, but its result can
 // land after the user has pushed Help/Identity on top of it — that delivery
 // must still merge into the costs screen beneath rather than being dropped
-// because the top-of-stack screen is no longer ScreenCosts. Callers must
+// because an overlay sits on top of ScreenCosts. Callers must
 // hold c.mu.
 func (c *Controller) costsStateBeneathOverlay() *CostsState {
 	for i := len(c.stack) - 1; i >= 0; i-- {
@@ -116,8 +116,8 @@ func (c *Controller) costsStateBeneathOverlay() *CostsState {
 	return nil
 }
 
-// costsOpenAtNewestDrillLevel builds a DrillLevel positioned per FR-002
-// "open at today": cursor on the newest (rightmost, current/open) column of
+// costsOpenAtNewestDrillLevel builds a DrillLevel that opens at today:
+// cursor on the newest (rightmost, current/open) column of
 // window. ScrollX is left at zero here — reconcileCostsScrollToCursor (run
 // separately once ViewportCols is known) is what actually pins the newest
 // column to the visible right edge; this helper only owns the cursor
@@ -171,11 +171,10 @@ func (c *Controller) ensureCostsState(now time.Time) {
 	if top.State.Costs != nil {
 		return
 	}
-	// FR-002 "open at today": the cursor starts on the newest (current,
-	// open) period, not column 0 — costsOpenAtNewestDrillLevel is the single
-	// helper every reset-to-default path (initial seed, digit-0 pivot,
-	// trailing-anchored zoom-out) shares, so they can never drift apart on
-	// what "today" means.
+	// The cursor starts on the newest (current, open) period, not column 0 —
+	// costsOpenAtNewestDrillLevel is the single helper every reset-to-default
+	// path (initial seed, digit-0 pivot, trailing-anchored zoom-out) shares, so
+	// they can never drift apart on what "today" means.
 	window := costs.BuildWindow(costs.GranularityMonth, now)
 	// NoCache (demo, or an explicit --no-cache session) mirrors every other
 	// on-disk cache in the codebase (session.NoCache's own
@@ -188,7 +187,7 @@ func (c *Controller) ensureCostsState(now time.Time) {
 	} else {
 		store = costs.LoadStore(c.core.Profile())
 	}
-	// X9: LoadStore's own Recovered() (a corrupt/alien-version cache file
+	// LoadStore's own Recovered() (a corrupt/alien-version cache file
 	// set aside to .bak) must always flash — a silent data loss otherwise.
 	if store.Recovered() {
 		c.applyIntents([]runtime.UIIntent{runtime.FlashIntent{
@@ -230,7 +229,7 @@ func (c *Controller) GetCostsDrillStack() []costs.DrillLevel {
 // applyCostsMoveCol performs on a scroll action, run here too so the FIRST
 // render after ViewportCols becomes known (before the user has ever
 // scrolled) already shows the cursor's column, e.g. the newest period at
-// the right edge on initial open (FR-002). No-op when the top screen is
+// the right edge on initial open. No-op when the top screen is
 // not ScreenCosts.
 func (c *Controller) SetCostsViewportCols(n int) {
 	c.mu.Lock()
@@ -250,8 +249,8 @@ func (c *Controller) SetCostsViewportCols(n int) {
 // EnsureCostsFetch checks the top costs screen's current shape against the
 // Store and returns the KindFetchCosts TaskRequest when the cache is cold
 // (nil on a warm cache) — the sole fetch decision point for opening the
-// Cost Explorer screen (SC-002: HandleNavigate/NavigateKindPushCosts must
-// never fetch unconditionally). Call after EnsureCostsState has seeded the
+// Cost Explorer screen (HandleNavigate/NavigateKindPushCosts never
+// fetch unconditionally). Call after EnsureCostsState has seeded the
 // screen.
 func (c *Controller) EnsureCostsFetch() []runtime.TaskRequest {
 	c.mu.Lock()
@@ -264,8 +263,8 @@ func (c *Controller) EnsureCostsFetch() []runtime.TaskRequest {
 }
 
 // costsRefreshTasks re-dispatches the active/beneath costs screen's own top
-// frame — the P5 counterpart to activeListRefreshTasks (C10's retry idiom)
-// for a costs screen opened before AWS finished connecting: the pre-connect
+// frame — the counterpart to activeListRefreshTasks for a costs screen
+// opened before AWS finished connecting: the pre-connect
 // fetch failed with executor.go's "no client configured" error (or was
 // never dispatched at all), and ClientsReady landing must recover it
 // without user action. Clears a stale pre-connect ErrorMsg unconditionally
@@ -281,7 +280,7 @@ func (c *Controller) costsRefreshTasks() []runtime.TaskRequest {
 	return costsTaskSlice(c.ensureCostsShapeFetched(cs))
 }
 
-// ForceRefreshCosts implements Ctrl+R on the costs screen (FR-012):
+// ForceRefreshCosts implements Ctrl+R on the costs screen:
 // expires the active shape's cached open period so ensureCostsShapeFetched
 // treats it as missing regardless of freshness, then dispatches the
 // resulting fetch — closed periods are untouched, refetched only if they
@@ -311,25 +310,23 @@ func (c *Controller) forceRefreshCostsLocked() []runtime.TaskRequest {
 }
 
 // costsQueryForFrame returns the CE query shape that must be cached/fetched
-// to render drill's grid at metric — screen.QueryForFrame is the pure
-// implementation (moved there: it touches only costs.DrillLevel/
-// costs.Metric, nothing session-scoped); this one-line wrapper is the
-// single call site every costs_state.go/costs_body.go consumer keeps using.
+// to render drill's grid at metric; screen.QueryForFrame is the pure
+// implementation.
 func costsQueryForFrame(drill costs.DrillLevel, metric costs.Metric) costs.Query {
 	return screen.QueryForFrame(drill, metric)
 }
 
 // costsGridForFrame builds the raw aggregated Grid for one drill frame
 // against cs's accumulated Store — costs.BuildGrid plus the overlays that
-// must happen BEFORE any display-level post-processing: anomaly marks
-// (FR-014); for a LINKED_ACCOUNT pivot, the store's cached id->name attrs;
+// must happen BEFORE any display-level post-processing: anomaly marks;
+// for a LINKED_ACCOUNT pivot, the store's cached id->name attrs;
 // for a SERVICE pivot, AWS's vendor prefix stripped off every row label
 // (the single seam every SERVICE-labelled surface — grid rows, the
 // breadcrumb segment naming a SERVICE-pinned frame, the anomaly footer —
 // reads through, so none of them can independently drift on when/how the
 // strip applies). The display-level post-processing itself (the zero-row
-// filter, cursor clamp, viewport slice, empty-finer-grain note) is
-// screen.BuildViewModel's now (architecture.md Seam 8) — see
+// filter, cursor clamp, viewport slice, empty-finer-grain note) belongs to
+// screen.BuildViewModel (architecture.md Seam 8) — see
 // costsViewModelForFrame, the single source cursor movement, drilling, and
 // render all read.
 func costsGridForFrame(cs *CostsState, drill costs.DrillLevel) costs.Grid {
@@ -363,10 +360,7 @@ func costsGridForFrame(cs *CostsState, drill costs.DrillLevel) costs.Grid {
 // render (buildCostsBody) all read, so none of them can independently
 // drift on the displayed row set, the clamped cursor, or the visible
 // column window (architecture.md Seam 8: "the renderer and Enter handler
-// share one clamped view-model"). No adapter-level caching: both
-// costs.BuildGrid and screen.BuildViewModel recompute fresh every call —
-// cs.Store.Revision() is threaded through only as BuildViewModel's own
-// black-box memoization hint, never an adapter-side cache key anymore.
+// share one clamped view-model").
 func costsViewModelForFrame(cs *CostsState, drill costs.DrillLevel) (costs.Grid, screen.ViewModel) {
 	grid := costsGridForFrame(cs, drill)
 	vm := screen.BuildViewModel(grid, drill.RowDim,
@@ -382,7 +376,7 @@ func costsViewModelForFrame(cs *CostsState, drill costs.DrillLevel) (costs.Grid,
 // BuildViewModel computes the identical window internally for Rows/
 // VisibleCols; this is the small remainder buildCostsBody still needs on
 // its own to slice grid.Totals, which BuildViewModel's pure signature does
-// not carry (Seam 8 names Rows/Cursor/VisibleCols/Note only).
+// not carry.
 func costsVisibleColumnRange(cs *CostsState, drill costs.DrillLevel, totalCols int) (start, count int) {
 	start, count = 0, totalCols
 	if cs.ViewportCols > 0 && cs.ViewportCols < totalCols {
@@ -399,7 +393,7 @@ func costsVisibleColumnRange(cs *CostsState, drill costs.DrillLevel, totalCols i
 // dispatches a task covering the whole window (closed periods merge
 // idempotently, so re-requesting already-cached ones alongside a genuine
 // gap is harmless); a grid-warm shape with a stale/absent anomaly slot
-// (X3) still dispatches an anomalies-only task, SkipGrid'd so it never
+// still dispatches an anomalies-only task, SkipGrid'd so it never
 // re-bills for cost data the store already has, and never touches
 // Loading/AwaitedIdentity since nothing the grid render depends on is
 // missing. Returns nil (and clears Loading) only when both are fresh.
@@ -469,7 +463,7 @@ func (c *Controller) applyCostsMoveRow(cs *CostsState, delta int) {
 }
 
 // applyCostsMoveCol clamps the top drill frame's cursor column to the
-// window's bounds after a ±1 move (time-axis horizontal scroll, FR-004),
+// window's bounds after a ±1 move (time-axis horizontal scroll),
 // then reconciles ScrollX so the cursor stays within the renderer's
 // visible viewport: scrolling right past the last visible column
 // advances the window toward the newest period; scrolling left past the
@@ -489,7 +483,7 @@ func (c *Controller) applyCostsMoveCol(cs *CostsState, delta int) *runtime.TaskR
 	}
 	top.Cursor.Col = clampInt(top.Cursor.Col+delta, 0, len(top.Window)-1)
 	reconcileCostsScrollToCursor(top, cs.ViewportCols)
-	// The zero-row display filter reads only the VISIBLE cells (Seam 8),
+	// The zero-row display filter reads only the VISIBLE cells,
 	// so a horizontal scroll can change which rows are filtered even
 	// though the row set itself never moved — re-clamp Cursor.Row against
 	// the ViewModel built at the new scroll position, the same single
@@ -517,7 +511,7 @@ func (c *Controller) extendCostsWindowOlder(cs *CostsState, top *costs.DrillLeve
 }
 
 // applyCostZoom walks the granularity chain in/out, mutating the top frame
-// in place (never pushes a drill frame — FR-005). Boundary steps (in at
+// in place (never pushes a drill frame). Boundary steps (in at
 // day, out at year) are no-ops. Week/day are bounded, drill-style windows
 // anchored on the cursor's current period (zooming IN on a specific month
 // must show that month's weeks). Month/year are always the canonical
@@ -529,7 +523,7 @@ func (c *Controller) extendCostsWindowOlder(cs *CostsState, top *costs.DrillLeve
 // the app has ever shown.
 //
 // Returns the KindFetchCosts TaskRequest when the new granularity's query
-// shape is not yet cached (FR-017 shape-miss), nil otherwise.
+// shape is not yet cached, nil otherwise.
 func (c *Controller) applyCostZoom(cs *CostsState, in bool) *runtime.TaskRequest {
 	top := &cs.DrillStack[len(cs.DrillStack)-1]
 	idx := granChainIndex(top.Granularity)
@@ -568,13 +562,12 @@ func (c *Controller) applyCostZoom(cs *CostsState, in bool) *runtime.TaskRequest
 
 	top.Granularity = newGran
 	top.Window = newWindow
-	// FR-002 "open at today": zooming back out to a trailing-anchored
-	// (month/year) window re-lands on the newest period, matching the
-	// default view's own cursor placement — not on column 0, which would
-	// silently jump the cursor to the oldest month every time. A zoom-IN
-	// (or an out-zoom that stays bounded, week/day) keeps landing at the
-	// start of the newly bounded window, since that IS the period being
-	// drilled into.
+	// Zooming back out to a trailing-anchored (month/year) window re-lands on
+	// the newest period, matching the default view's own cursor placement —
+	// not on column 0, which would silently jump the cursor to the oldest
+	// month every time. A zoom-IN (or an out-zoom that stays bounded,
+	// week/day) lands at the start of the newly bounded window, since that IS
+	// the period being drilled into.
 	if !in && newGran.TrailingAnchored() {
 		top.Cursor.Col = len(newWindow) - 1
 	} else {
@@ -618,7 +611,7 @@ func granChainIndex(g costs.Granularity) int {
 func (c *Controller) applyCostMetricCycle(cs *CostsState) *runtime.TaskRequest {
 	idx := max(slices.Index(metricCycle, cs.Metric), 0)
 	cs.Metric = metricCycle[(idx+1)%len(metricCycle)]
-	// X6: clamp the cursor row against the NEW metric's filtered ViewModel
+	// Clamp the cursor row against the NEW metric's filtered ViewModel
 	// right here, at mutation time — a metric switch can shrink the
 	// visible row set (a row's display metric may have no value under the
 	// new metric), and a stale Cursor.Row left for applyCostsSelect to
@@ -633,15 +626,12 @@ func (c *Controller) applyCostMetricCycle(cs *CostsState) *runtime.TaskRequest {
 
 // applyCostPivot handles digit keys 0-9. 1-6 mutate the top frame's RowDim
 // in place (keeping any accumulated Filter/Window — a re-pivot of the
-// current scope, not a reset) and reset its cursor to the top-left cell,
-// per US2 acceptance #1 ("same columns... cursor reset to top-left").
+// current scope, not a reset) and reset its cursor row to the top.
 // 0 resets to the default view: root frame, service pivot, invoice metric,
-// every drill popped (data-model.md's pivot-preset table). 7-9 are reserved
-// no-ops.
+// every drill popped. 7-9 are reserved no-ops.
 //
 // Returns the KindFetchCosts TaskRequest when the new pivot's GroupBy shape
-// is not yet cached (FR-017 shape-miss), nil otherwise (including the 7-9
-// no-op case).
+// is not yet cached, nil otherwise (including the 7-9 no-op case).
 func (c *Controller) applyCostPivot(cs *CostsState, n int) *runtime.TaskRequest {
 	switch n {
 	case 0:
@@ -653,7 +643,7 @@ func (c *Controller) applyCostPivot(cs *CostsState, n int) *runtime.TaskRequest 
 		reconcileCostsScrollToCursor(&cs.DrillStack[0], cs.ViewportCols)
 		return c.ensureCostsShapeFetched(cs)
 	case 1, 2, 3, 4, 5, 6:
-		// X12: only Row resets (a new pivot dimension's rows are unrelated
+		// Only Row resets (a new pivot dimension's rows are unrelated
 		// to the old ones); Col is PRESERVED, merely clamped to the
 		// window's own bounds (unchanged by a pivot) — resetting it to 0
 		// would yank the view to the oldest column and poison the next
@@ -691,7 +681,7 @@ var pivotDigitDims = [7]costs.Dimension{
 // DrillRefusedReason/ResourceRowNote) describe the just-popped CHILD frame's
 // own in-flight/failed fetch, never the parent's — the parent's own data is
 // already available (Select never drills from a Loading frame), so it must
-// never render blocked behind state a frame it no longer owns left behind.
+// never render blocked behind state left by a popped child frame.
 // Cleared unconditionally on every actual pop; a caller that wants to set
 // one of these fresh (e.g. ApplyCostsLoaded's own classified-refusal
 // auto-pop) must do so AFTER calling this, not before.
@@ -730,20 +720,19 @@ func costsResourceRowTargetType(filter costs.Filter) string {
 
 // applyCostsSelect drills into the cursor's (row, period) cell: narrows the
 // filter to the row's dimension value, pivots to the next dimension in the
-// chain (account/region -> service -> usage type -> resource, FR-006), and
+// chain (account/region -> service -> usage type -> resource), and
 // re-renders columns one granularity finer within the selected period. At
 // the bottom of the chain (RESOURCE_ID) it navigates to the mapped a9s
-// resource detail view, or sets ResourceRowNote for a service with none
-// (FR-008); it also no-ops when the resource-level drill's window/filter
-// gate (FR-007) is not satisfied. The decision itself is
+// resource detail view, or sets ResourceRowNote for a service with none;
+// it also no-ops when the resource-level drill's window/filter
+// gate is not satisfied. The decision itself is
 // screen.Select's — this is a thin switch over its typed outcome
-// (architecture.md Seam 3): Loading gates unconditionally (X7), a stale
+// (architecture.md Seam 3): Loading gates unconditionally, a stale
 // cursor beyond the live grid's row count is a strict no-op
 // (screen.NoSelection), never a blind empty-value pin.
 //
 // Returns the KindFetchCosts TaskRequest when the new child frame's query
-// shape is not yet cached (FR-017 shape-miss), nil otherwise (including
-// every no-op path).
+// shape is not yet cached, nil otherwise (including every no-op path).
 func (c *Controller) applyCostsSelect(cs *CostsState) *runtime.TaskRequest {
 	// Cleared on every attempt so a stale note/refusal reason never outlives
 	// the Enter press that produced it — the cases below set one fresh when
@@ -756,13 +745,11 @@ func (c *Controller) applyCostsSelect(cs *CostsState) *runtime.TaskRequest {
 		return nil
 	}
 
-	// Seam 8: the ViewModel's own Cursor.Row is always a valid index into
+	// The ViewModel's own Cursor.Row is always a valid index into
 	// Rows when Rows is non-empty (screen.BuildViewModel's clamp) — reading
 	// through it here, rather than re-checking cur.Cursor.Row's raw bounds,
 	// means a stale cursor left over from ANY prior mutation resolves to
-	// the clamped (last visible) row instead of screen.NoSelection, not just
-	// the specific mutation points that call costsViewModelForFrame of
-	// their own accord (X6's principle applied uniformly at this seam).
+	// the clamped (last visible) row instead of screen.NoSelection.
 	_, vm := costsViewModelForFrame(cs, *cur)
 	row := screen.GridRowRef{}
 	if len(vm.Rows) > 0 {
@@ -779,9 +766,8 @@ func (c *Controller) applyCostsSelect(cs *CostsState) *runtime.TaskRequest {
 	// (ApplyCostsLoaded), regardless of whether every window period ends up
 	// individually re-verified as covered — the same lenient "the fetch this
 	// frame is waiting on has resolved" signal every other action already
-	// relies on. X7's fix is that this check is no longer skipped for a
-	// frame the user just pushed: PushDrill below leaves AwaitedIdentity set
-	// exactly as ensureCostsShapeFetched left it, so a fast second Enter on a
+	// relies on. PushDrill below leaves AwaitedIdentity set exactly as
+	// ensureCostsShapeFetched left it, so a fast second Enter on a
 	// still-loading fresh frame reads Loading true here too.
 	state := screen.ScreenState{
 		RowDim:          cur.RowDim,
@@ -828,7 +814,7 @@ func (c *Controller) applyCostsSelect(cs *CostsState) *runtime.TaskRequest {
 			// and Granularity can never describe two different chains.
 			Granularity: out.Granularity,
 			Window:      out.Window,
-			// N3: the granularity-fallback gate's inputs, carried straight
+			// The granularity-fallback gate's inputs, carried straight
 			// through from Select's own PushDrill outcome — Eligible only
 			// when the parent's selected cell was non-zero, so an
 			// ordinarily-empty drill never fires it.
@@ -839,7 +825,7 @@ func (c *Controller) applyCostsSelect(cs *CostsState) *runtime.TaskRequest {
 			},
 		})
 		// Open the child on the current column — the newest whose period has
-		// already begun (FR-002 "open at today"), like the root/pivot frames.
+		// already begun, like the root/pivot frames.
 		// The col-0 (oldest) default parks on a cell outside the RESOURCE_ID
 		// 14-day retention window late in the month; the raw last column is
 		// wrong too, because week/day child windows — unlike months, which
@@ -849,12 +835,10 @@ func (c *Controller) applyCostsSelect(cs *CostsState) *runtime.TaskRequest {
 		top := &cs.DrillStack[len(cs.DrillStack)-1]
 		top.Cursor.Col = costsCurrentCol(top.Window, cs.Now)
 		reconcileCostsScrollToCursor(top, cs.ViewportCols)
-		// X7: AwaitedIdentity is left exactly as ensureCostsShapeFetched set
-		// it for the new child frame (set when genuinely a shape-miss, ""
-		// when the child's shape happens to already be cached) — no longer
-		// force-cleared to permit blind chaining; a fast second Enter on
-		// this still-loading frame reads Loading true via the same check
-		// above.
+		// AwaitedIdentity stays exactly as ensureCostsShapeFetched set it for
+		// the new child frame (set on a shape-miss, "" when the child's shape is
+		// already cached), so a fast second Enter on this still-loading frame
+		// reads Loading true via the check above.
 		return c.ensureCostsShapeFetched(cs)
 	default:
 		return nil
@@ -909,7 +893,7 @@ func cloneCostsFilter(f costs.Filter) costs.Filter {
 // isResourceDrillQuery reports whether q is the RESOURCE_ID-shaped query a
 // resource-level drill dispatches (GetCostAndUsageWithResources) — the only
 // shape a classified refusal error is downgraded from a blocking ErrorMsg to
-// an FR-007 FooterNote refusal for.
+// a FooterNote refusal for.
 func isResourceDrillQuery(q costs.Query) bool {
 	return len(q.GroupBy) == 1 && q.GroupBy[0] == costs.DimensionResourceID
 }
@@ -918,16 +902,13 @@ func isResourceDrillQuery(q costs.Query) bool {
 // specific classified CE sentinels a resource-level drill can legitimately
 // hit as an honest, expected outcome rather than a fetch failure:
 // ErrCostsAccessDenied (the real-account shape — CE refuses resource-level
-// data until the account opts in) and ErrCostsDataUnavailable. Which wire
-// codes map to those sentinels is the classifier's to say, not this
-// comment's.
+// data until the account opts in) and ErrCostsDataUnavailable.
 func isClassifiedResourceDrillRefusal(err error) bool {
 	return errors.Is(err, awsclient.ErrCostsAccessDenied) || errors.Is(err, awsclient.ErrCostsDataUnavailable)
 }
 
 // costsResourceDrillRefusalNote builds the FooterNote text for a classified
-// resource-level opt-in refusal (FR-007-shaped: an honest, human-readable
-// explanation, not a silent no-op). The actionable AWS text is the API
+// resource-level opt-in refusal. The actionable AWS text is the API
 // error's message field, read through awsclient.MessageOf: %v-ing the full
 // chain would let the "operation error ..." / "https response error ..."
 // wrapper prefixes consume the footer line and truncate that text away
@@ -939,7 +920,7 @@ func costsResourceDrillRefusalNote(err error) string {
 }
 
 // ApplyCostsLoaded merges one Cost Explorer fetch result into the costs
-// screen's Store + session counters (FR-013: APICalls increments by
+// screen's Store + session counters (APICalls increments by
 // Requests even on error, and Store.Merge/MergeCoverage/MergeAttrs run
 // unconditionally on success, regardless of match — a delivery is never
 // silently dropped, even one landing while Help/Identity is stacked above
@@ -950,16 +931,12 @@ func costsResourceDrillRefusalNote(err error) string {
 // a different shape or a different period range at the SAME shape (e.g.
 // zooming from May to June at week granularity — identical CacheKey,
 // different Range) before an earlier fetch's result arrives, and that
-// now-stale-from-the-controller's-perspective delivery must not clear
-// Loading or install an error for what the user is actually waiting on —
-// only the result that matches both does. On a matching error it
-// sets ErrorMsg so buildCostsBody renders the explicit error state
-// (FR-017) instead of an empty grid; on a matching success it clears any
-// prior ErrorMsg. DataThrough is not tracked here at all — buildCostsBody
-// derives it fresh from cs.Store's own cached records for the current
-// shape (costs.Store.DataThrough), so a warm disk cache re-entered with
-// zero fetches this session still shows a correct value.
-// ApplyCostsLoaded's return is the granularity-fallback re-fetch (N3) it
+// stale delivery must not clear Loading or install an error for what the
+// user is actually waiting on — only the result that matches both does.
+// On a matching error it sets ErrorMsg so buildCostsBody renders the
+// explicit error state instead of an empty grid; on a matching success it
+// clears any prior ErrorMsg.
+// ApplyCostsLoaded's return is the granularity-fallback re-fetch it
 // may itself dispatch when this delivery lands with zero records for a
 // frame whose selected parent cell was non-zero — nil on every other path.
 // Handle appends it to the tasks it returns, mirroring every other
@@ -970,10 +947,10 @@ func (c *Controller) ApplyCostsLoaded(ev messages.CostsLoaded) *runtime.TaskRequ
 		// The costs screen was fully popped before this delivery arrived —
 		// costsStateBeneathOverlay finds no ScreenCosts entry anywhere on
 		// the stack, so there is no CostsState left to mutate. The fetch was
-		// still genuinely billed and its data real (FR-013/FR-017: billed CE
-		// data is never silently discarded) — merge it into a fresh
-		// disk-backed Store for this profile instead, mirroring every other
-		// on-disk cache's NoCache gate (R4): under NoCache there is no
+		// still genuinely billed and its data real (billed CE data is never
+		// silently discarded) — merge it into a fresh disk-backed Store for this
+		// profile instead, mirroring every other on-disk cache's NoCache gate:
+		// under NoCache there is no
 		// screen state left to apply to AND no disk cache to touch, so this
 		// is a pure no-op rather than a stray read+write. now falls back to
 		// lastCostsNow (the clock this session's costs screen was last
@@ -1022,15 +999,15 @@ func (c *Controller) ApplyCostsLoaded(ev messages.CostsLoaded) *runtime.TaskRequ
 				// GetCostAndUsageWithResources) is an honest, expected
 				// outcome of attempting the drill — not a fetch failure that
 				// should blank the whole grid behind the blocking ErrorMsg
-				// body. It surfaces as the same FR-007 FooterNote seam
+				// body. It surfaces as the same FooterNote seam
 				// DrillRefusedReason already feeds, and the just-pushed
 				// RESOURCE_ID frame is popped back to its parent so the
 				// screen never shows an empty child frame with nothing to
 				// display. Every other error keeps the blocking ErrorMsg. Pop
 				// FIRST, set the reason AFTER — applyCostsBack itself clears
-				// DrillRefusedReason (P3: a popped child frame's state must
-				// never leak onto its parent), so setting the note before the
-				// pop would have it wiped by the very call that surfaces it.
+				// DrillRefusedReason (a popped child frame's state never leaks
+				// onto its parent), so setting the note before the pop would
+				// have it wiped by the very call that surfaces it.
 				c.applyCostsBack(cs)
 				cs.DrillRefusedReason = costsResourceDrillRefusalNote(ev.Err)
 			} else {
@@ -1059,9 +1036,9 @@ func (c *Controller) ApplyCostsLoaded(ev messages.CostsLoaded) *runtime.TaskRequ
 	// here rather than saved synchronously — Handle flushes it once c.mu is
 	// released, so the disk write never blocks a concurrent action against
 	// the controller. A write failure is surfaced as a flash, never a panic
-	// and never silently dropped data. R4: skipped entirely under NoCache —
-	// a memory-only Store (ensureCostsState's own NoCache branch) must
-	// never reach a disk write.
+	// and never silently dropped data. Skipped entirely under NoCache — a
+	// memory-only Store (ensureCostsState's own NoCache branch) must never
+	// reach a disk write.
 	if !c.core.NoCache() {
 		c.costsDirtyStore = cs.Store
 	}
@@ -1069,7 +1046,7 @@ func (c *Controller) ApplyCostsLoaded(ev messages.CostsLoaded) *runtime.TaskRequ
 	return c.applyCostsGranularityFallback(cs, ev, matchesAwaited)
 }
 
-// applyCostsGranularityFallback is N3's re-plan trigger: when this delivery
+// applyCostsGranularityFallback is the re-plan trigger: when this delivery
 // matches what the top frame was waiting on, genuinely carried zero
 // records, and the top frame's own FallbackGate is eligible (the parent
 // drill step's selected cell was non-zero) and hasn't already fired once,
@@ -1129,7 +1106,7 @@ func costsAnomalyResultFromEvent(ev messages.CostsLoaded) costs.AnomalyResult {
 //
 // Coverage and Truncated are taken only from a delivery that actually
 // attempted the grid fetch: a SkipGrid anomalies-only delivery
-// (ensureCostsShapeFetched's X3 branch) leaves Grid.Truncated at its zero
+// (ensureCostsShapeFetched's anomalies-only branch) leaves Grid.Truncated at its zero
 // value and would otherwise stamp a window it never fetched as complete.
 func costsFetchResultFromEvent(ev messages.CostsLoaded) costs.FetchResult {
 	r := costs.FetchResult{

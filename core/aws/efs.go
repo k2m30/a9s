@@ -15,7 +15,7 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// efsW1Findings returns the active Wave-1 findings for this filesystem in §4
+// efsW1Findings returns the active Wave-1 findings for this filesystem in
 // precedence order: Broken signals first (error, no mount targets), then
 // Warning signals (creating, updating, deleting). The first finding's phrase
 // is the "top" displayed in the Status column (plus (+N-1) suffix); the full
@@ -100,7 +100,6 @@ func FetchEFSFileSystemsPage(ctx context.Context, api EFSDescribeFileSystemsAPI,
 
 		mountTargets := fmt.Sprintf("%d", fs.NumberOfMountTargets)
 
-		// Compute Wave-1 findings.
 		findings, attentionDetails := efsW1Findings(fs.LifeCycleState, fs.NumberOfMountTargets, fs.Encrypted)
 		statusPhrase := domain.StatusPhrase(findings)
 

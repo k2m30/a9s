@@ -24,4 +24,4 @@ const (
 	CodeCFNOutputSecret domain.FindingCode = "cfn.output-secret"
 )
 
-// S5 operator sentences: what is wrong, what it exposes, what fixing it takes.
+// Operator sentences: what is wrong, what it exposes, what fixing it takes.

@@ -3,8 +3,7 @@
 package views
 
 // ScrollState manages cursor position and scroll window calculation
-// for list-style views. It encapsulates the duplicated cursor/scroll
-// logic found in ResourceListModel and MainMenuModel.
+// for list-style views (ResourceListModel, MainMenuModel).
 type ScrollState struct {
 	cursor int
 	total  int

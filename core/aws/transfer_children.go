@@ -2,7 +2,7 @@
 
 // transfer_children.go — Transfer Family Agreements child view. Agreements
 // are the only server-scoped child (DescribedAgreement.ServerId;
-// ListAgreements(ServerId)) — docs/resources/transfer.md §2.1. Profiles and
+// ListAgreements(ServerId)). Profiles and
 // certificates are account-scoped (ListedProfile/ListedCertificate carry no
 // ServerId), so they are not separate child views; each agreement's
 // LocalProfileId/PartnerProfileId and their certificates are resolved on
@@ -29,15 +29,14 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// transfer.* agreement/certificate FindingCodes — docs/resources/transfer.md §3.2.
+// transfer.* agreement/certificate FindingCodes.
 const (
 	transferCodeAgreementInactive domain.FindingCode = "transfer.warn.agreement_inactive"
 	transferCodeCertExpired       domain.FindingCode = "transfer.broken.cert_expired"
 	transferCodeCertExpiring      domain.FindingCode = "transfer.warn.cert_expiring"
 )
 
-// transferCertExpiringWindow is the "expires soon" lookahead window
-// (docs/resources/transfer.md §3.2: "within 30 days").
+// transferCertExpiringWindow is the "expires soon" lookahead window.
 const transferCertExpiringWindow = 30 * 24 * time.Hour
 
 // FetchTransferAgreements fetches one server's agreements: ListAgreements +
@@ -103,8 +102,8 @@ func FetchTransferAgreements(ctx context.Context, api TransferAPI, serverID stri
 // buildTransferAgreementResource constructs a Resource from a
 // DescribeAgreement response. LocalProfileId/PartnerProfileId are stored
 // raw (the bare profile id); enrichTransferAgreement resolves their As2Id
-// fact and certificate expiry on demand (docs/resources/transfer.md
-// §2.1/§3.2) — an ACTIVE agreement carries zero findings until then. serverID
+// fact and certificate expiry on demand — an ACTIVE agreement carries zero
+// findings until then. serverID
 // is threaded through to Fields["server_id"] so the console-link builder can
 // deep-link to the parent server's page.
 func buildTransferAgreementResource(agreement *transfertypes.DescribedAgreement, serverID string) resource.Resource {
@@ -138,7 +137,7 @@ func buildTransferAgreementResource(agreement *transfertypes.DescribedAgreement,
 // to their As2Id fact (DescribeProfile) and evaluates each profile's
 // certificates for expiry (DescribeCertificate) — both account-scoped
 // lookups with no server link, so this detail-open enrichment is the only
-// place they can be resolved (docs/resources/transfer.md §2.1). clients must
+// place they can be resolved. clients must
 // be the session's *DetailEnrichmentCtx, the production shape the runtime
 // always passes.
 func enrichTransferAgreement(ctx context.Context, clients any, res resource.Resource) (resource.Resource, error) {
@@ -232,7 +231,7 @@ func resolveTransferProfile(ctx context.Context, api TransferAPI, profileID stri
 // transferCertificateFinding evaluates one certificate for expiry via
 // DescribeCertificate: InactiveDate past or Status INACTIVE is Broken
 // "expired"; within 30 days is Warning "expires in <N>d" — the child-row
-// signal (docs/resources/transfer.md §3.2), never bubbled to the server
+// signal, never bubbled to the server
 // row. A lookup that did not answer returns (zero, false) AND the reason: an
 // absent expiry warning must not read as a certificate that is not expiring.
 func transferCertificateFinding(ctx context.Context, api TransferAPI, certID string) (domain.Finding, bool, error) {

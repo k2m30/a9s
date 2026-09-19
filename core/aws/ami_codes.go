@@ -15,11 +15,11 @@ const (
 	CodeAMIStateFailed domain.FindingCode = "ami.state.failed"
 
 	// CodeAMIStateDim — AMI is in the "deregistered" or "disabled" state
-	// (no longer launchable). Severity: SevDim.
+	// (not launchable). Severity: SevDim.
 	CodeAMIStateDim domain.FindingCode = "ami.state.dim"
 
-	// CodeAMIDeprecated — AMI's DeprecationTime has passed; AWS Console no
-	// longer recommends it for new launches. Severity: SevWarn.
+	// CodeAMIDeprecated — AMI's DeprecationTime has passed; the AWS Console does
+	// not recommend it for new launches. Severity: SevWarn.
 	CodeAMIDeprecated domain.FindingCode = "ami.deprecated"
 
 	// CodeAMIPublic — the AMI's launch permission includes every AWS

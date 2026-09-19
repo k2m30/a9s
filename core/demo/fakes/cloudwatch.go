@@ -29,7 +29,6 @@ func (f *CloudWatchFake) DescribeAlarmHistory(_ context.Context, in *cloudwatch.
 	if in == nil || in.AlarmName == nil {
 		return &cloudwatch.DescribeAlarmHistoryOutput{AlarmHistoryItems: []cwtypes.AlarmHistoryItem{}}, nil
 	}
-	// No refusal here, unlike the by-id lookups in the sibling fakes.
 	// DescribeAlarmHistory models no not-found error at all — AWS answers an
 	// unknown alarm name with an empty history — so refusing would show a
 	// fetch error where the real account shows an empty list. The rule is per

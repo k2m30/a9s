@@ -10,7 +10,6 @@ import (
 	"github.com/k2m30/a9s/v3/core/runtime"
 )
 
-// handleActionBack handles ActionBack.
 func (c *Controller) handleActionBack(_ Action) (ViewState, []runtime.TaskRequest) {
 	// Costs screen: Esc pops one drill frame while drilled; only once back
 	// at the root frame does it fall through to the generic screen-pop below
@@ -19,10 +18,9 @@ func (c *Controller) handleActionBack(_ Action) (ViewState, []runtime.TaskReques
 		return c.snapshot(), nil
 	}
 
-	// Pop a single screen, mirroring the TUI's m.popView() — NOT a full
-	// collapse (root-collapse is the "root" Command). Per-view Esc semantics
-	// (clear filter/search before popping) are handled in the per-screen
-	// Update methods in the TUI adapter.
+	// Pop a single screen — NOT a full collapse (root-collapse is the "root"
+	// Command). Per-view Esc semantics (clear filter/search before popping)
+	// are handled in the per-screen Update methods in the TUI adapter.
 	c.applyIntents([]runtime.UIIntent{runtime.PopScreen{}})
 
 	// When the pop reveals a detail screen
@@ -34,23 +32,6 @@ func (c *Controller) handleActionBack(_ Action) (ViewState, []runtime.TaskReques
 	// openRelatedDetail (core/app/navigate.go) already produce, so this
 	// is renderer-agnostic — both TUI and web/headless callers get the
 	// recompute from this single ActionBack effect.
-	//
-	// Deliberately NOT mirrored for a revealed text (YAML/JSON) screen (N2):
-	// unlike a detail's related panel, a text screen has no persistent
-	// "unresolved" badge state to repair on every reveal — it is either
-	// enriched or not, and regenerateTextScreenLocked (detail_state.go) now
-	// repairs every matching stacked text screen, not just the top one, the
-	// moment ANY sibling operation for the same resource successfully folds
-	// (e.g. YAML then JSON: JSON's result now regenerates the buried YAML
-	// screen too). The only residual gap is Back pressed before either
-	// operation's enrichment ever lands at all — the same kind of transient,
-	// self-healing "not yet enriched" state enrichDetail's RawStruct==nil
-	// case already treats as normal (detail_enrich_engine.go) — and
-	// re-entering the view (detail → y/J) already re-triggers a fresh
-	// workload via PushYAML/PushJSON's own beginDetailWorkloadLocked call.
-	// Unconditionally recomputing on every text-screen reveal would cost a
-	// real AWS re-fetch on the overwhelmingly common case (a screen the user
-	// already fully viewed) to cover this rare, self-recovering window.
 	var tasks []runtime.TaskRequest
 	if ds := c.topDetailState(); ds != nil {
 		_, tasks = c.beginDetailWorkloadLocked(ds.ResourceType, ds.Resource, false, true)
@@ -58,7 +39,6 @@ func (c *Controller) handleActionBack(_ Action) (ViewState, []runtime.TaskReques
 	return c.snapshot(), tasks
 }
 
-// handleActionMoveUp handles ActionMoveUp.
 func (c *Controller) handleActionMoveUp(a Action) (ViewState, []runtime.TaskRequest) {
 	if vs, tasks, handled := c.applyDetailActions(a); handled {
 		return vs, tasks
@@ -94,7 +74,6 @@ func (c *Controller) handleActionMoveUp(a Action) (ViewState, []runtime.TaskRequ
 	return c.snapshot(), nil
 }
 
-// handleActionMoveDown handles ActionMoveDown.
 func (c *Controller) handleActionMoveDown(a Action) (ViewState, []runtime.TaskRequest) {
 	if vs, tasks, handled := c.applyDetailActions(a); handled {
 		return vs, tasks
@@ -126,7 +105,6 @@ func (c *Controller) handleActionMoveDown(a Action) (ViewState, []runtime.TaskRe
 	return c.snapshot(), nil
 }
 
-// handleActionMoveTop handles ActionMoveTop.
 func (c *Controller) handleActionMoveTop(a Action) (ViewState, []runtime.TaskRequest) {
 	if vs, tasks, handled := c.applyDetailActions(a); handled {
 		return vs, tasks
@@ -146,7 +124,6 @@ func (c *Controller) handleActionMoveTop(a Action) (ViewState, []runtime.TaskReq
 	return c.snapshot(), nil
 }
 
-// handleActionMoveBottom handles ActionMoveBottom.
 func (c *Controller) handleActionMoveBottom(a Action) (ViewState, []runtime.TaskRequest) {
 	if vs, tasks, handled := c.applyDetailActions(a); handled {
 		return vs, tasks
@@ -176,7 +153,6 @@ func (c *Controller) handleActionMoveBottom(a Action) (ViewState, []runtime.Task
 	return c.snapshot(), nil
 }
 
-// handleActionPageUp handles ActionPageUp.
 func (c *Controller) handleActionPageUp(a Action) (ViewState, []runtime.TaskRequest) {
 	if vs, tasks, handled := c.applyDetailActions(a); handled {
 		return vs, tasks
@@ -210,7 +186,6 @@ func (c *Controller) handleActionPageUp(a Action) (ViewState, []runtime.TaskRequ
 	return c.snapshot(), nil
 }
 
-// handleActionPageDown handles ActionPageDown.
 func (c *Controller) handleActionPageDown(a Action) (ViewState, []runtime.TaskRequest) {
 	if vs, tasks, handled := c.applyDetailActions(a); handled {
 		return vs, tasks
@@ -243,7 +218,6 @@ func (c *Controller) handleActionPageDown(a Action) (ViewState, []runtime.TaskRe
 	return c.snapshot(), nil
 }
 
-// handleActionScrollLeft handles ActionScrollLeft.
 func (c *Controller) handleActionScrollLeft(_ Action) (ViewState, []runtime.TaskRequest) {
 	if vs, tasks, ok := c.handleCostsScreenAction(func(cs *CostsState) *runtime.TaskRequest {
 		return c.applyCostsMoveCol(cs, -1)
@@ -258,7 +232,6 @@ func (c *Controller) handleActionScrollLeft(_ Action) (ViewState, []runtime.Task
 	return c.snapshot(), nil
 }
 
-// handleActionScrollRight handles ActionScrollRight.
 func (c *Controller) handleActionScrollRight(_ Action) (ViewState, []runtime.TaskRequest) {
 	if vs, tasks, ok := c.handleCostsScreenAction(func(cs *CostsState) *runtime.TaskRequest {
 		return c.applyCostsMoveCol(cs, 1)
@@ -271,9 +244,8 @@ func (c *Controller) handleActionScrollRight(_ Action) (ViewState, []runtime.Tas
 	return c.snapshot(), nil
 }
 
-// handleActionSelect handles ActionSelect.
 func (c *Controller) handleActionSelect(_ Action) (ViewState, []runtime.TaskRequest) {
-	// Costs screen: Enter drills into the cursor's cell (FR-006).
+	// Costs screen: Enter drills into the cursor's cell.
 	if vs, tasks, ok := c.handleCostsScreenAction(c.applyCostsSelect); ok {
 		return vs, tasks
 	}
@@ -360,7 +332,6 @@ func (c *Controller) handleActionSelect(_ Action) (ViewState, []runtime.TaskRequ
 	return c.snapshot(), nil
 }
 
-// handleActionCostZoomIn handles ActionCostZoomIn.
 func (c *Controller) handleActionCostZoomIn(_ Action) (ViewState, []runtime.TaskRequest) {
 	vs, tasks, _ := c.handleCostsScreenAction(func(cs *CostsState) *runtime.TaskRequest {
 		return c.applyCostZoom(cs, true)
@@ -368,7 +339,6 @@ func (c *Controller) handleActionCostZoomIn(_ Action) (ViewState, []runtime.Task
 	return vs, tasks
 }
 
-// handleActionCostZoomOut handles ActionCostZoomOut.
 func (c *Controller) handleActionCostZoomOut(_ Action) (ViewState, []runtime.TaskRequest) {
 	vs, tasks, _ := c.handleCostsScreenAction(func(cs *CostsState) *runtime.TaskRequest {
 		return c.applyCostZoom(cs, false)
@@ -376,13 +346,12 @@ func (c *Controller) handleActionCostZoomOut(_ Action) (ViewState, []runtime.Tas
 	return vs, tasks
 }
 
-// handleActionCostMetric handles ActionCostMetric.
 func (c *Controller) handleActionCostMetric(_ Action) (ViewState, []runtime.TaskRequest) {
 	vs, tasks, _ := c.handleCostsScreenAction(c.applyCostMetricCycle)
 	return vs, tasks
 }
 
-// handleActionCostPivot handles ActionCostPivot. a.N carries the pressed digit.
+// a.N carries the pressed digit for ActionCostPivot.
 func (c *Controller) handleActionCostPivot(a Action) (ViewState, []runtime.TaskRequest) {
 	vs, tasks, _ := c.handleCostsScreenAction(func(cs *CostsState) *runtime.TaskRequest {
 		return c.applyCostPivot(cs, a.N)
@@ -486,7 +455,6 @@ func stepToSelectable(cur, total, direction int, isSkippable func(i int) bool) i
 	return cur
 }
 
-// handleActionRelatedSelect handles ActionRelatedSelect.
 func (c *Controller) handleActionRelatedSelect(a Action) (ViewState, []runtime.TaskRequest) {
 	// Web UI click path: navigate to the related row at the visible index in
 	// Arg. Sets RelatedFocus + RelatedCursor then delegates to the same
@@ -549,7 +517,6 @@ func (c *Controller) handleActionRelatedSelect(a Action) (ViewState, []runtime.T
 	return c.snapshot(), tasks
 }
 
-// handleActionFieldSelect handles ActionFieldSelect.
 func (c *Controller) handleActionFieldSelect(a Action) (ViewState, []runtime.TaskRequest) {
 	// Web UI click path: navigate to the resource linked by the navigable
 	// detail field at the visible index in Arg. Mirrors the TUI Enter-on-
@@ -578,8 +545,8 @@ func (c *Controller) handleActionFieldSelect(a Action) (ViewState, []runtime.Tas
 	if field.NavID != "" {
 		targetID = field.NavID
 	}
-	// No RelatedIDs / FetchFilter / Checker needed: HandleRelatedNavigate
-	// routes a single-ID event to a cache-hit detail or a by-ID fetch.
+	// HandleRelatedNavigate routes a single-ID event to a cache-hit detail
+	// or a by-ID fetch.
 	ev := runtime.RelatedNavigateEvent{
 		TargetType:     field.TargetType,
 		SourceResource: ds.Resource,

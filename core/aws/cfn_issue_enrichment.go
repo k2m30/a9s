@@ -118,7 +118,7 @@ func EnrichCFNStackEvents(ctx context.Context, clients *ServiceClients, resource
 // adds "~" findings for stacks that have drifted from their template. Both
 // fold through mergeRowResult, so a stack that failed and drifted keeps both
 // findings, events first.
-// Partial findings from each sub-enricher are preserved even when they return an error (E5).
+// Partial findings from each sub-enricher are preserved even when they return an error.
 func EnrichCFNCombined(ctx context.Context, clients *ServiceClients, resources []resource.Resource, _ resource.ResourceCache) (IssueEnricherResult, error) {
 	eventsResult, eventsErr := EnrichCFNStackEvents(ctx, clients, resources, nil)
 	driftResult, driftErr := EnrichCFNDrift(ctx, clients, resources, nil)

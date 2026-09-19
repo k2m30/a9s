@@ -27,7 +27,6 @@ const (
 	kinesisCodeMinRetention domain.FindingCode = "kinesis.min-retention"
 )
 
-// S5 operator sentences for the stream posture codes above.
 // kinesisDefaultRetentionHours is the retention a stream is created with. At
 // or below it, a day-long consumer outage is data loss.
 const kinesisDefaultRetentionHours int32 = 24
@@ -50,7 +49,7 @@ func EnrichKinesisStreamSummary(ctx context.Context, clients *ServiceClients, re
 	var failures []Failure
 	total := 0
 	resources = capAtEnrichmentCap(&result, resources, func(r resource.Resource) bool {
-		// Rule 4: a stream being torn down has no posture worth reporting.
+		// A stream being torn down has no posture worth reporting.
 		return r.Fields["stream_status"] != string(kinesistypes.StreamStatusDeleting)
 	}, resourceIDsOf)
 	var mu sync.Mutex

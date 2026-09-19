@@ -50,7 +50,7 @@ type iamOutcome struct {
 }
 
 // captureIAMUser lists every IAM user (ListUsers, all pages) and captures the
-// access-key ages and MFA/login-profile posture the doc's §3.2 needs.
+// access-key ages and MFA/login-profile posture.
 func captureIAMUser(ctx context.Context, cfg aws.Config) (any, error) {
 	client := iam.NewFromConfig(cfg)
 
@@ -135,7 +135,7 @@ type iamGroup struct {
 }
 
 // captureIAMGroup lists every IAM group (ListGroups, all pages) and captures
-// GetGroup's Users[] count per the doc's §3.2 (empty-group-orphan signal).
+// GetGroup's Users[] count (empty-group-orphan signal).
 func captureIAMGroup(ctx context.Context, cfg aws.Config) (any, error) {
 	client := iam.NewFromConfig(cfg)
 
@@ -180,7 +180,7 @@ type roleEntry struct {
 }
 
 // captureRole lists every IAM role (ListRoles, all pages) and captures
-// RoleLastUsed via GetRole per the doc's §3.2.
+// RoleLastUsed via GetRole.
 func captureRole(ctx context.Context, cfg aws.Config) (any, error) {
 	client := iam.NewFromConfig(cfg)
 
@@ -228,8 +228,8 @@ type policyEntry struct {
 }
 
 // capturePolicy lists every customer-managed policy (ListPolicies with
-// Scope=Local, all pages) and captures the default version's Document per the
-// doc's §3.2 (wildcard-admin detection).
+// Scope=Local, all pages) and captures the default version's Document
+// (wildcard-admin detection).
 func capturePolicy(ctx context.Context, cfg aws.Config) (any, error) {
 	client := iam.NewFromConfig(cfg)
 
@@ -287,8 +287,8 @@ type kmsKey struct {
 }
 
 // captureKMS lists every KMS key (ListKeys, all pages) and captures
-// DescribeKey (KeyState, KeyManager) + GetKeyRotationStatus per the doc's §3.2
-// — all KMS attention signals are Wave 2.
+// DescribeKey (KeyState, KeyManager) + GetKeyRotationStatus — all KMS
+// attention signals are Wave 2.
 func captureKMS(ctx context.Context, cfg aws.Config) (any, error) {
 	client := kms.NewFromConfig(cfg)
 
@@ -354,8 +354,7 @@ type secretEntry struct {
 }
 
 // captureSecrets lists every secret (ListSecrets, all pages) and captures
-// DescribeSecret's VersionIdsToStages per the doc's §3.2 (stuck-AWSPENDING
-// signal).
+// DescribeSecret's VersionIdsToStages (stuck-AWSPENDING signal).
 func captureSecrets(ctx context.Context, cfg aws.Config) (any, error) {
 	client := secretsmanager.NewFromConfig(cfg)
 
@@ -426,8 +425,7 @@ type acmCertificate struct {
 }
 
 // captureACM lists every certificate (ListCertificates, all pages) and
-// captures DescribeCertificate's RenewalSummary + DomainValidationOptions per
-// the doc's §3.2.
+// captures DescribeCertificate's RenewalSummary + DomainValidationOptions.
 func captureACM(ctx context.Context, cfg aws.Config) (any, error) {
 	client := acm.NewFromConfig(cfg)
 
@@ -478,7 +476,7 @@ func captureACM(ctx context.Context, cfg aws.Config) (any, error) {
 }
 
 // wafData is the raw view of WAFv2 Web ACLs the checklist generator reads, across both the
-// REGIONAL and CLOUDFRONT scopes per the doc's §1.
+// REGIONAL and CLOUDFRONT scopes.
 type wafData struct {
 	WebACLs []wafWebACL `json:"web_acls"`
 }
@@ -495,8 +493,7 @@ type wafWebACL struct {
 
 // captureWAF lists Web ACLs in both the REGIONAL scope and, when the current
 // region is us-east-1 (the only region CLOUDFRONT-scope ACLs can be listed
-// from), the CLOUDFRONT scope, then captures GetWebACL's Rules/DefaultAction
-// per the doc's §3.2.
+// from), the CLOUDFRONT scope, then captures GetWebACL's Rules/DefaultAction.
 func captureWAF(ctx context.Context, cfg aws.Config) (any, error) {
 	client := wafv2.NewFromConfig(cfg)
 
@@ -577,9 +574,8 @@ type ssmParameter struct {
 	LastModifiedDate string `json:"last_modified_date,omitempty"`
 }
 
-// captureSSM lists every parameter (DescribeParameters, all pages). No Wave 2
-// describe call is defined by the doc — the §3.1 signals are all derivable
-// from ParameterMetadata on the list response.
+// captureSSM lists every parameter (DescribeParameters, all pages). Every
+// signal derives from ParameterMetadata on the list response.
 func captureSSM(ctx context.Context, cfg aws.Config) (any, error) {
 	client := ssm.NewFromConfig(cfg)
 

@@ -35,7 +35,6 @@ func ListProfiles(configPath string) ([]string, error) {
 		}
 	}
 
-	// Collect and sort
 	profiles := make([]string, 0, len(seen))
 	for p := range seen {
 		profiles = append(profiles, p)

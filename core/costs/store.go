@@ -29,7 +29,7 @@ const schemaVersion = 3
 const anomalyTTL = 24 * time.Hour
 
 // openPeriodTTL bounds how long a cached open-period fetch is trusted
-// before Lookup treats it as missing and the caller re-fetches (FR-011).
+// before Lookup treats it as missing and the caller re-fetches.
 const openPeriodTTL = 24 * time.Hour
 
 // settlementLag is how long after a period's own End a fetch must land
@@ -56,8 +56,8 @@ type periodEntry struct {
 // immutableAt reports whether e was fetched at or after p's own End PLUS
 // settlementLag — the point CE's own revision window has closed and data
 // for p is permanent. This is the single predicate every closure-adjacent
-// decision in this file keys on, replacing every hand-rolled `p.Closed(now)`
-// check against a cached entry: "is p closed relative to THIS call's own
+// decision in this file keys on, rather than `p.Closed(now)` against a
+// cached entry: "is p closed relative to THIS call's own
 // now" and "was e itself fetched after p's settlement window closed" are
 // different questions — a bucket fetched mid-period (while genuinely open),
 // or even shortly after closure but still within settlementLag, does not
@@ -105,10 +105,9 @@ type queryEntry struct {
 
 // anomalyBucket is the single cached anomaly snapshot slot. Covered is the
 // date range the underlying GetAnomalies call was actually scoped to
-// (Query.Range) — a zero-value Covered means "no range recorded" (every
-// bucket written before this field existed, or written via PutAnomalies'
-// two-argument form), treated as covering any requested window so existing
-// TTL-only callers/behavior are unaffected.
+// (Query.Range) — a zero-value Covered means "no range recorded" (e.g.
+// written via PutAnomalies' two-argument form), treated as covering any
+// requested window.
 type anomalyBucket struct {
 	FetchedAt time.Time     `yaml:"fetched_at"`
 	Marks     []AnomalyMark `yaml:"marks"`
@@ -133,8 +132,7 @@ func (b *anomalyBucket) coversWindow(window []Period) bool {
 // question "does this authoritative answer speak for everything this capped
 // walk found". A zero Period on either side means "no range resolved": an
 // unranged authoritative answer speaks for everything, and an unranged capped
-// walk claims everything and is replaced by any ranged answer, which is the
-// behaviour that held before ranges were tracked at all.
+// walk claims everything and is replaced by any ranged answer.
 func (b *anomalyBucket) coveredBy(p Period) bool {
 	if p == (Period{}) || b.Covered == (Period{}) {
 		return true
@@ -188,16 +186,14 @@ func (s *Store) Revision() int {
 
 // CachePath returns the on-disk cache file path for one profile's cost
 // data: <cache root>/<profile>--costs.yaml. Cost data is account-scoped,
-// not region-scoped (data-model.md), so — unlike core/cache's
+// not region-scoped, so — unlike core/cache's
 // per-profile+region directories — there is exactly one file per profile.
 // Root resolution and the filename encoding come from core/cache
 // (Root/EncodePathElem) — the same single source core/cache.DirIn uses.
 //
 // EncodePathElem, not SanitizePathElem: the latter maps a slash and a space
 // alike to an underscore, so two profiles differing only there would share
-// one costs file and read each other's spend. Like the pair directories,
-// there is no fallback to the collapsed name — a profile whose name needs
-// escaping starts cold once and writes its own file from then on.
+// one costs file and read each other's spend.
 func CachePath(profile string) string {
 	root := cache.Root()
 	if root == "" {
@@ -492,7 +488,7 @@ func (s *Store) mergeCoverage(q Query, covered []Period, now time.Time, truncate
 // window (translated internally via NativeCoveragePeriods(q.Granularity,
 // window) — same single-translation-point rule as MergeCoverage) that is
 // not yet immutableAt its own period, forcing the next Lookup to report it
-// missing — Ctrl+R's force-refresh (FR-012): only genuinely still-open
+// missing — Ctrl+R's force-refresh: only genuinely still-open
 // buckets are force-refetched; a bucket already fetched post-closure is left
 // untouched (refetched again only if genuinely absent).
 func (s *Store) ExpireOpenPeriod(q Query, window []Period, now time.Time) {
@@ -630,8 +626,7 @@ func (s *Store) anomaliesCoverageLocked(window []Period, now time.Time) (marks [
 // PutAnomalies replaces the single cached anomaly snapshot. covered is the
 // date range the underlying GetAnomalies call was scoped to — a zero-value
 // Period is stamped verbatim, treated as covering any window by
-// coversWindow (the pre-range-tracking behavior, preserved for any bucket
-// whose caller never resolved a real range).
+// coversWindow.
 func (s *Store) PutAnomalies(marks []AnomalyMark, now time.Time, covered Period) {
 	s.mu.Lock()
 	defer s.mu.Unlock()

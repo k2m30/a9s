@@ -6,11 +6,7 @@
 // rtb and vpc are cache-scan checkers that read the sibling resource cache
 // directly (never RawStruct alone) — zero extra AWS calls, mirroring
 // lt_related.go's asg/ng/ec2 checkers via the shared cachedTypedRows
-// tri-state helper (related_common.go). ct-events uses the universal
-// ctEventsCheckerFor pivot, registered inline in catalog_networking.go — no
-// dedicated function here, matching the asg/lt/ebs convention. No sg checker
-// exists: docs/related-resources.md § vpc-peer excludes it (no declared
-// link; cross-region peers cannot reference SGs at all).
+// tri-state helper (related_common.go).
 package aws
 
 import (
@@ -24,8 +20,7 @@ import (
 
 // checkVpcPeerRTB scans the loaded rtb cache for routes referencing this
 // peering connection via Routes[].VpcPeeringConnectionId — "who actually
-// routes to this peer", the pivot that makes vpc-peer worth adding
-// (docs/resources/vpc-peer.md §2 rtb bullet). Zero extra API calls.
+// routes to this peer". Zero extra API calls.
 //
 // A present-but-truncated rtb cache is trusted enough to scan — the house
 // fleet convention (lt's asg/ng/ec2 checkers): State stays RelatedResolved,
@@ -53,8 +48,7 @@ func checkVpcPeerRTB(_ context.Context, _ any, res resource.Resource, cache reso
 // whichever side's VpcId (requester and/or accepter) is present in the
 // loaded local vpc cache. A cross-account remote side is never in the
 // cache — it stays a plain fact (VpcId + OwnerId + Region, visible via the
-// raw detail fields), never a pivot. Never hardcode requester-is-local
-// (docs/resources/vpc-peer.md §2 vpc bullet).
+// raw detail fields), never a pivot. Either side may be the local one.
 //
 // A present-but-truncated vpc cache is trusted enough to scan, mirroring
 // checkVpcPeerRTB's house fleet convention — only a wholly absent cache

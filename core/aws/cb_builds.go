@@ -51,7 +51,6 @@ func FetchCBBuilds(
 ) (resource.FetchResult, error) {
 	projectName := parentCtx["project_name"]
 
-	// Step 1: Fetch one page of build IDs
 	listInput := &codebuild.ListBuildsForProjectInput{
 		ProjectName: &projectName,
 	}
@@ -66,7 +65,6 @@ func FetchCBBuilds(
 
 	pageIDs := listOutput.Ids
 
-	// Step 2: BatchGetBuilds in chunks of 100
 	var resources []resource.Resource
 
 	for i := 0; i < len(pageIDs); i += 100 {

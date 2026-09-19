@@ -15,7 +15,6 @@ type EC2DescribeInstancesAPI interface {
 
 // EC2FetchInstancesAPI combines DescribeInstances and DescribeInstanceStatus,
 // which are both required by FetchEC2InstancesPage (status enrichment uses the second).
-// EC2DescribeInstanceStatusAPI is defined in the Wave 2 enrichment section below.
 type EC2FetchInstancesAPI interface {
 	EC2DescribeInstancesAPI
 	EC2DescribeInstanceStatusAPI
@@ -143,15 +142,14 @@ type EC2FetchLaunchTemplatesAPI interface {
 // DescribeVpcPeeringConnections operation — the single list call that
 // carries full detail (Status, ExpirationTime, both VpcInfo sides) for VPC
 // Peering Connections; no per-connection describe exists
-// (docs/resources/vpc-peer.md §1).
+// (docs/resources/vpc-peer.md).
 type EC2DescribeVpcPeeringConnectionsAPI interface {
 	DescribeVpcPeeringConnections(ctx context.Context, params *ec2.DescribeVpcPeeringConnectionsInput, optFns ...func(*ec2.Options)) (*ec2.DescribeVpcPeeringConnectionsOutput, error)
 }
 
 // EC2DescribeInstanceAttributeAPI defines the interface for the EC2
 // DescribeInstanceAttribute operation. Used by the on-demand ec2 detail
-// enricher (enrichEc2) to fetch the instance's user-data script — not part
-// of the EC2API aggregate since no fetcher or related checker needs it.
+// enricher (enrichEc2) to fetch the instance's user-data script.
 type EC2DescribeInstanceAttributeAPI interface {
 	DescribeInstanceAttribute(ctx context.Context, params *ec2.DescribeInstanceAttributeInput, optFns ...func(*ec2.Options)) (*ec2.DescribeInstanceAttributeOutput, error)
 }

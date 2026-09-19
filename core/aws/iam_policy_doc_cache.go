@@ -31,7 +31,7 @@ func (c *PolicyDocumentCache) Get(key string) any { return c.get(key) }
 
 // Set stores a document in the cache, unconditionally — the op-oblivious
 // write path every caller outside the on-demand detail-enrichment engine
-// uses unchanged.
+// uses.
 func (c *PolicyDocumentCache) Set(key string, doc any) { c.set(key, doc) }
 
 // SetIfNewer stores doc under key per opAwareDocStore.setIfNewer's contract.

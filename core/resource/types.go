@@ -10,7 +10,7 @@ import (
 )
 
 // Color classifies a resource's health for display, filtering, and badges.
-// Type alias of domain.Color — zero-churn backward compat for TUI consumers.
+// Type alias of domain.Color.
 type Color = domain.Color
 
 const (
@@ -21,15 +21,15 @@ const (
 )
 
 // ResourceTypeDef defines a category of AWS resources the app can browse.
-// Type alias of catalog.ResourceTypeDef — zero-churn backward compat for TUI consumers.
+// Type alias of catalog.ResourceTypeDef.
 type ResourceTypeDef = catalog.ResourceTypeDef
 
 // Column defines a column in a resource table view.
-// Type alias of domain.Column — zero-churn backward compat for TUI consumers.
+// Type alias of domain.Column.
 type Column = domain.Column
 
 // ChildViewDef describes a child view that can be drilled into from a parent
-// resource list. Type alias of domain.ChildViewDef — zero-churn backward compat.
+// resource list. Type alias of domain.ChildViewDef.
 type ChildViewDef = domain.ChildViewDef
 
 // ResolveChildContext resolves a ChildViewDef's ContextKeys against the

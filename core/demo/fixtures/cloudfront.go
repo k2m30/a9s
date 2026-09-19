@@ -42,7 +42,7 @@ var sharedCloudFrontFixtures = sync.OnceValue(func() *CloudFrontFixtures {
 							DomainName: aws.String("acme-webapp-assets-prod.s3-website.us-east-1.amazonaws.com"),
 						},
 						// alb-api-backend origin — required for the cf:elb /
-						// elb:cf related-panel pivot witness. DomainName must
+						// elb:cf related-panel pivot. DomainName must
 						// match an existing ELB fixture's DNS name exactly
 						// (checkCfELB / checkELBCF match on dns_name).
 						{
@@ -59,7 +59,7 @@ var sharedCloudFrontFixtures = sync.OnceValue(func() *CloudFrontFixtures {
 					},
 				},
 				// LambdaFunctionAssociations — required for the lambda:cf
-				// related-panel pivot witness (checkLambdaCF). Lambda@Edge
+				// related-panel pivot (checkLambdaCF). Lambda@Edge
 				// always references a published version; api-gateway-authorizer
 				// is a real lambda.go fixture.
 				DefaultCacheBehavior: &cftypes.DefaultCacheBehavior{
@@ -76,7 +76,7 @@ var sharedCloudFrontFixtures = sync.OnceValue(func() *CloudFrontFixtures {
 					},
 				},
 				// WebACLId — required for the cf:waf related-panel pivot
-				// witness (checkCfWAF). Matches the acme-cloudfront-waf ACL's
+				// (checkCfWAF). Matches the acme-cloudfront-waf ACL's
 				// ARN in waf.go (ResourcesByWebACL already reverse-maps this
 				// same distribution for the waf→cf direction).
 				WebACLId: aws.String("arn:aws:wafv2:us-east-1:123456789012:regional/webacl/acme-cloudfront-waf/a1b2c3d4-5678-90ab-cdef-222222222222"),
@@ -247,7 +247,7 @@ var sharedCloudFrontFixtures = sync.OnceValue(func() *CloudFrontFixtures {
 			// how a shared asset bucket is normally fronted. Its name is
 			// absent from this account's bucket list, so the origin check
 			// must ask HeadBucket rather than read absence as deletion. It
-			// carries no finding: that is the whole point of the witness.
+			// carries no finding.
 			{
 				Id:         aws.String("E9I0J1K2L3M4N5"),
 				ARN:        aws.String("arn:aws:cloudfront::123456789012:distribution/E9I0J1K2L3M4N5"),
@@ -325,7 +325,7 @@ func NewCloudFrontFixtures() *CloudFrontFixtures {
 	return sharedCloudFrontFixtures()
 }
 
-// Witness distributions for the w6a Prowler batch. Each names the ONE demo
+// Distributions carrying the cf posture findings. Each names the ONE demo
 // distribution carrying its finding.
 const (
 	// CFOriginBucketMissing is the distribution whose S3 origin names a
@@ -358,7 +358,7 @@ const (
 
 	// CFS3OriginNoOAC is the distribution whose REST-endpoint S3 origin has
 	// neither an origin access control nor a legacy origin access identity;
-	// it is the no-root-object row as well.
+	// it is also the no-root-object distribution.
 	CFS3OriginNoOAC = CFNoRootObject
 
 	// CFDefaultCert is the distribution serving custom aliases with the
@@ -372,7 +372,7 @@ const (
 	// endpoint over http-only. It must carry NO insecure-protocol finding:
 	// that endpoint serves HTTP alone, so http-only is the only policy it
 	// accepts and there is nothing for an operator to change. It is the
-	// row with no origin access control that carries no finding for it,
+	// distribution with no origin access control that carries no finding for it,
 	// because a website endpoint is exactly the origin that cannot have one.
 	CFS3WebsiteOrigin = "E7G8H9I0J1K2L3"
 
@@ -385,8 +385,8 @@ const (
 // cfHealthyConfig is the baseline every demo distribution config starts from:
 // access logging on, a default root object, a custom certificate at TLS 1.2,
 // a geo restriction, and an S3 origin behind an origin access control. Each
-// witness below switches off exactly the one setting it demonstrates, so the
-// demo bench shows one row per cf finding.
+// distribution below switches off exactly the one setting behind its finding,
+// so each cf finding has one carrier.
 func cfHealthyConfig(originID, originDomain, alias string) *cftypes.DistributionConfig {
 	return &cftypes.DistributionConfig{
 		Enabled:           aws.Bool(true),
@@ -427,7 +427,7 @@ func cfHealthyConfig(originID, originDomain, alias string) *cftypes.Distribution
 
 // cfDistributionConfigs returns one config per demo distribution. Every
 // distribution needs one: an absent config reads as no logging and no default
-// root object, which would colour every row instead of the named witnesses.
+// root object, which would colour every distribution, not only the named ones.
 func cfDistributionConfigs() map[string]*cftypes.DistributionConfig {
 	cfgs := map[string]*cftypes.DistributionConfig{
 		// Healthy, and the carrier for the cf→lambda pivot.
@@ -466,7 +466,7 @@ func cfDistributionConfigs() map[string]*cftypes.DistributionConfig {
 	cfgs[CFS3OriginNoOAC].Origins.Items[0].S3OriginConfig = &cftypes.S3OriginConfig{OriginAccessIdentity: aws.String("")}
 	// The website-endpoint row has no access control either, which is the
 	// only shape that endpoint can take, so it must carry no finding for it.
-	// It also carries the default-certificate witness; the two conditions
+	// It also carries the default-certificate finding; the two conditions
 	// are independent.
 	cfgs[CFS3WebsiteOrigin].Origins.Items[0].OriginAccessControlId = aws.String("")
 	cfgs[CFS3WebsiteOrigin].Origins.Items[0].S3OriginConfig = &cftypes.S3OriginConfig{OriginAccessIdentity: aws.String("")}

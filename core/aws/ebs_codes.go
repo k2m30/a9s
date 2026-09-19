@@ -40,8 +40,8 @@ const (
 	// billed indefinitely with no retention policy pruning it.
 	CodeEBSSnapAgedAutomated domain.FindingCode = "ebs-snap.aged-automated"
 
-	// CodeEBSSnapOrphan — snapshot's source volume is no longer present in
-	// the loaded ebs cache. Severity: SevWarn.
+	// CodeEBSSnapOrphan — snapshot's source volume is absent from the loaded
+	// ebs cache. Severity: SevWarn.
 	CodeEBSSnapOrphan domain.FindingCode = "ebs-snap.orphan"
 )
 

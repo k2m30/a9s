@@ -94,10 +94,9 @@ func FetchRDSInstancesPageAt(ctx context.Context, api RDSDescribeDBInstancesAPI,
 		statusPhrase := domain.StatusPhrase(findings)
 		if statusPhrase == "" {
 			// Unknown / undocumented RDS status: keep the raw value visible in
-			// the table so colorDBI's legacy classifier (which inspects
-			// Fields["status"] and the public/encrypted/deletion-protection
-			// overlays) keeps working. "available" with zero warnings legitimately
-			// returns "" and is intentionally skipped.
+			// the table; colorDBI inspects Fields["status"] and the
+			// public/encrypted/deletion-protection overlays. "available" with zero
+			// warnings returns "".
 			if raw := aws.ToString(db.DBInstanceStatus); raw != "" && raw != "available" {
 				statusPhrase = raw
 			}
@@ -172,9 +171,8 @@ var transitionalStatusSet = map[string]struct{}{
 func computeDBIFindings(db rdstypes.DBInstance, now time.Time) ([]domain.Finding, map[domain.FindingCode]domain.AttentionDetail) {
 	status := aws.ToString(db.DBInstanceStatus)
 
-	// Broken statuses. `stopped` belongs here per the catalog colorDBI legacy
-	// classification (an instance you must restart before it can serve traffic
-	// is operationally broken, not transitional).
+	// Broken statuses. `stopped` belongs here: an instance you must restart
+	// before it can serve traffic is operationally broken, not transitional.
 	brokenMap := map[string]domain.FindingCode{
 		"failed":                              CodeDBIFailed,
 		"storage-full":                        CodeDBIStorageFull,
@@ -260,7 +258,7 @@ func dbiPostureFindings(db rdstypes.DBInstance, now time.Time) ([]domain.Finding
 	return findings, details
 }
 
-// firstNonEmptyPendingModifiedValueKey inspects PendingModifiedValues fields in spec-defined order
+// firstNonEmptyPendingModifiedValueKey inspects PendingModifiedValues fields in a fixed order
 // and returns the name of the first non-nil/non-empty field.
 func firstNonEmptyPendingModifiedValueKey(pmv *rdstypes.PendingModifiedValues) string {
 	if pmv == nil {

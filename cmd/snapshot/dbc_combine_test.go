@@ -11,60 +11,24 @@ import (
 // sentinel is sufficient to pin the contract.
 var errThrottled = errors.New("ThrottlingException: rate exceeded")
 
-// dbc_combine_test.go — RED regression tests pinning the fix for the finding:
-// cmd/snapshot's dbc/dbc-snap capture discards ALL DocDB rows when the RDS-side
-// DescribeDBClusters (or DescribeDBClusterSnapshots) call fails, unlike the
-// live app fetcher's partial-success behavior (core/aws fetchers return
-// whatever rows they got plus a per-source error, never discard a whole page
-// because a sibling source failed).
+// The dbc/dbc-snap capture keeps the partial-success behavior of the live app
+// fetcher: a failed DocDB or RDS source never discards the other source's rows.
 //
-// captureDBC (cmd/snapshot/databases.go) currently does:
-//
-//	out, err := rdsClient.DescribeDBClusters(ctx, ...)
-//	if err != nil {
-//	    return nil, err   // <-- discards every docdb row already gathered
-//	}
-//
-// — and the same shape at the DescribeDBClusterSnapshots call in
-// captureDBCSnap. This file pins the fix as two pure, side-effect-free combine
-// functions the coder will extract from captureDBC / captureDBCSnap:
-//
-//	func combineDBCClusters(docdb []dbcCluster, docdbErr error, rds []dbcCluster, rdsErr error) (dbcData, error)
-//	func combineDBCSnapshots(docdb []dbcSnapshot, docdbErr error, rds []dbcSnapshot, rdsErr error) (dbcSnapData, error)
-//
-// Semantics pinned:
-//   - both sides ok: merged with docdb-first dedup (existing dedupDBCByID /
-//     dedupDBCSnapByID behavior — docdb rows win on ID collision).
+//   - both sides ok: merged with docdb-first dedup (dedupDBCByID /
+//     dedupDBCSnapByID — docdb rows win on ID collision).
 //   - one side fails, the other has rows: rows from the healthy side are
-//     preserved, the returned error is nil (NOT a top-level capture failure),
-//     and the section itself records which side failed via a new
-//     PartialErrors []string field on dbcData / dbcSnapData. Compile-red on
-//     this field is expected and intentional until the coder widens the
-//     struct.
-//   - both sides fail: top-level error is non-nil (the whole section is
-//     omitted from the snapshot by the caller, mirroring today's captureDBC
-//     behavior when the only source errors).
-//
-// This file will not compile until combineDBCClusters, combineDBCSnapshots,
-// and the PartialErrors field exist with these exact contracts.
+//     preserved, the returned error is nil, and PartialErrors records which
+//     side failed.
+//   - both sides fail: top-level error is non-nil and the caller omits the
+//     section from the snapshot.
 
-// compileTimeContractCheck_combineDBCClusters pins the exact function
-// signature the coder must implement — this line alone is the "red": it will
-// not compile until combineDBCClusters is extracted from captureDBC with this
-// exact contract.
 var _ func([]dbcCluster, error, []dbcCluster, error) (dbcData, error) = combineDBCClusters
 
-// compileTimeContractCheck_combineDBCSnapshots pins the exact function
-// signature the coder must implement for the snapshot variant.
 var _ func([]dbcSnapshot, error, []dbcSnapshot, error) (dbcSnapData, error) = combineDBCSnapshots
 
-// ---------------------------------------------------------------------------
-// combineDBCClusters — cluster variant
-// ---------------------------------------------------------------------------
-
-// TestCombineDBCClusters_BothOK_MergesWithDocDBFirstDedup pins the untouched
-// happy-path contract: both sides succeed, rows are merged with the existing
-// docdb-first dedup (dedupDBCByID), and no error / no PartialErrors.
+// TestCombineDBCClusters_BothOK_MergesWithDocDBFirstDedup pins the happy
+// path: both sides succeed, rows are merged with the docdb-first dedup
+// (dedupDBCByID), and no error / no PartialErrors.
 func TestCombineDBCClusters_BothOK_MergesWithDocDBFirstDedup(t *testing.T) {
 	docdb := []dbcCluster{
 		{Source: "docdb", DBClusterIdentifier: "shared-id"},
@@ -100,8 +64,8 @@ func TestCombineDBCClusters_BothOK_MergesWithDocDBFirstDedup(t *testing.T) {
 	}
 }
 
-// TestCombineDBCClusters_RDSFails_DocDBRowsPreserved pins the core finding
-// fix: when the RDS-side call fails but DocDB succeeded and returned rows,
+// TestCombineDBCClusters_RDSFails_DocDBRowsPreserved pins that when the
+// RDS-side call fails but DocDB succeeded and returned rows,
 // those rows must be preserved (not discarded), the returned error must be
 // nil (not a top-level capture failure), and the failure must be recorded in
 // PartialErrors so the operator can see the RDS side was incomplete.
@@ -145,9 +109,8 @@ func TestCombineDBCClusters_DocDBFails_RDSRowsPreserved(t *testing.T) {
 }
 
 // TestCombineDBCClusters_BothFail_TopLevelError pins that a genuine top-level
-// failure (both sources errored, nothing usable) still returns a non-nil
-// error so the caller omits the section entirely — mirroring today's
-// captureDBC behavior when the only source available errors.
+// failure (both sources errored, nothing usable) returns a non-nil error so
+// the caller omits the section entirely.
 func TestCombineDBCClusters_BothFail_TopLevelError(t *testing.T) {
 	got, err := combineDBCClusters(nil, errThrottled, nil, errThrottled)
 	if err == nil {
@@ -157,10 +120,6 @@ func TestCombineDBCClusters_BothFail_TopLevelError(t *testing.T) {
 		t.Errorf("Clusters = %+v, want empty when both sides failed", got.Clusters)
 	}
 }
-
-// ---------------------------------------------------------------------------
-// combineDBCSnapshots — snapshot variant
-// ---------------------------------------------------------------------------
 
 // TestCombineDBCSnapshots_BothOK_MergesWithDocDBFirstDedup mirrors the
 // cluster happy-path test for the snapshot variant (dedupDBCSnapByID).
@@ -193,9 +152,9 @@ func TestCombineDBCSnapshots_BothOK_MergesWithDocDBFirstDedup(t *testing.T) {
 	}
 }
 
-// TestCombineDBCSnapshots_RDSFails_DocDBRowsPreserved is the core finding fix
-// for the snapshot variant: an RDS DescribeDBClusterSnapshots failure must not
-// discard already-gathered DocDB snapshot rows.
+// TestCombineDBCSnapshots_RDSFails_DocDBRowsPreserved pins that an RDS
+// DescribeDBClusterSnapshots failure keeps the already-gathered DocDB
+// snapshot rows.
 func TestCombineDBCSnapshots_RDSFails_DocDBRowsPreserved(t *testing.T) {
 	docdb := []dbcSnapshot{
 		{Source: "docdb", DBClusterSnapshotIdentifier: "docdb-snap-1"},

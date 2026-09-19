@@ -35,11 +35,9 @@ type profilesLoadedMsg struct {
 // failure is the other outcome of the same request, so it is routed and
 // ordered by the same facts its paired success would have carried: the screen
 // that asked, the sequence that says which request this is, and the lane the
-// delivery gate matches on. Two hand-built literals per call site let those
-// drift, and they did — a failed page named no screen, so it was applied to
-// whichever list of its type was topmost, and carried no sequence, so a
-// failure a later refresh had already superseded could never be recognised as
-// stale.
+// delivery gate matches on. A failure naming no screen would apply to
+// whichever list of its type is topmost, and one carrying no sequence could
+// never be recognised as stale once a later refresh superseded it.
 type fetchOutcome struct {
 	resourceType string
 	gen          domain.Gen

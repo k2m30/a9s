@@ -58,7 +58,6 @@ func FetchRolePolicies(
 ) (resource.FetchResult, error) {
 	roleName := parentCtx["role_name"]
 
-	// Fetch one page of managed (attached) policies
 	attachedOutput, err := attachedAPI.ListAttachedRolePolicies(ctx, &iam.ListAttachedRolePoliciesInput{
 		RoleName: &roleName,
 	})
@@ -95,7 +94,6 @@ func FetchRolePolicies(
 		})
 	}
 
-	// Fetch one page of inline policies
 	inlineOutput, err := inlineAPI.ListRolePolicies(ctx, &iam.ListRolePoliciesInput{
 		RoleName: &roleName,
 	})
@@ -123,7 +121,6 @@ func FetchRolePolicies(
 		})
 	}
 
-	// Managed first, then inline
 	resources := make([]resource.Resource, 0, len(managed)+len(inline))
 	resources = append(resources, managed...)
 	resources = append(resources, inline...)

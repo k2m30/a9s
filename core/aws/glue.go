@@ -120,7 +120,7 @@ func FetchGlueJobsPage(ctx context.Context, api GlueGetJobsAPI, continuationToke
 // executor output to CloudWatch as the run happens.
 const glueContinuousLogArgument = "--enable-continuous-cloudwatch-log"
 
-// addGluePostureFindings evaluates the three w6b posture signals against the
+// addGluePostureFindings evaluates the three posture signals against the
 // GetJobs response the fetcher already holds.
 func addGluePostureFindings(r *resource.Resource, job gluetypes.Job) {
 	// One finding for three Prowler checks: S3, CloudWatch-logs and job

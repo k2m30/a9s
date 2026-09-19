@@ -5,11 +5,8 @@
 // per-def related-check fan-out.
 //
 // handleRelatedNavigate is the TUI's related-navigation entry point. It
-// constructs a transient
-// runtime.Core, calls core.HandleRelatedNavigate, then applies the navigation
-// decision to the view stack and translates TaskRequests into tea.Cmd values.
-// The existing app.go dispatch line (return m.handleRelatedNavigate(msg)) is
-// unchanged.
+// calls core.HandleRelatedNavigate, then applies the navigation decision to
+// the view stack and translates TaskRequests into tea.Cmd values.
 //
 // handleRelatedNavigateChild stays here as a TUI-only helper because it
 // dispatches a messages.EnterChildView — a Bubble Tea message type.
@@ -25,7 +22,7 @@
 // refresh, ActionBack reveal, related-panel resolve-in-place) reaches this
 // same fan-out.
 //
-// Exact-ID drills now route through the runtime's KindFetchByIDDetail task for
+// Exact-ID drills route through the runtime's KindFetchByIDDetail task for
 // any type with a registered FetchByIDs helper (ami, kms, policy, ebs-snap).
 package tui
 
@@ -112,7 +109,7 @@ func (m Model) handleRelatedNavigate(msg messages.RelatedNavigate) (tea.Model, t
 			w, h := m.innerSize()
 			rs.width, rs.height = w, h
 			m.pushRS(rs)
-			// C6 replay: seed instantly from the session filtered-rows cache; the
+			// Replay: seed instantly from the session filtered-rows cache; the
 			// fetch below stays as the ⟳ verify-refresh.
 			m.ctrl.SeedFilteredListFromCache(msg.TargetType, result.FetchFilter)
 			return m, tea.Batch(initCmd, m.fetchResourcesFiltered(msg.TargetType, result.FetchFilter, m.core.AvailabilityGen()))
@@ -219,7 +216,7 @@ func (m Model) handleRelatedNavigate(msg messages.RelatedNavigate) (tea.Model, t
 
 			// BeginDetailWorkload begins the op and returns its complete
 			// workload (enrich + related) in one call — cache-replay
-			// suppression (D6: no re-fan-out over cached data) is decided
+			// suppression (no re-fan-out over cached data) is decided
 			// INSIDE it, merging directly into the same DetailState this
 			// screen renders from.
 			_, tasks := m.ctrl.BeginDetailWorkload(msg.TargetType, r, false, false)
@@ -238,7 +235,7 @@ func (m Model) handleRelatedNavigate(msg messages.RelatedNavigate) (tea.Model, t
 			// needsRelated is false (narrow terminal or no registered related
 			// defs): the right column never shows, so drop the related half —
 			// dispatch only enrich — then fall through to the cache-miss
-			// fallback below, exactly mirroring the pre-builder shape.
+			// fallback below.
 			var cmds []tea.Cmd
 			if enrichOnly := dropTaskKind(tasks, runtime.KindRelatedCheck); len(enrichOnly) > 0 {
 				cmds = append(cmds, m.dispatchTaskRequests(enrichOnly))
@@ -324,11 +321,9 @@ func relatedNavigateTasksToCmd(m Model, targetType string, result runtime.Naviga
 	rest := make([]runtime.TaskRequest, 0, len(tasks))
 	for _, t := range tasks {
 		if t.Key.Kind == runtime.KindFetchFiltered {
-			// The related handler does not set a fetchFilteredPayload on the
-			// task — the filter lives in result.FetchFilter. ExecuteTask
-			// would fail with "missing fetchFilteredPayload", so this one
-			// case stays adapter-local instead of going through the shared
-			// dispatcher.
+			// The filter lives in result.FetchFilter, not on the task, so
+			// ExecuteTask would fail with "missing fetchFilteredPayload"; this
+			// one case stays adapter-local.
 			cmds = append(cmds, m.fetchResourcesFiltered(targetType, result.FetchFilter, m.core.AvailabilityGen()))
 			continue
 		}

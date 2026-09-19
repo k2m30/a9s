@@ -112,7 +112,6 @@ func networkingDefaultViews() map[string]ViewDef {
 				{Path: "RequesterVpcInfo"}, {Path: "AccepterVpcInfo"}, {Path: "Tags"},
 			},
 		},
-		// Child views for networking resources
 		"elb_listeners": {
 			Detail: []DetailField{
 				{Path: "ListenerArn"}, {Path: "Port"}, {Path: "Protocol"}, {Path: "DefaultActions"},

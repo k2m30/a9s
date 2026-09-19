@@ -45,7 +45,6 @@ func FetchInternetGatewaysPage(ctx context.Context, api EC2DescribeInternetGatew
 			}
 		}
 
-		// Extract VPC ID and state from attachments
 		vpcID := ""
 		state := "detached"
 		if len(igw.Attachments) > 0 {

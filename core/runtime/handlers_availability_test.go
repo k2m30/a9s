@@ -55,12 +55,9 @@ func pickKnownShortName(t *testing.T) string {
 	return catalog.All()[0].ShortName
 }
 
-// TestHandleEnrichmentChecked_TruncationPrecedence_Wave1Wins covers the
-// regression case Architect/CodexReviewer flagged: Wave-1 probe truncated +
-// Wave-2 sees zero issues + zero findings → badge must stay Truncated=true.
-//
-// The deleted handler applied the override after the zero-clear step; the
-// runtime port must preserve that ordering.
+// Wave-1 probe truncated + Wave-2 sees zero issues + zero findings → the
+// badge stays Truncated=true: the Wave-1 override applies after the
+// zero-clear step.
 func TestHandleEnrichmentChecked_TruncationPrecedence_Wave1Wins(t *testing.T) {
 	rt := pickKnownShortName(t)
 
@@ -84,9 +81,6 @@ func TestHandleEnrichmentChecked_TruncationPrecedence_Wave1Wins(t *testing.T) {
 	}
 }
 
-// TestHandleEnrichmentChecked_TruncationPrecedence_NoWave1NoIssues_ClearsToFalse
-// covers the symmetric case: no Wave-1 truncation + zero issues + zero
-// findings → badge goes back to Truncated=false.
 func TestHandleEnrichmentChecked_TruncationPrecedence_NoWave1NoIssues_ClearsToFalse(t *testing.T) {
 	rt := pickKnownShortName(t)
 
@@ -108,9 +102,6 @@ func TestHandleEnrichmentChecked_TruncationPrecedence_NoWave1NoIssues_ClearsToFa
 	}
 }
 
-// TestHandleEnrichmentChecked_TruncationPrecedence_Wave2WithFindings_StaysTruthy
-// covers the case where Wave-2 is genuinely truncated and reports findings —
-// the badge stays truncated regardless of Wave-1.
 func TestHandleEnrichmentChecked_TruncationPrecedence_Wave2WithFindings_StaysTruthy(t *testing.T) {
 	rt := pickKnownShortName(t)
 
@@ -134,10 +125,6 @@ func TestHandleEnrichmentChecked_TruncationPrecedence_Wave2WithFindings_StaysTru
 	}
 }
 
-// TestHandleEnrichmentChecked_PatchDetail_NilFindings_ClearsContract verifies
-// the runtime emits PatchDetail with EnrichmentFindings=nil when Wave-2
-// returned no findings, so the adapter (intent.go contract: nil = clear) wipes
-// stale detail-view markers.
 func TestHandleEnrichmentChecked_PatchDetail_NilFindings_ClearsContract(t *testing.T) {
 	rt := pickKnownShortName(t)
 
@@ -158,9 +145,6 @@ func TestHandleEnrichmentChecked_PatchDetail_NilFindings_ClearsContract(t *testi
 	}
 }
 
-// TestHandleEnrichmentChecked_PatchDetail_NonNilFindings_PassesThrough verifies
-// the symmetric case: when Wave-2 returns a populated findings map, the
-// PatchDetail intent forwards it unchanged for the adapter to apply.
 func TestHandleEnrichmentChecked_PatchDetail_NonNilFindings_PassesThrough(t *testing.T) {
 	rt := pickKnownShortName(t)
 

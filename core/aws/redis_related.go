@@ -158,9 +158,8 @@ func checkRedisCFN(ctx context.Context, clients any, res resource.Resource, cach
 
 // checkRedisCtEvents scans the ct-events cache for CloudTrail events whose
 // ResourceName exactly matches the replication group ID or ARN.
-// Substring matching is intentionally avoided (P2-2): "prod-redis" would
-// otherwise match events for "prod-redis-sessions". The EventSource fallback
-// is also removed — it matched ElastiCache events for every RG on the account.
+// Matching is exact: a substring match of "prod-redis" would also hit
+// events for "prod-redis-sessions".
 func checkRedisCtEvents(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	var rgID, rgARN string
 	rg, ok := assertStruct[elasticachetypes.ReplicationGroup](res.RawStruct)
@@ -194,8 +193,6 @@ func checkRedisCtEvents(ctx context.Context, clients any, res resource.Resource,
 			continue
 		}
 		matched := false
-		// Exact match only: ResourceName == rgID or ResourceName == rgARN.
-		// This prevents "prod-redis" from matching events scoped to "prod-redis-sessions".
 		for _, r := range ev.Resources {
 			name := strings.TrimSpace(strings.ToLower(aws.ToString(r.ResourceName)))
 			if name == strings.ToLower(rgID) || (rgARN != "" && name == strings.ToLower(rgARN)) {
@@ -295,7 +292,7 @@ func checkRedisLogs(ctx context.Context, clients any, res resource.Resource, cac
 // checkRedisSecrets scans the loaded secrets cache for secrets whose name
 // matches "<rgID>/auth-token" OR that carry the tag
 // "elasticache:replication-group-id=<rgID>". Best-effort; may return zero
-// when no tag/naming convention is followed (allowed per spec §2).
+// when no tag/naming convention is followed.
 func checkRedisSecrets(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	var rgID string
 	rg, ok := assertStruct[elasticachetypes.ReplicationGroup](res.RawStruct)
@@ -322,12 +319,10 @@ func checkRedisSecrets(ctx context.Context, clients any, res resource.Resource, 
 	namingConvention := rgID + "/auth-token"
 	var ids []string
 	for _, secRes := range secretList {
-		// Name-based match.
 		if secRes.ID == namingConvention || secRes.Name == namingConvention {
 			ids = append(ids, secRes.ID)
 			continue
 		}
-		// Tag-based match via RawStruct.
 		entry, ok := assertStruct[smtypes.SecretListEntry](secRes.RawStruct)
 		if !ok {
 			continue
@@ -541,9 +536,8 @@ func redisSubnetGroup(ctx context.Context, clients any, res resource.Resource) (
 		return nil, nil
 	}
 	// A member cluster came back, so redisMemberCluster already proved the
-	// ElastiCache client is usable; only the typed pointer is needed again,
-	// and an unchecked assertion would panic into the "?" this file just
-	// stopped rendering.
+	// ElastiCache client is usable; the checked assertion only recovers the
+	// typed pointer.
 	c, cok := clients.(*ServiceClients)
 	if !cok {
 		return nil, errRedisNoGroupDetail

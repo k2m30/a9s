@@ -53,8 +53,7 @@ type sessionEntry struct {
 	// newer than the recorded one (a fresh detail open/refresh superseding an
 	// older, still-draining fan-out for the same key), not just "not already
 	// running" — otherwise a refresh issued while the original open's
-	// fan-out is still draining is silently dropped (#issue: web detail
-	// refresh mid-flight). Entries are deleted on completion via
+	// fan-out is still draining is silently dropped. Entries are deleted on completion via
 	// compare-and-delete (see drainBackgroundTasks) so a superseded task's
 	// exit cannot clear the newer task's entry. Guarded by inFlightMu,
 	// independent of mu (the background drain never holds entry.mu — see
@@ -141,7 +140,6 @@ func (s *Server) ListenAndServe(ctx context.Context, readyCh chan<- struct{}) er
 	}
 	s.addr = ln.Addr().String()
 
-	// Signal the caller that the address is now known.
 	if readyCh != nil {
 		close(readyCh)
 	}
@@ -288,14 +286,13 @@ func (s *Server) getOrCreateSession(sessionID string) *sessionEntry {
 
 // bootstrapLiveSession performs the AWS connect for a live session and drains
 // the full availability sweep in the background — mirroring the TUI lane's
-// ClientsReady-time dispatch. Any startup command (-c) is no longer applied
-// here: newSession arms it via Core.SetCommand (the same runtime.Core.Session
-// .Command field tui.WithCommand sets), so BootstrapLive's HandleClientsReady
-// call below arms session.CommandArmed/PendingCommand itself, and the drain's
-// per-task interception of TaskKindEmitNavigate (see drainsync.go) applies
-// the deferred navigation the moment handleAvailabilityCacheLoaded emits it —
-// the same one lane the TUI's -c flag drives (deferred -c navigation, D11), instead of a
-// second server-side apply racing or duplicating it.
+// ClientsReady-time dispatch. newSession arms the startup command (-c) via
+// Core.SetCommand (the same runtime.Core.Session.Command field
+// tui.WithCommand sets), so BootstrapLive's HandleClientsReady call below
+// arms session.CommandArmed/PendingCommand itself, and the drain's per-task
+// interception of TaskKindEmitNavigate (see drainsync.go) applies the
+// deferred navigation the moment handleAvailabilityCacheLoaded emits it —
+// the same one lane the TUI's -c flag drives.
 //
 // It runs in its own goroutine and relies on the controller's internal
 // locking (not entry.mu), so request handlers are never blocked for the
@@ -352,7 +349,7 @@ const backgroundTaskTimeout = 30 * time.Second
 // it supersedes the running entry — otherwise a refresh dispatched while the
 // original open's fan-out is still draining would be silently dropped for
 // sharing the same Key. Non-detail kinds carry a zero op ID and fall back to
-// plain same-key dedup (running == skip), unchanged from before. Each
+// plain same-key dedup (running == skip). Each
 // drained key is removed from entry.inFlight on completion (success or
 // timeout) via compare-and-delete, so a superseded task's own completion
 // cannot clear the newer task's entry.

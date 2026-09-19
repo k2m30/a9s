@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
 
 // glue_codes.go — canonical wave-1 FindingCode constants for the glue
-// resource type. All three read fields GetJobs already returns
-// (glue.go:86 keeps the whole gluetypes.Job in RawStruct).
+// resource type. All three read fields GetJobs returns; the fetcher keeps
+// the whole gluetypes.Job in RawStruct.
 package aws
 
 import "github.com/k2m30/a9s/v3/core/domain"
@@ -22,5 +22,3 @@ const (
 	//nolint:gosec // G101 false positive: a finding code, not a credential
 	CodeGlueArgumentSecret domain.FindingCode = "glue.argument-secret"
 )
-
-// S5 operator sentences.

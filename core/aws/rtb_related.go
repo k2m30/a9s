@@ -15,7 +15,7 @@ import (
 )
 
 // checkRTBSubnet searches the subnet cache for subnets associated with this route table.
-// It extracts SubnetIds from ec2types.RouteTable.Associations[] (Pattern C — cache lookup).
+// It extracts SubnetIds from ec2types.RouteTable.Associations[].
 func checkRTBSubnet(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	rtb, ok := assertStruct[ec2types.RouteTable](res.RawStruct)
 	if !ok {
@@ -24,7 +24,7 @@ func checkRTBSubnet(_ context.Context, _ any, res resource.Resource, _ resource.
 		}
 		return resource.KnownRelated("subnet", nil, false)
 	}
-	// In-body: RouteTable.Associations[].SubnetId ARE the associated subnets.
+	// RouteTable.Associations[].SubnetId are the associated subnets.
 	var ids []string
 	for _, assoc := range rtb.Associations {
 		if assoc.SubnetId != nil && *assoc.SubnetId != "" {
@@ -35,7 +35,7 @@ func checkRTBSubnet(_ context.Context, _ any, res resource.Resource, _ resource.
 }
 
 // checkRTBNAT searches the nat cache for NAT gateways referenced in this route table's routes.
-// It extracts NatGatewayIds from ec2types.RouteTable.Routes[] (Pattern C — cache lookup).
+// It extracts NatGatewayIds from ec2types.RouteTable.Routes[].
 func checkRTBNAT(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	rtb, ok := assertStruct[ec2types.RouteTable](res.RawStruct)
 	if !ok {
@@ -44,7 +44,7 @@ func checkRTBNAT(_ context.Context, _ any, res resource.Resource, _ resource.Res
 		}
 		return resource.KnownRelated("nat", nil, false)
 	}
-	// In-body: RouteTable.Routes[].NatGatewayId ARE the referenced NAT gateways.
+	// RouteTable.Routes[].NatGatewayId are the referenced NAT gateways.
 	// Skip blackhole routes — AWS leaves the stale target id on a route after the
 	// NAT is deleted, so counting it would advertise an unopenable target.
 	var ids []string
@@ -60,7 +60,7 @@ func checkRTBNAT(_ context.Context, _ any, res resource.Resource, _ resource.Res
 }
 
 // checkRTBIGW searches the igw cache for Internet Gateways referenced in this route table's routes.
-// It extracts GatewayIds from Routes[] that start with "igw-" (Pattern C — cache lookup).
+// It extracts GatewayIds from Routes[] that start with "igw-".
 func checkRTBIGW(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	rtb, ok := assertStruct[ec2types.RouteTable](res.RawStruct)
 	if !ok {
@@ -69,7 +69,7 @@ func checkRTBIGW(_ context.Context, _ any, res resource.Resource, _ resource.Res
 		}
 		return resource.KnownRelated("igw", nil, false)
 	}
-	// In-body: RouteTable.Routes[].GatewayId with the igw- prefix ARE the IGWs.
+	// RouteTable.Routes[].GatewayId with the igw- prefix are the IGWs.
 	// Skip blackhole routes — the target id is stale once the gateway is gone.
 	var ids []string
 	for _, route := range rtb.Routes {
@@ -84,7 +84,7 @@ func checkRTBIGW(_ context.Context, _ any, res resource.Resource, _ resource.Res
 }
 
 // checkRTBCFN checks EC2 RouteTable tags for aws:cloudformation:stack-name
-// and matches against the CFN stack cache (Pattern C — tag-based).
+// and matches against the CFN stack cache.
 func checkRTBCFN(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	stackName := rtbCFNStackName(res)
 	if stackName == "" {
@@ -123,7 +123,7 @@ func rtbCFNStackName(res resource.Resource) string {
 	return tagValue(rtb.Tags, "aws:cloudformation:stack-name")
 }
 
-// checkRTBVPC returns the VPC this route table belongs to (Pattern F).
+// checkRTBVPC returns the VPC this route table belongs to.
 // Reads vpc_id from Fields which is populated by the route tables fetcher.
 func checkRTBVPC(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	vpcID := res.Fields["vpc_id"]
@@ -143,7 +143,7 @@ func checkRTBENI(_ context.Context, _ any, res resource.Resource, _ resource.Res
 		}
 		return resource.KnownRelated("eni", nil, false)
 	}
-	// In-body: RouteTable.Routes[].NetworkInterfaceId ARE the referenced ENIs.
+	// RouteTable.Routes[].NetworkInterfaceId are the referenced ENIs.
 	// Skip blackhole routes — the target id is stale once the ENI is gone.
 	var ids []string
 	for _, route := range rtb.Routes {
@@ -167,7 +167,7 @@ func checkRTBTGW(_ context.Context, _ any, res resource.Resource, _ resource.Res
 		}
 		return resource.KnownRelated("tgw", nil, false)
 	}
-	// In-body: RouteTable.Routes[].TransitGatewayId ARE the referenced TGWs.
+	// RouteTable.Routes[].TransitGatewayId are the referenced TGWs.
 	// Skip blackhole routes — the target id is stale once the TGW is gone.
 	var ids []string
 	for _, route := range rtb.Routes {

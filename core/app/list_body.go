@@ -22,19 +22,18 @@ import (
 //
 // topLevelCanonical marks whether this call targets the canonical top-level,
 // unfiltered ScreenResourceList for typeName (not a ScreenChildList, and not
-// a filtered/related-nav list — EscPops/ParentContext) — the same C6 scope
+// a filtered/related-nav list — EscPops/ParentContext) — the same scope
 // gate maybeSaveResourceListCache/syncExactTotalToMenu already use. Only a
 // topLevelCanonical call routes its accepted rows through
 // Core.ObserveRows (the RowStore is the single per-type row source of
 // truth, and a child/related-filtered list's narrower row set must never
-// poison it). A
-// non-topLevelCanonical call keeps writing ls.Rows locally only, exactly as
-// before RowStore existed — its content already came from a store read
-// (listScreenResources' fallback, or a related-navigate cache hit) and must
-// not be re-written back into the store under the same type key.
+// poison it). A non-topLevelCanonical call writes ls.Rows locally only —
+// its content already came from a store read (listScreenResources'
+// fallback, or a related-navigate cache hit) and must not be re-written
+// back into the store under the same type key.
 //
-// Every incoming page is run through MaterializeListFields first (Contract B
-// render-sufficiency): Path-based, Key-less columns get their scalar value
+// Every incoming page is run through MaterializeListFields first:
+// Path-based, Key-less columns get their scalar value
 // written into Fields while RawStruct is still present, so a later on-disk
 // cache replay (which never carries RawStruct) renders identical cells.
 // Resources that already have Fields populated (e.g. a cache-replay caller
@@ -44,7 +43,7 @@ import (
 // fetchErr is non-nil when this call carries a partial-success composite
 // error (messages.ResourcesLoaded.Err: some resources returned AND something
 // failed) — always nil for a cache-replay seed, which has no fetch error
-// concept. Per cache contract C4, a non-nil fetchErr installs its own text as
+// concept. A non-nil fetchErr installs its own text as
 // the screen's error marker (never just preserves whatever marker a prior,
 // unrelated failure may have left behind); a hard failure (no resources at
 // all) never reaches this method, routing through
@@ -125,11 +124,10 @@ func (c *Controller) applyResourcesLoaded(ls *ListState, typeName string, resour
 	// resource type never share a row slice. Each screen's fetch result lands
 	// exclusively on that screen's ListState.
 	//
-	// Append-dedup backstop (D13): an append must never introduce a row whose ID already
-	// exists on the screen. This is a backstop, not the fix for the root
-	// cause below — it only prevents a duplicate that already reached this
-	// call from becoming visible; the empty-cursor guard is what stops the
-	// duplicate fetch from happening in the first place.
+	// Append-dedup backstop: an append must never introduce a row whose ID
+	// already exists on the screen. The backstop only keeps a duplicate that
+	// reached this call from becoming visible; the empty-cursor guard is what
+	// stops the duplicate fetch from happening in the first place.
 	//
 	// topLevelCanonical routes the SAME decision (append/replace) through
 	// Core.ObserveRows first and adopts its accepted slice onto
@@ -162,29 +160,28 @@ func (c *Controller) applyResourcesLoaded(ls *ListState, typeName string, resour
 		// choke point, leaving a
 		// concurrently in-flight sibling request's flag (LoadingMore vs
 		// Refreshing are allowed to overlap) untouched — the seeded (or
-		// now-replaced) rows are confirmed for THIS request only. Callers that
+		// replaced) rows are confirmed for THIS request only. Callers that
 		// seed rows from a cache-first source set Refreshing=true themselves
 		// AFTER calling this method, so this clear only ever fires for a
 		// genuine fetch-result swap, never undoing the seed-time flag.
 		ls.clearFetchInFlight(loadingMore, listSeq)
 		// Seed-time provisional total: a fetch result retires the seed's
 		// population only when it actually supersedes it — an EXACT result
-		// (authoritative proof of the new total, C5), or one that already
+		// (authoritative proof of the new total), or one that already
 		// reaches the seeded population. A still-truncated result shallower
 		// than the seed knew has verified only part of the list and cannot
-		// downgrade the total to its own row depth; that regression is the
-		// "N+" frame where N shrank back to the last-known page.
+		// downgrade the total to its own row depth, which would render an "N+"
+		// frame whose N shrinks back to the last-known page.
 		if pagination == nil || !pagination.IsTruncated || len(ls.Rows) >= ls.TotalCount {
 			ls.TotalCount = 0
 		}
-		// Per cache contract C4: a successful fetch result clears any outstanding error
+		// A successful fetch result clears any outstanding error
 		// marker from a previous failed attempt. A partial-failure result
 		// (fetchErr non-nil) installs THIS fetch's own error text instead — the
-		// fetch that just landed did not actually resolve cleanly, so C4's
-		// "keeps the content, swaps the marker for an error marker" applies,
-		// and the marker must reflect the failure that just happened, never a
-		// stale marker (or no marker at all) left over from an unrelated
-		// earlier attempt.
+		// fetch that just landed did not resolve cleanly, so the content stays
+		// and the marker becomes an error marker reflecting the failure that
+		// just happened, never a stale marker (or no marker at all) left over
+		// from an unrelated earlier attempt.
 		if fetchErr != nil {
 			ls.setFetchError(fetchErr.Error())
 		} else {
@@ -198,8 +195,8 @@ func (c *Controller) applyResourcesLoaded(ls *ListState, typeName string, resour
 		// enumeration failing while managed-policy pagination reports
 		// IsTruncated=false) reached the last page and still cannot speak for
 		// the whole population, because a DIFFERENT component of the fetch is
-		// what failed. Answering both from HasPagination titled such a list
-		// "N+" and offered a load-more with no cursor behind it.
+		// what failed. Answering both from HasPagination would title such a list
+		// "N+" and offer a load-more with no cursor behind it.
 		switch {
 		case pagination != nil:
 			ls.HasPagination = pagination.IsTruncated
@@ -217,8 +214,8 @@ func (c *Controller) applyResourcesLoaded(ls *ListState, typeName string, resour
 	// Fresh rows arrive without Wave-2 findings; re-apply the latest known
 	// findings from the enrichment store so a silent-swap refetch never leaves
 	// the controller rows (and therefore the list-open save path, which
-	// persists row findings per C6)
-	// glyph-blind until the next EnrichmentChecked. Mirrors the session-side
+	// persists row findings) glyph-blind until the next EnrichmentChecked.
+	// Mirrors the session-side
 	// fold, which re-applies onto Core stores after every result lands. Uses
 	// listEnrichmentFindings (every independently-evaluated Wave-2 Finding
 	// per resource) so a multi-condition resource keeps every Finding across
@@ -249,8 +246,8 @@ func (c *Controller) applyResourcesLoaded(ls *ListState, typeName string, resour
 func outgoingRowFindingsByID(ls *ListState, cachedRows func() []resource.Resource) (map[string][]domain.Finding, map[string]map[domain.FindingCode]domain.AttentionDetail) {
 	// The fallback is a function, not a slice: reading the type cache clones
 	// every row it holds, and the common case (a screen that already has rows)
-	// never looks at it. Passed eagerly, that clone was a full copy of the
-	// type's rows on every result, under the controller lock, for nobody.
+	// never looks at it. Passed eagerly, that clone would copy the type's
+	// rows on every result, under the controller lock, for nobody.
 	var source []resource.Resource
 	if ls != nil && len(ls.Rows) > 0 {
 		source = ls.Rows
@@ -277,7 +274,7 @@ func outgoingRowFindingsByID(ls *ListState, cachedRows func() []resource.Resourc
 }
 
 // dedupAgainstExisting returns the subset of incoming whose ID is not already
-// present in existing (C2/C6): an append that would introduce a row already
+// present in existing: an append that would introduce a row already
 // on the screen is dropped rather than shown twice. Delegates to
 // resource.DedupByID, the single-source implementation.
 func dedupAgainstExisting(existing, incoming []resource.Resource) []resource.Resource {
@@ -312,7 +309,7 @@ func (c *Controller) materializeListFieldsForType(typeName string, resources []r
 //
 // It is called BEFORE the controller lock, never under it: a page is twelve
 // thousand rows on a large account, and a per-row pass held against every
-// reader is the shape the absorb latency pin exists to forbid. Nothing is
+// reader stalls all of them. Nothing is
 // written in place for the same reason it runs there — the page is still the
 // fetch lane's, and the cache writer may already be copying an earlier one
 // that shares its rows.
@@ -333,9 +330,9 @@ func SanitizedRows(resources []resource.Resource) []resource.Resource {
 //
 // Selected/ScrollX/Filter/Sort/AttentionOnly/Loading/Truncated/Pagination/
 // EnrichmentFindings/EnrichmentTruncated/LoadingMore/Refreshing/
-// LastFetchError are NOT cached here — they are cheap to read fresh from ls
-// (and the controller's enrichment maps) on every call, cache or no cache,
-// so buildListBody always sets them directly on the returned ListBody.
+// LastFetchError are cheap to read fresh from ls (and the controller's
+// enrichment maps) on every call, so buildListBody always sets them
+// directly on the returned ListBody.
 type listBodyMemo struct {
 	valid           bool
 	rowsVersion     uint64
@@ -501,8 +498,7 @@ func (c *Controller) fallbackRowsGenFor(ls *ListState, typeName string) domain.G
 //
 // Never memoises: a read lock is enough for every caller here, and populating
 // the memo is a mutation. A cold screen therefore pays the chain once per
-// call until the next snapshot builds the body — which is what these callers
-// did on every call, warm or cold, before.
+// call until the next snapshot builds the body.
 // Callers must hold c.mu (read is enough).
 func (c *Controller) listVisibleLocked(ls *ListState, typeName string) []resource.Resource {
 	if !c.listBodyMemoStale(ls.bodyMemo, ls, c.fallbackRowsGenFor(ls, typeName)) {
@@ -518,8 +514,8 @@ func (c *Controller) listVisibleLocked(ls *ListState, typeName string) []resourc
 
 // listBodyBuild is one list body's build inputs, frozen under the controller
 // lock so the O(n log n) filter+sort and the O(n·cols) cell extraction can run
-// WITHOUT it — the absorb half of the C4 latency guarantee: a 6000-row row
-// pass under the lock would stall every key press behind it.
+// WITHOUT it: a 6000-row row pass under the lock would stall every key
+// press behind it.
 //
 // ls is a detached copy of the screen's ListState, and its Rows a shallow copy
 // of the resolved row set: the build reads them while other writers keep
@@ -542,15 +538,15 @@ type listBodyBuild struct {
 
 // captureListBodyBuild freezes everything run() reads. Callers must hold c.mu.
 func (c *Controller) captureListBodyBuild(ls *ListState, typeName string, td *resource.ResourceTypeDef, fallbackRowsGen domain.Gen) listBodyBuild {
-	// Build the row set from the per-screen store (Bug 1 fix: uses ls.Rows when
-	// available so two stacked same-type screens see their own independent rows).
+	// Build the row set from the per-screen store (ls.Rows when available, so
+	// two stacked same-type screens see their own independent rows).
 	detached := ls.cloneForBuild(c.listScreenResources(ls, typeName))
 	return listBodyBuild{
 		ls:       &detached,
 		typeName: typeName,
 		instance: ls.instance,
 		td:       td,
-		// One typeDef per screen (row 39) means one column set: the cells the
+		// One typeDef per screen means one column set: the cells the
 		// rows are made of, the strings the text filter compares and the
 		// column a sort names are the same list, resolved here once. Resolved
 		// from the already-resolved td rather than the catalog, so a test
@@ -576,13 +572,12 @@ func (b listBodyBuild) run() listBodyMemo {
 	// comparator sees the identity election.
 	visible = listSortResources(b.columns, b.td, b.ls, visible)
 
-	// Build rows.
 	statusCol := resolveListStatusCol(b.columns, b.td)
 	rows := make([]ListRow, 0, len(visible))
 	for _, r := range visible {
 		cells := extractListCells(b.columns, r, b.td)
 		severity, colorTag := resolveListRowSeverity(b.td, r)
-		// S4: bake the Wave-2 issue-Finding Phrase into the status cell, from the
+		// Bake the Wave-2 issue-Finding Phrase into the status cell, from the
 		// same enrichment findings map that drives the glyph. Without this the web
 		// renders a blank Status for flagged rows in live mode (the cell only
 		// reflects Wave-1 r.Findings / a FieldUpdate that live never applies),
@@ -694,7 +689,7 @@ func (c *Controller) ListFrameTitle() string {
 // buildListFrameTitle computes the frame title string for a list screen,
 // mirroring FrameTitle() in resourcelist.go.
 //
-// Per docs/attention-signals.md §Visualization Surfaces: the " !N" issue
+// Per docs/attention-signals.md: the " !N" issue
 // suffix is UNCONDITIONAL — it renders after the count parentheses on any
 // list screen (top-level or ScreenChildList), on any renderer (TUI or web),
 // whenever N > 0 and the screen is not in attention-only mode. N is the
@@ -787,11 +782,10 @@ func (c *Controller) buildListFrameTitle(ctx runtime.ScreenContext, ls *ListStat
 
 // ListSelected returns the resource at the current cursor position in the
 // visible (filtered+sorted) row set, plus a navigable bool (always true when
-// a resource is present — row-dependent guards are wired in the flip step).
-// The selection index is clamped to the visible count before indexing (Bug 2
-// fix) so that a refresh that shrinks the list never leaves the cursor pointing
-// past the end, causing Enter/copy to silently do nothing while a row is
-// visually highlighted.
+// a resource is present). The selection index is clamped to the visible
+// count before indexing so that a refresh that shrinks the list never
+// leaves the cursor pointing past the end, causing Enter/copy to silently
+// do nothing while a row is visually highlighted.
 func (c *Controller) ListSelected() (resource.Resource, bool) {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
@@ -850,7 +844,7 @@ func (c *Controller) listIssueCount(ls *ListState, typeName string) int {
 		return 0
 	}
 	td := *tdp
-	// S1 contract: the list-title suffix and the menu sync-back use the SAME
+	// The list-title suffix and the menu sync-back use the SAME
 	// aggregation as the menu badge — and the badge never counts types with
 	// ExcludeFromIssueBadge (e.g. ct-events, where "issue-colored" rows are
 	// historical events, not live problems). Without this, an excluded type
@@ -872,7 +866,7 @@ func (c *Controller) listIssueCount(ls *ListState, typeName string) int {
 		case listHasBadgeFinding(r):
 			ic++
 		case td.ResolveColor(runtime.Wave1Only(r)).IsIssue():
-			// S1 contract (docs/attention-signals.md): a lone Wave-2 "~" warn
+			// Per docs/attention-signals.md, a lone Wave-2 "~" warn
 			// must NOT bump the count — a warning is not an issue. runtime.Wave1Only
 			// strips merged Wave-2 findings before ResolveColor so this branch
 			// counts Wave-1 issue-colored rows only, matching the menu badge's
@@ -882,8 +876,8 @@ func (c *Controller) listIssueCount(ls *ListState, typeName string) int {
 			ic++
 		case len(r.Findings) == 0:
 			if fs, hasFinding := findings[r.ID]; hasFinding && len(fs) > 0 && domain.WorstSeverityFinding(fs).Severity == domain.SevBroken {
-				// S1: Wave-2 findings bump the count only at "!" severity —
-				// "~ findings do not bump" (docs/attention-signals.md). Wave-1
+				// Wave-2 findings bump the count only at "!" severity
+				// (docs/attention-signals.md). Wave-1
 				// yellow/red rows are already counted by the color branch above,
 				// matching the menu badge's probe-side aggregation. A resource
 				// may carry more than one independently-evaluated Wave-2
@@ -912,7 +906,7 @@ func (c *Controller) GetListVisibleResources() []resource.Resource {
 // ApplyListFieldUpdates merges Wave-2 field updates into the cached resource
 // slice for typeName. Keyed by resource ID then field key.
 // Updates are applied both to the top list screen's ls.Rows (the primary read
-// path after the Bug 1 fix) and to the RowStore-backed type cache (for
+// path) and to the RowStore-backed type cache (for
 // callers such as GetListAllResources that don't have a specific ListState).
 func (c *Controller) ApplyListFieldUpdates(typeName string, updates map[string]map[string]string) {
 	c.mu.Lock()
@@ -993,11 +987,11 @@ func (c *Controller) applyListFieldUpdates(typeName string, updates map[string]m
 // This is the controller-side half of a Ctrl+R refresh's stale-findings
 // cleanup. internal/tui's Model.applyEnrichment strips Wave-2 findings from
 // the session-owned stores (Core.ResourceCache / LazyResourceCache /
-// ProbeResources); those stores no longer alias the controller's rows since
-// applyResourcesLoaded materializes copies (MaterializeListFields) into
-// ls.Rows / the RowStore. Without this explicit companion call, a
-// ResourceListModel constructed from the (now-copied) cache-hit rows retains
-// stale Wave-2 findings across Ctrl+R even after the session-side clear.
+// ProbeResources); applyResourcesLoaded materializes copies
+// (MaterializeListFields) into ls.Rows / the RowStore, so without this
+// explicit companion call a ResourceListModel constructed from the copied
+// cache-hit rows retains stale Wave-2 findings across Ctrl+R even after
+// the session-side clear.
 func (c *Controller) ClearRowFindings(typeName string) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -1055,7 +1049,7 @@ func (c *Controller) clearRowFindings(typeName string) {
 // list reaches only the session-owned stores (Core.applyEnrichment) and the
 // controller's enrichmentStore glyph map, so the list-open save path (which
 // persists from ls.Rows) writes rows with no findings — cached rows then
-// reseed glyphless (violating C6's persisted-findings round-trip). Callers must hold c.mu (write); the
+// reseed glyphless. Callers must hold c.mu (write); the
 // PatchResourceList intent case is the production entry point. A nil
 // findings map clears Wave-2 entries, matching runtime.ApplyWave2ToRow's
 // contract. findings carries every independently-evaluated Wave-2 Finding
@@ -1065,10 +1059,9 @@ func (c *Controller) clearRowFindings(typeName string) {
 //
 // uninspected comes straight off the intent — the rows the enricher could
 // not inspect, decided once by the runtime — and is handed to the shared
-// fold (runtime.FoldWave2Rows) unexamined. This function does not re-decide
-// which rows the result speaks for; deciding it here as well is how a
-// timed-out probe could strip a finding from the screen while the file it
-// was saved to kept it.
+// fold (runtime.FoldWave2Rows) unexamined: the fold is the one place that
+// decides which rows the result speaks for, so the screen and the file it
+// is saved to cannot disagree about a timed-out probe's rows.
 func (c *Controller) applyRowFindings(typeName string, findings map[string][]domain.Finding, details map[string]map[domain.FindingCode]domain.AttentionDetail, uninspected map[string]string) {
 	c.foldRowFindings(typeName, findings, details, func([]resource.Resource) map[string]string { return uninspected })
 }
@@ -1137,14 +1130,12 @@ func (c *Controller) foldRowFindings(typeName string, findings map[string][]doma
 	}
 }
 
-// listHasBadgeFinding reports whether a row's own findings bump the S1 issue
+// listHasBadgeFinding reports whether a row's own findings bump the issue
 // count. Wave-1 findings (fetcher-written, no "wave2:" Source prefix) count at
 // any issue severity — a Wave-1 warning IS the yellow row the menu badge
-// counts by color. Wave-2 findings count only at "!" severity: per the S1
-// contract "~ findings do not bump", and now that applyRowFindings writes
-// Wave-2 findings onto controller rows, counting them at warn severity here
-// would reintroduce the very drift the severity gate on the enrichment-store
-// branch fixed.
+// counts by color. Wave-2 findings count only at "!" severity
+// (docs/attention-signals.md), the same gate the enrichment-store branch
+// applies.
 func listHasBadgeFinding(r resource.Resource) bool {
 	for _, f := range r.Findings {
 		if f.Severity == domain.SevBroken {
@@ -1186,8 +1177,7 @@ func (c *Controller) PushChildListScreen(typeName string) {
 }
 
 // GetListEnrichmentFindings returns the enrichment findings map for typeName.
-// Used by renderDataRow to resolve glyph markers without accessing the deleted
-// findingsByID field on ResourceListModel.
+// Used by renderDataRow to resolve glyph markers.
 func (c *Controller) GetListEnrichmentFindings(typeName string) map[string][]domain.Finding {
 	c.mu.RLock()
 	defer c.mu.RUnlock()

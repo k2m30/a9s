@@ -46,10 +46,6 @@ const (
 	CodeECSTaskHealthUnhealthy domain.FindingCode = "ecs-task.health.unhealthy"
 )
 
-// ecsTaskWave1Findings returns the wave1 Finding slice for an ECS task's
-// last_status. Returns nil for terminal/healthy states (RUNNING, STOPPED).
-// Shared by ecs_task.go and ecs_svc_tasks.go::convertEcsTask to keep their
-// lifecycle classification in lockstep.
 // ecsStopCodeIsRoutine reports whether a StopCode names the platform doing its
 // job rather than the task failing. The scheduler stops tasks on every
 // deployment and scale-in, Spot reclaims capacity it warned about, and a
@@ -67,6 +63,10 @@ func ecsStopCodeIsRoutine(stopCode string) bool {
 	return false
 }
 
+// ecsTaskWave1Findings returns the wave1 Finding slice for an ECS task's
+// last_status. Returns nil for terminal/healthy states (RUNNING, STOPPED).
+// Shared by ecs_task.go and ecs_svc_tasks.go::convertEcsTask to keep their
+// lifecycle classification in lockstep.
 func ecsTaskWave1Findings(status string) []domain.Finding {
 	switch status {
 	case "PROVISIONING":
@@ -85,12 +85,6 @@ func ecsTaskWave1Findings(status string) []domain.Finding {
 	return nil
 }
 
-// ecsTaskStructuralFindings returns the wave1 Finding slice for the ecs-task
-// top-level resource type, mirroring colorECSTask's own precedence: a
-// RUNNING task with an UNHEALTHY container health check is broken outright;
-// a STOPPED task with a non-UserInitiated stop code is broken; any other
-// STOPPED task is a normal, dim lifecycle stop; everything else falls
-// through to the shared transitional-state findings.
 // ecsTaskHealthWords renders a container health status as the word an operator
 // says. HEALTHY is the SDK's spelling of the enum; a task AWS reports no
 // health for at all stays empty, which is not the same as reporting unknown.
@@ -101,12 +95,17 @@ func ecsTaskHealthWords(status ecstypes.HealthStatus) string {
 	return strings.ToLower(string(status))
 }
 
+// ecsTaskStructuralFindings returns the wave1 Finding slice for the ecs-task
+// top-level resource type, mirroring colorECSTask's own precedence: a
+// RUNNING task with an UNHEALTHY container health check is broken outright;
+// a STOPPED task with a non-UserInitiated stop code is broken; any other
+// STOPPED task is a normal, dim lifecycle stop; everything else falls
+// through to the shared transitional-state findings.
 func ecsTaskStructuralFindings(status, stopCode, healthStatus string) []domain.Finding {
 	// Compared case-insensitively because this predicate also runs over rows
-	// rebuilt from the on-disk type cache, and a row cached before the health
-	// column moved to words still holds the SDK's uppercase spelling. Reading
-	// it strictly would retire the finding on exactly those rows: the cell
-	// would say the task is unhealthy while the row coloured green.
+	// rebuilt from the on-disk type cache, which may hold the SDK's uppercase
+	// spelling. Reading it strictly would drop the finding on those rows: the
+	// cell would say the task is unhealthy while the row coloured green.
 	if strings.EqualFold(healthStatus, string(ecstypes.HealthStatusUnhealthy)) {
 		return []domain.Finding{wave1Finding(CodeECSTaskHealthUnhealthy)}
 	}

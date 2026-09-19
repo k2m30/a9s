@@ -36,10 +36,10 @@ const (
 	// SelectorBody.Items), so template index == controller index by
 	// definition; the controller does not need to replay cursor-movement
 	// semantics (e.g. the menu's skip-unavailable stepping) to reach it.
-	// Used by the web UI's row/entry click path, replacing a move-top +
-	// N×move-down + select round-trip chain that could land on the wrong
-	// row whenever cursor movement skips entries (e.g. the main menu's
-	// confirmed-empty resource types).
+	// Used by the web UI's row/entry click path: a move-top + N×move-down +
+	// select round-trip chain would land on the wrong row whenever cursor
+	// movement skips entries (e.g. the main menu's confirmed-empty resource
+	// types).
 	ActionSelectIndex ActionKind = "select-index"
 
 	ActionOpenDetail   ActionKind = "open-detail"
@@ -114,7 +114,7 @@ const (
 
 	// Cost Explorer screen actions. Cursor movement reuses ActionMoveUp/Down
 	// (row axis) and ActionScrollLeft/Right (time-column axis); Enter/Esc
-	// reuse ActionSelect/ActionBack (data-model.md).
+	// reuse ActionSelect/ActionBack.
 	ActionCostZoomIn  ActionKind = "cost-zoom-in"  // +/=
 	ActionCostZoomOut ActionKind = "cost-zoom-out" // -/_
 	ActionCostMetric  ActionKind = "cost-metric"   // b — cycle display metric

@@ -98,7 +98,6 @@ func FetchS3BucketsPageWithNotifications(
 		resources = append(resources, r)
 	}
 
-	// Build pagination metadata
 	nextToken := ""
 	isTruncated := false
 	if output.ContinuationToken != nil && *output.ContinuationToken != "" {
@@ -197,7 +196,6 @@ func FetchS3Objects(ctx context.Context, api S3ListObjectsV2API, bucket, prefix 
 
 	var resources []resource.Resource
 
-	// Add folders (CommonPrefixes) first
 	for _, cp := range output.CommonPrefixes {
 		folderKey := ""
 		if cp.Prefix != nil {
@@ -223,7 +221,6 @@ func FetchS3Objects(ctx context.Context, api S3ListObjectsV2API, bucket, prefix 
 		resources = append(resources, r)
 	}
 
-	// Add files (Contents)
 	for _, obj := range output.Contents {
 		objKey := ""
 		if obj.Key != nil {

@@ -130,8 +130,8 @@ func FetchKMSKeysPage(ctx context.Context, c *ServiceClients, continuationToken 
 // plus any failures encountered (a ListAliases error, or
 // a Truncated=true response with no NextMarker — which would otherwise
 // restart the page-1 fetch forever). Shared by FetchKMSKeysPage and
-// FetchKMSKeysByIDs so a future contract tweak (retry policy, the
-// no-marker guard) is applied to both callers, not just one.
+// FetchKMSKeysByIDs so both apply the same retry policy and no-marker
+// guard.
 func buildKMSAliasMap(ctx context.Context, c *ServiceClients) (map[string][]string, []Failure) {
 	var failures []Failure
 	aliasMap := make(map[string][]string)

@@ -133,7 +133,7 @@ func (s *ruleSetStore) GetOrFetch(ctx context.Context, fetcher func(context.Cont
 			// set is later activated. A typed nil pointer (e.g.
 			// (*DescribeActiveReceiptRuleSetOutput)(nil) wrapped in any) must
 			// also be treated as absent — a non-nil interface holding a nil
-			// pointer is not nil under ==. See PIN 5 regression test.
+			// pointer is not nil under ==.
 			return nil, nil
 		}
 		// Only commit the value if the store has not been cleared since we

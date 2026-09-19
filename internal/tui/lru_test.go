@@ -12,7 +12,7 @@ import (
 
 // testResults returns a non-nil slice of session.RelatedCacheResult for use
 // as a cache value. The result carries exactly count synthetic IDs so
-// Result.Count() == count, matching this helper's old Count-literal behavior.
+// Result.Count() == count.
 func testResults(count int) []session.RelatedCacheResult {
 	ids := make([]string, count)
 	for i := range ids {
@@ -49,7 +49,6 @@ func TestRelatedCacheLRU_LRUEviction(t *testing.T) {
 	c.Set("b", testResults(2))
 	c.Set("c", testResults(3))
 
-	// Access "a" to make it the most recently used.
 	if _, ok := c.Get("a"); !ok {
 		t.Fatal("expected 'a' to exist before eviction test")
 	}

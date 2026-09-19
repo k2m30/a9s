@@ -34,4 +34,4 @@ const (
 	CodeASGNoELBHealthCheck domain.FindingCode = "asg.no-elb-health-check"
 )
 
-// S5 operator sentences for the codes above.
+// Operator sentences for the codes above.

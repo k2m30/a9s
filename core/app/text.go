@@ -154,7 +154,6 @@ func TextSearchMatches(lines []string, query string) []SearchMatch {
 func buildTextBody(ts *TextState) *TextBody {
 	matches := ts.searchMatches()
 
-	// Clamp SearchCursor to valid range.
 	cursor := ts.SearchCursor
 	if len(matches) == 0 {
 		cursor = 0
@@ -193,7 +192,7 @@ func (c *Controller) TextFrameTitle() string {
 
 // ErrorHistoryLines formats the controller's session error history as
 // display lines, newest-first, "[HH:MM:SS] message" per entry — matching the
-// format the TUI's error-log viewer (! key) has always shown. Used to seed
+// format the TUI's error-log viewer (! key) shows. Used to seed
 // ScreenErrorLog's TextState via EnsureTextState so the error-log screen
 // renders from Snapshot().Body.Text like every other ctrl-backed text screen,
 // with the controller's errorHistory as the single source of truth — see the

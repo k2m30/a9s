@@ -22,7 +22,7 @@ import (
 )
 
 // checkRoleEKS scans the eks cluster cache for clusters whose RoleArn matches this
-// role's ARN or name. Pattern C.
+// role's ARN or name.
 func checkRoleEKS(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	roleName := res.ID
 	roleARN := ""
@@ -247,15 +247,14 @@ func checkRolePolicy(ctx context.Context, clients any, res resource.Resource, _ 
 
 // checkRoleEC2 scans the EC2 instance cache for instances whose IamInstanceProfile
 // ARN last segment (the profile name) equals this role's name — the common
-// one-profile-per-role convention (docs/resources/role.md §2 ec2). This is an
+// one-profile-per-role convention (docs/resources/role.md). This is an
 // exact-boundary match, not a substring match: "my-role" must not match a
 // profile named "my-role-2". Profiles whose name differs from the role name
-// (EKS/ASG-generated profiles) are not resolved here — that would require a
+// (EKS/ASG-generated profiles) match nothing: resolving them needs a
 // per-profile iam:GetInstanceProfile fan-out across all distinct profile ARNs
-// in the ec2 cache, which is out of the zero/one-call budget this checker is
-// scoped to; see checkEC2Role (ec2_related.go) for the reverse direction,
-// which resolves the same ambiguity per-instance with a bounded single call.
-// Pattern C: cache scan with exact-name approximation.
+// in the ec2 cache, outside the zero/one-call budget this checker is
+// scoped to; checkEC2Role (ec2_related.go) resolves the reverse direction
+// per-instance with a bounded single call.
 func checkRoleEC2(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	roleName := res.ID
 	if roleName == "" {

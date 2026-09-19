@@ -51,8 +51,7 @@ const (
 	WarnDbcNoBkpMaintARN = "arn:aws:rds:us-east-1:123456789012:cluster:warn-dbc-no-bkp-plus-maint"
 
 	// ProdDBCSnapAuroraID — Aurora cluster snapshot for prod-aurora-cluster.
-	// Imported by tests/integration/scenario_related_drill_through_test.go as
-	// the dbc-snap graph-root: drilling its dbc back-pivot lands on
+	// The dbc-snap graph root: drilling its dbc back-pivot lands on
 	// prod-aurora-cluster (the Aurora dbc graph-root).
 	ProdDBCSnapAuroraID  = "rds:prod-aurora-cluster-2026-04-15"
 	ProdDBCSnapAuroraARN = "arn:aws:rds:us-east-1:123456789012:cluster-snapshot:rds:prod-aurora-cluster-2026-04-15"
@@ -62,50 +61,45 @@ const (
 	ProdDBCSnapDocDBID  = "rds:acme-docdb-prod-2026-03-20"
 	ProdDBCSnapDocDBARN = "arn:aws:rds:us-east-1:123456789012:cluster-snapshot:rds:acme-docdb-prod-2026-03-20"
 
-	// WarnDBCSnapCopyingID is the witness for dbc-snap.warn.transitional: a
+	// WarnDBCSnapCopyingID carries dbc-snap.warn.transitional: a
 	// state the predicate does not enumerate and cannot restore from yet.
 	WarnDBCSnapCopyingID  = "acme-docdb-prod-snap-copying"
 	WarnDBCSnapCopyingARN = "arn:aws:rds:us-east-1:123456789012:cluster-snapshot:acme-docdb-prod-snap-copying"
 
 	// WarnDBCSnapOrphanID — orphan: parent cluster NOT in dbc list.
-	// Pins the SnapshotCrossRef helper's orphan rule for dbc-snap.
 	WarnDBCSnapOrphanID  = "orphan-deleted-cluster-snap"
 	WarnDBCSnapOrphanARN = "arn:aws:rds:us-east-1:123456789012:cluster-snapshot:orphan-deleted-cluster-snap"
 
 	// WarnDBCSnapPastRetentionID — automated snapshot 30 days old whose
 	// parent cluster (ProdDbcID = acme-docdb-prod, BackupRetentionPeriod=7)
-	// is in the dbc cache. Pins the past-retention rule on dbc-snap.
+	// is in the dbc cache, so the past-retention rule fires.
 	WarnDBCSnapPastRetentionID  = "rds:dbc-retention-test"
 	WarnDBCSnapPastRetentionARN = "arn:aws:rds:us-east-1:123456789012:cluster-snapshot:rds:dbc-retention-test"
 
 	// WarnDBCSnapFailedAndManualOldID — failed AND manual >365d AND parent
-	// missing → stacks 3 Wave-1 phrases. Pins the dbc-snap fetcher Issues
-	// contract; the merged "(+N)" display is composed at render time by
-	// domain.StatusPhrase.
+	// missing → stacks 3 Wave-1 phrases; the merged "(+N)" display is
+	// composed at render time by domain.StatusPhrase.
 	WarnDBCSnapFailedAndManualOldID  = "broken-dbc-snap-failed-manual-old"
 	WarnDBCSnapFailedAndManualOldARN = "arn:aws:rds:us-east-1:123456789012:cluster-snapshot:broken-dbc-snap-failed-manual-old"
 
 	// WarnDBCSnapIncompatibleRestoreID — Status=incompatible-restore
-	// (Broken precedence). Pins the dbc-snap incompatible-* signal.
+	// (Broken precedence).
 	WarnDBCSnapIncompatibleRestoreID  = "broken-dbc-snap-incompat-restore"
 	WarnDBCSnapIncompatibleRestoreARN = "arn:aws:rds:us-east-1:123456789012:cluster-snapshot:broken-dbc-snap-incompat-restore"
 
-	// WarnDBCSnapUnencryptedID — available + StorageEncrypted=false. Pins
-	// CodeDBCSnapUnencrypted — the OWNER BUG fix: docdb-cluster-dev-style
-	// automated snapshots that are unencrypted must carry a wave1 Finding
-	// (colorDBCSnap no longer classifies Warning from Fields["storage_encrypted"]
-	// directly; the finding is the only path to the yellow row + cause phrase).
+	// WarnDBCSnapUnencryptedID — available + StorageEncrypted=false. An
+	// unencrypted automated snapshot carries CodeDBCSnapUnencrypted; the
+	// finding is the only path to the yellow row + cause phrase.
 	WarnDBCSnapUnencryptedID  = "unenc-docdb-cluster-dev-snap"
 	WarnDBCSnapUnencryptedARN = "arn:aws:rds:us-east-1:123456789012:cluster-snapshot:unenc-docdb-cluster-dev-snap"
 
-	// WarnDBCSnapManualUnusedID — available + manual + age > 365d. Pins
-	// CodeDBCSnapManualUnused firing on its own (unlike
+	// WarnDBCSnapManualUnusedID — available + manual + age > 365d. Raises
+	// CodeDBCSnapManualUnused on its own (unlike
 	// WarnDBCSnapFailedAndManualOldID, whose Status=failed early-return
-	// suppresses the manual-age check per computeDBCSnapFindings §0.1).
+	// suppresses the manual-age check in computeDBCSnapFindings).
 	WarnDBCSnapManualUnusedID  = "manual-forgotten-dbc-snap"
 	WarnDBCSnapManualUnusedARN = "arn:aws:rds:us-east-1:123456789012:cluster-snapshot:manual-forgotten-dbc-snap"
 
-	// shared internal constants
 	dbcKMSKeyID = "arn:aws:kms:us-east-1:123456789012:key/a1b2c3d4-5678-90ab-cdef-111111111111"
 	dbcSGID     = "sg-0ccc333333333333c"
 	dbcVPCID    = "vpc-0abc123def456789a"
@@ -162,7 +156,7 @@ func dbcBaseline(id string) docdbtypes.DBCluster {
 
 // normalizeDocDBClusterPosture forces every DocumentDB cluster to the healthy
 // value for the two posture predicates the DocDB SDK carries. The dbc posture
-// witnesses live on the Aurora side (rds.go), where all four fields exist, so
+// carriers live on the Aurora side (rds.go), where all four fields exist, so
 // no DocumentDB row should carry one of these findings.
 func normalizeDocDBClusterPosture(cs []docdbtypes.DBCluster) []docdbtypes.DBCluster {
 	out := make([]docdbtypes.DBCluster, len(cs))
@@ -175,7 +169,7 @@ func normalizeDocDBClusterPosture(cs []docdbtypes.DBCluster) []docdbtypes.DBClus
 }
 
 func buildDBCClusters() []docdbtypes.DBCluster {
-	// 1. acme-docdb-prod — Healthy baseline: every §2 pivot returns ≥1 row.
+	// acme-docdb-prod — Healthy baseline: every related pivot returns ≥1 row.
 	prod := dbcBaseline(ProdDbcID)
 	prod.DBClusterArn = aws.String(ProdDbcARN)
 	prod.DBClusterMembers = []docdbtypes.DBClusterMember{
@@ -188,13 +182,11 @@ func buildDBCClusters() []docdbtypes.DBCluster {
 	}
 	prod.ClusterCreateTime = aws.Time(mustTime("2025-04-15T10:20:00Z"))
 
-	// 2. warn-dbc-modifying — Status=modifying; all else healthy.
 	modifying := dbcBaseline("warn-dbc-modifying")
 	modifying.Status = aws.String("modifying")
 	modifying.EngineVersion = aws.String("4.0.0")
 	modifying.ClusterCreateTime = aws.Time(mustTime("2025-11-05T08:30:00Z"))
 
-	// 3. broken-dbc-failed — Status=failed.
 	failed := dbcBaseline("broken-dbc-failed")
 	failed.Status = aws.String("failed")
 	failed.DBClusterMembers = []docdbtypes.DBClusterMember{}
@@ -202,17 +194,14 @@ func buildDBCClusters() []docdbtypes.DBCluster {
 	failed.BackupRetentionPeriod = aws.Int32(1)
 	failed.ClusterCreateTime = aws.Time(mustTime("2026-04-10T12:00:00Z"))
 
-	// 4. broken-dbc-enc-unreachable — Status=inaccessible-encryption-credentials.
 	encUnreachable := dbcBaseline("broken-dbc-enc-unreachable")
 	encUnreachable.Status = aws.String("inaccessible-encryption-credentials")
 	encUnreachable.ClusterCreateTime = aws.Time(mustTime("2026-01-15T09:00:00Z"))
 
-	// 5. broken-dbc-incompat-params — Status=incompatible-parameters.
 	incompatParams := dbcBaseline("broken-dbc-incompat-params")
 	incompatParams.Status = aws.String("incompatible-parameters")
 	incompatParams.ClusterCreateTime = aws.Time(mustTime("2025-12-20T14:00:00Z"))
 
-	// 6. broken-dbc-no-writer — available, two readers, zero writers.
 	noWriter := dbcBaseline("broken-dbc-no-writer")
 	noWriter.Status = aws.String("available")
 	noWriter.DeletionProtection = aws.Bool(false)
@@ -223,23 +212,19 @@ func buildDBCClusters() []docdbtypes.DBCluster {
 	}
 	noWriter.ClusterCreateTime = aws.Time(mustTime("2025-09-01T08:00:00Z"))
 
-	// 7. warn-dbc-no-prot — available, writer, encrypted, retention=7, DeletionProtection=false.
 	noProt := dbcBaseline("warn-dbc-no-prot")
 	noProt.DeletionProtection = aws.Bool(false)
 	noProt.ClusterCreateTime = aws.Time(mustTime("2025-07-10T11:00:00Z"))
 
-	// 8. warn-dbc-unenc — available, writer, retention=7, DeletionProtection=true, StorageEncrypted=false.
 	unenc := dbcBaseline("warn-dbc-unenc")
 	unenc.StorageEncrypted = aws.Bool(false)
 	unenc.KmsKeyId = nil
 	unenc.ClusterCreateTime = aws.Time(mustTime("2025-08-20T16:45:00Z"))
 
-	// 9. warn-dbc-no-bkp — available, writer, encrypted, DeletionProtection=true, BackupRetentionPeriod=0.
 	noBkp := dbcBaseline("warn-dbc-no-bkp")
 	noBkp.BackupRetentionPeriod = aws.Int32(0)
 	noBkp.ClusterCreateTime = aws.Time(mustTime("2025-06-01T10:00:00Z"))
 
-	// 10. warn-dbc-multi — available, writer, StorageEncrypted=false + DeletionProtection=false + BackupRetentionPeriod=0.
 	// Expected Status="delete-protection off (+2)".
 	multi := dbcBaseline("warn-dbc-multi")
 	multi.StorageEncrypted = aws.Bool(false)
@@ -248,12 +233,12 @@ func buildDBCClusters() []docdbtypes.DBCluster {
 	multi.BackupRetentionPeriod = aws.Int32(0)
 	multi.ClusterCreateTime = aws.Time(mustTime("2025-05-15T09:00:00Z"))
 
-	// 11. healthy-dbc-maint-overdue — healthy baseline; paired with overdue maintenance action.
+	// healthy-dbc-maint-overdue — healthy baseline; paired with overdue maintenance action.
 	maintOverdue := dbcBaseline(MaintDbcOverdueID)
 	maintOverdue.DBClusterArn = aws.String(MaintDbcOverdueARN)
 	maintOverdue.ClusterCreateTime = aws.Time(mustTime("2025-03-01T12:00:00Z"))
 
-	// 12. warn-dbc-no-bkp-plus-maint — Wave-1 no-bkp + overdue maintenance.
+	// warn-dbc-no-bkp-plus-maint — Wave-1 no-bkp + overdue maintenance.
 	noBkpPlusMaint := dbcBaseline(WarnDbcNoBkpMaintID)
 	noBkpPlusMaint.DBClusterArn = aws.String(WarnDbcNoBkpMaintARN)
 	noBkpPlusMaint.BackupRetentionPeriod = aws.Int32(0)
@@ -313,7 +298,6 @@ func buildDBCSnapshots() []docdbtypes.DBClusterSnapshot {
 			VpcId:                       aws.String(dbcVPCID),
 		},
 		// Orphan snapshot — parent cluster "deleted-legacy-cluster" NOT in dbc list.
-		// Pins the SnapshotCrossRef helper orphan rule for dbc-snap.
 		{
 			DBClusterSnapshotIdentifier: aws.String(WarnDBCSnapOrphanID),
 			DBClusterIdentifier:         aws.String("deleted-legacy-cluster"),
@@ -422,9 +406,8 @@ func buildDBCSnapshots() []docdbtypes.DBClusterSnapshot {
 			VpcId:                       aws.String(dbcVPCID),
 		},
 		// WarnDBCSnapUnencryptedID — available, automated, StorageEncrypted=false.
-		// Pins CodeDBCSnapUnencrypted: the OWNER BUG fixture — an automated
-		// snapshot with no other Wave-1 signal must still carry a Finding so
-		// the yellow row shows a cause phrase.
+		// An automated snapshot with no other Wave-1 signal still carries
+		// CodeDBCSnapUnencrypted, so the yellow row shows a cause phrase.
 		{
 			DBClusterSnapshotIdentifier: aws.String(WarnDBCSnapUnencryptedID),
 			DBClusterIdentifier:         aws.String(ProdDbcID),
@@ -438,8 +421,8 @@ func buildDBCSnapshots() []docdbtypes.DBClusterSnapshot {
 			StorageEncrypted:            aws.Bool(false),
 			VpcId:                       aws.String(dbcVPCID),
 		},
-		// WarnDBCSnapManualUnusedID — available, manual, 400d old. Pins
-		// CodeDBCSnapManualUnused firing standalone (Status stays "available",
+		// WarnDBCSnapManualUnusedID — available, manual, 400d old. Raises
+		// CodeDBCSnapManualUnused alone (Status stays "available",
 		// so it is not suppressed by the Broken-precedence early return).
 		{
 			DBClusterSnapshotIdentifier: aws.String(WarnDBCSnapManualUnusedID),
@@ -488,9 +471,8 @@ func buildDBCSubnetGroups() []docdbtypes.DBSubnetGroup {
 	}
 }
 
-// buildDBCPendingMaintenance returns ResourcePendingMaintenanceActions entries for:
-//   - healthy-dbc-maint-overdue: os-upgrade, AutoAppliedAfterDate 2026-03-15 (past)
-//   - warn-dbc-no-bkp-plus-maint: system-update, AutoAppliedAfterDate 2026-03-10 (past)
+// buildDBCPendingMaintenance returns overdue pending maintenance for
+// healthy-dbc-maint-overdue and warn-dbc-no-bkp-plus-maint.
 func buildDBCPendingMaintenance() []docdbtypes.ResourcePendingMaintenanceActions {
 	overdueDate := time.Date(2026, 3, 15, 0, 0, 0, 0, time.UTC)
 	noBkpDate := time.Date(2026, 3, 10, 0, 0, 0, 0, time.UTC)

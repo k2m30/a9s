@@ -10,9 +10,9 @@ import (
 	backuptypes "github.com/aws/aws-sdk-go-v2/service/backup/types"
 )
 
-// Exported plan IDs and ARNs — referenced by QA tests and sibling fixtures by symbol.
+// Exported plan IDs and ARNs — referenced by tests and sibling fixtures by symbol.
 const (
-	// plan-healthy-daily (replaces legacy acme-daily-backup)
+	// plan-healthy-daily
 	HealthyDailyPlanID  = "11111111-1111-1111-1111-111111111111"
 	HealthyDailyPlanARN = "arn:aws:backup:us-east-1:123456789012:backup-plan:11111111-1111-1111-1111-111111111111"
 
@@ -24,7 +24,7 @@ const (
 	ProdCriticalPlanID  = "33333333-3333-3333-3333-333333333333"
 	ProdCriticalPlanARN = "arn:aws:backup:us-east-1:123456789012:backup-plan:33333333-3333-3333-3333-333333333333"
 
-	// plan-broken-2failed (graph-root for U9 — every count-shown:yes pivot must resolve ≥1)
+	// plan-broken-2failed (graph root: every related pivot resolves ≥1)
 	ProdDatabasePlanID  = "44444444-4444-4444-4444-444444444444"
 	ProdDatabasePlanARN = "arn:aws:backup:us-east-1:123456789012:backup-plan:44444444-4444-4444-4444-444444444444"
 
@@ -36,36 +36,35 @@ const (
 	AppDataPlanID  = "66666666-6666-6666-6666-666666666666"
 	AppDataPlanARN = "arn:aws:backup:us-east-1:123456789012:backup-plan:66666666-6666-6666-6666-666666666666"
 
-	// plan-broken-mixed (U7d — ! beats ~)
+	// plan-broken-mixed (! beats ~)
 	ComplianceMixedPlanID  = "77777777-7777-7777-7777-777777777777"
 	ComplianceMixedPlanARN = "arn:aws:backup:us-east-1:123456789012:backup-plan:77777777-7777-7777-7777-777777777777"
 
-	// plan-old-failure (window-exclusion test — job is 48h+ old)
+	// plan-old-failure (its job is 48h+ old, outside the window)
 	DevSporadicPlanID  = "88888888-8888-8888-8888-888888888888"
 	DevSporadicPlanARN = "arn:aws:backup:us-east-1:123456789012:backup-plan:88888888-8888-8888-8888-888888888888"
 
 	// plan-fleet-wide selects every volume, database, cluster and table by
-	// wildcard and names the coverage witnesses in its exclusions, so
+	// wildcard and excludes the uncovered resources by name, so
 	// "not covered by a backup plan" has exactly one carrier per type.
 	FleetWidePlanID  = "99999999-9999-9999-9999-999999999999"
 	FleetWidePlanARN = "arn:aws:backup:us-east-1:123456789012:backup-plan:99999999-9999-9999-9999-999999999999"
 
-	// Vault names
 	BackupDefaultVaultName = "acme-default-vault"
 	BackupProdVaultName    = "acme-prod-vault"
 
-	// KMS key for acme-prod-vault — must exist in kms.go (sibling edit).
+	// KMS key for acme-prod-vault — must exist in kms.go.
 	// DescribeBackupVault("acme-prod-vault").EncryptionKeyArn uses this ARN;
 	// the KMS checker extracts the key ID (last "/" segment = BackupProdVaultKMSKeyID).
 	BackupProdVaultKMSKeyID  = "acme-prod-master-key"
 	BackupProdVaultKMSKeyARN = "arn:aws:kms:us-east-1:123456789012:key/acme-prod-master-key"
 
-	// SNS topic for acme-prod-vault notifications — must exist in sns.go (sibling edit).
+	// SNS topic for acme-prod-vault notifications — must exist in sns.go.
 	// GetBackupVaultNotifications("acme-prod-vault").SNSTopicArn points here.
 	BackupAlertsSNSTopicName = "acme-backup-alerts"
 	BackupAlertsSNSTopicARN  = "arn:aws:sns:us-east-1:123456789012:acme-backup-alerts"
 
-	// IAM role for backup selections on broken plans — must exist in iam.go (sibling edit).
+	// IAM role for backup selections on broken plans — must exist in iam.go.
 	// checkBackupRole extracts "AcmeBackupRoleProd" as the last "/" segment.
 	AcmeBackupRoleARN = "arn:aws:iam::123456789012:role/AcmeBackupRoleProd"
 )
@@ -119,8 +118,6 @@ func buildBackupRecoveryPoints() map[string][]backuptypes.RecoveryPointByResourc
 			},
 		},
 		// orders-prod DynamoDB table recovery point (checkDdbBackup pivot).
-		// The current checkDdbBackup calls ListRecoveryPointsByResource; after phase-7
-		// rewrites it to a cache scan, this entry remains as belt-and-suspenders.
 		OrdersProdARN: {
 			{
 				RecoveryPointArn: aws.String("arn:aws:backup:us-east-1:123456789012:recovery-point:rp-ddb-weekly-20260420"),
@@ -161,12 +158,10 @@ func buildBackupRecoveryPoints() map[string][]backuptypes.RecoveryPointByResourc
 		},
 		// dbi-snap pivot — required for the dbi-snap→backup related-panel pivot.
 		// checkDBISnapBackup calls ListRecoveryPointsByResource(ResourceArn=res.Fields["arn"]).
-		// The graph-root ProdDBISnapARN gets 1 recovery point. BackupCoveredDBISnapARN
-		// gets 2 to validate the universal ≥1 contract independently of graph-root.
-		// Per §9.3 structural exemption: dbi-snap pivots are 1:1 by AWS data model
-		// (a snapshot has exactly one source instance, one encryption key, and at
-		// most zero clusters since Aurora cluster snapshots live in dbc-snap), so
-		// the universal "≥50% Count ≥ 2" relaxation is unsatisfiable for this type.
+		// ProdDBISnapARN gets 1 recovery point, BackupCoveredDBISnapARN gets 2.
+		// dbi-snap pivots are 1:1 by AWS data model: a snapshot has exactly one
+		// source instance and one encryption key, and Aurora cluster snapshots
+		// live in dbc-snap.
 		ProdDBISnapARN: {
 			{
 				RecoveryPointArn: aws.String("arn:aws:backup:us-east-1:123456789012:recovery-point:rp-rds1-daily-20260415"),
@@ -243,7 +238,6 @@ func buildBackupPlanRules() map[string][]backuptypes.BackupRule {
 func buildBackupVaultEncryptionKeys() map[string]string {
 	return map[string]string{
 		BackupProdVaultName: BackupProdVaultKMSKeyARN,
-		// BackupDefaultVaultName intentionally absent — no customer-managed key.
 	}
 }
 
@@ -253,7 +247,6 @@ func buildBackupVaultEncryptionKeys() map[string]string {
 func buildBackupVaultSNSTopics() map[string]string {
 	return map[string]string{
 		BackupProdVaultName: BackupAlertsSNSTopicARN,
-		// BackupDefaultVaultName intentionally absent — no SNS topic configured.
 	}
 }
 
@@ -263,8 +256,7 @@ func buildBackupVaultSNSTopics() map[string]string {
 // Timestamps are computed relative to time.Now() at fixture-construction time
 // so the demo (and the integration scenario harness) always sees jobs inside
 // the enricher's rolling 24h window — no matter what date the test runs on.
-// The plan-old-failure fixture is intentionally 48h old to pin the
-// window-exclusion invariant.
+// The plan-old-failure job is 48h old, outside that window.
 func buildBackupJobs() []backuptypes.BackupJob {
 	now := time.Now()
 	inWindow := func(hoursAgo int) *time.Time {
@@ -285,7 +277,7 @@ func buildBackupJobs() []backuptypes.BackupJob {
 			},
 		},
 
-		// plan-broken-2failed (ProdDatabasePlanID): two failed jobs in window (graph-root U9).
+		// plan-broken-2failed (ProdDatabasePlanID): two failed jobs in window.
 		{
 			BackupJobId:   aws.String("job-44-a"),
 			State:         backuptypes.BackupJobStateFailed,
@@ -381,7 +373,7 @@ func buildBackupJobs() []backuptypes.BackupJob {
 		},
 
 		// plan-old-failure (DevSporadicPlanID): FAILED job 48h+ ago — outside the 24h window.
-		// The enricher must ignore this job (window-exclusion test).
+		// The enricher ignores this job.
 		{
 			BackupJobId:   aws.String("job-88-a"),
 			State:         backuptypes.BackupJobStateFailed,
@@ -400,9 +392,9 @@ func buildBackupJobs() []backuptypes.BackupJob {
 // The fetcher reads Resources to populate Fields["resources"] for sibling pivots (s3, efs).
 func buildBackupSelections() map[string][]backuptypes.BackupSelection {
 	return map[string][]backuptypes.BackupSelection{
-		// plan-healthy-daily: selects healthy S3 bucket, the legacy shared
+		// plan-healthy-daily: selects healthy S3 bucket, the shared
 		// EFS, the graph-root EFS (ProdEFSARN), and the orders-prod DynamoDB
-		// table — preserves s3→backup, efs→backup, and ddb→backup pivots via
+		// table — backs the s3→backup, efs→backup, and ddb→backup pivots via
 		// cache scan of Fields["resources"]. Also includes the Aurora parent DB
 		// (ProdDbiAuroraARN) so the dbi-snap→backup pivot resolves Count ≥ 2
 		// for snapshots whose parent is that DB (this plan + ProdDatabasePlanID
@@ -419,12 +411,12 @@ func buildBackupSelections() map[string][]backuptypes.BackupSelection {
 					OrdersProdARN,
 					ProdDbiAuroraARN,
 					// vol-0a1b2c3d4e5f60001 is the EBS volume whose
-					// AWS-Backup-created snapshot witnesses the ebs-snap:backup
+					// AWS-Backup-created snapshot backs the ebs-snap:backup
 					// related-panel pivot (ec2.go snapshot fixture).
 					"arn:aws:ec2:us-east-1:123456789012:volume/vol-0a1b2c3d4e5f60001",
 				},
 				// ListOfTags — tag-based selection required for the ec2:backup
-				// and ebs:backup related-panel pivot witnesses. Matches the
+				// and ebs:backup related-panel pivots. Matches the
 				// backup=daily tag on i-0a1b2c3d4e5f60001 (ec2.go) and its
 				// root volume vol-0a1b2c3d4e5f60001 (ec2.go).
 				ListOfTags: []backuptypes.Condition{
@@ -447,7 +439,7 @@ func buildBackupSelections() map[string][]backuptypes.BackupSelection {
 		},
 
 		// plan-broken-2failed (graph-root for backup; also covers dbi-snap and
-		// dbc-snap pivots): uses AcmeBackupRoleProd — role pivot resolves ≥1 on U9.
+		// dbc-snap pivots): uses AcmeBackupRoleProd, so the role pivot resolves ≥1.
 		// Resources covers the dbi-snap parent DBs (ProdDbiID + ProdDbiAuroraID)
 		// AND the dbc-snap parent clusters (ProdDbcARN + Aurora cluster ARN), so
 		// every snapshot whose parent is one of those resources gets the backup
@@ -467,9 +459,8 @@ func buildBackupSelections() map[string][]backuptypes.BackupSelection {
 		},
 
 		// plan-fleet-wide: one wildcard selection per service the coverage
-		// join reads, minus the four resources that witness the finding. It is
-		// what makes every other demo row explicitly covered rather than
-		// accidentally so.
+		// join reads, minus the four uncovered resources, so every other demo
+		// resource is covered by a plan.
 		FleetWidePlanID: {
 			{
 				SelectionName: aws.String("acme-fleet-wide-selection"),
@@ -508,8 +499,7 @@ func buildBackupSelections() map[string][]backuptypes.BackupSelection {
 		},
 
 		// plan-broken-mixed: uses AcmeBackupRoleProd. Also selects the
-		// graph-root EFS so efs→backup resolves to ≥2 plans (U9 ≥50%
-		// Count>=2 requirement).
+		// graph-root EFS so efs→backup resolves to ≥2 plans.
 		ComplianceMixedPlanID: {
 			{
 				SelectionName: aws.String("acme-compliance-mixed-selection"),
@@ -533,8 +523,6 @@ func buildBackupSelections() map[string][]backuptypes.BackupSelection {
 }
 
 // NewBackupFixtures constructs BackupFixtures from the canonical demo data.
-// Every plan in the impl-plan §2 is represented here; adversarial fixtures
-// (nil CreatedBy, nil CreationDate, API errors) stay inline in QA test files.
 var sharedBackupFixtures = sync.OnceValue(func() *BackupFixtures {
 	return &BackupFixtures{
 		RecoveryPoints:      buildBackupRecoveryPoints(),
@@ -570,7 +558,7 @@ var sharedBackupFixtures = sync.OnceValue(func() *BackupFixtures {
 				},
 			},
 
-			// plan-never-ran: no jobs ever → Healthy (spec §4 "never run is also Healthy").
+			// plan-never-ran: no jobs ever → Healthy.
 			{
 				BackupPlanName:   aws.String("acme-newly-created"),
 				BackupPlanId:     aws.String(NeverRanPlanID),
@@ -578,7 +566,6 @@ var sharedBackupFixtures = sync.OnceValue(func() *BackupFixtures {
 				CreationDate:     aws.Time(mustParseBackupTime("2026-04-22T18:00:00Z")),
 				VersionId:        aws.String("v1"),
 				CreatorRequestId: aws.String("acme-newly-created-init"),
-				// LastExecutionDate intentionally nil — never ran.
 			},
 
 			// plan-broken-1failed: one FAILED job in window → !.
@@ -606,7 +593,7 @@ var sharedBackupFixtures = sync.OnceValue(func() *BackupFixtures {
 				CreatorRequestId:  aws.String("acme-prod-database-init"),
 			},
 
-			// plan-broken-aborted: one ABORTED job → ! (ABORTED maps to "failed" bucket per §3.2).
+			// plan-broken-aborted: one ABORTED job → ! (ABORTED counts as failed).
 			{
 				BackupPlanName:    aws.String("acme-staging-hourly"),
 				BackupPlanId:      aws.String(StagingHourlyPlanID),
@@ -628,7 +615,7 @@ var sharedBackupFixtures = sync.OnceValue(func() *BackupFixtures {
 				CreatorRequestId:  aws.String("acme-app-data-init"),
 			},
 
-			// plan-broken-mixed (U7d): FAILED + PARTIAL + COMPLETED → ! beats ~.
+			// plan-broken-mixed: FAILED + PARTIAL + COMPLETED → ! beats ~.
 			{
 				BackupPlanName:    aws.String("acme-compliance-mixed"),
 				BackupPlanId:      aws.String(ComplianceMixedPlanID),

@@ -125,7 +125,6 @@ func FetchLogEvents(ctx context.Context, api CWLogsGetLogEventsAPI, logGroupName
 
 		name := logEventDisplayName(message)
 
-		// Status classification based on message content
 		status := classifyLogEventStatus(message)
 
 		r := resource.Resource{

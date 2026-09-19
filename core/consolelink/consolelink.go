@@ -2,9 +2,7 @@
 
 // Package consolelink builds AWS Management Console deep-link URLs for a9s
 // resources, backing the TUI's "o" (open) / "O" (copy) keys and the web
-// client's equivalent actions. Every URL shape here was live-verified
-// against AWS's own /go/view console resolver (see the resource-spec table
-// this package implements).
+// client's equivalent actions.
 package consolelink
 
 import (

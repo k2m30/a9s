@@ -64,7 +64,6 @@ func (f *DynamoDBFake) DescribeContinuousBackups(_ context.Context, input *dynam
 	if desc, ok := f.fix.ContinuousBackups[name]; ok {
 		return &dynamodb.DescribeContinuousBackupsOutput{ContinuousBackupsDescription: desc}, nil
 	}
-	// Default: PITR ENABLED — no finding emitted.
 	return &dynamodb.DescribeContinuousBackupsOutput{
 		ContinuousBackupsDescription: &ddbtypes.ContinuousBackupsDescription{
 			ContinuousBackupsStatus: ddbtypes.ContinuousBackupsStatusEnabled,

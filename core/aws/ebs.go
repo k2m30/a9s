@@ -43,7 +43,6 @@ func FetchEBSVolumesPage(ctx context.Context, api EC2DescribeVolumesAPI, continu
 			volumeID = *vol.VolumeId
 		}
 
-		// Extract Name from Tags
 		name := ""
 		for _, tag := range vol.Tags {
 			if tag.Key != nil && *tag.Key == "Name" {
@@ -91,7 +90,6 @@ func FetchEBSVolumesPage(ctx context.Context, api EC2DescribeVolumesAPI, continu
 		r := resource.Resource{
 			ID:   volumeID,
 			Name: name,
-			// Status intentionally unset — lifecycle state is emitted as a Finding.
 			Fields: map[string]string{
 				"volume_id":   volumeID,
 				"name":        name,
@@ -112,7 +110,6 @@ func FetchEBSVolumesPage(ctx context.Context, api EC2DescribeVolumesAPI, continu
 		resources = append(resources, r)
 	}
 
-	// Build pagination metadata
 	nextToken := ""
 	isTruncated := false
 	if output.NextToken != nil {
@@ -158,7 +155,6 @@ func FetchEBSSnapshotsPage(ctx context.Context, api EC2DescribeSnapshotsAPI, con
 		resources = append(resources, snapshotToResource(snap))
 	}
 
-	// Build pagination metadata
 	nextToken := ""
 	isTruncated := false
 	if output.NextToken != nil {
@@ -278,7 +274,6 @@ func snapshotToResource(snap ec2types.Snapshot) resource.Resource {
 	r := resource.Resource{
 		ID:   snapshotID,
 		Name: name,
-		// Status intentionally unset — lifecycle state is emitted as a Finding.
 		Fields: map[string]string{
 			"snapshot_id": snapshotID,
 			"name":        name,
@@ -293,9 +288,6 @@ func snapshotToResource(snap ec2types.Snapshot) resource.Resource {
 		RawStruct: snap,
 	}
 
-	// emit canonical Findings for non-healthy snapshot states.
-	// completed → healthy (no Finding). pending → SevWarn.
-	// error / recoverable / recovering → SevBroken.
 	switch snap.State {
 	case ec2types.SnapshotStatePending:
 		r.Findings = []domain.Finding{wave1Finding(CodeEBSSnapStatePending)}

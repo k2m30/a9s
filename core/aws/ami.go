@@ -52,7 +52,6 @@ func FetchAMIsByIDs(ctx context.Context, api EC2DescribeImagesAPI, ids []string)
 		return nil, fmt.Errorf("fetching AMIs by id: %w", err)
 	}
 
-	// Build a set of returned IDs to detect which requested IDs are missing.
 	returned := make(map[string]struct{}, len(out.Images))
 	resources := make([]resource.Resource, 0, len(out.Images))
 	for _, img := range out.Images {
@@ -92,7 +91,6 @@ func FetchAMIsPage(ctx context.Context, api EC2DescribeImagesAPI, continuationTo
 		resources = append(resources, imageResource(img))
 	}
 
-	// Build pagination metadata
 	nextToken := ""
 	isTruncated := false
 	if output.NextToken != nil {
@@ -155,7 +153,6 @@ func imageResource(img ec2types.Image) resource.Resource {
 		public = "true"
 	}
 
-	// Compute deprecated: "yes (Nmo ago)" if past, "soon" if within 90d, "" otherwise
 	deprecated := ""
 	if img.DeprecationTime != nil && *img.DeprecationTime != "" {
 		if t, err := time.Parse(time.RFC3339, *img.DeprecationTime); err == nil {
@@ -177,7 +174,6 @@ func imageResource(img ec2types.Image) resource.Resource {
 	r := resource.Resource{
 		ID:   imageID,
 		Name: name,
-		// Status intentionally unset — lifecycle state is emitted as a Finding.
 		Fields: map[string]string{
 			"image_id":         imageID,
 			"name":             name,

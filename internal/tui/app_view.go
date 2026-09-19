@@ -74,8 +74,8 @@ func (m Model) View() tea.View {
 	case rsKindReveal:
 		content = renderReveal(rs)
 	case rsKindText:
-		// YAML, JSON, and error-log are all ctrl-backed text screens as of
-		// goal-4 wave 4a; content always comes from the controller's TextBody.
+		// YAML, JSON, and error-log are all ctrl-backed text screens;
+		// content always comes from the controller's TextBody.
 		content = renderText(snap.Body.Text, rs)
 	case rsKindSelector:
 		content = renderSelector(snap.Body.Selector, rs)
@@ -90,7 +90,7 @@ func (m Model) View() tea.View {
 	rightContent := m.headerRight()
 	badge := m.accountBadge()
 	role := m.identityRoleName()
-	// §7.4: when stack depth exceeds 4, append "[N]" alongside the version string
+	// When stack depth exceeds 4, append "[N]" alongside the version string
 	// (the depth badge augments the version; it never displaces it).
 	displayVersion := Version
 	if len(m.stack) > 4 {
@@ -125,8 +125,8 @@ func (m Model) View() tea.View {
 		}
 	case rsKindText:
 		// Use the controller footer only when the controller is actually on a
-		// text screen (YAML/JSON/error-log are all ctrl-backed as of goal-4 wave
-		// 4a) — guards against a stale snapshot mid-transition where rs.kind has
+		// text screen (YAML/JSON/error-log are all ctrl-backed) — guards
+		// against a stale snapshot mid-transition where rs.kind has
 		// already switched but snap.Body has not (or vice versa).
 		if rs.ctrlBacked && snap.Body.Kind == app.BodyKindText {
 			if ctrlHints := snap.Footer; len(ctrlHints) > 0 {
@@ -237,7 +237,7 @@ func (m Model) headerRight() string {
 	}
 	if m.flash.active {
 		msg := m.flash.text
-		// Truncate to prevent header wrapping (fixes #84).
+		// Truncate to prevent header wrapping.
 		// The 40 columns reserved for the left side are the account identity:
 		// a9s + version + profile:region + padding. An error is cut to what
 		// remains rather than given the rest of the line — which account the

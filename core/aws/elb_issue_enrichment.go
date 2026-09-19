@@ -132,7 +132,7 @@ func redirectsToHTTPS(listener elbtypes.Listener) bool {
 // would paint every freshly-created, unhardened LB red.
 //
 // Per-LB API failures aggregate into a composite error returned alongside
-// the partial findings (E1–E6 contract). LoadBalancerArn is read from
+// the partial findings. LoadBalancerArn is read from
 // r.Fields["load_balancer_arn"] — the elb fetcher emits ID = bare LB name
 // and stores the ARN in Fields. Each call is wrapped in RetryOnThrottle.
 func EnrichELBAttributes(ctx context.Context, clients *ServiceClients, resources []resource.Resource, _ resource.ResourceCache) (IssueEnricherResult, error) {

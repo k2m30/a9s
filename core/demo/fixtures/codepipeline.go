@@ -58,8 +58,8 @@ var sharedCodePipelineFixtures = sync.OnceValue(func() *CodePipelineFixtures {
 				Updated:      aws.Time(mustParseCPTime("2026-03-10T10:00:00+00:00")),
 			},
 		},
-		// acme-api-deploy is the graph-root pipeline declaration used to
-		// witness every pipeline:* related-panel pivot and the reverse
+		// acme-api-deploy is the graph-root pipeline declaration behind
+		// every pipeline:* related-panel pivot and the reverse
 		// cb:pipeline pivot. RoleArn + Stages/actions reference real sibling
 		// fixtures: acme-ci-deploy-role (iam.go), acme-api-build
 		// (codebuild.go), acme-npm/acme-artifacts (codeartifact.go),

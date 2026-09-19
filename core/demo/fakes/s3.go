@@ -63,10 +63,8 @@ func (f *S3Fake) ListObjectsV2(_ context.Context, input *s3.ListObjectsV2Input, 
 	objs := f.fix.Objects[bucket][prefix]
 	prefixes := f.fix.CommonPrefixes[bucket][prefix]
 
-	// If bucket doesn't exist, return NoSuchBucket.
 	if _, ok := f.fix.Objects[bucket]; !ok {
 		if _, ok2 := f.fix.CommonPrefixes[bucket]; !ok2 {
-			// Check if bucket is in bucket list
 			found := false
 			for _, b := range f.fix.Buckets {
 				if b.Name != nil && *b.Name == bucket {
@@ -133,9 +131,9 @@ func (f *S3Fake) GetBucketLocation(_ context.Context, input *s3.GetBucketLocatio
 //   - Key present, nil value     → return NoSuchPublicAccessBlockConfiguration Smithy error.
 //   - Key absent                 → return all-flags-true output (healthy default).
 //
-// The healthy default for absent keys ensures non-spec buckets (CloudTrail-event
-// fixtures, name-pool fillers) don't noise up the S1 issues badge. Only the 4
-// spec-driven finding fixtures register explicit configs in the map.
+// The healthy default for absent keys keeps buckets that exist for other
+// fixtures (CloudTrail-event fixtures, name-pool fillers) out of the issues
+// badge; only the finding fixtures register explicit configs in the map.
 func (f *S3Fake) GetPublicAccessBlock(_ context.Context, input *s3.GetPublicAccessBlockInput, _ ...func(*s3.Options)) (*s3.GetPublicAccessBlockOutput, error) {
 	if input.Bucket == nil {
 		return nil, fmt.Errorf("GetPublicAccessBlock: bucket name is required")
@@ -265,7 +263,7 @@ func (f *S3Fake) GetBucketLifecycleConfiguration(_ context.Context, input *s3.Ge
 
 // GetBucketPolicyStatus returns AWS's own public/not-public verdict on the
 // bucket policy. Buckets with no entry in PolicyStatuses are not public —
-// the healthy default, so only the witness bucket lights up the finding.
+// the healthy default, so only the fixture bucket registered there lights up the finding.
 func (f *S3Fake) GetBucketPolicyStatus(_ context.Context, input *s3.GetBucketPolicyStatusInput, _ ...func(*s3.Options)) (*s3.GetBucketPolicyStatusOutput, error) {
 	if input.Bucket == nil {
 		return nil, fmt.Errorf("GetBucketPolicyStatus: bucket name is required")

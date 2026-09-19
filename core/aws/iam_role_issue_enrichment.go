@@ -29,7 +29,6 @@ const (
 //   - RoleLastUsed.LastUsedDate is nil OR time.Since(LastUsedDate) > 90 days → "~" finding "dormant role (>90d)"
 //
 // AWS service-linked roles (Path starts with "/aws-service-role/") are skipped.
-// Skip when clients.IAM == nil.
 func EnrichIAMRoleLastUsed(ctx context.Context, clients *ServiceClients, resources []resource.Resource, _ resource.ResourceCache) (IssueEnricherResult, error) {
 	result := IssueEnricherResult{
 		Findings:     make(map[string][]domain.Finding),
@@ -91,8 +90,8 @@ func EnrichIAMRoleLastUsed(ctx context.Context, clients *ServiceClients, resourc
 		}
 	})
 	MarkInformationalOnly(&result)
-	// After MarkInformationalOnly, which owns the aggregate Truncated flag for
-	// this "~"-only enricher: the composite error is a separate answer, and
-	// dropping it told the operator nothing about a refused call.
+	// MarkInformationalOnly owns the aggregate Truncated flag for this
+	// "~"-only enricher; the composite error is a separate answer naming
+	// any refused call.
 	return result, errors.Join(loopErr, AggregateFailures("role last-used", failures, n))
 }

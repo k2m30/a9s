@@ -27,7 +27,7 @@ const (
 // and returns a Finding when key rotation is not enabled.
 // Severity is "~" (informational) — rotation-disabled is an informational
 // finding, not a "!" issue.
-// AWS-managed keys are not asked. A per-key error marks the key not inspected.
+// AWS-managed keys are skipped. A per-key error marks the key not inspected.
 func EnrichKMSRotation(ctx context.Context, clients *ServiceClients, resources []resource.Resource, _ resource.ResourceCache) (IssueEnricherResult, error) {
 	result := IssueEnricherResult{
 		Findings:     make(map[string][]domain.Finding),
@@ -129,8 +129,8 @@ func kmsKeyIsGoingAway(r resource.Resource) bool {
 }
 
 // kmsKeyIsAWSManaged reads KeyManager off the DescribeKey metadata the
-// fetcher stashed. FetchKMSKeysPage filters AWS-managed keys out, but
-// FetchKMSKeysByIDs does not, so a drilled-into key can still arrive here.
+// fetcher stashed. FetchKMSKeysPage filters AWS-managed keys out, while
+// FetchKMSKeysByIDs keeps them, so a drilled-into key can still arrive here.
 func kmsKeyIsAWSManaged(r resource.Resource) bool {
 	meta, ok := r.RawStruct.(kmstypes.KeyMetadata)
 	return ok && meta.KeyManager == kmstypes.KeyManagerTypeAws

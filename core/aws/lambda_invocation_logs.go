@@ -65,7 +65,6 @@ func FetchLambdaInvocationLogs(ctx context.Context, api CWLogsFilterLogEventsAPI
 				ts = formatEpochMillis(*event.Timestamp)
 			}
 
-			// ID: use EventId if available, otherwise generate
 			id := ""
 			if event.EventId != nil {
 				id = *event.EventId
@@ -75,7 +74,6 @@ func FetchLambdaInvocationLogs(ctx context.Context, api CWLogsFilterLogEventsAPI
 
 			name := logEventDisplayName(message)
 
-			// Status classification using shared function from log_events.go
 			status := classifyLogEventStatus(message)
 
 			logStream := ""

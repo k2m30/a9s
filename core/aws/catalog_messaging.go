@@ -333,8 +333,7 @@ var messagingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 	},
 	{
 		// Elastic Beanstalk lives in the MESSAGING category (not compute) so the
-		// main menu's category grouping stays contiguous
-		// (TestQA_MainMenu_CategoryOrderMatchesSpec).
+		// main menu's category grouping stays contiguous.
 		Name:          "Elastic Beanstalk",
 		ShortName:     "eb",
 		Aliases:       []string{"eb", "beanstalk", "elastic-beanstalk"},

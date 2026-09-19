@@ -185,10 +185,6 @@ func (m *Model) pushScreen(v runtime.PushScreen) tea.Cmd {
 // styles.ThemeFromYAML before emitting ApplyThemeIntent + Save task. The
 // adapter parse-error branch below is therefore defensive — under normal
 // flow the bytes are guaranteed to parse.
-//
-// With the renderer-state stack, there are no stored ResourceListModel
-// instances whose style caches need invalidating — transient models are
-// created fresh per render frame, so no cache walk is needed.
 func (m *Model) applyTheme(v runtime.ApplyThemeIntent) tea.Cmd {
 	t, err := styles.ThemeFromYAML(v.Bytes)
 	if err != nil {
@@ -252,7 +248,7 @@ func (m Model) executeTaskCmd(req runtime.TaskRequest) tea.Cmd {
 }
 
 // dispatchTaskRequests is the only task->tea.Cmd translation switch in the
-// TUI adapter: every screen adapter, every ported handler and coreUpdate
+// TUI adapter: every screen adapter, every handler and coreUpdate
 // route their TaskRequests through it, so a task kind's translation rule
 // lives in exactly one place and a kind added here works from every caller.
 //
@@ -263,11 +259,9 @@ func (m Model) executeTaskCmd(req runtime.TaskRequest) tea.Cmd {
 // kinds is never what makes a task dispatchable, so a kind whose payload the
 // adapter does not recognise still runs.
 //
-// KindFetchFiltered is deliberately absent: HandleRelatedNavigate never
-// attaches a payload to that task — the filter clause travels out-of-band on
-// its own NavigationResult, not on the TaskRequest — so it cannot be
-// resolved from tasks alone. relatedNavigateTasksToCmd, the only producer of
-// that kind, resolves it locally before delegating the rest here.
+// KindFetchFiltered is resolved by relatedNavigateTasksToCmd, the only
+// producer of that kind, before it delegates the rest here: the filter clause
+// travels on HandleRelatedNavigate's NavigationResult, not on the TaskRequest.
 func (m Model) dispatchTaskRequests(tasks []runtime.TaskRequest) tea.Cmd {
 	if len(tasks) == 0 {
 		return nil

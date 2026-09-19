@@ -184,8 +184,8 @@ func (m Model) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	}
 
 	// ToggleRelated (r) — show/hide the right-column related panel on detail screens.
-	// Handled here (not delegated to updateActiveRS) because there is no stored
-	// DetailModel on the stack; all right-column state lives directly on the rs.
+	// Handled here (not delegated to updateActiveRS) because all right-column
+	// state lives directly on the rs.
 	if key.Matches(msg, m.keys.ToggleRelated) && rs.kind == rsKindDetail {
 		return m.handleToggleRelated()
 	}

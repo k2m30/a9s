@@ -181,7 +181,7 @@ func costsGetCostAndUsageResponse(fx *fixtures.CostsFixtures, req *http.Request)
 }
 
 // costsGetCostAndUsageWithResourcesResponse serves the resource-level drill
-// (FR-007/FR-008): one bucket per day in the requested range, one group per
+// one bucket per day in the requested range, one group per
 // fixtures.CostsResourceRow registered under every SERVICE the request's
 // filter pins — a service with no registered rows returns an empty (but
 // valid) ResultsByTime, not an error.
@@ -310,7 +310,7 @@ func costsMonthlyResultsByTime(fx *fixtures.CostsFixtures, groupDims []string, e
 	})
 }
 
-// costsDailyResultsByTime is the DAILY-granularity aggregation (FR-018's
+// costsDailyResultsByTime is the DAILY-granularity aggregation (the
 // week/day zoom): every fixture row's monthly Amount is deterministically
 // split across that row's calendar days (costsSplitAmountAcrossDays — equal
 // share with the exact remainder folded into the last day, so a service's

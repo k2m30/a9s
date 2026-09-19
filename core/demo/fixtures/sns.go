@@ -14,8 +14,7 @@ import (
 // publish or subscribe to every principal (sns.public-policy), and SNSNoKMS
 // the one topic with no KmsMasterKeyId (sns.no-kms). Every other topic
 // carries an account-scoped policy and a KMS key.
-// The sns rows are keyed by topic ARN, which is what the list renders and
-// what the witness gate compares against.
+// The sns rows are keyed by topic ARN, which is what the list renders.
 const (
 	SNSPublicPolicy = SNSPublicPolicyARN
 	SNSNoKMS        = SNSNoKMSARN

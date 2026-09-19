@@ -17,11 +17,10 @@ import (
 
 // checkACMCF searches the CloudFront cache for distributions whose viewer
 // certificate ARN matches this ACM certificate's ARN.
-// Pattern C — cache lookup via ViewerCertificate.ACMCertificateArn.
+// Cache lookup via ViewerCertificate.ACMCertificateArn.
 func checkACMCF(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
-	// The acm fetcher sets ID = domain name; the ARN is stored in
-	// Fields["certificate_arn"]. CloudFront's ACMCertificateArn is the
-	// full ARN, so matching must use the ARN, not the bare domain.
+	// CloudFront's ACMCertificateArn is the full ARN, so matching uses the
+	// ARN, not the bare domain.
 	certARN := res.Fields["certificate_arn"]
 	if certARN == "" {
 		// Fall back to RawStruct for callers that pass sparse resources.
@@ -58,7 +57,7 @@ func checkACMCF(ctx context.Context, clients any, res resource.Resource, cache r
 }
 
 // acmCertInUseBy returns the ARNs from acm:DescribeCertificate.InUseBy for
-// this ACM certificate. Pattern C: one API call.
+// this ACM certificate.
 func acmCertInUseBy(ctx context.Context, clients any, res resource.Resource) ([]string, error) {
 	certARN := ""
 	raw, ok := assertStruct[acmtypes.CertificateSummary](res.RawStruct)
@@ -129,7 +128,7 @@ func checkACMAPIGW(ctx context.Context, clients any, res resource.Resource, cach
 }
 
 // checkACMR53 reports Route 53 hosted zones containing DNS validation
-// records for this ACM certificate. Pattern C: one acm:DescribeCertificate
+// records for this ACM certificate. One acm:DescribeCertificate
 // call extracts DomainValidationOptions[].ResourceRecord.Name; then we
 // determine which hosted zone hosts each validation record by matching the
 // record name against cached zones' names (longest suffix match).

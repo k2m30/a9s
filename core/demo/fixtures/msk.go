@@ -10,14 +10,14 @@ import (
 	kafkatypes "github.com/aws/aws-sdk-go-v2/service/kafka/types"
 )
 
-// MSKPublic names the one demo cluster whose brokers are published to the
-// internet (msk.public-access), and MSKUnauthenticated the one cluster
-// accepting clients with no credentials (msk.unauthenticated). Every other
-// cluster keeps public access off and unauthenticated access disabled.
 // MSKBrokerLogGroup is the CloudWatch log group acme-events-prod delivers its
 // broker logs to.
 const MSKBrokerLogGroup = "/aws/msk/acme-events-prod"
 
+// MSKPublic names the one demo cluster whose brokers are published to the
+// internet (msk.public-access), and MSKUnauthenticated the one cluster
+// accepting clients with no credentials (msk.unauthenticated). Every other
+// cluster keeps public access off and unauthenticated access disabled.
 const (
 	MSKPublic          = "msk-public"
 	MSKUnauthenticated = "msk-unauthenticated"
@@ -170,7 +170,7 @@ var sharedMSKFixtures = sync.OnceValue(func() *MSKFixtures {
 				CreationTime:   aws.Time(mustParseMSKTime("2026-03-20T16:00:00+00:00")),
 			},
 			// Issue: State=FAILED → Broken (cluster in unrecoverable failure state).
-			// EncryptionInTransit.ClientBroker=TLS_PLAINTEXT witnesses
+			// EncryptionInTransit.ClientBroker=TLS_PLAINTEXT raises
 			// msk.encryption-not-tls (EnrichMSKCluster: ClientBroker != TLS).
 			{
 				ClusterName:    aws.String("msk-failed"),
@@ -196,7 +196,7 @@ var sharedMSKFixtures = sync.OnceValue(func() *MSKFixtures {
 				},
 			},
 			// Issue: State=REBOOTING_BROKER → Warning (broker maintenance in progress).
-			// CurrentBrokerSoftwareInfo.KafkaVersion=2.6.2 witnesses
+			// CurrentBrokerSoftwareInfo.KafkaVersion=2.6.2 raises
 			// msk.broker-outdated (EnrichMSKCluster: version below 2.8 cutoff).
 			{
 				ClusterName:    aws.String("msk-rebooting"),

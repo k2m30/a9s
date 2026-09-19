@@ -31,14 +31,13 @@ const sdkServicePkgPrefix = "github.com/aws/aws-sdk-go-v2/service/"
 var writeVerbRe = regexp.MustCompile(`^(?:Create|Delete|Update|Put|Modify|Terminate|Stop|Reboot|Execute|Send|Publish|Remove|Start|Cancel|Attach|Detach|Associate|Disassociate|Register|Deregister|Enable|Disable|Restore|Invoke|Revoke|Authorize)[A-Z][A-Za-z0-9]*$`)
 
 // exemptNames are exact method-name matches for local helpers that are not
-// AWS API calls despite matching writeVerbRe (see scripts/verify-readonly.sh
-// history for why each one exists).
+// AWS API calls despite matching writeVerbRe.
 var exemptNames = map[string]bool{
 	"CreateServiceClients": true,
 	"ExecuteTaskAt":        true,
-	// Session-state mutators (in-memory maps on session.Session), moved into
-	// scanned core/runtime, where RefreshListEnrichment owns the list-refresh
-	// mutation list.
+	// Session-state mutators (in-memory maps on session.Session) in scanned
+	// core/runtime, where RefreshListEnrichment owns the list-refresh mutation
+	// list.
 	"DeleteEnrichmentRan":          true,
 	"DeleteEnrichmentTruncatedIDs": true,
 }

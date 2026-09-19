@@ -15,8 +15,7 @@ import (
 
 // ecsTaskStopCodeFailedDef is the stop-code finding, declared once. The
 // ecs-task and ecs_tasks catalog entries are the same rows reached by two
-// routes, so the definition they share is one literal; two copies of it were
-// one fact whose halves could drift apart on the next edit.
+// routes, so the definition they share is one literal.
 var ecsTaskStopCodeFailedDef = catalog.FindingDef{Code: CodeECSTaskStopCodeFailed, Phrase: "stopped: <reason>", Severity: domain.SevBroken, Source: "wave1", Detail: "The task stopped because something went wrong rather than because the scheduler or the platform stopped it, so whatever it was serving stopped with it. The stop reason names the cause: an essential container exiting, a task that never started, or the host it was placed on going unhealthy are the common ones."}
 
 // deprecatedLambdaRuntimes is the set of Lambda runtime identifiers that AWS
@@ -901,8 +900,6 @@ var computeTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stati
 			{TargetType: "subnet", DisplayName: "Subnets", Checker: checkLTSubnet},
 			{TargetType: "ct-events", DisplayName: "CloudTrail Events", Checker: ctEventsCheckerFor("lt")},
 		},
-		// See docs/resources/lt-impl-plan.md §0 for why ami/kms/sg are not
-		// registered here.
 		Navigable: []domain.NavigableField{
 			{FieldPath: "DefaultVersion.LaunchTemplateData.NetworkInterfaces.SubnetId", TargetType: "subnet"},
 		},

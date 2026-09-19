@@ -1,26 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
 
-// headless_regression_test.go — regression tests for four headless-controller
-// bugs fixed in commit 56910d32.
-//
-// Fix 3 (related ResourceIDs): mergeDetailRelatedRow now propagates ResourceIDs
-//
-//	from the RelatedCheckBatch result into DetailState.RelatedRows. Pre-fix the
-//	field was silently dropped on the existing-row update path.
-//
-// Fix 4 (load-more context): ActionLoadMore now includes ParentContext and
-//
-//	FetchFilter in the emitted FetchMorePayload. Pre-fix only ContinuationToken
-//	was set, causing the executor to call the wrong (top-level) fetcher for
-//	child / filtered lists.
-//
-// Fix 5 (filtered related-nav payload): applyRelatedNavResult now returns a
-//
-//	payload-bearing KindFetchFiltered task (FetchFilteredPayload{Filter: ...}).
-//	Pre-fix HandleRelatedNavigate returned a no-payload task, which ExecuteTask
-//	could not route to the filtered fetcher, producing an empty list.
-//
-// Fix 6 (live connect): not tested here — see TestLiveConnect_NotTested below.
 package app_test
 
 import (
@@ -32,21 +11,10 @@ import (
 	"github.com/k2m30/a9s/v3/core/runtime/messages"
 )
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Fix 3: mergeDetailRelatedRow must propagate ResourceIDs
-// ─────────────────────────────────────────────────────────────────────────────
-
 // TestHandleRelatedCheckBatch_ResourceIDs_EnableSingleResourceNav verifies that
 // when a RelatedCheckBatch carries exactly one ResourceID, a subsequent
 // ActionSelect on the focused related row produces a navigation task (proving
 // the ID reached the row and was used to derive TargetID for the detail path).
-//
-// Strategy: use newControllerAtDetail to arrive at a known detail screen, seed
-// the related panel with a row via ApplyDetailRelated, then send a
-// RelatedCheckBatch that updates the same DisplayName with ResourceIDs=[Y].
-// ActionSelect on the focused row must emit at least one task.  If the update
-// path dropped ResourceIDs, targetID would be "" and navigation would fall
-// through without emitting a fetch task.
 //
 // mergeDetailRelatedRow's existing-row branch must assign ResourceIDs along
 // with Count/Loading/Err/Truncated/FetchFilter.
@@ -87,7 +55,6 @@ func TestHandleRelatedCheckBatch_ResourceIDs_EnableSingleResourceNav(t *testing.
 	}
 	c.Handle(batch) //nolint:ineffassign,staticcheck // asserting via ActionSelect tasks, not Handle return value
 
-	// Enable related focus so ActionSelect navigates via the related row.
 	c.Apply(app.Action{Kind: app.ActionToggleFocus}) //nolint:ineffassign,staticcheck // focus state observed via Snapshot
 
 	snap = c.Snapshot()
@@ -98,10 +65,6 @@ func TestHandleRelatedCheckBatch_ResourceIDs_EnableSingleResourceNav(t *testing.
 		t.Skip("related panel did not accept focus — cannot drive related navigation in this test env")
 	}
 
-	// ActionSelect on the focused related row.  If ResourceIDs survived the
-	// batch update, navigation resolves to a single resource (targetID ==
-	// updatedID) and emits at least one task.  If ResourceIDs were dropped,
-	// targetID=="" and no task is emitted.
 	_, navTasks := c.Apply(app.Action{Kind: app.ActionSelect})
 
 	if len(navTasks) == 0 {
@@ -113,9 +76,6 @@ func TestHandleRelatedCheckBatch_ResourceIDs_EnableSingleResourceNav(t *testing.
 // TestHandleRelatedCheckBatch_ResourceIDs_InsertPath verifies that when a
 // RelatedCheckBatch result for a new DisplayName (insert path) carries
 // ResourceIDs, those IDs end up usable for navigation.
-//
-// The actual bug was only on the update path; the insert path always assigned
-// the full struct.  This test guards both paths against regression.
 func TestHandleRelatedCheckBatch_ResourceIDs_InsertPath(t *testing.T) {
 	res := fakeEC2Resources()[0]
 	c := newControllerAtDetail(t, res, "ec2")
@@ -156,18 +116,9 @@ func TestHandleRelatedCheckBatch_ResourceIDs_InsertPath(t *testing.T) {
 	}
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Fix 4: ActionLoadMore must carry ParentContext and FetchFilter in payload
-// ─────────────────────────────────────────────────────────────────────────────
-
 // TestActionLoadMore_ChildList_PayloadCarriesParentContext verifies that when
 // ActionLoadMore is applied to a list with ParentContext set (child list),
 // the returned FetchMorePayload carries that ParentContext.
-//
-// Pre-fix failure: the FetchMorePayload was constructed with only
-// ContinuationToken.  ParentContext and FetchFilter were omitted, so the
-// executor routed the request to the top-level fetcher instead of the child
-// fetcher, returning incorrect results.
 func TestActionLoadMore_ChildList_PayloadCarriesParentContext(t *testing.T) {
 	c := newListController(t, "ec2")
 
@@ -223,10 +174,6 @@ func TestActionLoadMore_ChildList_PayloadCarriesParentContext(t *testing.T) {
 // TestActionLoadMore_FilteredList_PayloadCarriesFetchFilter verifies that when
 // ActionLoadMore is applied to a list with FetchFilter set, the returned
 // FetchMorePayload carries that FetchFilter.
-//
-// Pre-fix failure: same as TestActionLoadMore_ChildList_PayloadCarriesParentContext —
-// FetchFilter was omitted, causing the executor to call the wrong fetcher for
-// filtered lists (e.g., related-navigation filtered by vpc-id).
 func TestActionLoadMore_FilteredList_PayloadCarriesFetchFilter(t *testing.T) {
 	c := newListController(t, "ec2")
 
@@ -279,8 +226,7 @@ func TestActionLoadMore_FilteredList_PayloadCarriesFetchFilter(t *testing.T) {
 
 // TestActionLoadMore_NoContext_PayloadHasOnlyToken verifies that a plain
 // top-level list (no ParentContext, no FetchFilter) produces a FetchMorePayload
-// with only the ContinuationToken set and both maps nil/empty.  This is the
-// baseline case — it must still work correctly after the fix.
+// with only the ContinuationToken set and both maps nil/empty.
 func TestActionLoadMore_NoContext_PayloadHasOnlyToken(t *testing.T) {
 	c := newListController(t, "ec2")
 
@@ -314,7 +260,6 @@ func TestActionLoadMore_NoContext_PayloadHasOnlyToken(t *testing.T) {
 	if payload.ContinuationToken != wantCursor {
 		t.Errorf("FetchMorePayload.ContinuationToken=%q, want %q", payload.ContinuationToken, wantCursor)
 	}
-	// Plain list: neither context map should be populated.
 	if len(payload.ParentContext) != 0 {
 		t.Errorf("FetchMorePayload.ParentContext non-empty on plain list: %v", payload.ParentContext)
 	}
@@ -323,25 +268,10 @@ func TestActionLoadMore_NoContext_PayloadHasOnlyToken(t *testing.T) {
 	}
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Fix 5: applyRelatedNavResult must emit FetchFilteredPayload on KindFetchFiltered
-// ─────────────────────────────────────────────────────────────────────────────
-
 // TestActionSelect_RelatedNav_FetchFilter_TaskCarriesPayload verifies that when
 // ActionSelect on a focused related row resolves to a NavigationKindFilteredList
 // with FetchFilter, the returned tasks include KindFetchFiltered with a non-nil
 // FetchFilteredPayload.Filter.
-//
-// Strategy: use newControllerAtDetail with a known resource, seed a related row
-// with FetchFilter set and Count>1 (so the row resolves via
-// NavigationKindFilteredList rather than the single-resource fast-path).  Enable
-// RelatedFocus, call ActionSelect, and assert the returned tasks include a
-// payload-bearing KindFetchFiltered task.
-//
-// Pre-fix failure: HandleRelatedNavigate emitted a KindFetchFiltered task with
-// nil Payload.  ExecuteTask type-asserted payload to FetchFilteredPayload and got
-// a zero-value struct with nil Filter, so the filtered fetcher received no filter
-// and returned all resources (or errored), leaving the list empty.
 func TestActionSelect_RelatedNav_FetchFilter_TaskCarriesPayload(t *testing.T) {
 	res := fakeEC2Resources()[0]
 	c := newControllerAtDetail(t, res, "ec2")
@@ -364,7 +294,6 @@ func TestActionSelect_RelatedNav_FetchFilter_TaskCarriesPayload(t *testing.T) {
 		},
 	})
 
-	// Enable related focus so ActionSelect navigates via the related row.
 	c.Apply(app.Action{Kind: app.ActionToggleFocus}) //nolint:ineffassign,staticcheck // focus state observed via Snapshot
 
 	snap = c.Snapshot()
@@ -372,9 +301,6 @@ func TestActionSelect_RelatedNav_FetchFilter_TaskCarriesPayload(t *testing.T) {
 		t.Skip("related panel did not accept focus — cannot test related navigation in this environment")
 	}
 
-	// ActionSelect on the focused row triggers HandleRelatedNavigate →
-	// applyRelatedNavResult.  With FetchFilter set and Count>1, the result is
-	// NavigationKindFilteredList → KindFetchFiltered with FetchFilteredPayload.
 	_, navTasks := c.Apply(app.Action{Kind: app.ActionSelect})
 
 	if len(navTasks) == 0 {
@@ -414,18 +340,14 @@ func TestActionSelect_RelatedNav_FetchFilter_TaskCarriesPayload(t *testing.T) {
 	}
 }
 
-// TestRelatedNav_MultiID_SeedsRelatedIDSet verifies the [P2] fix: navigating a
+// TestRelatedNav_MultiID_SeedsRelatedIDSet verifies that navigating a
 // related row that carries multiple ResourceIDs and NO FetchFilter (e.g. an EC2
 // instance → its several security groups) resolves to NavigationKindFilteredList
 // and seeds the pushed list's RelatedIDSet to exactly those IDs — so the list
 // renders only the related subset (list.go's RelatedIDSet prefilter), not every
 // resource of the target type. Both the mouse click (ActionRelatedSelect) and
-// the keyboard Enter (ActionSelect) paths must seed it identically, since Fix #6
-// routes both through the shared dispatchRelatedNavigate.
-//
-// Pre-fix, applyRelatedNavResult's filtered-list branch handled FilterText and
-// FetchFilter but never seeded RelatedIDSet for the multi-ID case, so the web
-// showed all resources of the type.
+// the keyboard Enter (ActionSelect) paths must seed it identically, since both
+// route through the shared dispatchRelatedNavigate.
 func TestRelatedNav_MultiID_SeedsRelatedIDSet(t *testing.T) {
 	ids := []string{"sg-aaa111", "sg-bbb222", "sg-ccc333"}
 	c := newControllerAtDetail(t, fakeEC2Resources()[0], "ec2")
@@ -437,15 +359,14 @@ func TestRelatedNav_MultiID_SeedsRelatedIDSet(t *testing.T) {
 		// no FetchFilter → the multi-ID subset path
 	}})
 
-	// Click the related row. Fix #6 routes the click (ActionRelatedSelect) and
-	// the keyboard Enter (ActionSelect) through the same dispatchRelatedNavigate,
-	// so this exercises the shared applyRelatedNavResult seeding that both use.
+	// The click (ActionRelatedSelect) and the keyboard Enter (ActionSelect)
+	// share dispatchRelatedNavigate, so this exercises the applyRelatedNavResult
+	// seeding both use.
 	vs, _ := c.Apply(app.Action{Kind: app.ActionRelatedSelect, Arg: "0"})
 
 	// Apply must return the POST-navigation snapshot: c.snapshot() runs AFTER
 	// dispatchRelatedNavigate pushes the filtered list (Go evaluates return
-	// operands left-to-right), otherwise a
-	// caller trusting Apply's ViewState got the stale source detail.
+	// operands left-to-right).
 	if vs.Body.Kind != app.BodyKindList {
 		t.Errorf("Apply returned Body.Kind=%q after the related click, want %q "+
 			"(stale pre-navigation snapshot — snapshot taken before dispatch)", vs.Body.Kind, app.BodyKindList)
@@ -466,25 +387,16 @@ func TestRelatedNav_MultiID_SeedsRelatedIDSet(t *testing.T) {
 	}
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Fix 6: live connect — not tested (see rationale)
-// ─────────────────────────────────────────────────────────────────────────────
-
-// TestLiveConnect_NotTested documents why Fix 6 has no automated unit test.
-//
-// The live-connect branch in construct.go initiates a real TCP connection to
-// AWS endpoints.  There is no injectable failure seam (dial func, transport
-// override) that would let a unit test exercise the "connection failed →
-// controller stays on menu" path without real credentials or network access.
-// A test that opens a live connection would be flaky in CI (network-dependent,
-// credential-dependent, timing-sensitive).
+// TestLiveConnect_NotTested records that the live-connect branch in
+// construct.go opens a real TCP connection to AWS endpoints and offers no
+// injectable failure seam (dial func, transport override) to exercise the
+// "connection failed → controller stays on menu" path without real
+// credentials or network access.
 //
 // The demo-mode path exercised by TestHeadless_FetchPopulatesListRows
 // (headless_drain_test.go) is the structurally parallel path: controller
 // initialises with fake clients, tasks execute synchronously, and list rows
-// are populated.  If a dial-failure injection seam is added later, a unit test
-// that asserts Body.Kind==BodyKindMenu after a failing connect (no panic, no
-// hang, no goroutine leak) should be written here.
+// are populated.
 func TestLiveConnect_NotTested(t *testing.T) {
 	t.Skip("live-connect fix requires real AWS credentials; no injectable failure seam — see comment")
 }

@@ -14,7 +14,7 @@ import (
 //
 // The runtime returns []UIIntent + []TaskRequest from HandleEvent; the
 // adapter walks its view tree applying matching intents and turns each
-// TaskRequest into platform-specific async work. This preserves today's
+// TaskRequest into platform-specific async work. This keeps
 // stack-walking semantics (every matching view in the stack receives the
 // update) without exposing renderer types to the shared core.
 type UIIntent interface {
@@ -107,8 +107,8 @@ func (PatchMenu) isIntent() {}
 // Payload carries per-screen typed data (selectors, reveal results,
 // child-list parameters). It is nil for capability screens whose
 // adapter-side builder resolves everything from ScreenContext alone.
-// Callers that emit PushScreen with Context only continue to work because
-// the builder closures type-switch on Payload and tolerate the zero value
+// Callers may emit PushScreen with Context only: the builder closures
+// type-switch on Payload and tolerate the zero value
 // when their ScreenID does not require it.
 type PushScreen struct {
 	ID      ScreenID
@@ -126,9 +126,7 @@ func (PushScreen) isIntent() {}
 // the adapter re-parses via
 // styles.ThemeFromYAML before applying. This keeps the runtime free of
 // any lipgloss / Bubble Tea coupling that hosting a *styles.Theme
-// would force. Option A (extracting a domain.Theme value type) was
-// considered cleaner but is a larger refactor properly scoped to a
-// follow-on PR; B preserves the boundary invariant today.
+// would force.
 //
 // On parse failure the adapter MUST emit a flash describing the
 // failure and skip the apply; the persist task that this intent ships
@@ -160,7 +158,7 @@ func (ReplaceScreen) isIntent() {}
 
 // OriginCache and OriginVerified are the two valid values for
 // PatchMenuAvailability.Origin — a cross-layer contract shared by every
-// Core handler that sets Origin and every adapter that reads it (C3).
+// Core handler that sets Origin and every adapter that reads it.
 // Defined as constants (rather than inline string literals) so a typo in
 // either producer or consumer fails to compile instead of silently landing
 // on the "leave origin unchanged" empty-string branch.
@@ -177,7 +175,7 @@ type PatchMenuAvailability struct {
 	Truncated    bool
 	// Origin distinguishes a disk-cache-seeded entry ("cache", not yet
 	// re-verified this session) from one confirmed by a live probe this
-	// session ("verified") — C3. Empty means "leave the stored origin
+	// session ("verified"). Empty means "leave the stored origin
 	// unchanged" (used by callers that only ever touch Count/Truncated).
 	Origin string
 }
@@ -278,12 +276,10 @@ func (SetErrorHintIntent) isIntent() {}
 // HandleAPIError so a failed AWS call removes the spinner immediately rather
 // than waiting for the next render.
 //
-// Err carries the error-marker text (C4): when non-empty, the adapter
+// Err carries the error-marker text: when non-empty, the adapter
 // must also set the active list's LastFetchError to Err, so cached content
 // stays on screen with the marker swapped from "refreshing"/"loading" to
-// "error" instead of going blank. Empty when the failure is not list-scoped
-// (matches the pre-existing spinner-only behavior for other HandleAPIError
-// call sites).
+// "error" instead of going blank. Empty when the failure is not list-scoped.
 //
 // Append mirrors messages.APIError.Append: LoadingMore and Refreshing are
 // allowed to be simultaneously in flight on the same screen (a Ctrl+R issued
@@ -305,10 +301,8 @@ type ClearActiveListLoadingIntent struct {
 	// (core/app/intents.go's applyIntents) route this clear to the exact
 	// screen the failed request belongs to — the same ResourceType +
 	// CanonicalList() agreement handleResourcesLoadedEvent uses to route a
-	// paired success — rather than the pre-existing "whatever screen is on
-	// top" behavior. A zero Provenance (FetchProvenanceUnknown) means the
-	// producer predates this contract; the consumer falls back to the
-	// top-of-stack list screen for those, matching
+	// paired success. A zero Provenance (FetchProvenanceUnknown) falls back
+	// to the top-of-stack list screen, matching
 	// FetchResourcesPayload.Provenance's own zero-value grace.
 	ResourceType string
 	Provenance   messages.FetchProvenance
@@ -352,8 +346,7 @@ func (RefreshActiveListIntent) isIntent() {}
 // when the loaded slice should be cached without the view-side
 // write-through path (i.e. the active view is not the ResourceListModel for
 // this type, so cacheTopLevelResourceList will not fire). Entry may be nil
-// to signal a clear (no current emitter exercises that branch — kept for
-// symmetry).
+// to signal a clear.
 //
 // Entry is *domain.ListViewCacheEntry; adapters apply the intent via
 // Core.SetResourceCache (RowStore-backed).
@@ -389,10 +382,10 @@ type PatchLazyResourceCache struct {
 func (PatchLazyResourceCache) isIntent() {}
 
 // SetIdentityIntent carries the resolved caller-identity mirror to the
-// adapter. The runtime writes session.Identity (still typed as
+// adapter. The runtime writes session.Identity (typed as
 // *awsclient.CallerIdentity) before emitting; this
 // intent gives the renderer a renderer-shaped value to apply to active
-// views (today: IdentityModel.SetIdentity) without importing core/aws.
+// views (IdentityModel.SetIdentity) without importing core/aws.
 // nil Identity is permitted and signals a no-op render-side update
 // (the session field is already cleared by Core in that path).
 type SetIdentityIntent struct {

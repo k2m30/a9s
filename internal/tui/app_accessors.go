@@ -18,9 +18,7 @@ import (
 )
 
 // Core returns the runtime-owned *runtime.Core handle. Test-only accessor
-// — production code uses m.core directly. Replaces the prior Session()
-// accessor whose session-typed return value forced the tui package to
-// import the core/session package.
+// — production code uses m.core directly.
 func (m Model) Core() *runtime.Core {
 	return m.core
 }

@@ -39,19 +39,19 @@ type SFNFixtures struct {
 	Executions    map[string][]sfntypes.ExecutionListItem // key: state machine ARN
 	// Definitions maps state machine ARN -> ASL definition JSON, served by
 	// DescribeStateMachine. Required for the ecs-svc:sfn related-panel pivot
-	// witness (checkECSSvcSFN matches Task states whose Resource starts with
+	// (checkECSSvcSFN matches Task states whose Resource starts with
 	// "arn:aws:states:::ecs:runTask" and whose Parameters.TaskDefinition
 	// contains the ECS service's task-definition family name) and for the
-	// sfn:lambda related-panel pivot witness (checkSFNLambda walks the
+	// sfn:lambda related-panel pivot (checkSFNLambda walks the
 	// definition for Task states referencing a Lambda function ARN).
 	Definitions map[string]string
 	// RoleArns maps state machine ARN -> execution role ARN, served by
 	// DescribeStateMachine. Required for the sfn:role related-panel pivot
-	// witness (checkSFNRole). acme-lambda-execution is a real iam.go fixture.
+	// (checkSFNRole). acme-lambda-execution is a real iam.go fixture.
 	RoleArns map[string]string
 	// EncryptionKeyIDs maps state machine ARN -> KMS key ID, served by
 	// DescribeStateMachine. Required for the sfn:kms related-panel pivot
-	// witness (checkSFNKMS). Shared prod KMS key used across fixtures.
+	// (checkSFNKMS). Shared prod KMS key used across fixtures.
 	EncryptionKeyIDs map[string]string
 	// LoggingLevels maps state machine ARN -> its execution logging level,
 	// served by DescribeStateMachine. A machine absent from this map is
@@ -60,7 +60,7 @@ type SFNFixtures struct {
 	// History maps execution ARN -> GetExecutionHistory events, served by
 	// SFNFake.GetExecutionHistory. Required for the sfn_execution_history
 	// child view and its sfn-execution-history.broken.event_failed finding
-	// witness (ClassifyEventStatus classifies *Failed/*TimedOut/
+	// (ClassifyEventStatus classifies *Failed/*TimedOut/
 	// ExecutionAborted event types as "failed").
 	History map[string][]sfntypes.HistoryEvent
 }
@@ -210,11 +210,10 @@ var sharedSFNFixtures = sync.OnceValue(func() *SFNFixtures {
 				},
 			},
 			// user-onboarding-flow's single (and therefore latest) execution
-			// failed on a STANDARD-type state machine — required to keep
-			// sfn.latest-execution-failed witnessed by a fixture ListExecutions
-			// is actually called against (payment-validation is EXPRESS, which
-			// EnrichStepFunctionsStatus now skips pre-call since AWS rejects
-			// ListExecutions for that type with StateMachineTypeNotSupported).
+			// failed on a STANDARD-type state machine — a fixture that raises
+			// sfn.latest-execution-failed, since EnrichStepFunctionsStatus skips
+			// EXPRESS machines such as payment-validation: AWS rejects
+			// ListExecutions for that type with StateMachineTypeNotSupported.
 			smARNUserOnboarding: {
 				{
 					ExecutionArn:    aws.String("arn:aws:states:us-east-1:123456789012:execution:user-onboarding-flow:exec-2026-0322-0500-c2d3e4f5"),
@@ -229,9 +228,9 @@ var sharedSFNFixtures = sync.OnceValue(func() *SFNFixtures {
 		// order-fulfillment-workflow's ASL definition runs an ECS task on
 		// the acme-services cluster using the api-gateway task-definition
 		// family (both real ecs.go fixtures) — required for the
-		// ecs-svc:sfn related-panel pivot witness (checkECSSvcSFN) — then
+		// ecs-svc:sfn related-panel pivot (checkECSSvcSFN) — then
 		// invokes api-gateway-authorizer (real lambda.go fixture) — required
-		// for the sfn:lambda related-panel pivot witness (checkSFNLambda).
+		// for the sfn:lambda related-panel pivot (checkSFNLambda).
 		Definitions: map[string]string{
 			// The only demo definition with a credential written into it.
 			// The value is synthetic; secretscan reports the key and the
@@ -374,7 +373,7 @@ var sharedSFNFixtures = sync.OnceValue(func() *SFNFixtures {
 		// task fails to pull its container image, which fails the .sync
 		// task integration and, with no Catch, the execution itself —
 		// required for the sfn_execution_history.broken.event_failed
-		// witness (both TaskFailed and ExecutionFailed classify "failed").
+		// finding (both TaskFailed and ExecutionFailed classify "failed").
 		History: map[string][]sfntypes.HistoryEvent{
 			execArnOrderFulfillmentFailed: {
 				{

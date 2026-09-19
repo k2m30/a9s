@@ -50,10 +50,8 @@ type DetailOperation struct {
 // EnrichDetailPayload task only when resource.GetDetailEnricher(resourceType)
 // is registered, a RelatedCheckPayload task only when
 // resource.GetRelated(resourceType) is non-empty — in the SAME call that
-// mints the op ID. No public type here names "half a workload": earlier
-// revisions returned the two as separate *TaskRequest out-params, which let
-// a caller keep one and drop the other; a single opaque slice has no such
-// seam. The sole caller is core/app's beginDetailWorkloadLocked builder,
+// mints the op ID. One opaque slice gives a caller no way to keep one task
+// and drop the other. The sole caller is core/app's beginDetailWorkloadLocked builder,
 // which may itself trim the related entry out (cache-replay suppression) but
 // never receives it as a separately addressable value.
 //

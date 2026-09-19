@@ -15,10 +15,9 @@ import (
 )
 
 // checkCbPipeline is a reverse-scan checker for the codebuild→pipeline relationship.
-// Pattern C+reverse: iterate cache["pipeline"]; for each pipeline call
+// Iterate cache["pipeline"]; for each pipeline call
 // codepipeline:GetPipeline and scan Stages[].Actions[] where
 // ActionTypeId.Provider == "CodeBuild" AND Configuration["ProjectName"] == parent name.
-// NeedsTargetCache: true.
 func checkCbPipeline(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	project, ok := assertStruct[cbtypes.Project](res.RawStruct)
 	if !ok {

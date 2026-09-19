@@ -57,7 +57,6 @@ func FetchNatGatewaysPage(ctx context.Context, api EC2DescribeNatGatewaysAPI, co
 
 		state := string(nat.State)
 
-		// Extract public IP from NatGatewayAddresses
 		publicIP := ""
 		if len(nat.NatGatewayAddresses) > 0 {
 			if nat.NatGatewayAddresses[0].PublicIp != nil {

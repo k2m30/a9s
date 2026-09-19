@@ -21,7 +21,7 @@ func checkKinesisAlarms(ctx context.Context, clients any, res resource.Resource,
 
 // checkKinesisLambda calls lambda:ListEventSourceMappings with the
 // EventSourceArn filter set to this stream's ARN (one call per open stream —
-// budget rule 7 in docs/related-resources.md) and maps the returned
+// the per-open call budget in docs/related-resources.md) and maps the returned
 // FunctionArn entries against the lambda cache. Secondary event sources on a
 // given mapping are not relevant here — every mapping returned by the
 // EventSourceArn-filtered call already belongs to this stream.
@@ -34,7 +34,7 @@ func checkKinesisLambda(ctx context.Context, clients any, res resource.Resource,
 }
 
 // checkKinesisCFN calls kinesis:ListTagsForStream and looks up the
-// aws:cloudformation:stack-name tag in the cfn cache. Pattern C.
+// aws:cloudformation:stack-name tag in the cfn cache.
 func checkKinesisCFN(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	streamName := res.ID
 	if streamName == "" {
@@ -86,7 +86,7 @@ func checkKinesisCFN(ctx context.Context, clients any, res resource.Resource, ca
 }
 
 // checkKinesisKMS calls kinesis:DescribeStreamSummary and returns the KeyId
-// configured for KMS-at-rest encryption. Pattern C.
+// configured for KMS-at-rest encryption.
 func checkKinesisKMS(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	streamName := res.ID
 	if streamName == "" {
@@ -114,10 +114,9 @@ func checkKinesisKMS(ctx context.Context, clients any, res resource.Resource, ca
 }
 
 // checkKinesisDDB is a reverse-scan checker for the kinesis→ddb relationship.
-// Pattern C+reverse: iterate cache["ddb"]; for each DynamoDB table call
-// dynamodb:DescribeKinesisStreamingDestination and check if any destination's
+// It iterates cache["ddb"]; for each DynamoDB table it calls
+// dynamodb:DescribeKinesisStreamingDestination and checks if any destination's
 // StreamArn matches this Kinesis stream's ARN.
-// NeedsTargetCache: true.
 func checkKinesisDDB(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	streamARN := res.Fields["stream_arn"]
 	if streamARN == "" {

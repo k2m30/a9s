@@ -16,7 +16,6 @@ import (
 )
 
 // checkDbiSG reads VpcSecurityGroups from the DBInstance RawStruct and returns their IDs.
-// Pattern F — no cache needed.
 func checkDbiSG(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	db, ok := assertStruct[rdstypes.DBInstance](res.RawStruct)
 	if !ok {
@@ -35,7 +34,6 @@ func checkDbiSG(_ context.Context, _ any, res resource.Resource, _ resource.Reso
 }
 
 // checkDbiKMS reads the KmsKeyId ARN from the DBInstance RawStruct and extracts the UUID suffix.
-// Pattern F — no cache needed.
 func checkDbiKMS(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	db, ok := assertStruct[rdstypes.DBInstance](res.RawStruct)
 	if !ok {
@@ -52,7 +50,6 @@ func checkDbiKMS(ctx context.Context, clients any, res resource.Resource, cache 
 }
 
 // checkDbiSubnets reads DBSubnetGroup.Subnets from the DBInstance RawStruct and returns their IDs.
-// Pattern F — no cache needed.
 func checkDbiSubnets(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	db, ok := assertStruct[rdstypes.DBInstance](res.RawStruct)
 	if !ok {
@@ -75,14 +72,12 @@ func checkDbiSubnets(_ context.Context, _ any, res resource.Resource, _ resource
 
 // checkDbiAlarm searches the alarm cache for alarms with a "DBInstanceIdentifier" dimension
 // matching this DB instance's identifier.
-// Pattern D — dimension-based lookup.
 func checkDbiAlarm(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	return alarmIDsByDimension(ctx, clients, cache, "", "DBInstanceIdentifier", res.ID)
 }
 
 // checkDbiDBISnap searches the dbi-snap cache for snapshots whose DBInstanceIdentifier
 // matches this DB instance's identifier.
-// Pattern C — reverse cache lookup.
 func checkDbiDBISnap(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	dbIdentifier := res.ID
 	if dbIdentifier == "" {
@@ -111,7 +106,7 @@ func checkDbiDBISnap(ctx context.Context, clients any, res resource.Resource, ca
 }
 
 // checkDBILogs searches the logs cache for log groups matching the RDS naming convention.
-// Pattern N — naming convention: /aws/rds/instance/{db-instance-id}/{log-type}
+// Naming convention: /aws/rds/instance/{db-instance-id}/{log-type}
 func checkDBILogs(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	dbID := res.ID
 	if dbID == "" {
@@ -228,7 +223,7 @@ func checkDbiRole(_ context.Context, clients any, res resource.Resource, cache r
 }
 
 // checkDbiENI resolves the ENIs that RDS provisions for this DB instance via
-// a single ec2:DescribeNetworkInterfaces call (Pattern C). RDS manages its
+// a single ec2:DescribeNetworkInterfaces call. RDS manages its
 // ENIs with the description "RDSNetworkInterface" and attaches them to the
 // instance's security groups. We filter by description + group-id to scope.
 func checkDbiENI(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {

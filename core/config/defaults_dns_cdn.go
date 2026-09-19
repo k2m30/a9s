@@ -33,7 +33,6 @@ func dnsCdnDefaultViews() map[string]ViewDef {
 				{Path: "RouteSelectionExpression"}, {Path: "CorsConfiguration"}, {Path: "Tags"},
 			},
 		},
-		// Child views for DNS/CDN resources
 		"r53_records": {
 			Detail: []DetailField{
 				{Path: "Name"}, {Path: "Type"}, {Path: "TTL"}, {Path: "ResourceRecords"}, {Path: "AliasTarget"},

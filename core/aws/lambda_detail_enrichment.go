@@ -40,7 +40,6 @@ func enrichLambda(ctx context.Context, clients any, res resource.Resource) (reso
 	return enrichDetail(ctx, clients, res, detailEnrichSpec[lambdatypes.FunctionConfiguration, lambdaDetailPayload]{
 		unwrap: unwrapEnriched(func(w FunctionEnriched) lambdatypes.FunctionConfiguration { return w.FunctionConfiguration }),
 		id: func(cfg lambdatypes.FunctionConfiguration, _ resource.Resource) (string, error) {
-			// Prefer FunctionName, fall back to FunctionArn.
 			switch {
 			case cfg.FunctionName != nil && *cfg.FunctionName != "":
 				return *cfg.FunctionName, nil

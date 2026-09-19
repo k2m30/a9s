@@ -4,13 +4,11 @@
 //
 // rendererState holds ONLY renderer-local values: viewport, search widget,
 // right-column widget, scroll/cursor ints, reveal payload, help context, and
-// terminal dimensions. It contains ZERO stored view model pointers.
+// terminal dimensions.
 //
 // The free render functions (renderMenu, renderList, renderDetail, etc.) each
 // create a short-lived transient view model populated from the controller body
 // + rendererState, call the existing Render* method, and discard the model.
-// This keeps the existing Render* methods (and all tests that call them) working
-// unchanged while removing the stored model from the stack.
 package tui
 
 import (
@@ -49,7 +47,7 @@ const (
 // rendererState is per-stack-entry renderer state. One rendererState is pushed
 // onto m.stack for every screen the TUI pushes (menu, list, detail, text,
 // selector, help, identity, reveal). It carries only the values that the free
-// render functions need to produce output — no stored view model fields.
+// render functions need to produce output.
 type rendererState struct {
 	// kind identifies which free render function to call for this rs.
 	kind rsKind
@@ -101,8 +99,8 @@ type rendererState struct {
 
 	// ctrlBacked is true when a corresponding controller screen was pushed at the
 	// same time as this rendererState. Used by popRS() to decide whether to call
-	// ActionBack on the controller when popping this entry. As of goal-4 wave 4a
-	// every rsKind pushes a matching controller screen (help/identity/error-log
+	// ActionBack on the controller when popping this entry. Every rsKind
+	// pushes a matching controller screen (help/identity/error-log
 	// included) — see docs/architecture.md "the controller stack is authoritative".
 	ctrlBacked bool
 
@@ -153,8 +151,8 @@ func newTextRS() *rendererState {
 // ctrlBacked=true: the caller pushes runtime.ScreenErrorLog onto the
 // controller and seeds its TextState via m.ctrl.EnsureTextState (mirroring
 // YAML/JSON) before calling this, so the error-log viewer renders from
-// snap.Body.Text like every other ctrl-backed text screen — no adapter-local
-// errorLogText copy (goal-4 wave 4a: StackInSync sees error-log as ctrl-backed).
+// snap.Body.Text like every other ctrl-backed text screen (StackInSync sees
+// error-log as ctrl-backed).
 func newErrorLogRS() *rendererState {
 	return &rendererState{kind: rsKindText, ctrlBacked: true}
 }
@@ -167,7 +165,7 @@ func newSelectorRS(onSelect func(string) tea.Msg) *rendererState {
 
 // newHelpRS returns a fresh rendererState for the help overlay.
 // ctrlBacked=true: the caller pushes runtime.ScreenHelp onto the controller
-// before calling this (goal-4 wave 4a), so StackInSync sees the help overlay
+// before calling this, so StackInSync sees the help overlay
 // as ctrl-backed. The rs still carries helpContext/helpShortName — the TUI's
 // help rendering stays view-model-driven (NewHelpWithResource) rather than
 // consuming Body.Help, since the TUI already resolves the richer per-context
@@ -186,7 +184,7 @@ func newCostsRS() *rendererState {
 
 // newIdentityRS returns a fresh rendererState for the identity overlay.
 // ctrlBacked=true: the caller pushes runtime.ScreenIdentity onto the
-// controller before calling this (goal-4 wave 4a), so StackInSync sees the
+// controller before calling this, so StackInSync sees the
 // identity overlay as ctrl-backed. The rs still carries identity
 // loading/error/data state directly (SetIdentityIntent updates it via
 // applyIntents) rather than reading Body.Identity, since the identity fetch
@@ -319,8 +317,8 @@ func renderCosts(body *app.CostsBody, rs *rendererState) string {
 }
 
 // renderIdentity renders the identity overlay from adapter-owned rs fields.
-// The TUI identity overlay is NOT ctrl-backed: all state lives in rs, updated
-// directly by the SetIdentityIntent handler in app_dispatch.go.
+// The identity overlay's displayed state lives in rs, updated directly by
+// the SetIdentityIntent handler in app_dispatch.go.
 func renderIdentity(rs *rendererState, profile, region string) string {
 	m := views.NewIdentity(profile, region, keys.Default())
 	m.SetSize(rs.width, rs.height)

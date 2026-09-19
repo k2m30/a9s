@@ -207,7 +207,7 @@ func checkS3KMS(ctx context.Context, clients any, res resource.Resource, cache r
 // per-bucket API call. S3 server-access logs are delivered to ANOTHER S3
 // BUCKET (not CloudWatch Log Groups), so the pivot targets `s3` — the
 // destination resource kind — and the navigation ID is the destination
-// bucket name. Spec §2 `logs` subsection.
+// bucket name.
 func checkS3Logs(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	bucket := res.ID
 	if bucket == "" {
@@ -302,14 +302,14 @@ func checkS3Glue(ctx context.Context, clients any, res resource.Resource, cache 
 
 // checkS3Backup scans the backup cache for plans that cover this bucket.
 // Two matching paths are applied per cached plan:
-//   - Legacy: Fields["resource_arn"] exactly equals the bucket ARN
+//   - Exact: Fields["resource_arn"] equals the bucket ARN
 //     (recovery-point-shaped cache entries; unrelated to BackupSelection).
 //   - Selection: BackupPlanCoversARN checks Fields["resources"] (may contain
 //     wildcard patterns such as arn:aws:s3:::*) and Fields["not_resources"]
 //     (exclusion list). A plan covers this bucket iff any Resources entry
 //     matches AND no NotResources entry matches.
 //
-// No live API call is made — this is a pure cache scan.
+// Reads the cache only.
 func checkS3Backup(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	bucket := res.ID
 	if bucket == "" {
@@ -341,10 +341,9 @@ func checkS3Backup(ctx context.Context, clients any, res resource.Resource, cach
 }
 
 // checkS3EBRule scans the eb-rule cache for rules whose EventPattern filters
-// on `source=aws.s3` AND `detail.bucket.name` containing this bucket. Spec
-// §2: "rules with EventPattern.source=['aws.s3'] AND EventPattern.detail.
-// bucket.name matching this bucket". Event-pattern is the only standard
-// join between an S3 bucket and an EventBridge rule (per a9s-devops).
+// on `source=aws.s3` AND `detail.bucket.name` containing this bucket. An event
+// pattern is the only standard join between an S3 bucket and an EventBridge
+// rule.
 func checkS3EBRule(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	bucket := res.ID
 	if bucket == "" {
@@ -376,8 +375,8 @@ func checkS3EBRule(ctx context.Context, clients any, res resource.Resource, cach
 }
 
 // checkS3R53 scans the r53 cache for hosted zones containing an S3-website
-// alias record whose NAME (FQDN) equals this bucket's name. Spec §2: "alias
-// to S3 requires bucket-name==FQDN; that's the join key" — the bucket name
+// alias record whose NAME (FQDN) equals this bucket's name. An alias to S3
+// requires bucket-name==FQDN, so that is the join key — the bucket name
 // is NEVER part of AliasTarget.DNSName (AWS returns the regional endpoint).
 // The r53 fetcher pre-filters the zone's records for S3-website aliases
 // and emits the FQDNs as Fields["s3website_alias_names"].
@@ -414,10 +413,9 @@ func checkS3R53(ctx context.Context, clients any, res resource.Resource, cache r
 }
 
 // checkS3Role resolves roles named as AWS principals in the bucket's
-// resource policy. Spec §2: "Call s3:GetBucketPolicy, parse the JSON
-// policy document for Statement[].Principal.AWS entries matching IAM
-// role ARNs, look each up in the already-loaded `role` list." This is
-// the canonical direction of the relationship — the access grant lives
+// resource policy: the Statement[].Principal.AWS entries of s3:GetBucketPolicy
+// that are IAM role ARNs, looked up in the already-loaded `role` list. This
+// is the canonical direction of the relationship — the access grant lives
 // on the bucket side, not on the role's own policies.
 //
 // Wildcards, service principals, and cross-account role ARNs that do
@@ -526,8 +524,7 @@ func extractBucketPolicyAWSPrincipals(doc string) []string {
 // (arn:<partition>:iam::<account>:role/<name>). Rejects wildcards,
 // account-root ARNs, user ARNs and STS assumed-role sessions — the role pivot
 // only surfaces role principals. The partition is the account's own and is
-// never compared. Role name extraction reuses roleNameFromARN from
-// iam_roles_related.go.
+// never compared.
 func isIAMRoleARN(s string) bool {
 	a, ok := ARNForService(s, "iam")
 	return ok && strings.HasPrefix(a.Resource, "role/")

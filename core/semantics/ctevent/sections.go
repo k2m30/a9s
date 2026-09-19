@@ -10,9 +10,6 @@ import (
 // BuildSections builds the ordered list of detail sections for the given parsed event.
 // Section order: ACTOR → ACTION → TARGET → CONTEXT → ERROR (if present) → REQUEST → RESPONSE.
 //
-// See specs/013-ct-event-detail-v2/contracts/ctevent-api.md for the full contract,
-// and specs/013-ct-event-detail-v2/data-model.md for the Section and Row type definitions.
-//
 // Guarantees:
 //   - Returns a non-nil slice (possibly empty in degenerate cases).
 //   - Empty sections (len(Rows) == 0) are omitted from the result.
@@ -60,7 +57,7 @@ func BuildSections(event *Event) []Section {
 	}
 
 	// REQUEST — uses cleanedParams (TARGET fields already removed).
-	// Strip boring-default keys before summarizing (drop-boring-defaults rule §1.2).
+	// Strip boring-default keys before summarizing.
 	requestParams := dropBoringKeys(cleanedParams)
 	var requestRows []Row
 	if summarizer, ok := summarizerByService[event.EventSource]; ok {
@@ -200,7 +197,7 @@ func serviceFromSource(eventSource string) string {
 func buildActionRows(event *Event) []Row {
 	var rows []Row
 
-	// Event: row — always present; carries Severity (FR-002 single-cell exception).
+	// Event: row — always present; the only row that carries Severity.
 	eventValue := serviceFromSource(event.EventSource) + ":" + event.EventName
 	rows = append(rows, Row{
 		Key:      "Event",
@@ -225,7 +222,7 @@ func buildActionRows(event *Event) []Row {
 
 // boringRequestKeys are top-level requestParameters keys that duplicate information
 // already present in other sections, or are meta-fields that add no value in the
-// REQUEST section (drop-boring-defaults rule §1.2).
+// REQUEST section.
 var boringRequestKeys = map[string]struct{}{
 	"Verb":          {},
 	"Read only":     {},

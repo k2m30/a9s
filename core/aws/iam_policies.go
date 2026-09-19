@@ -64,7 +64,6 @@ func FetchIAMPoliciesPage(ctx context.Context, api IAMListPoliciesAPI, continuat
 		resources = append(resources, managedPolicyToResource(policy))
 	}
 
-	// Build pagination metadata — IAM uses IsTruncated bool + Marker *string
 	nextToken := ""
 	isTruncated := output.IsTruncated
 	if isTruncated && output.Marker != nil {
@@ -193,14 +192,13 @@ func getAWSManagedPolicyByName(ctx context.Context, api IAMGetPolicyAPI, partiti
 // reading Fields on a lazily-added policy observe the same fields as on a
 // paginated-fetched policy.
 //
-// Concurrency trade-off (acknowledged): no top-level lock is held across the
+// Concurrency trade-off: no top-level lock is held across the
 // check-build-mark sequence. Two concurrent lazy-add calls can both observe
 // `store.ManagedBuilt() == false` and both invoke buildLocalPolicies.
 // The store itself remains correct (writes are mutex-guarded inside the
 // PolicyStore impl), so duplicate Set calls are idempotent — but two AWS
 // ListPolicies pagination walks may run in parallel before one wins the
-// MarkManagedBuilt race. The previous package-global `allPoliciesMu`
-// serialized this. Acceptable here because: (a) lazy-add is the
+// MarkManagedBuilt race. Acceptable here because: (a) lazy-add is the
 // related-panel drill-in path, not high-volume; (b) duplicate Sets are
 // last-write-wins on identical data, so the final cache state is consistent;
 // (c) introducing a sync.Once or

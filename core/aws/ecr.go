@@ -92,7 +92,7 @@ func FetchECRRepositoriesPage(ctx context.Context, api ECRDescribeRepositoriesAP
 	}, nil
 }
 
-// addECRPostureFindings evaluates the two w6b posture signals that
+// addECRPostureFindings evaluates the two posture signals that
 // DescribeRepositories already answers. Neither carries a supporting row: the
 // phrase states the whole fact, and a row repeating it would print that fact
 // twice one line apart.

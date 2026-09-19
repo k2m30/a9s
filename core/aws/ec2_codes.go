@@ -37,5 +37,3 @@ const (
 	// CodeEC2PublicIP — instance holds a routable public IPv4 address.
 	CodeEC2PublicIP domain.FindingCode = "ec2.public-ip"
 )
-
-// S5 operator sentences stamped onto Finding.Detail for the posture codes above.

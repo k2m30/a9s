@@ -44,17 +44,10 @@ type IssueEnricher struct {
 // InFetcherWave2Sentinel returns zero findings, zero issues, not truncated,
 // and never fails.
 //
-// No catalog entry registers it. It once marked a type whose extra per-item
-// describe happens inside the fetcher — eks and ng — as "Wave-2-covered", but
-// a type is Wave-2-covered when it declares a finding with Source "wave2",
-// which is what the signals table prints and what
-// TestTheWave2RegistrationMatchesTheDocsWave2Column now holds in both
-// directions. Every eks and ng finding is emitted by wave1Finding off data the
-// fetcher already holds, so the claim had nothing behind it and the generated
-// eks doc contradicted itself about whether the type had Wave 2 signals.
-//
-// It remains as the benign Fn the enrichment-queue and refresh tests register
-// when they need an enricher that is present and does nothing.
+// No catalog entry registers it: a type is Wave-2-covered when it declares
+// a finding with Source "wave2". It is the benign Fn the enrichment-queue
+// and refresh tests register when they need an enricher that is present and
+// does nothing.
 func InFetcherWave2Sentinel(_ context.Context, _ *ServiceClients, _ []resource.Resource, _ resource.ResourceCache) (IssueEnricherResult, error) {
 	return IssueEnricherResult{
 		Findings:         map[string][]domain.Finding{},
@@ -119,7 +112,7 @@ var Wave2EmissionObserver func(resourceID string, f domain.Finding)
 //
 // The wording is the one the code's catalog.FindingDef declares; values fill
 // its "<…>" slots left to right, so an enricher measuring a count passes the
-// count and never a sentence. The S5 detail sentence comes from the same
+// count and never a sentence. The detail sentence comes from the same
 // declaration.
 //
 // rows MAY be nil; the helper omits the AttentionDetail entry when empty so a
@@ -539,9 +532,8 @@ type IssueEnricherResult struct {
 //     (those are pointers / interface values shared with the running app).
 //   - DO read field values, lengths, and IsTruncated freely.
 //
-// Violations are not currently caught at compile time. Future contributors
-// who need to derive a mutable view should append([]Resource{}, slice...) into
-// a local slice first.
+// To derive a mutable view, append([]Resource{}, slice...) into a local
+// slice first.
 type IssueEnricherFunc func(ctx context.Context, clients *ServiceClients, resources []resource.Resource, cache resource.ResourceCache) (IssueEnricherResult, error)
 
 // FindingRowCap bounds the supporting rows one finding shows in the detail
@@ -634,8 +626,8 @@ const (
 // the walker's: a service that returns at most one item per row answers that
 // row the moment a page names it, while a service that spreads a row's items
 // across pages answers nothing until the walk reaches the end. Getting this
-// wrong is silent — a backup plan seen once on page 1 read as inspected while
-// its failed job sat past the cap.
+// wrong is silent: a backup plan seen once on page 1 reads as inspected while
+// its failed job sits past the cap.
 //
 // The aggregate Truncated flag stays with the caller: a walk that can hide
 // only informational coverage lower-bounds no issue count.

@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-// coverage_live_gaps_whitebox_test.go — white-box tests for live,
-// production-reachable functions that carried low coverage (primaryWave2Finding,
-// saveThemeConfigCmd). Both are unexported, so they are tested directly from
+// coverage_live_gaps_whitebox_test.go — white-box tests for
+// primaryWave2Finding and saveThemeConfigCmd. Both are unexported, so they
+// are tested directly from
 // package tui rather than through the full renderer stack.
 package tui
 

@@ -8,8 +8,8 @@ import (
 	"testing"
 )
 
-// TestMergeSnapshotFile_PreservesNumericPrecision pins the fix for the
-// finding: a partial run must carry over untouched type sections as raw
+// TestMergeSnapshotFile_PreservesNumericPrecision pins that a partial run
+// carries over untouched type sections as raw
 // bytes, not through json.Unmarshal into `any` (which downcasts every
 // number to float64 and silently rounds anything above 2^53).
 func TestMergeSnapshotFile_PreservesNumericPrecision(t *testing.T) {
@@ -31,8 +31,6 @@ func TestMergeSnapshotFile_PreservesNumericPrecision(t *testing.T) {
 		t.Fatalf("failed to write fixture snapshot.json: %v", err)
 	}
 
-	// Partial run selects "s3" only — "ebs" (holding the big int) must be
-	// carried over untouched.
 	types, _ := mergeSnapshotFile(path, []string{"s3"})
 
 	rawEBS, ok := types["ebs"]
@@ -43,10 +41,6 @@ func TestMergeSnapshotFile_PreservesNumericPrecision(t *testing.T) {
 		t.Errorf("carried-over ebs section lost numeric precision: got %s, want literal digits %s present", rawEBS, bigInt)
 	}
 
-	// Simulate the save step: build a new snapshotFile from the merged
-	// sections plus a freshly captured "s3" section, marshal it, and check
-	// the big int survives on disk byte-for-byte — the operator-visible
-	// truth the finding is about.
 	newSnap := snapshotFile{
 		Region:      "eu-west-2",
 		CollectedAt: "2026-01-02T00:00:00Z",
@@ -166,9 +160,7 @@ func TestMergeSnapshotFile_ErrorsCarriedExceptSelected(t *testing.T) {
 
 // TestMergeSnapshotFile_MalformedFile pins that a present-but-corrupt
 // snapshot.json (e.g. truncated by a killed process) degrades to empty maps
-// rather than propagating a decode error into the caller's control flow —
-// consistent with the original inline `if err := json.Unmarshal(...); err ==
-// nil` guard that silently ignored decode failures.
+// rather than propagating a decode error into the caller's control flow.
 func TestMergeSnapshotFile_MalformedFile(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "snapshot.json")
@@ -186,7 +178,4 @@ func TestMergeSnapshotFile_MalformedFile(t *testing.T) {
 	}
 }
 
-// compileTimeContractCheck pins the exact function signature the coder must
-// implement — this line alone is the "red": it will not compile until
-// mergeSnapshotFile is extracted from main() with this exact contract.
 var _ func(string, []string) (map[string]json.RawMessage, map[string]string) = mergeSnapshotFile

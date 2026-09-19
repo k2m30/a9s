@@ -215,7 +215,6 @@ func ecrEbRuleMatches(pattern, repoName, repoARN string) bool {
 		return false
 	}
 
-	// Check source includes "aws.ecr"
 	if src, ok := p["source"]; ok {
 		var sources []string
 		if err := json.Unmarshal(src, &sources); err != nil || !slices.Contains(sources, "aws.ecr") {
@@ -225,7 +224,6 @@ func ecrEbRuleMatches(pattern, repoName, repoARN string) bool {
 		return false
 	}
 
-	// Check detail.repository-name or resources match.
 	// If a repository-name filter is present but doesn't match, return false.
 	// Only fall through to "no filter → broad match" when no filter key exists.
 	hasRepoFilter := false
@@ -255,7 +253,6 @@ func ecrEbRuleMatches(pattern, repoName, repoARN string) bool {
 		}
 	}
 	if hasRepoFilter {
-		// A filter existed but didn't match — not related.
 		return false
 	}
 	// Source matches aws.ecr with no repository filter — treat as broad match.

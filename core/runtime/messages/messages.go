@@ -9,8 +9,8 @@
 // handler from forgetting to gen-check, because the Gen value is reachable
 // through the interface without knowing the concrete event type.
 //
-// Renderer adapters translate between concrete Bubble Tea (or future Electron
-// IPC, Wails, etc.) values and these types at the boundary. The shared core
+// Renderer adapters translate between concrete Bubble Tea values and these
+// types at the boundary. The shared core
 // only ever sees Cmd / Event values.
 package messages
 
@@ -76,14 +76,12 @@ type GenStamped interface {
 	// return false instead: a mid-sweep rebuild can legitimately re-emit a
 	// message stamped with a pre-rotation gen, and rejecting zero alongside
 	// every other stale value closes that specific hazard (see
-	// AvailabilityPrefetched's own doc comment) — an exception grounded in a
-	// real production race, not a convenience choice, so treat it as the
-	// template for any future false-returning event.
+	// AvailabilityPrefetched's own doc comment).
 	AcceptZeroGen() bool
 }
 
 // IsStale reports whether ev should be discarded because its generation stamp
-// no longer matches the session. It is the single staleness check used by both
+// does not match the session. It is the single staleness check used by both
 // the central guard in Core.HandleEvent and any adapter-level guards that need
 // the same logic.
 func IsStale(ev GenStamped, src GenSource) bool {

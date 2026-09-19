@@ -12,8 +12,7 @@ import (
 )
 
 // checkIGWVPC extracts Attachments[0].VpcId from the IGW RawStruct and searches
-// the vpc cache for a matching resource (Pattern F + C hybrid: field extraction
-// from self, then cache lookup).
+// the vpc cache for a matching resource.
 func checkIGWVPC(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	raw, ok := assertStruct[ec2types.InternetGateway](res.RawStruct)
 	if !ok {
@@ -25,12 +24,12 @@ func checkIGWVPC(_ context.Context, _ any, res resource.Resource, _ resource.Res
 	if len(raw.Attachments) == 0 || raw.Attachments[0].VpcId == nil || *raw.Attachments[0].VpcId == "" {
 		return resource.KnownRelated("vpc", nil, false)
 	}
-	// In-body: the IGW's own Attachments[0].VpcId IS the attached VPC.
+	// The IGW's own Attachments[0].VpcId is the attached VPC.
 	return relatedResult("vpc", []string{*raw.Attachments[0].VpcId})
 }
 
 // checkIGWRTB searches the rtb cache for route tables that contain a route
-// with a GatewayId matching this IGW's ID (Pattern C — search target cache).
+// with a GatewayId matching this IGW's ID.
 func checkIGWRTB(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	igwID := res.ID
 	raw, ok := assertStruct[ec2types.InternetGateway](res.RawStruct)

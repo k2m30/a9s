@@ -67,7 +67,6 @@ func cicdDefaultViews() map[string]ViewDef {
 				{Path: "ImageScanFindingsSummary"}, {Path: "LastRecordedPullTime"},
 			},
 		},
-		// Child views for CI/CD resources
 		"cfn_events": {
 			Detail: []DetailField{
 				{Path: "EventId"}, {Path: "StackId"}, {Path: "StackName"}, {Path: "Timestamp"},

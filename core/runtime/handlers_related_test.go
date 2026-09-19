@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
 
 // handlers_related_test.go — unit tests for the runtime-side related-navigation
-// dispatch (PR-05a-h4 / AS-150 NEEDS CHANGES finding #2).
+// dispatch.
 //
 // These tests live inside the runtime package so they can exercise unexported
 // helpers (relatedFetchTasks, relatedCacheSnapshot) directly. The exported
@@ -26,10 +26,9 @@ func newTestSession() *session.Session {
 	return session.New()
 }
 
-// TestRelatedCacheSnapshot_SingleEntry pins relatedCacheSnapshot's post-Stage-3
-// contract: a type's rows live in exactly one RowStore entry (whether written
-// via a full Observe or a Partial ObservePartial), so the snapshot need only
-// mirror RowStore.SnapshotAll — there is no merge-precedence to apply anymore.
+// A type's rows live in exactly one RowStore entry (whether written via a
+// full Observe or a Partial ObservePartial), so relatedCacheSnapshot mirrors
+// RowStore.SnapshotAll.
 func TestRelatedCacheSnapshot_SingleEntry(t *testing.T) {
 	s := newTestSession()
 	s.RowStore.Observe("ec2", []resource.Resource{{ID: "i-cache", Name: "from-fetch"}, {ID: "i-shared", Name: "from-fetch"}}, nil, session.OriginFetch, false)
@@ -96,7 +95,7 @@ func TestRelatedFetchTasks_PartialCoverage_TruncatedCache_FetchMore(t *testing.T
 	if tasks[0].Key.Scope != "ec2" {
 		t.Errorf("Scope = %q, want %q", tasks[0].Key.Scope, "ec2")
 	}
-	// AS-270: continuation token must travel on the TaskRequest as a typed
+	// The continuation token travels on the TaskRequest as a typed
 	// FetchMorePayload so the adapter is a pure pass-through.
 	payload, ok := tasks[0].Payload.(FetchMorePayload)
 	if !ok {
@@ -107,11 +106,9 @@ func TestRelatedFetchTasks_PartialCoverage_TruncatedCache_FetchMore(t *testing.T
 	}
 }
 
-// TestRelatedFetchTasks_FetchMore_EmptyToken — pins that an empty NextToken
-// on a truncated cache entry still travels as a FetchMorePayload (with
-// ContinuationToken=""), rather than being silently dropped. The runtime is
-// the single decision-maker; payload absence would force the adapter to
-// re-derive state.
+// An empty NextToken on a truncated cache entry still travels as a
+// FetchMorePayload (ContinuationToken=""). The runtime is the single
+// decision-maker; without the payload the adapter would re-derive state.
 func TestRelatedFetchTasks_FetchMore_EmptyToken(t *testing.T) {
 	s := newTestSession()
 	s.RowStore.Observe("ec2", []resource.Resource{{ID: "i-1"}}, &resource.PaginationMeta{IsTruncated: true, NextToken: ""}, session.OriginFetch, false)
@@ -129,11 +126,10 @@ func TestRelatedFetchTasks_FetchMore_EmptyToken(t *testing.T) {
 	}
 }
 
-// TestRelatedFetchTasks_FetchResources_NoPayload — KindFetchResources tasks
-// do not carry a FetchMorePayload (the continuation-token payload belongs to
-// KindFetchMore only); assert the payload is a FetchResourcesPayload stamped
-// FetchProvenanceFilteredList — this fetch backs a related-navigation drill,
-// never the type's canonical top-level list.
+// A KindFetchResources task carries a FetchResourcesPayload stamped
+// FetchProvenanceFilteredList (the continuation-token payload belongs to
+// KindFetchMore only): this fetch backs a related-navigation drill, never the
+// type's canonical top-level list.
 func TestRelatedFetchTasks_FetchResources_NoPayload(t *testing.T) {
 	s := newTestSession()
 	s.RowStore.Observe("ec2", []resource.Resource{{ID: "i-1"}}, &resource.PaginationMeta{IsTruncated: false}, session.OriginFetch, false)
@@ -297,12 +293,9 @@ func TestHandleRelatedNavigate_RelatedIDs_FullCoverage_NoTask(t *testing.T) {
 	}
 }
 
-// ─── AS-201 additions: edge cases not yet covered above ────────────────────
-
-// TestRelatedFetchTasks_MixedFullCoverage_Nil — coverage split across a full
-// Observe and a Partial ObservePartial for the SAME type, fully covered → no
-// fetch. Pins that ObservePartial's append-and-dedup-by-ID merge (rather
-// than a separate map) is what the coverage calculation reads.
+// Coverage split across a full Observe and a Partial ObservePartial for the
+// SAME type, fully covered → no fetch: the coverage calculation reads
+// ObservePartial's append-and-dedup-by-ID merge.
 func TestRelatedFetchTasks_MixedFullCoverage_Nil(t *testing.T) {
 	s := newTestSession()
 	s.RowStore.Observe("ec2", []resource.Resource{{ID: "i-1"}}, nil, session.OriginFetch, false)
@@ -314,10 +307,9 @@ func TestRelatedFetchTasks_MixedFullCoverage_Nil(t *testing.T) {
 	}
 }
 
-// TestRelatedFetchTasks_MissPaginationNil_FetchResources — miss with a
-// RowStore entry present but its Pagination is nil → KindFetchResources
-// (not KindFetchMore). Pins the precedence "no pagination info → start over"
-// vs. "pagination present and IsTruncated → continue".
+// A miss with a RowStore entry present but nil Pagination → KindFetchResources
+// (not KindFetchMore): no pagination info starts over; pagination present and
+// IsTruncated continues.
 func TestRelatedFetchTasks_MissPaginationNil_FetchResources(t *testing.T) {
 	s := newTestSession()
 	s.RowStore.Observe("ec2", []resource.Resource{{ID: "i-1"}}, nil, session.OriginFetch, false)
@@ -334,12 +326,9 @@ func TestRelatedFetchTasks_MissPaginationNil_FetchResources(t *testing.T) {
 	}
 }
 
-// TestRelatedFetchTasks_MissNoResourceCache_LazyOnly_FetchResources — partial
-// miss where the only RowStore entry is Partial (ObservePartial, no full
-// Observe ever landed) → KindFetchResources. Pins that the partial-only path
-// correctly falls through to a full-fetch request when coverage is
-// incomplete (relatedFetchTasks's truncated-pagination branch requires a
-// non-Partial entry — see relatedFetchTasks's doc comment).
+// A partial miss where the only RowStore entry is Partial (ObservePartial, no
+// full Observe) → KindFetchResources: relatedFetchTasks's
+// truncated-pagination branch requires a non-Partial entry.
 func TestRelatedFetchTasks_MissNoResourceCache_LazyOnly_FetchResources(t *testing.T) {
 	s := newTestSession()
 	s.RowStore.ObservePartial("ec2", []resource.Resource{{ID: "i-1"}})

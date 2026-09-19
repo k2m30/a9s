@@ -117,7 +117,7 @@ type wave2TestHelper interface {
 // duration of the test. The previous entry (if any) is restored via t.Cleanup
 // so callers do not need to manage save/restore manually.
 //
-// Test-only — production code does not call this. Callers may pass shortName
+// Test-only. Callers may pass shortName
 // values that are NOT in the catalog (sentinel names) to exercise dispatch
 // without polluting real resource type wiring.
 func SetWave2EnricherForTest(t wave2TestHelper, shortName string, e IssueEnricher) {

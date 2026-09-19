@@ -20,5 +20,3 @@ const (
 	// CodeECSSvcTasksBelowDesired — fewer tasks are running than the service asks for.
 	CodeECSSvcTasksBelowDesired domain.FindingCode = "ecs-svc.tasks.below-desired"
 )
-
-// S5 operator sentences for the task-count findings.

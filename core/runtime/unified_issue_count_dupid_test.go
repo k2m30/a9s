@@ -19,13 +19,10 @@ func alwaysBrokenTD() resource.ResourceTypeDef {
 	}
 }
 
-// TestUnifiedIssueCount_DistinctResourcesSharingID_CountEach pins the menu
-// badge to count per resource, matching the list title (listIssueCount, which
-// counts per row). Two DISTINCT resources that share an ID — e.g. two ACM
-// certificates for one domain, both expired (ACM keys on the domain name) —
-// must each bump the badge. Before this fix unifiedIssueCount accumulated into
-// a set keyed by r.ID, collapsing the pair to one and undercounting the menu
-// relative to the list.
+// The menu badge counts per resource, matching the list title
+// (listIssueCount, which counts per row). Two DISTINCT resources that share
+// an ID — e.g. two ACM certificates for one domain, both expired (ACM keys on
+// the domain name) — must each bump the badge.
 func TestUnifiedIssueCount_DistinctResourcesSharingID_CountEach(t *testing.T) {
 	resources := []resource.Resource{
 		{ID: "artifacts.example.com", Name: "cert-expired-2023"},
@@ -36,9 +33,8 @@ func TestUnifiedIssueCount_DistinctResourcesSharingID_CountEach(t *testing.T) {
 	}
 }
 
-// TestUnifiedIssueCount_SameResourceBothWaves_CountsOnce guards the intended
-// dedup the fix must preserve: a single resource flagged by BOTH its Wave-1
-// color AND a Wave-2 "!" finding counts once, never twice.
+// A single resource flagged by BOTH its Wave-1 color AND a Wave-2 "!"
+// finding counts once, never twice.
 func TestUnifiedIssueCount_SameResourceBothWaves_CountsOnce(t *testing.T) {
 	resources := []resource.Resource{{ID: "i-solo", Name: "one",
 		Findings: []domain.Finding{{Severity: domain.SevBroken, Source: "wave2:dupidtest"}}}}

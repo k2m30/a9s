@@ -144,17 +144,16 @@ func (c *Controller) ExecuteOne(ctx context.Context, req runtime.TaskRequest) (f
 // a deadline shorter than perTaskTimeout, or every task would inherit that
 // tighter bound instead of the intended per-task one.
 //
-// This is the fix for the "whole sweep dies at 60s" defect: a live web
-// availability sweep (identity + cache load + Wave-1 probes + Wave-2
-// enrichments, on the order of 100+ tasks) gets one budget per task, never
-// one deadline across the whole DrainSyncContextProgress call: once a shared
-// deadline expires, every remaining queued task fails with
+// A live web availability sweep (identity + cache load + Wave-1 probes +
+// Wave-2 enrichments, on the order of 100+ tasks) gets one budget per task,
+// never one deadline across the whole DrainSyncContextProgress call: once a
+// shared deadline expires, every remaining queued task fails with
 // context.DeadlineExceeded and is dropped silently, because a task error is
 // just `continue`d. Under the per-task model the queue always drains to
-// completion (bounded by maxDrainIterations, the pre-existing runaway
-// backstop) unless the PARENT itself is cancelled.
+// completion (bounded by maxDrainIterations, the runaway backstop) unless the
+// PARENT itself is cancelled.
 //
-// Per-task timeouts are not silently swallowed: every task whose OWN
+// Per-task timeouts are counted: every task whose OWN
 // per-task budget (taskCtx, not some inner AWS-call deadline the task set up
 // on its own) is exhausted by the time ExecuteTaskAt returns is counted — this
 // is checked via taskCtx.Err() == context.DeadlineExceeded, not
@@ -168,9 +167,8 @@ func (c *Controller) ExecuteOne(ctx context.Context, req runtime.TaskRequest) (f
 // per timeout — because Controller.flash is a single last-write-wins slot
 // (see ApplyIntents' FlashIntent case): applying N sequential flashes here
 // would just leave the LAST timeout's text visible and silently drop the
-// count of the other N-1, which is exactly the kind of silent loss this
-// function exists to prevent. This mirrors the existing fetch-error flash
-// shape (see runtime.HandleResourcesLoaded's "fetch <type>: <err>" FlashIntent)
+// count of the other N-1. This mirrors the fetch-error flash shape
+// (see runtime.HandleResourcesLoaded's "fetch <type>: <err>" FlashIntent)
 // while staying accurate about a multi-task drain.
 //
 // onEvent fires after every task that produces a dispatchable event,

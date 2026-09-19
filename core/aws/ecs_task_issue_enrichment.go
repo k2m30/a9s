@@ -32,7 +32,7 @@ const (
 
 // ecsTaskGone reports a task that is stopped or on its way there. The row is
 // a task, not a definition, so once teardown starts its definition's posture
-// is no longer an open item — nobody is going to reconfigure a task that is
+// is not an open item — nobody is going to reconfigure a task that is
 // already draining. The single place that fact is spelled: the fetcher's
 // lifecycle findings and the Wave-2 posture pass both call it. The lifecycle
 // finding for these states still fires; a state is not a posture.
@@ -63,12 +63,11 @@ func EnrichECSTasks(ctx context.Context, clients *ServiceClients, resources []re
 
 	// Cap the work list BEFORE grouping: the cap limits how many tasks a9s
 	// looked at, and capping the input keeps which tasks those are
-	// deterministic (grouping first made it depend on map order) while
+	// deterministic (grouping first would make it depend on map order) while
 	// recording every dropped row as uninspected. Resource.ID IS the task ID
 	// (core/aws/ecs_task.go), which is also how TruncatedIDs is keyed below.
 	resources = capAtEnrichmentCap(&result, resources, nil, resourceIDsOf)
 
-	// Group task ARNs by cluster ARN.
 	clusterTasks := make(map[string][]string)
 	taskIDToResource := make(map[string]string) // taskID → resource key (task_id field)
 	for _, r := range resources {
@@ -77,9 +76,8 @@ func EnrichECSTasks(ctx context.Context, clients *ServiceClients, resources []re
 		if cluster == "" || taskID == "" {
 			continue
 		}
-		// Reconstruct task ARN from cluster and task ID (task_id is the last segment).
-		// We need to find the full ARN — use the cluster ARN stored in the field.
-		// The cluster field stores the full cluster ARN from the fetcher.
+		// task_id is the last ARN segment; the cluster field holds the full
+		// cluster ARN.
 		clusterTasks[cluster] = append(clusterTasks[cluster], taskID)
 		taskIDToResource[taskID] = taskID
 	}
@@ -128,7 +126,6 @@ func EnrichECSTasks(ctx context.Context, clients *ServiceClients, resources []re
 
 				var rows []domain.DetailRow
 
-				// Check stop code for known failure modes.
 				switch task.StopCode {
 				case ecstypes.TaskStopCodeTaskFailedToStart, ecstypes.TaskStopCodeEssentialContainerExited:
 					// The plain-English reading of the stop code is the
@@ -141,7 +138,6 @@ func EnrichECSTasks(ctx context.Context, clients *ServiceClients, resources []re
 					})
 				}
 
-				// Check containers for non-zero exit codes.
 				for _, container := range task.Containers {
 					if container.ExitCode != nil && *container.ExitCode != 0 {
 						name := ""
@@ -219,9 +215,8 @@ func ecsTaskDefinitionPosture(ctx context.Context, clients *ServiceClients, resu
 			return
 		}
 		// The service answered and the answer carries no definition. There is
-		// no error to read a cause off, so a9s states one: handing this arm a
-		// nil error left every task on the definition marked with no reason
-		// and the aggregate saying "no reason given" about a call a9s can name.
+		// no error to read a cause off, so a9s states one; a nil error would mark
+		// every task on the definition with no reason.
 		if out == nil || out.TaskDefinition == nil {
 			for _, taskID := range tasksByDef[defARN] {
 				MarkUnusable(result, taskID, &failures, "DescribeTaskDefinition returned no task definition")

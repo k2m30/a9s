@@ -16,7 +16,6 @@ import (
 // checkCbRole extracts the ServiceRole ARN from the CodeBuild Project RawStruct.
 // It extracts the role name from the last path segment of the ARN (after the last "/")
 // and searches the role cache by name.
-// Pattern F — forward field lookup.
 func checkCbRole(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	project, ok := assertStruct[cbtypes.Project](res.RawStruct)
 	if !ok {
@@ -32,15 +31,14 @@ func checkCbRole(ctx context.Context, clients any, res resource.Resource, cache 
 
 // checkCbLogs searches the logs cache for the CloudWatch log group associated
 // with this CodeBuild project.
-// Pattern F+N — uses explicit LogsConfig.CloudWatchLogs.GroupName if set,
-// otherwise falls back to naming convention: /aws/codebuild/{projectName}.
+// Uses explicit LogsConfig.CloudWatchLogs.GroupName if set, otherwise the
+// naming convention /aws/codebuild/{projectName}.
 func checkCbLogs(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	project, ok := assertStruct[cbtypes.Project](res.RawStruct)
 	if !ok {
 		return resource.UnknownRelated("logs")
 	}
 
-	// Determine expected log group name: explicit config or naming convention.
 	expectedLogGroup := "/aws/codebuild/" + res.ID
 	if project.LogsConfig != nil &&
 		project.LogsConfig.CloudWatchLogs != nil &&
@@ -67,7 +65,6 @@ func checkCbLogs(ctx context.Context, clients any, res resource.Resource, cache 
 }
 
 // checkCbSG extracts security group IDs from the CodeBuild Project's VpcConfig.
-// Pattern F — no cache needed.
 func checkCbSG(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	project, ok := assertStruct[cbtypes.Project](res.RawStruct)
 	if !ok {
@@ -85,7 +82,7 @@ func checkCbSG(_ context.Context, _ any, res resource.Resource, _ resource.Resou
 	return relatedResult("sg", ids)
 }
 
-// checkCbVPC returns the VPC this CodeBuild project runs in (Pattern R).
+// checkCbVPC returns the VPC this CodeBuild project runs in.
 // Reads Project.VpcConfig.VpcId from the RawStruct.
 // Returns Count: 0 for projects not configured with VPC access.
 func checkCbVPC(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
@@ -101,7 +98,6 @@ func checkCbVPC(_ context.Context, _ any, res resource.Resource, _ resource.Reso
 
 // checkCbKMS extracts the KMS key from the CodeBuild Project's EncryptionKey field.
 // EncryptionKey is a KMS key ARN or alias ARN. Returns the key ID (last segment after "/").
-// Pattern F — no cache needed.
 func checkCbKMS(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	project, ok := assertStruct[cbtypes.Project](res.RawStruct)
 	if !ok || project.EncryptionKey == nil || *project.EncryptionKey == "" {
@@ -115,7 +111,6 @@ func checkCbKMS(ctx context.Context, clients any, res resource.Resource, cache r
 }
 
 // checkCbSubnet extracts subnet IDs from cbtypes.Project.VpcConfig.Subnets.
-// Pattern F — no cache needed.
 func checkCbSubnet(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	project, ok := assertStruct[cbtypes.Project](res.RawStruct)
 	if !ok {
@@ -134,13 +129,13 @@ func checkCbSubnet(_ context.Context, _ any, res resource.Resource, _ resource.R
 }
 
 // checkCbAlarm scans the alarm cache for CloudWatch alarms with a "ProjectName"
-// dimension matching this project's name. Pattern D.
+// dimension matching this project's name.
 func checkCbAlarm(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	return alarmIDsByDimension(ctx, clients, cache, "AWS/CodeBuild", "ProjectName", res.ID)
 }
 
 // checkCbECR maps the CodeBuild project's build image to an ECR repository when the
-// Environment.Image references an ECR URI. Pattern F+C.
+// Environment.Image references an ECR URI.
 func checkCbECR(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	project, ok := assertStruct[cbtypes.Project](res.RawStruct)
 	if !ok {
@@ -163,7 +158,7 @@ func checkCbECR(ctx context.Context, clients any, res resource.Resource, cache r
 }
 
 // checkCbS3 scans Artifacts/SecondaryArtifacts/Source for S3 bucket locations and
-// matches against the S3 cache. Pattern F+C.
+// matches against the S3 cache.
 func checkCbS3(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	project, ok := assertStruct[cbtypes.Project](res.RawStruct)
 	if !ok {
@@ -201,7 +196,7 @@ func checkCbS3(ctx context.Context, clients any, res resource.Resource, cache re
 
 // checkCbSecrets extracts Secrets Manager secret references from project environment
 // variables (Type=SECRETS_MANAGER). The Value is either the secret name or an ARN
-// with an optional ":json-key" suffix. Pattern F.
+// with an optional ":json-key" suffix.
 func checkCbSecrets(_ context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	project, ok := assertStruct[cbtypes.Project](res.RawStruct)
 	if !ok {
@@ -220,7 +215,7 @@ func checkCbSecrets(_ context.Context, clients any, res resource.Resource, cache
 }
 
 // checkCbSSM extracts SSM parameter references from project environment variables
-// (Type=PARAMETER_STORE). Pattern F.
+// (Type=PARAMETER_STORE).
 func checkCbSSM(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	project, ok := assertStruct[cbtypes.Project](res.RawStruct)
 	if !ok {

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
 
 // costs.go — Cost Explorer fetchers: SDK <-> core/costs domain mapping,
-// pagination, and error classification. Read-only (FR-016): only Get*
+// pagination, and error classification. Read-only: only Get*
 // operations are ever called.
 package aws
 
@@ -24,7 +24,7 @@ import (
 var ceMetrics = []string{"UnblendedCost", "BlendedCost", "AmortizedCost", "NetAmortizedCost"}
 
 // CostFetchResult carries mapped records/attrs plus a request counter for
-// the $-per-session footer (FR-013): the counter is data returned by the
+// the $-per-session footer: the counter is data returned by the
 // fetcher, not a side effect the caller must separately track.
 type CostFetchResult struct {
 	Records      []costs.Record
@@ -33,12 +33,12 @@ type CostFetchResult struct {
 	// Truncated is true when drainCostUsagePages stopped at costsGridPageCap
 	// with more pages still available — Records is then a lower bound, never
 	// a discovered-complete zero-group result, and must render as partial
-	// rather than as authoritative totals (FR-017: partial dollars rendered
+	// rather than as authoritative totals (partial dollars rendered
 	// as complete dollars is a correctness defect).
 	Truncated bool
 }
 
-// Typed sentinel errors surfaced as explicit view states (FR-017): an
+// Typed sentinel errors surfaced as explicit view states: an
 // empty grid must never masquerade as zero spend.
 var (
 	ErrCostsAccessDenied    = errors.New("cost explorer: access denied")
@@ -49,7 +49,7 @@ var (
 	// GetCostAndUsageWithResources: CE rejects a resource-level call that
 	// doesn't isolate exactly one SERVICE. The drill query always pins one
 	// before reaching RESOURCE_ID (costs.ResourceDrillAllowed), so this
-	// surfaces as an explicit ErrorMsg (FR-017) rather than a raw CE 400 if
+	// surfaces as an explicit ErrorMsg rather than a raw CE 400 if
 	// that gate is ever bypassed.
 	ErrCostsResourceDrillMissingServiceFilter = errors.New("cost explorer: resource-level fetch requires exactly one SERVICE filter")
 )
@@ -75,8 +75,8 @@ func classifyCostsError(err error) error {
 
 // invoiceMetricKey returns the costs.Metric key that UnblendedCost should
 // be parsed into: "unblended" only for the unblended display shape's own
-// NotEquals[RECORD_TYPE] Tax/Credit/Refund exclusion (data-model.md's
-// display mapping) — a distinct Query/CacheKey scoped to a specific set of
+// NotEquals[RECORD_TYPE] Tax/Credit/Refund exclusion — a distinct
+// Query/CacheKey scoped to a specific set of
 // record types. An Equals[RECORD_TYPE] clause is a RECORD_TYPE pivot/drill
 // in invoice mode (digit 6 then Enter), not the unblended shape, and stays
 // keyed under "invoice" so cs.Metric=="invoice" finds it.
@@ -187,10 +187,9 @@ func mapAttrs(dst map[string]string, attrs []cetypes.DimensionValuesWithAttribut
 const costsGridPageCap = 50
 
 // costsAnomalyPageCap bounds FetchCostAnomalies the same way, at a smaller
-// ceiling: GetAnomalies' own generated paginator already treats a
-// nil-or-empty NextPageToken as terminal (the contract this file's hand-rolled
-// loop now matches), so this cap is a pure belt against an account with an
-// unusually large anomaly backlog, not a correctness fix on its own. Firing
+// ceiling: GetAnomalies' own generated paginator treats a nil-or-empty
+// NextPageToken as terminal, and so does this loop, so this cap is a pure
+// belt against an account with an unusually large anomaly backlog. Firing
 // it sets AnomaliesFetchResult.Truncated rather than silently capping the
 // mark set — the same "lower bound, not a discovered-complete result"
 // distinction CostFetchResult.Truncated already makes for the grid fetch.
@@ -209,7 +208,7 @@ type costUsagePage struct {
 // drainCostUsagePages pages fetchPage to exhaustion, mapping every page's
 // groups into Records and every page's DimensionValueAttributes into
 // Attrs. Every request — including a failed one — counts toward
-// RequestCount (FR-013).
+// RequestCount.
 func drainCostUsagePages(invoiceKey costs.Metric, fetchPage func(nextToken *string) (costUsagePage, error)) (CostFetchResult, error) {
 	result := CostFetchResult{Attrs: make(map[string]string)}
 	var token *string
@@ -270,7 +269,7 @@ func FetchCostAndUsage(ctx context.Context, api CostsGetCostAndUsageAPI, q costs
 }
 
 // FetchCostAndUsageWithResources paginates GetCostAndUsageWithResources to
-// exhaustion — the resource-level drill (FR-007), gated by
+// exhaustion — the resource-level drill, gated by
 // costs.ResourceDrillAllowed before this is ever called.
 func FetchCostAndUsageWithResources(ctx context.Context, api CostsGetCostAndUsageWithResourcesAPI, q costs.Query) (CostFetchResult, error) {
 	input := &costexplorer.GetCostAndUsageWithResourcesInput{
@@ -306,7 +305,7 @@ type AnomaliesFetchResult struct {
 
 // FetchCostAnomalies paginates GetAnomalies up to costsAnomalyPageCap,
 // mapping each anomaly's first root cause into a preformatted RootCause
-// string and a Dimension map for per-cell matching (FR-014). Requests is
+// string and a Dimension map for per-cell matching. Requests is
 // the number of GetAnomalies pages actually requested — CostsLoaded.Requests
 // must fold this in alongside the main cost-and-usage fetch's own count,
 // since the anomaly overlay is a separate billed CE call riding alongside
@@ -329,8 +328,7 @@ func FetchCostAnomalies(ctx context.Context, api CostsGetAnomaliesAPI, window co
 			result.Marks = append(result.Marks, mapAnomaly(a))
 		}
 		// Same nil-or-empty stop condition GetAnomaliesPaginator.HasMorePages
-		// itself uses — this hand-rolled loop now matches its own API's
-		// generated paginator instead of diverging from it.
+		// itself uses.
 		if out.NextPageToken == nil || *out.NextPageToken == "" {
 			return result, nil
 		}

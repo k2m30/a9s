@@ -143,7 +143,7 @@ type ServiceClients struct {
 	Backup           BackupAPI
 	MWAA             MWAAAPI
 	Transfer         TransferAPI
-	// CostExplorer is account-scoped, not region-scoped (data-model.md) —
+	// CostExplorer is account-scoped, not region-scoped —
 	// callers never partition it by the session's selected region.
 	CostExplorer CostsAPI
 	STS          *sts.Client

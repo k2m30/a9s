@@ -7,7 +7,7 @@
 //	                        cache and returns the decision plus any fetch
 //	                        TaskRequests the adapter should start.
 //
-// The view construction and all Bubble Tea specifics remain in the TUI adapter
+// The view construction and all Bubble Tea specifics live in the TUI adapter
 // (internal/tui/runtime_adapter.go). The runtime owns only the pure policy:
 // what kind of navigation and whether a server fetch is needed.
 package runtime
@@ -22,8 +22,8 @@ import (
 )
 
 // NavigationKind enumerates the possible outcomes of resolving a
-// RelatedNavigateEvent. The pure contract is documented in
-// §"Related-navigation contract (#278)" on ResolveRelatedNavigate below.
+// RelatedNavigateEvent. The pure contract is documented on
+// ResolveRelatedNavigate below.
 type NavigationKind int
 
 const (
@@ -89,7 +89,7 @@ const (
 	// ID via its registered FetchByIDs helper and navigate straight to its
 	// detail view. It fires
 	// on any cache-miss exact-ID drill for types that have a registered
-	// FetchByIDs (currently: ami, kms, policy, ebs-snap). When the target type
+	// FetchByIDs. When the target type
 	// is in the owned cache, navigation resolves to NavigationKindDetail upstream
 	// and this task is never emitted.
 	KindFetchByIDDetail TaskKind = "fetch-by-id-detail"
@@ -105,8 +105,7 @@ const (
 // rerun's own result instead of treating it as an ordinary list-open fetch.
 // Provenance overrides the executor's default FetchProvenanceCanonicalList
 // stamp — the zero value (FetchProvenanceUnknown) leaves the default in
-// place, so every existing plain list-open/refresh dispatch (which never
-// sets this field) is unaffected. A related-navigation drill that falls back
+// place. A related-navigation drill that falls back
 // to a full- or next-page fetch (HandleRelatedNavigate's TargetID-cache-miss,
 // Truncated-scan, and RelatedIDs-cache-miss branches below) sets it to
 // FetchProvenanceFilteredList: that fetch's result lands on a related
@@ -123,8 +122,7 @@ func (FetchResourcesPayload) isTaskPayload() {}
 
 // FetchMorePayload carries the continuation token the adapter must use when
 // the runtime requests a KindFetchMore fetch. The runtime captures the token
-// from the session cache at dispatch time so the adapter no longer reaches
-// back into session state to re-derive it.
+// from the session cache at dispatch time.
 //
 // ParentContext and FetchFilter are non-nil when the list being paginated is
 // a child list (ParentContext) or a filtered list (FetchFilter). The executor
@@ -179,7 +177,7 @@ func (FetchByIDDetailPayload) isTaskPayload() {}
 // HandleRelatedNavigate resolves the navigation kind using the session cache
 // and returns the decision plus any fetch tasks the adapter should start.
 //
-// View construction and Bubble Tea specifics remain in the TUI adapter so this
+// View construction and Bubble Tea specifics live in the TUI adapter so this
 // handler is platform-agnostic and testable without standing up Bubble Tea.
 func (c *Core) HandleRelatedNavigate(ev RelatedNavigateEvent) (NavigationResult, []TaskRequest) {
 	snap := relatedCacheSnapshot(c.session)
@@ -260,7 +258,6 @@ func (c *Core) RelatedCachedResource(targetType, id string) (resource.Resource, 
 func relatedFetchTasks(s *session.Session, targetType string, relatedIDs []string) []TaskRequest {
 	tr := s.RowStore.Snapshot(targetType)
 
-	// Count how many of the requested IDs are already covered.
 	covered := make(map[string]struct{}, len(relatedIDs))
 	for _, r := range tr.Rows {
 		covered[r.ID] = struct{}{}
@@ -273,7 +270,6 @@ func relatedFetchTasks(s *session.Session, targetType string, relatedIDs []strin
 	}
 
 	if missing == 0 {
-		// All IDs are in cache — no fetch needed.
 		return nil
 	}
 
@@ -304,7 +300,7 @@ func relatedFetchTasks(s *session.Session, targetType string, relatedIDs []strin
 }
 
 // relatedCacheSnapshot returns a flat map[string][]resource.Resource snapshot
-// suitable for the navigation resolver, reading directly from RowStore . A type's rows live in exactly one RowStore entry (full or Partial),
+// suitable for the navigation resolver, reading directly from RowStore. A type's rows live in exactly one RowStore entry (full or Partial),
 // so there is no merge precedence to apply.
 func relatedCacheSnapshot(s *session.Session) map[string][]resource.Resource {
 	all := s.RowStore.SnapshotAll(true)
@@ -320,7 +316,7 @@ func relatedCacheSnapshot(s *session.Session) map[string][]resource.Resource {
 // related-navigation resolution. Exported so tests/unit can drive it without
 // reaching into runtime internals.
 //
-// Related-navigation contract (#278):
+// Related-navigation contract:
 //
 //  1. Unknown target type          → NavigationKindFlash (error surfaced to the user).
 //  2. Child type                   → NavigationKindEnterChildView.

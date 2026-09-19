@@ -12,8 +12,8 @@ import (
 	"github.com/k2m30/a9s/v3/internal/tui/text"
 )
 
-// ctEventsLegend renders the CloudTrail Events glyph + row-tint + cell-color legend
-// per design doc §8a. Called only when context is HelpFromResourceList* and
+// ctEventsLegend renders the CloudTrail Events glyph + row-tint + cell-color legend.
+// Called only when context is HelpFromResourceList* and
 // resourceShortName is "ct-events".
 func (m HelpModel) ctEventsLegend() string {
 	catStyle := styles.HelpCatStyle

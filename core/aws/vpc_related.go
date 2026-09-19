@@ -219,7 +219,6 @@ func checkVPCVPCE(ctx context.Context, clients any, res resource.Resource, cache
 }
 
 // checkVPCCFN checks the VPC's tags for aws:cloudformation:stack-name.
-// No cache access needed — the tag carries the stack name directly.
 func checkVPCCFN(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	raw, ok := assertStruct[ec2types.Vpc](res.RawStruct)
 	if !ok {

@@ -206,10 +206,9 @@ var sharedAthenaFixtures = sync.OnceValue(func() *AthenaFixtures {
 					},
 				},
 			},
-			// The witness for both athena governance findings: settings are not
+			// Carries both athena governance findings: settings are not
 			// enforced, so a caller can override them per query, and results
-			// land unencrypted. Both on one workgroup, because they are
-			// independent codes and nothing else exercises the pair.
+			// land unencrypted.
 			AthenaGovernanceMisconfigured: {
 				WorkGroup: &athenatypes.WorkGroup{
 					Name:  aws.String(AthenaGovernanceMisconfigured),

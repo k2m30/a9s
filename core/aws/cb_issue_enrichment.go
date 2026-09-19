@@ -122,13 +122,11 @@ func EnrichCodeBuildStatus(ctx context.Context, clients *ServiceClients, resourc
 		if b.EndTime != nil {
 			rows = append(rows, domain.DetailRow{Label: "Ended", Value: b.EndTime.Format("2006-01-02")})
 		}
-		// Append the latest failed phase if build is not complete.
 		if !b.BuildComplete {
 			if b.CurrentPhase != nil && *b.CurrentPhase != "" {
 				rows = append(rows, domain.DetailRow{Label: "Current Phase", Value: cbPhaseWords(*b.CurrentPhase), Tier: "~"})
 			}
 		} else {
-			// Find the latest failed phase.
 			for i := len(b.Phases) - 1; i >= 0; i-- {
 				ph := b.Phases[i]
 				if ph.PhaseStatus == cbtypes.StatusTypeFailed {

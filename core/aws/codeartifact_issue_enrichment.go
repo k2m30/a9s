@@ -50,7 +50,6 @@ func EnrichCodeArtifactRepository(ctx context.Context, clients *ServiceClients, 
 	var mu sync.Mutex
 	loopErr := ForEachRow(ctx, &result, resourceIDs(resources), EnrichmentParallelism, func(i int) {
 		r := resources[i]
-		// Support both "repo_name" (fetcher canonical) and "repository_name" (legacy/test alias).
 		repoName := r.Fields["repo_name"]
 		if repoName == "" {
 			repoName = r.Fields["repository_name"]
@@ -58,7 +57,6 @@ func EnrichCodeArtifactRepository(ctx context.Context, clients *ServiceClients, 
 		if repoName == "" {
 			repoName = r.ID
 		}
-		// Support both "domain_name" (fetcher canonical) and "domain" (legacy/test alias).
 		domainName := r.Fields["domain_name"]
 		if domainName == "" {
 			domainName = r.Fields["domain"]

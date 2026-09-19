@@ -6,11 +6,6 @@
 // DetailEnrichmentCtx. Cache lifetime is tied to the session; profile/region
 // rotation rebuilds the cache so entries from a previous account are not
 // returned to the next one.
-//
-// Step Functions definitions are deliberately UNCACHED by design (see
-// enrichSfn's doc comment: the ARN survives a redeploy, so caching would
-// serve a stale definition exactly while an operator watches a deploy) — this
-// cache currently holds only cfn entries.
 package aws
 
 import (
@@ -126,8 +121,8 @@ type DetailDocCache struct {
 func (c *DetailDocCache) Get(key string) any { return c.get(key) }
 
 // Set stores a document in the cache, unconditionally — the op-oblivious
-// write path every caller outside the on-demand detail-enrichment engine
-// uses unchanged.
+// write path for every caller outside the on-demand detail-enrichment
+// engine.
 func (c *DetailDocCache) Set(key string, doc any) { c.set(key, doc) }
 
 // SetIfNewer stores doc under key per opAwareDocStore.setIfNewer's contract,

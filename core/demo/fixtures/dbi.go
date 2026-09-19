@@ -79,7 +79,7 @@ const (
 	WarnDbiPublicMaintARN = "arn:aws:rds:us-east-1:123456789012:db:warn-dbi-public-maint"
 
 	// ProdDbiRetentionParentID — healthy DBI with BackupRetentionPeriod=7.
-	// Used by dbi-snap fixtures to test the "automated snapshot past retention" enricher signal.
+	// Parent of the dbi-snap "automated snapshot past retention" fixture.
 	ProdDbiRetentionParentID  = "prod-dbi-retention-parent"
 	ProdDbiRetentionParentARN = "arn:aws:rds:us-east-1:123456789012:db:prod-dbi-retention-parent"
 
@@ -95,7 +95,6 @@ const (
 	BrokenDbiIncompatibleRestoreID  = "broken-dbi-incompatible-restore"
 	BrokenDbiIncompatibleRestoreARN = "arn:aws:rds:us-east-1:123456789012:db:broken-dbi-incompatible-restore"
 
-	// Shared fixture constants
 	dbiKMSKeyID       = "arn:aws:kms:us-east-1:123456789012:key/a1b2c3d4-5678-90ab-cdef-111111111111"
 	dbiDeadbeefKeyARN = "arn:aws:kms:us-east-1:123456789012:key/deadbeef-0000-0000-0000-000000000000"
 
@@ -117,7 +116,7 @@ const (
 	dbiMonitoringRoleARN  = "arn:aws:iam::123456789012:role/rds-monitoring-role"
 	dbiEnhancedMonitorARN = "arn:aws:iam::123456789012:role/rds-enhanced-monitoring"
 
-	// One witness per security-posture finding. Every other instance takes
+	// One carrier per security-posture finding. Every other instance takes
 	// the healthy value from dbiBaselineHealthy, so the demo bench shows
 	// exactly one row per finding.
 
@@ -146,7 +145,7 @@ const (
 	dbiEngineDeprecatedARN = "arn:aws:rds:us-east-1:123456789012:db:broken-dbi-engine-deprecated"
 
 	// DBIHealthyEngineVersion is the engine version every healthy instance
-	// runs; DBIDeprecatedEngineVersion is the retired one the witness runs.
+	// runs; DBIDeprecatedEngineVersion is the retired one DBIEngineDeprecated runs.
 	// The RDS fake answers DescribeDBEngineVersions from these two.
 	DBIHealthyEngineVersion    = "16.2"
 	DBIDeprecatedEngineVersion = "11.22"
@@ -155,7 +154,6 @@ const (
 )
 
 // NewDBIFixtures builds and returns a fully-populated DBIFixtures struct.
-// The Instances slice contains all non-adversarial fixtures from the spec §2.
 // PendingMaintenanceActions contains the Wave 2 enrichment data for maint-dbi-scheduled.
 var sharedDBIFixtures = sync.OnceValue(func() *DBIFixtures {
 	return &DBIFixtures{
@@ -193,7 +191,7 @@ func dbiBaselineHealthy(id, arn string) rdstypes.DBInstance {
 		MultiAZ:                    aws.Bool(true),
 		PerformanceInsightsEnabled: aws.Bool(true),
 		// Healthy for every security-posture predicate: only the dedicated
-		// witness rows below turn one of these off.
+		// posture instances below turn one of these off.
 		AutoMinorVersionUpgrade:          aws.Bool(true),
 		IAMDatabaseAuthenticationEnabled: aws.Bool(true),
 		CertificateDetails: &rdstypes.CertificateDetails{
@@ -222,7 +220,6 @@ func dbiBaselineHealthy(id, arn string) rdstypes.DBInstance {
 }
 
 func buildDBIInstances() []rdstypes.DBInstance {
-	// 1. prod-dbi-1 — baseline Healthy, graph-connected
 	prodDbi1 := dbiBaselineHealthy(ProdDbiID, ProdDbiARN)
 	prodDbi1.MasterUserSecret = &rdstypes.MasterUserSecret{
 		SecretArn: aws.String(ProdDbiMasterSecretARN),
@@ -233,9 +230,8 @@ func buildDBIInstances() []rdstypes.DBInstance {
 	prodDbi1.MonitoringRoleArn = aws.String(dbiEnhancedMonitorARN)
 	prodDbi1.EnabledCloudwatchLogsExports = []string{"postgresql", "upgrade"}
 
-	// 2. prod-dbi-aurora-1 — Aurora cluster member, Healthy.
-	// This fixture is the "all related pivots non-zero" graph-root for dbi
-	// (asserted in tests/integration/scenario_dbi_visual_test.go). Aurora
+	// prod-dbi-aurora-1 — Aurora cluster member, Healthy, and the graph
+	// root for dbi: every related pivot is non-zero. Aurora
 	// supports all the optional fields below — cluster-level secret + instance
 	// MasterUserSecret may coexist, Enhanced Monitoring works per-instance,
 	// associated roles support S3 import/export workflows, and log exports
@@ -254,7 +250,6 @@ func buildDBIInstances() []rdstypes.DBInstance {
 	auroraBase.MonitoringRoleArn = aws.String(dbiEnhancedMonitorARN)
 	auroraBase.EnabledCloudwatchLogsExports = []string{"postgresql", "upgrade"}
 
-	// 3. staging-dbi-modifying — Warning (transitional with pending class change)
 	modifying := dbiBaselineHealthy(StagingDbiModifyingID, StagingDbiModifyingARN)
 	modifying.DBInstanceStatus = aws.String("modifying")
 	modifying.PendingModifiedValues = &rdstypes.PendingModifiedValues{
@@ -264,44 +259,35 @@ func buildDBIInstances() []rdstypes.DBInstance {
 		{Key: aws.String("Environment"), Value: aws.String("staging")},
 	}
 
-	// 4. staging-dbi-rebooting — Warning (transitional, no pending values)
 	rebooting := dbiBaselineHealthy(StagingDbiRebootingID, StagingDbiRebootingARN)
 	rebooting.DBInstanceStatus = aws.String("rebooting")
 	rebooting.TagList = []rdstypes.Tag{
 		{Key: aws.String("Environment"), Value: aws.String("staging")},
 	}
 
-	// 5. broken-dbi-storage-full — Broken
 	storageFull := dbiBaselineHealthy(BrokenDbiStorageFullID, BrokenDbiStorageFullARN)
 	storageFull.DBInstanceStatus = aws.String("storage-full")
 
-	// 6. broken-dbi-encryption-locked — Broken (inaccessible-encryption-credentials)
 	encLocked := dbiBaselineHealthy(BrokenDbiEncryptionLockedID, BrokenDbiEncryptionLockedARN)
 	encLocked.DBInstanceStatus = aws.String("inaccessible-encryption-credentials")
 	encLocked.StorageEncrypted = aws.Bool(true)
 	encLocked.KmsKeyId = aws.String(dbiDeadbeefKeyARN)
 
-	// 7. warn-dbi-no-backups — Warning (BackupRetentionPeriod=0)
 	noBackups := dbiBaselineHealthy(WarnDbiNoBackupsID, WarnDbiNoBackupsARN)
 	noBackups.BackupRetentionPeriod = aws.Int32(0)
 
-	// 8. warn-dbi-public — Warning (CIS RDS.2 — publicly accessible)
 	public := dbiBaselineHealthy(WarnDbiPublicID, WarnDbiPublicARN)
 	public.PubliclyAccessible = aws.Bool(true)
 
-	// 9. warn-dbi-unencrypted — Warning (CIS RDS.3 — unencrypted storage)
 	unencrypted := dbiBaselineHealthy(WarnDbiUnencryptedID, WarnDbiUnencryptedARN)
 	unencrypted.StorageEncrypted = aws.Bool(false)
 	unencrypted.KmsKeyId = nil
 
-	// 10. warn-dbi-unprotected — Warning (DeletionProtection=false)
 	unprotected := dbiBaselineHealthy(WarnDbiUnprotectedID, WarnDbiUnprotectedARN)
 	unprotected.DeletionProtection = aws.Bool(false)
 
-	// 11. maint-dbi-scheduled — Healthy + pending maintenance (Wave 2 enricher target)
 	maintScheduled := dbiBaselineHealthy(MaintDbiScheduledID, MaintDbiScheduledARN)
 
-	// 12. warn-dbi-multi — 3 Wave 1 warnings stacked (backups=0, public=true, unencrypted)
 	// DeletionProtection=true so only 3 of the 4 warnings fire.
 	// Expected Wave 1 Status: "no automated backups (+2)"
 	warnMulti := dbiBaselineHealthy(WarnDbiMultiID, WarnDbiMultiARN)
@@ -311,31 +297,25 @@ func buildDBIInstances() []rdstypes.DBInstance {
 	warnMulti.KmsKeyId = nil
 	warnMulti.DeletionProtection = aws.Bool(true)
 
-	// 13. warn-dbi-public-maint — Wave 1 warning (public) + Wave 2 maintenance
 	// Expected Wave 1 Status: "publicly accessible"
 	// Expected Status after Wave 2 enrichment: "publicly accessible (+1)"
 	warnPublicMaint := dbiBaselineHealthy(WarnDbiPublicMaintID, WarnDbiPublicMaintARN)
 	warnPublicMaint.PubliclyAccessible = aws.Bool(true)
 
-	// 14. prod-dbi-retention-parent — Healthy DBI with BackupRetentionPeriod=7.
 	// Used as the parent of WarnDBISnapPastRetentionID in dbi-snap fixtures to
 	// trigger the "automated snapshot past BackupRetentionPeriod" enricher signal.
 	retentionParent := dbiBaselineHealthy(ProdDbiRetentionParentID, ProdDbiRetentionParentARN)
 	retentionParent.BackupRetentionPeriod = aws.Int32(7)
 
-	// 15. broken-dbi-incompatible-network — Broken (DBInstanceStatus=incompatible-network)
 	incompatNetwork := dbiBaselineHealthy(BrokenDbiIncompatibleNetworkID, BrokenDbiIncompatibleNetworkARN)
 	incompatNetwork.DBInstanceStatus = aws.String("incompatible-network")
 
-	// 16. broken-dbi-incompatible-option-group — Broken (DBInstanceStatus=incompatible-option-group)
 	incompatOptionGroup := dbiBaselineHealthy(BrokenDbiIncompatibleOptionGroupID, BrokenDbiIncompatibleOptionGroupARN)
 	incompatOptionGroup.DBInstanceStatus = aws.String("incompatible-option-group")
 
-	// 17. broken-dbi-incompatible-restore — Broken (DBInstanceStatus=incompatible-restore)
 	incompatRestore := dbiBaselineHealthy(BrokenDbiIncompatibleRestoreID, BrokenDbiIncompatibleRestoreARN)
 	incompatRestore.DBInstanceStatus = aws.String("incompatible-restore")
 
-	// 18-23. One witness per security-posture finding.
 	singleAZ := dbiBaselineHealthy(DBISingleAZ, dbiSingleAZARN)
 	singleAZ.MultiAZ = aws.Bool(false)
 

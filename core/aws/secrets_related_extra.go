@@ -197,7 +197,6 @@ func checkSecretsECSTask(ctx context.Context, clients any, res resource.Resource
 		if taskDefARN == "" {
 			continue
 		}
-		// Fetch the task definition to inspect container secrets
 		tdOut, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*ecspkg.DescribeTaskDefinitionOutput, error) {
 			return ecsAPI.DescribeTaskDefinition(ctx, &ecspkg.DescribeTaskDefinitionInput{
 				TaskDefinition: &taskDefARN,
@@ -206,8 +205,7 @@ func checkSecretsECSTask(ctx context.Context, clients any, res resource.Resource
 		if err != nil {
 			// "Task definition does not exist" (ClientException) is definitive
 			// absence, not a real failure — skip without aggregating. Every
-			// other error (AccessDenied, Throttling, transient) aggregates per
-			// the E3 rule. Mirrors ecsJoinEFSVolumes in ecs_task.go.
+			// other error (AccessDenied, Throttling, transient) aggregates.
 			if ErrCodeIs(err, "ClientException") {
 				continue
 			}
@@ -282,7 +280,6 @@ func checkSecretsLogs(ctx context.Context, clients any, res resource.Resource, c
 
 	c, cok := clients.(*ServiceClients)
 	if !cok || c == nil {
-		// Return the default log group name derived from the ARN
 		return relatedResult("logs", []string{defaultLogGroup})
 	}
 	lambdaAPI, ok := c.Lambda.(LambdaGetFunctionAPI)
@@ -452,7 +449,7 @@ func checkSecretsSNS(ctx context.Context, clients any, res resource.Resource, _ 
 	// The rotation function's configuration is where the dead-letter topic is
 	// named, so a call that did not answer leaves the count unknown; reporting
 	// zero read as "checked, no topic".
-	// no finding: this arm now answers with the related panel's unknown.
+	// no finding: this arm answers with the related panel's unknown.
 	if err != nil || out == nil || out.Configuration == nil {
 		return resource.UnknownRelated("sns")
 	}

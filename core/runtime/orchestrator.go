@@ -39,8 +39,8 @@ type Core struct {
 
 // New constructs a Core bound to the given session and catalog snapshot.
 // The catalog slice is borrowed, not copied — callers must treat
-// the installed catalog as immutable for the lifetime of the Core, which
-// matches the existing static-catalog contract.
+// the installed catalog as immutable for the lifetime of the Core, per the
+// static-catalog contract.
 func New(s *session.Session, types []catalog.ResourceTypeDef) *Core {
 	return &Core{session: s, types: types}
 }
@@ -52,9 +52,7 @@ func (c *Core) SetIsDemo(v bool) { c.isDemo = v }
 // IsDemo reports whether the runtime is operating in demo mode.
 func (c *Core) IsDemo() bool { return c.isDemo }
 
-// Session returns the runtime-owned session handle. Adapters need this
-// during the migration to read state the per-handler PRs have not yet
-// migrated; the field becomes private-only once handler moves complete.
+// Session returns the runtime-owned session handle.
 func (c *Core) Session() *session.Session { return c.session }
 
 // Types returns the catalog snapshot the Core was constructed with.
@@ -74,31 +72,6 @@ func (c *Core) SetSaveColumns(fn func(shortName string) []config.ListColumn) {
 // tasks to start.
 //
 // Unrecognised event types fall through to the nil, nil default.
-//
-// Messages NOT wired here (skipped — double-dispatch risk):
-//
-//	messages.ResourcesLoaded      — TUI shim handleResourcesLoaded calls
-//	                                Core.HandleResourcesLoaded directly after
-//	                                adapter-side derive + updateActiveView.
-//	messages.RelatedCheckResult   — TUI shim handleRelatedCheckResult resolves
-//	                                sourceID from the active detail view before
-//	                                calling Core.HandleRelatedCheckResult.
-//	messages.EnrichDetailResult   — TUI shim handleEnrichDetailResult does
-//	                                adapter-side staleness drop and derive
-//	                                before calling Core.HandleEnrichDetailResult.
-//	messages.ValueRevealed        — TUI shim handleValueRevealed requires the
-//	                                adapter's flash.gen for staleness surface.
-//	messages.ClientsReady         — TUI shim handleClientsReady passes
-//	                                StackDepth and HasActiveRL (renderer state)
-//	                                into Core.HandleClientsReady.
-//	messages.Flash                — TUI shim handleFlash bumps flash.gen before
-//	                                calling Core.HandleFlash.
-//	messages.ClearFlash           — TUI shim handleClearFlash passes flash.gen
-//	                                and flash.isError (adapter state) into Core.
-//	messages.ThemeFileRead        — TUI shim handleThemeFileRead runs
-//	                                styles.ThemeFromYAML (renderer package) to
-//	                                produce ParseErr before calling Core.
-//	profilesLoadedMsg             — TUI-private type; no messages.* counterpart.
 func (c *Core) HandleEvent(ev Event) ([]UIIntent, []TaskRequest) {
 	if g, ok := ev.(messages.GenStamped); ok && messages.IsStale(g, c.session) {
 		return nil, nil
@@ -115,50 +88,32 @@ func (c *Core) HandleEvent(ev Event) ([]UIIntent, []TaskRequest) {
 	case messages.EnrichmentChecked:
 		return c.handleEnrichmentChecked(msg)
 	case messages.ResourcesLoaded:
-		// Row-store dual-write, PLUS the list-open Wave-2 probe task — but
-		// NEVER HandleResourcesLoaded's ClearFlash/PatchResourceCache intents.
-		// The TUI adapter calls Core.HandleResourcesLoaded
-		// directly (bypassing HandleEvent entirely, see
+		// Forwards HandleResourcesLoaded's tasks (the list-open Wave-2 probe),
+		// its FlashIntent and its verdict (filterResourcesLoadedIntents) — but
+		// NEVER its ClearFlash/PatchResourceCache intents. The TUI adapter
+		// calls Core.HandleResourcesLoaded directly (see
 		// runtime_adapter_resources.go) and Controller.Handle
-		// (core/app/handle.go) already runs its own, separate
-		// ResourcesLoaded pipeline (handleResourcesLoadedEvent /
-		// applyResourcesLoaded). Applying HandleResourcesLoaded's ClearFlash/
-		// PatchResourceCache intents here too would double-apply them for
-		// every Controller.Handle caller (web/headless/tests) — a real
-		// core/app behavior change this stage must not make. Feed RowStore
-		// the same canonicalization + Fetch-origin write HandleResourcesLoaded
-		// performs, then call HandleResourcesLoaded ourselves and forward its
-		// tasks plus its FlashIntent and its verdict
-		// (filterResourcesLoadedIntents): a partial-fetch
-		// composite error (C4) is the one intent HandleResourcesLoaded emits
-		// that has no other producer on this lane — applyResourcesLoaded only
-		// installs the screen's own LastFetchError marker, it never flashes —
-		// so dropping it here left a partial failure completely invisible on
-		// web/headless while the TUI (which applies HandleResourcesLoaded's
-		// intents in full via dispatchCoreScreenResult) already surfaced it.
-		// A TaskRequest is not an intent and is never double-applied by
+		// (core/app/handle.go) runs its own ResourcesLoaded pipeline
+		// (handleResourcesLoadedEvent / applyResourcesLoaded); applying those
+		// intents here too would double-apply them for every
+		// Controller.Handle caller (web/headless/tests). A partial-fetch
+		// composite error's FlashIntent has no other producer on this lane:
+		// applyResourcesLoaded only installs the screen's own LastFetchError
+		// marker, it never flashes. A TaskRequest is never double-applied by
 		// Controller.Handle (only applyIntents(intents) is), so the tasks are
-		// still forwarded unfiltered: this is the one shared producer for the
-		// Wave-2 list-open dispatch that reaches the web/headless lane. The
-		// TUI reaches the same producer via its own direct
-		// HandleResourcesLoaded call in runtime_adapter_resources.go, so that
-		// task is emitted exactly once per lane per list load.
+		// forwarded unfiltered: this is the one shared producer for the
+		// Wave-2 list-open dispatch on the web/headless lane, and the TUI
+		// reaches the same producer via its own direct call, so the task is
+		// emitted exactly once per lane per list load.
 		//
-		// The RowStore write is NOT here. Controller.Handle is the only caller
-		// that reaches this case with a ResourcesLoaded (the TUI routes the
-		// message to its own shim), and its pipeline observes the same rows a
-		// few lines later — materialized, which is the shape every reader
-		// wants. Two observations of one delivery meant two deep clones of the
-		// row set under the controller lock, and the second one won anyway.
-		// core/app.Controller.handleResourcesLoadedEvent owns the write for
-		// every screen state, including a canonical result whose screen is
-		// gone.
-		//
-		// Nor is the supersession check here any more. HandleResourcesLoaded
-		// asks it once and the answer leaves as a ListResultVerdict, which
-		// Controller.Handle stamps onto the message before its own pipeline
-		// sees it — a second check on this lane could only ever agree, or be
-		// the one that got it wrong.
+		// core/app.Controller.handleResourcesLoadedEvent owns the RowStore
+		// write for every screen state, including a canonical result whose
+		// screen is gone: Controller.Handle is the only caller that reaches
+		// this case with a ResourcesLoaded, and its pipeline observes the
+		// same rows materialized, the shape every reader wants. The
+		// supersession question is answered once, by HandleResourcesLoaded,
+		// as a ListResultVerdict Controller.Handle stamps onto the message
+		// before its own pipeline sees it.
 		intents, tasks := c.HandleResourcesLoaded(ResourcesLoadedEvent{
 			ResourceType: msg.ResourceType,
 			Resources:    msg.Resources,
@@ -183,12 +138,12 @@ func (c *Core) HandleEvent(ev Event) ([]UIIntent, []TaskRequest) {
 	case messages.IdentityError:
 		return c.HandleIdentityError(IdentityErrorEvent{Err: msg.Err})
 	case messages.APIError:
-		// Per cache contract C4: a headless/web caller feeding a failed KindFetchResources
+		// A headless/web caller feeding a failed KindFetchResources
 		// execution's messages.APIError straight through HandleEvent (rather
 		// than the TUI shim's bump-then-call path) must still get the
 		// classification + ClearActiveListLoadingIntent(Err) intent — a web
 		// caller has no adapter-owned flash.gen, so ConnectGen serves as the
-		// stable stand-in (same pattern Controller.Handle already uses for
+		// stable stand-in (the same pattern Controller.Handle uses for
 		// this event). The FlashTick task is dropped: it is only meaningful
 		// to a running event loop (TUI/web timer), and a headless/orchestrator
 		// caller has no loop to process it.
@@ -214,8 +169,7 @@ func (c *Core) HandleEvent(ev Event) ([]UIIntent, []TaskRequest) {
 // HandleEvent's messages.ResourcesLoaded case uses it to forward the
 // partial-fetch-error flash without forwarding the ClearFlash/
 // PatchResourceCache intents Controller.Handle's own ResourcesLoaded pipeline
-// already owns (see that case's doc comment for why double-applying those
-// would be a real behavior change). The verdict is not applied to anything —
+// owns (see that case's comment). The verdict is not applied to anything —
 // it is how the canonical short name and the supersession answer reach the
 // pipeline that consumes the message (StampListResult).
 func filterResourcesLoadedIntents(intents []UIIntent) []UIIntent {

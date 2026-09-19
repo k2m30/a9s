@@ -4,7 +4,7 @@
 //
 // Thin wrapper around EnrichSnapshotCrossRef (snapshot_cross_ref.go) configured
 // with the dbi-snap parent (rds DBInstance) extractors. The enricher detects
-// two signals from docs/resources/dbi-snap.md §3.1:
+// two signals (docs/resources/dbi-snap.md):
 //
 //  1. orphan: parent DBInstanceIdentifier NOT found in the loaded dbi cache.
 //     Phrase: "orphan: source DB deleted"

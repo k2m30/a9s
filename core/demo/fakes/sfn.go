@@ -110,7 +110,7 @@ func validateSFNArn(val string) error {
 	return nil
 }
 
-// ListTagsForResource returns an empty tag list — demo mode does not model SFN tags.
+// ListTagsForResource returns an empty tag list.
 func (f *SFNFake) ListTagsForResource(_ context.Context, _ *sfn.ListTagsForResourceInput, _ ...func(*sfn.Options)) (*sfn.ListTagsForResourceOutput, error) {
 	return &sfn.ListTagsForResourceOutput{}, nil
 }

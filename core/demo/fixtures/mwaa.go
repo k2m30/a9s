@@ -20,7 +20,7 @@ type MWAAFixtures struct {
 	// this value.
 	Environments map[string]mwaatypes.Environment
 	// DeniedNames are listed by ListEnvironments but GetEnvironment returns
-	// AccessDeniedException for them — the live-witnessed IAM shape where a
+	// AccessDeniedException for them — the IAM shape where a
 	// role may list environments but not read their details. The fetcher
 	// keeps these as name-only degraded rows (finding mwaa.warn.details_denied).
 	DeniedNames []string
@@ -31,7 +31,7 @@ type MWAAFixtures struct {
 }
 
 // Exported environment-name constants — referenced by sibling fixture files
-// (as the alarm dimension value / log-group name segment) and by QA tests.
+// (as the alarm dimension value / log-group name segment) and by tests.
 const (
 	ProdAirflowEtlID            = "prod-airflow-etl"
 	ProdAirflowReportingID      = "prod-airflow-reporting"
@@ -82,8 +82,8 @@ func mwaaLogGroupArn(envName, component string) string {
 }
 
 // mwaaLoggingConfig builds all five per-component logging configurations for
-// envName. webserverEnabled=false models the wave-3 anti-test fixture
-// (prod-airflow-reporting): a disabled logging component must never raise a
+// envName. webserverEnabled=false models prod-airflow-reporting:
+// a disabled logging component must never raise a
 // finding.
 func mwaaLoggingConfig(envName string, webserverEnabled bool) *mwaatypes.LoggingConfiguration {
 	component := func(name string, enabled bool) *mwaatypes.ModuleLoggingConfiguration {
@@ -127,7 +127,7 @@ func mwaaPublicWebserverURL(uuidNoDashes string) string {
 // mwaaCeleryQueueARN builds the Celery Executor queue ARN in an AWS-owned
 // account (471100000000) — distinct from the customer account, mirroring
 // the real AWS-owned-account reality (detail fact only, no related-panel
-// pivot: docs/resources/mwaa.md §2 `sqs` exclusion).
+// pivot: docs/resources/mwaa.md).
 func mwaaCeleryQueueARN(uuid string) string {
 	return "arn:aws:sqs:" + mwaaRegion + ":471100000000:airflow-celery-" + uuid
 }
@@ -168,7 +168,7 @@ func mwaaBaseEnvironment(name string, status mwaatypes.EnvironmentStatus, class 
 }
 
 // withLastUpdateFailed overrides env's LastUpdate to a failed update carrying
-// errorCode/errorMessage — the "last update failed" §3.2 finding witness.
+// errorCode/errorMessage, raising the "last update failed" finding.
 func withLastUpdateFailed(env mwaatypes.Environment, errorCode, errorMessage string) mwaatypes.Environment {
 	env.LastUpdate = &mwaatypes.LastUpdate{
 		Status:    mwaatypes.UpdateStatusFailed,
@@ -193,7 +193,7 @@ var sharedMWAAFixtures = sync.OnceValue(func() *MWAAFixtures {
 	etl.WeeklyMaintenanceWindowStart = aws.String("WED:22:30")
 	envs[ProdAirflowEtlID] = etl
 
-	// Healthy silence row: WebserverLogs disabled (wave-3 anti-test — a
+	// Healthy silence row: WebserverLogs disabled (a
 	// disabled logging component must never raise a finding). mw1.small, 1
 	// scheduler.
 	reporting := mwaaBaseEnvironment(ProdAirflowReportingID, mwaatypes.EnvironmentStatusAvailable, "mw1.small",
@@ -250,7 +250,7 @@ var sharedMWAAFixtures = sync.OnceValue(func() *MWAAFixtures {
 	envs[WarnAirflowPublicID] = public
 
 	// AVAILABLE + LastUpdate FAILED + PUBLIC_ONLY — both background findings
-	// on the same green row: S4 "last update failed (+1)".
+	// on the same green row: "last update failed (+1)".
 	multi := mwaaBaseEnvironment(WarnAirflowMultiID, mwaatypes.EnvironmentStatusAvailable, "mw1.small",
 		"3a4b4c5d6e7f40819223344556677899")
 	multi = withLastUpdateFailed(multi, "INCORRECT_CONFIGURATION", "Scheduler failed to launch: requirements.txt install failed")
@@ -258,9 +258,9 @@ var sharedMWAAFixtures = sync.OnceValue(func() *MWAAFixtures {
 	multi.WebserverUrl = aws.String(mwaaPublicWebserverURL("3a4b4c5d6e7f40819223344556677899"))
 	envs[WarnAirflowMultiID] = multi
 
-	// Listed but GetEnvironment-denied — the live-witnessed IAM shape (a
+	// Listed but GetEnvironment-denied — the IAM shape of a
 	// readonly role allowing ListEnvironments while denying
-	// airflow:GetEnvironment). Renders as a name-only degraded row with the
+	// airflow:GetEnvironment. Renders as a name-only degraded row with the
 	// `details denied` finding; deliberately NOT in the Environments map.
 	denied := []string{WarnAirflowDetailsDeniedID}
 

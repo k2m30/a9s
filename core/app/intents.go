@@ -10,9 +10,9 @@ import (
 // ApplyIntents applies a slice of UIIntents to the controller's screen stack
 // and state: stack navigation (Push/Pop/Replace/PopSelector), menu
 // availability/issue/progress patches, list enrichment, identity, flash, and
-// error-log/hint state. The few remaining variants are intentional no-ops
+// error-log/hint state. The remaining variants are intentional no-ops
 // (documented at the default case) — renderer-specific or served via another
-// controller path, not migration leftovers.
+// controller path.
 //
 // ApplyIntents never panics on a PopScreen against an empty stack.
 // It returns the post-apply ViewState snapshot.
@@ -42,8 +42,7 @@ func (c *Controller) applyIntentsLocked(intents []runtime.UIIntent) {
 			// zero-valued and carry the child type in ChildListPayload instead —
 			// resolve it here so the pushed Screen.Ctx.ResourceType is non-empty
 			// (topListState/ensureListState key off it, and the renderer builder
-			// resolves the same field). Mirrors the TUI adapter's pre-collapse
-			// PushScreen case in app_dispatch.go.
+			// resolves the same field).
 			if ctx.ResourceType == "" {
 				if clp, ok := v.Payload.(runtime.ChildListPayload); ok {
 					ctx.ResourceType = clp.ChildType
@@ -55,9 +54,8 @@ func (c *Controller) applyIntentsLocked(intents []runtime.UIIntent) {
 			})
 
 		case runtime.PopScreen:
-			// Never pop the root screen (the menu) — mirrors the TUI's popView
-			// (app_stack.go), which refuses to pop the last screen. Popping to an
-			// empty stack would blank the app to BodyKindUnknown.
+			// Never pop the root screen (the menu): popping to an empty stack
+			// would blank the app to BodyKindUnknown.
 			if len(c.stack) > 1 {
 				c.forgetListFetchSeqOf(c.stack[len(c.stack)-1])
 				c.stack = c.stack[:len(c.stack)-1]
@@ -86,7 +84,7 @@ func (c *Controller) applyIntentsLocked(intents []runtime.UIIntent) {
 
 		case runtime.PatchMenuAvailability:
 			if ms := c.rootMenuState(); ms != nil {
-				// C1/C9: a live answer outranks any seed. A cache-origin
+				// A live answer outranks any seed. A cache-origin
 				// patch that arrives after this type was verified this
 				// session is a load that lost the race — applying it would
 				// regress the count the operator is looking at back to the
@@ -100,7 +98,7 @@ func (c *Controller) applyIntentsLocked(intents []runtime.UIIntent) {
 				// such as "rds" for ShortName "dbi"). buildMenuBody resolves the
 				// active key per item using menuActiveKey().
 				applyAvailabilityObservation(ms, v.ResourceType, v.Count, v.Truncated)
-				// Per cache contract C3: track cache-seeded vs live-verified origin
+				// Track cache-seeded vs live-verified origin
 				// independently of the exactness guard above — a truncated
 				// sweep result that loses the count/truncated race still
 				// means the type WAS live-checked this session, so its
@@ -114,8 +112,8 @@ func (c *Controller) applyIntentsLocked(intents []runtime.UIIntent) {
 			}
 
 		case runtime.PatchMenu:
-			// A live observation (empty Origin): it assigns, exactly as it
-			// always has, but through the one badge writer.
+			// A live observation (empty Origin): it assigns, through the one
+			// badge writer.
 			if ms := c.rootMenuState(); ms != nil {
 				c.applyMenuIssueObservation(ms, v.ResourceType, v.Issues, v.Truncated, "")
 			}
@@ -157,7 +155,7 @@ func (c *Controller) applyIntentsLocked(intents []runtime.UIIntent) {
 			if ms := c.rootMenuState(); ms != nil {
 				ms.ClearAvailability()
 			}
-			// C9: this intent is the only rotation-visible chokepoint on the
+			// This intent is the only rotation-visible chokepoint on the
 			// Controller — fired by both HandleProfileSelected and
 			// HandleRegionSelected (core/runtime/handlers.go), as well as
 			// menu Ctrl+R. session.Rotate bumps generation counters but never
@@ -178,8 +176,7 @@ func (c *Controller) applyIntentsLocked(intents []runtime.UIIntent) {
 				// v.Issues is populated by the sole PatchResourceList producer
 				// (runtime/handlers_availability.go's HandleEnrichmentChecked) with
 				// the unified cross-wave count on every emission; nil is a
-				// defensive fallback for a hypothetical future producer that
-				// forgets to set it, not an observed case today.
+				// defensive fallback.
 				issueCount, issueTruncated := 0, false
 				issuesAuthoritative := v.Issues != nil
 				if v.Issues != nil {
@@ -193,8 +190,7 @@ func (c *Controller) applyIntentsLocked(intents []runtime.UIIntent) {
 				// v.Enrichment.Findings/AttentionDetails carry every
 				// independently-evaluated Wave-2 condition per resource —
 				// applyEnrichmentState stores them directly in the controller's
-				// single enrichment store; no single-representative reduction or
-				// fallback wrapping happens on this write path.
+				// single enrichment store.
 				if v.Enrichment.RowIDs != nil {
 					c.mergeEnrichmentRows(v.ResourceType, issueCount, issueTruncated, v.Enrichment.Findings, v.Enrichment.AttentionDetails, v.Enrichment.RowIDs, issuesAuthoritative)
 					c.applyListFieldUpdates(v.ResourceType, v.Enrichment.FieldUpdates)
@@ -209,13 +205,12 @@ func (c *Controller) applyIntentsLocked(intents []runtime.UIIntent) {
 				// ...and the findings themselves must land on the controller's own
 				// rows (ls.Rows / the RowStore-backed type cache) — the list-open
 				// save path persists from them, so without this the on-disk cache
-				// rows carry no findings and reseed glyphless (violating
-				// C6's persisted-findings round-trip). A
+				// rows carry no findings and reseed glyphless. A
 				// multi-condition resource keeps every Finding — and every
 				// finding's own AttentionDetail — on the row.
 				// TruncatedIDs is the runtime's own decision about which rows
 				// this result speaks for; the controller folds the same rows
-				// the runtime did and re-decides nothing.
+				// the runtime did.
 				c.applyRowFindings(v.ResourceType, v.Enrichment.Findings, v.Enrichment.AttentionDetails, v.Enrichment.TruncatedIDs)
 			}
 
@@ -235,8 +230,8 @@ func (c *Controller) applyIntentsLocked(intents []runtime.UIIntent) {
 			// (never by a same-pair refresh) so the previous pair's ARN is never
 			// served — via CopyContent or the identity screen — after a rotation,
 			// before the new pair's identity fetch (if any) lands. identityLoading
-			// is deliberately left alone: it is owned by handleActionOpenIdentity's
-			// fetch-start/fetch-end lifecycle, not this rotation chokepoint.
+			// belongs to handleActionOpenIdentity's fetch-start/fetch-end
+			// lifecycle, not this rotation chokepoint.
 			c.identityResult = nil
 			c.identityErrMsg = ""
 
@@ -278,7 +273,7 @@ func (c *Controller) applyIntentsLocked(intents []runtime.UIIntent) {
 			// top-of-stack list screen.
 			if ls := c.clearActiveListLoadingTarget(v); ls != nil {
 				ls.clearFetchInFlight(v.LoadingMore, v.ListSeq)
-				// Per cache contract C4: a fetch failure over cached content stops the
+				// A fetch failure over cached content stops the
 				// refreshing marker and swaps in an error marker instead —
 				// nothing goes blank, rows stay on screen.
 				if v.Err != "" {
@@ -296,12 +291,12 @@ func (c *Controller) applyIntentsLocked(intents []runtime.UIIntent) {
 			// Idempotent per def: REPLACES any existing entry for this
 			// DefDisplayName under the key rather than appending a second
 			// one. The cache is read for completeness
-			// (core/app/navigate.go's relatedCacheCoverage, R2/R3) as well
+			// (core/app/navigate.go's relatedCacheCoverage) as well
 			// as panel replay, so a re-observed result for an
 			// already-covered def must update in place — an append-only
-			// write let a re-run of the related-check fan-out (e.g. a
+			// write would let a re-run of the related-check fan-out (e.g. a
 			// YAML/JSON open, whose suppression decision is independent of
-			// whether a detail panel is on top) silently double up every
+			// whether a detail panel is on top) double up every
 			// def's entry on each pass. This is also the write-through that
 			// makes the cache-hit replay path in openSelectedListDetail
 			// (controller.go) and openRelatedDetail (navigate.go) hit on a
@@ -332,9 +327,8 @@ func (c *Controller) applyIntentsLocked(intents []runtime.UIIntent) {
 			// resource type — not just the currently active one. When a user has
 			// navigated from detail-A to detail-B, enrichment results for both
 			// must reach both screens, so popping back to detail-A shows the
-			// correct Attention section immediately. Mirrors the TUI adapter's
-			// former local PatchDetail case in app_dispatch.go (removed — this is
-			// now the single source of truth for both TUI and web/headless).
+			// correct Attention section immediately. This is the single source of
+			// truth for both TUI and web/headless.
 			c.applyDetailFieldUpdates(v.ResourceType, v.FieldUpdates)
 			switch {
 			case v.ResourceID != "":
@@ -362,10 +356,9 @@ func (c *Controller) applyIntentsLocked(intents []runtime.UIIntent) {
 			}
 
 		// The remaining intents are renderer-specific or are served through
-		// another controller path, so they are intentional no-ops here rather
-		// than migration leftovers:
+		// another controller path, so they are intentional no-ops here:
 		//   RefreshActiveListIntent — carries no state of its own to apply here;
-		//                             the C10 replay it signals is turned into a
+		//                             the pre-connect replay it signals is turned into a
 		//                             fetch task by refreshTasksForIntents, which
 		//                             callers (Handle, BootstrapLive) invoke
 		//                             alongside applyIntents.
@@ -380,8 +373,8 @@ func (c *Controller) applyIntentsLocked(intents []runtime.UIIntent) {
 }
 
 // refreshTasksForIntents scans intents for RefreshActiveListIntent and, when
-// present, returns the active-list (or, P5, active costs screen) refresh
-// tasks (C10: a navigation/fetch issued before AWS connect completes must
+// present, returns the active-list (or active costs screen) refresh
+// tasks (a navigation/fetch issued before AWS connect completes must
 // replay once connected). Shared by Handle and BootstrapLive so the scan is
 // not duplicated across the TUI-independent ClientsReady seams. Callers must
 // hold c.mu.

@@ -32,7 +32,7 @@ func (f *ACMFake) ListCertificates(_ context.Context, _ *acm.ListCertificatesInp
 // EnrichACMCertificate's expiry/orphan Wave-2 issue checks) plus InUseBy +
 // DomainValidationOptions for known demo certs so the acm:elb / acm:apigw /
 // acm:r53 related-panel checkers (which call this API directly) resolve real
-// witnesses instead of an empty stub. ARN validation is still enforced so
+// certificate users. ARN validation is enforced so
 // that callers passing a bare certificate name are caught early.
 func (f *ACMFake) DescribeCertificate(_ context.Context, input *acm.DescribeCertificateInput, _ ...func(*acm.Options)) (*acm.DescribeCertificateOutput, error) {
 	if input == nil || input.CertificateArn == nil {

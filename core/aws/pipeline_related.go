@@ -2,7 +2,7 @@
 
 // pipeline_related.go contains CodePipeline pipeline related-resource checker functions.
 //
-// All pipeline→* checkers here use Pattern C: a single GetPipeline call per checker
+// All pipeline→* checkers here make a single GetPipeline call per checker
 // (wrapped in RetryOnThrottle) resolves the full stage/action structure for the
 // pipeline. Action configuration maps (key-value strings) are mined for the relevant
 // target resource identifiers based on the action Provider. Bare names (not ARNs) are
@@ -29,7 +29,7 @@ var errPipelineNotConfigured = errors.New("codepipeline client not configured")
 // pipelineGetDeclaration wraps GetPipeline in RetryOnThrottle. A nil error
 // means the declaration was resolved; any non-nil error means it was not, and
 // the caller must not treat that the same as a definitive "not found". Per
-// the golden contract (docs/related-resources.md rule 6), the error must be
+// docs/related-resources.md, the error must be
 // classified — never collapsed wholesale — via pipelineRelatedOnErr:
 // errPipelineNotConfigured means no CodePipeline client was even wired to
 // attempt the call (structurally can't look, ever — UnknownRelated, still
@@ -63,8 +63,8 @@ func pipelineGetDeclaration(ctx context.Context, clients any, pipelineName strin
 }
 
 // pipelineRelatedOnErr classifies a pipelineGetDeclaration failure into the
-// correct RelatedCheckResult, per the golden contract's error rule
-// (docs/related-resources.md rule 6): errPipelineNotConfigured is the one
+// correct RelatedCheckResult, per the error rule in
+// docs/related-resources.md: errPipelineNotConfigured is the one
 // structural "we never even attempted the call" case — no client was wired,
 // retrying changes nothing — and stays UnknownRelated. Every other error
 // means GetPipeline was actually invoked and failed (AccessDenied, exhausted
@@ -124,7 +124,7 @@ func checkPipelineCB(ctx context.Context, clients any, res resource.Resource, _ 
 }
 
 // checkPipelineRole returns the pipeline's service role (Pipeline.RoleArn) and
-// any per-action role overrides. Pattern C: GetPipeline.
+// any per-action role overrides.
 func checkPipelineRole(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	p, err := pipelineGetDeclaration(ctx, clients, res.ID)
 	if err != nil {
@@ -134,7 +134,6 @@ func checkPipelineRole(ctx context.Context, clients any, res resource.Resource, 
 	if p.RoleArn != nil && *p.RoleArn != "" {
 		names = append(names, *p.RoleArn)
 	}
-	// Also include any per-action RoleArn overrides.
 	pipelineActions(p, func(_ string, a cptypes.ActionDeclaration) {
 		if a.RoleArn != nil {
 			names = append(names, *a.RoleArn)
@@ -281,7 +280,6 @@ func checkPipelineS3(ctx context.Context, clients any, res resource.Resource, _ 
 	for _, st := range p.ArtifactStores {
 		addBucket(&st)
 	}
-	// Also include S3 deploy action buckets.
 	pipelineActions(p, func(_ string, a cptypes.ActionDeclaration) {
 		if actionProvider(a) != "S3" {
 			return
@@ -316,7 +314,7 @@ func mapKeys(m map[string]struct{}) []string {
 }
 
 // checkPipelineEbRule resolves EventBridge rules that target this CodePipeline pipeline.
-// Pattern C: one events:ListRuleNamesByTarget call using the pipeline ARN from
+// One events:ListRuleNamesByTarget call using the pipeline ARN from
 // res.Fields["arn"]. Count = len(RuleNames).
 func checkPipelineEbRule(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	pipelineARN := res.Fields["arn"]

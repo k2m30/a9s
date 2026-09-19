@@ -21,12 +21,6 @@
 //  2. EnrichS3Posture in s3_issue_enrichment.go — mark the bucket's
 //     ID in TruncatedIDs (row "?") but skip the failure-aggregate entry so
 //     the `!` log stays quiet on multi-region accounts.
-//
-// This regression class was latent: the only checker that classified
-// cross-region (the issue enricher) kept its detection inline, so the four
-// related-def checkers fell through to an UnknownRelated result. Extracting the classifier
-// into one helper makes future call-site additions (more per-bucket S3 calls)
-// consistent by default.
 package aws
 
 // isS3CrossRegionErr reports whether err is the S3 cross-region rejection

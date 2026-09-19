@@ -123,7 +123,7 @@ func (f *EKSFake) DescribeNodegroup(_ context.Context, input *eks.DescribeNodegr
 // DescribeClusterVersions reports the support state of every Kubernetes minor
 // the fixtures use. Only the minor named by fixtures.EKSVersionUnsupported's
 // cluster is out of standard support, so exactly one demo row carries the
-// version finding and no cluster's Version column had to be changed for it.
+// version finding.
 func (f *EKSFake) DescribeClusterVersions(_ context.Context, _ *eks.DescribeClusterVersionsInput, _ ...func(*eks.Options)) (*eks.DescribeClusterVersionsOutput, error) {
 	out := &eks.DescribeClusterVersionsOutput{}
 	for version, status := range fixtures.EKSVersionSupport {

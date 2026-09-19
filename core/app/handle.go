@@ -16,10 +16,9 @@ import (
 // traceFoldAcceptance emits a trace.KindFold event recording whether a
 // GenStamped detail-operation result (RelatedCheckBatch, RelatedCheckResult,
 // EnrichDetailResult) was accepted or rejected by the OperationID acceptance
-// check immediately preceding each call site below — the invisible half of
-// every "action B landed while action A was still in flight" defect this
-// package's fold logic exists to get right. Guarded by trace.Enabled() so
-// the rejection-reason string is never built when tracing is off.
+// check immediately preceding each call site below — the fold decision
+// that is otherwise invisible. Guarded by trace.Enabled() so the
+// rejection-reason string is never built when tracing is off.
 func (c *Controller) traceFoldAcceptance(eventType string, operationID domain.Gen, accepted bool) {
 	if !trace.Enabled() {
 		return
@@ -62,10 +61,10 @@ func (c *Controller) Handle(ev runtime.Event) (ViewState, []runtime.TaskRequest)
 
 	intents, tasks := c.core.HandleEvent(ev)
 	c.applyIntentsLocked(intents)
-	// C10: a navigation issued before AWS connect completes must replay once
+	// A navigation issued before AWS connect completes must replay once
 	// ClientsReady lands. HandleEvent's ClientsReady path (and any other event
 	// that can carry PendingRefresh) emits RefreshActiveListIntent for that;
-	// applyIntents does not act on it, so route it through the shared helper.
+	// applyIntents ignores it, so route it through the shared helper.
 	tasks = append(tasks, c.refreshTasksForIntents(intents)...)
 
 	// HandleEvent's central GenStamped guard drops stale events from the intent
@@ -82,7 +81,7 @@ func (c *Controller) Handle(ev runtime.Event) (ViewState, []runtime.TaskRequest)
 		// Reverse-scan reapply, mirroring the TUI (runtime_adapter_resources.go):
 		// re-run the source predicate against each loaded page so a truncated
 		// "(0+)"/"(N+)" list discovers matches on later pages. Handle already holds
-		// c.mu (line 25), so call the lock-free core directly — the exported
+		// c.mu, so call the lock-free core directly — the exported
 		// ApplyReapplyCheckerAgainst would re-lock the non-reentrant RWMutex and
 		// self-deadlock. No-op when no reapply-checker is registered for the type.
 		// Both steps below act on the list on top, so they run only when the
@@ -104,7 +103,7 @@ func (c *Controller) Handle(ev runtime.Event) (ViewState, []runtime.TaskRequest)
 	// rather than a ResourcesLoaded — this typed outcome is Core.HandleEvent's
 	// default nil,nil path (orchestrator.go), so nothing else pops this
 	// placeholder; it would otherwise strand the user on a permanently empty
-	// list. Never a stranded empty list.
+	// list.
 	if msg, ok := ev.(messages.ByIDFetchFailed); ok {
 		c.popAutoOpenSinglePlaceholderOnNotFound(msg)
 	}
@@ -115,7 +114,7 @@ func (c *Controller) Handle(ev runtime.Event) (ViewState, []runtime.TaskRequest)
 	// stack before calling Core.HandleClientsReady). The headless/web lane has
 	// no TUI shim, so Handle must do the same renderer-shape computation here
 	// — mirroring BootstrapLive — or a connect result fed through DrainSync
-	// (drainsync.go) never reaches HandleClientsReady at all, and C10's
+	// (drainsync.go) never reaches HandleClientsReady at all, and the
 	// pre-connect-navigation replay never fires on this lane. Routed
 	// unconditionally (success AND failure) — Core.HandleClientsReady's own
 	// Gen guard drops stale results, and Err != nil routes internally to
@@ -201,17 +200,15 @@ func (c *Controller) Handle(ev runtime.Event) (ViewState, []runtime.TaskRequest)
 		}
 	}
 
-	// messages.APIError: routed entirely through runtime.Core.HandleEvent
-	// (the case added there mirrors this same ConnectGen stand-in + intent
-	// application) — the C4 fetch-failure handling lives in the Core, not
-	// here. Handling it a second time
-	// here would double-apply the ClearActiveListLoadingIntent/FlashIntent
-	// the Core already returns via the intents/tasks captured above.
+	// messages.APIError: routed entirely through runtime.Core.HandleEvent,
+	// which owns the fetch-failure handling. Handling it a second time here
+	// would double-apply the ClearActiveListLoadingIntent/FlashIntent the Core
+	// already returns via the intents/tasks captured above.
 
 	// messages.IdentityError: the identity fetch failed. Core.HandleEvent routes
-	// this through HandleIdentityError which clears IdentityFetching but does not
-	// store the error string (it is view-layer state). Store it here so snapshot
-	// can build IdentityBody.ErrorMsg. IsStale uses AspectConnect + Gen.
+	// this through HandleIdentityError, which clears IdentityFetching; the error
+	// string is view-layer state, stored here so snapshot can build
+	// IdentityBody.ErrorMsg. IsStale uses AspectConnect + Gen.
 	if msg, ok := ev.(messages.IdentityError); ok && !messages.IsStale(msg, c.core) {
 		c.identityLoading = false
 		// An STS refusal names the profile or role it refused, and the
@@ -220,7 +217,7 @@ func (c *Controller) Handle(ev runtime.Event) (ViewState, []runtime.TaskRequest)
 		c.identityErrMsg = domain.Sanitize(msg.Err)
 	}
 
-	// messages.CostsLoaded is not wired into runtime.Core.HandleEvent: the
+	// messages.CostsLoaded is handled here rather than in runtime.Core.HandleEvent: the
 	// merge target (CostsState) lives on the controller's screen stack, not
 	// on session state Core owns. Controller.Handle is already the shared
 	// headless/web/TUI entry point (see the package doc above), so handling
@@ -235,7 +232,7 @@ func (c *Controller) Handle(ev runtime.Event) (ViewState, []runtime.TaskRequest)
 	}
 
 	tasks = c.stampDispatchSnapshotLocked(tasks)
-	// C4, absorb half: the row pass this event just made stale is the most
+	// The row pass this event just made stale is the most
 	// expensive thing the snapshot below would do, and it is pure. Freeze its
 	// inputs here, drop the lock, build, and take the lock back only to swap
 	// the built body in — so a 6000-row result holds the lock for the swap and
@@ -285,12 +282,12 @@ func (c *Controller) Handle(ev runtime.Event) (ViewState, []runtime.TaskRequest)
 // strands nothing, because the screen's rows went with it, and a result naming
 // no screen was dispatched by no screen — nothing is waiting on it.
 //
-// The scan this replaced matched on resource type and lane instead. Two lists
-// of one type share both — a filtered drill on a filtered drill, a child list
-// on a child list — so it returned whichever was topmost and the deeper one's
-// page landed on the newer one. There is nothing weaker to fall back to:
-// matching by type is a guess, and a page nobody applies is better than a page
-// applied to the wrong list.
+// Matching on resource type and lane is not enough: two lists of one type
+// share both — a filtered drill on a filtered drill, a child list on a
+// child list — so the deeper one's page would land on the newer one.
+// There is nothing weaker to fall back to: matching by type is a guess,
+// and a page nobody applies is better than a page applied to the wrong
+// list.
 //
 // Shared by handleResourcesLoadedEvent (the fetch-success path) and
 // clearActiveListLoadingTarget (the paired fetch-FAILURE path, via
@@ -321,10 +318,9 @@ func (c *Controller) handleResourcesLoadedEvent(msg messages.ResourcesLoaded) {
 		// No screen owns this result — it arrived after its list was popped,
 		// or none was ever opened. A canonical one still speaks for the type's
 		// population, so the store takes it: this is the one RowStore write for
-		// a delivery nothing renders, and the reason Core.HandleEvent no longer
-		// makes its own.
+		// a delivery nothing renders.
 		//
-		// Only a canonical result is eligible, the gate that write carried: a
+		// Only a canonical result is eligible: a
 		// filtered drill, a by-ID lookup and a child fetch share this message
 		// shape but are never the type's global population, and must neither
 		// replace nor extend the shared per-type entry a canonical fetch owns.
@@ -348,15 +344,13 @@ func (c *Controller) handleResourcesLoadedEvent(msg messages.ResourcesLoaded) {
 	}
 	topLevelCanonical := isTopLevelCanonicalList(s.ID, s.State.List)
 	c.applyResourcesLoaded(s.State.List, canon, msg.Resources, msg.Pagination, msg.Append, msg.LoadingMore, topLevelCanonical, msg.Err, msg.ListSeq)
-	// Exact-total menu sync-back: sync the list's now-current row count to the root menu's
-	// availability badge here, at the controller level, so both the TUI and
-	// web renderer get it — this replaces the TUI-only sync-back that used
-	// to run only on pop, in internal/tui/app_stack.go's popRS. Firing on
-	// every ResourcesLoaded (not just a load-more that exhausts pagination)
-	// preserves the pre-existing "non-exhausted visits syncing counts
-	// upward" behavior popRS also provided: the only-increase guard inside
-	// syncExactTotalToMenu makes this safe to call unconditionally — a
-	// truncated or smaller result never regresses a larger known count.
+	// Exact-total menu sync-back: sync the list's current row count to the
+	// root menu's availability badge here, at the controller level, so both
+	// the TUI and web renderer get it. It fires on every ResourcesLoaded (not
+	// just a load-more that exhausts pagination), so non-exhausted visits sync
+	// counts upward: the only-increase guard inside syncExactTotalToMenu makes
+	// this safe to call unconditionally — a truncated or smaller result never
+	// regresses a larger known count.
 	// A fetch that came back refused, with nothing to show, observed
 	// nothing: syncing it would overwrite the type's cached count with a
 	// zero and call the type verified. Partial success (rows alongside a
@@ -364,7 +358,7 @@ func (c *Controller) handleResourcesLoadedEvent(msg messages.ResourcesLoaded) {
 	if msg.Err == nil || len(msg.Resources) > 0 {
 		c.syncExactTotalToMenu(s, canon)
 	}
-	// C6 — a filtered related drill's result is a session view; persisted
+	// A filtered related drill's result is a session view; persisted
 	// under (type + filter) so the next entry into the same drill seeds
 	// instantly (SeedFilteredListFromCache) instead of a bare Loading.
 	// Err results are skipped — a partial page must not replay as
@@ -379,24 +373,23 @@ func (c *Controller) handleResourcesLoadedEvent(msg messages.ResourcesLoaded) {
 // clearActiveListLoadingTarget resolves the *ListState a
 // ClearActiveListLoadingIntent (emitted by HandleAPIError on a failed fetch)
 // should apply to. When v carries a ResourceType and a non-Unknown
-// Provenance — true of every production HandleAPIError dispatch as of the
-// failure-routing fix (every messages.APIError construction site pairs it
-// with the same Provenance its paired ResourcesLoaded success would carry) —
-// it is routed through the exact same findResourceListScreen scan the
-// success path uses, so the failure lands on the screen that actually owns
-// the request that failed rather than whatever screen happens to be
-// topmost (the defect this exists to close: navigating from list A to list
-// B before A's fetch fails must never mark B with A's error while stranding
-// A's own loading indicator). No match (including an already-popped screen)
-// resolves to nil — fails closed, exactly like a ResourcesLoaded success
-// with no matching screen.
+// Provenance — true of every production HandleAPIError dispatch (every
+// messages.APIError construction site pairs it with the same Provenance
+// its paired ResourcesLoaded success would carry) — it is routed through
+// the exact same findResourceListScreen scan the success path uses, so the
+// failure lands on the screen that actually owns the request that failed
+// rather than whatever screen happens to be topmost: navigating from list
+// A to list B before A's fetch fails must never mark B with A's error
+// while stranding A's own loading indicator. No match (including an
+// already-popped screen) resolves to nil — fails closed, exactly like a
+// ResourcesLoaded success with no matching screen.
 //
-// A zero ResourceType or Provenance means the producer predates this
-// contract (a hand-built APIError with no paired fetch, or the
+// A zero ResourceType or Provenance means an APIError not tied to a list
+// fetch (a hand-built APIError with no paired fetch, or the
 // ClientsReady-wrong-client-type path in internal/tui/runtime_adapter.go's
 // emitAPIErrorCmd, which is not scoped to any particular list at all) —
-// falls back to the pre-existing top-of-stack list screen behavior for
-// those, mirroring FetchResourcesPayload.Provenance's own zero-value grace.
+// those fall back to the top-of-stack list screen, mirroring
+// FetchResourcesPayload.Provenance's own zero-value grace.
 func (c *Controller) clearActiveListLoadingTarget(v runtime.ClearActiveListLoadingIntent) *ListState {
 	if v.ResourceType != "" && v.Provenance != messages.FetchProvenanceUnknown {
 		s, ok := c.findResourceListScreen(v.ScreenID)
@@ -450,11 +443,11 @@ func (c *Controller) syncExactTotalToMenu(screen *Screen, canon string) {
 	newIssues := c.listIssueCount(ls, canon)
 	c.syncMenuIssueCount(ms, canon, newIssues, newTrunc, false)
 
-	// C6 scope boundary: only the canonical top-level, unfiltered list may
+	// Scope boundary: only the canonical top-level, unfiltered list may
 	// reach the persisted per-type cache file. A ScreenChildList never does,
 	// even when (by coincidence) its resource type matches canon. Runs AFTER
-	// the badge sync above, because the file records what the badge now
-	// holds — one observation, reconciled once.
+	// the badge sync above, because the file records what the badge holds —
+	// one observation, reconciled once.
 	if screen.ID == runtime.ScreenResourceList {
 		c.maybeSaveResourceListCache(ls, canon)
 	}
@@ -466,18 +459,18 @@ func (c *Controller) syncExactTotalToMenu(screen *Screen, canon string) {
 }
 
 // maybeSaveResourceListCache persists ls.Rows for canon's canonical
-// top-level, unfiltered list to its per-type disk cache file (C6: every
+// top-level, unfiltered list to its per-type disk cache file (every
 // loaded page, not just the first — ls.Rows already holds append-mode
-// accumulation from applyResourcesLoaded). No-op when NoCache is set (C7b)
+// accumulation from applyResourcesLoaded). No-op when NoCache is set
 // or when canon has no resolvable ResourceTypeDef (issue-badge exclusion
 // cannot be determined). Best-effort — a write failure is silently dropped,
 // mirroring every other cache-write call site in this file.
 //
-// Callers MUST already have applied the C6 scope gate (top-level
+// Callers MUST already have applied the scope gate (top-level
 // ScreenResourceList, not EscPops, not ParentContext) before calling this —
 // isTopLevelCanonicalList computes it.
 //
-// The issue count it writes is the one the menu badge now holds — not a
+// The issue count it writes is the one the menu badge holds — not a
 // second derivation from the same rows. The badge already applied the one
 // observation rule (an observation that cannot prove an issue is gone does
 // not lower it), and a file that recorded the raw rows-derived number
@@ -488,10 +481,9 @@ func (c *Controller) syncExactTotalToMenu(screen *Screen, canon string) {
 //
 // The per-type materialize/build-rows/write body lives once in
 // runtime.Core.SaveTypeRows, shared with the sweep lane
-// (saveProbeResourcesToTypeFiles). No ObserveRows write follows the disk
-// save: applyResourcesLoaded (this method's only two callers'
-// common ancestor) already routed ls.Rows through Core.ObserveRows before
-// either caller reached here, so ls.Rows already IS what the store holds.
+// (saveProbeResourcesToTypeFiles). applyResourcesLoaded (the common
+// ancestor of this method's two callers) has already routed ls.Rows
+// through Core.ObserveRows, so ls.Rows IS what the store holds.
 func (c *Controller) maybeSaveResourceListCache(ls *ListState, canon string) {
 	if ls == nil || c.core.NoCache() {
 		return
@@ -515,7 +507,7 @@ func (c *Controller) maybeSaveResourceListCache(ls *ListState, canon string) {
 	// generation than one already written for this type is dropped rather
 	// than allowed to undo it (Core.SaveTypeRows).
 	obsGen := c.core.AnyOriginResourceCacheGen(canon)
-	// C4: every input is frozen here, under the lock; the write itself runs
+	// Every input is frozen here, under the lock; the write itself runs
 	// after the caller releases it, so a slow filesystem can never stall the
 	// next key or a web snapshot behind this save. The frozen pair is what
 	// lets the write still be rejected if the operator switches profile
@@ -536,9 +528,9 @@ func (c *Controller) maybeSaveResourceListCache(ls *ListState, canon string) {
 // stageCacheWrite appends one save to the ordered queue. Callers hold c.mu
 // (write) and have already frozen the save's inputs — the controller mutex is
 // the same lock every key event needs, so no disk I/O may happen while it is
-// held (C4), the same handoff the costs cache's dirty store performs in Handle. It never performs the
+// held, the same handoff the costs cache's dirty store performs in Handle. It never performs the
 // write: a type file's yaml.Marshal of the whole row set is the same order of
-// work as the row pass the absorb moved off the lock (C4), and running it on
+// work as the row pass the absorb runs off the lock, and running it on
 // this goroutine only moves that cost from the lock into the caller's own
 // latency — the fetch that triggered the save, and the key press behind it,
 // would still wait for a 6000-row marshal.
@@ -678,11 +670,10 @@ func (c *Controller) popAutoOpenSinglePlaceholderOnNotFound(msg messages.ByIDFet
 // pages" by those fields alone. ls.Loading (cleared only by
 // applyResourcesLoaded, itself only reached for the screen whose type
 // matches the incoming message — handleResourcesLoadedEvent) is the
-// existing, already-correct signal for "has this placeholder's own fetch
-// ever actually returned" — reused here rather than adding a new field.
+// signal for "has this placeholder's own fetch ever actually returned".
 //
 // If neither fallback applies (no pagination and no StubCreator), the
-// placeholder list is left as-is, same as before these fallbacks existed.
+// placeholder list is left as-is.
 func (c *Controller) autoOpenSingleDetail() []runtime.TaskRequest {
 	if len(c.stack) == 0 {
 		return nil
@@ -715,10 +706,8 @@ func (c *Controller) autoOpenSingleDetail() []runtime.TaskRequest {
 			return nil // this placeholder's own fetch has not landed yet; do not infer exhaustion from a page that was simply never fetched
 		}
 		// A page that HAS rows but not the target is exactly the "never lands
-		// on the first page" case fallback 1 exists for — keying this on
-		// len(ls.Rows) instead of "was the target found" stranded any target
-		// past page 1 on a large listing, silently contradicting this
-		// function's own "never stranded" contract.
+		// on the first page" case fallback 1 exists for; keying this on
+		// len(ls.Rows) would strand any target past page 1 on a large listing.
 		if ls.HasPagination && !ls.LoadingMore {
 			ls.LoadingMore = true
 			return []runtime.TaskRequest{{
@@ -767,8 +756,8 @@ func (c *Controller) HandleResourcesLoadedEvent(msg messages.ResourcesLoaded) {
 	// uses, so a page that arrives through it crosses the text boundary here
 	// or nowhere.
 	msg.Resources = SanitizedRows(msg.Resources)
-	// The per-type save this result queues runs after the lock is released
-	// (C4), exactly as Handle runs it — deferred first so it fires last.
+	// The per-type save this result queues runs after the lock is released,
+	// exactly as Handle runs it — deferred first so it fires last.
 	defer c.wakeCacheWriter()
 	c.mu.Lock()
 	defer c.mu.Unlock()

@@ -91,9 +91,7 @@ func FetchECSServicesPage(
 				arn = *svc.ServiceArn
 			}
 
-			// emit wave1 Findings for non-healthy lifecycle states.
-			// ACTIVE → no Finding (healthy). Fields["status"] is still populated
-			// so the existing structural Color path works as fallback.
+			// Fields["status"] stays populated for the structural Color fallback.
 			findings := ecsSvcFindings(status, svc.DesiredCount, svc.RunningCount)
 
 			r := resource.Resource{

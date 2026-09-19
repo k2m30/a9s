@@ -38,8 +38,8 @@ const (
 	// acmCodeStatusFailed — Status is one of EXPIRED, REVOKED, FAILED, or
 	// VALIDATION_TIMED_OUT. The certificate cannot be used for TLS.
 	acmCodeStatusFailed domain.FindingCode = "acm.status.failed"
-	// acmCodeStatusInactive — Status==INACTIVE. An imported certificate no
-	// longer attached to any resource for TLS termination.
+	// acmCodeStatusInactive — Status==INACTIVE. An imported certificate not
+	// attached to any resource for TLS termination.
 	acmCodeStatusInactive domain.FindingCode = "acm.status.inactive"
 
 	// CodeACMWeakKey — KeyAlgorithm is RSA below 2048 bits. Elliptic-curve
@@ -118,9 +118,7 @@ func FetchACMCertificatesPage(ctx context.Context, api ACMListCertificatesAPI, c
 			inUse = "true"
 		}
 
-		// Compute days_left until certificate expiry.
-		// Format: "<N> days" for future expiry, "expired" for past expiry.
-		// Check NotAfter against now directly so sub-day past expiry shows
+		// NotAfter is compared against now directly so a sub-day past expiry reads
 		// "expired" rather than truncating to "0 days".
 		daysLeft := ""
 		if cert.NotAfter != nil {
@@ -205,9 +203,7 @@ func FetchACMCertificatesPage(ctx context.Context, api ACMListCertificatesAPI, c
 // for a year, and still built on a key worth attacking.
 //
 // Every argument is a value the fetcher writes into Fields, so a row rebuilt
-// from Fields alone reaches the same verdict. acm has no Wave 2 IssueEnricher:
-// every signal it carries is readable straight off ListCertificates, zero
-// extra API calls.
+// from Fields alone reaches the same verdict.
 func acmFindings(statusWords, notAfter, inUse, keyAlgorithmWords string, now time.Time) []domain.Finding {
 	var out []domain.Finding
 	if statusWords == acmStatusIssued {

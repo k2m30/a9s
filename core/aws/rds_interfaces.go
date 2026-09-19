@@ -15,7 +15,7 @@ type RDSDescribeDBInstancesAPI interface {
 
 // RDSDescribeDBClustersAPI defines the interface for the RDS DescribeDBClusters
 // operation. Used by the dbc fetcher to cover Aurora + Multi-AZ DB clusters
-// (see docs/resources/dbc.md §1 Coverage). Per AWS SDK docstring
+// (see docs/resources/dbc.md). Per AWS SDK docstring
 // (rds@v1.116.3/api_op_DescribeDBClusters.go:19-28), this returns Aurora +
 // Multi-AZ explicitly and may also return Neptune / DocumentDB rows.
 type RDSDescribeDBClustersAPI interface {
@@ -36,7 +36,7 @@ type RDSDescribeDBClusterSnapshotsAPI interface {
 // resolution when the subnet group is needed, and by the dbc fetcher for
 // Aurora-side subnet-group resolution (rdstypes.DBCluster rows). DocDB-side
 // rows (docdb_types.DBCluster) resolve via c.DocDB.DescribeDBSubnetGroups.
-// See docs/resources/dbc.md §1 Coverage.
+// See docs/resources/dbc.md.
 type RDSDescribeDBSubnetGroupsAPI interface {
 	DescribeDBSubnetGroups(ctx context.Context, params *rds.DescribeDBSubnetGroupsInput, optFns ...func(*rds.Options)) (*rds.DescribeDBSubnetGroupsOutput, error)
 }

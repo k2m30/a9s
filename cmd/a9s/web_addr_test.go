@@ -4,16 +4,11 @@ import (
 	"testing"
 )
 
-// TestRequireLoopbackAddr_TableDriven is the security regression test for the
-// requireLoopbackAddr bind-address guard (commit 56910d32 fix #1).
-//
-// Pre-fix failure: requireLoopbackAddr did not exist; the web server bound to
-// whatever address the caller supplied, including 0.0.0.0 and routable IPs,
-// exposing the unauthenticated SSE stream and other endpoints to any host on
-// the network before the session token was even exchanged.
-//
-// The test must return an error for all non-loopback addresses and nil for all
-// loopback addresses.
+// TestRequireLoopbackAddr_TableDriven pins the requireLoopbackAddr
+// bind-address guard: a non-loopback bind exposes the unauthenticated SSE
+// stream and other endpoints to any host on the network before the session
+// token is exchanged. Every non-loopback address returns an error and every
+// loopback address returns nil.
 func TestRequireLoopbackAddr_TableDriven(t *testing.T) {
 	tests := []struct {
 		name    string

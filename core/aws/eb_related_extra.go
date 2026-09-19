@@ -93,7 +93,6 @@ func checkEbTG(ctx context.Context, clients any, res resource.Resource, cache re
 		return resource.KnownRelated("tg", nil, false)
 	}
 
-	// Collect LB names, resolve each to ARN via DescribeLoadBalancers.
 	var tgARNs []string
 	var failures []Failure
 	for _, lb := range resOut.EnvironmentResources.LoadBalancers {
@@ -102,7 +101,6 @@ func checkEbTG(ctx context.Context, clients any, res resource.Resource, cache re
 		}
 		lbName := *lb.Name
 
-		// Resolve name → ARN.
 		lbOut, lbErr := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*elbv2.DescribeLoadBalancersOutput, error) {
 			return c.ELBv2.DescribeLoadBalancers(ctx, &elbv2.DescribeLoadBalancersInput{
 				Names: []string{lbName},
@@ -295,7 +293,6 @@ func checkEbRole(ctx context.Context, clients any, res resource.Resource, cache 
 			}
 			switch {
 			case ns == "aws:autoscaling:launchconfiguration" && name == "IamInstanceProfile":
-				// Resolve instance profile to role ARNs
 				roleARNs, answered := asgInstanceProfileToRoles(ctx, c, val)
 				refs = append(refs, roleARNs...)
 				resolved = resolved && answered

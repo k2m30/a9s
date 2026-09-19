@@ -40,10 +40,7 @@ type ListState struct {
 	// from, for the canonical top-level list only.
 	// Zero for a screen that has never routed through Core.ObserveRows (a
 	// freshly-pushed screen, or a non-canonical child/filtered list, whose
-	// Rows are written locally without ever touching RowStore). Carries no
-	// behavior today — reserved for a future conformance check that a
-	// canonical screen's Rows never regress behind a fresher store
-	// generation without an explicit re-adopt.
+	// Rows are written locally without ever touching RowStore).
 	RowsGen domain.Gen `json:"rows_gen,omitempty"`
 
 	Filter           string `json:"filter,omitempty"`
@@ -55,7 +52,6 @@ type ListState struct {
 	AttentionOnly    bool   `json:"attention_only,omitempty"`
 	PaginationCursor string `json:"pagination_cursor,omitempty"`
 
-	// Inventory fields from docs/historical/analysis/web-ui-state-inventory.md §ResourceListModel.
 	HasPagination bool `json:"has_pagination,omitempty"`
 	// PopulationUnconfirmed is true when this list cannot assert that its rows
 	// are the type's whole population. HasPagination implies it — a page left
@@ -67,7 +63,7 @@ type ListState struct {
 	// hint, the load-more dispatch, all of which need a cursor to be true of.
 	// PopulationUnconfirmed is "do not record this as an exact total": the
 	// disk-cache exactness flag and the menu's count sync-back. Carrying both
-	// on one field titled a fully-loaded list as "N+" and offered a load-more
+	// on one field would title a fully-loaded list as "N+" and offer a load-more
 	// with no cursor to follow.
 	PopulationUnconfirmed bool `json:"population_unconfirmed,omitempty"`
 
@@ -101,7 +97,7 @@ type ListState struct {
 	// list: a non-append fetch starts the list over and so resets it, an
 	// appended page ORs its own answer in. Page two saying "no more pages" is
 	// a different fact from page one's failure to enumerate, and letting it
-	// overwrite the failure recorded the list as the type's exact population
+	// overwrite the failure would record the list as the type's exact population
 	// on the strength of a page that never saw what was missing.
 	FetchIncomplete bool                `json:"fetch_incomplete,omitempty"`
 	AutoOpenSingle  bool                `json:"auto_open_single,omitempty"`
@@ -142,7 +138,7 @@ type ListState struct {
 	// mutually exclusive with it.
 	Refreshing bool `json:"refreshing,omitempty"`
 	// LastFetchError is the error marker text for the most recent failed
-	// fetch over this screen, or "" when no error is outstanding (C4).
+	// fetch over this screen, or "" when no error is outstanding.
 	// Set by a messages.APIError landing while this screen is active; cleared
 	// on the next successful ResourcesLoaded for this screen.
 	LastFetchError string `json:"last_fetch_error,omitempty"`
@@ -179,7 +175,6 @@ type ListState struct {
 }
 
 // DetailState holds the mutable display state for a resource-detail screen.
-// Controller-owned fields (per docs/historical/analysis/web-ui-state-inventory.md §DetailModel).
 type DetailState struct {
 	// Display-interaction state
 	SearchQuery  string `json:"search_query,omitempty"`
@@ -207,8 +202,8 @@ type DetailState struct {
 	RelatedHidden bool `json:"related_hidden,omitempty"`
 	// RelatedUserVisible is true only when the user explicitly toggled the panel
 	// ON (mirrors rightColVisible in the TUI). Auto-show (initDetailRelatedRows)
-	// does NOT set this flag. Used by buildDetailFooterHints to gate the
-	// "tab: Cols" hint, which matches DetailModel.BottomHints checking m.rightColVisible.
+	// leaves it false. Used by buildDetailFooterHints to gate the "tab: Cols"
+	// hint.
 	RelatedUserVisible  bool   `json:"related_user_visible,omitempty"`
 	RelatedFocus        bool   `json:"related_focus,omitempty"`
 	RelatedCursor       int    `json:"related_cursor"`
@@ -242,8 +237,8 @@ type DetailState struct {
 	cursorLayout detailLayout
 }
 
-// DetailRelatedRow is one row in the detail screen's related panel, mirroring
-// rightColumnRow but as a serialisable value type (no funcs, no checker).
+// DetailRelatedRow is one row in the detail screen's related panel, as a
+// serialisable value type (no funcs, no checker).
 type DetailRelatedRow struct {
 	TargetType  string `json:"target_type"`
 	DisplayName string `json:"display_name"`
@@ -320,7 +315,6 @@ type SelectorState struct {
 }
 
 // MenuState holds the mutable display state for the main-menu screen.
-// Maps the CONTROLLER bucket from docs/historical/analysis/web-ui-state-inventory.md §MainMenuModel.
 type MenuState struct {
 	Filter         string          `json:"filter,omitempty"`
 	Cursor         int             `json:"cursor"`
@@ -342,7 +336,7 @@ type MenuState struct {
 	IssueTruncAuthoritative map[string]bool `json:"issue_trunc_authoritative,omitempty"`
 	// Origin tracks, per resource type, whether the stored availability count
 	// is disk-cache-seeded ("cache") or confirmed by a live probe this
-	// session ("verified") — C3.
+	// session ("verified").
 	Origin map[string]string `json:"origin,omitempty"`
 	// ProbeCause tracks, per resource type, the error class of the last
 	// availability probe that FAILED for it (classifyProbeErr's vocabulary:

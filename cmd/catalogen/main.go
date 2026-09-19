@@ -140,10 +140,8 @@ func generateRelatedResources(repoRoot string, types []catalog.ResourceTypeDef) 
 }
 
 // designColorDocs are the design pages that state which colour a row takes.
-// They are prose pages a person writes, and the colour rules inside them were
-// the catalog's severities typed a second time — which is why they went stale:
-// ec2 gained a second stopped code at a second severity and three lines in
-// these two files went on calling every stopped row red.
+// They are prose pages a person writes; the colour rules inside them are
+// generated from the catalog's severities rather than typed a second time.
 var designColorDocs = []string{
 	filepath.Join("docs", "design", "design.md"),
 	filepath.Join("docs", "design", "ec2-status-checks.md"),
@@ -151,7 +149,7 @@ var designColorDocs = []string{
 
 // designColorCodes are the lifecycle findings whose colour these pages
 // illustrate. The list names which rows the block explains; the severity of
-// each — the fact that went stale — is read from the catalog.
+// each is read from the catalog.
 var designColorCodes = []domain.FindingCode{
 	"ec2.state.pending",
 	"ec2.state.stopping",
@@ -208,11 +206,9 @@ func generateDesignColors(repoRoot string) error {
 func generateResourceDoc(repoRoot string, rt catalog.ResourceTypeDef) error {
 	path := filepath.Join(repoRoot, "docs", "resources", rt.ShortName+".md")
 
-	// Header section content.
 	header := fmt.Sprintf("%s — %s. %s\n",
 		rt.ShortName, rt.Category, statusKeyFragment(rt))
 
-	// Findings section content.
 	var findingsContent strings.Builder
 	if len(rt.Findings) > 0 {
 		findingsContent.WriteString("| Code | Phrase | Severity | Source | Detail |\n")
@@ -224,7 +220,6 @@ func generateResourceDoc(repoRoot string, rt catalog.ResourceTypeDef) error {
 		}
 	}
 
-	// Related section content.
 	var relatedContent strings.Builder
 	if len(rt.Related) > 0 {
 		relatedContent.WriteString("| Target Type | Display Name | Truncated? |\n")
@@ -239,13 +234,11 @@ func generateResourceDoc(repoRoot string, rt catalog.ResourceTypeDef) error {
 		}
 	}
 
-	// If the file does not exist, create a stub.
 	if _, err := os.Stat(path); os.IsNotExist(err) {
 		stub := buildStub(rt, header, findingsContent.String(), relatedContent.String())
 		return os.WriteFile(path, []byte(stub), 0o600)
 	}
 
-	// File exists — update each generated section in place.
 	if err := updateGeneratedSection(path, "header", header); err != nil {
 		return err
 	}
@@ -258,7 +251,7 @@ func generateResourceDoc(repoRoot string, rt catalog.ResourceTypeDef) error {
 	return updateGeneratedSection(path, "related", relatedContent.String())
 }
 
-// badgeNote is the §4 S1 note saying which waves feed this type's issue
+// badgeNote is the note saying which waves feed this type's issue
 // badge: only a type that registers a Wave 2 enricher can have Wave 2
 // findings counted.
 func badgeNote(rt catalog.ResourceTypeDef) string {
@@ -291,7 +284,6 @@ func updateGeneratedSection(path, section, content string) error {
 	raw, err := os.ReadFile(path)
 	if err != nil {
 		if os.IsNotExist(err) {
-			// Create file with just this section.
 			body := fmt.Sprintf("%s\n%s%s\n", begin, content, end)
 			return os.WriteFile(path, []byte(body), 0o600)
 		}
@@ -304,12 +296,10 @@ func updateGeneratedSection(path, section, content string) error {
 	endIdx := strings.Index(existing, end)
 
 	if beginIdx == -1 || endIdx == -1 {
-		// Markers absent — append the block.
 		appended := existing + "\n" + begin + "\n" + content + end + "\n"
 		return os.WriteFile(path, []byte(appended), 0o600) //nolint:gosec // path is derived from repoRoot+catalog short names, not user input
 	}
 
-	// Replace content between markers (exclusive).
 	before := existing[:beginIdx+len(begin)]
 	after := existing[endIdx:]
 	updated := before + "\n" + content + after
@@ -365,7 +355,7 @@ func escapeMarkdownCell(s string) string {
 	return replacer.Replace(s)
 }
 
-// detailCell is the Detail column of a findings table: the declared S5
+// detailCell is the Detail column of a findings table: the declared operator
 // sentence, or an em dash for a finding that renders none. The sentence is
 // authored prose — its backticks are code spans it means to render — so only
 // the pipe, which would end the cell, is escaped.

@@ -9,7 +9,7 @@ import (
 )
 
 // registerAllHandlers registers all demo handlers onto t.
-// STS and Cost Explorer are the only services still routed through the HTTP
+// STS and Cost Explorer are the only services routed through the HTTP
 // transport; every other service is covered by typed fakes
 // (core/demo/fakes). Cost Explorer has no typed-fake path — costs.Store/
 // Query are shaped around SDK JSON responses, not a Go client interface —

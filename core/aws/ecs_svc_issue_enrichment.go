@@ -36,9 +36,8 @@ func ecsServiceScheduling(status string) bool {
 // pointer AWS appends, which is not a reason and is long enough to push the
 // cause off a one-line cell.
 //
-// A message a9s finds no marker in keeps all of its words. AWS wording this
-// code has not seen must not lose its reason the way the fixed phrase did,
-// and an event a9s cannot parse still said something.
+// A message a9s finds no marker in keeps all of its words: an event a9s
+// cannot parse still said something.
 func ecsEventReason(message string) string {
 	reason := message
 	for _, marker := range []string{" because ", " due to "} {
@@ -78,7 +77,7 @@ func EnrichECSServices(ctx context.Context, clients *ServiceClients, resources [
 
 	// Cap the work list BEFORE grouping: the cap is a limit on how many
 	// services a9s looked at, and capping the input keeps which services those
-	// are deterministic (grouping first made it depend on map order) while
+	// are deterministic (grouping first would make it depend on map order) while
 	// recording every dropped row as uninspected.
 	resources = capAtEnrichmentCap(&result, resources, nil, resourceIDsOf)
 
@@ -149,7 +148,6 @@ func EnrichECSServices(ctx context.Context, clients *ServiceClients, resources [
 					continue
 				}
 
-				// Check deployments for rollout failures and circuit-breaker.
 				// Same shape as the event scan below: a9s's words on one row,
 				// AWS's reason on the row under it, never behind a colon in the
 				// value, which would shape one fact two ways and put AWS's FAILED
@@ -175,12 +173,10 @@ func EnrichECSServices(ctx context.Context, clients *ServiceClients, resources [
 					}
 				}
 
-				// runningCount < desiredCount with no IN_PROGRESS deployment → stuck.
 				serviceStuck := svc.DesiredCount > 0 &&
 					svc.RunningCount < svc.DesiredCount &&
 					!hasInProgress
 
-				// Check recent events for placement/ELB failures.
 				var eventRows []domain.DetailRow
 				for _, ev := range svc.Events {
 					if ev.CreatedAt == nil || ev.Message == nil {

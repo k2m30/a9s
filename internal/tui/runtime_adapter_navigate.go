@@ -101,10 +101,8 @@ func (m Model) handleNavigate(msg messages.Navigate) (tea.Model, tea.Cmd) {
 		// screen's ListState. This is a top-level, menu-driven list — pushed as
 		// ScreenResourceList (not PushChildListScreen's ScreenChildList, which
 		// is reserved for actual child/related lists, see list_state.go's
-		// "persist-eligible" contract). Using ScreenChildList here silently
-		// disabled the C6 disk-cache save gate
-		// (maybeSaveResourceListCache checks screen.ID == ScreenResourceList)
-		// for every top-level TUI list (#17 wave 2).
+		// "persist-eligible" contract). The disk-cache save gate
+		// (maybeSaveResourceListCache) requires screen.ID == ScreenResourceList.
 		m.ctrl.ApplyIntents([]runtime.UIIntent{runtime.PushScreen{
 			ID:      runtime.ScreenResourceList,
 			Context: runtime.ScreenContext{ResourceType: canon},
@@ -125,7 +123,7 @@ func (m Model) handleNavigate(msg messages.Navigate) (tea.Model, tea.Cmd) {
 		issueCount := m.ctrl.GetMenuIssueCounts()[canon]
 		issueTrunc := m.ctrl.GetMenuIssueTruncated()[canon]
 		rl.SetEnrichmentState(issueCount, issueTrunc, wave2FindingsByID(entry.Resources), wave2DetailsByID(entry.Resources))
-		// C3: the retained rows are seeded-but-unverified until the
+		// The retained rows are seeded-but-unverified until the
 		// verification task HandleNavigate returned for this branch lands, so
 		// the surface carries the refreshing marker. NewResourceListFromCache
 		// clears Refreshing as part of applying the seeded page, hence the
@@ -153,7 +151,7 @@ func (m Model) handleNavigate(msg messages.Navigate) (tea.Model, tea.Cmd) {
 		// topListState() inside NewResourceList/NewResourceListFromCache
 		// resolves to this screen's ListState. Top-level, menu-driven list —
 		// see the ScreenResourceList-not-ScreenChildList note on the
-		// NavigateKindPushResourceListCached branch above (#17 wave 2).
+		// NavigateKindPushResourceListCached branch above.
 		m.ctrl.ApplyIntents([]runtime.UIIntent{runtime.PushScreen{
 			ID:      runtime.ScreenResourceList,
 			Context: runtime.ScreenContext{ResourceType: canon},
@@ -162,7 +160,7 @@ func (m Model) handleNavigate(msg messages.Navigate) (tea.Model, tea.Cmd) {
 		var rl views.ResourceListModel
 		var initCmd tea.Cmd
 		if result.CachedEntry != nil {
-			// Per C1/Goal 4: HandleNavigate attached a synthetic seed from
+			// HandleNavigate attached a synthetic seed from
 			// session.ProbeResources/ProbeTruncated on this cache-miss branch —
 			// build the list the same way the PushResourceListCached case does
 			// (no loading shell, no spinner) so warm list-open renders instantly.
@@ -176,7 +174,7 @@ func (m Model) handleNavigate(msg messages.Navigate) (tea.Model, tea.Cmd) {
 				"", 0, false, 0, 0, false,
 				m.ctrl,
 			)
-			// C3 (docs/design/cache-requirements.md): a seeded-but-unverified
+			// Per docs/design/cache-requirements.md, a seeded-but-unverified
 			// surface must carry the refreshing marker so it renders
 			// distinguishably from verified-fresh content. NewResourceListFromCache
 			// (via ApplyResourcesLoaded) clears Refreshing as part of applying the
@@ -213,15 +211,13 @@ func (m Model) handleNavigate(msg messages.Navigate) (tea.Model, tea.Cmd) {
 		// Initialise related rows from registered defs so the controller body
 		// shows loading state immediately (mirrors newRightColumn on SetSize).
 		m.ctrl.InitDetailRelatedRows(result.ResolvedType)
-		// No separate ApplyDetailFinding call here: EnsureDetailState above
-		// already seeds ds.Findings/ds.AttentionDetails from
+		// EnsureDetailState above seeds ds.Findings/ds.AttentionDetails from
 		// result.Resource.Findings/AttentionDetails verbatim (a freshly-pushed
-		// ScreenDetail always hits ensureDetailState's non-nil branch), which
-		// already carries every wave-2 finding ApplyWave2ToRow appended (#52 —
-		// a resource with more than one independently-evaluated condition).
-		// primaryWave2Finding only ever surfaces the WORST-severity one; re-applying it
-		// here would strip the ones EnsureDetailState just correctly seeded
-		// down to that single entry.
+		// ScreenDetail always hits ensureDetailState's non-nil branch),
+		// carrying every wave-2 finding ApplyWave2ToRow appended — a resource
+		// can have more than one independently-evaluated condition.
+		// primaryWave2Finding surfaces only the WORST-severity one, so applying
+		// it here would strip the rest down to that single entry.
 		// Create a transient detail model only to configure the controller state
 		// (SetNavProvider seeds navigable-field data into the ctrl).
 		d := views.NewDetailWithCtrl(*result.Resource, result.ResolvedType, m.viewConfig, m.keys, m.ctrl)
@@ -240,10 +236,9 @@ func (m Model) handleNavigate(msg messages.Navigate) (tea.Model, tea.Cmd) {
 		}
 		m.pushRS(detailRS)
 		// BeginDetailWorkload begins the op and returns its complete workload
-		// (enrich + related) in one call — cache-replay suppression (D6: no
+		// (enrich + related) in one call — cache-replay suppression (no
 		// re-fan-out over cached data) is decided INSIDE it (shared with the
-		// headless/web NavigateKindPushDetail case in core/app/navigate.go),
-		// not re-derived here via a separate ReplayRelatedCache call.
+		// headless/web NavigateKindPushDetail case in core/app/navigate.go).
 		_, workloadTasks := m.ctrl.BeginDetailWorkload(result.ResolvedType, *result.Resource, false, false)
 		if !detailRS.rightColAutoShown {
 			// Narrow terminal or no registered related defs: the right
@@ -270,12 +265,9 @@ func (m Model) handleNavigate(msg messages.Navigate) (tea.Model, tea.Cmd) {
 		if rs := m.activeRS(); rs.kind == rsKindList {
 			activeShortName = rs.resourceType
 		}
-		// Every sibling NavigateKindPush* case pushes the matching controller
-		// screen before its rendererState (see PushRegion/PushTheme/PushCosts
-		// immediately below) — this one didn't, which desynced m.stack from
-		// m.ctrl's screen stack the moment Help was opened via this Navigate
-		// path (as opposed to the direct '?' key handler in app_input.go,
-		// which already pushes both).
+		// The controller screen is pushed before the rendererState, like every
+		// sibling NavigateKindPush* case, so m.stack mirrors m.ctrl's screen
+		// stack.
 		m.ctrl.ApplyIntents([]runtime.UIIntent{runtime.PushScreen{ID: runtime.ScreenHelp}})
 		helpRS := newHelpRS(ctx, activeShortName)
 		w, h := m.innerSize()
@@ -347,7 +339,7 @@ func (m Model) handleNavigate(msg messages.Navigate) (tea.Model, tea.Cmd) {
 	case runtime.NavigateKindPushCosts:
 		m.ctrl.ApplyIntents([]runtime.UIIntent{runtime.PushScreen{ID: runtime.ScreenCosts}})
 		m.ctrl.EnsureCostsState(app.Now())
-		// SC-002: HandleNavigate itself never fetches unconditionally —
+		// HandleNavigate itself never fetches unconditionally —
 		// EnsureCostsFetch is the sole cache-first decision point, so a
 		// warm cache opens with zero CE calls.
 		tasks = append(tasks, m.ctrl.EnsureCostsFetch()...)
@@ -440,8 +432,7 @@ func (m Model) pushSelectorScreen(screenID runtime.ScreenID, options []string, c
 
 // translateNavigateTarget maps the TUI's messages.ViewTarget enum to the
 // runtime's NavigateTarget enum. Returning NavigateTargetUnknown for an
-// unrecognised input causes HandleNavigate to noop, matching the original
-// handler's silent default branch.
+// unrecognised input causes HandleNavigate to noop.
 func translateNavigateTarget(t messages.ViewTarget) runtime.NavigateTarget {
 	switch t {
 	case messages.TargetMainMenu:
@@ -537,8 +528,7 @@ func (m Model) handleCopy() (tea.Model, tea.Cmd) {
 // tea.Cmd values. The runtime-owned mutations (gen bumps, cache deletes,
 // applyEnrichment, ProbeResources/ProbeTruncated reset, RuleSets swap) all
 // touch the session owned by core — same data the runtime would mutate via
-// c.session — so a future split into runtime-side helpers can land
-// without re-shaping the call sites here.
+// c.session.
 func (m Model) handleRefresh() (tea.Model, tea.Cmd) {
 	rs := m.activeRS()
 
@@ -596,7 +586,7 @@ func (m Model) handleRefresh() (tea.Model, tea.Cmd) {
 
 	if rs.kind == rsKindCosts {
 		// Controller.handleActionRefresh's own topCostsState branch owns the
-		// force-refetch-open-period logic now (FR-012) — routed generically
+		// force-refetch-open-period logic — routed generically
 		// through Apply so this transport carries no costs-specific logic.
 		_, tasks := m.ctrl.Apply(app.Action{Kind: app.ActionRefresh})
 		if len(tasks) == 0 {
@@ -623,21 +613,17 @@ func (m Model) handleRefresh() (tea.Model, tea.Cmd) {
 	// Deleting the cache entry afterwards is still correct (forces a fresh
 	// fetch).
 	//
-	// Deliberately NOT clearing the controller's own rendered rows
-	// (ls.Rows / c.resourceCache via ClearRowFindings) here: that would
-	// blank every Wave-2 glyph on screen for the full AWS round-trip between
-	// this Update() and the rerun's EnrichmentChecked arrival — a real,
-	// user-visible flicker, not just a stale-state risk. Wave-2 state is
-	// stale-until-replaced (never blank-until-replaced): ApplyWave2ToRow
-	// already strips-then-conditionally-reappends per resource ID against the
-	// FULL fresh findings map when the rerun's result lands, so any row
-	// missing from that map is correctly cleared at that point — pre-clearing
-	// here would only widen the visible gap without changing the eventual state.
+	// The controller's own rendered rows (ls.Rows / c.resourceCache) keep
+	// their Wave-2 state until the rerun lands: clearing them here would blank
+	// every Wave-2 glyph for the full AWS round-trip. Wave-2 state is
+	// stale-until-replaced: ApplyWave2ToRow strips-then-conditionally-reappends
+	// per resource ID against the FULL fresh findings map when the rerun's
+	// result lands, so any row missing from that map is cleared then.
 	if parentCtx == nil && !escPops {
 		(&m).applyEnrichment(rt)
 	}
 
-	m.core.DeleteResourceCache(rt) // clear cache for refreshed type only
+	m.core.DeleteResourceCache(rt)
 	if rt == "ses" {
 		// Swap (see detail-view path above): protects against in-flight blocked
 		// DescribeActiveReceiptRuleSet fetchers re-poisoning the cache.
@@ -662,8 +648,8 @@ func (m Model) handleRefresh() (tea.Model, tea.Cmd) {
 }
 
 // refreshActiveList refreshes the top-of-stack resource list, reading its
-// resource type + fetch configuration from the controller rather than from
-// a stored view model. Used by handleRefresh and the RefreshActiveListIntent
+// resource type + fetch configuration from the controller. Used by
+// handleRefresh and the RefreshActiveListIntent
 // handler in runtime_adapter.go (applyIntent).
 func (m Model) refreshActiveList() tea.Cmd {
 	rs := m.activeRS()
@@ -688,8 +674,7 @@ func (m Model) refreshActiveList() tea.Cmd {
 
 // refreshActiveListWithEnrichmentRerun wraps refreshActiveList with an
 // enrichment-rerun token stamp — mirrors refreshResourceListWithEnrichmentRerun
-// in probe_adapter.go but reads config from the controller rather than a
-// stored ResourceListModel.
+// in probe_adapter.go but reads config from the controller.
 func (m Model) refreshActiveListWithEnrichmentRerun(tok domain.Gen) tea.Cmd {
 	inner := m.refreshActiveList()
 	return func() tea.Msg {
@@ -749,8 +734,7 @@ func (m Model) handleIdentityError(msg messages.IdentityError) (tea.Model, tea.C
 }
 
 // handleToggleRelated handles the 'r' key on detail screens: toggles the right-column
-// related panel. Replaces the equivalent case in DetailModel.Update which is no
-// longer stored on the stack. State lives directly on the rendererState.
+// related panel. State lives directly on the rendererState.
 func (m Model) handleToggleRelated() (tea.Model, tea.Cmd) {
 	rs := m.activeRS()
 	if rs.kind != rsKindDetail {

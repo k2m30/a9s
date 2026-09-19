@@ -95,10 +95,8 @@ func EnrichEventBridgeRuleTargets(ctx context.Context, clients *ServiceClients, 
 		}
 		var rows []domain.DetailRow
 
-		// ENABLED rule with no targets → rule fires but goes nowhere.
 		noTargets := fetchErr == nil && state == "ENABLED" && len(targets) == 0 && !targetsTruncated
 
-		// DISABLED rule still has targets → probable drift/oversight.
 		if state == "DISABLED" && len(targets) > 0 {
 			rows = append(rows, domain.DetailRow{
 				Label: "Targets",
@@ -107,7 +105,6 @@ func EnrichEventBridgeRuleTargets(ctx context.Context, clients *ServiceClients, 
 			})
 		}
 
-		// Targets without DeadLetterConfig → missing DLQ.
 		for _, target := range targets {
 			if target.DeadLetterConfig == nil {
 				targetID := ""

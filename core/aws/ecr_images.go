@@ -50,7 +50,6 @@ func FetchECRImages(ctx context.Context, api ECRDescribeImagesAPI, parentCtx map
 		}, nil
 	}
 
-	// Sort by ImagePushedAt descending (newest first)
 	sort.Slice(pageImages, func(i, j int) bool {
 		if pageImages[i].ImagePushedAt == nil {
 			return false
@@ -96,13 +95,11 @@ func convertECRImage(img ecrtypes.ImageDetail, repositoryURI, repositoryName str
 		digest = *img.ImageDigest
 	}
 
-	// image_tags
 	imageTags := "<untagged>"
 	if len(img.ImageTags) > 0 {
 		imageTags = strings.Join(img.ImageTags, ", ")
 	}
 
-	// digest_short: strip "sha256:" prefix, first 12 chars
 	digestShort := ""
 	if digest != "" {
 		short := strings.TrimPrefix(digest, "sha256:")
@@ -112,32 +109,27 @@ func convertECRImage(img ecrtypes.ImageDetail, repositoryURI, repositoryName str
 		digestShort = short
 	}
 
-	// pushed_at
 	pushedAt := ""
 	if img.ImagePushedAt != nil {
 		pushedAt = img.ImagePushedAt.UTC().Format("2006-01-02 15:04")
 	}
 
-	// image_size
 	imageSize, imageSizeRaw := "", ""
 	if img.ImageSizeInBytes != nil {
 		imageSize = formatBytes(*img.ImageSizeInBytes)
 		imageSizeRaw = strconv.FormatInt(*img.ImageSizeInBytes, 10)
 	}
 
-	// scan_status
 	scanStatus := ""
 	if img.ImageScanStatus != nil {
 		scanStatus = string(img.ImageScanStatus.Status)
 	}
 
-	// finding_counts
 	findingCounts := ""
 	if img.ImageScanFindingsSummary != nil {
 		findingCounts = formatFindingCounts(img.ImageScanFindingsSummary.FindingSeverityCounts)
 	}
 
-	// image_uri
 	imageURI := ""
 	if len(img.ImageTags) > 0 {
 		imageURI = repositoryURI + ":" + img.ImageTags[0]
@@ -145,7 +137,6 @@ func convertECRImage(img ecrtypes.ImageDetail, repositoryURI, repositoryName str
 		imageURI = repositoryURI + "@" + digest
 	}
 
-	// Name: first tag or digest_short
 	name := digestShort
 	if len(img.ImageTags) > 0 {
 		name = imageTags
@@ -204,12 +195,10 @@ func ecrImageFindings(img ecrtypes.ImageDetail) []domain.Finding {
 // computeImageStatus determines the resource status based on scan findings
 // and tag state.
 func computeImageStatus(img ecrtypes.ImageDetail) string {
-	// Check scan failures first
 	if img.ImageScanStatus != nil && img.ImageScanStatus.Status == ecrtypes.ScanStatusFailed {
 		return "failed"
 	}
 
-	// Check finding severity counts
 	if img.ImageScanFindingsSummary != nil && len(img.ImageScanFindingsSummary.FindingSeverityCounts) > 0 {
 		counts := img.ImageScanFindingsSummary.FindingSeverityCounts
 		if c, ok := counts["CRITICAL"]; ok && c > 0 {
@@ -220,7 +209,6 @@ func computeImageStatus(img ecrtypes.ImageDetail) string {
 		}
 	}
 
-	// Untagged with no findings
 	if len(img.ImageTags) == 0 {
 		return "terminated"
 	}
@@ -235,7 +223,6 @@ func formatFindingCounts(counts map[string]int32) string {
 		return ""
 	}
 
-	// Severity order with abbreviations
 	severityOrder := []struct {
 		key  string
 		abbr string

@@ -8,7 +8,7 @@
 //	                 plus any TaskRequests the adapter should start.
 //
 // View construction, view-stack manipulation, and Bubble Tea specifics
-// remain in the TUI adapter (internal/tui/runtime_adapter_navigate.go).
+// live in the TUI adapter (internal/tui/runtime_adapter_navigate.go).
 // The runtime owns only the platform-agnostic policy: type validation,
 // cache lookups, enrichment-dispatch trigger, and fetch task emission.
 package runtime
@@ -119,7 +119,7 @@ func (FetchRevealPayload) isTaskPayload() {}
 // spans (Window) — the executor threads Window through onto the resulting
 // messages.CostsLoaded event so ApplyCostsLoaded can stamp Store.MergeCoverage
 // for precisely what was requested, independent of which periods CE actually
-// returned records for (R2: a period with zero returned groups is a real,
+// returned records for (a period with zero returned groups is a real,
 // cacheable answer, not a gap).
 type FetchCostsPayload struct {
 	Query  costs.Query
@@ -133,7 +133,7 @@ type FetchCostsPayload struct {
 	// SkipGrid tells the executor to skip the GetCostAndUsage(WithResources)
 	// call: the grid shape is already fully covered (screen.FetchPlan.Grid
 	// false) and only the anomaly slot is absent/expired — an
-	// anomalies-only dispatch (X3), never billed for cost data the store
+	// anomalies-only dispatch, never billed for cost data the store
 	// already has.
 	SkipGrid bool
 }
@@ -173,7 +173,7 @@ func listSeedEntry(rows []resource.Resource, pagination *resource.PaginationMeta
 // state the runtime owns (canonical-type resolution), and returns the
 // decision plus any fetch tasks the adapter should start.
 //
-// View construction and Bubble Tea specifics remain in the TUI adapter so
+// View construction and Bubble Tea specifics live in the TUI adapter so
 // this handler is platform-agnostic and testable without standing up
 // Bubble Tea.
 func (c *Core) HandleNavigate(ev NavigateEvent) (NavigateResult, []TaskRequest) {
@@ -182,30 +182,19 @@ func (c *Core) HandleNavigate(ev NavigateEvent) (NavigateResult, []TaskRequest) 
 		return NavigateResult{Kind: NavigateKindPopAll}, nil
 
 	case NavigateTargetResourceList:
-		// One-shot command disarm (D15): disarm the deferred one-shot -c navigation the instant any
-		// resource-list navigation actually happens. CommandArmed/PendingCommand
-		// (session.go) latch a REPLAY of this exact navigation, deferred until
-		// handleAvailabilityCacheLoaded's seed lands (deferred -c navigation, D11).
-		// A manually-typed navigation to the SAME or a
-		// DIFFERENT resource type in the race window between arming (connect
-		// time) and consumption (availability-cache-loaded time) left the flag
-		// armed, so the later deferred emit fired a second, redundant
-		// NavigateTargetResourceList for the (still-armed) PendingCommand type —
-		// pushing a second ScreenChildList/ScreenResourceList of that type onto
-		// an already-navigated stack. Two ListStates then existed for one
-		// visible screen: the first fetch landed on the first push, the second
-		// (armed-replay) fetch landed on the second push, and callers reading
-		// topListState() (the load-more gate, the renderer) saw whichever push
-		// was topmost — silently diverging from whichever push the frame last
-		// rendered. Clearing the arming here (not at the push site) closes the
-		// race at its source: by the time handleAvailabilityCacheLoaded checks
-		// CommandArmed, any real navigation that already happened has disarmed
-		// it, so the deferred emit becomes the intended no-op instead of a
-		// duplicate push. The armed emit's own eventual HandleNavigate call
-		// re-disarms harmlessly (CommandArmed is already false by then, cleared
-		// synchronously by handleAvailabilityCacheLoaded before dispatch).
-		// Guarded on the current value (not an unconditional write) so the
-		// overwhelmingly common never-armed case costs only a bool read.
+		// Disarm the deferred one-shot -c navigation the instant any
+		// resource-list navigation happens. CommandArmed/PendingCommand
+		// (session.go) latch a REPLAY of this navigation, deferred until
+		// handleAvailabilityCacheLoaded's seed lands. A navigation in the
+		// window between arming (connect time) and consumption
+		// (availability-cache-loaded time) would otherwise leave the flag
+		// armed, and the deferred emit would push a second list of the
+		// PendingCommand type onto an already-navigated stack — two
+		// ListStates for one visible screen. The armed emit's own
+		// HandleNavigate call re-disarms harmlessly (CommandArmed is already
+		// false by then, cleared by handleAvailabilityCacheLoaded before
+		// dispatch). Guarded on the current value so the common never-armed
+		// case costs only a bool read.
 		if c.session.CommandArmed {
 			c.session.CommandArmed = false
 			c.session.PendingCommand = ""
@@ -229,7 +218,7 @@ func (c *Core) HandleNavigate(ev NavigateEvent) (NavigateResult, []TaskRequest) 
 		if entry, ok := c.ResourceCache(canon); ok {
 			// Cached resources already carry fetcher-emitted Findings.
 			//
-			// C1: the retained rows are what the session last saw, not what AWS
+			// The retained rows are what the session last saw, not what AWS
 			// holds now — the re-entry seeds them and verifies them, exactly as
 			// the miss branch below does. The task is returned here rather than
 			// synthesised by whichever adapter happens to notice, so the TUI and
@@ -254,11 +243,10 @@ func (c *Core) HandleNavigate(ev NavigateEvent) (NavigateResult, []TaskRequest) 
 		}
 		// The seed rides the miss branch, not a NavigateKindPushResourceListCached
 		// promotion: this check above (c.ResourceCache(canon)) only hits a FULL
-		// (non-Partial, OriginFetch) RowStore entry (warm-open seeding, C1 + Goal 4) — an
+		// (non-Partial, OriginFetch) RowStore entry (warm-open seeding) — an
 		// OriginProbe/OriginDisk entry retained below is knowledge the probe
 		// gathered, not a verified live fetch, so the fetch must still run to
-		// confirm/replace what the probe retained; Kind and the
-		// KindFetchResources task below are unchanged.
+		// confirm/replace what the probe retained.
 		//
 		// A type's rows live in exactly one RowStore entry regardless of which
 		// lane wrote them, so the store is read directly.
@@ -274,7 +262,7 @@ func (c *Core) HandleNavigate(ev NavigateEvent) (NavigateResult, []TaskRequest) 
 		// entry with a zero-length Rows slice means a live Wave-1 probe (or a
 		// disk seed, or a fetch) already confirmed the type is empty this
 		// session — that observed-empty result is fresher than any disk row
-		// (C2), so it seeds a bare list rather than falling back to stale disk
+		// so it seeds a bare list rather than falling back to stale disk
 		// rows.
 		tr := c.session.RowStore.Snapshot(canon)
 		if tr.Gen != 0 {
@@ -336,8 +324,8 @@ func (c *Core) HandleNavigate(ev NavigateEvent) (NavigateResult, []TaskRequest) 
 		}
 		// Related-check is detail-only. The runtime decides *applicability*
 		// (this is a detail navigation → DispatchRelated); the adapter applies
-		// the *gate* (d.NeedsRelatedCheck() && RelatedCache miss). This split is
-		// the boundary-correct end state, not a deferral: NeedsRelatedCheck is
+		// the *gate* (d.NeedsRelatedCheck() && RelatedCache miss).
+		// NeedsRelatedCheck is
 		// true only when the right column auto-shows, which depends on terminal
 		// width — inherently renderer-side state a platform-agnostic runtime
 		// cannot (and should not) own. The RelatedCache short-circuit is an
@@ -377,7 +365,7 @@ func (c *Core) HandleNavigate(ev NavigateEvent) (NavigateResult, []TaskRequest) 
 			}}
 
 	case NavigateTargetCosts:
-		// No unconditional fetch here (SC-002): the adapter's PushCosts
+		// The adapter's PushCosts
 		// handling seeds CostsState via EnsureCostsState, then the shared
 		// ensureCostsShapeFetched decides — a warm cache opens with zero CE
 		// calls, a cold one fetches. See core/app/navigate.go and

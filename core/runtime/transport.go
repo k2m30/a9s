@@ -5,9 +5,8 @@
 // The TUI's WithClients bootstrap option takes `*runtime.ServiceClients` — a
 // transparent
 // alias for the AWS-typed ServiceClients struct. core/runtime owns the
-// alias because runtime already legitimately imports core/aws; the TUI
-// only sees the runtime-exported name so its production-side import set
-// drops the awsclient package entirely.
+// alias because runtime already imports core/aws; the TUI only sees the
+// runtime-exported name, keeping core/aws out of its production imports.
 package runtime
 
 import awsclient "github.com/k2m30/a9s/v3/core/aws"

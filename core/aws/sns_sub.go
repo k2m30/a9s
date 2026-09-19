@@ -61,7 +61,6 @@ func FetchSNSSubscriptionsPage(ctx context.Context, api SNSListSubscriptionsAPI,
 			endpoint = *sub.Endpoint
 		}
 
-		// Extract topic name from TopicArn (last segment after ":")
 		topicName := topicArn
 		if parts := strings.Split(topicArn, ":"); len(parts) > 0 {
 			topicName = parts[len(parts)-1]
@@ -130,7 +129,7 @@ func snsSubFindings(subscriptionArn, protocol, endpoint string) ([]domain.Findin
 	return findings, map[domain.FindingCode]domain.AttentionDetail{
 		CodeSNSSubPlainHTTP: {Rows: []domain.DetailRow{
 			// Scheme and host only. A webhook path is routinely the shared
-			// secret that authenticates the caller (rule 7).
+			// secret that authenticates the caller.
 			{Label: "Endpoint", Value: snsSubEndpointOrigin(endpoint), Tier: "~"},
 		}},
 	}

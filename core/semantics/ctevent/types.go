@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
 
 // Package ctevent implements the CloudTrail event detail view data model.
-// See specs/013-ct-event-detail-v2/data-model.md for the full type specification
-// and specs/013-ct-event-detail-v2/contracts/ctevent-api.md for the public API contracts.
 package ctevent
 
 import "time"
@@ -54,8 +52,7 @@ type Event struct {
 	// Insight-specific (only when EventCategory == "Insight")
 	InsightDetails *InsightDetails
 
-	// Verb classification (computed once during Parse via existing
-	// core/aws/ct_events_severity.go ClassifyCTVerb)
+	// Verb classification (computed once during Parse via ClassifyCTVerb)
 	Verb string // "R" | "W" | "D" | "S" | "I" | "N" | "?"
 
 	// Status is the severity tier computed from the event by
@@ -66,7 +63,7 @@ type Event struct {
 }
 
 // UserIdentity holds the parsed userIdentity block. Discriminated by Type.
-// All 12 variants from taxonomy §4 are representable.
+// All 12 userIdentity variants are representable.
 type UserIdentity struct {
 	Type        string // "IAMUser" | "AssumedRole" | "Root" | "AWSService" | ...
 	PrincipalID string
@@ -140,7 +137,7 @@ type Row struct {
 	TargetType  string // resource type to navigate to (e.g. "role", "ec2", "s3")
 	FieldPath   string // synthetic path for cursor identity (e.g. "ACTOR.Principal")
 	Severity    string // OPTIONAL: severity tier for value coloring ("ct-info"|"ct-attention"|"ct-danger")
-	// Set ONLY on the Event row in ACTION (FR-002 single-cell exception).
+	// Set ONLY on the Event row in ACTION.
 	// All other rows leave this empty and render through neutral ColDetailVal.
 	NavID string // Optional navigation identifier. When non-empty, navigation dispatch uses
 	// this instead of Value. Used when the display Value (e.g. full ARN) differs

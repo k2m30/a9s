@@ -24,11 +24,11 @@ type ECRFixtures struct {
 	Policies map[string]string
 	// LifecyclePolicies maps repository name to its lifecycle policy JSON
 	// (for GetLifecyclePolicy). A repository absent from this map has no
-	// lifecycle policy, which is what ECRNoLifecycle witnesses.
+	// lifecycle policy (ECRNoLifecycle).
 	LifecyclePolicies map[string]string
 }
 
-// Witness repositories for the ecr posture findings. Each names the ONE demo
+// Repositories carrying the ecr posture findings. Each names the ONE demo
 // repository that carries its finding; every other repository is set to the
 // healthy value for that condition.
 const (
@@ -80,7 +80,7 @@ var sharedECRFixtures = sync.OnceValue(func() *ECRFixtures {
 			CreatedAt: aws.Time(mustParseECRTime("2025-03-01T10:00:00+00:00")),
 		},
 		{
-			// ECRMutableTags witness: a deployed tag can be moved to different
+			// ECRMutableTags: a deployed tag can be moved to different
 			// image content without any deployment.
 			RepositoryName:             aws.String("acme/frontend"),
 			RepositoryUri:              aws.String("123456789012.dkr.ecr.us-east-1.amazonaws.com/acme/frontend"),
@@ -95,7 +95,7 @@ var sharedECRFixtures = sync.OnceValue(func() *ECRFixtures {
 			CreatedAt: aws.Time(mustParseECRTime("2025-03-01T10:05:00+00:00")),
 		},
 		{
-			// ECRScanOnPushOff witness: images arrive unscanned.
+			// ECRScanOnPushOff: images arrive unscanned.
 			RepositoryName:             aws.String("acme/base-images"),
 			RepositoryUri:              aws.String("123456789012.dkr.ecr.us-east-1.amazonaws.com/acme/base-images"),
 			RepositoryArn:              aws.String("arn:aws:ecr:us-east-1:123456789012:repository/acme/base-images"),
@@ -109,7 +109,7 @@ var sharedECRFixtures = sync.OnceValue(func() *ECRFixtures {
 			CreatedAt: aws.Time(mustParseECRTime("2025-01-15T08:30:00+00:00")),
 		},
 		{
-			// ECRHighVulnerabilities witness: high findings, no critical.
+			// ECRHighVulnerabilities: high findings, no critical.
 			RepositoryName:             aws.String(ECRHighVulnerabilities),
 			RepositoryUri:              aws.String("123456789012.dkr.ecr.us-east-1.amazonaws.com/" + ECRHighVulnerabilities),
 			RepositoryArn:              aws.String("arn:aws:ecr:us-east-1:123456789012:repository/" + ECRHighVulnerabilities),
@@ -123,7 +123,7 @@ var sharedECRFixtures = sync.OnceValue(func() *ECRFixtures {
 			CreatedAt: aws.Time(mustParseECRTime("2025-07-04T09:00:00+00:00")),
 		},
 		{
-			// ECRNoLifecycle witness: absent from the LifecyclePolicies map
+			// ECRNoLifecycle: absent from the LifecyclePolicies map
 			// below, so every image it has ever held is kept forever.
 			RepositoryName:             aws.String("acme/batch-processor"),
 			RepositoryUri:              aws.String("123456789012.dkr.ecr.us-east-1.amazonaws.com/acme/batch-processor"),
@@ -137,7 +137,7 @@ var sharedECRFixtures = sync.OnceValue(func() *ECRFixtures {
 			},
 			CreatedAt: aws.Time(mustParseECRTime("2025-06-20T12:00:00+00:00")),
 		},
-		// ECRPublicPolicy witness: the repository policy grants a wildcard
+		// ECRPublicPolicy: the repository policy grants a wildcard
 		// principal, so any AWS account can pull these images.
 		{
 			RepositoryName:             aws.String(ECRPublicPolicy),
@@ -155,7 +155,7 @@ var sharedECRFixtures = sync.OnceValue(func() *ECRFixtures {
 		// The healthy repository: immutable tags, scan on push, a lifecycle
 		// policy, no resource policy and no vulnerable images. Demo mode needs
 		// one row of every type in the healthy state, and every other
-		// repository here is a witness for something.
+		// repository here carries a finding.
 		{
 			RepositoryName:             aws.String("acme/internal-tools"),
 			RepositoryUri:              aws.String("123456789012.dkr.ecr.us-east-1.amazonaws.com/acme/internal-tools"),
@@ -190,7 +190,7 @@ var sharedECRFixtures = sync.OnceValue(func() *ECRFixtures {
 
 	images := map[string][]ecrtypes.ImageDetail{
 		ECRHighVulnerabilities: {
-			// ECRHighVulnerabilities witness: highs only, so the repository
+			// ECRHighVulnerabilities: highs only, so the repository
 			// carries the warning tier of the vulnerability signal rather
 			// than the broken one acme/api-service carries.
 			{

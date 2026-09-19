@@ -6,7 +6,7 @@
 // core/session) so renderer adapters can resolve cache keys via
 // core/runtime instead of importing core/session. RelatedCacheResult is
 // re-exported as a type alias so callers can construct cache entries using
-// the runtime name; the underlying type still lives in core/session
+// the runtime name; the underlying type lives in core/session
 // because *session.RelatedCacheLRU stores it and session.Session.New
 // initialises the cache field.
 package runtime
@@ -22,7 +22,7 @@ type RelatedCacheResult = session.RelatedCacheResult
 
 // RelatedCacheKey builds the map key for RelatedCache lookups, using the
 // same `<resourceType>:<resourceID>` format as the session-side helper.
-// Moved here so renderer adapters can resolve cache keys without importing
+// Lives here so renderer adapters can resolve cache keys without importing
 // core/session.
 func RelatedCacheKey(resourceType, resourceID string) string {
 	return resourceType + ":" + resourceID

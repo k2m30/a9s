@@ -28,7 +28,7 @@ type StackEnriched struct {
 // natural cache miss that forces a fresh GetTemplate instead of serving a
 // pre-update template. Stale entries under the old version's key are never
 // evicted, but that's bounded and small per session (docs/architecture.md
-// §On-Demand detail enrichment).
+// "On-Demand detail enrichment").
 func enrichCfn(ctx context.Context, clients any, res resource.Resource) (resource.Resource, error) {
 	return enrichDetail(ctx, clients, res, detailEnrichSpec[cfntypes.Stack, any]{
 		unwrap: unwrapEnriched(func(w StackEnriched) cfntypes.Stack { return w.Stack }),

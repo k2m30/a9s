@@ -24,9 +24,9 @@ var registry []ResourceTypeDef //nolint:gochecknoglobals // process-scope catalo
 //
 // It is an atomic pointer to an immutable map rather than a plain map because
 // SetChildTypeForTest writes it while production goroutines read it: the
-// enrichment path resolves a type name on the cache-writer goroutine, and a
-// test registering a child type raced it. Writers copy the map and swap the
-// pointer, so a reader holds a map nobody will write to again.
+// enrichment path resolves a type name on the cache-writer goroutine. Writers
+// copy the map and swap the pointer, so a reader holds a map nobody will write
+// to again.
 var childRegistry atomic.Pointer[map[string]ResourceTypeDef] //nolint:gochecknoglobals // process-scope catalog
 
 // installed records whether SetTypes has been called. Used to surface a
@@ -78,9 +78,7 @@ func SetChildTypes(children []ResourceTypeDef) {
 // Case-insensitive match against ShortName and all Aliases.
 //
 // Unexported on purpose: a lookup that answers for half the catalog reads
-// like a general one at the call site, and every caller that picked a half
-// was wrong for the other — a child view file was "no such type", a child's
-// Related was a declaration nothing read. Outside this package there is
+// like a general one at the call site. Outside this package there is
 // FindAny, and TopLevelOnly / ChildOnly for the three callers that mean one
 // half and say so.
 //
@@ -147,9 +145,8 @@ func loadChildren() *map[string]ResourceTypeDef {
 }
 
 // SetChildTypeForTest registers or replaces one child type, for a test that
-// needs a type the catalog does not ship. It lives here, on the one registry,
-// because a second registry in front of this one is what a production reader
-// raced against.
+// needs a type the catalog does not ship. It writes the one registry
+// production readers use.
 //
 // Copy-on-write: the map a reader already holds is never touched.
 func SetChildTypeForTest(def ResourceTypeDef) {
@@ -157,10 +154,9 @@ func SetChildTypeForTest(def ResourceTypeDef) {
 }
 
 // installedChildren is the map SetChildTypes installed, kept so cleanup can
-// tell a test's own registration from an override of a shipped child. No
-// lookup reads it: it exists only so removing an override restores what the
-// catalog ships instead of deleting it for the rest of the process, which is
-// what the registry this replaced did by having two maps.
+// tell a test's own registration from an override of a shipped child:
+// removing an override restores what the catalog ships instead of deleting it
+// for the rest of the process.
 var installedChildren atomic.Pointer[map[string]ResourceTypeDef] //nolint:gochecknoglobals // process-scope catalog
 
 // CleanupChildTypeForTest removes a child type registered by
@@ -203,9 +199,7 @@ func swapChildren(edit func(map[string]ResourceTypeDef)) {
 // FindAny returns the type a view name refers to, parent or child, or nil.
 //
 // A view file, a migration and a load report all name a type the same way and
-// none of them cares which registry it lives in — asking Find alone answered
-// "no such type" for every child view, which is how child files were stamped
-// as migrated and migrated by nothing.
+// none of them cares which registry it lives in.
 func FindAny(name string) *ResourceTypeDef {
 	if td := find(name); td != nil {
 		return td
@@ -217,7 +211,7 @@ func FindAny(name string) *ResourceTypeDef {
 // children alone. They exist for the three callers whose answer IS the half —
 // resource.FindResourceType is the parents accessor, GetChildType the
 // children one, and GetPaginatedChildFetcher reads a field only a child has —
-// and their names say so at the call site, which "Find" never did.
+// and their names say so at the call site.
 func TopLevelOnly(name string) *ResourceTypeDef { return find(name) }
 
 // ChildOnly is TopLevelOnly's other half. See its comment.

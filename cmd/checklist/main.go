@@ -44,8 +44,8 @@ type ChecklistMenu struct {
 }
 
 type ChecklistList struct {
-	Columns    []string       `json:"columns"`    // exact ordered column headers (impl-plan U10)
-	Jargon     []string       `json:"jargon"`     // header strings that must NEVER appear (impl-plan U10)
+	Columns    []string       `json:"columns"`    // exact ordered column headers
+	Jargon     []string       `json:"jargon"`     // header strings that must NEVER appear
 	Shown      int            `json:"shown"`      // rows on the first page
 	Truncated  bool           `json:"truncated"`  // "Results truncated" indicator
 	Colors     map[string]int `json:"colors"`     // row-<color> class counts

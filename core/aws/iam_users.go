@@ -79,7 +79,6 @@ func FetchIAMUsersPage(ctx context.Context, api IAMListUsersAPI, continuationTok
 		resources = append(resources, r)
 	}
 
-	// Build pagination metadata — IAM uses IsTruncated bool + Marker *string
 	nextToken := ""
 	isTruncated := output.IsTruncated
 	if isTruncated && output.Marker != nil {

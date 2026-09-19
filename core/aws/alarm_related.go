@@ -11,7 +11,7 @@ import (
 )
 
 // checkAlarmSNS checks AlarmActions, OKActions, and InsufficientDataActions for
-// SNS topic ARNs. Pattern F — reads directly from RawStruct, no cache needed.
+// SNS topic ARNs. Reads directly from RawStruct.
 func checkAlarmSNS(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	raw, ok := assertStruct[cwtypes.MetricAlarm](res.RawStruct)
 	if !ok {
@@ -38,8 +38,8 @@ func checkAlarmSNS(_ context.Context, _ any, res resource.Resource, _ resource.R
 }
 
 // checkAlarmASG checks whether this alarm targets an Auto Scaling Group via its
-// "AutoScalingGroupName" dimension. Pattern D reverse — alarm carries the ASG name
-// in its dimensions; we look it up in the ASG cache by ID or Name.
+// "AutoScalingGroupName" dimension. The alarm carries the ASG name in its
+// dimensions; it is looked up in the ASG cache by ID or Name.
 func checkAlarmASG(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	raw, ok := assertStruct[cwtypes.MetricAlarm](res.RawStruct)
 	if !ok {

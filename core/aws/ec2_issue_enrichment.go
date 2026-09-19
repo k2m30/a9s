@@ -37,12 +37,11 @@ const (
 )
 
 // classifyEC2Status maps an AWS instance/system status-check value to its
-// FindingCode and severity per docs/resources/ec2.md §4. Only "impaired" is Broken;
+// FindingCode and severity per docs/resources/ec2.md. Only "impaired" is Broken;
 // "initializing" and "insufficient-data" are Warning and must never carry
 // the "impaired" wording, and each gets its own code. "ok" and
-// "not-applicable" produce no finding — "not-applicable" is explicitly out
-// of scope per docs/resources/ec2.md §5 (line 244): AWS classifies it as
-// Healthy/informational, not surfaced.
+// "not-applicable" produce no finding — AWS classifies "not-applicable" as
+// Healthy/informational.
 func classifyEC2Status(status ec2types.SummaryStatus) (domain.FindingCode, bool) {
 	switch status {
 	case ec2types.SummaryStatusImpaired:
@@ -52,7 +51,6 @@ func classifyEC2Status(status ec2types.SummaryStatus) (domain.FindingCode, bool)
 	case ec2types.SummaryStatusInsufficientData:
 		return ec2CodeInstanceStatusInsufficient, true
 	default:
-		// "ok" and "not-applicable" — no finding.
 		return "", false
 	}
 }
@@ -144,7 +142,6 @@ func ec2InstanceStatusFindings(ctx context.Context, clients *ServiceClients, res
 			c.rows = append(c.rows, row)
 		}
 
-		// Check instance status (docs/resources/ec2.md §4 lines 225-227).
 		if is.InstanceStatus != nil {
 			if code, ok := classifyEC2Status(is.InstanceStatus.Status); ok {
 				statusStr := domain.HumanizeStatusPhrase(string(is.InstanceStatus.Status))
@@ -152,7 +149,6 @@ func ec2InstanceStatusFindings(ctx context.Context, clients *ServiceClients, res
 			}
 		}
 
-		// Check system status (docs/resources/ec2.md §4 lines 225-227).
 		if is.SystemStatus != nil {
 			if code, ok := classifyEC2Status(is.SystemStatus.Status); ok {
 				statusStr := domain.HumanizeStatusPhrase(string(is.SystemStatus.Status))
@@ -160,7 +156,6 @@ func ec2InstanceStatusFindings(ctx context.Context, clients *ServiceClients, res
 			}
 		}
 
-		// Check scheduled events within 7 days.
 		// NotBeforeDeadline is the hard deadline (forced retirement/reboot).
 		// NotBefore is the earliest scheduled start — also within 7d is actionable.
 		for _, ev := range is.Events {
@@ -205,9 +200,8 @@ func ec2InstanceStatusFindings(ctx context.Context, clients *ServiceClients, res
 
 // ec2InternetExposure is the ec2 ↔ sg cross-reference: an instance holding a
 // public IP whose security groups already carry sg.go's risk verdict is
-// reachable from the internet on the ports that verdict names. It makes NO
-// API call and re-derives nothing — the sensitive-port set and the exposure
-// rules stay owned by sg.go, this pass only joins them to the instance.
+// API call; the sensitive-port set and the exposure rules are owned by sg.go,
+// and this pass only joins them to the instance.
 // An unloaded "sg" cache is not a clean bill of health: every instance the
 // join would judge is marked not inspected instead.
 func ec2InternetExposure(result *IssueEnricherResult, resources []resource.Resource, cache resource.ResourceCache) {

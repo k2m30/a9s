@@ -6,7 +6,7 @@ package resource
 import "github.com/k2m30/a9s/v3/core/domain"
 
 // Resource is the generic AWS resource instance. Declaration lives in
-// core/domain; this alias lets existing consumers compile without changes.
+// core/domain; this alias re-exports it.
 type Resource = domain.Resource
 
 // DedupByID returns the subset of incoming whose ID is not already present in

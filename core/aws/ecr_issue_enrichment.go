@@ -47,17 +47,14 @@ const ECRImagesPerRepo = 10
 // ImageDetails[].ImageScanFindingsSummary.FindingSeverityCounts — which AWS
 // populates inline when scan-on-push is enabled on the repo.
 //
-// Wave-2 budget: 1 call per repo (N), 0 ancillary per-image calls. This
-// matches the N+1 design every other enricher follows. The previous
-// implementation fanned out up to 11 calls per repo which blew the 10s
-// enrichment context on any account with >10 repos.
+// Wave-2 budget: 1 call per repo (N), 0 ancillary per-image calls.
 //
 // Findings:
-//   - Any CRITICAL across scanned images → "!" severity (bumps S1 badge).
+//   - Any CRITICAL across scanned images → "!" severity.
 //   - Any HIGH (no CRITICAL) → "~" severity.
 //
 // fieldUpdates keys: "critical_vulns", "high_vulns", "images_scanned".
-// Per-repo errors aggregate into a composite returned error (E1–E6 contract).
+// Per-repo errors aggregate into a composite returned error.
 // Repositories without scan data (unscanned images) contribute zero counts
 // silently — AWS returns a nil ImageScanFindingsSummary for those.
 func EnrichECRRepository(ctx context.Context, clients *ServiceClients, resources []resource.Resource, _ resource.ResourceCache) (IssueEnricherResult, error) {
@@ -246,5 +243,3 @@ func ecrLifecyclePolicyMissing(ctx context.Context, api ECRAPI, repoName string)
 	}
 	return false, err
 }
-
-// S5 operator sentences for the two policy findings.

@@ -14,7 +14,7 @@ const (
 )
 
 // CodeDDBDeletionProtectionOff is the wave-1 posture finding read from the
-// DescribeTable output the fetcher already holds (Prowler gap closure).
+// DescribeTable output the fetcher already holds.
 const CodeDDBDeletionProtectionOff domain.FindingCode = "ddb.deletion-protection-off"
 
 // CodeDDBNotInBackupPlan — no backup plan selection matches this table.

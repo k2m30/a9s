@@ -17,7 +17,7 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// trailDeliveryStaleAfter is the delivery-staleness threshold (docs/resources/trail.md §3.2):
+// trailDeliveryStaleAfter is the delivery-staleness threshold:
 // a logging trail with no delivered file in over an hour is Broken.
 const trailDeliveryStaleAfter = time.Hour
 

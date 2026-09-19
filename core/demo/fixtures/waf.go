@@ -10,12 +10,12 @@ import (
 	wafv2types "github.com/aws/aws-sdk-go-v2/service/wafv2/types"
 )
 
-// WAFNoRules is the witness Web ACL for waf.no-rules: it exists and is
+// WAFNoRules is the Web ACL raising waf.no-rules: it exists and is
 // associated, but contains no rules at all. Every other demo ACL has at
 // least one rule.
 const WAFNoRules = "acme-empty-waf"
 
-// WAFOrphan is the witness Web ACL for waf.orphan: it has rules and a logging
+// WAFOrphan is the Web ACL raising waf.orphan: it has rules and a logging
 // configuration, and is attached to nothing. Every other demo ACL appears in
 // ResourcesByWebACL with at least one associated resource.
 const WAFOrphan = "acme-unattached-waf"

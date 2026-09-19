@@ -20,7 +20,6 @@ func checkRedshiftAlarms(ctx context.Context, clients any, res resource.Resource
 
 // checkRedshiftSG extracts security group IDs from the Redshift Cluster's
 // VpcSecurityGroups slice.
-// Pattern F — no cache needed.
 func checkRedshiftSG(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	cluster, ok := assertStruct[redshifttypes.Cluster](res.RawStruct)
 	if !ok {
@@ -35,7 +34,7 @@ func checkRedshiftSG(_ context.Context, _ any, res resource.Resource, _ resource
 	return relatedResult("sg", ids)
 }
 
-// checkRedshiftVPC returns the VPC this Redshift cluster runs in (Pattern R).
+// checkRedshiftVPC returns the VPC this Redshift cluster runs in.
 // Reads Cluster.VpcId from the RawStruct.
 func checkRedshiftVPC(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	cluster, ok := assertStruct[redshifttypes.Cluster](res.RawStruct)
@@ -49,7 +48,6 @@ func checkRedshiftVPC(_ context.Context, _ any, res resource.Resource, _ resourc
 }
 
 // checkRedshiftRole extracts IAM role ARNs from the Redshift Cluster's IamRoles slice.
-// Pattern F — no cache needed.
 func checkRedshiftRole(_ context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	cluster, ok := assertStruct[redshifttypes.Cluster](res.RawStruct)
 	if !ok {
@@ -68,7 +66,7 @@ func checkRedshiftRole(_ context.Context, clients any, res resource.Resource, ca
 }
 
 // checkRedshiftKMS extracts the KMS key ID from the Redshift Cluster's KmsKeyId
-// field. Pattern F — no cache needed.
+// field.
 func checkRedshiftKMS(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	cluster, ok := assertStruct[redshifttypes.Cluster](res.RawStruct)
 	if !ok || cluster.KmsKeyId == nil || *cluster.KmsKeyId == "" {
@@ -152,7 +150,7 @@ func checkRedshiftSecrets(ctx context.Context, clients any, res resource.Resourc
 }
 
 // checkRedshiftLogs resolves the cluster's audit-log target via a single
-// redshift:DescribeLoggingStatus call (Pattern C). When LogDestinationType
+// redshift:DescribeLoggingStatus call. When LogDestinationType
 // is cloudwatch, one log-group ID is emitted per enabled LogExports[] entry
 // following the /aws/redshift/cluster/{clusterID}/{logExport} naming convention.
 func checkRedshiftLogs(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
@@ -188,7 +186,7 @@ func checkRedshiftLogs(ctx context.Context, clients any, res resource.Resource, 
 }
 
 // checkRedshiftS3 resolves the audit-log S3 bucket via a single
-// redshift:DescribeLoggingStatus call (Pattern C). BucketName is set only
+// redshift:DescribeLoggingStatus call. BucketName is set only
 // when the cluster logs to S3 (not CloudWatch).
 func checkRedshiftS3(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	status, err := redshiftLoggingStatus(ctx, clients, res)
@@ -208,7 +206,7 @@ func checkRedshiftS3(ctx context.Context, clients any, res resource.Resource, _ 
 }
 
 // checkRedshiftSubnet resolves the cluster's subnet-group members via a
-// single redshift:DescribeClusterSubnetGroups call (Pattern C).
+// single redshift:DescribeClusterSubnetGroups call.
 func checkRedshiftSubnet(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	cluster, ok := assertStruct[redshifttypes.Cluster](res.RawStruct)
 	if !ok || cluster.ClusterSubnetGroupName == nil || *cluster.ClusterSubnetGroupName == "" {

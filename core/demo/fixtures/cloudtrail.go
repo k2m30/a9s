@@ -26,7 +26,7 @@ const CtEventPathNamedSecret = "evt-0a1b2c3d4e5f60010"
 const CtEventPathNamedRole = "evt-0a1b2c3d4e5f60011"
 
 // CtEventSecondPathNamedRole names the second path-filed role by an ARN
-// carrying its IAM path, so the path rule has two witnesses rather than one.
+// carrying its IAM path.
 const CtEventSecondPathNamedRole = "evt-0a1b2c3d4e5f60012"
 
 // CtEventDeletedRole names a role no demo IAM fixture carries; its pivot stays
@@ -55,7 +55,7 @@ func NewCloudTrailFixtures() *CloudTrailFixtures {
 
 // buildCTTrailStatus keys GetTrailStatus responses by trail ARN. One trail is
 // intentionally not logging, one has a LatestDeliveryError, one has a stale
-// LatestDeliveryTime (docs/resources/trail.md §3.2), the rest healthy.
+// LatestDeliveryTime (docs/resources/trail.md), the rest healthy.
 func buildCTTrailStatus() map[string]cloudtrail.GetTrailStatusOutput {
 	return map[string]cloudtrail.GetTrailStatusOutput{
 		"arn:aws:cloudtrail:us-east-1:123456789012:trail/acme-management-trail": {
@@ -76,7 +76,7 @@ func buildCTTrailStatus() map[string]cloudtrail.GetTrailStatusOutput {
 			IsLogging: aws.Bool(true),
 		},
 		// IsLogging=true but LatestDeliveryTime is fixed far in the past —
-		// always >1h stale regardless of when the demo runs, witnessing the
+		// always >1h stale regardless of when the demo runs, raising the
 		// "silent delivery failure" Broken condition (checkTrailDeliveryStale).
 		"arn:aws:cloudtrail:us-east-1:123456789012:trail/acme-stale-delivery-trail": {
 			IsLogging:          aws.Bool(true),
@@ -84,10 +84,6 @@ func buildCTTrailStatus() map[string]cloudtrail.GetTrailStatusOutput {
 		},
 	}
 }
-
-// ---------------------------------------------------------------------------
-// Trails (for DescribeTrails)
-// ---------------------------------------------------------------------------
 
 func buildCTTrails() []cloudtrailtypes.Trail {
 	return []cloudtrailtypes.Trail{
@@ -199,7 +195,7 @@ func buildCTTrails() []cloudtrailtypes.Trail {
 			KmsKeyId:                   aws.String("arn:aws:kms:us-east-1:123456789012:key/a1b2c3d4-5678-90ab-cdef-111111111111"),
 		},
 		// LatestDeliveryTime stale (>1h) while IsLogging=true → Wave-2 Broken
-		// "silent delivery failure" (docs/resources/trail.md §3.2).
+		// "silent delivery failure" (docs/resources/trail.md).
 		{
 			Name:                       aws.String("acme-stale-delivery-trail"),
 			TrailARN:                   aws.String("arn:aws:cloudtrail:us-east-1:123456789012:trail/acme-stale-delivery-trail"),
@@ -322,10 +318,6 @@ func buildCTTrails() []cloudtrailtypes.Trail {
 		},
 	}
 }
-
-// ---------------------------------------------------------------------------
-// Events (for LookupEvents)
-// ---------------------------------------------------------------------------
 
 func buildCTEvents() []cloudtrailtypes.Event {
 	t1 := time.Date(2026, 3, 28, 14, 30, 15, 0, time.UTC)
@@ -473,7 +465,6 @@ func buildCTEvents() []cloudtrailtypes.Event {
 			CloudTrailEvent: aws.String(`{"eventVersion":"1.08","userIdentity":{"type":"AssumedRole","principalId":"AROAEXAMPLE666666666:ci-session","arn":"arn:aws:sts::999988887777:assumed-role/ci-runner/ci-session","accountId":"999988887777","sessionContext":{"sessionIssuer":{"type":"Role","principalId":"AROAEXAMPLE666666666","arn":"arn:aws:iam::123456789012:role/ci-runner","accountId":"123456789012","userName":"ci-runner"},"attributes":{"mfaAuthenticated":"false","creationDate":"2026-03-28T09:00:00Z"}}},"eventTime":"2026-03-28T09:05:11Z","eventSource":"s3.amazonaws.com","eventName":"VpcEndpointAccess","awsRegion":"us-east-1","sourceIPAddress":"203.0.113.50","userAgent":"aws-sdk-java/2.20 Linux/5.15 Java/17.0","requestParameters":{},"responseElements":null,"requestID":"req-vpc-ep-001","eventID":"evt-0a1b2c3d4e5f60006","readOnly":true,"eventType":"AwsApiCall","managementEvent":false,"recipientAccountId":"123456789012","eventCategory":"NetworkActivity","vpcEndpointId":"vpce-0abc123"}`),
 			Resources:       []cloudtrailtypes.Resource{},
 		},
-		// Wireframe cases A–L
 		{
 			EventId:         aws.String("e-a1b2c3d4"),
 			EventName:       aws.String("DescribeInstances"),
@@ -522,7 +513,7 @@ func buildCTEvents() []cloudtrailtypes.Event {
 		{
 			// The one root-account event that is not also a write: verb wins over
 			// root in the severity ladder, so a root CreateBucket reports as a
-			// modifying call and only a root READ witnesses root activity.
+			// modifying call and only a root READ reports as root activity.
 			EventId:         aws.String("e-e5f6a7b9"),
 			EventName:       aws.String("GetAccountSummary"),
 			EventTime:       aws.Time(tE),
@@ -627,7 +618,6 @@ func buildCTEvents() []cloudtrailtypes.Event {
 				{ResourceType: aws.String("AWS::IAM::User"), ResourceName: aws.String("bob")},
 			},
 		},
-		// Lambda events
 		{
 			EventId:     aws.String("evt-lambda-invoke-001"),
 			EventName:   aws.String("Invoke"),
@@ -652,7 +642,6 @@ func buildCTEvents() []cloudtrailtypes.Event {
 			},
 			CloudTrailEvent: aws.String(`{"eventVersion":"1.08","userIdentity":{"type":"IAMUser","arn":"arn:aws:iam::123456789012:user/ci-service-account","accountId":"123456789012","accessKeyId":"AKIAEXAMPLE002","userName":"ci-service-account"},"eventSource":"lambda.amazonaws.com","eventName":"UpdateFunctionCode20150331v2","requestParameters":{"functionName":"arn:aws:lambda:us-east-1:123456789012:function:data-pipeline-transform"}}`),
 		},
-		// RDS event
 		{
 			EventId:     aws.String("evt-rds-modify-001"),
 			EventName:   aws.String("ModifyDBInstance"),
@@ -665,7 +654,6 @@ func buildCTEvents() []cloudtrailtypes.Event {
 			},
 			CloudTrailEvent: aws.String(`{"eventVersion":"1.08","userIdentity":{"type":"IAMUser","arn":"arn:aws:iam::123456789012:user/alice.johnson","accountId":"123456789012","userName":"alice.johnson"},"eventSource":"rds.amazonaws.com","eventName":"ModifyDBInstance","requestParameters":{"dBInstanceIdentifier":"prod-api-primary"}}`),
 		},
-		// ECS event
 		{
 			EventId:     aws.String("evt-ecs-update-001"),
 			EventName:   aws.String("UpdateService"),
@@ -678,7 +666,6 @@ func buildCTEvents() []cloudtrailtypes.Event {
 			},
 			CloudTrailEvent: aws.String(`{"eventVersion":"1.08","userIdentity":{"type":"IAMUser","arn":"arn:aws:iam::123456789012:user/ci-service-account","accountId":"123456789012","userName":"ci-service-account"},"eventSource":"ecs.amazonaws.com","eventName":"UpdateService","requestParameters":{"cluster":"acme-services"}}`),
 		},
-		// DynamoDB event — acme-orders table (legacy fixture).
 		{
 			EventId:     aws.String("evt-ddb-update-001"),
 			EventName:   aws.String("UpdateTable"),
@@ -691,7 +678,7 @@ func buildCTEvents() []cloudtrailtypes.Event {
 			},
 			CloudTrailEvent: aws.String(`{"eventVersion":"1.08","userIdentity":{"type":"IAMUser","arn":"arn:aws:iam::123456789012:user/alice.johnson","accountId":"123456789012","userName":"alice.johnson"},"eventSource":"dynamodb.amazonaws.com","eventName":"UpdateTable","requestParameters":{"tableName":"acme-orders"}}`),
 		},
-		// DynamoDB event — orders-prod table (universal ct-events pivot graph-root).
+		// DynamoDB event — orders-prod table.
 		// The ct-events related checker matches events whose ResourceName contains
 		// the table name "orders-prod". This ensures the pivot resolves ≥ 1.
 		{
@@ -706,7 +693,6 @@ func buildCTEvents() []cloudtrailtypes.Event {
 			},
 			CloudTrailEvent: aws.String(`{"eventVersion":"1.08","userIdentity":{"type":"IAMUser","arn":"arn:aws:iam::123456789012:user/alice.johnson","accountId":"123456789012","userName":"alice.johnson"},"eventSource":"dynamodb.amazonaws.com","eventName":"UpdateContinuousBackups","requestParameters":{"tableName":"orders-prod","pointInTimeRecoverySpecification":{"pointInTimeRecoveryEnabled":true}}}`),
 		},
-		// Secrets Manager event
 		{
 			EventId:     aws.String("evt-secrets-get-001"),
 			EventName:   aws.String("GetSecretValue"),
@@ -719,7 +705,6 @@ func buildCTEvents() []cloudtrailtypes.Event {
 			},
 			CloudTrailEvent: aws.String(`{"eventVersion":"1.08","userIdentity":{"type":"IAMUser","arn":"arn:aws:iam::123456789012:user/ci-service-account","accountId":"123456789012","userName":"ci-service-account"},"eventSource":"secretsmanager.amazonaws.com","eventName":"GetSecretValue","requestParameters":{"secretId":"prod/database/primary"}}`),
 		},
-		// EKS event
 		{
 			EventId:     aws.String("evt-eks-describe-001"),
 			EventName:   aws.String("DescribeCluster"),
@@ -785,7 +770,6 @@ func buildCTEvents() []cloudtrailtypes.Event {
 			},
 			CloudTrailEvent: aws.String(`{"eventVersion":"1.08","userIdentity":{"type":"IAMUser","arn":"arn:aws:iam::123456789012:user/alice.johnson","accountId":"123456789012","userName":"alice.johnson"},"eventSource":"rds.amazonaws.com","eventName":"ModifyDBInstance","awsRegion":"us-east-1","requestParameters":{"dBInstanceIdentifier":"warn-dbi-public-maint","publiclyAccessible":true},"responseElements":{"dBInstanceIdentifier":"warn-dbi-public-maint","dBInstanceStatus":"available"},"requestID":"req-rds-mod-pubmaint-001","eventID":"evt-rds-warn-public-maint-001","readOnly":false,"eventType":"AwsApiCall","managementEvent":true,"recipientAccountId":"123456789012","eventCategory":"Management","resources":[{"ARN":"` + WarnDbiPublicMaintARN + `","accountId":"123456789012","type":"AWS::RDS::DBInstance"}]}`),
 		},
-		// CloudFormation event
 		{
 			EventId:     aws.String("evt-cfn-update-001"),
 			EventName:   aws.String("UpdateStack"),
@@ -831,8 +815,8 @@ func buildCTEvents() []cloudtrailtypes.Event {
 				AcmeWarehouseID,
 			)),
 		},
-		// prod-redis-sessions events — ready for redis→ct-events related-panel pivot (phase-7).
-		// ResourceName matches ProdRedisID so checkRedisCTEvents (phase-7) can filter by
+		// prod-redis-sessions events — required for redis→ct-events related-panel pivot.
+		// ResourceName matches ProdRedisID so checkRedisCtEvents can filter by
 		// fields["resource_name"] == res.ID (the replication group ID).
 		// Username matches ci-service-account which exists in iam.go (IAM Users fixture).
 		{
@@ -1052,7 +1036,7 @@ func buildCTEvents() []cloudtrailtypes.Event {
 	}
 }
 
-// Witness trails for the w6a Prowler batch. Each names the ONE demo trail
+// Trails carrying the trail posture findings. Each names the ONE demo trail
 // that carries its finding; every other trail is set to the healthy value for
 // that condition.
 const (

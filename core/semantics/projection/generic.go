@@ -137,8 +137,7 @@ func buildItems(r domain.Resource, cfg *config.ViewsConfig, navProvider func(str
 	// Pass nil navMap to suppress navigability — navigable affordances are
 	// only meaningful when the operator has a configured detail path that maps
 	// field keys to target types. Without that contract, an Enter press on
-	// a randomly-ordered flat field would be surprising. This preserves
-	// parity with the original TUI field-list builder's nil-config path.
+	// a randomly-ordered flat field would be surprising.
 	if len(detailPaths) == 0 {
 		if len(fields) == 0 {
 			return nil

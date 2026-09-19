@@ -3,7 +3,7 @@
 // runtime_adapter.go is the Bubble Tea adapter glue for the platform-
 // agnostic runtime.Core. It owns:
 //
-//  1. applyIntent — the per-intent applier used by the 6 ported
+//  1. applyIntent — the per-intent applier used by the
 //     handlers (HandleFlash / HandleClearFlash / HandleAPIError /
 //     HandleClientsReady / HandleProfileSelected / HandleRegionSelected
 //     adapters in app_flash.go and app_session.go) AND any future
@@ -49,10 +49,7 @@ import (
 //
 // PushScreen / PopScreen / PopSelectorIntent forward to m.ctrl.ApplyIntents
 // first, then apply only the rendererState half — the same controller-first
-// ordering app_dispatch.go's applyIntents (plural) uses. Before this both
-// paths independently re-derived the controller-side gate (rs.kind checks
-// mirroring the controller's Screen.ID checks) instead of asking the
-// controller directly, which is the divergence risk goal 4 closes: the
+// ordering app_dispatch.go's applyIntents (plural) uses: the
 // controller's screen stack is the single source of truth for depth/identity,
 // and the renderer stack must be a strict mirror (see StackInSync in
 // app_stack_invariant.go).
@@ -89,19 +86,11 @@ func (m *Model) applyIntent(intent runtime.UIIntent) tea.Cmd {
 	case runtime.SetErrorHintIntent:
 		m.showErrorHint = v.Show
 	case runtime.ClearActiveListLoadingIntent:
-		// Controller-first (goal 4): forward to the SAME
-		// core/app/intents.go case the headless/web lane applies, rather than
-		// hand-rolling ClearListLoading+SetListFetchError here. Two
-		// independent mechanisms for one decision could disagree — and did:
-		// this TUI-local pair called ClearListLoading(v.Append) (correctly
-		// per-request) THEN SetListFetchError(v.Err), which unconditionally
-		// cleared Refreshing regardless of Append, defeating the per-request
-		// clear for a load-more failure racing a genuinely in-flight
-		// Refreshing. The rsKindList top-of-stack guard is also gone: the
-		// controller's own case routes by the intent's ResourceType+
-		// Provenance (when set) to the screen that actually owns the failed
-		// request, which is strictly more precise than "is a list screen on
-		// top right now".
+		// Controller-first: forward to the SAME core/app/intents.go case the
+		// headless/web lane applies. It clears loading per request (a
+		// load-more failure must not clear a genuinely in-flight Refreshing)
+		// and routes by the intent's ResourceType+Provenance (when set) to the
+		// screen that owns the failed request, not whatever list is on top.
 		m.ctrl.ApplyIntents([]runtime.UIIntent{v})
 	case runtime.MenuClearAvailabilityIntent:
 		m.ctrl.ApplyIntents([]runtime.UIIntent{runtime.MenuClearAvailabilityIntent{}})
@@ -130,15 +119,10 @@ func (m *Model) applyIntent(intent runtime.UIIntent) tea.Cmd {
 			}
 		}
 	case runtime.PopSelectorIntent:
-		// Controller-first (goal 4): forward so the controller applies its own
+		// Controller-first: forward so the controller applies its own
 		// type-checked gate (pop only when top.ID is a selector screen —
 		// core/app/intents.go) BEFORE the renderer decides whether to drop
-		// its own rendererState. Previously this case gated on rs.kind==
-		// rsKindSelector alone and popped via popRS() (which re-derives its own
-		// ActionBack-driven controller pop) — two independently-maintained
-		// conditionals that only agreed because the stacks were assumed already
-		// in sync. Forwarding first makes the controller state authoritative;
-		// popRSOnly then removes only the renderer half so ActionBack is not
+		// its own rendererState; popRSOnly then removes only the renderer half so ActionBack is not
 		// invoked a second time.
 		m.ctrl.ApplyIntents([]runtime.UIIntent{v})
 		if m.activeRS().kind == rsKindSelector {
@@ -149,14 +133,14 @@ func (m *Model) applyIntent(intent runtime.UIIntent) tea.Cmd {
 			return m.refreshActiveList()
 		}
 	case runtime.PushScreen:
-		// Controller-first (goal 4): forward the intent so the controller's
+		// Controller-first: forward the intent so the controller's
 		// Screen{ID, Ctx} push (core/app/intents.go) lands before the
 		// renderer constructs its rendererState half. pushScreen only calls
 		// m.pushRS — it never touches m.ctrl — so this cannot double-push.
 		m.ctrl.ApplyIntents([]runtime.UIIntent{v})
 		return m.pushScreen(v)
 	case runtime.PopScreen:
-		// Controller-first (goal 4), mirroring app_dispatch.go's applyIntents
+		// Controller-first, mirroring app_dispatch.go's applyIntents
 		// PushScreen/PopScreen handling: forward to the controller, then
 		// popRSOnly to remove only the renderer half — popRS() would re-derive
 		// an ActionBack call and pop the controller stack a second time.
@@ -234,8 +218,7 @@ func emitAPIErrorCmd(p runtime.EmitAPIErrorPayload) tea.Cmd {
 	gen := p.Gen
 	return func() tea.Msg {
 		// No fetch behind this one — a connect failure. The seam takes the
-		// two facts it has and leaves the rest zero, which is what the literal
-		// did; an exemption for it would be an allowlist of one.
+		// two facts it has and leaves the rest zero.
 		return runtime.FetchOutcome{Gen: gen}.Msg(resource.FetchResult{}, err)
 	}
 }

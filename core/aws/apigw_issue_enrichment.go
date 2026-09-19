@@ -143,7 +143,6 @@ func apigwHTTPRow(ctx context.Context, clients *ServiceClients, r resource.Resou
 			stageName = aws.String("(unnamed)")
 		}
 
-		// Check throttling on DefaultRouteSettings.
 		if drs := stage.DefaultRouteSettings; drs != nil {
 			noThrottle := (drs.ThrottlingBurstLimit != nil && *drs.ThrottlingBurstLimit == 0) ||
 				(drs.ThrottlingRateLimit != nil && *drs.ThrottlingRateLimit == 0)
@@ -161,7 +160,6 @@ func apigwHTTPRow(ctx context.Context, clients *ServiceClients, r resource.Resou
 			}
 		}
 
-		// Check access log settings.
 		if stage.AccessLogSettings == nil {
 			rows = append(rows, domain.DetailRow{
 				Label: "Stage",
@@ -190,8 +188,6 @@ func apigwHTTPRow(ctx context.Context, clients *ServiceClients, r resource.Resou
 
 	stagesCount := len(stages)
 	if stagesCount == 0 && !stagesTruncated && fetchErr == nil {
-		// No deployed stages — surface as an informational finding.
-		// Only emitted when stage fetch succeeded (no error, no page cap).
 		// The phrase says there are none; the row says what kind of API
 		// is sitting undeployed, which the phrase cannot.
 		setWave2Finding(&row, apiID, apigwCodeNoDeployedStages, []domain.DetailRow{{
@@ -211,14 +207,14 @@ func apigwHTTPRow(ctx context.Context, clients *ServiceClients, r resource.Resou
 
 // apigwV1API is the pair of REST calls the enricher needs. It is reached by
 // type assertion off clients.APIGatewayV1 rather than by widening
-// APIGatewayV1API, so a client or fake that predates these calls still
-// satisfies the aggregate. Same shape as CodeArtifactListPackagesAPI.
+// APIGatewayV1API, so a client or fake that implements only the aggregate
+// still satisfies it. Same shape as CodeArtifactListPackagesAPI.
 type apigwV1API interface {
 	APIGatewayV1GetAuthorizersAPI
 	APIGatewayV1GetStagesAPI
 }
 
-// apigwRESTFindings evaluates rows 18-21 for one REST API. It returns true
+// apigwRESTFindings evaluates the REST posture rules for one API. It returns true
 // when the stage listing failed, so the caller marks the row truncated rather
 // than reporting an API whose posture it could not read as clean.
 func apigwRESTFindings(ctx context.Context, api apigwV1API, result *IssueEnricherResult, r resource.Resource, ownAccount string) error {
@@ -293,7 +289,7 @@ func apigwRESTPolicy(r resource.Resource) string {
 	return aws.ToString(api.Policy)
 }
 
-// apigwHTTPNoAuthorizer evaluates row 18 for one HTTP (v2) API. There is no
+// apigwHTTPNoAuthorizer evaluates the no-authorizer rule for one HTTP (v2) API. There is no
 // private endpoint type on v2, so an unauthorized one is always the warn code.
 func apigwHTTPNoAuthorizer(ctx context.Context, clients *ServiceClients, result *IssueEnricherResult, apiID string) error {
 	// One authorizer on any page is enough to clear the row, so the walk stops

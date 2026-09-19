@@ -9,10 +9,9 @@ package aws
 // enrichDBCSnapCrossRef package-level var directly, testing the exact
 // function wired into catalog_databases.go's dbc-snap Wave2 field.
 //
-// Pins regression B1: a fetcher-emitted Broken phrase ("failed") MUST
-// survive cross-ref enrichment. When the enricher adds "orphan: source
-// cluster deleted", the merged status must be "failed (+1)", NOT the
-// orphan phrase overriding the Broken phrase.
+// A fetcher-emitted Broken phrase ("failed") survives cross-ref enrichment:
+// when the enricher adds "orphan: source cluster deleted", the merged status
+// is "failed (+1)", not the orphan phrase overriding the Broken phrase.
 
 import (
 	"context"
@@ -31,11 +30,6 @@ import (
 // fetcher set Status="failed" (Broken) retains "failed" as the top phrase
 // after the cross-ref enricher adds the orphan signal. The merged status must
 // be "failed (+1)", not the orphan phrase.
-//
-// This is the key correctness contract for WarnDBCSnapFailedAndManualOldID:
-// three signals stack (failed + manual-old + orphan); the coder's fixture
-// sets parent="deleted-legacy-cluster" (not in dbc cache) so orphan fires.
-// This test covers the two-signal case (failed + orphan) as a focused pin.
 func TestEnrichDBCSnapCrossRef_FailedPlusOrphan(t *testing.T) {
 	snap := docdbtypes.DBClusterSnapshot{
 		DBClusterSnapshotIdentifier: aws.String("snap-failed"),
@@ -44,8 +38,6 @@ func TestEnrichDBCSnapCrossRef_FailedPlusOrphan(t *testing.T) {
 		SnapshotType:                aws.String("manual"),
 	}
 
-	// Build the resource as the fetcher would emit it: Status="failed",
-	// Issues=["failed"] — the pre-enrichment state.
 	res := resource.Resource{
 		ID:        "snap-failed",
 		Name:      "snap-failed",
@@ -53,8 +45,6 @@ func TestEnrichDBCSnapCrossRef_FailedPlusOrphan(t *testing.T) {
 		RawStruct: snap,
 	}
 
-	// dbc cache is loaded but "deleted-legacy-cluster" is absent → orphan fires.
-	// IsTruncated=false so the orphan rule is NOT suppressed.
 	otherCluster := docdbtypes.DBCluster{
 		DBClusterIdentifier:   aws.String("other-cluster"),
 		BackupRetentionPeriod: aws.Int32(7),
@@ -73,7 +63,6 @@ func TestEnrichDBCSnapCrossRef_FailedPlusOrphan(t *testing.T) {
 		t.Fatalf("enrichDBCSnapCrossRef returned unexpected error: %v", err)
 	}
 
-	// The orphan finding must be present with the dbc-snap-specific phrase.
 	findings, hasFinding := result.Findings["snap-failed"]
 	if !hasFinding {
 		t.Fatal("Findings[\"snap-failed\"] missing; want orphan finding from cross-ref enricher")
@@ -84,11 +73,9 @@ func TestEnrichDBCSnapCrossRef_FailedPlusOrphan(t *testing.T) {
 			finding.Phrase, "orphan: source cluster deleted")
 	}
 
-	// AS-140: FieldUpdates must be empty — the merged "failed (+1)" stack is
-	// computed at render time by domain.StatusPhrase(r.Findings) (Wave-1
-	// "failed" finding + this enricher's Wave-2 orphan finding). The B1
-	// regression is now structurally impossible because the enricher no
-	// longer writes the merged phrase.
+	// FieldUpdates is empty: the merged "failed (+1)" stack is computed at
+	// render time by domain.StatusPhrase(r.Findings) (Wave-1 "failed" finding
+	// + this enricher's Wave-2 orphan finding).
 	if updates, ok := result.FieldUpdates["snap-failed"]; ok && len(updates) != 0 {
 		t.Errorf("AS-140: expected empty FieldUpdates for snap-failed (status overlay removed); got %v", updates)
 	}
@@ -112,7 +99,6 @@ func TestEnrichDBCSnapCrossRef_TruncatedDBC_OrphanSuppressed(t *testing.T) {
 		RawStruct: snap,
 	}
 
-	// dbc cache is truncated — parent not visible, but truncation prevents orphan.
 	otherCluster := docdbtypes.DBCluster{
 		DBClusterIdentifier: aws.String("other-cluster"),
 	}
@@ -157,7 +143,6 @@ func TestEnrichDBCSnapCrossRef_RDSShape_OrphanAndPastRetention(t *testing.T) {
 			RawStruct: snap,
 		}
 
-		// dbc cache has an rdstypes.DBCluster but NOT "deleted-aurora".
 		otherParent := rdstypes.DBCluster{
 			DBClusterIdentifier:   aws.String("other-aurora"),
 			BackupRetentionPeriod: aws.Int32(14),
@@ -181,8 +166,8 @@ func TestEnrichDBCSnapCrossRef_RDSShape_OrphanAndPastRetention(t *testing.T) {
 		if finding.Phrase != "orphan: source cluster deleted" {
 			t.Errorf("Summary = %q, want %q", finding.Phrase, "orphan: source cluster deleted")
 		}
-		// AS-140: FieldUpdates must be empty — merged phrase is computed at
-		// render time by domain.StatusPhrase(r.Findings).
+		// FieldUpdates is empty: the merged phrase is computed at render time by
+		// domain.StatusPhrase(r.Findings).
 		if updates, ok := result.FieldUpdates["aurora-orphan"]; ok && len(updates) != 0 {
 			t.Errorf("AS-140: expected empty FieldUpdates for aurora-orphan (status overlay removed); got %v", updates)
 		}

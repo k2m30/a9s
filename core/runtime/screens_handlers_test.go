@@ -1,15 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
 
-// screens_handlers_test.go — Core-direct unit tests for the five
-// view-stack handler ports added in Phase-05 PR-05a-h4-a (AS-650 / AS-769):
-//
-//	HandleProfilesLoaded — emits PushScreen{ScreenProfileSelector,...}.
-//	HandleValueRevealed  — emits PushScreen{ScreenReveal,...} or flash on Err.
-//	HandleEnterChildView — emits PushScreen{ScreenChildList,...} + fetch task;
-//	                       unknown ChildType flashes an error.
-//	HandleThemeSelected  — emits TaskKindReadThemeFile; invalid name flashes.
-//	HandleThemeFileRead  — emits Apply/Pop/Flash + Save task on success;
-//	                       read failure flashes.
+// screens_handlers_test.go — Core-direct unit tests for the view-stack
+// handlers (HandleProfilesLoaded, HandleValueRevealed, HandleEnterChildView,
+// HandleThemeSelected, HandleThemeFileRead).
 //
 // Package runtime (not runtime_test) so the suite can access unexported
 // fields when needed; the helpers in handlers_test.go (newCore, findFlashIntent,
@@ -22,8 +15,6 @@ import (
 
 	"github.com/k2m30/a9s/v3/core/resource"
 )
-
-// ---- helpers ---------------------------------------------------------------
 
 // findPushScreen returns the first PushScreen intent in xs and a bool flag.
 func findPushScreen(xs []UIIntent) (PushScreen, bool) {
@@ -89,8 +80,6 @@ func withTempChildType(t *testing.T, shortName string) {
 	})
 }
 
-// ---- HandleProfilesLoaded ----------------------------------------------------
-
 func TestCore_HandleProfilesLoaded_EmitsProfileSelectorPushScreen(t *testing.T) {
 	c := newCore()
 	c.session.Profile = "dev-account"
@@ -120,8 +109,6 @@ func TestCore_HandleProfilesLoaded_EmitsProfileSelectorPushScreen(t *testing.T) 
 		t.Errorf("expected Current=dev-account (from session), got %q", pp.Current)
 	}
 }
-
-// ---- HandleValueRevealed -----------------------------------------------------
 
 func TestCore_HandleValueRevealed_SuccessEmitsRevealPushScreen(t *testing.T) {
 	c := newCore()
@@ -171,15 +158,13 @@ func TestCore_HandleValueRevealed_ErrorEmitsFlash(t *testing.T) {
 	if !fi.IsError {
 		t.Errorf("expected IsError=true, got false")
 	}
-	// INVERTED by spec row 6 (task "errors"): a failed reveal is a failed AWS
-	// call, so it reads the cause through the one formatter instead of the raw
-	// error: the raw chain is what puts a request id on the status bar.
+	// A failed reveal is a failed AWS call, so it reads the cause through the
+	// one formatter instead of the raw error: the raw chain would put a
+	// request id on the status bar.
 	if got, want := fi.Text, "reveal: permission denied"; got != want {
 		t.Errorf("Text=%q want %q", got, want)
 	}
 }
-
-// ---- HandleEnterChildView ----------------------------------------------------
 
 func TestCore_HandleEnterChildView_KnownTypeEmitsScreenAndTask(t *testing.T) {
 	c := newCore()
@@ -252,8 +237,6 @@ func TestCore_HandleEnterChildView_UnknownTypeEmitsFlashError(t *testing.T) {
 	}
 }
 
-// ---- HandleThemeSelected -----------------------------------------------------
-
 func TestCore_HandleThemeSelected_ValidNameEmitsReadTask(t *testing.T) {
 	c := newCore()
 
@@ -295,8 +278,6 @@ func TestCore_HandleThemeSelected_InvalidNameEmitsFlashError(t *testing.T) {
 		t.Errorf("Text=%q want prefix %q", fi.Text, prefix)
 	}
 }
-
-// ---- HandleThemeFileRead -----------------------------------------------------
 
 func TestCore_HandleThemeFileRead_SuccessEmitsApplyPopFlashAndSaveTask(t *testing.T) {
 	c := newCore()
@@ -373,13 +354,10 @@ func TestCore_HandleThemeFileRead_ReadErrorEmitsFlashOnly(t *testing.T) {
 	}
 }
 
-// TestCore_HandleThemeFileRead_ParseErrorEmitsFlashOnly pins the AS-784
-// invariant: when the adapter reports a theme-validation failure (ParseErr set,
-// post-SC-009 the parse runs in the renderer-side adapter, not the runtime), the
-// handler must emit exactly one error flash and MUST NOT emit ApplyThemeIntent,
-// PopSelectorIntent, or any TaskKindSaveThemeConfig task. Pre-AS-784 the handler
-// emitted Save unconditionally on read success, persisting an invalid theme
-// choice to disk even though the adapter rejected the apply.
+// When the adapter reports a theme-validation failure (ParseErr; the parse
+// runs in the renderer-side adapter), the handler emits exactly one error
+// flash and no ApplyThemeIntent, PopSelectorIntent or TaskKindSaveThemeConfig
+// task: a Save on read success would persist a theme the adapter rejected.
 func TestCore_HandleThemeFileRead_ParseErrorEmitsFlashOnly(t *testing.T) {
 	c := newCore()
 
@@ -416,11 +394,9 @@ func TestCore_HandleThemeFileRead_ParseErrorEmitsFlashOnly(t *testing.T) {
 	}
 }
 
-// TestCore_HandleThemeFileRead_InvalidHexColorEmitsFlashOnly exercises the
-// second validation-failure mode the adapter's styles.ThemeFromYAML guards:
-// YAML that parses as a themeYAML struct but contains an invalid hex colour
-// string. The adapter surfaces it as ParseErr; same runtime invariants as the
-// malformed-YAML test above — Save must NOT fire.
+// The second validation-failure mode the adapter's styles.ThemeFromYAML
+// guards: YAML that parses as a themeYAML struct but contains an invalid hex
+// colour string, surfaced as ParseErr. Save must NOT fire.
 func TestCore_HandleThemeFileRead_InvalidHexColorEmitsFlashOnly(t *testing.T) {
 	c := newCore()
 
@@ -449,8 +425,6 @@ func TestCore_HandleThemeFileRead_InvalidHexColorEmitsFlashOnly(t *testing.T) {
 		t.Errorf("expected IsError=true on invalid hex colour")
 	}
 }
-
-// ---- shared helper ---------------------------------------------------------
 
 // taskKinds extracts the TaskKind slice from tasks for diagnostic prints.
 func taskKinds(tasks []TaskRequest) []TaskKind {

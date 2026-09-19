@@ -28,4 +28,4 @@ const (
 	CodeCBEnvSecret domain.FindingCode = "cb.env-secret"
 )
 
-// S5 operator sentences.
+// Operator sentences.

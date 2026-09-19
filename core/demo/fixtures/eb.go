@@ -14,8 +14,7 @@ import (
 // environment each for managed platform updates off
 // (eb.managed-updates-off), basic health reporting
 // (eb.enhanced-health-off) and no log streaming (eb.cloudwatch-logs-off).
-// The eb rows are keyed by environment ID, which is what the list renders
-// and what the witness gate compares against.
+// The eb rows are keyed by environment ID, which is what the list renders.
 //
 // All three are Green and Ready and carry no other finding. A configuration
 // signal is severity "~", so an environment already reporting a health
@@ -50,15 +49,15 @@ type EBFixtures struct {
 	Environments []ebtypes.EnvironmentDescription
 	// ConfigurationSettings maps "applicationName/environmentName" to the
 	// configuration set served by DescribeConfigurationSettings. Required
-	// for the secrets:eb, eb:sg and eb:role related-panel pivot witnesses.
+	// for the secrets:eb, eb:sg and eb:role related-panel pivots.
 	ConfigurationSettings map[string][]ebtypes.ConfigurationSettingsDescription
 	// EnvironmentResources maps environmentName -> resources, served by
 	// DescribeEnvironmentResources. Required for the eb:elb and eb:tg
-	// related-panel pivot witnesses (checkEbELB / checkEbTG).
+	// related-panel pivots (checkEbELB / checkEbTG).
 	EnvironmentResources map[string]*ebtypes.EnvironmentResourceDescription
 	// ApplicationVersions maps applicationName -> versions, served by
 	// DescribeApplicationVersions. Required for the eb:s3 related-panel
-	// pivot witness (checkEbS3).
+	// pivot (checkEbS3).
 	ApplicationVersions map[string][]ebtypes.ApplicationVersionDescription
 	// EnvironmentHealthCauses maps environmentName -> DescribeEnvironmentHealth
 	// causes. Backs EnrichEBEnvironmentHealth's Wave-2 "~" issue check.
@@ -83,7 +82,7 @@ var sharedEBFixtures = sync.OnceValue(func() *EBFixtures {
 							OptionName: aws.String("DATABASE_URL"),
 							Value:      aws.String("{{resolve:secretsmanager:arn:aws:secretsmanager:us-east-1:123456789012:secret:prod/database/primary-AbCdEf}}"),
 						},
-						// Required for eb:sg related-panel pivot witness
+						// Required for eb:sg related-panel pivot
 						// (checkEbSG). sg-0aaa111111111111a is a real ec2.go
 						// security group (acme-web-alb-sg).
 						{
@@ -91,7 +90,7 @@ var sharedEBFixtures = sync.OnceValue(func() *EBFixtures {
 							OptionName: aws.String("SecurityGroups"),
 							Value:      aws.String("sg-0aaa111111111111a"),
 						},
-						// Required for eb:role related-panel pivot witness
+						// Required for eb:role related-panel pivot
 						// (checkEbRole). acme-ci-deploy-role is a real
 						// iam.go role fixture.
 						{
@@ -112,7 +111,7 @@ var sharedEBFixtures = sync.OnceValue(func() *EBFixtures {
 			"acme-web/" + ebEnvNoLogs:         ebOptionSet("acme-web", ebEnvNoLogs, "true", "enhanced", "false"),
 		},
 		// EnvironmentResources — required for eb:elb and eb:tg related-panel
-		// pivot witnesses (checkEbELB / checkEbTG). acme-prod-web is a real
+		// pivots (checkEbELB / checkEbTG). acme-prod-web is a real
 		// elb.go load balancer fixture with a listener forwarding to a
 		// target group.
 		EnvironmentResources: map[string]*ebtypes.EnvironmentResourceDescription{
@@ -124,7 +123,7 @@ var sharedEBFixtures = sync.OnceValue(func() *EBFixtures {
 			},
 		},
 		// ApplicationVersions — required for eb:s3 related-panel pivot
-		// witness (checkEbS3). a9s-demo-healthy is a real s3.go bucket.
+		// (checkEbS3). a9s-demo-healthy is a real s3.go bucket.
 		ApplicationVersions: map[string][]ebtypes.ApplicationVersionDescription{
 			"acme-api": {
 				{
@@ -153,7 +152,7 @@ func NewEBFixtures() *EBFixtures {
 }
 
 // ebOptionSet builds the configuration set for one environment, naming all
-// three of the settings rows 13-15 read so each witness trips exactly one
+// three settings the eb findings read, so each carrier trips exactly one
 // and is explicitly healthy on the other two.
 func ebOptionSet(app, env, managedActions, healthSystem, streamLogs string) []ebtypes.ConfigurationSettingsDescription {
 	return []ebtypes.ConfigurationSettingsDescription{{

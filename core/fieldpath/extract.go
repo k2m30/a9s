@@ -22,7 +22,6 @@ func ExtractValue(obj any, dotPath string) (reflect.Value, error) {
 	current := reflect.ValueOf(obj)
 
 	for _, seg := range segments {
-		// Dereference pointers
 		for current.Kind() == reflect.Pointer {
 			if current.IsNil() {
 				return reflect.Value{}, fmt.Errorf("nil pointer at segment %q", seg)
@@ -117,7 +116,6 @@ func ExtractScalar(obj any, dotPath string) string {
 		return ""
 	}
 
-	// Dereference pointer
 	for val.Kind() == reflect.Pointer {
 		if val.IsNil() {
 			return ""
@@ -125,7 +123,6 @@ func ExtractScalar(obj any, dotPath string) string {
 		val = val.Elem()
 	}
 
-	// Non-scalar types return ""
 	if !isScalar(val) {
 		return ""
 	}
@@ -139,8 +136,7 @@ func ExtractScalar(obj any, dotPath string) string {
 //
 // Intended for operators of scalar-on-list navigable field paths like
 // "VpcSecurityGroups.VpcSecurityGroupId" where the slice always has ≥ 1
-// element carrying the target ID. For multi-element coverage, callers
-// can iterate all elements with ExtractListScalars (future extension).
+// element carrying the target ID.
 //
 // CONTRACT: This function returns only the FIRST element of any slice
 // encountered. It must not be used where all list elements are needed.
@@ -149,20 +145,17 @@ func ExtractFirstListScalar(obj any, dotPath string) string {
 	current := reflect.ValueOf(obj)
 
 	for _, seg := range segments {
-		// Dereference pointers
 		for current.Kind() == reflect.Pointer {
 			if current.IsNil() {
 				return ""
 			}
 			current = current.Elem()
 		}
-		// Index into slices (pick element 0)
 		for current.Kind() == reflect.Slice || current.Kind() == reflect.Array {
 			if current.Len() == 0 {
 				return ""
 			}
 			current = current.Index(0)
-			// Re-deref if slice elements are pointers
 			for current.Kind() == reflect.Pointer {
 				if current.IsNil() {
 					return ""
@@ -384,7 +377,6 @@ func ToSafeValue(val reflect.Value) any {
 			if isZeroOrNil(fv) {
 				continue
 			}
-			// Prefer json tag name, fall back to Go field name
 			name := field.Name
 			if tag := field.Tag.Get("json"); tag != "" && tag != "-" {
 				if n := strings.Split(tag, ",")[0]; n != "" {
@@ -474,7 +466,6 @@ func isZeroOrNil(v reflect.Value) bool {
 // applies here. Duplicates are rare in AWS tag data but possible; when they
 // occur the honest answer is to not flatten.
 func tryFlattenKeyValueSlice(val reflect.Value) map[string]any {
-	// element type after pointer deref
 	et := val.Type().Elem()
 	for et.Kind() == reflect.Pointer {
 		et = et.Elem()
@@ -526,7 +517,7 @@ func tryFlattenKeyValueSlice(val reflect.Value) map[string]any {
 		}
 		// Preserve nil Values as YAML null rather than silently coercing to
 		// the empty string — "no value set" and "value is empty string" are
-		// distinct and the struct-form output made the distinction visible.
+		// distinct.
 		if v, vok := stringFieldValue(ev.FieldByName("Value")); vok {
 			out[k] = v
 		} else {
@@ -584,9 +575,9 @@ type FieldItem struct {
 	IndentLevel int    // 0 = top-level, 1 = sub-field
 	IsNavigable bool   // true when FieldPath matches a NavigableField
 	TargetType  string // non-empty when IsNavigable (e.g., "vpc")
-	IsSection   bool   // NEW (v2.1): true for ct-events top-level section headers (ACTOR/ACTION/TARGET/CONTEXT/...)
+	IsSection   bool   // true for ct-events top-level section headers (ACTOR/ACTION/TARGET/CONTEXT/...)
 	// Used only by the ct-events detail view branch; inert for all other resource types.
-	ColorTier string // NEW (v2.1): severity tier for value coloring ("ct-info"|"ct-attention"|"ct-danger")
+	ColorTier string // severity tier for value coloring ("ct-info"|"ct-attention"|"ct-danger")
 	// Set only on the Event row in ACTION by ct-events. Empty string falls through to neutral DetailVal.
 	NavID string // Navigation ID override — used by ct-events Principal rows where the display Value is the
 	// full ARN but navigation needs the bare name. Inert when empty.
@@ -635,7 +626,6 @@ func ExtractFieldList(obj any, fields map[string]string, paths []string, navigab
 		val := ""
 		nonScalarFromObj := false
 		nonScalarFromFields := false
-		// 1. Check fields map first (case-insensitive match)
 		if len(fields) > 0 {
 			for k, v := range fields {
 				if strings.EqualFold(k, path) {
@@ -643,7 +633,6 @@ func ExtractFieldList(obj any, fields map[string]string, paths []string, navigab
 					break
 				}
 			}
-			// Try snake_case if not found
 			if val == "" {
 				snakeKey := ToSnakeCase(path)
 				if v, ok := fields[snakeKey]; ok {
@@ -655,7 +644,6 @@ func ExtractFieldList(obj any, fields map[string]string, paths []string, navigab
 				val = strings.Join(nested, "\n")
 			}
 		}
-		// 2. Fall back to ExtractSubtree
 		if val == "" && obj != nil {
 			val = ExtractSubtree(obj, path)
 			if val != "" {
@@ -670,7 +658,6 @@ func ExtractFieldList(obj any, fields map[string]string, paths []string, navigab
 				}
 			}
 		}
-		// 3. Default to "-"
 		if val == "" {
 			val = "-"
 		}
@@ -714,7 +701,6 @@ func ExtractFieldList(obj any, fields map[string]string, paths []string, navigab
 				})
 			}
 		} else {
-			// Scalar
 			items = append(items, FieldItem{
 				Path:        path,
 				Key:         path,

@@ -15,8 +15,8 @@ import (
 
 // DetailsDeniedFindingDef returns the catalog declaration matching what
 // DegradedDetailsDenied emits. Every adopting type lists this in its
-// `Findings` slice so the coverage gates demand a demo witness for it.
-// detail is the type's own S5 sentence; "" takes the name-only default.
+// `Findings` slice so the coverage gates demand a demo fixture for it.
+// detail is the type's own operator sentence; "" takes the name-only default.
 func DetailsDeniedFindingDef(shortName, detail string) catalog.FindingDef {
 	if detail == "" {
 		detail = detailsDeniedDetail
@@ -33,7 +33,7 @@ func DetailsDeniedFindingDef(shortName, detail string) catalog.FindingDef {
 // DetailsUnavailableFindingDef returns the catalog declaration matching what
 // detailsUnavailableFinding emits. Every adopting type lists this alongside
 // DetailsDeniedFindingDef in its `Findings` slice so the coverage gates
-// demand a demo witness for the non-auth path too.
+// demand a demo fixture for the non-auth path too.
 func DetailsUnavailableFindingDef(shortName string) catalog.FindingDef {
 	return catalog.FindingDef{
 		Code:     DetailsUnavailableCode(shortName),

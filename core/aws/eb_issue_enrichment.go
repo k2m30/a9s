@@ -24,8 +24,7 @@ const (
 	ebCodeCWLogsOff         domain.FindingCode = "eb.cloudwatch-logs-off"
 )
 
-// S5 operator sentences for the environment configuration codes above.
-// The three environment settings rows 13-15 read, each identified by the
+// The three environment settings the posture check reads, each identified by the
 // namespace AND option name AWS returns it under. Matching on the option
 // name alone reads a same-named option from another namespace.
 const (
@@ -81,7 +80,6 @@ func EnrichEBEnvironmentHealth(ctx context.Context, clients *ServiceClients, res
 			rows = append(rows, domain.DetailRow{Label: "Cause", Value: cause, Tier: "~"})
 		}
 		// Key on resource ID (environment ID) for registry consistency.
-		// Fall back to name if ID is not set.
 		key := r.ID
 		if key == "" {
 			key = name
@@ -95,15 +93,15 @@ func EnrichEBEnvironmentHealth(ctx context.Context, clients *ServiceClients, res
 
 // ebConfigurationPosture reads DescribeConfigurationSettings once per
 // environment (cap EnrichmentCap). The one response carries all three option
-// values rows 13-15 need, so it is parsed once and emits three independent
-// findings rather than calling three times.
+// values the three posture checks need, so it is parsed once and emits three
+// independent findings rather than calling three times.
 func ebConfigurationPosture(ctx context.Context, clients *ServiceClients, result *IssueEnricherResult, resources []resource.Resource) error {
 	api, ok := clients.ElasticBeanstalk.(EBDescribeConfigurationSettingsAPI)
 	if !ok {
 		return nil
 	}
 	resources = capAtEnrichmentCap(result, resources, func(r resource.Resource) bool {
-		// Rule 4: an environment being torn down has no posture worth
+		// An environment being torn down has no posture worth
 		// reporting, and its settings are about to stop existing.
 		return !ebLifecycleEnded(r.Fields["status"])
 	}, resourceIDsOf)

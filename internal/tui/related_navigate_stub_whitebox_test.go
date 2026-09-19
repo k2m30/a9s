@@ -2,9 +2,8 @@
 
 package tui
 
-// related_navigate_stub_whitebox_test.go — OPEN INVESTIGATION white-box port
-// (specs/022-codebase-cleanup/wave3-status.md §"OPEN INVESTIGATION — possible
-// live regression (StubCreator / auto-open-single)").
+// related_navigate_stub_whitebox_test.go — StubCreator auto-open-single
+// through the root Model.Update chain.
 //
 // app.go's root Update() switch routes every messages.ResourcesLoaded to
 // m.handleResourcesLoaded (runtime_adapter_resources.go), never to the
@@ -18,9 +17,7 @@ package tui
 // handleResourcesLoaded's StubCreator branch.
 //
 // Uses the real "ami" ResourceTypeDef (core/aws/catalog_compute.go),
-// which has both a StubCreator and FetchByIDs registered — the same type the
-// original resourcelist_ami_stub_test.go was written against, and the type
-// named in the investigation's traced chain. FetchByIDs matters: with
+// which has both a StubCreator and FetchByIDs registered. FetchByIDs matters: with
 // Clients() non-nil, handleRelatedNavigate's TargetID branch short-circuits
 // straight to a KindFetchByIDDetail task and never reaches newRelatedList at
 // all, so a real AWS-connected session cannot exercise this branch for "ami" —
@@ -39,7 +36,7 @@ import (
 
 // newNoClientsModel builds a root Model that has never received
 // messages.ClientsReady, so m.core.Clients() is nil — the exact precondition
-// the investigation's traced chain needs to reach the "no by-ID fetcher or
+// the chain needs to reach the "no by-ID fetcher or
 // clients not yet ready" fallback branch instead of the direct
 // KindFetchByIDDetail short-circuit.
 func newNoClientsModel(t *testing.T) Model {
@@ -83,7 +80,7 @@ func firstNavigateMsg(cmd tea.Cmd) (messages.Navigate, bool) {
 // amiSourceEC2 is the EC2 instance whose ImageId field drives the
 // navigable-field RelatedNavigate to "ami" (core/aws/catalog_compute.go's
 // Navigable: []domain.NavigableField{{FieldPath: "ImageId", TargetType:
-// "ami"}}) — the same field-navigation origin the investigation traced.
+// "ami"}}).
 func amiSourceEC2() resource.Resource {
 	return resource.Resource{
 		ID:   "i-0stubwhitebox000001",

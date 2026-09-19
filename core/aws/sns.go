@@ -51,7 +51,6 @@ func FetchSNSTopicsPage(ctx context.Context, api SNSListTopicsAPI, continuationT
 		resources = append(resources, r)
 	}
 
-	// Build pagination metadata
 	nextToken := ""
 	isTruncated := false
 	if output.NextToken != nil {

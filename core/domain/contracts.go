@@ -151,7 +151,6 @@ type FetchByIDsFunc func(ctx context.Context, clients any, ids []string) ([]Reso
 type DetailEnricher func(ctx context.Context, clients any, res Resource) (Resource, error)
 
 // RelatedChecker returns a count of related resources of a specific type.
-// Note: returns RelatedCheckResult which remains in core/resource/ for now.
 type RelatedChecker func(ctx context.Context, clients any, res Resource, cache ResourceCache) RelatedCheckResult
 
 // RelatedCheckResult is returned by a RelatedChecker.
@@ -162,10 +161,10 @@ type RelatedChecker func(ctx context.Context, clients any, res Resource, cache R
 // optionally a truncated lower bound), "could not determine", "the lookup
 // errored", or "resolved via a deferred server-side filter" — and those four
 // are mutually exclusive by construction only if nothing outside this package
-// can populate the fields directly. With exported fields, any of the ~136
-// checker files could (and did) write `RelatedCheckResult{TargetType: t,
-// Count: 0}` after a swallowed error or a denied call, reporting a confident
-// zero for what was actually "we don't know". Unexporting the fields makes
+// can populate the fields directly. With exported fields, any checker could
+// write `RelatedCheckResult{TargetType: t, Count: 0}` after a swallowed error
+// or a denied call, reporting a confident zero for what is actually "we don't
+// know". Unexporting the fields makes
 // that literal a compile error from every other package; the only way to
 // build a value is through KnownRelated / UnknownRelated / ErrorRelated /
 // DeferredRelated (see related_result.go), each of which can express exactly

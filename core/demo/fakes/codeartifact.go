@@ -45,13 +45,12 @@ func (f *CodeArtifactFake) GetRepositoryPermissionsPolicy(_ context.Context, inp
 	return &codeartifact.GetRepositoryPermissionsPolicyOutput{Policy: policy}, nil
 }
 
-// DescribeRepository returns an empty repository — demo mode does not model repository details.
+// DescribeRepository returns an empty repository.
 func (f *CodeArtifactFake) DescribeRepository(_ context.Context, _ *codeartifact.DescribeRepositoryInput, _ ...func(*codeartifact.Options)) (*codeartifact.DescribeRepositoryOutput, error) {
 	return &codeartifact.DescribeRepositoryOutput{}, nil
 }
 
 // GetDomainPermissionsPolicy is a no-op stub satisfying CodeArtifactGetDomainPermissionsPolicyAPI.
-// Demo mode does not model CodeArtifact domain permissions policies.
 func (f *CodeArtifactFake) GetDomainPermissionsPolicy(_ context.Context, _ *codeartifact.GetDomainPermissionsPolicyInput, _ ...func(*codeartifact.Options)) (*codeartifact.GetDomainPermissionsPolicyOutput, error) {
 	return &codeartifact.GetDomainPermissionsPolicyOutput{}, nil
 }

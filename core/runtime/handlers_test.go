@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
 
-// handlers_test.go — unit tests for the 6 handlers ported from
-// internal/tui in Phase-05 PR-05a-h3 (AS-324).
+// handlers_test.go — unit tests for the flash, API-error, connect and
+// profile/region handlers.
 //
 // Package runtime (not runtime_test) so we can access unexported fields
 // such as c.session directly, and read session-owned fields like
@@ -18,10 +18,7 @@ import (
 	"github.com/k2m30/a9s/v3/core/session"
 )
 
-// ---- helpers ---------------------------------------------------------------
-
-// newCore returns a Core with a fresh session and nil catalog (the 6 ported
-// handlers do not consult the catalog).
+// newCore returns a Core with a fresh session and nil catalog.
 func newCore() *Core {
 	return New(session.New(), nil)
 }
@@ -128,15 +125,10 @@ func findConnectPayload(tasks []TaskRequest) (ConnectPayload, bool) {
 	return ConnectPayload{}, false
 }
 
-// ---- HandleFlash tests -----------------------------------------------------
-
-// TestHandleFlash_NotError: IsError=false → single FlashIntent, one FlashTick
-// with the right gen and 2 s duration.
 func TestHandleFlash_NotError(t *testing.T) {
 	c := newCore()
 	intents, tasks := c.HandleFlash(FlashEvent{Text: "hello", IsError: false, NewGen: 3})
 
-	// exactly one FlashIntent
 	fi, ok := findFlashIntent(intents)
 	if !ok {
 		t.Fatal("expected FlashIntent, got none")
@@ -148,7 +140,6 @@ func TestHandleFlash_NotError(t *testing.T) {
 		t.Error("FlashIntent.IsError = true, want false")
 	}
 
-	// FlashTick with correct gen and 2 s
 	tick, ok := findFlashTick(tasks)
 	if !ok {
 		t.Fatal("expected FlashTickPayload task, got none")
@@ -161,12 +152,9 @@ func TestHandleFlash_NotError(t *testing.T) {
 	}
 }
 
-// TestHandleFlash_IsError: IsError=true → FlashIntent + FlashTick with 2 s.
-//
 // The error flash is the record, and the history entry is made where the
 // flash is applied: a second, history-carrying intent beside the flash would
-// let the two hosts disagree about whether a failure was logged. Do not add
-// an assertion that a separate history intent is emitted here.
+// let the two hosts disagree about whether a failure was logged.
 func TestHandleFlash_IsError(t *testing.T) {
 	c := newCore()
 	intents, tasks := c.HandleFlash(FlashEvent{Text: "bad thing", IsError: true, NewGen: 7})
@@ -194,9 +182,6 @@ func TestHandleFlash_IsError(t *testing.T) {
 	}
 }
 
-// ---- HandleClearFlash tests ------------------------------------------------
-
-// TestHandleClearFlash_StaleGen: Gen != CurrentGen → nil, nil.
 func TestHandleClearFlash_StaleGen(t *testing.T) {
 	c := newCore()
 	intents, tasks := c.HandleClearFlash(ClearFlashEvent{Gen: 1, CurrentGen: 2, IsError: false})
@@ -208,8 +193,6 @@ func TestHandleClearFlash_StaleGen(t *testing.T) {
 	}
 }
 
-// TestHandleClearFlash_CurrentGen_NotError: matching gen, non-error flash →
-// ClearFlash intent only, no SetErrorHintIntent.
 func TestHandleClearFlash_CurrentGen_NotError(t *testing.T) {
 	c := newCore()
 	intents, tasks := c.HandleClearFlash(ClearFlashEvent{Gen: 5, CurrentGen: 5, IsError: false})
@@ -225,8 +208,6 @@ func TestHandleClearFlash_CurrentGen_NotError(t *testing.T) {
 	}
 }
 
-// TestHandleClearFlash_CurrentGen_IsError: matching gen, error flash →
-// ClearFlash + SetErrorHintIntent{Show:true}.
 func TestHandleClearFlash_CurrentGen_IsError(t *testing.T) {
 	c := newCore()
 	intents, tasks := c.HandleClearFlash(ClearFlashEvent{Gen: 5, CurrentGen: 5, IsError: true})
@@ -246,10 +227,6 @@ func TestHandleClearFlash_CurrentGen_IsError(t *testing.T) {
 	}
 }
 
-// ---- HandleAPIError tests --------------------------------------------------
-
-// TestHandleAPIError_UnknownError: plain errors.New error → classifier returns
-// "Unknown", handler uses err.Error() as flash text.
 func TestHandleAPIError_UnknownError(t *testing.T) {
 	c := newCore()
 	err := errors.New("boom")
@@ -282,11 +259,7 @@ func TestHandleAPIError_UnknownError(t *testing.T) {
 	}
 }
 
-// TestHandleAPIError_AlwaysEmitsThreeIntents: regardless of error type, the
-// mandatory intents must always be present.
-//
-// An error flash IS the history entry, made where it is applied; no
-// separate history intent exists to count.
+// An error flash IS the history entry, made where it is applied.
 func TestHandleAPIError_AlwaysEmitsThreeIntents(t *testing.T) {
 	c := newCore()
 	intents, _ := c.HandleAPIError(APIErrorEvent{Err: errors.New("any"), NewGen: 1})
@@ -299,7 +272,6 @@ func TestHandleAPIError_AlwaysEmitsThreeIntents(t *testing.T) {
 	}
 }
 
-// TestHandleAPIError_AlwaysEmitsFlashTick: the 5 s tick is always scheduled.
 func TestHandleAPIError_AlwaysEmitsFlashTick(t *testing.T) {
 	c := newCore()
 	_, tasks := c.HandleAPIError(APIErrorEvent{Err: errors.New("any"), NewGen: 9})
@@ -313,12 +285,8 @@ func TestHandleAPIError_AlwaysEmitsFlashTick(t *testing.T) {
 	}
 }
 
-// ---- HandleClientsReady tests ----------------------------------------------
-
-// TestHandleClientsReady_StaleGen: ev.Gen != session.ConnectGen → nil, nil.
 func TestHandleClientsReady_StaleGen(t *testing.T) {
 	c := newCore()
-	// session.New() seeds ConnectGen=0; send Gen=99 which is != 0
 	intents, tasks := c.HandleClientsReady(ClientsReadyEvent{
 		Gen: 99, NewGen: 1,
 	})
@@ -330,8 +298,6 @@ func TestHandleClientsReady_StaleGen(t *testing.T) {
 	}
 }
 
-// TestHandleClientsReady_Failure_RollsBackPrevState: failure with HasPrevState=true
-// restores PrevProfile/PrevRegion and clears the latch.
 func TestHandleClientsReady_Failure_RollsBackPrevState(t *testing.T) {
 	c := newCore()
 	s := c.session
@@ -369,8 +335,6 @@ func TestHandleClientsReady_Failure_RollsBackPrevState(t *testing.T) {
 	}
 }
 
-// TestHandleClientsReady_Failure_EmitsErrorIntents: failure path emits
-// FlashIntent(IsError=true) + FlashTick(5s).
 func TestHandleClientsReady_Failure_EmitsErrorIntents(t *testing.T) {
 	c := newCore()
 	s := c.session
@@ -388,11 +352,9 @@ func TestHandleClientsReady_Failure_EmitsErrorIntents(t *testing.T) {
 	if !fi.IsError {
 		t.Error("FlashIntent.IsError = false, want true")
 	}
-	// INVERTED by spec row 3 (task "errors"): a failed connect says what
-	// failed and why, in the same sentence its error-history entry gets. The
-	// old assertion required the bare err.Error(), which left the flash and
-	// the log entry free to drift into two shapes for one fact. Do not
-	// restore it.
+	// A failed connect says what failed and why, in the same sentence its
+	// error-history entry gets, so the flash and the log entry share one
+	// shape.
 	if fi.Text != "connect: no route to host" {
 		t.Errorf("FlashIntent.Text = %q, want %q", fi.Text, "connect: no route to host")
 	}
@@ -408,9 +370,6 @@ func TestHandleClientsReady_Failure_EmitsErrorIntents(t *testing.T) {
 	}
 }
 
-// TestHandleClientsReady_Failure_WithExistingClients_FiresBootstrapTasks:
-// when session.Clients != nil, failure path also fires FetchIdentity +
-// LoadAvailCache.
 func TestHandleClientsReady_Failure_WithExistingClients_FiresBootstrapTasks(t *testing.T) {
 	c := newCore()
 	s := c.session
@@ -430,8 +389,6 @@ func TestHandleClientsReady_Failure_WithExistingClients_FiresBootstrapTasks(t *t
 	}
 }
 
-// TestHandleClientsReady_Failure_WithExistingClients_NoCache: NoCache=true →
-// DemoPrefetchCounts instead of LoadAvailCache.
 func TestHandleClientsReady_Failure_WithExistingClients_NoCache(t *testing.T) {
 	c := newCore()
 	s := c.session
@@ -455,8 +412,6 @@ func TestHandleClientsReady_Failure_WithExistingClients_NoCache(t *testing.T) {
 	}
 }
 
-// TestHandleClientsReady_Success_PreSuppliedClients: ev.Clients==nil with
-// PreSuppliedClients set → installs PreSuppliedClients into session.Clients.
 func TestHandleClientsReady_Success_PreSuppliedClients(t *testing.T) {
 	c := newCore()
 	s := c.session
@@ -474,8 +429,6 @@ func TestHandleClientsReady_Success_PreSuppliedClients(t *testing.T) {
 	}
 }
 
-// TestHandleClientsReady_Success_InstallsClients: ev.Clients as *ServiceClients
-// → installs into session.Clients.
 func TestHandleClientsReady_Success_InstallsClients(t *testing.T) {
 	c := newCore()
 	s := c.session
@@ -495,12 +448,10 @@ func TestHandleClientsReady_Success_InstallsClients(t *testing.T) {
 	}
 }
 
-// TestHandleClientsReady_Success_NoPendingRefresh_NoFlashWork pins the
-// Core contract the TUI adapter's `hasFlashWork` gate relies on: when
-// PendingRefresh=false, the success path emits NO FlashIntent in intents
-// and NO FlashTickPayload in tasks, so the adapter must not advance
-// m.flash.gen and must not invalidate any in-flight ClearFlashMsg for
-// the current flash.
+// The TUI adapter's `hasFlashWork` gate relies on this: with
+// PendingRefresh=false the success path emits no FlashIntent and no
+// FlashTickPayload, so the adapter must not advance m.flash.gen or
+// invalidate an in-flight ClearFlashMsg for the current flash.
 func TestHandleClientsReady_Success_NoPendingRefresh_NoFlashWork(t *testing.T) {
 	c := newCore()
 	s := c.session
@@ -523,9 +474,6 @@ func TestHandleClientsReady_Success_NoPendingRefresh_NoFlashWork(t *testing.T) {
 	}
 }
 
-// TestHandleClientsReady_StaleGen_NoFlashWork pins the symmetric Core
-// contract for the stale path: stale Gen returns (nil, nil), so the
-// adapter's hasFlashWork gate correctly leaves m.flash.gen alone.
 func TestHandleClientsReady_StaleGen_NoFlashWork(t *testing.T) {
 	c := newCore()
 	c.session.ConnectGen = 5
@@ -544,9 +492,6 @@ func TestHandleClientsReady_StaleGen_NoFlashWork(t *testing.T) {
 	}
 }
 
-// TestHandleClientsReady_Success_PendingRefreshWithActiveRL: PendingRefresh=true
-// AND HasActiveRL=true → RefreshActiveListIntent + "Connected. Refreshing..."
-// flash, PendingRefresh cleared.
 func TestHandleClientsReady_Success_PendingRefreshWithActiveRL(t *testing.T) {
 	c := newCore()
 	s := c.session
@@ -574,8 +519,6 @@ func TestHandleClientsReady_Success_PendingRefreshWithActiveRL(t *testing.T) {
 	}
 }
 
-// TestHandleClientsReady_Success_PendingRefresh_NoActiveRL: PendingRefresh=true
-// but HasActiveRL=false → no RefreshActiveListIntent, PendingRefresh cleared.
 func TestHandleClientsReady_Success_PendingRefresh_NoActiveRL(t *testing.T) {
 	c := newCore()
 	s := c.session
@@ -596,8 +539,6 @@ func TestHandleClientsReady_Success_PendingRefresh_NoActiveRL(t *testing.T) {
 	}
 }
 
-// TestHandleClientsReady_Success_NoCache: NoCache=true → DemoPrefetchCounts
-// task instead of FetchIdentity + LoadAvailCache.
 func TestHandleClientsReady_Success_NoCache(t *testing.T) {
 	c := newCore()
 	s := c.session
@@ -620,8 +561,6 @@ func TestHandleClientsReady_Success_NoCache(t *testing.T) {
 	}
 }
 
-// TestHandleClientsReady_Success_LivePath: normal live AWS path → FetchIdentity
-// + LoadAvailCache tasks.
 func TestHandleClientsReady_Success_LivePath(t *testing.T) {
 	c := newCore()
 	s := c.session
@@ -640,9 +579,8 @@ func TestHandleClientsReady_Success_LivePath(t *testing.T) {
 	}
 }
 
-// TestHandleClientsReady_Success_Command_StackDepth1: Command set + StackDepth==1
-// → the live path does NOT emit TaskKindEmitNavigate directly (the
-// navigation-race half of D11). Emitting it here would race handleAvailabilityCacheLoaded's
+// Command set + StackDepth==1 → the live path does NOT emit
+// TaskKindEmitNavigate directly. Emitting it here would race handleAvailabilityCacheLoaded's
 // session.ProbeResources seed (tea.Batch runs task cmds concurrently),
 // landing on a bare "Loading..." list with no title count. Instead
 // HandleClientsReady arms the deferred navigation — session.CommandArmed
@@ -676,8 +614,6 @@ func TestHandleClientsReady_Success_Command_StackDepth1(t *testing.T) {
 	}
 }
 
-// TestHandleClientsReady_Success_Command_StackDepth2: Command set but
-// StackDepth > 1 → NO EmitNavigate, Command still cleared.
 func TestHandleClientsReady_Success_Command_StackDepth2(t *testing.T) {
 	c := newCore()
 	s := c.session
@@ -698,11 +634,6 @@ func TestHandleClientsReady_Success_Command_StackDepth2(t *testing.T) {
 	}
 }
 
-// ---- HandleProfileSelected tests -------------------------------------------
-
-// TestHandleProfileSelected_FirstSwitch: no prior latch → captures current
-// Profile/Region as rollback target, bumps ConnectGen, sets new Profile, clears
-// Region, sets PendingRefresh, emits correct intents and tasks.
 func TestHandleProfileSelected_FirstSwitch(t *testing.T) {
 	c := newCore()
 	s := c.session
@@ -715,7 +646,6 @@ func TestHandleProfileSelected_FirstSwitch(t *testing.T) {
 		NewGen:  5,
 	})
 
-	// rollback latch captured before Rotate
 	if !s.HasPrevState {
 		t.Error("HasPrevState should be true after first switch")
 	}
@@ -726,12 +656,10 @@ func TestHandleProfileSelected_FirstSwitch(t *testing.T) {
 		t.Errorf("PrevRegion = %q, want %q", s.PrevRegion, "us-east-1")
 	}
 
-	// ConnectGen bumped by Rotate
 	if s.ConnectGen != initialConnectGen+1 {
 		t.Errorf("ConnectGen = %d, want %d", s.ConnectGen, initialConnectGen+1)
 	}
 
-	// new profile set, region cleared
 	if s.Profile != "new-profile" {
 		t.Errorf("Profile = %q, want %q", s.Profile, "new-profile")
 	}
@@ -739,12 +667,10 @@ func TestHandleProfileSelected_FirstSwitch(t *testing.T) {
 		t.Errorf("Region = %q, want empty after profile switch", s.Region)
 	}
 
-	// PendingRefresh set
 	if !s.PendingRefresh {
 		t.Error("PendingRefresh should be true after profile switch")
 	}
 
-	// intents: MenuClearAvailability, PopSelector, Flash
 	if !findMenuClearAvailability(intents) {
 		t.Error("expected MenuClearAvailabilityIntent")
 	}
@@ -759,7 +685,6 @@ func TestHandleProfileSelected_FirstSwitch(t *testing.T) {
 		t.Errorf("FlashIntent.Text = %q, want %q", fi.Text, "Switching to new-profile...")
 	}
 
-	// tasks: Connect + FlashTick
 	cp, ok := findConnectPayload(tasks)
 	if !ok {
 		t.Fatal("expected TaskKindConnect")
@@ -785,23 +710,18 @@ func TestHandleProfileSelected_FirstSwitch(t *testing.T) {
 	}
 }
 
-// TestHandleProfileSelected_SecondSwitch_PreservesRollbackTarget: rapid A→B→C
-// case — second switch must keep A (not B) as the rollback target.
 func TestHandleProfileSelected_SecondSwitch_PreservesRollbackTarget(t *testing.T) {
 	c := newCore()
 	s := c.session
 	s.Profile = "profile-A"
 	s.Region = "us-east-1"
 
-	// First switch A→B
 	c.HandleProfileSelected(ProfileSelectedEvent{Profile: "profile-B", NewGen: 1}) //nolint:ineffassign,staticcheck // return values intentionally ignored
 
-	// At this point PrevProfile should be "profile-A"
 	if s.PrevProfile != "profile-A" {
 		t.Fatalf("after first switch PrevProfile = %q, want %q", s.PrevProfile, "profile-A")
 	}
 
-	// Second switch B→C; must keep rollback target as A
 	c.HandleProfileSelected(ProfileSelectedEvent{Profile: "profile-C", NewGen: 2}) //nolint:ineffassign,staticcheck // return values intentionally ignored
 
 	if s.PrevProfile != "profile-A" {
@@ -809,10 +729,6 @@ func TestHandleProfileSelected_SecondSwitch_PreservesRollbackTarget(t *testing.T
 	}
 }
 
-// ---- HandleRegionSelected tests --------------------------------------------
-
-// TestHandleRegionSelected_FirstSwitch: mirrors HandleProfileSelected — captures
-// rollback latch, bumps ConnectGen, sets region, preserves profile in ConnectPayload.
 func TestHandleRegionSelected_FirstSwitch(t *testing.T) {
 	c := newCore()
 	s := c.session
@@ -825,7 +741,6 @@ func TestHandleRegionSelected_FirstSwitch(t *testing.T) {
 		NewGen: 8,
 	})
 
-	// rollback latch
 	if !s.HasPrevState {
 		t.Error("HasPrevState should be true after first region switch")
 	}
@@ -836,22 +751,18 @@ func TestHandleRegionSelected_FirstSwitch(t *testing.T) {
 		t.Errorf("PrevRegion = %q, want %q", s.PrevRegion, "eu-west-1")
 	}
 
-	// ConnectGen bumped
 	if s.ConnectGen != initialConnectGen+1 {
 		t.Errorf("ConnectGen = %d, want %d", s.ConnectGen, initialConnectGen+1)
 	}
 
-	// new region set
 	if s.Region != "ap-southeast-1" {
 		t.Errorf("Region = %q, want %q", s.Region, "ap-southeast-1")
 	}
 
-	// PendingRefresh set
 	if !s.PendingRefresh {
 		t.Error("PendingRefresh should be true after region switch")
 	}
 
-	// intents
 	if !findMenuClearAvailability(intents) {
 		t.Error("expected MenuClearAvailabilityIntent")
 	}
@@ -866,7 +777,6 @@ func TestHandleRegionSelected_FirstSwitch(t *testing.T) {
 		t.Errorf("FlashIntent.Text = %q, want %q", fi.Text, "Switching to ap-southeast-1...")
 	}
 
-	// ConnectPayload preserves existing Profile, sets new Region
 	cp, ok := findConnectPayload(tasks)
 	if !ok {
 		t.Fatal("expected TaskKindConnect")
@@ -892,8 +802,6 @@ func TestHandleRegionSelected_FirstSwitch(t *testing.T) {
 	}
 }
 
-// TestHandleRegionSelected_SecondSwitch_PreservesRollbackTarget: rapid R1→R2→R3
-// case keeps R1 as rollback target.
 func TestHandleRegionSelected_SecondSwitch_PreservesRollbackTarget(t *testing.T) {
 	c := newCore()
 	s := c.session
@@ -913,9 +821,6 @@ func TestHandleRegionSelected_SecondSwitch_PreservesRollbackTarget(t *testing.T)
 	}
 }
 
-// TestHandleRegionSelected_ConnectPayload_ProfilePreserved: the ConnectPayload
-// must carry the session's current Profile (not empty string) when the region
-// changes.
 func TestHandleRegionSelected_ConnectPayload_ProfilePreserved(t *testing.T) {
 	c := newCore()
 	s := c.session
@@ -928,16 +833,12 @@ func TestHandleRegionSelected_ConnectPayload_ProfilePreserved(t *testing.T) {
 	if !ok {
 		t.Fatal("expected TaskKindConnect")
 	}
-	// Profile must come from s.Profile (captured before Rotate clears it —
-	// the handler assigns s.Region = ev.Region but never touches s.Profile).
-	// After Rotate s.Profile is still "prod" (Rotate does not clear Profile).
+	// Rotate does not clear Profile.
 	if cp.Profile != "prod" {
 		t.Errorf("ConnectPayload.Profile = %q, want %q", cp.Profile, "prod")
 	}
 }
 
-// TestHandleClientsReady_Success_ClearsHasPrevState: success path always clears
-// HasPrevState, PrevProfile, PrevRegion.
 func TestHandleClientsReady_Success_ClearsHasPrevState(t *testing.T) {
 	c := newCore()
 	s := c.session
@@ -962,7 +863,6 @@ func TestHandleClientsReady_Success_ClearsHasPrevState(t *testing.T) {
 	}
 }
 
-// TestHandleFlash_FlashTickKind: FlashTick task always uses TaskKindFlashTick.
 func TestHandleFlash_FlashTickKind(t *testing.T) {
 	c := newCore()
 	_, tasks := c.HandleFlash(FlashEvent{Text: "x", IsError: false, NewGen: 1})
@@ -971,7 +871,6 @@ func TestHandleFlash_FlashTickKind(t *testing.T) {
 	}
 }
 
-// TestHandleAPIError_FlashTickKind: HandleAPIError always uses TaskKindFlashTick.
 func TestHandleAPIError_FlashTickKind(t *testing.T) {
 	c := newCore()
 	_, tasks := c.HandleAPIError(APIErrorEvent{Err: errors.New("e"), NewGen: 1})
@@ -980,9 +879,6 @@ func TestHandleAPIError_FlashTickKind(t *testing.T) {
 	}
 }
 
-// TestHandleClearFlash_ZeroGen_IsStale: Gen=0, CurrentGen=0 are EQUAL so not
-// stale — should emit ClearFlash (verifies the stale guard is Gen != CurrentGen,
-// not Gen < CurrentGen).
 func TestHandleClearFlash_ZeroGen_BothZero_NotStale(t *testing.T) {
 	c := newCore()
 	intents, _ := c.HandleClearFlash(ClearFlashEvent{Gen: 0, CurrentGen: 0, IsError: false})
@@ -991,14 +887,11 @@ func TestHandleClearFlash_ZeroGen_BothZero_NotStale(t *testing.T) {
 	}
 }
 
-// TestHandleProfileSelected_ConnectGen_UsedInPayload: ConnectPayload.Gen must
-// equal the post-Rotate ConnectGen (the gen captured after Rotate, not before).
 func TestHandleProfileSelected_ConnectGen_UsedInPayload(t *testing.T) {
 	c := newCore()
 	s := c.session
 	s.Profile = "p"
 	s.Region = "r"
-	// Force a specific starting ConnectGen
 	s.ConnectGen = 10
 
 	_, tasks := c.HandleProfileSelected(ProfileSelectedEvent{Profile: "q", NewGen: 1})
@@ -1013,13 +906,10 @@ func TestHandleProfileSelected_ConnectGen_UsedInPayload(t *testing.T) {
 	}
 }
 
-// TestHandleClientsReady_Failure_NilClients_NoBootstrapTasks: failure with
-// session.Clients == nil → no FetchIdentity / LoadAvailCache tasks.
 func TestHandleClientsReady_Failure_NilClients_NoBootstrapTasks(t *testing.T) {
 	c := newCore()
 	s := c.session
 	s.ConnectGen = 1
-	// s.Clients is nil (default from session.New())
 
 	_, tasks := c.HandleClientsReady(ClientsReadyEvent{
 		Gen: 1, NewGen: 2,
@@ -1037,18 +927,15 @@ func TestHandleClientsReady_Failure_NilClients_NoBootstrapTasks(t *testing.T) {
 	}
 }
 
-// TestHandleClientsReady_Failure_RewiresPostRotateStores: after
-// Session.Rotate() installs fresh
-// per-session stores (PolicyStore / IdentityStore / RuleSetStore), the
-// failure path on the resulting ClientsReadyMsg must rewire the retained
-// transport with those post-rotate stores. Otherwise Pattern-C related
-// checkers (Glue tags, EBS Backup) and IAM lazy-add silently read the
-// pre-rotate (now-discarded) stores until the next successful reconnect.
+// Session.Rotate() installs fresh per-session stores (PolicyStore /
+// IdentityStore / RuleSetStore); the failure path must rewire the retained
+// transport with them, or Pattern-C related checkers (Glue tags, EBS Backup)
+// and IAM lazy-add read the discarded pre-rotate stores until the next
+// successful reconnect.
 func TestHandleClientsReady_Failure_RewiresPostRotateStores(t *testing.T) {
 	c := newCore()
 	s := c.session
 
-	// Pre-rotate transport: holds the "old" per-session stores.
 	preRotateIAM := session.NewPolicyStore()
 	preRotateID := session.NewIdentityStore()
 	preRotateRS := session.NewRuleSetStore()
@@ -1061,7 +948,7 @@ func TestHandleClientsReady_Failure_RewiresPostRotateStores(t *testing.T) {
 	// session.New() already installed fresh "post-rotate" stores on
 	// s.IAMPolicies / s.IdentityStore / s.RuleSets — capture them for
 	// comparison. They MUST be distinct from the pre-rotate stores wired
-	// onto sc above (otherwise this test cannot detect the regression).
+	// onto sc above.
 	postRotateIAM := s.IAMPolicies
 	postRotateID := s.IdentityStore
 	postRotateRS := s.RuleSets
@@ -1086,13 +973,9 @@ func TestHandleClientsReady_Failure_RewiresPostRotateStores(t *testing.T) {
 	}
 }
 
-// TestHandleClientsReady_StaleGen_ReturnsEmpty: when the Core sees a stale
-// ConnectGen on a
-// ClientsReadyMsg, it returns (nil, nil). The TUI adapter relies on this
-// to gate its flash.gen bump (it must not bump on stale dispatches —
-// doing so would invalidate ClearFlashMsg already in flight for the
-// current flash, leaving an active flash stuck on screen). This test
-// pins the Core side of that contract; the adapter side is the
+// The TUI adapter gates its flash.gen bump on this (nil, nil): bumping on a
+// stale dispatch would invalidate the ClearFlashMsg already in flight for
+// the current flash, leaving it stuck on screen. The adapter side is the
 // `len(intents) > 0 || len(tasks) > 0` guard in app_session.go.
 func TestHandleClientsReady_StaleGen_ReturnsEmpty(t *testing.T) {
 	c := newCore()

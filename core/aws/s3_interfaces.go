@@ -58,16 +58,14 @@ type S3GetBucketPolicyAPI interface {
 }
 
 // S3GetBucketCorsAPI defines the interface for the S3 GetBucketCors
-// operation. Used by the on-demand s3 detail enricher (enrichS3) — not part
-// of the S3API aggregate since no fetcher or related checker needs it.
+// operation. Used by the on-demand s3 detail enricher (enrichS3).
 type S3GetBucketCorsAPI interface {
 	GetBucketCors(ctx context.Context, params *s3.GetBucketCorsInput, optFns ...func(*s3.Options)) (*s3.GetBucketCorsOutput, error)
 }
 
 // S3GetBucketLifecycleAPI defines the interface for the S3
 // GetBucketLifecycleConfiguration operation. Used by the on-demand s3
-// detail enricher (enrichS3) — not part of the S3API aggregate since no
-// fetcher or related checker needs it.
+// detail enricher (enrichS3).
 type S3GetBucketLifecycleAPI interface {
 	GetBucketLifecycleConfiguration(ctx context.Context, params *s3.GetBucketLifecycleConfigurationInput, optFns ...func(*s3.Options)) (*s3.GetBucketLifecycleConfigurationOutput, error)
 }

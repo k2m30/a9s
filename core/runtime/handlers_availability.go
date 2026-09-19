@@ -7,15 +7,6 @@ package runtime
 // These are (c *Core) handlers reading session state via c.session; view
 // updates are returned as []UIIntent and async probe dispatch as
 // []TaskRequest.
-//
-// Handler dispatch:
-//
-//	handleAvailabilityCacheLoaded → seeds menu from disk cache, queues probes.
-//	handleAvailabilityPrefetched  → applies sync prefetch counts (demo / no-cache).
-//	handleAvailabilityChecked     → applies one Wave-1 probe result, fires next.
-//	startEnrichment               → builds Wave-2 queue, returns probe tasks.
-//	handleEnrichmentChecked       → applies one Wave-2 result, fires next.
-//	unifiedIssueCount             → cross-wave de-duped issue count for S1 badge.
 
 import (
 	"maps"
@@ -33,14 +24,14 @@ import (
 // handleAvailabilityCacheLoaded applies cached entries to the main menu and
 // starts background availability checks.
 func (c *Core) handleAvailabilityCacheLoaded(msg messages.AvailabilityCacheLoaded) ([]UIIntent, []TaskRequest) {
-	// C9: a load carries the pair it read. A result for a pair the operator
+	// A load carries the pair it read. A result for a pair the operator
 	// has since left is discarded whole — counts, issue badges and seeded
 	// rows alike — rather than describing one account with another's answer.
 	// The comparison is unconditional because the session pair is always
 	// resolved by the time a stamped load exists: LoadAvailabilityCache
 	// stamps the region it resolved (Session.ResolvePair) before it reads a
 	// directory, so the pre-connect load answers for a pair the session
-	// already carries (D10/D11) and any other pair is a stale answer.
+	// already carries and any other pair is a stale answer.
 	if msg.Profile != "" && msg.Region != "" {
 		if profile, region := c.session.CurrentPair(); profile != msg.Profile || region != msg.Region {
 			logging.L().Warn("cache load discarded", "loaded_pair", msg.Profile+"--"+msg.Region, "current_pair", profile+"--"+region)
@@ -76,8 +67,7 @@ func (c *Core) handleAvailabilityCacheLoaded(msg messages.AvailabilityCacheLoade
 
 	var intents []UIIntent
 
-	// Emit one PatchMenuAvailability intent per resource type with cached data.
-	// Per cache contract C3: Origin="cache" — seeded from disk, not yet re-verified this
+	// Origin="cache" — seeded from disk, not yet re-verified this
 	// session (handleAvailabilityChecked flips it to "verified" once the
 	// matching live probe result lands).
 	for shortName, count := range entries {
@@ -89,23 +79,23 @@ func (c *Core) handleAvailabilityCacheLoaded(msg messages.AvailabilityCacheLoade
 		})
 	}
 
-	// Per C1: seed RowStore with the disk-cached rows for every
+	// Seed RowStore with the disk-cached rows for every
 	// known type so a cold list-open renders real cells instantly
 	// (Loading=false, Refreshing=true) instead of the empty Loading shell —
 	// mirrors Count/Truncated already being applied to the menu above.
 	//
 	// Prefers real per-row data from the current pair's disk Store (all pages
-	// C6 persisted, not just the first) when available. Falls back to
+	// persisted, not just the first) when available. Falls back to
 	// Count-many placeholder rows (ID-only, no Fields) when the Store has no
 	// row data for a type that nonetheless carries a known count — this keeps
 	// the seeded-list contract (Loading=false) intact even for callers that
 	// deliver a counts-only AvailabilityCacheLoaded event without a populated
-	// on-disk per-type file (e.g. a synthetic/legacy counts projection).
+	// on-disk per-type file (e.g. a synthetic counts projection).
 	//
 	// A seed never outranks an observation already in hand: any type this
 	// session has fully observed — from disk, from a probe, or from a live
 	// fetch, with rows or verified empty — is left alone, so a load that
-	// loses the race to a live answer cannot regress it (C1/C9). A
+	// loses the race to a live answer cannot regress it. A
 	// Partial-only entry (a by-ID drill) is not a full observation and is
 	// still seeded over.
 	if len(entries) > 0 {
@@ -140,17 +130,17 @@ func (c *Core) handleAvailabilityCacheLoaded(msg messages.AvailabilityCacheLoade
 			// feeds RowStore's rows-carrying Observe (OriginDisk — a later live
 			// probe/fetch result is never regressed by a race-losing disk seed).
 			// A type with no real disk rows (placeholder-only fallback) is a
-			// counts-only observation (C6a): it must never fabricate Rows, so it
+			// counts-only observation: it must never fabricate Rows, so it
 			// feeds ObserveCount instead of Observe.
 			switch {
 			case len(realRows) > 0:
 				c.ObserveRows(shortName, realRows, &resource.PaginationMeta{IsTruncated: truncated[shortName]}, session.OriginDisk, false)
 				// ObserveRows/Observe sets TotalCount=len(rows) unconditionally, which
-				// silently drops a C6a count exceeding the seeded row page (e.g. a
+				// silently drops a count exceeding the seeded row page (e.g. a
 				// 55-row disk count with only 50 real rows on disk) — the first list
 				// frame would then show 50+ instead of 55+. ObserveCountRows'
-				// counts-only write (C6a contract, rowstore.go's ObserveCount doc
-				// comment) restores the wider count without touching Rows.
+				// counts-only write (rowstore.go's ObserveCount doc comment)
+				// restores the wider count without touching Rows.
 				if count > len(realRows) {
 					c.ObserveCountRows(shortName, count)
 				}
@@ -167,7 +157,6 @@ func (c *Core) handleAvailabilityCacheLoaded(msg messages.AvailabilityCacheLoade
 		}
 	}
 
-	// Apply cached issue counts.
 	if len(issueKnown) > 0 {
 		intents = append(intents, PatchMenuIssueBatch{
 			Counts:    issueCounts,
@@ -177,7 +166,7 @@ func (c *Core) handleAvailabilityCacheLoaded(msg messages.AvailabilityCacheLoade
 		})
 	}
 
-	// C1: everything cached is re-verified on sight, including on a re-entry
+	// Everything cached is re-verified on sight, including on a re-entry
 	// into a pair this session already swept — the account moved on while the
 	// operator was looking at the other one. The swept memo is therefore not
 	// a reason to skip; it exists only so a duplicate delivery cannot re-run
@@ -212,14 +201,13 @@ func (c *Core) handleAvailabilityCacheLoaded(msg messages.AvailabilityCacheLoade
 
 		// The disk-cache load races ahead of the AWS connect on startup by
 		// design (Init fires both concurrently via tea.Batch for
-		// instant-paint, C1) — it routinely wins, since local disk I/O
+		// instant-paint) — it routinely wins, since local disk I/O
 		// finishes long before a network connect settles. Dispatching probe
 		// tasks while Clients is still nil would run every one of them
 		// against a nil transport and fail hard ("AWS clients not
 		// initialized"), permanently losing that probe for the session
-		// instead of actually checking availability (the four resource
-		// types first in resource.AllShortNames() were observed failing
-		// this way). Latch AvailSweepPending instead; the next successful
+		// instead of actually checking availability. Latch AvailSweepPending
+		// instead; the next successful
 		// HandleClientsReady drains the first batch once a real transport
 		// exists.
 		if c.session.Clients != nil {
@@ -229,7 +217,7 @@ func (c *Core) handleAvailabilityCacheLoaded(msg messages.AvailabilityCacheLoade
 		}
 	}
 
-	// Deferred -c navigation (D11): consume the one-shot -c navigation armed by
+	// Deferred -c navigation: consume the one-shot -c navigation armed by
 	// handleClientsReadySuccess on the live path, now that the
 	// RowStore seed above has landed — dispatching it any
 	// earlier (e.g. alongside TaskKindLoadAvailCache) would race the seed,
@@ -271,13 +259,12 @@ func (c *Core) handleAvailabilityPrefetched(msg messages.AvailabilityPrefetched)
 			ResourceType: shortName,
 			Count:        count,
 			Truncated:    msg.Truncated[shortName],
-			// Per cache contract C3: a prefetch is a synchronous LIVE count (demo /
+			// A prefetch is a synchronous LIVE count (demo /
 			// no-cache mode), not a disk-cache seed — origin is "verified"
 			// from the moment it lands, no separate probe confirms it.
 			Origin: OriginVerified,
 		})
 	}
-	// Issue counts from the prefetch.
 	for shortName, count := range msg.IssueCounts {
 		intents = append(intents, PatchMenu{
 			ResourceType: shortName,
@@ -332,11 +319,11 @@ func (c *Core) handleAvailabilityChecked(msg messages.AvailabilityChecked) ([]UI
 	// One name for this result everywhere below. A probe may be delivered
 	// under a registry alias ("rds") or under the canonical short name
 	// ("dbi"); keying the per-sweep scan-health guard, the probe-status
-	// record and the emitted intents on the raw string made the same type two
-	// entries and let a redundant delivery re-flash its banner.
+	// record and the emitted intents on the raw string would make the same
+	// type two entries and let a redundant delivery re-flash its banner.
 	canon := resource.CanonicalShortName(msg.ResourceType)
 
-	// #462: record this probe's scan status regardless of outcome — a
+	// Record this probe's scan status regardless of outcome — a
 	// hard-failed probe still needs to be visible via Core.ScanStatus.
 	outcome, errClass := availabilityOutcome(c, canon, len(msg.Resources) > 0, msg.Truncated, msg.Err)
 	// This probe IS the new Wave-1 baseline: aggregate == baseline.
@@ -355,20 +342,18 @@ func (c *Core) handleAvailabilityChecked(msg messages.AvailabilityChecked) ([]UI
 	}
 	intents = append(intents, PatchMenuProbeCause{ResourceType: canon, Cause: cause})
 
-	// Update menu availability on full success or partial-success.
 	if msg.Err == nil || len(msg.Resources) > 0 {
 		intents = append(intents, PatchMenuAvailability{
 			ResourceType: canon,
 			Count:        msg.Count,
 			Truncated:    msg.Truncated,
-			// Per cache contract C3: a live AvailabilityChecked result confirms this type
+			// A live AvailabilityChecked result confirms this type
 			// this session — origin flips from "cache" (or unset) to
 			// "verified" regardless of whether the exactness guard in
 			// applyIntents' PatchMenuAvailability case ends up keeping the
 			// prior Count/Truncated.
 			Origin: OriginVerified,
 		})
-		// Issue counts from the probe.
 		intents = append(intents, PatchMenu{
 			ResourceType: canon,
 			Issues:       msg.Issues,
@@ -377,17 +362,17 @@ func (c *Core) handleAvailabilityChecked(msg messages.AvailabilityChecked) ([]UI
 
 		// Retain probe resources for Wave-2 enrichment. Fetcher-emitted rows
 		// already carry Findings.
-		// C6b/D17: this bare Wave-1 probe result carries no Wave-2 data of its
+		// This bare Wave-1 probe result carries no Wave-2 data of its
 		// own — if a prior Wave-2 enrichment pass this session already wrote
 		// Findings/Fields onto the type's previous in-memory rows, a plain
 		// overwrite here would blank them until the next enrichment sweep
-		// completes (the visible mid-session blink D17 describes). Carry
+		// completes (a visible mid-session blink). Carry
 		// forward the previous rows' Wave-2-sourced Findings and this type's
 		// registered enricher Fields keys per matching resource ID first.
 		// The "previous rows" read is RowStore's own current snapshot for
 		// canonType — the Wave-2-carried result
 		// IS this probe's final row state, and ObserveRows below is its only
-		// write destination now.
+		// write destination.
 		previous, _ := c.ProbeResources(canon)
 		freshResources := carryWave2ForResources(previous, msg.Resources, issueEnricherFieldKeysFor(canon))
 		c.ObserveRows(canon, freshResources, &resource.PaginationMeta{IsTruncated: msg.Truncated}, session.OriginProbe, false)
@@ -396,11 +381,11 @@ func (c *Core) handleAvailabilityChecked(msg messages.AvailabilityChecked) ([]UI
 	// Surface probe failures. A soft failure records into the `!` error log
 	// without a blocking banner; any other row-less failure banners.
 	//
-	// #462: exactly one scan-health entry per type per sweep.
+	// Exactly one scan-health entry per type per sweep.
 	// c.session.ScanHealthLogged (cleared at sweep start and by Rotate())
 	// guards against a type's AvailabilityChecked message being delivered
-	// more than once within the same sweep — a pre-existing double-delivery
-	// path elsewhere in dispatch — re-adding the entry or re-flashing the
+	// more than once within the same sweep — a double-delivery path
+	// elsewhere in dispatch — re-adding the entry or re-flashing the
 	// banner on the redundant delivery. Both branches below emit one
 	// FlashIntent and the entry is made where that intent is applied, so
 	// gating the emission on the guard gates the entry too.
@@ -426,7 +411,6 @@ func (c *Core) handleAvailabilityChecked(msg messages.AvailabilityChecked) ([]UI
 		Total:   c.session.AvailTotal,
 	})
 
-	// If queue has more items, fire next probe.
 	if len(c.session.AvailQueue) > 0 {
 		next := c.session.AvailQueue[0]
 		c.session.AvailQueue = c.session.AvailQueue[1:]
@@ -468,14 +452,14 @@ func (c *Core) handleAvailabilityChecked(msg messages.AvailabilityChecked) ([]UI
 		c.session.MarkPairSwept()
 	}
 
-	// Dispatch-time payload freeze (restated on RowStore): snapshot RowStore NOW, before a later
+	// Dispatch-time payload freeze: snapshot RowStore NOW, before a later
 	// mutation (e.g. a subsequent handleEnrichmentChecked's
 	// applyEnrichment/FieldUpdates AmendRows fold for a type already in this
 	// snapshot) could change it out from under an already-dispatched save —
 	// snapshotRowStoreForSave's SnapshotAll call captures a defensive,
 	// by-construction-isolated copy at THIS instant (see SaveCachePayload's
 	// doc comment for why dispatch-time capture is required here). This is
-	// the Wave-1 sweep-completion save, so no type is Wave-2-answered (C6b):
+	// the Wave-1 sweep-completion save, so no type is Wave-2-answered:
 	// the executor carries forward on-disk Wave-2 data these bare rows
 	// themselves lack instead of letting them clobber it.
 	tasks = append(tasks, TaskRequest{
@@ -530,10 +514,9 @@ func (c *Core) startEnrichment() ([]UIIntent, []TaskRequest) {
 		// Rerun-start bookkeeping: bump type gen and wipe the stale ran flag
 		// so the eventual EnrichmentChecked result's staleness guard and
 		// EnrichmentRan bookkeeping are correct for THIS run. Deliberately
-		// does NOT strip the type's existing Wave-2 findings here (C1/C6b:
-		// stale-until-replaced, not blank-until-replaced — mirrors the fix
-		// already applied to internal/tui's Ctrl+R handleRefresh path, see
-		// TestRerunStart_KeepsVisibleFindingsUntilReplaced). Merely queuing a
+		// does NOT strip the type's existing Wave-2 findings here
+		// (stale-until-replaced, not blank-until-replaced, like internal/tui's
+		// Ctrl+R handleRefresh path). Merely queuing a
 		// fresh enrichment probe must not blank a row's visible glyph before
 		// the fresh result actually lands; applyEnrichment (called from
 		// handleEnrichmentChecked once the result arrives) already
@@ -558,8 +541,8 @@ func (c *Core) startEnrichment() ([]UIIntent, []TaskRequest) {
 // being redispatched — that list-open probe's own eventual completion will
 // drive this sweep's refill/EnrichChecked bookkeeping in its place, rather
 // than this call physically dispatching the SAME resource type a second
-// time (#462/#463 defect 2b: a list-open probe racing a queued sweep entry
-// must never be dispatched twice). The loop keeps popping past any number
+// time (a list-open probe racing a queued sweep entry must never be
+// dispatched twice). The loop keeps popping past any number
 // of such already-covered entries until it finds one to actually dispatch,
 // or the queue drains empty.
 func (c *Core) refillEnrichSweep() []TaskRequest {
@@ -609,7 +592,7 @@ func (c *Core) finishEnrichmentSweepIfDone(intents []UIIntent, tasks []TaskReque
 	// stale-payload completion can still return its refill task (see the TypeGen guard in handleEnrichmentChecked).
 	if len(refillTasks) == 0 && c.session.EnrichChecked >= c.session.EnrichTotal {
 		intents = append(intents, PatchMenuEnrichProgress{Checked: 0, Total: 0})
-		// Dispatch-time payload freeze (restated on RowStore): SnapshotAll captures a defensive,
+		// Dispatch-time payload freeze: SnapshotAll captures a defensive,
 		// by-construction-isolated copy (see RowStore.SnapshotAll's doc
 		// comment) at THIS dispatch instant, immune to any later Amend the live
 		// store still accepts for this type. On the normal completion path this
@@ -617,7 +600,7 @@ func (c *Core) finishEnrichmentSweepIfDone(intents []UIIntent, tasks []TaskReque
 		// retained rows. On a stale progress-only completion, it persists the
 		// latest currently retained rows; any newer rerun completion will save
 		// again when it lands.
-		// Wave2Answered (C6b): the types this sweep's enrichment actually
+		// Wave2Answered: the types this sweep's enrichment actually
 		// answered for supersede their carried Wave-2 data wholesale, so a
 		// healed or resolved issue clears; a type whose probe failed is
 		// absent from the set and keeps what the file already knows.
@@ -638,14 +621,14 @@ func (c *Core) handleEnrichmentChecked(msg messages.EnrichmentChecked) ([]UIInte
 	}
 	payloadStale := msg.TypeGen != 0 && msg.TypeGen != c.session.EnrichmentTypeGenGet(msg.ResourceType)
 
-	// Sweep-slot freeing is split from payload staleness (#462/#463 defect
-	// 1): a sweep member's slot frees up — and the queue refills — the
+	// Sweep-slot freeing is split from payload staleness: a sweep member's
+	// slot frees up — and the queue refills — the
 	// moment ITS completion arrives, even when the TypeGen guard below goes
 	// on to discard the payload itself (a rerun bumped the type's gen while
 	// its sweep probe was still in flight). Skipping this refill on a stale
-	// completion is exactly the bug: every such rerun would strand the rest
-	// of EnrichQueue. A non-member completion (e.g. a list-open probe,
-	// #462/#463 defect 2) never steals a refill slot; when its own current
+	// completion would strand the rest of EnrichQueue on every such rerun.
+	// A non-member completion (e.g. a list-open probe) never steals a
+	// refill slot; when its own current
 	// payload covers a type still sitting in EnrichQueue, it removes exactly
 	// that queued entry and advances progress so the later refill cannot
 	// dispatch the same type a second time.
@@ -683,7 +666,7 @@ func (c *Core) handleEnrichmentChecked(msg messages.EnrichmentChecked) ([]UIInte
 		return nil, tasks
 	}
 
-	// #462/#463 defect 1: fold this Wave-2 result onto the type's Wave-1
+	// Fold this Wave-2 result onto the type's Wave-1
 	// BASELINE (AvailOutcome/AvailDuration/AvailErr), never onto the
 	// previous record's aggregate — folding onto the aggregate would
 	// re-accumulate Duration and keep a stale partial/Err across repeated
@@ -711,7 +694,6 @@ func (c *Core) handleEnrichmentChecked(msg messages.EnrichmentChecked) ([]UIInte
 	var intents []UIIntent
 	tasks := refillTasks
 
-	// Surface enrichment failures as flash.
 	if msg.Err != nil {
 		_, region := c.session.CurrentPair()
 		intents = append(intents, FlashIntent{
@@ -725,7 +707,7 @@ func (c *Core) handleEnrichmentChecked(msg messages.EnrichmentChecked) ([]UIInte
 	// verdict that this type is clean, so nothing it touches may be treated
 	// as a Wave-2 answer — the rows keep the findings they are rendering,
 	// the type stays out of this sweep's authoritative save, and the menu
-	// badge stands until a probe actually answers (C1: a marked, stale answer
+	// badge stands until a probe actually answers (a marked, stale answer
 	// beats a confidently wrong clean one).
 	answeredNobody := msg.Err != nil && len(msg.Findings) == 0 && len(msg.FieldUpdates) == 0 && len(msg.TruncatedIDs) == 0
 	if answeredNobody {
@@ -736,7 +718,6 @@ func (c *Core) handleEnrichmentChecked(msg messages.EnrichmentChecked) ([]UIInte
 		return c.finishEnrichmentSweepIfDone(intents, tasks, refillTasks)
 	}
 
-	// Update findings and menu issue count on success or partial success.
 	{
 		c.session.EnrichmentRanSet(msg.ResourceType)
 		msg = c.keepRowAnswers(msg)
@@ -807,7 +788,6 @@ func (c *Core) handleEnrichmentChecked(msg messages.EnrichmentChecked) ([]UIInte
 		c.session.EnrichmentCutSet(msg.ResourceType, msg.Truncated)
 		issueTruncated := issueLowerBound(msg.ResourceType, c.pageTruncated(msg.ResourceType), msg.Truncated, unified > 0 || len(allFindings) > 0, len(msg.TruncatedIDs))
 
-		// Emit menu issue badge update.
 		intents = append(intents, PatchMenu{
 			ResourceType: msg.ResourceType,
 			Issues:       unified,
@@ -818,7 +798,6 @@ func (c *Core) handleEnrichmentChecked(msg messages.EnrichmentChecked) ([]UIInte
 			Total:   c.session.EnrichTotal,
 		})
 
-		// Emit resource-list enrichment patch (updates list badge + row markers).
 		// Findings/AttentionDetails carry every independently-evaluated
 		// condition per resource (feeds applyRowFindings/ApplyWave2ToRow so a
 		// multi-condition resource's row fold keeps every finding's own
@@ -837,7 +816,6 @@ func (c *Core) handleEnrichmentChecked(msg messages.EnrichmentChecked) ([]UIInte
 			Enrichment:   enrichPatch,
 		})
 
-		// Emit detail-view patch for any open detail views of this type.
 		// ResourceID empty = all detail views of this type; the adapter looks up
 		// the findings for each view's specific resource ID from
 		// EnrichmentFindings. allFindings carries every independently-evaluated
@@ -855,15 +833,14 @@ func (c *Core) handleEnrichmentChecked(msg messages.EnrichmentChecked) ([]UIInte
 }
 
 // snapshotRowStoreForSave builds a TaskKindSaveCache payload from RowStore's
-// current retained rows. SnapshotAll(false) excludes Partial-only entries (C6
-// scope: a sparse by-ID read must never poison a type's canonical persisted
-// list).
+// current retained rows. SnapshotAll(false) excludes Partial-only entries (a
+// sparse by-ID read must never poison a type's canonical persisted list).
 //
 // SnapshotAll's own defensive-copy guarantee (fresh slice + fresh Fields map
 // per row, see RowStore.Snapshot's doc comment) is what gives this payload
 // its dispatch-time freeze.
 //
-// wave2Answered is stamped onto the returned payload as-is (C6b) — see
+// wave2Answered is stamped onto the returned payload as-is — see
 // SaveCachePayload's doc comment for what it drives at execute time.
 // rowStoreGens is the row-store observation generation of every type it
 // holds — the stamp a frozen save carries so a later observation of the same
@@ -892,22 +869,20 @@ func (c *Core) snapshotRowStoreForSave(wave2Answered map[string]bool) *SaveCache
 // rowStoreResourcesAndTruncated converts RowStore.SnapshotAll(false) into
 // the (resources, truncated) map pair
 // snapshotRowStoreForSave and the TaskKindSaveCache nil-Payload executor
-// fallback both need — the shape TaskKindSaveCache's payload/live-read
-// carried since before the row-store unification (SaveCachePayload.Resources/
-// Truncated). Excludes Partial-only entries (SnapshotAll(false) already
+// fallback both need (SaveCachePayload.Resources/Truncated). Excludes
+// Partial-only entries (SnapshotAll(false) already
 // drops those) and every Rows-empty entry EXCEPT a live, exact rows-carrying
 // observation of a genuine zero population (Origin Probe or Fetch, exact
 // pagination) — that IS the type's population going to zero this session,
 // not the absence of an observation, and must still reach the save. A
-// counts-only ObserveCount write (C6a: count known, rows never observed)
+// counts-only ObserveCount write (count known, rows never observed)
 // stays excluded even though it may leave Origin at its OriginDisk zero
 // value or carry forward a prior rows-carrying Origin untouched —
 // discriminated on Pagination (ObserveCount never sets it) together with
 // Origin, not Origin alone, since TypeRows' zero-value Origin IS OriginDisk.
-// A disk-seeded entry (Origin OriginDisk) stays excluded the same way it
-// always has.
+// A disk-seeded entry (Origin OriginDisk) is excluded too.
 //
-// A nil tr.Pagination reports truncated=true (C5: nil pagination is never
+// A nil tr.Pagination reports truncated=true (nil pagination is never
 // exact — mirrors availabilityFromResourceCache's identical guard), never
 // truncated=false: a nil-Pagination entry is the shape HandleResourcesLoaded's
 // PatchResourceCache/SetResourceCache carries before any real page-boundary
@@ -926,23 +901,23 @@ func (c *Core) rowStoreResourcesAndTruncated() (map[string][]resource.Resource, 
 			}
 		}
 		resources[shortName] = tr.Rows
-		// C5: nil Pagination means this entry's truncation state was never
+		// Nil Pagination means this entry's truncation state was never
 		// observed — treat as unknown/conservatively truncated, mirroring
 		// availabilityFromResourceCache's identical guard. A bare `!= nil &&
 		// .IsTruncated` here would let an unobserved (nil-Pagination) entry
 		// read as exact, letting a downstream Exact-count derivation silently
-		// downgrade a genuinely deeper stored-exact total (D14).
+		// downgrade a genuinely deeper stored-exact total.
 		truncated[shortName] = tr.Pagination == nil || tr.Pagination.IsTruncated
 	}
 	return resources, truncated
 }
 
 // rowsFromCacheRows converts a per-type file's persisted Rows (ID/Name/Fields
-// + Findings, C6: no RawStruct, no color/glyph/status) into the
+// + Findings, no RawStruct, no color/glyph/status) into the
 // resource.Resource shape session.ProbeResources carries. Colors/glyphs/
 // status are intentionally NOT reconstructed here — buildListBody derives
 // them at render time from Fields + Findings via the same classification
-// rules live data uses (C6).
+// rules live data uses.
 //
 // row.Fields/row.Findings are copied rather than assigned by reference:
 // (*cache.Store).Type returns a TypeFile by value, but its Rows slice and
@@ -1032,7 +1007,7 @@ func unifiedIssueCount(wave1Resources []resource.Resource, td resource.ResourceT
 //
 // Exported because both issue-count surfaces — the menu badge (unifiedIssueCount)
 // and the list title (Controller.listIssueCount) — must strip Wave-2 the same
-// way per docs/attention-signals.md S1 ("~ findings do not bump"), so the two
+// way per docs/attention-signals.md ("~ findings do not bump"), so the two
 // counts cannot drift.
 func Wave1Only(r resource.Resource) resource.Resource {
 	if len(r.Findings) == 0 {

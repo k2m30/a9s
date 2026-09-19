@@ -143,7 +143,7 @@ func EnrichSnapshotCrossRef(cfg SnapshotCrossRefConfig) IssueEnricherFunc {
 
 		publicErr := enrichSnapshotPublicShare(ctx, cfg, clients, resources, &result)
 
-		// Skip rule per spec §3.1: the cross-ref enricher requires the parent
+		// The cross-ref enricher requires the parent
 		// list to be loaded. If absent, both rules skip, and every snapshot
 		// with a parent is marked: neither rule was judged for it.
 		parentEntry, parentLoaded := cache[cfg.ParentShortName]
@@ -156,7 +156,6 @@ func EnrichSnapshotCrossRef(cfg SnapshotCrossRefConfig) IssueEnricherFunc {
 			return result, publicErr
 		}
 
-		// Build a lookup map: parent ID → RawStruct for O(1) access.
 		parentByID := make(map[string]any, len(parentEntry.Resources))
 		for _, p := range parentEntry.Resources {
 			parentByID[p.ID] = p.RawStruct

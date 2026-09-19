@@ -57,8 +57,8 @@ func checkNGRole(ctx context.Context, clients any, res resource.Resource, cache 
 	if ng.NodeRole == nil || *ng.NodeRole == "" {
 		return resource.KnownRelated("role", nil, false)
 	}
-	// In-body: the node group's NodeRole ARN normalizes to the role name (== the
-	// role's Resource.ID). Resolve by identity — no role-list fetch.
+	// The node group's NodeRole ARN normalizes to the role name (== the
+	// role's Resource.ID), so it resolves by identity.
 	return relatedRefs("role", []string{*ng.NodeRole}, refContext(clients, cache, "role"))
 }
 
@@ -109,7 +109,7 @@ func checkNGASG(ctx context.Context, clients any, res resource.Resource, cache r
 
 // checkNGEC2 scans the EC2 instance cache for instances tagged with this node
 // group's name via "eks:nodegroup-name" and optionally "eks:cluster-name".
-// Pattern C: tag-based cache scan, reading the cache directly — a cold or
+// It reads the cache directly — a cold or
 // missing "ec2" cache entry must never trigger a live fetch (see
 // checkNGEBS/cachedTypedRows for the shared contract).
 func checkNGEC2(_ context.Context, _ any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
@@ -170,7 +170,6 @@ func matchingNGInstances(ec2List []typedRow[ec2types.Instance], nodegroupName, c
 // checkNGSG extracts the remote access security group from the EKS Node Group's
 // Resources.RemoteAccessSecurityGroup field (present when the node group is not
 // using a launch template and SSH access is configured).
-// Pattern F — no cache needed.
 func checkNGSG(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	ng, ok := assertStruct[ekstypes.Nodegroup](res.RawStruct)
 	if !ok {
@@ -184,15 +183,14 @@ func checkNGSG(_ context.Context, _ any, res resource.Resource, _ resource.Resou
 }
 
 // checkNGAMI resolves the AMI used by this node group's launch template.
-// Pattern A — ec2:DescribeLaunchTemplateVersions if LaunchTemplate is set.
-// Managed NGs without a custom launch template: AMI resolution via SSM is deferred; returns Count:0.
+// Calls ec2:DescribeLaunchTemplateVersions when LaunchTemplate is set; a
+// managed NG without a custom launch template returns Count:0.
 func checkNGAMI(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	ng, ok := assertStruct[ekstypes.Nodegroup](res.RawStruct)
 	if !ok {
 		return resource.UnknownRelated("ami")
 	}
 	if ng.LaunchTemplate == nil || ng.LaunchTemplate.Id == nil || *ng.LaunchTemplate.Id == "" {
-		// Managed NG without custom LT — AMI resolution via SSM deferred.
 		return resource.KnownRelated("ami", nil, false)
 	}
 
@@ -231,9 +229,9 @@ func checkNGAMI(ctx context.Context, clients any, res resource.Resource, _ resou
 // checkNGEBS scans the EC2 instance cache for instances tagged with this node
 // group's name via "eks:nodegroup-name" (and, when known, "eks:cluster-name"),
 // then collects the EBS volume IDs from each matched instance's
-// BlockDeviceMappings. Pattern C: tag-based cache scan, mirroring checkNGEC2 —
-// zero extra AWS calls; a cold or missing "ec2" cache entry reads as unknown
-// ("?"), never as a fetch trigger (docs/resources/ng.md §2 ebs bullet).
+// BlockDeviceMappings, as checkNGEC2 does — zero extra AWS calls; a cold or
+// missing "ec2" cache entry reads as unknown ("?"), never as a fetch
+// trigger (docs/resources/ng.md).
 func checkNGEBS(_ context.Context, _ any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	nodegroupName, clusterName := ngIdentity(res)
 	if nodegroupName == "" {
@@ -264,7 +262,7 @@ func checkNGEBS(_ context.Context, _ any, res resource.Resource, cache resource.
 }
 
 // checkNGSubnet returns the subnet IDs this node group deploys into.
-// Pattern F — no AWS call needed; data is in Subnets[] on the Nodegroup struct.
+// The data is in Subnets[] on the Nodegroup struct.
 func checkNGSubnet(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	ng, ok := assertStruct[ekstypes.Nodegroup](res.RawStruct)
 	if !ok {

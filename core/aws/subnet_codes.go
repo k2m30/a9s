@@ -15,5 +15,5 @@ const (
 	CodeSubnetAutoPublicIP domain.FindingCode = "subnet.auto-public-ip"
 )
 
-// SubnetAutoPublicIPPhrase is the S4 status phrase for CodeSubnetAutoPublicIP.
+// SubnetAutoPublicIPPhrase is the status phrase for CodeSubnetAutoPublicIP.
 const SubnetAutoPublicIPPhrase = "auto-assigns public IPs"

@@ -1,12 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-// coverage_topup_whitebox_test.go — white-box tests for live,
-// production-reachable functions carrying low/zero coverage under the
-// codecov gate (coverpkg=./internal/...): RightColumnModel's
+// coverage_topup_whitebox_test.go — white-box tests for RightColumnModel's
 // Init/View/Update/updateKeyMsg/HasActionableRows (reached in production via
-// rs.rightCol in app_stack.go / NewRightColumn in runtime_adapter_related.go,
-// but not exercised directly elsewhere), the config-driven detail render
-// path, and the DetailModel-specific SetSize in
+// rs.rightCol in app_stack.go / NewRightColumn in runtime_adapter_related.go),
+// the config-driven detail render path, and the DetailModel-specific SetSize in
 // detail_helpers.go. All are unexported (or exercise unexported branches), so
 // they are tested directly from package views.
 package views
@@ -40,16 +37,8 @@ func TestTopUp_RightColumn_Init_ReturnsSameModelNilCmd(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// renderRelatedPanel (detail_helpers.go:248) — RightColumnModel's row-fact
-// store (rows, View, SelectedTypeName, HasActionableRows) was removed; row
-// facts and the RELATED panel's single render implementation now live in
-// core/app (buildDetailRelatedBlocks) and renderRelatedPanel respectively.
-// The "no defs registered" / "loading rows show display names + header"
-// cases already have direct coverage via the live Controller+RenderDetail
-// seam (tests/unit/rightcolumn_test.go's TestRightColumn_EmptyDefsShowsHint,
-// TestRightColumn_ShowsLoadingState, TestRightColumn_ToggleShowsRelatedHeader);
-// only the width<=0 guard and the filter-matches-nothing branch lacked
-// coverage anywhere, so those two are pinned here directly.
+// renderRelatedPanel (detail_helpers.go) — the width<=0 guard and the
+// filter-matches-nothing branch.
 // ---------------------------------------------------------------------------
 
 func TestTopUp_RenderRelatedPanel_WidthZero_ReturnsEmpty(t *testing.T) {
@@ -66,34 +55,13 @@ func TestTopUp_RenderRelatedPanel_FilterActiveNoRows_ShowsNoMatches(t *testing.T
 }
 
 // ---------------------------------------------------------------------------
-// RightColumnModel.Update / updateKeyMsg (rightcolumn.go:61, :69) — the
-// widget now holds only interaction state (focus/cursor/filter/scroll); row
-// facts and cursor skip-to-actionable semantics moved to
-// core/app/detail_cursor.go and are covered there:
-//   - resolve-by-DisplayName + DefDisplayName ambiguity fallback:
-//     tests/unit/detail_livepath_migration_test.go's
-//     TestDetailController_ApplyDetailRelatedResultForResource_CtEventsSelfPivots_ResolveByDefDisplayName,
-//     plus coverage_live_gaps_test.go's
-//     TestLiveGap_ApplyDetailRelatedResultForResource_AmbiguousTargetTypeWithoutDisplayName_NoBind
-//     and _UnambiguousTargetTypeFallback_Binds for the DefDisplayName-omitted
-//     branches.
-//   - Down/Up skip-to-next-actionable: tests/unit/app_related_cursor_skip_test.go
-//     (TestRelatedCursor_MoveDown_SkipsDimmedRow and siblings).
-//   - focus-entry landing on the first actionable/drillable row (the old
-//     live incremental "reassign cursor as new results stream in" behavior
-//     no longer exists — cursor placement only happens once, at
-//     ActionToggleFocus time): tests/unit/app_related_focus_entry_test.go.
-//   - filtered-set Up/Down movement: coverage_live_gaps_test.go's
-//     TestLiveGap_RelatedCursor_FilterMode_UpDown_MoveWithinFilteredSet.
-//   - Enter navigation sourcing SelectedRelatedRow from controller state:
-//     coverage_live_gaps_test.go's
-//     TestLiveGap_HandleDetailKeyMsg_RelatedPanelEnter_OnActionableRow_NavigatesUsingControllerRow.
+// RightColumnModel.Update / updateKeyMsg (rightcolumn.go) — the widget holds
+// only interaction state (focus/cursor/filter/scroll); row facts and cursor
+// skip-to-actionable semantics live in core/app/detail_cursor.go.
 // ---------------------------------------------------------------------------
 
 // topUpDefs3ResolvedModel returns a focused, sized RightColumnModel. defs are
-// accepted only for newRightColumn call-site parity — per rightcolumn.go's
-// package doc, the widget stores no row facts, so there is nothing left to
-// "resolve" here.
+// accepted for newRightColumn call-site parity.
 func topUpDefs3ResolvedModel(t *testing.T) RightColumnModel {
 	t.Helper()
 	defs := []resource.RelatedDef{

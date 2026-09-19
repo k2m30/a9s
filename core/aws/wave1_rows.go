@@ -120,11 +120,7 @@ func countTokenIn(slot string) string {
 // and an emitter passes the number or the list and nothing else.
 func fillSlot(slot, value string) string {
 	// A slot value becomes cell text, so it reads the way every other cell
-	// reads: config.CanonicalValue is the one place those conventions live,
-	// and a phrase slot was the one route onto the surface that bypassed it.
-	// A timestamp arrived at the status cell as the RFC3339 the SDK returned
-	// while the list's own time columns, which go through the same function,
-	// showed the day and the time of day one column over.
+	// reads: config.CanonicalValue is the one place those conventions live.
 	value = config.CanonicalValue(value)
 	if value == "" {
 		if testing.Testing() {

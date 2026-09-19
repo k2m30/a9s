@@ -59,7 +59,6 @@ func FetchSQSQueuesPage(ctx context.Context, listAPI SQSListQueuesAPI, attrAPI S
 
 		attrs := attrOutput.Attributes
 
-		// Extract queue name from URL (last segment after /)
 		queueName := queueURL
 		if parts := strings.Split(queueURL, "/"); len(parts) > 0 {
 			queueName = parts[len(parts)-1]
@@ -93,7 +92,6 @@ func FetchSQSQueuesPage(ctx context.Context, listAPI SQSListQueuesAPI, attrAPI S
 		resources = append(resources, r)
 	}
 
-	// Build pagination metadata
 	nextToken := ""
 	isTruncated := false
 	if listOutput.NextToken != nil {

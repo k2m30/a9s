@@ -18,18 +18,15 @@ import (
 // fieldpath.ExtractScalar(r.RawStruct, col.Path) and writing it under the key
 // that column's cell is read from — its own Key, or its title key
 // (config.TitleFieldKey, the spelling the extraction cascade reads first) when
-// it has none. This is the generic render-sufficiency step Contract B
-// requires: running it once, before a fetch result is cached or a screen's
+// it has none. This is the generic render-sufficiency step: running it
+// once, before a fetch result is cached or a screen's
 // rows are stored, means a later cache replay with RawStruct stripped renders
 // identical cells, without falling back to fieldpath on a nil RawStruct.
 //
-// A column carrying BOTH a Key and a Path is materialized too. It is the
-// ordinary shape since ResolveListColumnCascade started merging the catalog's
-// Key onto the defaults' Path, and skipping it left the cached row blank
-// wherever the fetcher had not written that key itself. The clobbering worry
-// that kept keyed columns out — a Wave-2 override fieldpath cannot see — is
-// already answered by the guard below: a key that already holds a non-empty
-// value is never written.
+// A column carrying BOTH a Key and a Path is materialized too:
+// ResolveListColumnCascade merges the catalog's Key onto the defaults'
+// Path, and a cached row would otherwise be blank wherever the fetcher did
+// not write that key itself.
 //
 // A column is only materialized when Fields does not already carry a
 // non-empty value under the resolved key, so a prior explicit value (or an
@@ -290,7 +287,7 @@ func humanizeListCell(col ColumnDef, v string) string {
 }
 
 // hasWave2Finding reports whether findings already contains a Wave-2 entry
-// (Source prefixed "wave2:"). Used by buildListBody's S4 status-cell override
+// (Source prefixed "wave2:"). Used by buildListBody's status-cell override
 // to detect when applyWave2ToRow has already mutated r.Findings directly
 // (the demo path and the internal/tui fold-layer live path both do this) —
 // in that case extractListCells has already derived the correct, possibly
@@ -342,7 +339,6 @@ func colorToTag(c domain.Color) string {
 // definition of "this is the name column"; nothing may re-derive it from a
 // substring of a key, a title or a path.
 func IdentityColumnIndex(columns []ColumnDef, td *resource.ResourceTypeDef) int {
-	// Step 1: explicit IdentityKey on the type definition.
 	if td != nil && td.IdentityKey != "" {
 		for i, c := range columns {
 			if c.Key == td.IdentityKey {
@@ -350,26 +346,23 @@ func IdentityColumnIndex(columns []ColumnDef, td *resource.ResourceTypeDef) int 
 			}
 		}
 	}
-	// Step 2: column key is literally "name".
 	for i, c := range columns {
 		if c.Key == "name" {
 			return i
 		}
 	}
-	// Step 3: column title equals "Name" (case-insensitive) or the type's display name.
 	for i, c := range columns {
 		if strings.EqualFold(c.Title, "Name") || (td != nil && strings.EqualFold(c.Title, td.Name)) {
 			return i
 		}
 	}
-	// Step 4: fall back to index 0.
 	return 0
 }
 
 // resolveListStatusCol finds the type's declared status column — the one
 // naming its lifecycle key, which config.IsStatusColumn is the one answer to.
 // Returns -1 when no status column exists. buildListBody uses it to bake the
-// issue-Finding Phrase (S4) into the status cell so the ViewState is
+// issue-Finding Phrase into the status cell so the ViewState is
 // render-ready — the TUI does this override at render time, but the web
 // renders Cells verbatim, so it must live in the ViewState for both renderers
 // (and the enrichment findings map, not the resource's embedded Wave-1
@@ -408,9 +401,8 @@ func (c *Controller) resolveColumnsLocked(typeName string) []ColumnDef {
 
 // listColumnsAndTypeLocked resolves a screen's typeDef and its column set
 // together, because they are one answer: the columns come FROM the typeDef.
-// Resolving them apart is how a screen renders one type's columns and filters
-// with another's — the shape row 39 removed at the typeDef and this removes at
-// the column set. Callers MUST already hold c.mu.
+// Resolving them apart would let a screen render one type's columns and
+// filter with another's. Callers MUST already hold c.mu.
 func (c *Controller) listColumnsAndTypeLocked(typeName string) (*resource.ResourceTypeDef, []ColumnDef) {
 	td := c.typeDefForLocked(typeName)
 	return td, resolveListColumnsForBuild(c.viewConfig, typeName, td)

@@ -27,7 +27,6 @@ const (
 	sfnCodeDefinitionSecret domain.FindingCode = "sfn.definition-secret"
 )
 
-// S5 operator sentences for the state-machine posture codes above.
 // EnrichStepFunctionsStatus calls ListExecutions(max:1) for each state machine (1 per SFN, cap ~50).
 // Returns a Finding for each state machine whose latest execution is FAILED, TIMED_OUT, or ABORTED.
 // Severity is "!" (broken/degraded). Summary: "latest execution <STATUS>".

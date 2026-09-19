@@ -17,7 +17,7 @@ import (
 
 // logsCodeRetentionNeverExpire is the canonical FindingCode for a log group
 // with no retention policy (RetentionInDays == nil), meaning events are kept
-// forever and billed indefinitely. docs/resources/logs.md §4.
+// forever and billed indefinitely.
 const logsCodeRetentionNeverExpire domain.FindingCode = "logs.retention-never-expire"
 
 // logsCodeStaleEmpty is the canonical FindingCode for a log group that is
@@ -26,7 +26,7 @@ const logsCodeRetentionNeverExpire domain.FindingCode = "logs.retention-never-ex
 const logsCodeStaleEmpty domain.FindingCode = "logs.stale-empty"
 
 // CodeLogsNoKMS is the canonical FindingCode for a log group with no customer
-// managed KMS key (KmsKeyId empty). docs/resources/logs.md §4.
+// managed KMS key (KmsKeyId empty).
 const CodeLogsNoKMS domain.FindingCode = "logs.no-kms"
 
 // logsStaleEmptyAge is the age threshold colorLogs uses to flag an empty log
@@ -135,7 +135,6 @@ func FetchCloudWatchLogGroupsPage(ctx context.Context, api CWLogsDescribeLogGrou
 		resources = append(resources, r)
 	}
 
-	// Build pagination metadata
 	nextToken := ""
 	isTruncated := false
 	if output.NextToken != nil {

@@ -37,11 +37,11 @@ type APIGWFixtures struct {
 }
 
 const (
-	// PublicAPIGWID is the graph-root API Gateway used to witness the
+	// PublicAPIGWID is the graph-root API Gateway for the apigw:kms,
 	// apigw:kms, apigw:lambda, apigw:acm and apigw:cf related-panel pivots.
 	PublicAPIGWID = "abc123def4"
-	// PublicAPIGWDomainName is the custom domain mapped to PublicAPIGWID —
-	// required for the apigw:acm pivot witness (checkApigwACM).
+	// PublicAPIGWDomainName is the custom domain mapped to PublicAPIGWID,
+	// required for the apigw:acm pivot (checkApigwACM).
 	PublicAPIGWDomainName = "api.acme-corp.com"
 	// APIGWVpcLinkID is the VPC link ID bound to PublicAPIGWID's VPC_LINK
 	// integration — required for the apigw:elb related-panel pivot
@@ -53,8 +53,8 @@ const (
 	// (checkApigwELB)'s security-group-based fallback match.
 	APIGWVpcLinkSecurityGroupID = "sg-0vpcl11111111111a"
 	// HealthyAPIGWID is the only API with a deployed stage that carries both
-	// non-zero throttling and access logging — the sole demo witness for the
-	// apigw Healthy color bucket (colorAPIGW falls through to structural
+	// non-zero throttling and access logging, so it is the only demo API in
+	// the apigw Healthy color bucket (colorAPIGW falls through to structural
 	// Healthy only when EnrichAPIGatewayStage raises no finding at all).
 	HealthyAPIGWID = "opq234rst5"
 )
@@ -108,8 +108,8 @@ var sharedAPIGWFixtures = sync.OnceValue(func() *APIGWFixtures {
 				CreatedDate:              aws.Time(time.Date(2025, 10, 12, 8, 0, 0, 0, time.UTC)),
 			},
 		},
-		// Integrations for PublicAPIGWID — required for the apigw:kms,
-		// apigw:lambda pivot witnesses (checkApigwKMS / checkApigwLambda both
+		// Integrations for PublicAPIGWID — required for the apigw:kms and
+		// apigw:lambda pivots (checkApigwKMS / checkApigwLambda both
 		// scan GetIntegrations output for IntegrationUri containing
 		// ":function:"). api-gateway-authorizer is a real lambda.go fixture
 		// with KMSKeyArn set.
@@ -155,7 +155,7 @@ var sharedAPIGWFixtures = sync.OnceValue(func() *APIGWFixtures {
 				},
 			},
 			// The healthy API must carry an authorizer too, or
-			// apigw.no-authorizer colours the one row that witnesses the
+			// apigw.no-authorizer colours the only row in the
 			// Healthy bucket.
 			HealthyAPIGWID: {
 				{
@@ -173,7 +173,7 @@ var sharedAPIGWFixtures = sync.OnceValue(func() *APIGWFixtures {
 			},
 		},
 		// DomainNames + ApiMappings — required for the apigw:acm pivot
-		// witness (checkApigwACM: GetDomainNames -> GetApiMappings match on
+		// (checkApigwACM: GetDomainNames -> GetApiMappings match on
 		// ApiId -> harvest CertificateArn from DomainNameConfigurations).
 		// The referenced cert is a real acm.go fixture for api.acme-corp.com.
 		DomainNames: []apigwtypes.DomainName{
@@ -193,7 +193,7 @@ var sharedAPIGWFixtures = sync.OnceValue(func() *APIGWFixtures {
 			},
 		},
 		// Stages — the $default stage on PublicAPIGWID has no throttling
-		// configured and no access logs, witnessing apigw.stage-config-issues
+		// configured and no access logs, so it raises apigw.stage-config-issues
 		// (EnrichAPIGatewayStage: DefaultRouteSettings.Throttling{Burst,Rate}Limit
 		// == 0 OR AccessLogSettings == nil).
 		Stages: map[string][]apigwtypes.Stage{
@@ -232,8 +232,6 @@ func NewAPIGWFixtures() *APIGWFixtures {
 	return sharedAPIGWFixtures()
 }
 
-// Witness APIs and stages for the w6a Prowler batch. The REST witnesses need
-// the v1 lane, which the demo fake currently returns empty for.
 const (
 	// APIGWRESTNoAuthorizer is the REST API with no authorizer and a
 	// resource policy that is absent or public.
@@ -258,7 +256,7 @@ const (
 )
 
 // APIGWV1Fixtures holds typed fixture data for the API Gateway v1 (REST)
-// lane. The a9s apigw list merges v1 and v2, and the four REST posture rows
+// lane. The a9s apigw list merges v1 and v2, and the four REST posture findings
 // have no v2 equivalent, so demo mode needs REST APIs to demonstrate them.
 type APIGWV1Fixtures struct {
 	RestApis []apigwv1types.RestApi
@@ -282,7 +280,7 @@ func apigwV1RestAPI(id, name, endpoint string) apigwv1types.RestApi {
 }
 
 // apigwV1HealthyStage returns a REST stage with access logging on, tracing on
-// and no credential in its variables, so it trips none of the REST rows.
+// and no credential in its variables, so it raises none of the REST findings.
 func apigwV1HealthyStage(name string) apigwv1types.Stage {
 	return apigwv1types.Stage{
 		StageName:      aws.String(name),
@@ -296,8 +294,8 @@ func apigwV1HealthyStage(name string) apigwv1types.Stage {
 	}
 }
 
-// NewAPIGWV1Fixtures constructs the REST-lane fixtures. Each API is the one
-// witness for its row; every other API is explicitly healthy for that row.
+// NewAPIGWV1Fixtures constructs the REST-lane fixtures. Each API is the only
+// carrier of its finding; every other API is healthy for that finding.
 var sharedAPIGWV1Fixtures = sync.OnceValue(func() *APIGWV1Fixtures { //nolint:gochecknoglobals // fixture singleton, matching this package's shape
 	noLogs := apigwV1HealthyStage(APIGWRESTStageSecretStage)
 	noLogs.AccessLogSettings = nil
@@ -324,14 +322,12 @@ var sharedAPIGWV1Fixtures = sync.OnceValue(func() *APIGWV1Fixtures { //nolint:go
 			apigwV1RestAPI(APIGWRESTNoAuthorizer, "acme-orders-rest", "EDGE"),
 			apigwV1RestAPI(APIGWRESTNoAccessLogs, "acme-unlogged-rest", "REGIONAL"),
 			apigwV1RestAPI(APIGWRESTTracingOff, "acme-untraced-rest", "REGIONAL"),
-			// Private, so the three endpoint words the REST rows can carry
-			// (edge, regional, private) all render on the bench. This row has
-			// an authorizer, so the endpoint word decides nothing here — the
-			// two endpoint-type findings keep their single witnesses each.
+			// Private, so the three endpoint words a REST API can carry
+			// (edge, regional, private) all render in the demo. This API has
+			// an authorizer, so its endpoint type raises no finding.
 			apigwV1RestAPI(APIGWRESTStageSecret, "acme-leaky-rest", "PRIVATE"),
 		},
 		Authorizers: map[string][]apigwv1types.Authorizer{
-			// APIGWRESTNoAuthorizer deliberately has none — it is the witness.
 			APIGWRESTNoAccessLogs: authorizer,
 			APIGWRESTTracingOff:   authorizer,
 			APIGWRESTStageSecret:  authorizer,

@@ -46,8 +46,8 @@ func newSession(profile, region, command string, demoMode, noCache bool, viewCfg
 			app.DrainSync(ctrl, tasks)
 		}
 	} else if !core.NoCache() {
-		// Live path, no pre-supplied clients: C1 requires the cached menu to
-		// render "before any AWS activity" — the AWS connect itself (and thus
+		// Live path, no pre-supplied clients: the cached menu renders before any
+		// AWS activity — the AWS connect itself (and thus
 		// the TaskKindLoadAvailCache dispatch inside handleClientsReadySuccess)
 		// only starts once getOrCreateSession's background BootstrapLive
 		// goroutine runs, which can lag the first GET/ /state response. Load
@@ -70,7 +70,7 @@ func newSession(profile, region, command string, demoMode, noCache bool, viewCfg
 		// arms session.CommandArmed/PendingCommand, and
 		// handleAvailabilityCacheLoaded dispatches the deferred
 		// TaskKindEmitNavigate once its ProbeResources seed has landed
-		// (deferred -c navigation, D11) — the same ordering the TUI's -c flag relies on.
+		// — the same ordering the TUI's -c flag relies on.
 		core.SetCommand(command)
 	}
 	// The config report goes on last: Controller.Apply clears the flash at the

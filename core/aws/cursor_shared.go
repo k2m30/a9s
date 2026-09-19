@@ -22,7 +22,7 @@ import (
 // decodeErr isolates the underlying json.Decode failure (bad syntax, wrong
 // shape, an unknown field) from the trailing-bytes/zero-value checks, since
 // some callers treat the two differently — e.g. a decoder that falls back
-// to interpreting a non-JSON token as some other pre-existing external
+// to interpreting a non-JSON token as some other external
 // format only for a genuine decodeErr, not for a well-formed decode that
 // turned out to be malformed some other way. malformed is true whenever
 // either the decode itself failed or the well-formedness checks did; token

@@ -2,7 +2,7 @@
 
 // app_stack.go — tui.Model renderer-state stack helpers.
 //
-// The view stack is now a []*rendererState slice: each entry carries only
+// The view stack is a []*rendererState slice: each entry carries only
 // viewport, search widget, right-column, scroll-offset, reveal payload, help
 // context, and terminal dimensions. No concrete view model pointers are stored.
 //
@@ -69,7 +69,7 @@ func (m *Model) popRSOnly() bool {
 // generic by construction, no per-screen-kind special case here.
 //
 // The returned tea.Cmd surfaces the TaskRequests ActionBack itself returns
-// (today, only ever a KindRelatedCheck re-dispatch — owner decision #38, see
+// (only ever a KindRelatedCheck re-dispatch — see
 // handleActionBack in core/app/actions_nav.go) translated into the TUI's
 // native trigger via relatedCheckStartedCmdFromTasks. The controller is the
 // single source of truth for "does revealing this screen need a
@@ -91,7 +91,7 @@ func (m *Model) popRSWithCtrlPop(ctrlPop bool) (bool, tea.Cmd) {
 	if ctrlPop && m.activeRS().ctrlBacked {
 		depthBefore := len(m.ctrl.ScreenIDs())
 		_, tasks := m.ctrl.Apply(app.Action{Kind: app.ActionBack})
-		// handleActionBack (owner decision #38) may return a KindRelatedCheck
+		// handleActionBack may return a KindRelatedCheck
 		// task when the pop reveals a detail screen with registered related
 		// defs — dispatchTaskRequests routes it to the same relatedCheckCmd
 		// fan-out every other related-check dispatch uses.
@@ -122,8 +122,8 @@ func (m *Model) innerSize() (int, int) {
 //
 // The controller decides the detail layout — the key column's width, where the
 // attention sentence wraps — against the viewport it was told about. A resize
-// that reached only the renderer left those decisions made for the old width,
-// so a narrower terminal clipped a sentence wrapped for a wider one instead of
+// that reached only the renderer would leave those decisions made for the old
+// width, clipping a sentence wrapped for a wider terminal instead of
 // re-wrapping it.
 func (m *Model) propagateSize() {
 	w, h := m.innerSize()
@@ -197,8 +197,7 @@ func (m *Model) helpContext() views.HelpContext {
 	return m.activeRS().helpContext
 }
 
-// updateActiveRS is the renderer-state equivalent of the former
-// updateActiveView: it routes messages that the active rs itself needs to
+// updateActiveRS routes messages that the active rs itself needs to
 // handle (viewport scrolling inside detail/text screens, search-widget keys,
 // and key events on list/menu screens).
 // Returns (tea.Model, tea.Cmd) to satisfy the Update signature.
@@ -361,15 +360,14 @@ func (m Model) handleDetailKeyMsg(msg tea.KeyMsg, rs *rendererState) (tea.Model,
 			// widget's filter-input mode here (mirroring its own filter-mode
 			// Enter) and re-syncing the controller keeps a later keypress on
 			// this detail screen from being trapped by the IsFiltering()
-			// routing gates in app_input.go (L48, L114). The filter TEXT and
+			// routing gates in app_input.go. The filter TEXT and
 			// its effect on the visible row set — including
 			// DetailState.RelatedCursor, see detail_cursor.go's ActionSetFilter
 			// case, which only resets the cursor on an actual text change —
 			// are left in place, so a Down made while filtering survives the
 			// confirm: the NEXT Enter (now non-filtering, below) navigates
 			// using that surviving cursor row. Only Escape clears the filter
-			// (see the Escape case above and
-			// TestBug_Root_RightColumnFilter_EscClearsConfirmedFilter).
+			// (see the Escape case above).
 			if prevFiltering {
 				rs.rightCol, _ = rs.rightCol.Update(msg)
 				m.ctrl.Apply(app.Action{Kind: app.ActionSetFilter, Arg: rs.rightCol.FilterQuery()})
@@ -387,8 +385,7 @@ func (m Model) handleDetailKeyMsg(msg tea.KeyMsg, rs *rendererState) (tea.Model,
 			// resolves IN PLACE — re-dispatching this resource's related checks.
 			// A truncated "(0+)" is RelatedResolved and navigates to a scoped list
 			// exactly like "(N+)"; resource.RelatedEnter is the single arbiter
-			// shared with the headless keyboard/mouse Enter paths, so the zero
-			// lower bound can never be special-cased into this no-op again.
+			// shared with the headless keyboard/mouse Enter paths.
 			if resource.RelatedEnter(row.State, row.Count, row.Truncated) == resource.RelatedEnterResolveInPlace {
 				res := m.ctrl.GetDetailResource()
 				rt := rs.resourceType
@@ -602,8 +599,7 @@ func (m Model) handleDetailKeyMsg(msg tea.KeyMsg, rs *rendererState) (tea.Model,
 
 // handleTextKeyMsg routes key events on a text screen (YAML, JSON, error log).
 // Search, scroll, and wrap keys are handled; all others fall through to the
-// viewport. This mirrors the key handling that YAMLModel.Update() performed
-// before the renderer-state stack architecture removed stored view models.
+// viewport.
 func (m Model) handleTextKeyMsg(msg tea.KeyMsg, rs *rendererState) (tea.Model, tea.Cmd) {
 	// Search input mode: capture all keys for the search widget.
 	// When input mode exits (Enter/Esc), sync the new state to the controller
@@ -668,8 +664,7 @@ func (m Model) handleTextKeyMsg(msg tea.KeyMsg, rs *rendererState) (tea.Model, t
 		return m, nil
 
 	case key.Matches(msg, m.keys.YAML):
-		// Toggle JSON -> YAML (ReplaceCurrent, mirroring the pre-refactor
-		// YAMLModel/JSONModel toggle). A no-op when already on YAML or on a
+		// Toggle JSON -> YAML (ReplaceCurrent). A no-op when already on YAML or on a
 		// non-YAML/JSON text screen (e.g. error log).
 		if screenID, ctx := m.ctrl.GetTextScreenContext(); screenID == runtime.ScreenJSON {
 			res := m.ctrl.GetTextResource()
@@ -716,7 +711,7 @@ func (m Model) handleTextKeyMsg(msg tea.KeyMsg, rs *rendererState) (tea.Model, t
 
 	case key.Matches(msg, m.keys.Describe):
 		// No-op on raw-text screens (error log) where there is no backing
-		// resource, mirroring the pre-refactor YAMLModel guard on rawText.
+		// resource.
 		if _, ctx := m.ctrl.GetTextScreenContext(); ctx.ResourceType != "" {
 			res := m.ctrl.GetTextResource()
 			return m, func() tea.Msg {

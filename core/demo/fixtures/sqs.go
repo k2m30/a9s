@@ -85,7 +85,7 @@ var sharedSQSFixtures = sync.OnceValue(func() *SQSFixtures {
 			},
 			// SQSPublicPolicy: the only queue whose access policy names a
 			// wildcard principal. Encrypted and with a redrive policy, so
-			// it trips that one row alone.
+			// it trips that one finding alone.
 			{
 				QueueURL:  sqsPublicPolicyQueueURL,
 				QueueName: SQSPublicPolicy,
@@ -99,7 +99,7 @@ var sharedSQSFixtures = sync.OnceValue(func() *SQSFixtures {
 				},
 			},
 			// SQSManagedSSE: encrypted by SQS with an AWS-owned key. A
-			// redrive policy keeps it off the missing-DLQ row, so the only
+			// redrive policy keeps it off the missing-DLQ finding, so the only
 			// thing this queue demonstrates is that managed encryption is
 			// encryption.
 			{

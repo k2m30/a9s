@@ -17,7 +17,7 @@ import (
 
 // trailLogBucketAPI is the pair of read-only S3 calls the log-bucket rows
 // need. Asserted off clients.S3 rather than folded into the aggregate, so a
-// client or fake that predates these rows still satisfies it.
+// client without these two calls still satisfies the aggregate.
 type trailLogBucketAPI interface {
 	S3GetBucketPolicyStatusAPI
 	S3GetBucketLoggingAPI

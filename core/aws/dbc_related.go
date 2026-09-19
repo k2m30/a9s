@@ -119,7 +119,6 @@ func dbcClusterMasterSecretARN(raw any) string {
 
 // checkDbcSG reads VpcSecurityGroups[] from the DBCluster RawStruct and returns their IDs.
 // Handles both docdb_types.DBCluster and rdstypes.DBCluster shapes.
-// Pattern F — no cache needed.
 func checkDbcSG(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	ids, ok := dbcClusterVpcSecurityGroupIDs(res.RawStruct)
 	if !ok {
@@ -133,14 +132,12 @@ func checkDbcSG(_ context.Context, _ any, res resource.Resource, _ resource.Reso
 
 // checkDbcAlarm searches the alarm cache for alarms with a "DBClusterIdentifier" dimension
 // matching this DocumentDB cluster's identifier.
-// Pattern D — dimension-based lookup.
 func checkDbcAlarm(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	return alarmIDsByDimension(ctx, clients, cache, "", "DBClusterIdentifier", res.ID)
 }
 
 // checkDbcLogs searches the logs cache for log groups matching the DocumentDB cluster's
 // naming convention: /aws/docdb/{clusterID}/audit or /aws/docdb/{clusterID}/profiler.
-// Pattern N — naming convention.
 func checkDbcLogs(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	clusterID := res.ID
 	if clusterID == "" {
@@ -241,11 +238,11 @@ func checkDbcDbcSnap(ctx context.Context, clients any, res resource.Resource, ca
 }
 
 // checkDbcSubnet resolves the subnets inside the cluster's DBSubnetGroup via
-// a single DescribeDBSubnetGroups call (Pattern C — live API). The DBCluster
+// a single DescribeDBSubnetGroups call (live API). The DBCluster
 // response only carries the subnet-group name; this call resolves it to the
 // concrete Subnets slice. For rdstypes.DBCluster (Aurora) shapes the call goes
 // to c.RDS; for docdb_types.DBCluster shapes it goes to c.DocDB.
-// See docs/resources/dbc.md §1 Coverage.
+// See docs/resources/dbc.md.
 func checkDbcSubnet(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	sng, err := dbcSubnetGroup(ctx, clients, res)
 	if err != nil {
@@ -264,7 +261,7 @@ func checkDbcSubnet(ctx context.Context, clients any, res resource.Resource, _ r
 }
 
 // checkDbcVPC resolves the VPC that hosts the cluster's subnet group via a
-// single DescribeDBSubnetGroups call (Pattern C). Engine dispatch mirrors
+// single DescribeDBSubnetGroups call. Engine dispatch mirrors
 // checkDbcSubnet — Aurora rows use c.RDS, DocDB rows use c.DocDB.
 func checkDbcVPC(ctx context.Context, clients any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	sng, err := dbcSubnetGroup(ctx, clients, res)
@@ -286,7 +283,7 @@ func checkDbcVPC(ctx context.Context, clients any, res resource.Resource, _ reso
 //   - docdb_types.DBCluster → dbcDocDBSubnetGroup (DocumentDB; DocDB API)
 //
 // A nil group with a nil error means the cluster names no subnet group, or the
-// named group no longer exists; an error means the describe could not be made
+// named group does not exist; an error means the describe could not be made
 // or failed.
 func dbcSubnetGroup(ctx context.Context, clients any, res resource.Resource) (*dbcSubnetGroupInfo, error) {
 	if _, ok := assertStruct[rdstypes.DBCluster](res.RawStruct); ok {
@@ -400,7 +397,6 @@ func checkDbcSecrets(ctx context.Context, clients any, res resource.Resource, ca
 // checkDbcKMS extracts the KMS key from the DBCluster's KmsKeyId field.
 // KmsKeyId is a KMS key ARN. Returns the key ID (last segment after "/").
 // Handles both docdb_types.DBCluster and rdstypes.DBCluster shapes.
-// Pattern F — no cache needed.
 func checkDbcKMS(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	keyID := dbcClusterKmsKeyID(res.RawStruct)
 	if keyID == "" {
@@ -412,11 +408,11 @@ func checkDbcKMS(ctx context.Context, clients any, res resource.Resource, cache 
 
 // checkDbcCTEvents looks up cached CloudTrail events for the cluster's
 // DBClusterIdentifier. Universal pivot — every registered type gets one;
-// see docs/related-resources.md §Policy. FetchFilter["ResourceName"] is always
+// see the Policy section of docs/related-resources.md. FetchFilter["ResourceName"] is always
 // set so the caller can do a filtered re-fetch; Count is "unknown" (windowed)
-// per the spec — the panel renders the visible page count rather than a total.
+// — the panel renders the visible page count rather than a total.
 // ResourceType is "AWS::RDS::DBCluster" — both DocDB and Aurora clusters share
-// this CloudTrail resource type (docs/resources/dbc.md §2 ct-events).
+// this CloudTrail resource type (docs/resources/dbc.md).
 // Built via BuildCTEventsPivotChecker — see ct_events_pivot.go for the shared logic.
 var checkDbcCTEvents = BuildCTEventsPivotChecker(CTEventsPivotConfig{
 	IDExtractor: func(res resource.Resource) string {

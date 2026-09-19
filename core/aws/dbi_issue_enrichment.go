@@ -24,8 +24,8 @@ const (
 
 // EnrichDBIMaintenance calls DescribePendingMaintenanceActions (account-wide, paginated)
 // and emits one Finding per dbi instance with pending maintenance. Severity "~"
-// (Wave 2 ~ does not bump the S1 menu badge). The merged
-// S4 status phrase (e.g. "maintenance scheduled" alone, or "stopped (+1)" stacked
+// (Wave 2 ~ does not bump the main-menu badge). The merged
+// status phrase (e.g. "maintenance scheduled" alone, or "stopped (+1)" stacked
 // over a Wave-1 finding) is computed at render time from r.Findings via
 // domain.StatusPhrase; this enricher only emits Findings.
 func EnrichDBIMaintenance(ctx context.Context, clients *ServiceClients, resources []resource.Resource, cache resource.ResourceCache) (IssueEnricherResult, error) {
@@ -53,10 +53,7 @@ func EnrichDBIMaintenance(ctx context.Context, clients *ServiceClients, resource
 		return result, tagErr
 	}
 
-	// Deterministic ARN-suffix matching via ordered probeIDs. There is no
-	// parallel statusByID map: the merged S4 phrase (single-finding or
-	// Wave-1+Wave-2 stacked) is computed at render time from r.Findings, so
-	// the enricher does not read the fetcher's status overlay here.
+	// Deterministic ARN-suffix matching via ordered probeIDs.
 	probeIDs := make([]string, 0, len(resources))
 	for _, r := range resources {
 		if r.ID != "" {
@@ -102,7 +99,7 @@ func EnrichDBIMaintenance(ctx context.Context, clients *ServiceClients, resource
 			continue
 		}
 
-		// Summary is the short S5 phrase; every concrete fact (Action,
+		// Summary is the short operator phrase; every concrete fact (Action,
 		// Description, Earliest Target, Apply Method) lives only in Rows so
 		// the Attention section does not render duplicated content.
 		var rows []domain.DetailRow
@@ -138,7 +135,7 @@ func EnrichDBIMaintenance(ctx context.Context, clients *ServiceClients, resource
 // (engine, version) pair across the instances — the pairs repeat heavily in
 // a real fleet, so the per-run cache turns an N-instance walk into a handful
 // of calls — and emits the deprecated-engine finding for every instance on a
-// version AWS no longer lists as available.
+// version AWS does not list as available.
 func enrichDBIEngineVersions(ctx context.Context, clients *ServiceClients, resources []resource.Resource, result *IssueEnricherResult) error {
 	resources = capAtEnrichmentCap(result, resources, func(r resource.Resource) bool {
 		_, ok := assertStruct[rdstypes.DBInstance](r.RawStruct)

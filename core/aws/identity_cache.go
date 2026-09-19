@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
 
 // identity_cache.go provides a session-scoped lookup for the caller's AWS
-// account ID. Used by related-panel Pattern C checkers that need to construct
+// account ID. Used by related-panel checkers that need to construct
 // resource ARNs for APIs like Backup ListRecoveryPointsByResource and Glue
 // GetTags (region for those ARNs comes from ServiceClients.Region).
 //
@@ -10,7 +10,7 @@
 // when the info cannot be resolved; an honest UnknownRelated result follows.
 //
 // Concurrency note: no top-level lock is held across the
-// "check store / fetch / set" sequence. Two concurrent Pattern C checks may
+// "check store / fetch / set" sequence. Two concurrent checks may
 // both observe AccountID()=="" + Err()==nil and both invoke
 // STS.GetCallerIdentity. The store itself remains correct; duplicate Set
 // calls are last-write-wins on identical successful results. Acceptable

@@ -26,8 +26,8 @@ func checkGlueRole(ctx context.Context, clients any, res resource.Resource, cach
 	if job.Role == nil || *job.Role == "" {
 		return resource.KnownRelated("role", nil, false)
 	}
-	// In-body: the job's Role ARN normalizes to the role name (== the role's
-	// Resource.ID). Resolve by identity — no role-list fetch.
+	// The job's Role ARN normalizes to the role name, which is the role's
+	// Resource.ID, so it resolves by identity.
 	return relatedRefs("role", []string{*job.Role}, refContext(clients, cache, "role"))
 }
 
@@ -42,7 +42,7 @@ func checkGlueAlarms(ctx context.Context, clients any, res resource.Resource, ca
 }
 
 // checkGlueLogs searches the logs cache for the shared Glue job log groups.
-// Pattern N — Glue jobs write to /aws-glue/jobs/output and /aws-glue/jobs/error
+// Glue jobs write to /aws-glue/jobs/output and /aws-glue/jobs/error
 // regardless of job name (shared log groups across all Glue jobs in the account).
 func checkGlueLogs(ctx context.Context, clients any, _ resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	logList, truncated, err := relatedResourcesFor(ctx, clients, cache, "logs")
@@ -63,7 +63,7 @@ func checkGlueLogs(ctx context.Context, clients any, _ resource.Resource, cache 
 }
 
 // checkGlueCFN calls glue:GetTags(resourceArn) and looks up the
-// aws:cloudformation:stack-name tag in the cfn cache. Pattern C.
+// aws:cloudformation:stack-name tag in the cfn cache.
 // Job ARN: arn:<partition>:glue:REGION:ACCOUNT:job/NAME.
 func checkGlueCFN(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	jobName := res.ID
@@ -133,8 +133,7 @@ func checkGlueS3(_ context.Context, clients any, res resource.Resource, cache re
 
 // checkGlueKMS calls glue:GetSecurityConfiguration(name=Job.SecurityConfiguration)
 // and extracts the KMS key ARNs from the encryption blocks (S3/CloudWatch/
-// JobBookmarks). Pattern C — single API call per checker. When the job has
-// no SecurityConfiguration, Count: 0.
+// JobBookmarks). When the job has no SecurityConfiguration, Count: 0.
 func checkGlueKMS(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	job, ok := assertStruct[gluetypes.Job](res.RawStruct)
 	if !ok {
@@ -179,9 +178,9 @@ func checkGlueKMS(ctx context.Context, clients any, res resource.Resource, cache
 	return kmsRelated(ctx, clients, cache, refs)
 }
 
-// checkGlueAthena scans the athena cache for workgroups whose enriched
-// Fields["glue_database"] (future enrichment) references this job's database
-// targets, falling back to Count: 0 when no match is found. Uses the cache.
+// checkGlueAthena scans the athena cache for workgroups whose
+// Fields["glue_job"] or ID equals this job's name, falling back to
+// Count: 0 when no match is found.
 func checkGlueAthena(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	jobName := res.ID
 	if jobName == "" {
@@ -196,8 +195,6 @@ func checkGlueAthena(ctx context.Context, clients any, res resource.Resource, ca
 	}
 	var ids []string
 	for _, wg := range wgList {
-		// Any workgroup tagged/named with the same job name is a convention
-		// signal. Without enrichment the cache typically yields no match.
 		if wg.Fields["glue_job"] == jobName || wg.ID == jobName {
 			ids = append(ids, wg.ID)
 		}
@@ -207,7 +204,7 @@ func checkGlueAthena(ctx context.Context, clients any, res resource.Resource, ca
 
 // checkGlueSecrets scans the job's DefaultArguments (on the RawStruct) for
 // values that look like Secrets Manager references (arn:aws:secretsmanager:
-// prefix). Uses res.RawStruct — no cache needed.
+// prefix).
 func checkGlueSecrets(_ context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	job, ok := assertStruct[gluetypes.Job](res.RawStruct)
 	if !ok {

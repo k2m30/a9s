@@ -9,9 +9,9 @@ import (
 	"github.com/k2m30/a9s/v3/core/runtime"
 )
 
-// buildListFooterHints builds the footer key hints for a resource-list screen,
-// ported faithfully from ResourceListModel.BottomHints() so the controller is
-// the single source of truth for all renderers. Callers must hold c.mu.
+// buildListFooterHints builds the footer key hints for a resource-list
+// screen; the controller is the single source of truth for all renderers.
+// Callers must hold c.mu.
 func (c *Controller) buildListFooterHints(ctx runtime.ScreenContext, ls *ListState) []KeyHint {
 	var hints []KeyHint
 
@@ -101,10 +101,10 @@ func (c *Controller) buildTextFooterHints(screenID runtime.ScreenID, ctx runtime
 	return hints
 }
 
-// buildDetailFooterHints builds the footer key hints for a detail screen.
-// Ported faithfully from DetailModel.BottomHints() so the controller is
-// the single source of truth for all renderers. Uses the controller-owned
-// FieldCursor and RelatedRows/RelatedFocus state in ds. Callers must hold c.mu.
+// buildDetailFooterHints builds the footer key hints for a detail screen;
+// the controller is the single source of truth for all renderers. Uses the
+// controller-owned FieldCursor and RelatedRows/RelatedFocus state in ds.
+// Callers must hold c.mu.
 func (c *Controller) buildDetailFooterHints(ds *DetailState) []KeyHint {
 	var hints []KeyHint
 
@@ -160,8 +160,8 @@ func (c *Controller) buildDetailFooterHints(ds *DetailState) []KeyHint {
 	// Related panel hints.
 	if related := resource.GetRelated(ds.ResourceType); len(related) > 0 {
 		hints = append(hints, KeyHint{Key: "r", Help: "Related"})
-		// "tab: Cols" only when user explicitly toggled the panel on —
-		// mirrors DetailModel.BottomHints which checks m.rightColVisible (not auto-shown).
+		// "tab: Cols" only when the user explicitly toggled the panel on,
+		// not when it was auto-shown.
 		if ds.RelatedUserVisible {
 			hints = append(hints, KeyHint{Key: "tab", Help: "Cols"})
 		}

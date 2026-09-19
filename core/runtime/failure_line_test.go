@@ -22,7 +22,7 @@ func regionGapChainErr() error {
 			Err: &net.DNSError{Err: "no such host", Name: "codeartifact.eu-central-2.amazonaws.com", IsNotFound: true}})
 }
 
-// TestSoftFailure_RoutesOnTheClass pins spec row 2 for the prefetch sweep: a
+// In the prefetch sweep a
 // region gap goes to the error log because the class says so, not because a
 // second predicate agreed with the class by luck. Rows already on screen are
 // the other soft case.
@@ -45,7 +45,7 @@ func TestSoftFailure_RoutesOnTheClass(t *testing.T) {
 	}
 }
 
-// TestFailureLine_OneSentence pins spec row 3 at its source: subject, then the
+// The failure line is the subject, then the
 // cause the class supplies, with the region named only when the class is about
 // the region.
 func TestFailureLine_OneSentence(t *testing.T) {
@@ -71,7 +71,7 @@ func TestFailureLine_OneSentence(t *testing.T) {
 	}
 }
 
-// TestFailureLine_SubjectSaidOnce pins the status bar's stutter: the aggregate
+// The aggregate
 // a fetcher returns labels itself with the resource type, and the subject the
 // handler passes ends with that same type; said twice, the line would read
 // "availability ec2: ec2: DescribeInstances failed for ...".
@@ -94,7 +94,7 @@ func TestFailureLine_SubjectSaidOnce(t *testing.T) {
 	}
 }
 
-// TestFailureLine_OneLine pins that the sentence stays one line. An enricher
+// An enricher
 // that runs two passes joins their aggregates with errors.Join, whose text
 // carries a newline; the status bar is one line, and a line break in it drops
 // the second pass off the screen.

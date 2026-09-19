@@ -5,13 +5,8 @@
 // AggregateFailures and AggregateMissing implement the canonical composite
 // error format for partial-batch AWS operations. Every fetcher, checker, and
 // enricher that iterates and describes per-item MUST use one of these helpers
-// to surface per-item failures while preserving partial success (silent-skip
-// ban, error-handling rules E2, E3, E5).
-//
-// Why this exists: before this helper, each FetchByIDs function inlined its
-// own composite-error format. Any divergence in format caused test assertions
-// to break when the wording drifted. Centralising here guarantees a single
-// format that tests can pin on.
+// to surface per-item failures while preserving partial success. One helper
+// gives a single format tests can pin on.
 package aws
 
 import (
@@ -406,10 +401,7 @@ func ClassifyAWSError(err error) (code string, message string, retryable bool) {
 
 // awsCodeClass is the one AWS-error-code table in a9s: which class each code
 // a9s recognises belongs to. ErrClass reads it for the word every surface
-// phrases, ClassifyAWSError reads it for the retry decision. They were two
-// lists once, and they drifted — SlowDown was retryable but classified as a
-// generic error, and UnauthorizedOperation, EC2's spelling of access denied,
-// was in neither.
+// phrases, ClassifyAWSError reads it for the retry decision.
 //
 // A code outside this table is passed through by ErrClass as itself: a9s says
 // nothing about it beyond the code AWS wrote.
@@ -617,9 +609,7 @@ func MessageOf(err error) string {
 
 // LocalConfigFailure is the whole sentence for a failed read of the local AWS
 // config file: the file named, then its own words. Callers flash exactly what
-// it returns and add nothing — two surfaces each gluing their own prefix onto
-// a shared fragment is how one unreadable file came to read two different ways
-// depending on which lane the operator met it through.
+// it returns and add nothing, so the file reads the same on every lane.
 //
 // MessageOf, not CauseOf: CauseOf answers from the AWS error-class table,
 // which has no word for a local file. An *fs.PathError satisfies net.Error, so

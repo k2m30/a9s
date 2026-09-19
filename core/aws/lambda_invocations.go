@@ -153,7 +153,6 @@ func convertReportEvent(event cwlogstypes.FilteredLogEvent, logGroup string) (re
 		message = *event.Message
 	}
 
-	// Only parse REPORT lines
 	matches := reportRegex.FindStringSubmatch(message)
 	if matches == nil {
 		return resource.Resource{}, false
@@ -165,11 +164,9 @@ func convertReportEvent(event cwlogstypes.FilteredLogEvent, logGroup string) (re
 	memorySizeMB := matches[4]
 	memoryUsedMB := matches[5]
 
-	// Format duration: strip trailing .00
 	formattedDuration := formatDuration(durationMs)
 	formattedBilled := formatDuration(billedDurationMs)
 
-	// Timestamp
 	ts := ""
 	if event.Timestamp != nil {
 		ts = formatEpochMillis(*event.Timestamp)
@@ -183,25 +180,21 @@ func convertReportEvent(event cwlogstypes.FilteredLogEvent, logGroup string) (re
 		initDurationMs = formatDuration(initMatch[1])
 	}
 
-	// XRAY trace
 	xrayTraceID := ""
 	if xrayMatch := xrayTraceRegex.FindStringSubmatch(message); xrayMatch != nil {
 		xrayTraceID = xrayMatch[1]
 	}
 
-	// Status detection
 	status := "OK"
 	if timeoutRegex.MatchString(message) {
 		status = "TIMEOUT"
 	}
 
-	// Name: truncated request ID (first 8 chars)
 	name := requestID
 	if len(name) > 8 {
 		name = name[:8]
 	}
 
-	// Memory used display: "used/total MB"
 	memoryUsed := memoryUsedMB + "/" + memorySizeMB + " MB"
 
 	logStream := ""

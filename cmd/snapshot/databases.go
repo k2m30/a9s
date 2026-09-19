@@ -245,7 +245,7 @@ func combineDBCClusters(docdbRows []dbcCluster, docdbErr error, rdsRows []dbcClu
 
 // dedupDBCByID dedups by DBClusterIdentifier, first-occurrence-wins, matching
 // the a9s fetcher contract (docdb concatenated first, then rds) documented in
-// docs/resources/dbc.md §1.
+// docs/resources/dbc.md.
 func dedupDBCByID(in []dbcCluster) []dbcCluster {
 	seen := make(map[string]bool, len(in))
 	out := make([]dbcCluster, 0, len(in))
@@ -469,7 +469,7 @@ func combineDBCSnapshots(docdbRows []dbcSnapshot, docdbErr error, rdsRows []dbcS
 
 // dedupDBCSnapByID dedups by DBClusterSnapshotIdentifier, first-occurrence-wins
 // (docdb-side concatenated first), matching the fetcher contract in
-// docs/resources/dbc-snap.md §1.
+// docs/resources/dbc-snap.md.
 func dedupDBCSnapByID(in []dbcSnapshot) []dbcSnapshot {
 	seen := make(map[string]bool, len(in))
 	out := make([]dbcSnapshot, 0, len(in))

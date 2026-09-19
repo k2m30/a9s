@@ -16,9 +16,9 @@ type RedshiftFixtures struct {
 	Clusters []redshifttypes.Cluster
 }
 
-// Stable IDs for Redshift fixtures — imported by sibling fixture files and QA tests.
+// Stable IDs for Redshift fixtures — imported by sibling fixture files and tests.
 const (
-	// One witness per Wave-2 posture finding. Every other cluster has audit
+	// One carrier per Wave-2 posture finding. Every other cluster has audit
 	// logging on and a parameter group that requires SSL.
 
 	// RedshiftAuditLoggingOff is the cluster with audit logging turned off.
@@ -27,7 +27,7 @@ const (
 	// require_ssl false.
 	RedshiftRequireSSLOff = "redshift-require-ssl-off"
 	// RedshiftSecureParameterGroup requires SSL; RedshiftOpenParameterGroup
-	// does not. Every cluster but the require-ssl witness uses the secure one.
+	// does not. Every cluster but RedshiftRequireSSLOff uses the secure one.
 	RedshiftSecureParameterGroup = "redshift-secure-params"
 	RedshiftOpenParameterGroup   = "redshift-open-params"
 
@@ -67,23 +67,21 @@ const (
 	RedshiftMaintenanceDeferredID = "redshift-maintenance-deferred"
 	// The negative control for RedshiftMaintenanceDeferredID: a deferral whose
 	// window has run out, which reports nothing. The ID shares no prefix with
-	// the active fixture so `findRow("redshift-maintenance-deferred")` in
-	// scenario tests picks that one and not this.
+	// the active fixture, so a prefix match on one never finds the other.
 	RedshiftDeferralLapsedID     = "redshift-deferral-lapsed"
 	RedshiftPubliclyAccessibleID = "redshift-publicly-accessible"
 	RedshiftUnencryptedID        = "redshift-unencrypted"
 
-	// Multi-finding (rule 7)
+	// Multi-finding
 	WarnRedshiftMultiID = "warn-redshift-multi"
 	WarnRedshiftTwoID   = "warn-redshift-two"
 
-	// Severity-precedence vehicles (U8)
 	// Severity-precedence fixture IDs — kept under 36 chars so the list-view Cluster ID
 	// column renders the full identifier without ellipsis truncation.
 	RedshiftBrokenWithWarningHiddenID           = "redshift-broken-w-hidden-warn"
 	RedshiftAvailUnavailableWithWarningHiddenID = "redshift-unavail-w-hidden-warn"
 
-	// Security group IDs used by the graph-root fixtures — referenced by ec2.go sibling additions.
+	// Security group IDs used by the graph-root fixtures — referenced by ec2.go.
 	RedshiftWarehouseSGID1 = "sg-warehouse-1"
 	RedshiftWarehouseSGID2 = "sg-warehouse-2"
 	RedshiftReportingSGID1 = "sg-reporting-1"
@@ -113,15 +111,11 @@ const (
 	// S3 audit bucket for acme-reporting (S3-logging graph-root).
 	RedshiftAuditBucket = "acme-redshift-audit"
 
-	// internal helpers — not exported, used within this file only.
-	redshiftProdVPCID    = fixtProdVPCID    // "vpc-0abc123def456789a"
-	redshiftStagingVPCID = fixtStagingVPCID // "vpc-0def456789abc123d"
+	redshiftProdVPCID    = fixtProdVPCID
+	redshiftStagingVPCID = fixtStagingVPCID
 )
 
 // NewRedshiftFixtures constructs RedshiftFixtures from the canonical demo data.
-// Every fixture in docs/historical/resources-impl-plans/redshift-impl-plan.md §2 is present.
-// Adversarial fixtures (nil-pointer Cluster, malformed Tags) are excluded —
-// those live inline in QA test files per the a9s-create-demo-fixture skill rule.
 var sharedRedshiftFixtures = sync.OnceValue(func() *RedshiftFixtures {
 	return &RedshiftFixtures{
 		Clusters: normalizeRedshiftParameterGroups(buildRedshiftClusters()),
@@ -147,7 +141,7 @@ func NewRedshiftFixtures() *RedshiftFixtures {
 }
 
 // redshiftBaselineHealthy returns a fully-configured Redshift cluster with all
-// spec §4 fields set to healthy values. Callers mutate specific fields to
+// health fields set to healthy values. Callers mutate specific fields to
 // produce issue-state variants.
 func redshiftBaselineHealthy(id string) redshifttypes.Cluster {
 	return redshifttypes.Cluster{
@@ -173,7 +167,7 @@ func redshiftBaselineHealthy(id string) redshifttypes.Cluster {
 }
 
 // normalizeRedshiftParameterGroups attaches a parameter group to every
-// cluster: the secure one everywhere except the require-ssl witness, which
+// cluster: the secure one everywhere except RedshiftRequireSSLOff, which
 // gets the open one. Without this the fixture set would have no parameter
 // group at all and the require_ssl check would read every cluster as unknown.
 func normalizeRedshiftParameterGroups(cs []redshifttypes.Cluster) []redshifttypes.Cluster {
@@ -193,10 +187,8 @@ func normalizeRedshiftParameterGroups(cs []redshifttypes.Cluster) []redshifttype
 }
 
 func buildRedshiftClusters() []redshifttypes.Cluster {
-	// -----------------------------------------------------------------------
-	// 1. acme-warehouse — Healthy, CloudWatch-logging graph-root (U9 §5.1)
+	// acme-warehouse — Healthy, CloudWatch-logging graph root.
 	// Covers: alarm, cfn, kms, logs, role, secrets, sg, subnet, vpc, ct-events
-	// -----------------------------------------------------------------------
 	warehouse := redshifttypes.Cluster{
 		ClusterIdentifier:         aws.String(AcmeWarehouseID),
 		ClusterStatus:             aws.String("available"),
@@ -232,11 +224,9 @@ func buildRedshiftClusters() []redshifttypes.Cluster {
 		},
 	}
 
-	// -----------------------------------------------------------------------
-	// 2. acme-reporting — Healthy, S3-logging graph-root (U9 §5.1)
+	// acme-reporting — Healthy, S3-logging graph root.
 	// Covers: alarm, cfn, kms, role, secrets, s3, sg, subnet, vpc, ct-events
 	// (logs=0 by design — S3 logging means no CW log groups)
-	// -----------------------------------------------------------------------
 	reporting := redshifttypes.Cluster{
 		ClusterIdentifier:         aws.String(AcmeReportingID),
 		ClusterStatus:             aws.String("available"),
@@ -271,9 +261,7 @@ func buildRedshiftClusters() []redshifttypes.Cluster {
 		},
 	}
 
-	// -----------------------------------------------------------------------
-	// 3. staging-dwh — ClusterStatus=paused (Out of Scope → treated Healthy)
-	// -----------------------------------------------------------------------
+	// staging-dwh — ClusterStatus=paused (treated Healthy).
 	stagingDwh := redshifttypes.Cluster{
 		ClusterIdentifier:         aws.String(StagingDwhID),
 		ClusterStatus:             aws.String("paused"),
@@ -295,54 +283,40 @@ func buildRedshiftClusters() []redshifttypes.Cluster {
 		},
 	}
 
-	// -----------------------------------------------------------------------
-	// 4. redshift-resizing — ClusterStatus=resizing → Warning
-	// -----------------------------------------------------------------------
+	// redshift-resizing — ClusterStatus=resizing → Warning
 	resizing := redshiftBaselineHealthy(RedshiftResizingID)
 	resizing.ClusterStatus = aws.String("resizing")
 	resizing.NumberOfNodes = aws.Int32(4)
 	resizing.DBName = aws.String("analytics")
 	resizing.ClusterCreateTime = aws.Time(mustParseRedshiftTime("2025-05-01T10:00:00Z"))
 
-	// -----------------------------------------------------------------------
-	// 5. redshift-rebooting — ClusterStatus=rebooting → Warning
-	// -----------------------------------------------------------------------
+	// redshift-rebooting — ClusterStatus=rebooting → Warning
 	rebooting := redshiftBaselineHealthy(RedshiftRebootingID)
 	rebooting.ClusterStatus = aws.String("rebooting")
 	rebooting.ClusterCreateTime = aws.Time(mustParseRedshiftTime("2025-08-12T09:00:00Z"))
 
-	// -----------------------------------------------------------------------
-	// 5b. redshift-creating — ClusterStatus=creating → Warning
-	// -----------------------------------------------------------------------
+	// redshift-creating — ClusterStatus=creating → Warning
 	creating := redshiftBaselineHealthy(RedshiftCreatingID)
 	creating.ClusterStatus = aws.String("creating")
 	creating.ClusterCreateTime = aws.Time(mustParseRedshiftTime("2026-04-20T09:00:00Z"))
 	creating.Endpoint = nil
 
-	// -----------------------------------------------------------------------
-	// 5c. redshift-modifying — ClusterStatus=modifying → Warning
-	// -----------------------------------------------------------------------
+	// redshift-modifying — ClusterStatus=modifying → Warning
 	modifyingCluster := redshiftBaselineHealthy(RedshiftModifyingID)
 	modifyingCluster.ClusterStatus = aws.String("modifying")
 	modifyingCluster.ClusterCreateTime = aws.Time(mustParseRedshiftTime("2025-10-01T09:00:00Z"))
 
-	// -----------------------------------------------------------------------
-	// 5d. redshift-renaming — ClusterStatus=renaming → Warning
-	// -----------------------------------------------------------------------
+	// redshift-renaming — ClusterStatus=renaming → Warning
 	renaming := redshiftBaselineHealthy(RedshiftRenamingID)
 	renaming.ClusterStatus = aws.String("renaming")
 	renaming.ClusterCreateTime = aws.Time(mustParseRedshiftTime("2025-06-18T13:00:00Z"))
 
-	// -----------------------------------------------------------------------
-	// 5e. redshift-deleting — ClusterStatus=deleting → Warning
-	// -----------------------------------------------------------------------
+	// redshift-deleting — ClusterStatus=deleting → Warning
 	deletingCluster := redshiftBaselineHealthy(RedshiftDeletingID)
 	deletingCluster.ClusterStatus = aws.String("deleting")
 	deletingCluster.ClusterCreateTime = aws.Time(mustParseRedshiftTime("2025-02-14T15:00:00Z"))
 
-	// -----------------------------------------------------------------------
-	// 6. redshift-incompatible-network — ClusterStatus=incompatible-network → Broken
-	// -----------------------------------------------------------------------
+	// redshift-incompatible-network — ClusterStatus=incompatible-network → Broken
 	incompatNet := redshiftBaselineHealthy(RedshiftIncompatibleNetworkID)
 	incompatNet.ClusterStatus = aws.String("incompatible-network")
 	incompatNet.NumberOfNodes = aws.Int32(2)
@@ -351,91 +325,69 @@ func buildRedshiftClusters() []redshifttypes.Cluster {
 	incompatNet.AvailabilityZone = aws.String("us-east-1b")
 	incompatNet.Endpoint = nil
 
-	// -----------------------------------------------------------------------
-	// 6b. redshift-incompatible-hsm — ClusterStatus=incompatible-hsm → Broken
-	// -----------------------------------------------------------------------
+	// redshift-incompatible-hsm — ClusterStatus=incompatible-hsm → Broken
 	incompatHSM := redshiftBaselineHealthy(RedshiftIncompatibleHSMID)
 	incompatHSM.ClusterStatus = aws.String("incompatible-hsm")
 	incompatHSM.DBName = aws.String("secure")
 	incompatHSM.ClusterCreateTime = aws.Time(mustParseRedshiftTime("2025-11-15T09:00:00Z"))
 	incompatHSM.Endpoint = nil
 
-	// -----------------------------------------------------------------------
-	// 6c. redshift-incompatible-params — ClusterStatus=incompatible-parameters → Broken
-	// -----------------------------------------------------------------------
+	// redshift-incompatible-params — ClusterStatus=incompatible-parameters → Broken
 	incompatParams := redshiftBaselineHealthy(RedshiftIncompatibleParamsID)
 	incompatParams.ClusterStatus = aws.String("incompatible-parameters")
 	incompatParams.DBName = aws.String("analytics")
 	incompatParams.ClusterCreateTime = aws.Time(mustParseRedshiftTime("2025-12-05T10:00:00Z"))
 	incompatParams.Endpoint = nil
 
-	// -----------------------------------------------------------------------
-	// 6d. redshift-incompatible-restore — ClusterStatus=incompatible-restore → Broken
-	// -----------------------------------------------------------------------
+	// redshift-incompatible-restore — ClusterStatus=incompatible-restore → Broken
 	incompatRestore := redshiftBaselineHealthy(RedshiftIncompatibleRestoreID)
 	incompatRestore.ClusterStatus = aws.String("incompatible-restore")
 	incompatRestore.DBName = aws.String("restored")
 	incompatRestore.ClusterCreateTime = aws.Time(mustParseRedshiftTime("2026-01-20T08:00:00Z"))
 	incompatRestore.Endpoint = nil
 
-	// -----------------------------------------------------------------------
-	// 7. redshift-hardware-failure — ClusterStatus=hardware-failure → Broken
-	// -----------------------------------------------------------------------
+	// redshift-hardware-failure — ClusterStatus=hardware-failure → Broken
 	hwFailure := redshiftBaselineHealthy(RedshiftHardwareFailureID)
 	hwFailure.ClusterStatus = aws.String("hardware-failure")
 	hwFailure.ClusterCreateTime = aws.Time(mustParseRedshiftTime("2025-09-20T14:00:00Z"))
 	hwFailure.Endpoint = nil
 
-	// -----------------------------------------------------------------------
-	// 8. redshift-storage-full — ClusterStatus=storage-full → Broken
-	// -----------------------------------------------------------------------
+	// redshift-storage-full — ClusterStatus=storage-full → Broken
 	storageFull := redshiftBaselineHealthy(RedshiftStorageFullID)
 	storageFull.ClusterStatus = aws.String("storage-full")
 	storageFull.NodeType = aws.String("dc2.large")
 	storageFull.DBName = aws.String("dwh")
 	storageFull.ClusterCreateTime = aws.Time(mustParseRedshiftTime("2025-08-20T14:00:00Z"))
 
-	// -----------------------------------------------------------------------
-	// 9. redshift-avail-unavailable — ClusterAvailabilityStatus=Unavailable → Broken
-	// -----------------------------------------------------------------------
+	// redshift-avail-unavailable — ClusterAvailabilityStatus=Unavailable → Broken
 	availUnavailable := redshiftBaselineHealthy(RedshiftAvailUnavailableID)
 	availUnavailable.ClusterAvailabilityStatus = aws.String("Unavailable")
 	availUnavailable.ClusterCreateTime = aws.Time(mustParseRedshiftTime("2025-12-01T10:00:00Z"))
 
-	// -----------------------------------------------------------------------
-	// 10. redshift-avail-failed — ClusterAvailabilityStatus=Failed → Broken
-	// -----------------------------------------------------------------------
+	// redshift-avail-failed — ClusterAvailabilityStatus=Failed → Broken
 	availFailed := redshiftBaselineHealthy(RedshiftAvailFailedID)
 	availFailed.ClusterAvailabilityStatus = aws.String("Failed")
 	availFailed.ClusterCreateTime = aws.Time(mustParseRedshiftTime("2026-01-15T09:00:00Z"))
 
-	// -----------------------------------------------------------------------
-	// 11. redshift-avail-maintenance — ClusterAvailabilityStatus=Maintenance → Warning
-	// -----------------------------------------------------------------------
+	// redshift-avail-maintenance — ClusterAvailabilityStatus=Maintenance → Warning
 	availMaint := redshiftBaselineHealthy(RedshiftAvailMaintenanceID)
 	availMaint.ClusterAvailabilityStatus = aws.String("Maintenance")
 	availMaint.ClusterCreateTime = aws.Time(mustParseRedshiftTime("2025-07-10T11:00:00Z"))
 
-	// -----------------------------------------------------------------------
-	// 12. redshift-avail-modifying — ClusterAvailabilityStatus=Modifying → Warning
-	// -----------------------------------------------------------------------
+	// redshift-avail-modifying — ClusterAvailabilityStatus=Modifying → Warning
 	availModifying := redshiftBaselineHealthy(RedshiftAvailModifyingID)
 	availModifying.ClusterAvailabilityStatus = aws.String("Modifying")
 	availModifying.ClusterCreateTime = aws.Time(mustParseRedshiftTime("2025-06-20T16:00:00Z"))
 
-	// -----------------------------------------------------------------------
-	// 13. redshift-pending-change — PendingModifiedValues.NodeType set → Warning
-	// -----------------------------------------------------------------------
+	// redshift-pending-change — PendingModifiedValues.NodeType set → Warning
 	pendingChange := redshiftBaselineHealthy(RedshiftPendingChangeID)
 	pendingChange.PendingModifiedValues = &redshifttypes.PendingModifiedValues{
 		NodeType: aws.String("ra3.4xlarge"),
 	}
 	pendingChange.ClusterCreateTime = aws.Time(mustParseRedshiftTime("2025-04-01T08:00:00Z"))
 
-	// -----------------------------------------------------------------------
-	// 14. redshift-maintenance-deferred — active DeferredMaintenanceWindow → Warning
+	// redshift-maintenance-deferred — active DeferredMaintenanceWindow → Warning
 	// DeferMaintenanceStartTime = now-1h, DeferMaintenanceEndTime = now+48h
-	// -----------------------------------------------------------------------
 	now := time.Now()
 	maintenanceDeferred := redshiftBaselineHealthy(RedshiftMaintenanceDeferredID)
 	maintenanceDeferred.DeferredMaintenanceWindows = []redshifttypes.DeferredMaintenanceWindow{
@@ -447,10 +399,8 @@ func buildRedshiftClusters() []redshifttypes.Cluster {
 	}
 	maintenanceDeferred.ClusterCreateTime = aws.Time(mustParseRedshiftTime("2025-03-15T12:00:00Z"))
 
-	// -----------------------------------------------------------------------
-	// 15. redshift-deferral-lapsed — DeferMaintenanceEndTime in the past, so
-	// the window is inactive and no deferral finding fires (negative case)
-	// -----------------------------------------------------------------------
+	// redshift-deferral-lapsed — DeferMaintenanceEndTime in the past, so
+	// the window is inactive and no deferral finding fires.
 	maintenanceDeferredExpired := redshiftBaselineHealthy(RedshiftDeferralLapsedID)
 	maintenanceDeferredExpired.DeferredMaintenanceWindows = []redshifttypes.DeferredMaintenanceWindow{
 		{
@@ -461,25 +411,19 @@ func buildRedshiftClusters() []redshifttypes.Cluster {
 	}
 	maintenanceDeferredExpired.ClusterCreateTime = aws.Time(mustParseRedshiftTime("2025-02-28T10:00:00Z"))
 
-	// -----------------------------------------------------------------------
-	// 16. redshift-publicly-accessible — PubliclyAccessible=true → Warning
-	// -----------------------------------------------------------------------
+	// redshift-publicly-accessible — PubliclyAccessible=true → Warning
 	publiclyAccessible := redshiftBaselineHealthy(RedshiftPubliclyAccessibleID)
 	publiclyAccessible.PubliclyAccessible = aws.Bool(true)
 	publiclyAccessible.ClusterCreateTime = aws.Time(mustParseRedshiftTime("2025-05-20T08:00:00Z"))
 
-	// -----------------------------------------------------------------------
-	// 17. redshift-unencrypted — Encrypted=false → Warning
-	// -----------------------------------------------------------------------
+	// redshift-unencrypted — Encrypted=false → Warning
 	unencrypted := redshiftBaselineHealthy(RedshiftUnencryptedID)
 	unencrypted.Encrypted = aws.Bool(false)
 	unencrypted.KmsKeyId = nil
 	unencrypted.ClusterCreateTime = aws.Time(mustParseRedshiftTime("2025-04-10T14:00:00Z"))
 
-	// -----------------------------------------------------------------------
-	// 18. warn-redshift-multi — 3 coexisting §3.1 warnings → "pending change queued (+2)"
+	// warn-redshift-multi — 3 coexisting warnings → "pending change queued (+2)"
 	// PendingModifiedValues + PubliclyAccessible + Encrypted=false
-	// -----------------------------------------------------------------------
 	warnMulti := redshiftBaselineHealthy(WarnRedshiftMultiID)
 	warnMulti.PendingModifiedValues = &redshifttypes.PendingModifiedValues{
 		NodeType: aws.String("ra3.4xlarge"),
@@ -489,21 +433,17 @@ func buildRedshiftClusters() []redshifttypes.Cluster {
 	warnMulti.KmsKeyId = nil
 	warnMulti.ClusterCreateTime = aws.Time(mustParseRedshiftTime("2025-07-01T09:00:00Z"))
 
-	// -----------------------------------------------------------------------
-	// 19. warn-redshift-two — 2 coexisting §3.1 warnings → "publicly accessible (+1)"
+	// warn-redshift-two — 2 coexisting warnings → "publicly accessible (+1)"
 	// PubliclyAccessible + Encrypted=false
-	// -----------------------------------------------------------------------
 	warnTwo := redshiftBaselineHealthy(WarnRedshiftTwoID)
 	warnTwo.PubliclyAccessible = aws.Bool(true)
 	warnTwo.Encrypted = aws.Bool(false)
 	warnTwo.KmsKeyId = nil
 	warnTwo.ClusterCreateTime = aws.Time(mustParseRedshiftTime("2025-08-05T11:00:00Z"))
 
-	// -----------------------------------------------------------------------
-	// 20. redshift-broken-with-warning-hidden — Broken suppresses Warnings (U8)
+	// redshift-broken-with-warning-hidden — Broken suppresses Warnings
 	// ClusterStatus=storage-full (Broken) + ClusterAvailabilityStatus=Modifying + PubliclyAccessible=true + Encrypted=false
 	// Expected: Fields["status"] = "broken: storage-full", Findings (wave1) phrases = ["broken: storage-full"]
-	// -----------------------------------------------------------------------
 	brokenWithWarning := redshiftBaselineHealthy(RedshiftBrokenWithWarningHiddenID)
 	brokenWithWarning.ClusterStatus = aws.String("storage-full")
 	brokenWithWarning.ClusterAvailabilityStatus = aws.String("Modifying")
@@ -512,17 +452,14 @@ func buildRedshiftClusters() []redshifttypes.Cluster {
 	brokenWithWarning.KmsKeyId = nil
 	brokenWithWarning.ClusterCreateTime = aws.Time(mustParseRedshiftTime("2025-09-15T08:00:00Z"))
 
-	// -----------------------------------------------------------------------
-	// 21. redshift-avail-unavailable-with-warning-hidden — availability-driven Broken suppresses Warning (U8)
+	// redshift-avail-unavailable-with-warning-hidden — availability-driven Broken suppresses Warning
 	// ClusterStatus=available, ClusterAvailabilityStatus=Unavailable + PubliclyAccessible=true
 	// Expected: Fields["status"] = "unavailable", Findings (wave1) phrases = ["unavailable"]
-	// -----------------------------------------------------------------------
 	availUnavailableWithWarning := redshiftBaselineHealthy(RedshiftAvailUnavailableWithWarningHiddenID)
 	availUnavailableWithWarning.ClusterAvailabilityStatus = aws.String("Unavailable")
 	availUnavailableWithWarning.PubliclyAccessible = aws.Bool(true)
 	availUnavailableWithWarning.ClusterCreateTime = aws.Time(mustParseRedshiftTime("2025-10-01T10:00:00Z"))
 
-	// One witness per Wave-2 posture finding.
 	auditLoggingOff := redshiftBaselineHealthy(RedshiftAuditLoggingOff)
 	auditLoggingOff.KmsKeyId = aws.String(RedshiftKMSKeyARN1)
 	requireSSLOff := redshiftBaselineHealthy(RedshiftRequireSSLOff)

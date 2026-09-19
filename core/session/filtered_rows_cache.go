@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
 
 // filtered_rows_cache.go — session home for server-side-filtered
-// related-drill results (cache contract C6).
+// related-drill results.
 //
 // A related-panel row backed by a FetchFilter (e.g. a KMS key's "CloudTrail
 // Events" pivot) always fetches with Cache:CacheNone and lands only on the

@@ -6,8 +6,7 @@ import "time"
 
 // defaultYearColumns and defaultMonthColumns are the trailing column counts
 // BuildWindow uses at year/month granularity — a fixed-count window ending
-// at anchor's own bucket (the open period), matching wireframe.md's 12-month
-// default view (Aug'25-Jul'26).
+// at anchor's own bucket (the open period).
 const (
 	defaultYearColumns  = 5
 	defaultMonthColumns = 12
@@ -28,8 +27,7 @@ const HistoryHorizonMonths = 13
 // own bucket, clamped so its earliest period never starts before
 // HistoryHorizonMonths' entitlement horizon (clampWindowStartToHorizon).
 // Week/day are bounded drill-zoom windows — every finer bucket inside
-// anchor's enclosing month (week) or enclosing ISO week (day) — per
-// wireframe.md's zoom example ("weeks of that month"); always well within
+// anchor's enclosing month (week) or enclosing ISO week (day); always well within
 // the horizon, so they are never clamped. Pure: anchor is always injected,
 // this package never calls time.Now().
 func BuildWindow(g Granularity, anchor time.Time) []Period {
@@ -88,7 +86,7 @@ func WindowWithin(sel Period, g Granularity, now time.Time) []Period {
 // monthsWithinPeriod tiles sel (any period, not necessarily calendar-year
 // aligned) into calendar months lying inside it, dropping months that have
 // not happened yet (past now's own month) and clamping the earliest month
-// to the CE history horizon — the year->month drill case (X4a), and any
+// to the CE history horizon — the year->month drill case, and any
 // other month-tiling of an arbitrary parent period.
 func monthsWithinPeriod(sel Period, now time.Time) []Period {
 	start, errS := ParseDate(sel.Start)
@@ -162,7 +160,7 @@ func clampWindowStartToHorizon(window []Period, anchor time.Time) []Period {
 
 // TrailingAnchored reports whether g's window is always the canonical
 // trailing-window-ending-at-now (year, month — the two granularities
-// FR-002's default view is defined at) rather than a window bounded to one
+// the default view uses) rather than a window bounded to one
 // specific parent bucket (week, day — reached only by zooming into a
 // specific month/week). Zoom callers use this to decide whether a
 // granularity change re-anchors on "now" or on the cursor's current
@@ -178,7 +176,7 @@ func (g Granularity) TrailingAnchored() bool {
 // through next December — CE rejects a Range.End past the first day of the
 // month after capAt's own month, so the open year is capped there too,
 // exactly like the open month's own bucket boundary. capAt is anchor for
-// BuildWindow's own (unchanged) semantics, or the real now for
+// BuildWindow's own semantics, or the real now for
 // TrailingWindow — the window's shape is always anchor's, only the open
 // bucket's own ceiling is capAt's.
 func yearWindow(anchor time.Time, n int, capAt time.Time) []Period {
@@ -217,7 +215,7 @@ func monthWindow(anchor time.Time, n int) []Period {
 
 // weekWindowsInMonth returns one Period per ISO week (Mon-Sun) touching the
 // calendar month containing anchor, with the first/last week clipped to the
-// month boundary (matching wireframe.md's "Jan 1-4" / "Jan 26-31" example).
+// month boundary (e.g. "Jan 1-4" / "Jan 26-31").
 func weekWindowsInMonth(anchor time.Time) []Period {
 	monthStart := time.Date(anchor.Year(), anchor.Month(), 1, 0, 0, 0, 0, time.UTC)
 	monthEnd := monthStart.AddDate(0, 1, 0)

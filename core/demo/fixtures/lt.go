@@ -22,7 +22,7 @@ type LTFixtures struct {
 	LaunchTemplates []ec2types.LaunchTemplate
 	// DefaultVersions maps LaunchTemplateId to its "$Default" version — the
 	// single extra per-template call that funds every related-panel pivot and
-	// every Wave 2 signal (docs/resources/lt.md §1, §2, §3.2). $Default (not
+	// every Wave 2 signal (docs/resources/lt.md). $Default (not
 	// $Latest) is what asg/ng/ec2 actually resolve at launch.
 	DefaultVersions map[string]ec2types.LaunchTemplateVersion
 	// DeniedIDs lists LaunchTemplateIds whose DescribeLaunchTemplateVersions
@@ -38,19 +38,17 @@ const (
 	// current AMI, two security groups. Referenced by two ASG fixtures
 	// (asg.go) and tagged onto two EC2 instances (ec2.go).
 	ProdWebLTID = "lt-0prodweb1111111a"
-	// EKSNodeLTID matches the pre-existing literal already wired into
+	// EKSNodeLTID matches the literal wired into
 	// eks.go's "general-pool" nodegroup (Nodegroup.LaunchTemplate.Id) and the
-	// EC2 fake's ImageId resolution for that nodegroup — reused verbatim so
-	// TestFetchNodeGroups_ResolvesImageIDFromCustomLaunchTemplate-style image
-	// resolution keeps working unchanged.
+	// EC2 fake's ImageId resolution for that nodegroup.
 	EKSNodeLTID = "lt-0eks111111111111a"
-	// SSMAmiLTID witnesses the no-pivot/no-finding ssm skip: ImageId is a
+	// SSMAmiLTID raises no pivot and no finding: ImageId is a
 	// resolve:ssm: reference, not an ami- id.
 	SSMAmiLTID = "lt-0ssmami11111111a"
 	// WarnLTIMDSv1ID sets HttpTokens=optional explicitly.
 	WarnLTIMDSv1ID = "lt-0warnimdsv11111a"
 	// WarnLTIMDSv1DefaultID leaves MetadataOptions nil entirely — the
-	// unset-defaults-to-optional trap witness (docs/resources/lt.md §3.2).
+	// unset-defaults-to-optional trap (docs/resources/lt.md).
 	WarnLTIMDSv1DefaultID = "lt-0warnimdsvdef111a"
 	// WarnLTUnencryptedID sets one BlockDeviceMappings[].Ebs.Encrypted=false explicitly.
 	WarnLTUnencryptedID = "lt-0warnunencrypt1a"
@@ -76,8 +74,8 @@ const (
 // unexported const per file rather than one shared export.
 const ltPrimaryKMSKeyID = "a1b2c3d4-5678-90ab-cdef-111111111111"
 
-// ltSecretUserData is the warn-lt-user-data-secret bootstrap script — the
-// lt.user-data-secret witness, with the API token pasted in rather than
+// ltSecretUserData is the warn-lt-user-data-secret bootstrap script. It
+// raises lt.user-data-secret: the API token is pasted in rather than
 // fetched from Parameter Store at boot.
 const ltSecretUserData = `#!/bin/bash
 set -euo pipefail
@@ -125,7 +123,7 @@ func ltEncryptedRootVolume(kmsKeyID string) []ec2types.LaunchTemplateBlockDevice
 }
 
 // ltUnencryptedRootVolume mirrors ltEncryptedRootVolume with
-// Encrypted=false explicit and no KmsKeyId — the ltCodeUnencrypted witness.
+// Encrypted=false explicit and no KmsKeyId, raising ltCodeUnencrypted.
 func ltUnencryptedRootVolume() []ec2types.LaunchTemplateBlockDeviceMapping {
 	return []ec2types.LaunchTemplateBlockDeviceMapping{
 		{
@@ -142,7 +140,7 @@ func ltUnencryptedRootVolume() []ec2types.LaunchTemplateBlockDeviceMapping {
 
 // buildLaunchTemplates returns the DescribeLaunchTemplates list shape: identity
 // plus DefaultVersionNumber/LatestVersionNumber/CreatedBy/CreateTime/Tags only
-// — no LaunchTemplateData (docs/resources/lt.md §6 citation on list-shape).
+// — no LaunchTemplateData (docs/resources/lt.md).
 func buildLaunchTemplates() []ec2types.LaunchTemplate {
 	entry := func(id, name string, defaultVer, latestVer int64, created string, env string) ec2types.LaunchTemplate {
 		return ec2types.LaunchTemplate{
@@ -201,8 +199,8 @@ func buildLTDefaultVersions() map[string]ec2types.LaunchTemplateVersion {
 
 		// eks-node-lt: NetworkInterfaces[] (Groups ∪ SubnetId) instead of the
 		// top-level SecurityGroupIds/subnet fields — mutually exclusive by API
-		// design, and this fixture is the NI-union witness. ImageId matches the
-		// pre-existing EC2 fake response for this exact LT id.
+		// design, so this template exercises the NI union. ImageId matches the
+		// EC2 fake response for this exact LT id.
 		EKSNodeLTID: version(EKSNodeLTID, 1, &ec2types.ResponseLaunchTemplateData{
 			ImageId:      aws.String("ami-0eks111111111111a"),
 			InstanceType: ec2types.InstanceTypeM5Large,
@@ -217,7 +215,7 @@ func buildLTDefaultVersions() map[string]ec2types.LaunchTemplateVersion {
 		}, "2025-03-05T12:00:00Z"),
 
 		// ssm-ami-lt: healthy; ImageId is a resolve:ssm: reference, a display
-		// fact only — never a pivot (docs/resources/lt.md §2 ami bullet).
+		// fact only — never a pivot (docs/resources/lt.md).
 		SSMAmiLTID: version(SSMAmiLTID, 1, &ec2types.ResponseLaunchTemplateData{
 			ImageId:             aws.String("resolve:ssm:/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-x86_64"),
 			InstanceType:        ec2types.InstanceTypeT3Medium,
@@ -255,7 +253,7 @@ func buildLTDefaultVersions() map[string]ec2types.LaunchTemplateVersion {
 		}, "2025-05-03T08:00:00Z"),
 
 		// warn-lt-multi: IMDSv1 allowed + unencrypted volume stack on one
-		// template → "IMDSv1 allowed (+1)" per §4 precedence.
+		// template → "IMDSv1 allowed (+1)".
 		WarnLTMultiID: version(WarnLTMultiID, 1, &ec2types.ResponseLaunchTemplateData{
 			ImageId:             aws.String(fixtProdAMIID1),
 			InstanceType:        ec2types.InstanceTypeT3Medium,
@@ -286,15 +284,12 @@ func buildLTDefaultVersions() map[string]ec2types.LaunchTemplateVersion {
 			MetadataOptions:     ltHealthyMetadataOptions(),
 			UserData:            aws.String(base64.StdEncoding.EncodeToString([]byte(ltSecretUserData))),
 		}, "2025-05-07T08:00:00Z"),
-
-		// WarnLTDeniedID intentionally absent — DescribeLaunchTemplateVersions
-		// is denied for this id (see LTFixtures.DeniedIDs).
 	}
 }
 
 func init() {
 	// dim: colorLT (core/aws/catalog_compute.go) is colorFromAnyFinding-only
-	// and no registered lt.* FindingDef is SevDim; docs/resources/lt.md §4
+	// and no registered lt.* FindingDef is SevDim; docs/resources/lt.md
 	// documents no Dim-producing signal.
 	Register(Pin{ShortName: "lt", Rows: 11, Issues: 6, CoverageGaps: []string{"dim"}})
 }

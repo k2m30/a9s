@@ -77,8 +77,8 @@ var sharedGlueFixtures = sync.OnceValue(func() *GlueFixtures {
 				Command: &gluetypes.JobCommand{
 					Name: aws.String("gluestreaming"),
 				},
-				// GlueLoggingOff witness: the continuous-logging argument is
-				// deliberately absent, so a killed run leaves no diagnostics.
+				// GlueLoggingOff: without the continuous-logging argument
+				// a killed run leaves no diagnostics.
 				SecurityConfiguration: aws.String(glueSecurityConfigName),
 				DefaultArguments: map[string]string{
 					"--job-language": "python",
@@ -96,8 +96,8 @@ var sharedGlueFixtures = sync.OnceValue(func() *GlueFixtures {
 				Command: &gluetypes.JobCommand{
 					Name: aws.String("pythonshell"),
 				},
-				// GlueNoSecurityConfig witness: SecurityConfiguration is
-				// deliberately absent, so output, logs and bookmarks are all
+				// GlueNoSecurityConfig: without a SecurityConfiguration,
+				// output, logs and bookmarks are all
 				// written unencrypted.
 				DefaultArguments: map[string]string{
 					"--enable-continuous-cloudwatch-log": "true",
@@ -142,7 +142,7 @@ var sharedGlueFixtures = sync.OnceValue(func() *GlueFixtures {
 					Name: aws.String("glueetl"),
 				},
 				SecurityConfiguration: aws.String(glueSecurityConfigName),
-				// GlueArgumentSecret witness: the warehouse password is passed
+				// GlueArgumentSecret: the warehouse password is passed
 				// as a default argument instead of a Secrets Manager reference.
 				DefaultArguments: map[string]string{
 					"--enable-continuous-cloudwatch-log": "true",
@@ -246,7 +246,7 @@ func NewGlueFixtures() *GlueFixtures {
 	return sharedGlueFixtures()
 }
 
-// Witness jobs for the glue posture findings. Each names the ONE demo job
+// Jobs carrying the glue posture findings. Each names the ONE demo job
 // that carries its finding; every other job is set to the healthy value for
 // that condition.
 const (

@@ -16,7 +16,6 @@ import (
 // checkCfnRole extracts the RoleARN from the CloudFormation Stack RawStruct.
 // It extracts the role name from the last path segment of the ARN (after the last "/")
 // and searches the role cache by name or ID.
-// Pattern F — forward field lookup.
 func checkCfnRole(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	stack, ok := assertStruct[cfntypes.Stack](res.RawStruct)
 	if !ok {
@@ -34,7 +33,7 @@ func checkCfnRole(ctx context.Context, clients any, res resource.Resource, cache
 }
 
 // checkCFNCFN finds related CloudFormation stacks — parent and child (nested) stacks.
-// Pattern F+C: forward lookup for ParentId (this is a nested stack) and reverse scan
+// Forward lookup for ParentId (this is a nested stack) and reverse scan
 // for stacks whose ParentId matches this stack's StackId (children of this stack).
 func checkCFNCFN(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	stack, ok := assertStruct[cfntypes.Stack](res.RawStruct)
@@ -53,13 +52,11 @@ func checkCFNCFN(ctx context.Context, clients any, res resource.Resource, cache 
 		return resource.UnknownRelated("cfn")
 	}
 
-	// Collect this stack's StackId for reverse lookup.
 	thisStackID := ""
 	if stack.StackId != nil {
 		thisStackID = *stack.StackId
 	}
 
-	// Build a set so we don't emit duplicates.
 	seen := make(map[string]struct{})
 
 	// Forward: if this stack has a ParentId, it is a nested stack — add the parent.
@@ -99,7 +96,6 @@ func checkCFNCFN(ctx context.Context, clients any, res resource.Resource, cache 
 
 // checkCfnSNS extracts notification ARNs from the CloudFormation Stack's
 // NotificationARNs field and returns SNS topic identifiers.
-// Pattern F — no cache needed.
 func checkCfnSNS(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	stack, ok := assertStruct[cfntypes.Stack](res.RawStruct)
 	if !ok {
@@ -119,8 +115,8 @@ func checkCfnSNS(_ context.Context, _ any, res resource.Resource, _ resource.Res
 
 // cfnStackResourcesByType calls cloudformation:ListStackResources(stack) and
 // returns the PhysicalResourceIds whose ResourceType matches the given value
-// (e.g. "AWS::S3::Bucket"). Pattern C — single paginated API call; we read
-// the first page only to honor the 1-call budget.
+// (e.g. "AWS::S3::Bucket"). Only the first page is read, to honor the
+// 1-call budget.
 //
 // truncated reports that the page carried a NextToken: resources of the wanted
 // type may sit on pages nobody read, so the count the caller renders is a

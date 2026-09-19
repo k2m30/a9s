@@ -12,7 +12,7 @@ import (
 
 // testRelatedResults returns a non-nil slice of RelatedCacheResult for use as
 // a cache value. The result carries exactly count synthetic IDs so
-// Result.Count() == count, matching this helper's old Count-literal behavior.
+// Result.Count() == count.
 func testRelatedResults(count int) []session.RelatedCacheResult {
 	ids := make([]string, count)
 	for i := range ids {
@@ -53,7 +53,6 @@ func TestRelatedCacheLRU_LRUEviction(t *testing.T) {
 	c.Set("b", testRelatedResults(2))
 	c.Set("c", testRelatedResults(3))
 
-	// Access "a" to promote it to most recently used.
 	if _, ok := c.Get("a"); !ok {
 		t.Fatal("expected 'a' to exist before eviction test")
 	}
@@ -171,10 +170,9 @@ func TestRelatedCacheLRU_SetUpdateExisting(t *testing.T) {
 // STORE for detail re-entry to work: entries keep their distinct
 // DefDisplayName, so the replay in core/app can bind each row separately.
 //
-// This guards against regressing to a shape where the cache stores only
-// resource.RelatedCheckResult — losing DefDisplayName left all four
-// ct-events self-pivot rows stuck loading because the strict-match fallback
-// refused to bind when TargetType matched multiple rows.
+// A cache storing only resource.RelatedCheckResult loses DefDisplayName and
+// leaves all four ct-events self-pivot rows loading, because the strict-match
+// fallback refuses to bind when TargetType matches multiple rows.
 func TestRelatedCacheLRU_PreservesDefDisplayName(t *testing.T) {
 	t.Parallel()
 

@@ -73,7 +73,6 @@ func FetchIAMGroupsPage(ctx context.Context, api IAMListGroupsAPI, continuationT
 		resources = append(resources, r)
 	}
 
-	// Build pagination metadata — IAM uses IsTruncated bool + Marker *string
 	nextToken := ""
 	isTruncated := output.IsTruncated
 	if isTruncated && output.Marker != nil {

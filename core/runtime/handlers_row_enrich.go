@@ -30,7 +30,7 @@ func (c *Core) handleRowEnriched(msg messages.RowEnriched) ([]UIIntent, []TaskRe
 	}
 	// The same rule as the sweep's: a probe that came back with an error and
 	// nothing else answered for nobody. The row keeps its mark and what it
-	// renders, and the operator hears why (C1: a marked, stale answer beats
+	// renders, and the operator hears why (a marked, stale answer beats
 	// a confidently wrong clean one).
 	if msg.Err != nil && len(msg.Findings) == 0 && len(msg.FieldUpdates) == 0 && !msg.Uninspected {
 		_, region := c.session.CurrentPair()

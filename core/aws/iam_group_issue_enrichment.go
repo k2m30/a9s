@@ -29,8 +29,6 @@ const (
 // Findings:
 //   - GetGroup.Users empty → "~" finding "group has no members (orphan)"
 //   - ListAttachedGroupPolicies empty AND ListGroupPolicies empty → "~" finding "group has no policies (no-op group)"
-//
-// Skip when clients.IAM == nil.
 func EnrichIAMGroup(ctx context.Context, clients *ServiceClients, resources []resource.Resource, _ resource.ResourceCache) (IssueEnricherResult, error) {
 	result := IssueEnricherResult{
 		Findings:     make(map[string][]domain.Finding),
@@ -61,7 +59,6 @@ func EnrichIAMGroup(ctx context.Context, clients *ServiceClients, resources []re
 			return
 		}
 
-		// Paginate members via GetGroup (uses Marker/IsTruncated).
 		var allUsers []iamtypes.User
 		memberTruncated := false
 		var groupMarker *string
@@ -95,7 +92,6 @@ func EnrichIAMGroup(ctx context.Context, clients *ServiceClients, resources []re
 			}
 		}
 
-		// Paginate attached policies.
 		var allAttached []iamtypes.AttachedPolicy
 		attachedTruncated := false
 		var attachedMarker *string
@@ -129,7 +125,6 @@ func EnrichIAMGroup(ctx context.Context, clients *ServiceClients, resources []re
 			}
 		}
 
-		// Paginate inline policies.
 		var allInline []string
 		inlineTruncated := false
 		var inlineMarker *string
@@ -217,6 +212,6 @@ func EnrichIAMGroup(ctx context.Context, clients *ServiceClients, resources []re
 	})
 	MarkInformationalOnly(&result)
 	// See EnrichIAMRoleLastUsed: the flag and the composite error are two
-	// answers, and this lane was returning only the first.
+	// separate answers, and both are returned.
 	return result, errors.Join(loopErr, AggregateFailures("group membership", failures, n))
 }

@@ -11,26 +11,8 @@
 // translates the returned intents and tasks back into adapter-visible side
 // effects.
 //
-// What lives here:
-//
-//	HandleFlash          — flash gen bump; schedules ClearFlash tick.
-//	HandleClearFlash     — flash auto-clear honouring the session-owned gen.
-//	HandleAPIError       — AWS error classification + flash with [code] message.
-//	HandleClientsReady   — clients/identity wiring + post-connect refresh / boot.
-//	HandleProfileSelected— rotate, rollback latch, request reconnect.
-//	HandleRegionSelected — mirror of HandleProfileSelected for region.
-//	HandleProfilesLoaded — emits PushScreen{ScreenProfileSelector,...}.
-//	HandleValueRevealed  — emits PushScreen{ScreenReveal,...} or FlashIntent.
-//	HandleEnterChildView — emits PushScreen{ScreenChildList,...} + fetch task.
-//	HandleThemeSelected  — emits TaskKindReadThemeFile.
-//	HandleThemeFileRead  — parses YAML; on parse OK emits Apply/Pop/Flash +
-//	                       Save task; on parse fail emits error flash only
-//	                       (Save is gated on parse success).
-//
-// What stays in the TUI adapter:
-//
-//   - handleKeyMsg (keyboard dispatch) — owns key.Matches semantics on
-//     adapter-owned tea types.
+// Keyboard dispatch (handleKeyMsg) lives in the TUI adapter, which owns
+// key.Matches semantics on adapter-owned tea types.
 package runtime
 
 import (
@@ -116,7 +98,7 @@ type APIErrorEvent struct {
 // adapter computes from its view stack. StackDepth == 1 means only the main
 // menu is on screen; HasActiveRL is true when the active view is a
 // ResourceListModel; HasActiveCosts is true when an active or
-// overlay-beneath costs screen exists (P5's own retry gate — the costs
+// overlay-beneath costs screen exists (the costs retry gate — the costs
 // screen keeps no ResourceListModel, so it needs its own signal alongside
 // HasActiveRL, never folded into it). The runtime uses these to decide
 // whether to emit the one-shot -c navigation and the post-switch refresh.
@@ -254,7 +236,7 @@ func (c *Core) handleClientsReadyFailure(ev ClientsReadyEvent) ([]UIIntent, []Ta
 	}}
 
 	if s.Clients != nil {
-		// P3 invariant: Session.Rotate() (run earlier on the switch attempt
+		// Session.Rotate() (run earlier on the switch attempt
 		// that just failed) installed fresh IAMPolicies / IdentityStore /
 		// RuleSets on the session. The retained transport still points at
 		// the pre-rotate (now-discarded) stores, so Pattern-C related
@@ -300,7 +282,7 @@ func (c *Core) handleClientsReadyFailure(ev ClientsReadyEvent) ([]UIIntent, []Ta
 // intent when PendingRefresh is set and the active view is a
 // ResourceListModel).
 //
-// -c navigation ordering (deferred -c navigation, D11): on the NoCache/demo path the counts
+// -c navigation ordering: on the NoCache/demo path the counts
 // are seeded synchronously below (DemoPrefetchCounts), so it is safe to emit
 // TaskKindEmitNavigate immediately. On the live path the availability cache
 // seed (session.ProbeResources) is populated asynchronously by
@@ -313,7 +295,6 @@ func (c *Core) handleClientsReadyFailure(ev ClientsReadyEvent) ([]UIIntent, []Ta
 func (c *Core) handleClientsReadySuccess(ev ClientsReadyEvent) ([]UIIntent, []TaskRequest) {
 	s := c.session
 
-	// Install the new transport.
 	if ev.Clients == nil {
 		if s.Clients == nil && s.PreSuppliedClients != nil {
 			s.PreSuppliedClients.SetIAMPolicies(s.IAMPolicies)
@@ -328,7 +309,7 @@ func (c *Core) handleClientsReadySuccess(ev ClientsReadyEvent) ([]UIIntent, []Ta
 		s.Clients = clients
 	} else {
 		// Wrong concrete type — surface as APIErrorMsg via the adapter so
-		// the existing classification flow handles it.
+		// the classification flow handles it.
 		wrongType := fmt.Errorf("internal: unexpected ClientsReadyMsg.Clients type %T", ev.Clients)
 		return nil, []TaskRequest{{
 			Key:     TaskKey{Kind: TaskKindEmitAPIError},
@@ -392,7 +373,6 @@ func (c *Core) handleClientsReadySuccess(ev ClientsReadyEvent) ([]UIIntent, []Ta
 		s.PendingCommand = pendingCommand
 	}
 
-	// Live AWS path: fetch identity + load disk cache.
 	s.IdentityFetching = true
 	tasks = append(tasks, TaskRequest{
 		Key:     TaskKey{Kind: TaskKindFetchIdentity},
@@ -442,7 +422,7 @@ func emitNavigateForCommand(cmd string) TaskRequest {
 
 // maybeRefreshIntents returns the refresh intents + flash when a pending
 // post-switch refresh should fire (PendingRefresh is set AND an active
-// resource list OR an active/beneath costs screen exists — P5: a costs
+// resource list OR an active/beneath costs screen exists — a costs
 // fetch dispatched before AWS finished connecting fails with "no client
 // configured for this session" and must recover once ClientsReady lands,
 // exactly like a pre-connect list navigation's own replay). Clears
@@ -554,7 +534,7 @@ type ThemeFileReadEvent struct {
 	// ParseErr is the renderer-side theme-validation result, computed by the
 	// adapter (which owns the styles package) before handing the event to the
 	// runtime. Keeping the parse in the adapter is what lets core/runtime
-	// stay renderer-agnostic (SC-009): the runtime branches on a domain-safe
+	// stay renderer-agnostic: the runtime branches on a domain-safe
 	// error instead of importing internal/tui/styles. Non-nil ⇒ malformed YAML.
 	ParseErr error
 }
@@ -651,7 +631,7 @@ func (c *Core) HandleThemeSelected(ev ThemeSelectedEvent) ([]UIIntent, []TaskReq
 //     no apply, no pop, no save. The selector stays open so the user can
 //     retry. Validation is performed by the adapter (which owns the styles
 //     package) and surfaced to the runtime as ev.ParseErr, so core/runtime
-//     never imports a renderer package (SC-009).
+//     never imports a renderer package.
 //  3. Read OK, parse OK → four results in order: ApplyThemeIntent (carries
 //     the YAML Bytes; the adapter re-parses via styles.ThemeFromYAML),
 //     PopSelectorIntent, success FlashIntent ("Theme: <name>"), and a
@@ -662,8 +642,8 @@ func (c *Core) HandleThemeSelected(ev ThemeSelectedEvent) ([]UIIntent, []TaskReq
 // adapter rejected the apply, so Save is gated on a successful parse.
 //
 // ApplyThemeIntent's payload carries raw bytes (the adapter does the second
-// parse for the renderer state); the save-fail UX delta is that the theme
-// stays applied for the session even if the config save fails.
+// parse for the renderer state). If the config save fails, the theme stays
+// applied for the session.
 func (c *Core) HandleThemeFileRead(ev ThemeFileReadEvent) ([]UIIntent, []TaskRequest) {
 	if ev.Err != nil {
 		return []UIIntent{FlashIntent{

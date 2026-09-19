@@ -169,7 +169,7 @@ var databasesTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 		}},
 		Color: colorS3,
 		Fetcher: fetcherWithClients(func(ctx context.Context, c *ServiceClients, continuationToken string) (resource.FetchResult, error) {
-			// Related-panel contract (docs/resources/s3.md §2): lambda/sns/sqs
+			// Related-panel contract (docs/resources/s3.md): lambda/sns/sqs
 			// pivots must resolve non-zero when this bucket has a matching
 			// notification target. Those checkers read Fields["notification_*"],
 			// which can only be populated by GetBucketNotificationConfiguration
@@ -469,7 +469,7 @@ var databasesTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 		},
 		Color: colorOpenSearch,
 		Fetcher: fetcherWithClients(func(ctx context.Context, c *ServiceClients, continuationToken string) (resource.FetchResult, error) {
-			// E5 partial success: degraded name-only rows may arrive alongside
+			// Partial success: degraded name-only rows may arrive alongside
 			// a composite error — return both, never drop the rows.
 			resources, err := FetchOpenSearchDomains(ctx, c.OpenSearch, c.OpenSearch)
 			if err != nil && len(resources) == 0 {
@@ -620,12 +620,6 @@ var databasesTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // sta
 			{TargetType: "lambda", DisplayName: "Lambda Functions", Checker: checkEFSLambda, NeedsTargetCache: false, Truncated: true},
 			{TargetType: "alarm", DisplayName: "CloudWatch Alarms", Checker: checkEFSAlarm, NeedsTargetCache: true, Truncated: true},
 			{TargetType: "backup", DisplayName: "Backup Plans", Checker: checkEFSBackup, NeedsTargetCache: true, Truncated: true},
-			// EC2 pivot intentionally removed: EC2→EFS mounting happens at the
-			// guest OS level via DNS lookup of mt ENIs. AWS exposes no API edge
-			// linking instance → filesystem — mount-target ENIs are
-			// RequesterManaged with no Attachment.InstanceId, so a checker can
-			// only return zero or heuristic noise. Honest drop beats a registered
-			// pivot that always returns Count=0 (U9 violation).
 			{TargetType: "ecs-task", DisplayName: "ECS Tasks", Checker: checkEFSECSTask, NeedsTargetCache: true, Truncated: true},
 			{TargetType: "eni", DisplayName: "Network Interfaces", Checker: checkEFSENI, NeedsTargetCache: true, Truncated: true},
 			{TargetType: "vpc", DisplayName: "VPC", Checker: checkEFSVPC, NeedsTargetCache: true, Truncated: true},

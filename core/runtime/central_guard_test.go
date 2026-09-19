@@ -2,9 +2,9 @@
 
 package runtime
 
-// central_guard_test.go — locks the central GenStamped guard in HandleEvent
-// (AS-74). The guard must discard stale events before the per-type switch so
-// no handler can accidentally skip the staleness check.
+// central_guard_test.go — the central GenStamped guard in HandleEvent
+// discards stale events before the per-type switch, so no handler can skip
+// the staleness check.
 
 import (
 	"testing"
@@ -13,12 +13,8 @@ import (
 	"github.com/k2m30/a9s/v3/core/runtime/messages"
 )
 
-// TestCentralGuard_StaleAvailabilityChecked verifies that a stale
-// AvailabilityChecked event (Gen mismatches session.AvailabilityGen) is
-// discarded at the central guard and does not advance AvailChecked.
 func TestCentralGuard_StaleAvailabilityChecked(t *testing.T) {
 	c := newCore()
-	// session.AvailabilityGen starts at 0; bump it so 0 is stale.
 	c.session.AvailabilityGen = domain.Gen(2)
 
 	staleEvent := messages.AvailabilityChecked{
@@ -38,8 +34,6 @@ func TestCentralGuard_StaleAvailabilityChecked(t *testing.T) {
 	}
 }
 
-// TestCentralGuard_FreshAvailabilityChecked verifies that a fresh
-// AvailabilityChecked (Gen matches) is NOT discarded by the guard.
 func TestCentralGuard_FreshAvailabilityChecked(t *testing.T) {
 	c := newCore()
 	c.session.AvailabilityGen = domain.Gen(2)
@@ -59,8 +53,6 @@ func TestCentralGuard_FreshAvailabilityChecked(t *testing.T) {
 	}
 }
 
-// TestCentralGuard_StaleEnrichmentChecked verifies that a stale
-// EnrichmentChecked event is discarded and does not advance EnrichChecked.
 func TestCentralGuard_StaleEnrichmentChecked(t *testing.T) {
 	c := newCore()
 	c.session.EnrichmentGen = domain.Gen(5)
@@ -80,9 +72,8 @@ func TestCentralGuard_StaleEnrichmentChecked(t *testing.T) {
 	}
 }
 
-// TestCentralGuard_ZeroGenAvailabilityChecked verifies that AvailabilityChecked
-// with Gen=0 IS treated as stale (AcceptZeroGen returns false for this type)
-// when the session counter is non-zero.
+// AcceptZeroGen is false for AvailabilityChecked: Gen=0 is stale once the
+// session counter is non-zero.
 func TestCentralGuard_ZeroGenAvailabilityChecked(t *testing.T) {
 	c := newCore()
 	c.session.AvailabilityGen = domain.Gen(1) // non-zero session counter
@@ -99,8 +90,7 @@ func TestCentralGuard_ZeroGenAvailabilityChecked(t *testing.T) {
 	}
 }
 
-// TestCentralGuard_ZeroGenEnrichmentChecked verifies that EnrichmentChecked
-// with Gen=0 is accepted as a safe sentinel (AcceptZeroGen returns true).
+// AcceptZeroGen is true for EnrichmentChecked: Gen=0 is a sentinel.
 func TestCentralGuard_ZeroGenEnrichmentChecked(t *testing.T) {
 	c := newCore()
 	c.session.EnrichmentGen = domain.Gen(5)

@@ -282,7 +282,6 @@ func (f *EC2Fake) DescribeTransitGatewayVpcAttachments(_ context.Context, input 
 }
 
 // DescribeTransitGatewayRouteTables is a no-op stub satisfying EC2DescribeTransitGatewayRouteTablesAPI.
-// Demo mode does not model TGW route tables.
 func (f *EC2Fake) DescribeTransitGatewayRouteTables(_ context.Context, _ *ec2.DescribeTransitGatewayRouteTablesInput, _ ...func(*ec2.Options)) (*ec2.DescribeTransitGatewayRouteTablesOutput, error) {
 	return &ec2.DescribeTransitGatewayRouteTablesOutput{}, nil
 }
@@ -295,8 +294,8 @@ func (f *EC2Fake) DescribeLaunchTemplates(_ context.Context, _ *ec2.DescribeLaun
 
 // DescribeLaunchTemplateVersions returns the "$Default" version fixture for
 // the requested LaunchTemplateId (lt.go's DefaultVersions map), or denies the
-// call with AccessDeniedException for lt.go's DeniedIDs (warn-lt-denied's
-// rich-degradation witness). Unknown ids return an empty result, matching
+// call with AccessDeniedException for lt.go's DeniedIDs (the warn-lt-denied
+// fixture). Unknown ids return an empty result, matching
 // DescribeImages's not-found-is-empty convention.
 func (f *EC2Fake) DescribeLaunchTemplateVersions(_ context.Context, input *ec2.DescribeLaunchTemplateVersionsInput, _ ...func(*ec2.Options)) (*ec2.DescribeLaunchTemplateVersionsOutput, error) {
 	if input == nil || input.LaunchTemplateId == nil {

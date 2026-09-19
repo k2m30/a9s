@@ -16,9 +16,8 @@
 // enrichment, releasing the singleflight entry in between — reuses it
 // instead of re-fetching: within one operation, a key is fetched at most
 // once, ever, independent of whether callers happened to overlap in time.
-// opID == 0 (no active DetailOperation) bypasses the memo entirely, keeping
-// every non-operation caller's exact pre-existing re-fetch-every-time
-// semantics.
+// opID == 0 (no active DetailOperation) bypasses the memo entirely, so every
+// non-operation caller re-fetches every time.
 //
 // Every decorator keys its singleflight group (and its completedResultMemo)
 // as the active core/runtime.DetailOperation's ID (WithDetailOp) plus the
@@ -143,8 +142,8 @@ const maxCompletedResultMemoEntries = 128
 //
 // opID == 0 (no active DetailOperation — a caller outside any detail
 // open/refresh) is NEVER memoized: only a real operation's calls are
-// deduplicated across its own lifetime, so every non-operation flow keeps
-// its exact pre-existing re-fetch-every-time semantics. A failed fetch is
+// deduplicated across its own lifetime, so every non-operation flow
+// re-fetches every time. A failed fetch is
 // also never memoized unless the caller's shouldMemoize predicate says
 // otherwise (S3's benign NoSuchBucketPolicy) — an AWS error is otherwise
 // retryable on the next call within the same operation, not permanently
@@ -314,15 +313,11 @@ func (c *coalescingSNS) GetTopicAttributes(ctx context.Context, params *sns.GetT
 
 // S3FullAPI widens S3API with the six S3 operations used only via a narrow
 // type-assertion elsewhere in core/aws: S3GetBucketPolicyAPI (s3_related.go
-// AND s3_detail_enrichment.go — this is the exact duplication this file
-// fixes), S3GetBucketCorsAPI and S3GetBucketLifecycleAPI
+// and s3_detail_enrichment.go), S3GetBucketCorsAPI and S3GetBucketLifecycleAPI
 // (s3_detail_enrichment.go), and S3GetBucketTaggingAPI,
 // S3GetBucketEncryptionAPI, S3GetBucketLoggingAPI (s3_related.go). S3API
-// itself does not embed any of them (s3_interfaces.go's per-interface
-// comments say "not part of the S3API aggregate since no fetcher or related
-// checker needs it" — true for Cors/Lifecycle when written, no longer true
-// for GetBucketPolicy). Without this widening, coalescingS3 embedding only
-// S3API would satisfy S3API but FAIL every one of those six assertions,
+// itself embeds none of them. Without this widening, coalescingS3 embedding
+// only S3API would satisfy S3API but FAIL every one of those six assertions,
 // breaking the s3 related panel and s3 detail enrichment entirely. Exported
 // alongside NewCoalescingS3 because it appears in that constructor's
 // exported signature.
@@ -398,11 +393,11 @@ func (c *coalescingS3) GetBucketPolicy(ctx context.Context, params *s3.GetBucket
 // every current consumer only reads from it.
 //
 // Does not violate "transport carries no session state" — see
-// coalescingSFN's doc comment; the same reasoning applies verbatim. No
-// benign-absence memoization (contrast coalescingS3): a Lambda function
-// disappearing out from under an open detail view is a genuine anomaly, not
-// a common, expected state the way an S3 bucket having no policy is — so
-// GetFunction errors are never memoized, exactly like SFN/SNS.
+// coalescingSFN's doc comment; the same reasoning applies verbatim.
+// GetFunction errors are never memoized, exactly like SFN/SNS: a Lambda
+// function disappearing out from under an open detail view is a genuine
+// anomaly, not a common, expected state the way an S3 bucket having no
+// policy is (contrast coalescingS3).
 type coalescingLambda struct {
 	LambdaAPI
 	g      singleflight.Group
@@ -435,9 +430,7 @@ func (c *coalescingLambda) GetFunction(ctx context.Context, params *lambda.GetFu
 }
 
 // alwaysMemoizeSuccess is the shouldMemoize predicate shared by every
-// decorator except coalescingS3: memoize exactly when the call succeeded,
-// exactly the pre-existing `err == nil` gate each one used before this file
-// was collapsed onto coalesceCall.
+// decorator except coalescingS3: memoize exactly when the call succeeded.
 func alwaysMemoizeSuccess[T any](_ T, err error) bool {
 	return err == nil
 }
@@ -487,19 +480,17 @@ func recordCoalesceCall(ledger *CallLedger, opID domain.Gen, api, argKey string,
 // check-then-act race between two synchronization primitives that do not
 // share a critical section.
 //
-// The fix does not add a second lock. Do already guarantees at most one
+// The recheck adds no second lock. Do already guarantees at most one
 // closure runs per key at any moment, and every OTHER concurrent caller for
 // that key is either blocked waiting to share this closure's result or has
 // not reached Do yet at all — so re-checking the memo as the very first
 // thing INSIDE the closure (i.e. only once Do has made this goroutine the
 // sole, serialized leader for the key) observes every prior leader's
-// memo.set with a real happens-before edge, via the memo's own mutex. That
-// is the entire fix: fold the memo recheck into the singleflight closure's
-// leadership window, rather than performing it before a leadership decision
-// has even been made. A per-key mutex (guarding the outer check and Do as
-// one critical section) would achieve the same serialization but requires
-// its own lifecycle (creating, sharing, and eventually discarding one mutex
-// per key) for a guarantee Do already provides for free.
+// memo.set with a real happens-before edge, via the memo's own mutex. A
+// per-key mutex (guarding the outer check and Do as one critical section)
+// would achieve the same serialization but requires its own lifecycle
+// (creating, sharing, and eventually discarding one mutex per key) for a
+// guarantee Do already provides for free.
 func coalesceCall[T any](
 	ctx context.Context,
 	g *singleflight.Group,

@@ -67,7 +67,6 @@ func (f *KMSFake) GetKeyRotationStatus(_ context.Context, input *kms.GetKeyRotat
 }
 
 // ListGrants is a no-op stub satisfying KMSListGrantsAPI.
-// Demo mode does not model KMS grants.
 func (f *KMSFake) ListGrants(_ context.Context, _ *kms.ListGrantsInput, _ ...func(*kms.Options)) (*kms.ListGrantsOutput, error) {
 	return &kms.ListGrantsOutput{}, nil
 }

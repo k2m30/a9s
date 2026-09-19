@@ -46,18 +46,18 @@ const (
 	fixtProdListenerRule = "arn:aws:elasticloadbalancing:us-east-1:123456789012:listener-rule/app/acme-prod-web/1234567890abcdef/aaaa1111bbbb2222/rule1111111111111"
 
 	// fixtLambdaProcessorTGARN backs the lambda:tg related-panel pivot
-	// witness — a Lambda-type target group registering process-orders
+	// — a Lambda-type target group registering process-orders
 	// (lambda.go) as its target.
 	fixtLambdaProcessorTGARN = "arn:aws:elasticloadbalancing:us-east-1:123456789012:targetgroup/lambda-processor-tg/3333333333333333"
 )
 
-// GRPCTargetGroupARN is the demo witness for a finding that carries more
+// GRPCTargetGroupARN carries a finding with more
 // supporting rows than the detail view shows: acme-grpc-tg registers more
 // wholly unhealthy targets than the row cap, which is the only way `--demo`
 // renders the closing "… +K more" row of a capped Attention list.
 const GRPCTargetGroupARN = "arn:aws:elasticloadbalancing:us-east-1:123456789012:targetgroup/acme-grpc-tg/1111111111111111"
 
-// Prowler-gap witnesses for the elb type. Each names the ONE demo load
+// Posture carriers for the elb type. Each names the ONE demo load
 // balancer that carries the corresponding Wave-2 finding; no other load
 // balancer has the attribute or the listener that would trip it.
 const (
@@ -97,12 +97,8 @@ var sharedELBFixtures = sync.OnceValue(func() *ELBFixtures {
 		},
 		// LoadBalancerAttributes — the prod ALB has access logging enabled
 		// to the a9s-demo-logs bucket (s3.go LogsBucketName), backing elb→s3.
-		// acme-internal-api has deletion protection disabled — pins
-		// elbCodeMisconfigured ("elb.misconfigured") firing dynamically in
-		// demo mode; before this entry no fixture LB carried
-		// deletion_protection.enabled=false, so the Wave-2 enricher had
-		// nothing to classify against (the OWNER GAP qa_finding_dynamic_witness_test.go
-		// pins as knownUnwitnessedFindings["elb:elb.misconfigured"]).
+		// acme-internal-api has deletion protection disabled, so
+		// elbCodeMisconfigured ("elb.misconfigured") fires in demo mode.
 		LoadBalancerAttributes: map[string][]elbv2types.LoadBalancerAttribute{
 			fixtProdELBARN: {
 				{Key: aws.String("access_logs.s3.enabled"), Value: aws.String("true")},
@@ -128,7 +124,7 @@ func NewELBFixtures() *ELBFixtures {
 }
 
 // lbARNByName resolves a demo load balancer's ARN from its name so the
-// witness tables below key off the same generated ARN the fetcher emits.
+// tables below key off the same generated ARN the fetcher emits.
 func lbARNByName(lbs []elbv2types.LoadBalancer, name string) string {
 	for _, lb := range lbs {
 		if aws.ToString(lb.LoadBalancerName) == name {
@@ -139,8 +135,8 @@ func lbARNByName(lbs []elbv2types.LoadBalancer, name string) string {
 }
 
 // buildWitnessAttributes gives each attribute-driven elb finding exactly one
-// witness. Every load balancer named here also carries the healthy value for
-// the sibling attribute, so neither witness trips the other's finding; every
+// carrier. Every load balancer named here also carries the healthy value for
+// the sibling attribute, so neither trips the other's finding; every
 // load balancer NOT named here has no attribute entry at all, which the
 // enricher reads as "not reported" rather than "misconfigured".
 func buildWitnessAttributes(f *ELBFixtures) {
@@ -264,7 +260,6 @@ func buildLoadBalancers() []elbv2types.LoadBalancer {
 		},
 	})
 
-	// Generate additional ELBs
 	names := []string{
 		"api-services-alb", "data-pipeline-nlb", "monitoring-alb", "ci-build-alb",
 		"acme-dev-web", "analytics-alb", "auth-service-alb", "reporting-alb",
@@ -365,7 +360,7 @@ func buildTargetGroups() []elbv2types.TargetGroup {
 			LoadBalancerArns:   []string{"arn:aws:elasticloadbalancing:us-east-1:123456789012:loadbalancer/app/staging-web-alb/5555555555aaaaaa"},
 		},
 		// Lambda-type target group — required for the lambda:tg related-panel
-		// pivot witness. checkLambdaTG calls DescribeTargetHealth and matches
+		// pivot. checkLambdaTG calls DescribeTargetHealth and matches
 		// Target.Id against the function ARN; process-orders is a real
 		// lambda.go fixture.
 		{
@@ -425,7 +420,7 @@ func buildListeners(f *ELBFixtures) {
 
 	// The only demo listeners on a pre-TLS-1.2 security policy. Both carry a
 	// certificate so the wave-1 "no certificate configured" signal stays on
-	// its own witness, and they are supplied 8443 before 443 for the same
+	// its own load balancer, and they are supplied 8443 before 443 for the same
 	// reason the cleartext pair is out of order.
 	weakTLSARN := lbARNByName(f.LoadBalancers, ELBWeakTLS)
 	f.Listeners[weakTLSARN] = []elbv2types.Listener{
@@ -542,10 +537,10 @@ func buildTargetHealth(f *ELBFixtures) {
 			},
 		},
 	}
-	// acme-grpc-tg — every target reports literal "unhealthy": the sole demo
-	// witness for the tg Broken color bucket (EnrichTargetGroupHealth: "!"
+	// acme-grpc-tg — every target reports literal "unhealthy": the only demo
+	// target group in the tg Broken color bucket (EnrichTargetGroupHealth: "!"
 	// only when every reporting target is unhealthy, not merely a mix), and
-	// the sole demo witness for a finding with more supporting rows than the
+	// the only demo finding with more supporting rows than the
 	// detail view shows. Twelve is the smallest count that puts two rows past
 	// awsclient.FindingRowCap, so the closing "… +2 more" row renders with a
 	// count no reader can mistake for the number of targets.
@@ -566,7 +561,7 @@ func buildTargetHealth(f *ELBFixtures) {
 	f.TargetHealth[GRPCTargetGroupARN] = grpcTargets
 	// Lambda-type target — Target.Id is the function ARN (no Port for
 	// lambda targets). process-orders is a real lambda.go fixture; matches
-	// the lambda:tg related-panel pivot witness (checkLambdaTG).
+	// the lambda:tg related-panel pivot (checkLambdaTG).
 	f.TargetHealth[fixtLambdaProcessorTGARN] = []elbv2types.TargetHealthDescription{
 		{
 			Target: &elbv2types.TargetDescription{

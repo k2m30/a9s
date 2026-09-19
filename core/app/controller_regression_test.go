@@ -1,19 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
 
-// controller_regression_test.go — five controller-path invariants:
-//
-//	Handle drops a stale ResourcesLoaded (IsStale guard).
-//	ApplyListFieldUpdates applies to every matching stack list.
-//	MenuSelected clamps the cursor when the visible list shrinks.
-//	ApplyDetailEnrichmentForResource sets ds.Resource on the match.
-//	ensureDetailState seeds ds.Findings with the resource's wave-1 findings
-//	so the Attention section shows them (TestApplyDetailFinding_PreservesWave1Findings).
-//
-// The TestApplyDetailFindingForResource_* tests below are general regression
-// tests for applyFindingToState's wave-2 strip/append behaviour and the
-// finding→Attention flow. They are NOT P2-4 guards (a resource with no wave-1
-// findings renders identically before and after the P2-4 fix); the dedicated
-// P2-4 guard is TestApplyDetailFinding_PreservesWave1Findings.
 package app_test
 
 import (
@@ -29,15 +15,8 @@ import (
 	"github.com/k2m30/a9s/v3/core/session"
 )
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Fix 1 (P1-2): Stale ResourcesLoaded must be dropped by Handle
-// ─────────────────────────────────────────────────────────────────────────────
-
 // TestHandle_StaleResourcesLoaded_Dropped verifies that Handle discards a
 // ResourcesLoaded whose Gen does not match the session's AvailabilityGen.
-//
-// Pre-fix failure: Handle called handleResourcesLoadedEvent unconditionally,
-// so the stale one-row message overwrote the three-row list to one row.
 func TestHandle_StaleResourcesLoaded_Dropped(t *testing.T) {
 	s := session.New()
 	s.Profile = "demo"
@@ -57,8 +36,6 @@ func TestHandle_StaleResourcesLoaded_Dropped(t *testing.T) {
 	}
 
 	// Gen=99 is stale because session seeds AvailabilityGen=1 (99 != 1).
-	// The message carries only 1 resource — if the stale guard is absent it
-	// overwrites the three-row list and the assertion below fails.
 	_, _ = c.Handle(messages.ResourcesLoaded{ //nolint:ineffassign,staticcheck // return values intentionally ignored
 		ResourceType: "ec2",
 		Resources:    fakeEC2Resources()[:1],
@@ -81,15 +58,8 @@ func TestHandle_StaleResourcesLoaded_Dropped(t *testing.T) {
 	}
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Fix 2 (P2-3): ApplyListFieldUpdates applies to every matching stack list
-// ─────────────────────────────────────────────────────────────────────────────
-
 // TestApplyListFieldUpdates_UpdatesBothStackedLists verifies that field updates
 // are applied to all same-type list screens on the stack, not only the top one.
-//
-// Both stacked lists' Rows take the update: after popping back to the
-// underlying list the new field value shows there too.
 func TestApplyListFieldUpdates_UpdatesBothStackedLists(t *testing.T) {
 	targetID := fakeEC2Resources()[0].ID // "i-0aaa111111111111a"
 
@@ -101,7 +71,6 @@ func TestApplyListFieldUpdates_UpdatesBothStackedLists(t *testing.T) {
 		t.Fatalf("precondition: want 3 rows, got %d", len(lb.Rows))
 	}
 
-	// Push a child list of the same type and seed it with the same rows.
 	c.PushChildListScreen("ec2")
 	c.ApplyResourcesLoaded("ec2", fakeEC2Resources(), nil, false)
 
@@ -110,12 +79,10 @@ func TestApplyListFieldUpdates_UpdatesBothStackedLists(t *testing.T) {
 		t.Fatalf("precondition screen2: want 3 rows, got %d", len(lb2.Rows))
 	}
 
-	// Apply field update targeting the resource on both screens.
 	c.ApplyListFieldUpdates("ec2", map[string]map[string]string{
 		targetID: {"state": "terminated"},
 	})
 
-	// Top list (screen 2) must reflect the update.
 	topRes := c.GetListVisibleResources()
 	updatedTop := ""
 	for _, r := range topRes {
@@ -128,7 +95,6 @@ func TestApplyListFieldUpdates_UpdatesBothStackedLists(t *testing.T) {
 		t.Errorf("Fix2: screen2 resource %q Fields[state]=%q, want %q", targetID, updatedTop, "terminated")
 	}
 
-	// Pop to screen 1 and assert the underlying list also has the update.
 	c.Apply(app.Action{Kind: app.ActionBack})
 
 	underlyingRes := c.GetListVisibleResources()
@@ -144,16 +110,9 @@ func TestApplyListFieldUpdates_UpdatesBothStackedLists(t *testing.T) {
 	}
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Fix 3 (P2-5): MenuSelected clamps cursor when visible list shrinks
-// ─────────────────────────────────────────────────────────────────────────────
-
 // TestMenuSelected_ClampsCursorWhenVisibleShrinks verifies that MenuSelected
 // returns ok=true when the cursor position is beyond the visible list (because
 // an attention filter reduced the visible count after the cursor moved).
-//
-// Pre-fix failure: MenuSelected returned ok=false when cursor >= len(visible),
-// making Enter a no-op on the highlighted last item.
 func TestMenuSelected_ClampsCursorWhenVisibleShrinks(t *testing.T) {
 	allTypes := resource.AllResourceTypes()
 	if len(allTypes) < 4 {
@@ -183,7 +142,6 @@ func TestMenuSelected_ClampsCursorWhenVisibleShrinks(t *testing.T) {
 	}
 	cursorBefore := vs.Body.Menu.Selected
 
-	// Enable attention-only filter; visible list shrinks to the 2 types with issues.
 	c.Apply(app.Action{Kind: app.ActionToggleAttention})
 
 	vs2 := c.Snapshot()
@@ -195,13 +153,11 @@ func TestMenuSelected_ClampsCursorWhenVisibleShrinks(t *testing.T) {
 		t.Skip("attention filter produced 0 entries — cannot test clamp")
 	}
 
-	// MenuSelected must return ok=true regardless of cursor position.
 	td, ok := c.MenuSelected()
 	if !ok {
 		t.Fatalf("Fix3: MenuSelected returned ok=false (cursorBefore=%d, visible=%d); must clamp to last entry", cursorBefore, len(visible))
 	}
 
-	// The returned type must be one of the visible entries.
 	found := false
 	for _, e := range visible {
 		if e.ShortName == td.ShortName {
@@ -213,10 +169,6 @@ func TestMenuSelected_ClampsCursorWhenVisibleShrinks(t *testing.T) {
 		t.Errorf("Fix3: MenuSelected returned %q which is not in visible entries — cursor was not clamped correctly", td.ShortName)
 	}
 }
-
-// ─────────────────────────────────────────────────────────────────────────────
-// helpers for detail tests
-// ─────────────────────────────────────────────────────────────────────────────
 
 // newControllerAtDetail pushes a list then a detail screen for res/resourceType
 // and calls EnsureDetailState so Snapshot().Body.Detail is non-nil.
@@ -244,16 +196,9 @@ func attentionFieldRows(body *app.DetailBody) []app.FieldRow {
 	return out
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Fix 4 (P2-1): ApplyDetailEnrichmentForResource replaces ds.Resource
-// ─────────────────────────────────────────────────────────────────────────────
-
 // TestApplyDetailEnrichmentForResource_UpdatesDetailFields verifies that
 // ApplyDetailEnrichmentForResource replaces ds.Resource with the enriched
 // resource so the detail body projects the enriched fields.
-//
-// Pre-fix failure: only the wave-2 finding was stored; ds.Resource was
-// unchanged, so the projection still showed pre-enrichment fields.
 func TestApplyDetailEnrichmentForResource_UpdatesDetailFields(t *testing.T) {
 	baseRes := resource.Resource{
 		ID:   "i-0aaa111111111111a",
@@ -295,9 +240,6 @@ func TestApplyDetailEnrichmentForResource_UpdatesDetailFields(t *testing.T) {
 		t.Fatal("Fix4: Body.Detail became nil after enrichment")
 	}
 
-	// The enriched field "iam_profile_arn" / "web-role" must appear in Fields.
-	// Without ds.Resource replacement the projector only sees the base resource
-	// and the IAM value is absent.
 	enrichedValueFound := false
 	for _, f := range vs2.Body.Detail.Fields {
 		if strings.Contains(f.Value, "web-role") || strings.Contains(f.Key, "iam_profile") {
@@ -312,9 +254,6 @@ func TestApplyDetailEnrichmentForResource_UpdatesDetailFields(t *testing.T) {
 
 // TestApplyDetailEnrichmentForResource_TargetsStackedDetail verifies that
 // enrichment reaches a detail screen stacked beneath the active screen.
-//
-// Pre-fix failure: without iterating the full stack, the matching underlying
-// detail was never updated.
 func TestApplyDetailEnrichmentForResource_TargetsStackedDetail(t *testing.T) {
 	resA := resource.Resource{
 		ID:   "i-0aaa111111111111a",
@@ -337,7 +276,6 @@ func TestApplyDetailEnrichmentForResource_TargetsStackedDetail(t *testing.T) {
 
 	c := newControllerAtDetail(t, resA, "ec2")
 
-	// Push a second detail for resB on top of resA's detail.
 	c.ApplyIntents([]runtime.UIIntent{
 		runtime.PushScreen{
 			ID:      runtime.ScreenDetail,
@@ -363,10 +301,8 @@ func TestApplyDetailEnrichmentForResource_TargetsStackedDetail(t *testing.T) {
 		Source:   "wave2:test",
 	}
 
-	// Enrich resA while resB is the top screen.
 	c.ApplyDetailEnrichmentForResource("ec2", resA.ID, enrichedA, finding, nil)
 
-	// Pop back to resA's detail and verify the enrichment landed.
 	c.Apply(app.Action{Kind: app.ActionBack})
 
 	vs := c.Snapshot()
@@ -386,14 +322,8 @@ func TestApplyDetailEnrichmentForResource_TargetsStackedDetail(t *testing.T) {
 	}
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Fix 5 (P2-4): Wave-2 finding lands in Attention block and replaces correctly
-// ─────────────────────────────────────────────────────────────────────────────
-
 // TestApplyDetailFindingForResource_LandsInAttentionBlock verifies that
 // applying a wave-2 finding results in an Attention section in the Fields slice.
-// General regression test for applyFindingToState — guards against a future
-// regression where the wave-2 finding fails to reach the Attention block.
 func TestApplyDetailFindingForResource_LandsInAttentionBlock(t *testing.T) {
 	res := resource.Resource{
 		ID:   "i-0aaa111111111111a",
@@ -447,8 +377,7 @@ func TestApplyDetailFindingForResource_LandsInAttentionBlock(t *testing.T) {
 
 // TestApplyDetailFindingForResource_SecondApplyReplacesFirst verifies that
 // a second wave-2 finding from the same source replaces the first. The Attention
-// block must contain the second finding but not the first. General regression
-// test for applyFindingToState's wave-2 strip-then-append behaviour.
+// block must contain the second finding but not the first.
 func TestApplyDetailFindingForResource_SecondApplyReplacesFirst(t *testing.T) {
 	res := resource.Resource{
 		ID:   "i-0aaa111111111111a",
@@ -508,9 +437,6 @@ func TestApplyDetailFindingForResource_SecondApplyReplacesFirst(t *testing.T) {
 
 // TestApplyDetailFindingForResource_ResourceFieldsPreserved verifies that
 // applying a wave-2 finding does not destroy the resource's own field projections.
-//
-// Pre-fix failure: an early version of applyFindingToState cleared ds.Resource
-// or corrupted state such that the field list became empty.
 func TestApplyDetailFindingForResource_ResourceFieldsPreserved(t *testing.T) {
 	res := resource.Resource{
 		ID:   "i-0aaa111111111111a",
@@ -547,13 +473,11 @@ func TestApplyDetailFindingForResource_ResourceFieldsPreserved(t *testing.T) {
 		t.Fatal("Fix5 fields: Body.Detail nil after applying wave-2 finding")
 	}
 
-	// After the finding the field count must be >= before (attention rows added).
 	fieldsAfter := len(vs2.Body.Detail.Fields)
 	if fieldsAfter < fieldsBefore {
 		t.Errorf("Fix5 fields: field count dropped from %d to %d — resource fields lost after wave-2 apply", fieldsBefore, fieldsAfter)
 	}
 
-	// The original resource field "state=impaired" must still appear.
 	stateFound := false
 	for _, f := range vs2.Body.Detail.Fields {
 		if strings.Contains(f.Value, "impaired") {
@@ -577,16 +501,9 @@ func attentionContains(body *app.DetailBody, substr string) bool {
 	return false
 }
 
-// TestApplyDetailFinding_PreservesWave1Findings is the actual P2-4 guard: when a
+// TestApplyDetailFinding_PreservesWave1Findings verifies that when a
 // resource already carries wave-1 (fetcher-emitted) findings and a wave-2
-// enrichment finding is applied, BOTH must remain in the Attention block.
-//
-// Pre-fix failure: buildDetailFieldItems did `r.Findings = ds.Findings`, which
-// overwrote the resource's wave-1 findings with only the wave-2 entry, so the
-// wave-1 issue vanished from the Attention section / status projection. The fix
-// merges wave-1 (non-"wave2:" Source) with ds.Findings (wave-2). The other Fix-5
-// tests use resources with no wave-1 findings, so they pass on both code paths
-// and do NOT exercise this merge.
+// enrichment finding is applied, BOTH remain in the Attention block.
 func TestApplyDetailFinding_PreservesWave1Findings(t *testing.T) {
 	res := resource.Resource{
 		ID:   "i-0aaa111111111111a",
@@ -634,24 +551,10 @@ func TestApplyDetailFinding_PreservesWave1Findings(t *testing.T) {
 	}
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Fix P2 (APIError): Handle(APIError) must clear Loading and surface a flash
-// ─────────────────────────────────────────────────────────────────────────────
-
-// TestController_APIErrorClearsListLoadingAndFlashes is the regression guard for
-// the headless-controller APIError handling path added in commit 56910d32.
-//
-// Pre-fix failure: Controller.Handle dropped messages.APIError entirely, so the
-// active list screen stayed stuck with Loading=true and no error flash was set.
-// The fix routes APIError through core.HandleAPIError and applies the returned
-// intents: ClearActiveListLoadingIntent (clears Loading) and FlashIntent
-// (surfaces Header.Flash).
-//
-// Test strategy:
-//  1. Navigate to an ec2 list screen (Loading=true, no resources seeded yet).
-//  2. Assert the precondition: Loading==true so the test is meaningful.
-//  3. Deliver messages.APIError with Gen=0 (AcceptZeroGen=true — never stale).
-//  4. Assert both intents were applied: Loading==false and Header.Flash is an error.
+// TestController_APIErrorClearsListLoadingAndFlashes verifies that
+// Handle(messages.APIError) applies the intents core.HandleAPIError returns:
+// ClearActiveListLoadingIntent (clears Loading) and FlashIntent (surfaces
+// Header.Flash).
 func TestController_APIErrorClearsListLoadingAndFlashes(t *testing.T) {
 	c := newListController(t, "ec2")
 
@@ -674,7 +577,6 @@ func TestController_APIErrorClearsListLoadingAndFlashes(t *testing.T) {
 
 	vs := c.Snapshot()
 
-	// Assert Fix 1: ClearActiveListLoadingIntent must have cleared Loading.
 	if vs.Body.List == nil {
 		t.Fatal("Body.List is nil after Handle(APIError) — list screen was unexpectedly popped")
 	}
@@ -682,7 +584,6 @@ func TestController_APIErrorClearsListLoadingAndFlashes(t *testing.T) {
 		t.Error("APIError left list stuck Loading=true — review P2 regression: ClearActiveListLoadingIntent was not applied by Handle(APIError)")
 	}
 
-	// Assert Fix 2: FlashIntent must have surfaced an error flash in the header.
 	if !vs.Header.Flash.IsError {
 		t.Error("APIError did not set Header.Flash.IsError=true — review P2 regression: FlashIntent was not applied by Handle(APIError)")
 	}

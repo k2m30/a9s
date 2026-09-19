@@ -75,8 +75,6 @@ func EnrichAthenaWorkGroup(ctx context.Context, clients *ServiceClients, resourc
 			key = wgName
 		}
 		// EnforceWorkGroupConfiguration defaults to true; false means callers can bypass settings.
-		// No supporting row: the phrase already says the setting is overridable,
-		// and U11 forbids restating it underneath.
 		if cfg.EnforceWorkGroupConfiguration != nil && !*cfg.EnforceWorkGroupConfiguration {
 			setWave2Finding(&result, key, athenaCodeSettingsNotEnforced, nil)
 

@@ -14,7 +14,7 @@
 // rdstypes.DBClusterSnapshot). The extractors below try docdbtypes first, then
 // rdstypes, returning zero values if neither matches.
 //
-// The enricher detects two signals from docs/resources/dbc-snap.md §3.1:
+// The enricher detects two signals (docs/resources/dbc-snap.md):
 //
 //  1. orphan: parent DBClusterIdentifier NOT found in the loaded dbc cache.
 //     Phrase: "orphan: source cluster deleted"

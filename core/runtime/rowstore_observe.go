@@ -3,19 +3,15 @@
 // rowstore_observe.go — RowStore dual-write for the two events HandleEvent
 // must never apply intents for.
 //
-// messages.ResourcesLoaded and messages.RelatedCheckResult are each already
-// owned by a dedicated, intent-returning Core method
-// (HandleResourcesLoaded / HandleRelatedCheckResult) that existing callers
-// (the TUI adapter, Controller.Handle) invoke directly — NOT through
-// HandleEvent. Wiring HandleEvent's switch to call those methods for these
-// two message types would make Controller.Handle (core/app/handle.go,
-// out of this stage's scope) apply the same intents a second time via its
-// existing, separate ResourcesLoaded/RelatedCheckResult pipeline — a real
-// behavior change. This file gives HandleEvent's ResourcesLoaded/
-// RelatedCheckResult cases a session-mutation-only path (RowStore dual-write,
-// no intents/tasks) so a generic HandleEvent caller (this stage's
-// differential-harness pin, a future headless caller) sees the store update
-// without touching core/app-owned intent application.
+// messages.ResourcesLoaded and messages.RelatedCheckResult are each owned by
+// a dedicated, intent-returning Core method (HandleResourcesLoaded /
+// HandleRelatedCheckResult) that callers (the TUI adapter, Controller.Handle)
+// invoke directly — NOT through HandleEvent. Controller.Handle
+// (core/app/handle.go) applies those intents through its own
+// ResourcesLoaded/RelatedCheckResult pipeline, so HandleEvent applying them
+// too would apply them twice. This file gives HandleEvent's
+// RelatedCheckResult case a session-mutation-only path (RowStore dual-write,
+// no intents/tasks) so a generic HandleEvent caller sees the store update.
 package runtime
 
 import (
@@ -49,11 +45,11 @@ func (c *Core) observeRelatedCheckResultRows(msg messages.RelatedCheckResult) {
 // prefetch that only inspected a first page). Truncation is a UNION of
 // entry.IsTruncated and entry.Pagination.IsTruncated, never a downgrade —
 // matching this codebase's standing rule that a truncation signal only ever
-// strengthens (C5's nil-Pagination-is-conservatively-truncated, RowStore's
+// strengthens (nil Pagination is conservatively truncated, RowStore's
 // refusal to replace an exact entry with a stale truncated subset, the
 // availability path's refusal to promote an unobserved count to Exact): a
-// future constructor that ever sets the two fields independently must not
-// have this silently turn a true "N+" into a confident, wrong "N". Copies
+// constructor that sets the two fields independently must not have this
+// turn a true "N+" into a confident, wrong "N". Copies
 // the struct rather than mutating it in place, since the same *PaginationMeta
 // also reaches PatchResourceCache's write of the canonical ResourceCache
 // entry. Shared by observeRelatedCheckResultRows's RowStore dual-write above

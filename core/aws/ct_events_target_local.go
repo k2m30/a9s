@@ -7,7 +7,7 @@ import (
 	"strings"
 )
 
-// extractTargetByEventName implements the §4 per-event-name fallback table.
+// extractTargetByEventName implements the per-event-name fallback table.
 // Called when resources[] is empty and the event is a management event.
 func extractTargetByEventName(eventName string, parsed map[string]any) string {
 	req, _ := parsed["requestParameters"].(map[string]any)
@@ -107,7 +107,6 @@ func extractTargetByEventName(eventName string, parsed map[string]any) string {
 		return "(none)"
 	}
 	// Catch-all: scan for any *Id / *Name / *Arn key at top level of requestParameters.
-	// Ranging over a nil map is a no-op in Go, so the nil check is not needed.
 	for k, v := range req {
 		if s, ok := v.(string); ok && s != "" {
 			if strings.HasSuffix(k, "Id") || strings.HasSuffix(k, "Name") || strings.HasSuffix(k, "Arn") {

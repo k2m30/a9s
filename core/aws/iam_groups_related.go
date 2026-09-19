@@ -47,12 +47,10 @@ func checkGroupPolicy(ctx context.Context, clients any, res resource.Resource, _
 		return resource.KnownRelated("policy", nil, false)
 	}
 	var ids []string
-	// Attached managed policies
 	attached, err := c.IAM.ListAttachedGroupPolicies(ctx, &iam.ListAttachedGroupPoliciesInput{GroupName: &groupName})
 	if err == nil {
 		ids = append(ids, attachedPolicyNames(attached.AttachedPolicies)...)
 	}
-	// Inline policies
 	inline, err2 := c.IAM.ListGroupPolicies(ctx, &iam.ListGroupPoliciesInput{GroupName: &groupName})
 	if err2 == nil {
 		ids = append(ids, inline.PolicyNames...)

@@ -14,7 +14,7 @@ import (
 // RDSFixtures holds all RDS domain objects served by the fake.
 type RDSFixtures struct {
 	// DBInstances is the full list returned by DescribeDBInstances.
-	// Sources: NewDBIFixtures().Instances (canonical fixtures) + legacy pool instances.
+	// Sources: NewDBIFixtures().Instances (canonical fixtures) + a bulk-generated pool.
 	DBInstances []rdstypes.DBInstance
 	// DBSnapshots is the full list returned by DescribeDBSnapshots.
 	DBSnapshots []rdstypes.DBSnapshot
@@ -32,7 +32,7 @@ type RDSFixtures struct {
 
 // NewRDSFixtures builds and returns a fully-populated RDSFixtures struct.
 // DBInstances are sourced from DBIFixtures (single source of truth) plus the
-// legacy bulk-generated pool. Callers that only need DBInstances should use
+// bulk-generated pool. Callers that only need DBInstances should use
 // NewDBIFixtures() directly.
 var sharedRDSFixtures = sync.OnceValue(func() *RDSFixtures {
 	dbi := NewDBIFixtures()
@@ -51,7 +51,7 @@ func NewRDSFixtures() *RDSFixtures {
 	return sharedRDSFixtures()
 }
 
-// One witness per dbc security-posture finding, on the Aurora side (the RDS
+// One carrier per dbc security-posture finding, on the Aurora side (the RDS
 // SDK is the only one of the two that carries all four fields). Every other
 // cluster — Aurora and DocumentDB alike — is normalized to the healthy value.
 const (
@@ -106,10 +106,10 @@ var rdsEnginePool = []struct {
 	{"aurora-postgresql", "16.4", "db.t3.medium"},
 }
 
-// normalizeRDSInstancePosture forces the legacy bulk-generated instance pool
+// normalizeRDSInstancePosture forces the bulk-generated instance pool
 // to the healthy value for every security-posture predicate. The pool exists
 // to give the list realistic bulk, not to demonstrate findings — the
-// dedicated witnesses in dbi.go own that job, and without this pass a dozen
+// dedicated posture instances in dbi.go own that job, and without this pass a dozen
 // filler rows would carry the same finding and bury them.
 func normalizeRDSInstancePosture(dbs []rdstypes.DBInstance) []rdstypes.DBInstance {
 	out := make([]rdstypes.DBInstance, len(dbs))
@@ -128,8 +128,8 @@ func normalizeRDSInstancePosture(dbs []rdstypes.DBInstance) []rdstypes.DBInstanc
 	return out
 }
 
-// normalizeRDSClusterPosture forces every cluster except the row that
-// witnesses a given posture finding to that finding's healthy value.
+// normalizeRDSClusterPosture forces every cluster except the one that
+// carries a given posture finding to that finding's healthy value.
 func normalizeRDSClusterPosture(cs []rdstypes.DBCluster) []rdstypes.DBCluster {
 	out := make([]rdstypes.DBCluster, len(cs))
 	copy(out, cs)
@@ -596,7 +596,7 @@ func rdsPostureWitnessCluster(id string, defect func(*rdstypes.DBCluster)) rdsty
 
 // buildRDSDBClusterSnapshots returns Aurora + Multi-AZ DB cluster snapshots.
 // ProdDBCSnapAuroraID provides the Aurora dbc→dbc-snap pivot and the dbc-snap
-// graph-root for drill-through tests.
+// graph root for the drill-through.
 func buildRDSDBClusterSnapshots() []rdstypes.DBClusterSnapshot {
 	return []rdstypes.DBClusterSnapshot{
 		{
@@ -618,7 +618,7 @@ func buildRDSDBClusterSnapshots() []rdstypes.DBClusterSnapshot {
 			VpcId:                       aws.String(rdsProdVPCID),
 		},
 		{
-			// Witness for dbc-snap.public: the fake reports its restore
+			// Raises dbc-snap.public: the fake reports its restore
 			// attribute as granting the "all" group.
 			DBClusterSnapshotIdentifier: aws.String(DBCSnapPublic),
 			DBClusterIdentifier:         aws.String("prod-aurora-cluster"),
@@ -703,14 +703,12 @@ func buildRDSEvents() []rdstypes.Event {
 }
 
 func init() {
-	// dbi issues is 28, not 42: the bulk pool sets DeletionProtection, so only
-	// warn-dbi-unprotected carries dbi.warn.deletion_protection_off and the
-	// fourteen rows that had no other issue left the badge.
-	// TestD4_DeletionProtectionHasOneWitness fails on a restored 42.
+	// The bulk pool sets DeletionProtection, so only warn-dbi-unprotected
+	// carries dbi.warn.deletion_protection_off.
 	Register(Pin{ShortName: "dbi", Rows: 51, Issues: 29, CoverageGaps: []string{"dim"}})
 	Register(Pin{ShortName: "dbi-snap", Rows: 12, Issues: 7, CoverageGaps: []string{"dim"}})
-	// dbc issues is 14 here and 15 in scenario_dbc_visual_test.go:
-	// healthy-dbc-maint-overdue is a Wave-2-only finding, uncounted at Wave 1.
+	// dbc issues counts Wave 1 only: healthy-dbc-maint-overdue's finding
+	// arrives in Wave 2.
 	Register(Pin{ShortName: "dbc", Rows: 17, Issues: 14, CoverageGaps: []string{"dim"}})
 	Register(Pin{ShortName: "dbc-snap", Rows: 13, Issues: 6, CoverageGaps: []string{"dim"}})
 }

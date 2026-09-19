@@ -81,10 +81,6 @@ func (f *fakeRDSSubnetGroupClient) DescribeDBClusterSnapshots(_ context.Context,
 	panic("DescribeDBClusterSnapshots should not be called in subnet-group tests")
 }
 
-// ---------------------------------------------------------------------------
-// Tests
-// ---------------------------------------------------------------------------
-
 // TestDbcSubnetGroup_DocDBShape verifies dbcSubnetGroup dispatches to
 // dbcDocDBSubnetGroup for a docdbtypes.DBCluster shape and returns the
 // VpcId and Subnets from the DocDB API response.
@@ -187,7 +183,6 @@ func TestDbcSubnetGroup_NilClient_DocDB(t *testing.T) {
 			DBSubnetGroup:       aws.String("some-sng"),
 		},
 	}
-	// Pass nil clients — dbcDocDBSubnetGroup must short-circuit.
 	info, _ := dbcSubnetGroup(context.Background(), nil, res)
 	if info != nil {
 		t.Errorf("dbcSubnetGroup = %+v, want nil when clients is nil", info)
@@ -204,7 +199,6 @@ func TestDbcSubnetGroup_NilClient_RDS(t *testing.T) {
 			DBSubnetGroup:       aws.String("some-sng"),
 		},
 	}
-	// Pass nil clients — dbcRDSSubnetGroup must short-circuit.
 	info, _ := dbcSubnetGroup(context.Background(), nil, res)
 	if info != nil {
 		t.Errorf("dbcSubnetGroup = %+v, want nil when clients is nil", info)

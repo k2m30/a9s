@@ -53,7 +53,6 @@ func checkTGELB(ctx context.Context, clients any, res resource.Resource, cache r
 		return resource.UnknownRelated("elb")
 	}
 
-	// Build a set of ARNs from the TG's LoadBalancerArns.
 	arnSet := make(map[string]struct{}, len(raw.LoadBalancerArns))
 	for _, arn := range raw.LoadBalancerArns {
 		arnSet[arn] = struct{}{}

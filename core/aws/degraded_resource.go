@@ -92,8 +92,7 @@ func degradedFindings(shortName, degradedCode string) []domain.Finding {
 // services) and UnauthorizedOperation (EC2 — lt's DescribeLaunchTemplateVersions
 // is EC2-backed and never returns AccessDenied). Any other error — or a nil
 // body (nil err) — is a non-auth failure and yields details_unavailable.
-// Deliberately local: accessDeniedErr (kms.go) stays KMS-only, its semantics
-// untouched.
+// Separate from accessDeniedErr (kms.go), which is KMS-only.
 func degradedAuthDenial(err error) bool {
 	// EC2 spells the same refusal UnauthorizedOperation, which is no class of
 	// its own — it is a code this one site adds to the denial class.

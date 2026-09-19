@@ -66,7 +66,6 @@ func fetchECSTasksPageWithJoin(
 		}
 
 		for _, task := range descOutput.Tasks {
-			// Extract task UUID from ARN (last segment after /)
 			taskID := ""
 			taskArn := ""
 			if task.TaskArn != nil {
@@ -145,9 +144,6 @@ func fetchECSTasksPageWithJoin(
 				fields["task_def_join_error"] = "true"
 			}
 
-			// emit wave1 Findings for non-healthy transitional states, plus
-			// the STOPPED/health-status structural signals colorECSTask used
-			// to read directly from Fields.
 			findings := ecsTaskStructuralFindings(status, stopCode, healthStatus)
 
 			r := resource.Resource{
@@ -252,7 +248,6 @@ func ecsJoinTaskDefinition(
 
 	var out taskDefJoinFields
 
-	// Collect unique EFS file-system IDs from Volumes.
 	efsSeen := make(map[string]struct{})
 	for _, v := range td.Volumes {
 		if v.EfsVolumeConfiguration != nil &&

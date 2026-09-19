@@ -40,11 +40,10 @@ func isZeroOrEpoch(t time.Time) bool {
 	return t.IsZero() || t.Unix() == 0
 }
 
-// computeOpenSearchFindings classifies a DomainStatus against every signal the
-// spec names. DescribeDomains is the fetcher's own call and DomainStatus
-// carries all of them, so there is no second pass reading these same fields
-// back out of Fields: one slice holds every finding and domain.StatusPhrase
-// counts each once.
+// computeOpenSearchFindings classifies a DomainStatus against every
+// opensearch signal. DescribeDomains is the fetcher's own call and
+// DomainStatus carries all of them, so one slice holds every finding and
+// domain.StatusPhrase counts each once.
 func computeOpenSearchFindings(d opensearchtypes.DomainStatus, now time.Time) []domainpkg.Finding {
 	var findings []domainpkg.Finding
 	if d.Deleted != nil && *d.Deleted {
@@ -118,7 +117,6 @@ func FetchOpenSearchDomainsAt(
 		return []resource.Resource{}, nil
 	}
 
-	// Collect domain names for the DescribeDomains call.
 	domainNames := make([]string, 0, len(listOutput.DomainNames))
 	for _, d := range listOutput.DomainNames {
 		if d.DomainName != nil {
@@ -152,7 +150,6 @@ func FetchOpenSearchDomainsAt(
 				}
 			}
 
-			// --- Signal flags ---
 			deleted := strconv.FormatBool(aws.ToBool(domain.Deleted))
 			processing := strconv.FormatBool(aws.ToBool(domain.Processing))
 			upgradeProcessing := strconv.FormatBool(aws.ToBool(domain.UpgradeProcessing))
@@ -164,7 +161,6 @@ func FetchOpenSearchDomainsAt(
 				processingStatus = string(domain.DomainProcessingStatus)
 			}
 
-			// Software update forced soon: UpdateAvailable AND AutomatedUpdateDate in the past.
 			updateAvailable := "false"
 			updateDate := ""
 			currentVersion := ""
@@ -181,7 +177,6 @@ func FetchOpenSearchDomainsAt(
 				newVersion = aws.ToString(sso.NewVersion)
 			}
 
-			// Encryption at rest: non-nil pointer with value false.
 			encEnabled := "true"
 			if domain.EncryptionAtRestOptions != nil &&
 				domain.EncryptionAtRestOptions.Enabled != nil &&

@@ -19,9 +19,8 @@ import (
 )
 
 // checkApigwKMS resolves KMS keys referenced by this API's Lambda integrations.
-// Weak pair (3-sometimes/2-no consensus). API Gateway has no direct KMS field;
-// we follow Lambda integrations as a best effort.
-// Pattern C: one GetIntegrations call + per-Lambda-target GetFunction call.
+// API Gateway has no direct KMS field; Lambda integrations are followed as a
+// best effort: one GetIntegrations call + per-Lambda-target GetFunction call.
 // Extracts KMSKeyArn from each Lambda integration's FunctionConfiguration.
 func checkApigwKMS(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	apiID := res.ID
@@ -88,8 +87,6 @@ func checkApigwKMS(ctx context.Context, clients any, res resource.Resource, cach
 // API Gateway by naming convention:
 //   - API-Gateway-Execution-Logs_{apiID}/ prefix (default execution log group)
 //   - /aws/apigateway/{apiName} (custom access log group convention)
-//
-// Pattern N — naming convention.
 func checkApigwLogs(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	apiID := res.ID
 	apiName := res.Name
@@ -142,7 +139,7 @@ func apigwListIntegrations(ctx context.Context, clients any, apiID string) ([]ap
 }
 
 // checkApigwLambda reports Lambda integration targets of this API Gateway.
-// Pattern C: one apigatewayv2:GetIntegrations call, filter to AWS_PROXY /
+// One apigatewayv2:GetIntegrations call, filter to AWS_PROXY /
 // AWS integrations whose IntegrationUri points at a Lambda invoke ARN.
 func checkApigwLambda(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	apiID := res.ID
@@ -184,7 +181,6 @@ func checkApigwACM(ctx context.Context, clients any, res resource.Resource, cach
 	if !ok {
 		return resource.UnknownRelated("acm")
 	}
-	// Enumerate all custom domain names (one call).
 	dn, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*apigatewayv2.GetDomainNamesOutput, error) {
 		return dnAPI.GetDomainNames(ctx, &apigatewayv2.GetDomainNamesInput{})
 	})
@@ -199,7 +195,6 @@ func checkApigwACM(ctx context.Context, clients any, res resource.Resource, cach
 			continue
 		}
 		total++
-		// Per domain: get its mappings; check if any maps to this API.
 		m, merr := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*apigatewayv2.GetApiMappingsOutput, error) {
 			return mapAPI.GetApiMappings(ctx, &apigatewayv2.GetApiMappingsInput{DomainName: d.DomainName})
 		})
@@ -220,7 +215,6 @@ func checkApigwACM(ctx context.Context, clients any, res resource.Resource, cach
 		if !matched {
 			continue
 		}
-		// Harvest CertificateArn from each domain configuration.
 		for _, dcfg := range d.DomainNameConfigurations {
 			if dcfg.CertificateArn != nil && *dcfg.CertificateArn != "" {
 				refs = append(refs, *dcfg.CertificateArn)
@@ -283,7 +277,7 @@ func checkApigwCF(ctx context.Context, clients any, res resource.Resource, cache
 }
 
 // checkApigwELB reports the Network Load Balancer behind this API's VPC
-// link. Pattern C: apigatewayv2:GetIntegrations to find VPC_LINK integrations
+// link. Uses apigatewayv2:GetIntegrations to find VPC_LINK integrations
 // and their ConnectionId (the VpcLink ID), apigatewayv2:GetVpcLinks
 // (account-wide, not API-scoped) to resolve that VpcLink's subnet/security-
 // group set, then intersect against the already-loaded elb cache's NLBs by
@@ -408,7 +402,7 @@ func checkApigwELB(ctx context.Context, clients any, res resource.Resource, cach
 }
 
 // checkApigwRole reports IAM roles this API assumes to call the integration
-// target or to run a request authorizer. Pattern C: reuses the
+// target or to run a request authorizer. Reuses the
 // apigatewayv2:GetIntegrations call (Integration.CredentialsArn) already
 // made by the lambda/kms/sfn/sns pivots, plus one apigatewayv2:GetAuthorizers
 // call (Authorizer.AuthorizerCredentialsArn) — role ARNs reduced to bare

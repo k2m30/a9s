@@ -2,13 +2,10 @@
 
 package runtime
 
-// helpers.go — session-state helpers on Core used by the per-handler PRs.
+// helpers.go — session-state helpers on Core.
 //
 // These methods operate only on c.session fields and platform-agnostic packages
-// (resource, aws/wave2.AllWave2).  They are the runtime equivalents of the
-// same-named methods that still exist on tui.Model for non-migrated callers;
-// both sets operate on the same *session.Session so mutations are visible to
-// both.
+// (resource, aws/wave2.AllWave2).
 
 import (
 	"slices"
@@ -31,9 +28,8 @@ import (
 //
 // Folds Wave-2 findings into RowStore's retained rows for canon via
 // AmendRows' copy-on-write mutation (a type's rows live in exactly one
-// RowStore entry, so this is the only per-type-row
-// destination left). The mutate-in-place bug class the dispatch-time payload
-// freeze guards against is exactly what Amend exists to remove — see
+// RowStore entry, so this is the only per-type-row destination). Amend's
+// copy-on-write keeps a dispatch-time payload freeze intact — see
 // RowStore.Amend's doc comment.
 // uninspected names the rows this result could not speak for — the
 // enricher's own TruncatedIDs. Threaded to FoldWave2Rows, which lands what the

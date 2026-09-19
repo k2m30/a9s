@@ -84,7 +84,6 @@ func checkCfELB(ctx context.Context, clients any, res resource.Resource, cache r
 		return resource.KnownRelated("elb", nil, false)
 	}
 
-	// Collect ELB domain names from origins.
 	elbDomains := make(map[string]struct{})
 	for _, origin := range dist.Origins.Items {
 		if origin.DomainName == nil {
@@ -234,7 +233,6 @@ func extractCfAliases(res resource.Resource) []string {
 	if ok && dist.Aliases != nil {
 		return dist.Aliases.Items
 	}
-	// Fallback to Fields.
 	raw := res.Fields["aliases"]
 	if raw == "" {
 		return nil
@@ -267,7 +265,7 @@ func checkCfAlarm(ctx context.Context, clients any, res resource.Resource, cache
 }
 
 // checkCfLambda reports Lambda@Edge associations on this distribution.
-// Pattern C: one cloudfront:GetDistributionConfig call; extract
+// One cloudfront:GetDistributionConfig call; extract
 // LambdaFunctionAssociations across default + ordered cache behaviors.
 func checkCfLambda(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	if res.ID == "" {

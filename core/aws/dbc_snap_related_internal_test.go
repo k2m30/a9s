@@ -9,7 +9,6 @@ package aws
 //
 //  1. TruncatedDBCCacheReturnsUnknown: dbc cache is truncated AND the parent
 //     cluster is not in the visible window → UnknownRelated("backup") (Count=-1).
-//     This is the bug the coder is fixing: current code returns Count=0.
 //
 //  2. TruncatedDBCCacheButParentResolved: dbc cache is truncated BUT the parent
 //     cluster IS in the visible window with a populated DBClusterArn → the
@@ -54,12 +53,9 @@ func buildDBCSnapBackupResource(snapshotID, parentClusterID string) resource.Res
 // truncated dbc list. Returning Count=0 would be a false "no backup coverage"
 // signal. UnknownRelated("backup") renders as "?" in the related panel,
 // which is the correct UX for "we don't know".
-//
-// This test FAILS until the coder's fix to checkDbcSnapBackup is shipped.
 func TestCheckDbcSnapBackup_TruncatedDBCCacheReturnsUnknown(t *testing.T) {
 	res := buildDBCSnapBackupResource("snap-missing-parent", "missing-cluster")
 
-	// dbc cache is truncated; "missing-cluster" is NOT in the visible window.
 	otherCluster := docdbtypes.DBCluster{
 		DBClusterIdentifier: aws.String("other-cluster"),
 		DBClusterArn:        aws.String("arn:aws:rds:us-east-1:123456789012:cluster:other-cluster"),
@@ -89,8 +85,6 @@ func TestCheckDbcSnapBackup_TruncatedDBCCacheReturnsUnknown(t *testing.T) {
 
 	result := checkDbcSnapBackup(context.Background(), nil, res, cache)
 
-	// Must return UnknownRelated shape: Count=-1, TargetType="backup".
-	// This is the key assertion — current (buggy) code returns Count=0.
 	if result.TargetType() != "backup" {
 		t.Errorf("TargetType = %q, want %q", result.TargetType(), "backup")
 	}
@@ -114,7 +108,6 @@ func TestCheckDbcSnapBackup_TruncatedDBCCacheButParentResolved(t *testing.T) {
 
 	res := buildDBCSnapBackupResource("snap-prod", parentID)
 
-	// dbc cache is truncated BUT the parent IS present with its ARN.
 	parentCluster := docdbtypes.DBCluster{
 		DBClusterIdentifier: aws.String(parentID),
 		DBClusterArn:        aws.String(parentARN),
@@ -144,15 +137,12 @@ func TestCheckDbcSnapBackup_TruncatedDBCCacheButParentResolved(t *testing.T) {
 
 	result := checkDbcSnapBackup(context.Background(), nil, res, cache)
 
-	// Parent was found in the visible window — backup scan must proceed.
-	// The plan covers the parent ARN → Count=1.
 	if result.TargetType() != "backup" {
 		t.Errorf("TargetType = %q, want %q", result.TargetType(), "backup")
 	}
 	if result.State() == domain.RelatedUnknown {
 		t.Errorf("Count = -1 (Unknown), but parent was resolved — should scan backup plans normally")
 	}
-	// Verify the plan was found (Count should be 1).
 	if result.Count() != 1 {
 		t.Errorf("Count = %d, want 1 (plan %q covers parent ARN)", result.Count(), planID)
 	}
@@ -169,7 +159,6 @@ func TestDbcSnapHelpers_DualShape(t *testing.T) {
 	const parentARN = "arn:aws:rds:us-east-1:123456789012:cluster:prod-cluster"
 	emptyCache := resource.ResourceCache{}
 
-	// --- checkDbcSnapDBC ---
 	t.Run("checkDbcSnapDBC_docdb", func(t *testing.T) {
 		snap := docdbtypes.DBClusterSnapshot{
 			DBClusterIdentifier: aws.String(parentID),
@@ -179,8 +168,8 @@ func TestDbcSnapHelpers_DualShape(t *testing.T) {
 		if result.TargetType() != "dbc" {
 			t.Errorf("TargetType = %q, want dbc", result.TargetType())
 		}
-		// INVERTED under row 18: an empty cache means no cluster list was read,
-		// and the snapshot's own parent id is not evidence the cluster exists.
+		// An empty cache means no cluster list was read, and the snapshot's own
+		// parent id is not evidence the cluster exists.
 		assertDbcSnapParentUnknown(t, result)
 	})
 
@@ -202,7 +191,6 @@ func TestDbcSnapHelpers_DualShape(t *testing.T) {
 		}
 	})
 
-	// --- checkDbcSnapKMS ---
 	t.Run("checkDbcSnapKMS_docdb", func(t *testing.T) {
 		snap := docdbtypes.DBClusterSnapshot{KmsKeyId: aws.String(kmsARN)}
 		res := resource.Resource{ID: "snap-4", RawStruct: snap}
@@ -239,7 +227,6 @@ func TestDbcSnapHelpers_DualShape(t *testing.T) {
 		}
 	})
 
-	// --- checkDbcSnapVPC ---
 	t.Run("checkDbcSnapVPC_docdb", func(t *testing.T) {
 		snap := docdbtypes.DBClusterSnapshot{VpcId: aws.String(vpcID)}
 		res := resource.Resource{ID: "snap-7", RawStruct: snap}
@@ -267,7 +254,6 @@ func TestDbcSnapHelpers_DualShape(t *testing.T) {
 		}
 	})
 
-	// --- dbcSnapParentRefs ---
 	t.Run("dbcSnapParentRefs_docdb", func(t *testing.T) {
 		snap := docdbtypes.DBClusterSnapshot{DBClusterIdentifier: aws.String(parentID)}
 		name, arn := dbcSnapParentRefs(snap)
@@ -290,7 +276,6 @@ func TestDbcSnapHelpers_DualShape(t *testing.T) {
 		}
 	})
 
-	// --- dbcResourceARN ---
 	t.Run("dbcResourceARN_docdb", func(t *testing.T) {
 		cluster := docdbtypes.DBCluster{DBClusterArn: aws.String(parentARN)}
 		got := dbcResourceARN(cluster)
@@ -316,8 +301,8 @@ func TestDbcSnapHelpers_DualShape(t *testing.T) {
 	})
 }
 
-// assertDbcSnapParentUnknown holds row 18's reading for checkDbcSnapDBC with no
-// cluster list read: Unknown, and never a count taken from the snapshot itself.
+// assertDbcSnapParentUnknown asserts that checkDbcSnapDBC with no cluster list
+// read answers Unknown, and never a count taken from the snapshot itself.
 func assertDbcSnapParentUnknown(t *testing.T, result resource.RelatedCheckResult) {
 	t.Helper()
 	if result.State() != domain.RelatedUnknown {

@@ -42,7 +42,6 @@ func FetchEC2InstancesPage(ctx context.Context, api EC2FetchInstancesAPI, contin
 		enrichEC2StatusChecks(ctx, api, resources)
 	}
 
-	// Build pagination metadata
 	nextToken := ""
 	isTruncated := false
 	if output.NextToken != nil {
@@ -139,7 +138,6 @@ func ec2InstanceToResource(inst ec2types.Instance) resource.Resource {
 		ID:   instanceID,
 		Name: name,
 		Type: "ec2",
-		// Status intentionally unset — lifecycle state is emitted as a Finding.
 		Fields: map[string]string{
 			"instance_id":       instanceID,
 			"name":              name,
@@ -156,8 +154,6 @@ func ec2InstanceToResource(inst ec2types.Instance) resource.Resource {
 		RawStruct: inst,
 	}
 
-	// emit canonical Findings for every non-healthy lifecycle state.
-	// Healthy ("running") has no Finding.
 	switch state {
 	case "pending":
 		r.Findings = []domain.Finding{wave1Finding(CodeEC2StatePending)}
@@ -197,9 +193,8 @@ func ec2InstanceToResource(inst ec2types.Instance) resource.Resource {
 
 // enrichEC2StatusChecks calls DescribeInstanceStatus for the page's resources
 // and merges system_status/instance_status into each resource's Fields map.
-// Errors are silently ignored (graceful degradation per design spec).
+// Errors are silently ignored (graceful degradation).
 func enrichEC2StatusChecks(ctx context.Context, api EC2DescribeInstanceStatusAPI, resources []resource.Resource) {
-	// Collect instance IDs.
 	ids := make([]string, 0, len(resources))
 	for _, r := range resources {
 		if r.ID != "" {
@@ -210,7 +205,6 @@ func enrichEC2StatusChecks(ctx context.Context, api EC2DescribeInstanceStatusAPI
 		return
 	}
 
-	// Build a map from instance ID to (systemStatus, instanceStatus).
 	statusMap := make(map[string][2]string, len(ids))
 
 	// DescribeInstanceStatus accepts max 100 IDs per call.
@@ -224,7 +218,6 @@ func enrichEC2StatusChecks(ctx context.Context, api EC2DescribeInstanceStatusAPI
 			IncludeAllInstances: aws.Bool(true),
 		})
 		if err != nil {
-			// Non-fatal: skip enrichment for this batch.
 			continue
 		}
 
@@ -244,7 +237,6 @@ func enrichEC2StatusChecks(ctx context.Context, api EC2DescribeInstanceStatusAPI
 		}
 	}
 
-	// Merge status fields into resources and promote Status for running instances.
 	for i, r := range resources {
 		if pair, ok := statusMap[r.ID]; ok {
 			if resources[i].Fields == nil {

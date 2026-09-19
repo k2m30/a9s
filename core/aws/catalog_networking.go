@@ -763,7 +763,6 @@ var networkingTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // st
 			{TargetType: "vpc", DisplayName: "VPC", Checker: checkVpcPeerVPC, NeedsTargetCache: true, Truncated: true},
 			{TargetType: "ct-events", DisplayName: "CloudTrail Events", Checker: ctEventsCheckerFor("vpc-peer")},
 		},
-		// No Navigable fields — see docs/resources/vpc-peer-impl-plan.md §0.
 		Findings: []catalog.FindingDef{
 			{Code: vpcPeerCodeProvisioning, Phrase: "provisioning", Severity: domain.SevWarn, Source: "wave1", Detail: "The connection is being set up and does not carry traffic yet. Wait for it to become active, then add routes on both sides before expecting anything to cross."},
 			{Code: vpcPeerCodeInitiating, Phrase: "initiating", Severity: domain.SevWarn, Source: "wave1", Detail: "The request has been made and the other VPC's owner has not accepted it yet, so nothing crosses between the two. Have the accepter approve it, then add routes on both sides — an accepted peering with no routes still carries nothing."},

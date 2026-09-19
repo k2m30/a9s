@@ -15,7 +15,7 @@ import (
 // interface references.
 const sgCodeUnused domain.FindingCode = "sg.unused"
 
-// sgUnusedPhrase is the S4 status phrase for sgCodeUnused.
+// sgUnusedPhrase is the status phrase for sgCodeUnused.
 const sgUnusedPhrase = "not attached to anything"
 
 // EnrichSGUsage cross-references each security group against the already

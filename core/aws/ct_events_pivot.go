@@ -1,8 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
 
-// ct_events_pivot.go — factory for CloudTrail events pivot checkers.
-// Eliminates the copy-paste pattern shared by checkDbcCTEvents,
-// checkDbcSnapCTEvents, and checkDBISnapCTEvents.
+// ct_events_pivot.go — factory for CloudTrail events pivot checkers, shared
+// by checkDbcCTEvents, checkDbcSnapCTEvents, and checkDBISnapCTEvents.
 package aws
 
 import (

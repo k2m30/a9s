@@ -28,10 +28,9 @@ type VpcPeerFixtures struct {
 const (
 	// ProdPeerSharedID is the graph root: active connection between the local
 	// prod VPC (a vpc cache member — resolves the vpc related-panel pivot)
-	// and a cross-account remote VPC that is NOT in the local vpc cache — the
-	// cache-membership-gate witness (docs/resources/vpc-peer.md §2 vpc).
-	// Two existing rtb fixtures (ec2.go) gain routes to it, backing the rtb
-	// pivot's ≥2 witness.
+	// and a cross-account remote VPC that is NOT in the local vpc cache, so
+	// the vpc pivot's cache-membership gate applies (docs/resources/vpc-peer.md).
+	// Two rtb fixtures (ec2.go) route to it, so the rtb pivot counts ≥2.
 	ProdPeerSharedID = "pcx-0prodpeershared1a"
 	// WarnPeerProvisioningID is being provisioned.
 	WarnPeerProvisioningID = "pcx-0warnprovision1a"
@@ -52,14 +51,14 @@ const (
 	// DimPeerDeletedID is fully torn down; AWS keeps it listed for a window.
 	DimPeerDeletedID = "pcx-0dimdeleted11111a"
 	// WarnPeerOverlapID is active with identical CidrBlockSets on both sides
-	// — the CIDR-overlap Wave 1 signal witness.
+	// — raising the CIDR-overlap Wave 1 signal.
 	WarnPeerOverlapID = "pcx-0warnoverlap1111a"
 	// WarnPeerNoRouteID is active with valid disjoint CIDRs but deliberately
 	// has NO loaded rtb route referencing it — the "no local route to peer"
-	// cache-scan witness.
+	// cache-scan signal.
 	WarnPeerNoRouteID = "pcx-0warnnoroute1111a"
 	// WarnPeerBlackholeID is active, but the one rtb route referencing it
-	// (ec2.go) has State blackhole — the "route to peer blackholed" witness.
+	// (ec2.go) has State blackhole, raising "route to peer blackholed".
 	WarnPeerBlackholeID = "pcx-0warnblackhole1a"
 )
 

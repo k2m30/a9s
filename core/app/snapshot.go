@@ -46,8 +46,7 @@ func (c *Controller) Snapshot() ViewState {
 // produced. Everything else is a fold of state into a ViewState.
 //
 // Conservative by construction — an unknown shape answers false and takes the
-// write lock, exactly as every snapshot did before. Callers must hold c.mu
-// (read is enough).
+// write lock. Callers must hold c.mu (read is enough).
 func (c *Controller) snapshotIsPureReadLocked() bool {
 	if len(c.stack) == 0 {
 		return true
@@ -238,8 +237,7 @@ func consoleTypeDefFor(shortName string) *resource.ResourceTypeDef {
 }
 
 // ScreenIDs returns the ScreenID of every entry on the controller's screen
-// stack, bottom-to-top. It exists so that renderer adapters (today: the TUI's
-// stackInSync debug assertion in internal/tui/app_stack_invariant.go) can
+// stack, bottom-to-top. It exists so that renderer adapters can
 // compare their own view stack against the controller's without reaching
 // into unexported Controller state — the controller stays the single source
 // of truth for stack depth and per-level screen identity (see docs/architecture.md
@@ -341,10 +339,8 @@ func helpContextForScreen(id runtime.ScreenID) domain.HelpContext {
 // was active when help was opened.
 //
 // toggleAttentionKey is hardcoded to "ctrl+z" — the built-in default for
-// keys.Map.ToggleAttentionOnly (internal/tui/keys/keys.go). The web renderer
-// has no per-session remapped keymap today, so this matches what every web
-// session actually sees; if per-session keymaps are added later this must
-// read the live binding the same way the TUI does.
+// keys.Map.ToggleAttentionOnly (internal/tui/keys/keys.go); the web
+// renderer has no per-session remapped keymap.
 func (c *Controller) buildHelpBody() *HelpBody {
 	ctx := domain.HelpFromMainMenu
 	if len(c.stack) >= 2 {

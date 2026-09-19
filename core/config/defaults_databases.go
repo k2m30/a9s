@@ -23,9 +23,8 @@ func databasesDefaultViews() map[string]ViewDef {
 			},
 		},
 		"redis": {
-			// List API: DescribeReplicationGroups. Each row = one ReplicationGroup.
-			// engine_version is not a field on ReplicationGroup (only on CacheCluster);
-			// it is omitted to avoid unnecessary DescribeCacheClusters traffic.
+			// Each row is one ReplicationGroup from DescribeReplicationGroups;
+			// engine_version lives on CacheCluster, not on ReplicationGroup.
 			Detail: []DetailField{
 				{Path: "ReplicationGroupId"}, {Path: "ARN"}, {Path: "Description"},
 				{Path: "Status"}, {Path: "CacheNodeType"}, {Path: "MemberClusters"},
@@ -60,7 +59,6 @@ func databasesDefaultViews() map[string]ViewDef {
 				{Path: "ClusterConfig"}, {Path: "EBSOptions"}, {Path: "Endpoint"}, {Path: "Endpoints"},
 				{Path: "EncryptionAtRestOptions"}, {Path: "DomainEndpointOptions"},
 				{Path: "AdvancedSecurityOptions"}, {Path: "Created"}, {Path: "Deleted"},
-				// {Key: "cluster_health", Label: "Cluster Health"} — re-add when CloudWatch Wave-3 enricher populates this field. Today the fetcher only writes domain_processing_status.
 			},
 		},
 		"redshift": {
@@ -99,7 +97,6 @@ func databasesDefaultViews() map[string]ViewDef {
 				{Path: "AvailabilityZones"},
 			},
 		},
-		// Child views for database/storage resources
 		"dbi_events": {
 			Detail: []DetailField{
 				{Path: "Date"}, {Path: "SourceIdentifier"}, {Path: "SourceType"},

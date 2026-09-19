@@ -191,7 +191,7 @@ func kmsRoleARNsFromPolicyJSON(policyJSON string) []string {
 }
 
 // checkKMSRole resolves IAM roles that have access to this KMS key.
-// Pattern C: calls kms:GetKeyPolicy (default policy) to parse Principal.AWS
+// It calls kms:GetKeyPolicy (default policy) to parse Principal.AWS
 // role ARNs from the policy JSON, and kms:ListGrants to collect GranteePrincipal
 // and RetiringPrincipal role ARNs. Results are deduplicated.
 func checkKMSRole(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
@@ -215,7 +215,6 @@ func checkKMSRole(ctx context.Context, clients any, res resource.Resource, cache
 	var refs []string
 	policyName := "default"
 
-	// --- GetKeyPolicy: parse Principal.AWS role ARNs ---
 	policyOut, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*kms.GetKeyPolicyOutput, error) {
 		return policyAPI.GetKeyPolicy(ctx, &kms.GetKeyPolicyInput{
 			KeyId:      &keyID,
@@ -230,7 +229,6 @@ func checkKMSRole(ctx context.Context, clients any, res resource.Resource, cache
 		refs = kmsRoleARNsFromPolicyJSON(*policyOut.Policy)
 	}
 
-	// --- ListGrants: collect role ARNs from GranteePrincipal / RetiringPrincipal ---
 	grantsOut, err := RetryOnThrottle(ctx, DefaultRetryConfig(), func() (*kms.ListGrantsOutput, error) {
 		return grantsAPI.ListGrants(ctx, &kms.ListGrantsInput{KeyId: &keyID})
 	})

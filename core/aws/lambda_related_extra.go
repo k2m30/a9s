@@ -22,8 +22,6 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// --- Forward Pattern F (data already in RawStruct) ---
-
 // checkLambdaSubnet extracts subnet IDs from Lambda VpcConfig.SubnetIds.
 func checkLambdaSubnet(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	fn, ok := assertStruct[lambdatypes.FunctionConfiguration](res.RawStruct)
@@ -58,12 +56,10 @@ func checkLambdaEFS(_ context.Context, clients any, res resource.Resource, cache
 	return relatedRefs("efs", refs, refContext(clients, cache, "efs"))
 }
 
-// --- Reverse cache scans (target cache references this Lambda) ---
-
 // checkLambdaAPIGW scans the apigw cache for HTTP/REST APIs that integrate
 // with this Lambda function. apigatewayv2.Api struct does not embed
 // integrations, so without a GetIntegrations API call this is undeterminable.
-// We truncated by searching for the function name in the api's Name or
+// It approximates by searching for the function name in the api's Name or
 // Tags — a weak signal, but better than Count:0 when a real match exists.
 func checkLambdaAPIGW(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	fnName := res.ID
@@ -157,7 +153,7 @@ func checkLambdaDDB(ctx context.Context, clients any, res resource.Resource, cac
 }
 
 // checkLambdaKinesis scans this Lambda's event source mappings for Kinesis
-// stream ARNs. Pattern A — live API.
+// stream ARNs.
 func checkLambdaKinesis(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	fnName := res.ID
 	if fnName == "" {
@@ -177,7 +173,7 @@ func checkLambdaKinesis(ctx context.Context, clients any, res resource.Resource,
 }
 
 // checkLambdaMSK scans this Lambda's event source mappings for MSK cluster
-// ARNs. Pattern A — live API.
+// ARNs.
 func checkLambdaMSK(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	fnName := res.ID
 	if fnName == "" {
@@ -197,7 +193,7 @@ func checkLambdaMSK(ctx context.Context, clients any, res resource.Resource, cac
 }
 
 // checkLambdaCTEvents scans the ct-events cache for events whose Resources
-// include this Lambda function (Pattern C — reverse).
+// include this Lambda function.
 func checkLambdaCTEvents(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	fnName := res.ID
 	if fnName == "" {
@@ -229,8 +225,6 @@ func checkLambdaCTEvents(ctx context.Context, clients any, res resource.Resource
 	return relatedResultTrunc("ct-events", ids, truncated)
 }
 
-// --- Reverse lookups that require fields not in the cached struct ---
-//
 // The following checkers reverse-look the target cache for references back to
 // this Lambda. When the target cache's struct doesn't carry the reference
 // (e.g. ELB target groups list, SNS subscription list entries), the checker
@@ -370,7 +364,7 @@ func checkLambdaSNS(ctx context.Context, clients any, res resource.Resource, cac
 }
 
 // checkLambdaSNSSub scans the sns-sub cache for subscriptions where this
-// Lambda is the endpoint (Pattern C — reverse).
+// Lambda is the endpoint.
 func checkLambdaSNSSub(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	fnARN := ""
 	if fn, ok := assertStruct[lambdatypes.FunctionConfiguration](res.RawStruct); ok && fn.FunctionArn != nil {
@@ -568,5 +562,4 @@ func checkLambdaSSM(ctx context.Context, clients any, res resource.Resource, cac
 	return relatedResultTrunc("ssm", ids, truncated)
 }
 
-// Ensure cwtypes stays imported for future alarm-related extensions.
 var _ = cwtypes.MetricAlarm{}

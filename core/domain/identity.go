@@ -12,9 +12,7 @@ package domain
 
 // CallerIdentity is the domain mirror of the AWS caller identity. Pure data;
 // the field set is the subset of awsclient.CallerIdentity that adapters
-// render (account badge, header role, identity panel rows). UserID is
-// intentionally omitted — it is only used by aws/identity.parseARN and
-// never read at the renderer boundary.
+// render (account badge, header role, identity panel rows).
 type CallerIdentity struct {
 	AccountID     string
 	AccountAlias  string

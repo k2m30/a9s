@@ -61,7 +61,6 @@ func checkUserPolicy(ctx context.Context, clients any, res resource.Resource, _ 
 
 // checkIAMUserCtEvents scans the ct-events cache for CloudTrail events where
 // the Username field matches this IAM user's name.
-// Pattern C: cache scan matching Fields["user"] to username.
 func checkIAMUserCtEvents(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	userName := res.ID
 	if userName == "" {

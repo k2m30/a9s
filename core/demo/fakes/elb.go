@@ -60,7 +60,6 @@ func (f *ELBFake) hasTargetGroup(arn string) bool {
 
 func (f *ELBFake) DescribeListeners(_ context.Context, input *elbv2.DescribeListenersInput, _ ...func(*elbv2.Options)) (*elbv2.DescribeListenersOutput, error) {
 	if input.LoadBalancerArn == nil {
-		// return all listeners
 		var all []elbv2types.Listener
 		for _, ls := range f.fix.Listeners {
 			all = append(all, ls...)

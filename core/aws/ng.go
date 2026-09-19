@@ -95,9 +95,8 @@ func buildNodeGroupResource(clusterName, ngName string, ng *ekstypes.Nodegroup) 
 		}
 	}
 
-	// No degraded code: this row came back from DescribeNodegroup. The
-	// recovery arm is for rows rebuilt from Fields, which degradedNodeGroup
-	// stamps.
+	// The empty degraded code fits a row DescribeNodegroup answered; rows
+	// rebuilt from Fields carry the one degradedNodeGroup stamps.
 	findings, issueRows := ngFindings(status, "", healthIssuesCount, issueCodes)
 
 	r := resource.Resource{

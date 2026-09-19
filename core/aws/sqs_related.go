@@ -76,12 +76,10 @@ func checkSQSSNS(ctx context.Context, clients any, res resource.Resource, cache 
 // and the endpoint ARN contains this queue's ARN.
 // Pattern C — reverse lookup in sns-sub cache.
 func checkSQSSNSSub(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
-	// Attempt to retrieve the queue ARN from the raw struct attributes first.
 	queueARN := ""
 	if raw, ok := assertStruct[SQSQueueAttributesRow](res.RawStruct); ok {
 		queueARN = raw.Attributes["QueueArn"]
 	}
-	// Fall back to constructing a partial match from the queue name.
 	queueName := res.ID
 	if queueARN == "" && queueName == "" {
 		return resource.UnknownRelated("sns-sub")
@@ -163,7 +161,6 @@ func checkSQSSQS(ctx context.Context, clients any, res resource.Resource, cache 
 	idSet := make(map[string]struct{})
 	for _, sqsRes := range sqsList {
 		if sqsRes.ID == thisName {
-			// Skip self.
 			continue
 		}
 		raw, ok := assertStruct[SQSQueueAttributesRow](sqsRes.RawStruct)

@@ -63,7 +63,6 @@ func FetchElasticIPs(ctx context.Context, api EC2DescribeAddressesAPI) ([]resour
 
 		addrDomain := string(addr.Domain)
 
-		// Compute attachment status: UNATTACHED if no association/instance/NIC.
 		eipStatus := eipStatusAttached
 		unassociated := addr.AssociationId == nil && addr.InstanceId == nil && addr.NetworkInterfaceId == nil
 		if unassociated {
@@ -87,8 +86,6 @@ func FetchElasticIPs(ctx context.Context, api EC2DescribeAddressesAPI) ([]resour
 			RawStruct: addr,
 		}
 
-		// emit CodeEIPUnassociated Finding when the EIP is
-		// allocated but not associated with any instance, ENI, or NAT gateway.
 		if unassociated {
 			r.Findings = []domain.Finding{wave1Finding(CodeEIPUnassociated)}
 		}

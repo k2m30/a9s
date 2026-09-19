@@ -38,7 +38,7 @@ type KinesisFixtures struct {
 
 // KinesisHealthyRetentionHours is what every demo stream keeps except the
 // one KinesisMinRetention names — comfortably above the 24-hour default the
-// kinesis.min-retention row flags.
+// kinesis.min-retention finding flags.
 const KinesisHealthyRetentionHours int32 = 168
 
 func mustParseKinesisTime(s string) time.Time {
@@ -110,7 +110,7 @@ var sharedKinesisFixtures = sync.OnceValue(func() *KinesisFixtures {
 				},
 			},
 			// KinesisMinRetention: the only stream still on the 24-hour
-			// default retention. Encrypted, so it trips that row alone.
+			// default retention. Encrypted, so it trips that finding alone.
 			{
 				StreamName:              aws.String(KinesisMinRetention),
 				StreamARN:               aws.String("arn:aws:kinesis:us-east-1:123456789012:stream/" + KinesisMinRetention),

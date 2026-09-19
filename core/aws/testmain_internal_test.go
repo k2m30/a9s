@@ -13,7 +13,6 @@ import (
 // Internal tests reach into resource.GetPaginatedFetcher (and other catalog-
 // backed accessors), which panic until SetTypes has been called.
 //
-// We don't import core/aws here — we're already in it. Install is local.
 // WireProjection wires the projection layer core/resource has no init() for.
 // See tests/unit/testmain_test.go for the hermetic A9S_CONFIG_FOLDER
 // default applied below.

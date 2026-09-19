@@ -40,7 +40,6 @@ type LambdaFixtures struct {
 	FunctionURLConfigs map[string][]lambdatypes.FunctionUrlConfig
 }
 
-// Lambda posture witnesses — one function per Prowler-derived finding.
 const (
 	// LambdaEnvSecret is the only function with a plaintext credential in
 	// its environment; every other function stores references, not values.
@@ -66,7 +65,7 @@ var sharedLambdaFixtures = sync.OnceValue(func() *LambdaFixtures {
 		},
 		Tags: map[string]map[string]string{
 			// api-gateway-authorizer carries the CFN stack tag — required for
-			// the lambda:cfn related-panel pivot witness. acme-eks-cluster is
+			// the lambda:cfn related-panel pivot. acme-eks-cluster is
 			// a real stack fixture (cfn.go).
 			"api-gateway-authorizer": {"aws:cloudformation:stack-name": "acme-eks-cluster"},
 		},
@@ -76,15 +75,15 @@ var sharedLambdaFixtures = sync.OnceValue(func() *LambdaFixtures {
 			lambdaProcessOrders: 10,
 		},
 		Policies: map[string]string{
-			// The lambda.public-policy witness: lambda:InvokeFunction granted
+			// Raises lambda.public-policy: lambda:InvokeFunction granted
 			// to every principal with no condition narrowing it.
 			LambdaPublicPolicy: `{"Version":"2012-10-17","Statement":[{"Sid":"AllowPublicInvoke","Effect":"Allow","Principal":"*","Action":"lambda:InvokeFunction","Resource":"arn:aws:lambda:us-east-1:123456789012:function:image-thumbnail-gen"}]}`,
 			// A healthy counterpart: the same grant scoped to one service
-			// principal, so the enricher's Public verdict is exercised both ways.
+			// principal, which the enricher reads as not public.
 			lambdaProcessOrders: `{"Version":"2012-10-17","Statement":[{"Sid":"AllowSQS","Effect":"Allow","Principal":{"Service":"sqs.amazonaws.com"},"Action":"lambda:InvokeFunction","Resource":"arn:aws:lambda:us-east-1:123456789012:function:process-orders"}]}`,
 		},
 		FunctionURLConfigs: map[string][]lambdatypes.FunctionUrlConfig{
-			// The lambda.function-url-public witness: AuthType NONE with a
+			// Raises lambda.function-url-public: AuthType NONE with a
 			// wildcard CORS origin.
 			LambdaFunctionURLPublic: {{
 				FunctionUrl:  aws.String("https://abcd1234efgh5678.lambda-url.us-east-1.on.aws/"),
@@ -285,7 +284,7 @@ func buildLambdaFunctions() []lambdatypes.FunctionConfiguration {
 				LogGroup:  aws.String("/aws/lambda/payment-webhook"),
 				LogFormat: lambdatypes.LogFormatText,
 			},
-			// The lambda.env-secret witness: the provider token pasted into
+			// Raises lambda.env-secret: the provider token pasted into
 			// the environment instead of resolved from Secrets Manager.
 			Environment: &lambdatypes.EnvironmentResponse{
 				Variables: map[string]string{
@@ -345,7 +344,7 @@ func buildLambdaFunctions() []lambdatypes.FunctionConfiguration {
 				LogFormat: lambdatypes.LogFormatText,
 			},
 			// DeadLetterConfig — required for the secrets:sns related-panel
-			// pivot witness (checkSecretsSNS reads the rotation Lambda's
+			// pivot (checkSecretsSNS reads the rotation Lambda's
 			// DLQ TargetArn when it points at an SNS topic). ops-alerts is
 			// the shared prod SNS topic (relatedAlarmSNSARN in cloudwatch.go).
 			DeadLetterConfig: &lambdatypes.DeadLetterConfig{
@@ -481,7 +480,7 @@ func buildLambdaFunctions() []lambdatypes.FunctionConfiguration {
 		LastUpdateStatus: lambdatypes.LastUpdateStatusSuccessful,
 	})
 
-	// Add one container-image function to demonstrate ECR→Lambda relationship.
+	// One container-image function for the ECR→Lambda relationship.
 	// checkECRLambda matches any lambda with PackageType=Image as potentially using an ECR repo.
 	fns = append(fns, lambdatypes.FunctionConfiguration{
 		FunctionName:  aws.String("api-service-runner"),

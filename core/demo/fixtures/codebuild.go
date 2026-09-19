@@ -49,7 +49,7 @@ var sharedCodeBuildFixtures = sync.OnceValue(func() *CodeBuildFixtures {
 				Buildspec: aws.String(inlineCBBuildspec),
 			},
 			// Artifacts.Location — required for the cb:s3 related-panel pivot
-			// witness (checkCbS3). a9s-demo-healthy is a real s3.go bucket.
+			// (checkCbS3). a9s-demo-healthy is a real s3.go bucket.
 			Artifacts: &cbtypes.ProjectArtifacts{
 				Type:     cbtypes.ArtifactsTypeS3,
 				Location: aws.String(HealthyBucketName),
@@ -60,12 +60,12 @@ var sharedCodeBuildFixtures = sync.OnceValue(func() *CodeBuildFixtures {
 			Environment: &cbtypes.ProjectEnvironment{
 				Type: cbtypes.EnvironmentTypeLinuxContainer,
 				// ECR-hosted build image — required for the cb:ecr
-				// related-panel pivot witness (checkCbECR). acme/api-service
+				// related-panel pivot (checkCbECR). acme/api-service
 				// is a real ecr.go repository fixture.
 				Image:       aws.String("123456789012.dkr.ecr.us-east-1.amazonaws.com/acme/api-service:builder"),
 				ComputeType: cbtypes.ComputeTypeBuildGeneral1Small,
 				// EnvironmentVariables — required for the cb:secrets and
-				// cb:ssm related-panel pivot witnesses (checkCbSecrets /
+				// cb:ssm related-panel pivots (checkCbSecrets /
 				// checkCbSSM). prod/api/gateway-key is a real secrets.go
 				// fixture, named by its ARN and a JSON key as CodeBuild
 				// allows; /acme/prod/app/config is a real ssm.go fixture.
@@ -75,7 +75,7 @@ var sharedCodeBuildFixtures = sync.OnceValue(func() *CodeBuildFixtures {
 				},
 			},
 			// VpcConfig — required for the cb:sg, cb:subnet and cb:vpc
-			// related-panel pivot witnesses (checkCbSG / checkCbSubnet /
+			// related-panel pivots (checkCbSG / checkCbSubnet /
 			// checkCbVPC). All three IDs are real ec2.go fixtures.
 			VpcConfig: &cbtypes.VpcConfig{
 				VpcId:            aws.String(fixtProdVPCID),
@@ -83,7 +83,7 @@ var sharedCodeBuildFixtures = sync.OnceValue(func() *CodeBuildFixtures {
 				SecurityGroupIds: []string{fixtProdAPIInternalSGID},
 			},
 			// EncryptionKey — required for the cb:kms related-panel pivot
-			// witness (checkCbKMS). Shared prod KMS key used across fixtures.
+			// (checkCbKMS). Shared prod KMS key used across fixtures.
 			EncryptionKey: aws.String("arn:aws:kms:us-east-1:123456789012:key/a1b2c3d4-5678-90ab-cdef-111111111111"),
 			LogsConfig: &cbtypes.LogsConfig{
 				CloudWatchLogs: &cbtypes.CloudWatchLogsConfig{
@@ -100,7 +100,7 @@ var sharedCodeBuildFixtures = sync.OnceValue(func() *CodeBuildFixtures {
 			Arn:         aws.String("arn:aws:codebuild:us-east-1:123456789012:project/acme-frontend-build"),
 			Description: aws.String("Build project for React frontend"),
 			ServiceRole: aws.String(prodCBRoleARN),
-			// CBBuildspecFromSource witness: the build commands come from a
+			// CBBuildspecFromSource: the build commands come from a
 			// file in the repository, so a pull request can rewrite what runs
 			// inside the build role.
 			Source: &cbtypes.ProjectSource{
@@ -116,10 +116,8 @@ var sharedCodeBuildFixtures = sync.OnceValue(func() *CodeBuildFixtures {
 			Arn:         aws.String("arn:aws:codebuild:us-east-1:123456789012:project/acme-docker-images"),
 			Description: aws.String("Base Docker image builder"),
 			// The one demo resource whose IAM Role pivot drills to a role
-			// carrying a finding (RoleInlinePrivEsc, iam.go): without it the
-			// drilled role detail is only reachable from the role list, so
-			// nothing compares the two surfaces. Every other project keeps
-			// prodCBRoleARN, so the pivot count is one either way.
+			// carrying a finding (RoleInlinePrivEsc, iam.go). Every other project
+			// keeps prodCBRoleARN, so the pivot count is one either way.
 			ServiceRole: aws.String("arn:aws:iam::123456789012:role/" + RoleInlinePrivEsc),
 			Source: &cbtypes.ProjectSource{
 				Type: cbtypes.SourceTypeS3,
@@ -138,7 +136,7 @@ var sharedCodeBuildFixtures = sync.OnceValue(func() *CodeBuildFixtures {
 				Location:  aws.String("https://github.com/acme/integration-tests.git"),
 				Buildspec: aws.String(inlineCBBuildspec),
 			},
-			// CBEnvSecret witness: the test database password is pasted into a
+			// CBEnvSecret: the test database password is pasted into a
 			// plaintext environment variable, so every build log prints it.
 			Environment: &cbtypes.ProjectEnvironment{
 				Type:        cbtypes.EnvironmentTypeLinuxContainer,
@@ -152,7 +150,7 @@ var sharedCodeBuildFixtures = sync.OnceValue(func() *CodeBuildFixtures {
 			LastModified: aws.Time(mustParseCBTime("2026-04-17T22:10:00+00:00")),
 			Created:      aws.Time(mustParseCBTime("2025-08-05T10:00:00+00:00")),
 		},
-		// CBPublicBuilds witness: build logs and artifacts are readable by
+		// CBPublicBuilds: build logs and artifacts are readable by
 		// anyone on the internet without an AWS account.
 		{
 			Name:              aws.String(CBPublicBuilds),
@@ -168,7 +166,7 @@ var sharedCodeBuildFixtures = sync.OnceValue(func() *CodeBuildFixtures {
 			LastModified: aws.Time(mustParseCBTime("2026-04-02T09:15:00+00:00")),
 			Created:      aws.Time(mustParseCBTime("2025-09-12T13:00:00+00:00")),
 		},
-		// CBSourceURLCredential witness: a personal access token is embedded in
+		// CBSourceURLCredential: a personal access token is embedded in
 		// the clone address, stored in the project and echoed into build logs.
 		{
 			Name:        aws.String(CBSourceURLCredential),
@@ -252,7 +250,7 @@ func NewCodeBuildFixtures() *CodeBuildFixtures {
 	return sharedCodeBuildFixtures()
 }
 
-// Witness projects for the cb posture findings. Each names the ONE demo
+// Projects carrying the cb posture findings. Each names the ONE demo
 // project that carries its finding; every other project is set to the
 // healthy value for that condition.
 const (

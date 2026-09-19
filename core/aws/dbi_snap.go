@@ -19,7 +19,7 @@ import (
 // ComputeDBISnapStatusAndIssues computes findings for an RDS snapshot.
 // Returns nil for a healthy (available + encrypted) snapshot.
 //
-// §0.1 precedence ladder (Broken > Warning, table order within severity):
+// Precedence ladder (Broken > Warning, in order within severity):
 //  1. Broken: failed
 //  2. Broken: incompatible-* (keyword preserved verbatim)
 //  3. Warning: creating: <pct>%
@@ -59,7 +59,6 @@ func ComputeDBISnapStatusAndIssues(snap rdstypes.DBSnapshot) []domain.Finding {
 
 // isSnapUnencrypted returns true when the snapshot's Encrypted field is
 // explicitly false. nil (field not set) is treated as encrypted (no signal).
-// Per spec §4: the unencrypted signal fires on Encrypted == false only.
 func isSnapUnencrypted(snap rdstypes.DBSnapshot) bool {
 	return snap.Encrypted != nil && !*snap.Encrypted
 }
@@ -115,13 +114,12 @@ func FetchDBISnapshotsPage(ctx context.Context, api RDSDescribeDBSnapshotsAPI, c
 
 		// encryptedStr stores the encryption state as a string field so the Color
 		// func can classify unencrypted available snapshots as ColorWarning.
-		// nil Encrypted is treated as encrypted (no unencrypted signal per spec §4).
+		// nil Encrypted is treated as encrypted.
 		encryptedStr := "true"
 		if snap.Encrypted != nil && !*snap.Encrypted {
 			encryptedStr = "false"
 		}
 
-		// Compute findings per §0.1 precedence ladder.
 		findings := ComputeDBISnapStatusAndIssues(snap)
 		statusPhrase := domain.StatusPhrase(findings)
 

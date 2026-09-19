@@ -2,13 +2,12 @@
 
 // Package aws — vpcpeer.go: EC2 VPC Peering Connection fetcher.
 //
-// docs/resources/vpc-peer.md §1: DescribeVpcPeeringConnections is the ONLY
-// call — it returns full detail (Status, ExpirationTime, both VpcInfo sides)
-// in the single paginated list response. NO per-connection describe exists,
-// so vpc-peer is the one type with no N+1 fan-out and no degraded-row story:
-// a DescribeVpcPeeringConnections denial is a whole-list error (the menu
-// shows the error state), never a partial success (docs/resources/vpc-peer
-// -impl-plan.md §0).
+// DescribeVpcPeeringConnections is the only call — it returns full detail
+// (Status, ExpirationTime, both VpcInfo sides) in the single paginated list
+// response. AWS has no per-connection describe, so vpc-peer has no N+1
+// fan-out and no degraded row: a DescribeVpcPeeringConnections denial is a
+// whole-list error (the menu shows the error state), never a partial
+// success.
 //
 // RawStruct is *ec2types.VpcPeeringConnection — a pointer to the loop copy,
 // so every *_related.go checker's assertStruct[ec2types.VpcPeeringConnection]
@@ -32,7 +31,7 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// vpc-peer.* FindingCodes — docs/resources/vpc-peer.md §3.1/§4 (Source
+// vpc-peer.* FindingCodes — docs/resources/vpc-peer.md (Source
 // "wave1", fetcher-written). The two Wave 2 cache-scan codes live in
 // vpcpeer_issue_enrichment.go, next to the enricher that emits them.
 const (
@@ -49,8 +48,7 @@ const (
 
 // FetchVpcPeeringConnectionsPage fetches a single page of VPC Peering
 // Connections. DescribeVpcPeeringConnections carries full detail (Status,
-// ExpirationTime, both VpcInfo sides) in the list call — no per-connection
-// describe, no degraded-row path (docs/resources/vpc-peer.md §1).
+// ExpirationTime, both VpcInfo sides) in the list call.
 func FetchVpcPeeringConnectionsPage(ctx context.Context, api EC2DescribeVpcPeeringConnectionsAPI, continuationToken string) (resource.FetchResult, error) {
 	input := &ec2.DescribeVpcPeeringConnectionsInput{
 		MaxResults: aws.Int32(DefaultPageSize),
@@ -118,7 +116,7 @@ func vpcPeerSide(info *ec2types.VpcPeeringConnectionVpcInfo) (vpcID, ownerID str
 
 // computeVpcPeerFindings builds the ordered Finding slice for one peering
 // connection: state first, then (active-only) CIDR overlap —
-// docs/resources/vpc-peer.md §4 precedence order. An active connection with
+// docs/resources/vpc-peer.md precedence order. An active connection with
 // disjoint CIDRs returns nil (blank Status, Healthy).
 func computeVpcPeerFindings(pc *ec2types.VpcPeeringConnection) ([]domain.Finding, map[domain.FindingCode]domain.AttentionDetail) {
 	if pc.Status == nil {
@@ -158,8 +156,7 @@ func computeVpcPeerFindings(pc *ec2types.VpcPeeringConnection) ([]domain.Finding
 	}
 
 	// CIDR overlap is active-only: CidrBlock/CidrBlockSet are nil for every
-	// non-active connection (VpcPeeringConnectionVpcInfo doc comment) —
-	// docs/resources/vpc-peer.md §3.1.
+	// non-active connection (VpcPeeringConnectionVpcInfo doc comment).
 	if code == ec2types.VpcPeeringConnectionStateReasonCodeActive {
 		if ranges, overlap := vpcPeerCIDROverlapDetail(pc.RequesterVpcInfo, pc.AccepterVpcInfo); overlap {
 			findings = append(findings, wave1Finding(vpcPeerCodeCidrOverlap))
@@ -173,8 +170,8 @@ func computeVpcPeerFindings(pc *ec2types.VpcPeeringConnection) ([]domain.Finding
 }
 
 // vpcPeerPendingAcceptanceFinding builds the pending-acceptance Finding: the
-// countdown to ExpirationTime IS the S4 phrase (docs/resources/vpc-peer.md
-// §4), rounded up to at least 1 day so a request expiring within hours never
+// countdown to ExpirationTime IS the status phrase, rounded up to at least
+// 1 day so a request expiring within hours never
 // reads as "0d". The expiration date itself is the Attention row.
 func vpcPeerPendingAcceptanceFinding(expiration *time.Time) (domain.Finding, []domain.DetailRow) {
 	days := 1
@@ -192,9 +189,8 @@ func vpcPeerPendingAcceptanceFinding(expiration *time.Time) (domain.Finding, []d
 
 // vpcPeerCIDROverlapDetail reports whether any IPv4 prefix in requester's
 // CidrBlockSet overlaps accepter's, returning the overlapping range pair(s)
-// for the S5 Detail sentence. Callers MUST only invoke this for an active
-// connection — CidrBlockSet is nil otherwise (docs/resources/vpc-peer.md
-// §3.1 load-bearing SDK fact); nil-safe regardless.
+// for the Detail sentence. Callers MUST only invoke this for an active
+// connection — CidrBlockSet is nil otherwise; nil-safe regardless.
 func vpcPeerCIDROverlapDetail(requester, accepter *ec2types.VpcPeeringConnectionVpcInfo) (string, bool) {
 	if requester == nil || accepter == nil {
 		return "", false

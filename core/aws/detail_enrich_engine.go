@@ -32,8 +32,7 @@ import (
 var ErrDetailEnrichSkipped = errors.New("detail enrichment skipped: resource has no live data yet")
 
 // docCache is the minimal cache contract shared by PolicyDocumentCache and
-// DetailDocCache — both already satisfy it via their existing Get/Set/
-// SetIfNewer methods, so no adapter type is needed.
+// DetailDocCache; both satisfy it via their Get/Set/SetIfNewer methods.
 type docCache interface {
 	Get(key string) any
 	Set(key string, doc any)
@@ -161,10 +160,10 @@ func enrichDetail[R, P any](ctx context.Context, clients any, res resource.Resou
 	// error rather than nil, so the caller (core/runtime.HandleEnrichDetailResult)
 	// can tell "nothing happened yet" apart from "this genuinely succeeded"
 	// and leave any pending sticky-refresh demand recorded instead of
-	// consuming it for an operation that fetched nothing. Deriving a wrapper
-	// from res.ID alone was rejected — it would embed a zero SDK struct and
-	// render misleading empty fields on the YAML/JSON views instead of just
-	// deferring. This must be checked before requiring dctx.Clients below:
+	// consuming it for an operation that fetched nothing. A wrapper derived
+	// from res.ID alone would embed a zero SDK struct and render misleading
+	// empty fields on the YAML/JSON views instead of just deferring.
+	// This must be checked before requiring dctx.Clients below:
 	// session caches (and so a valid dctx) are constructed before the AWS
 	// clients are, so a pre-connect open of a disk-seeded row has a non-nil
 	// dctx with a nil Clients — it must hit this skip, not the Clients error
@@ -219,8 +218,7 @@ func enrichDetail[R, P any](ctx context.Context, clients any, res resource.Resou
 	// related checkers make while opening/refreshing THIS detail share
 	// in-flight work, but an explicit refresh mints a brand-new operation ID
 	// (core/runtime.Core.BeginDetailOperation), so it can never join a
-	// pre-refresh call still in flight under the old one — no bypass call
-	// needed.
+	// pre-refresh call still in flight under the old one.
 	fetchCtx := WithDetailOp(ctx, dctx.OpID)
 	payload, err := spec.fetch(fetchCtx, dctx.Clients, id, item, res)
 	if err != nil {
@@ -228,9 +226,9 @@ func enrichDetail[R, P any](ctx context.Context, clients any, res resource.Resou
 	}
 
 	if cache != nil {
-		// Op-aware write (item 3, #261 boundary wave): dctx.OpID is 0 for a
-		// caller with no active DetailOperation (Set's own semantics apply
-		// unchanged); non-zero for a real operation, where a write from an
+		// Op-aware write: dctx.OpID is 0 for a caller with no active
+		// DetailOperation (Set's own semantics apply); non-zero for a
+		// real operation, where a write from an
 		// operation strictly older than the recorded writer is refused rather
 		// than silently overwriting a fresher entry a newer operation (or an
 		// explicit refresh) already wrote.

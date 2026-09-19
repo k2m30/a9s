@@ -22,8 +22,7 @@ import (
 type ECSFake struct {
 	fix *fixtures.ECSFixtures
 	// Now is the clock service events are stamped against; nil means
-	// time.Now. Tests set it to prove the witness holds however long the
-	// session has been open.
+	// time.Now.
 	Now func() time.Time
 }
 
@@ -76,7 +75,7 @@ func (f *ECSFake) ListServices(_ context.Context, input *ecs.ListServicesInput, 
 // stampEvents dates a service's events against the call rather than against
 // the moment the fixtures were built. The enricher reads a ten-minute window,
 // so a stored timestamp ages out of a session left open longer than that and
-// the witness disappears with the wall clock. Thirty seconds is what a service
+// the finding disappears with the wall clock. Thirty seconds is what a service
 // retrying a placement looks like.
 //
 // The events are copied, never restamped in place: the fixtures are shared by

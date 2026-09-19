@@ -62,15 +62,13 @@ type Model struct {
 	// in app_dispatch.go — the availability/enrich probe, save-cache, and
 	// connect lanes) to the currently active profile/region pair. pairCtx is
 	// a child of appCtx (so quit still cancels everything, including
-	// mid-rotation — see TestModel_QuitCancelsAppContext/
-	// TestModel_Cancel_CancelsAppContext), and is cancelled-then-re-armed by
+	// mid-rotation), and is cancelled-then-re-armed by
 	// handleProfileSelected/handleRegionSelected (app_session.go) on every
 	// rotation, so an already-dispatched background task for the old pair is
 	// aborted instead of surviving on appCtx (quit-only) and burning its AWS
 	// budget after the switch. The interactive fetch lanes in
-	// fetch_adapter.go deliberately keep using appCtx directly — they are
-	// already bounded by their own 30s fetchTimeout, and are not the lanes
-	// this field's rotation fixes.
+	// fetch_adapter.go use appCtx directly — they are bounded by their own
+	// 30s fetchTimeout.
 	pairCtx    context.Context
 	pairCancel context.CancelFunc
 
@@ -103,7 +101,7 @@ type Model struct {
 	isDemo bool // true when running in --demo mode (synthetic clients); controls Wave 2 skip
 
 	// screens is the renderer-side parallel of runtime.ScreenRegistry: it
-	// resolves runtime.ScreenID -> builder closure for the four ported
+	// resolves runtime.ScreenID -> builder closure for the
 	// view-stack handlers (HandleProfilesLoaded, HandleValueRevealed,
 	// HandleEnterChildView, HandleThemeSelected). Populated once in New()
 	// via defaultBuilders(&m); tests may shadow entries by assigning to
@@ -223,7 +221,7 @@ func (m Model) Init() tea.Cmd {
 			Region:  m.core.Region(),
 		}
 	}
-	// C1: the disk-cached menu must render before AWS connect settles —
+	// The disk-cached menu must render before AWS connect settles —
 	// seed it synchronously alongside the connect kickoff rather than
 	// waiting for ClientsReady to dispatch TaskKindLoadAvailCache.
 	seedCmd := m.loadAvailabilityCache()

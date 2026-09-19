@@ -2,8 +2,7 @@
 
 // risk_column.go owns the vocabulary of the "risk" Field, which every type
 // that declares it renders as its Status column. The values are read by an
-// operator, never by code, so they are lowercase operator words rather than
-// the enum-shaped tokens they replaced.
+// operator, never by code, so they are lowercase operator words.
 package aws
 
 const (

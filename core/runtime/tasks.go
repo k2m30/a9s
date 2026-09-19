@@ -11,8 +11,7 @@ import (
 )
 
 // TaskKind names a family of background tasks ("enrich", "related",
-// "logsource-discover", future query scans, …). Concrete kind constants
-// land alongside the per-handler PRs that own each task family.
+// "logsource-discover", …).
 type TaskKind string
 
 const (
@@ -152,8 +151,8 @@ type TaskPayload interface {
 // execute the task (resource pointers, cursors, target types, …). The
 // adapter type-switches on Payload to recover the typed fields. This
 // keeps Scope as a pure dedup key (opaque to the adapter) and lets
-// sibling per-handler PRs (probes, related, fetchers, …) define their
-// own payload variants without growing this struct or threading
+// each task family (probes, related, fetchers, …) define its
+// own payload variant without growing this struct or threading
 // out-of-band parameters into the dispatch path.
 type TaskRequest struct {
 	Key     TaskKey
@@ -221,8 +220,8 @@ func (DemoPrefetchCountsPayload) isTaskPayload() {}
 
 // FlashTickPayload carries the duration the adapter should sleep before
 // emitting a ClearFlashMsg, and the flash gen that ClearFlashMsg should
-// reference. The runtime owns the gen (computed at dispatch time) so the
-// stale-clear guard works the same as it did before extraction.
+// reference. The runtime owns the gen (computed at dispatch time) for the
+// stale-clear guard.
 type FlashTickPayload struct {
 	Gen      domain.Gen
 	Duration time.Duration
@@ -246,8 +245,7 @@ func (EmitNavigatePayload) isTaskPayload() {}
 // "wrong concrete type on Clients" branch. Gen is the session
 // AvailabilityGen captured at dispatch time (APIError.GenAspect() is
 // AspectAvailability) — stamped so this dispatch is subject to the same
-// staleness guard as every other APIError construction site, even though
-// the branch is unreachable today.
+// staleness guard as every other APIError construction site.
 type EmitAPIErrorPayload struct {
 	Err error
 	Gen domain.Gen
@@ -258,7 +256,7 @@ func (EmitAPIErrorPayload) isTaskPayload() {}
 // FetchChildResourcesPayload carries the child-type short name and the
 // parent context map used by the adapter's paginated child fetcher.
 // Emitted by HandleEnterChildView so the adapter's task dispatcher can build
-// the existing fetchChildResources closure without parsing TaskKey.Scope.
+// the fetchChildResources closure without parsing TaskKey.Scope.
 type FetchChildResourcesPayload struct {
 	ChildType     string
 	ParentContext map[string]string
@@ -291,28 +289,28 @@ func (SaveThemeConfigPayload) isTaskPayload() {}
 // SaveCachePayload carries a snapshot of the per-type rows the sweep/
 // enrichment completion just retained, captured at TASK-DISPATCH time (inside
 // handleAvailabilityChecked / handleEnrichmentChecked's "all done" branch) —
-// the dispatch-time payload freeze (C7/C8). This matters because c.session.ProbeResources can still be
+// the dispatch-time payload freeze. This matters because c.session.ProbeResources can still be
 // mutated in-place after dispatch but before the task executes (e.g. a LATER
 // handleEnrichmentChecked call's applyEnrichment/FieldUpdates merge touching a
 // type already captured in this snapshot); a save that read
 // c.session.ProbeResources live at EXECUTE time would race that later
-// mutation. Capturing the snapshot at dispatch time — mirroring the
-// DispatchSnapshot/CaptureDispatch pattern already used for
+// mutation. Capturing the snapshot at dispatch time — like
+// DispatchSnapshot/CaptureDispatch for
 // generations/clients — avoids that race entirely. Wave-2 findings are never
-// stripped at rerun start (C1/C6b: stale-until-replaced, not
+// stripped at rerun start (stale-until-replaced, not
 // blank-until-replaced); the dispatch-time snapshot stands on its own.
 //
 // Resources and Truncated are shallow copies of the maps (values are the
 // existing []resource.Resource slices/headers at capture time); the executor
 // only reads them, never mutates in place, so no deeper copy is needed.
 //
-// Wave2Answered (C6b) names the types this payload carries a FRESH Wave-2
+// Wave2Answered names the types this payload carries a FRESH Wave-2
 // answer for: for those, and only those, the save supersedes carried Wave-2
 // data wholesale, so a healed or resolved issue can clear. Every other type
 // — one whose enrichment probe failed or never ran, and every type in
 // handleAvailabilityChecked's bare Wave-1 sweep-completion save — carries
 // forward the on-disk Wave-2 data its rows lack instead of blanking it
-// (D17). A type-scoped tag, not a payload-wide flag: one failed probe in a
+// A type-scoped tag, not a payload-wide flag: one failed probe in a
 // sweep must not let that sweep's save persist its rows as clean.
 type SaveCachePayload struct {
 	Resources map[string][]resource.Resource

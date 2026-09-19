@@ -28,11 +28,11 @@ const (
 
 // EnrichDBCMaintenance calls DescribePendingMaintenanceActions (account-wide,
 // paginated) and emits one Finding per dbc cluster with overdue maintenance.
-// Severity "!" (Wave 2 "!" bumps the S1 menu badge). A finding is "overdue" when either:
+// Severity "!" (Wave 2 "!" bumps the main-menu badge). A finding is "overdue" when either:
 //   - AutoAppliedAfterDate is non-nil AND in the past, OR
 //   - ForcedApplyDate is non-nil AND in the past.
 //
-// The merged S4 status phrase (e.g. "maintenance overdue" alone, or
+// The merged status phrase (e.g. "maintenance overdue" alone, or
 // "stopped (+1)" stacked over a Wave-1 finding) is computed at render time
 // from r.Findings via domain.StatusPhrase; this enricher only emits Findings.
 func EnrichDBCMaintenance(ctx context.Context, clients *ServiceClients, resources []resource.Resource, cache resource.ResourceCache) (IssueEnricherResult, error) {
@@ -60,10 +60,7 @@ func EnrichDBCMaintenance(ctx context.Context, clients *ServiceClients, resource
 		return result, tagErr
 	}
 
-	// Deterministic ARN-suffix matching via ordered probeIDs. There is no
-	// parallel statusByID map: the merged S4 phrase (single-finding or
-	// Wave-1+Wave-2 stacked) is computed at render time from r.Findings, so
-	// the enricher does not read the fetcher's status overlay here.
+	// Deterministic ARN-suffix matching via ordered probeIDs.
 	probeIDs := make([]string, 0, len(resources))
 	for _, r := range resources {
 		if r.ID != "" {
@@ -112,7 +109,6 @@ func EnrichDBCMaintenance(ctx context.Context, clients *ServiceClients, resource
 			continue
 		}
 
-		// Check overdue: emit a finding ONLY when any action detail has a past date.
 		overdue := false
 		for _, pa := range action.PendingMaintenanceActionDetails {
 			if pa.ForcedApplyDate != nil && pa.ForcedApplyDate.Before(now) {
@@ -128,9 +124,9 @@ func EnrichDBCMaintenance(ctx context.Context, clients *ServiceClients, resource
 			continue
 		}
 
-		// Build rows. Summary is the short S5 phrase; every concrete fact
+		// Summary is the short operator phrase; every concrete fact
 		// (Action, Description, Earliest Target, Apply Method) lives only in
-		// Rows so the Attention section does not render duplicated content (U11).
+		// Rows so the Attention section does not render duplicated content.
 		var rows []domain.DetailRow
 		for _, pa := range action.PendingMaintenanceActionDetails {
 			if pa.Action != nil && *pa.Action != "" {

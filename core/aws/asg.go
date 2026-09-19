@@ -95,7 +95,6 @@ func FetchAutoScalingGroupsPage(ctx context.Context, api ASGDescribeAutoScalingG
 		r := resource.Resource{
 			ID:   asgName,
 			Name: asgName,
-			// Status intentionally unset — lifecycle state is emitted as a Finding.
 			Fields: map[string]string{
 				"asg_name":                  asgName,
 				"min_size":                  minSize,

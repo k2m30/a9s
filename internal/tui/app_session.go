@@ -121,7 +121,7 @@ func (m Model) handleThemeSelected(msg messages.ThemeSelected) (tea.Model, tea.C
 // PopSelectorIntent + success Flash + TaskKindSaveThemeConfig.
 func (m Model) handleThemeFileRead(msg messages.ThemeFileRead) (tea.Model, tea.Cmd) {
 	// Validate the theme YAML here in the adapter — styles is a renderer
-	// package, so the runtime stays renderer-agnostic (SC-009) by branching on
+	// package, so the runtime stays renderer-agnostic by branching on
 	// the resulting ParseErr rather than parsing the bytes itself. Only parse
 	// when the read succeeded; a read error short-circuits in the runtime.
 	var parseErr error

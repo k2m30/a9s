@@ -2,27 +2,27 @@
 
 // Package aws — lt.go: EC2 Launch Template fetcher.
 //
-// docs/resources/lt.md §1: DescribeLaunchTemplates (the list call) carries
-// identity/version-number/creator facts only — NO LaunchTemplateData. Every
-// §2 related-panel field and every §3.2 signal lives on the "$Default"
-// version, so this fetcher does DescribeLaunchTemplates (paginated) +
+// DescribeLaunchTemplates (the list call) carries identity/version-number/
+// creator facts only — no LaunchTemplateData. Every related-panel field and
+// every signal lives on the "$Default" version, so this fetcher does
+// DescribeLaunchTemplates (paginated) +
 // DescribeLaunchTemplateVersions(Versions=["$Default"]) per template
-// (in-fetcher N+1, the transfer.go/mwaa.go pattern) — both RetryOnThrottle,
-// E3/E5 aggregation. IMDSv1/unencrypted/details-denied findings are
-// fetcher-written (Source: "wave1"); the deprecated-ami finding alone lives
-// in lt_issue_enrichment.go's cache-scan enricher, because the fetcher has
-// no sibling caches to cross-reference against.
+// (in-fetcher N+1, as transfer.go and mwaa.go do), both under
+// RetryOnThrottle with per-item failures aggregated. IMDSv1/unencrypted/
+// details-denied findings are fetcher-written (Source: "wave1"); the
+// deprecated-ami finding alone lives in lt_issue_enrichment.go's cache-scan
+// enricher, because the fetcher has no sibling caches to cross-reference
+// against.
 //
 // RawStruct is LTRaw — a composite wrapper, not either bare SDK shape alone:
 // the list LaunchTemplate has DefaultVersionNumber/LatestVersionNumber/Tags
 // but no data; the LaunchTemplateVersion has LaunchTemplateData/CreatedBy/
 // CreateTime but not the latest-version number. A denied
-// DescribeLaunchTemplateVersions call keeps the row (rich degradation, the
-// transfer.go convention, not mwaa's name-only degradation): all list fields
-// survive, RawStruct is the SAME LTRaw type with a zero DefaultVersion (no
-// dual-shape fallback — every *_related.go Pattern F checker just sees
-// empty fields and reports unknown), and the shared details-denied finding
-// is appended with lt's own §4 sentence.
+// DescribeLaunchTemplateVersions call keeps the row with all list fields,
+// as transfer.go does: RawStruct is the same LTRaw type with a zero
+// DefaultVersion, so every *_related.go checker sees empty fields and
+// reports unknown, and the shared details-denied finding is appended with
+// lt's own sentence.
 package aws
 
 import (
@@ -39,9 +39,9 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// lt.* FindingCodes — docs/resources/lt.md §3/§4. ltCodeDeprecatedAMI is
-// declared here (not in lt_issue_enrichment.go) so every lt.* code lives in
-// one place, mirroring transfer.go's single const block.
+// lt.* FindingCodes (docs/resources/lt.md). ltCodeDeprecatedAMI is declared
+// here rather than in lt_issue_enrichment.go so every lt.* code lives in one
+// place.
 const (
 	ltCodeIMDSv1        domain.FindingCode = "lt.warn.imdsv1"
 	ltCodeUnencrypted   domain.FindingCode = "lt.warn.unencrypted"
@@ -51,10 +51,10 @@ const (
 )
 
 // LTRaw is the composite RawStruct for Launch Templates: neither bare SDK
-// shape alone carries the whole detail story (docs/resources/lt-impl-plan.md
-// §0). DefaultVersion is the zero value on a rich degraded row — the SAME
-// type for every row, healthy or degraded, so fieldpath/YAML/detail
-// rendering and every *_related.go checker walk one shape.
+// shape alone carries the whole detail story. DefaultVersion is the zero
+// value on a degraded row — the same type for every row, healthy or
+// degraded, so fieldpath/YAML/detail rendering and every *_related.go
+// checker walk one shape.
 type LTRaw struct {
 	Template       ec2types.LaunchTemplate
 	DefaultVersion ec2types.LaunchTemplateVersion
@@ -62,9 +62,9 @@ type LTRaw struct {
 
 // FetchLaunchTemplatesPage fetches a single page of Launch Templates.
 // DescribeLaunchTemplates carries no LaunchTemplateData, so every row gets a
-// per-id DescribeLaunchTemplateVersions("$Default") call (in-fetcher N+1, no
-// separate lt Wave-2-API-calling enrichment). Per-id describe failures are
-// aggregated (E3/E5) rather than dropping the row: the row is kept, built
+// per-id DescribeLaunchTemplateVersions("$Default") call (in-fetcher N+1).
+// Per-id describe failures are aggregated rather than dropping the row: the
+// row is kept, built
 // from the list fields, with the details-denied finding appended. A
 // DescribeLaunchTemplates failure returns an error, never an empty success
 // (AccessDenied contract).
@@ -123,10 +123,8 @@ func FetchLaunchTemplatesPage(ctx context.Context, api EC2FetchLaunchTemplatesAP
 // ltResource constructs a Resource from the list LaunchTemplate, its
 // "$Default" LaunchTemplateVersion, and the caller-computed findings — the
 // healthy path passes computeLTFindings(ver); the degraded path passes the
-// shared details-denied finding alongside a zero-value ver (the SAME *LTRaw
-// shape for both rows, docs/resources/lt-impl-plan.md §0). RawStruct is
-// *LTRaw (the composite wrapper's pointer, mwaa/transfer's value/pointer
-// convention).
+// shared details-denied finding alongside a zero-value ver. RawStruct is
+// *LTRaw for both.
 func ltResource(tpl ec2types.LaunchTemplate, ver ec2types.LaunchTemplateVersion, findings []domain.Finding) resource.Resource {
 	id := aws.ToString(tpl.LaunchTemplateId)
 	name := aws.ToString(tpl.LaunchTemplateName)
@@ -149,8 +147,8 @@ func ltResource(tpl ec2types.LaunchTemplate, ver ec2types.LaunchTemplateVersion,
 }
 
 // computeLTFindings builds the ordered Finding slice for one "$Default"
-// version: IMDSv1 first, then unencrypted-EBS — docs/resources/lt.md §4
-// precedence order (deprecated-ami and details-denied are appended later, by
+// version: IMDSv1 first, then unencrypted-EBS — the precedence order in
+// docs/resources/lt.md (deprecated-ami and details-denied are appended later, by
 // the Wave 2 enricher and the degraded-row builder respectively).
 func computeLTFindings(ver ec2types.LaunchTemplateVersion) []domain.Finding {
 	data := ver.LaunchTemplateData
@@ -162,7 +160,7 @@ func computeLTFindings(ver ec2types.LaunchTemplateVersion) []domain.Finding {
 
 	// HttpEndpoint == disabled means the metadata service is unreachable
 	// entirely; HttpTokens is moot and produces no signal regardless of its
-	// value (docs/resources/lt.md §3.2).
+	// value.
 	endpointDisabled := data.MetadataOptions != nil && data.MetadataOptions.HttpEndpoint == ec2types.LaunchTemplateInstanceMetadataEndpointStateDisabled
 
 	// Unset defaults to optional (SDK-confirmed) — absence of

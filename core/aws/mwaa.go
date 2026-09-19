@@ -17,14 +17,13 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// mwaa.* FindingCodes — docs/resources/mwaa.md §3.2/§4. The eleven
-// mwaaCode* state codes below classify Environment.Status; the two
-// background codes (mwaaCodeLastUpdateFailed, mwaaCodeWebserverPublic) fire
-// on ANY status. Every code here is color-bearing — the shared
-// colorAnyFindingOrHealthy helper (catalog_color_helpers.go) derives row
-// color from the worst-severity Finding present, with no state-vs-background
-// distinction (docs/resources/mwaa.md §4: no glyph-on-green case exists for
-// mwaa — every signal moves the row off green).
+// mwaa.* FindingCodes (docs/resources/mwaa.md). The eleven mwaaCode* state
+// codes below classify Environment.Status; the two background codes
+// (mwaaCodeLastUpdateFailed, mwaaCodeWebserverPublic) fire on ANY status.
+// Every code here is color-bearing — the shared colorAnyFindingOrHealthy
+// helper (catalog_color_helpers.go) derives row color from the
+// worst-severity Finding present, with no state-vs-background distinction:
+// every mwaa signal moves the row off green.
 const (
 	mwaaCodeCreating         domain.FindingCode = "mwaa.warn.creating"
 	mwaaCodeCreatingSnapshot domain.FindingCode = "mwaa.warn.creating_snapshot"
@@ -47,12 +46,11 @@ const (
 const mwaaListPageSize = 25
 
 // FetchMWAAEnvironmentsPage fetches a single page of MWAA environments.
-// ListEnvironments returns names only (docs/resources/mwaa.md §3.1 — no Wave
-// 1 signal), so every field and every Finding comes from a per-name
-// GetEnvironment call (in-fetcher N+1, the EKS pattern — no separate
-// mwaa_issue_enrichment.go). Per-name GetEnvironment failures are aggregated
-// (E3/E5) rather than dropping the whole page; a ListEnvironments failure
-// returns an error, never an empty success (AccessDenied contract).
+// ListEnvironments returns names only, so every field and every Finding
+// comes from a per-name GetEnvironment call (in-fetcher N+1, as for EKS).
+// Per-name GetEnvironment failures are aggregated rather than dropping the
+// whole page; a ListEnvironments failure returns an error, never an empty
+// success (AccessDenied contract).
 func FetchMWAAEnvironmentsPage(ctx context.Context, c *ServiceClients, continuationToken string) (resource.FetchResult, error) {
 	input := &mwaa.ListEnvironmentsInput{
 		MaxResults: aws.Int32(mwaaListPageSize),
@@ -106,11 +104,9 @@ func buildMWAAResource(name string, env *mwaatypes.Environment) resource.Resourc
 	rawStatus := string(env.Status)
 	statusPhrase := domain.StatusPhrase(findings)
 	if statusPhrase == "" && rawStatus != "" && rawStatus != string(mwaatypes.EnvironmentStatusAvailable) {
-		// Defensive parity with rds.go's status-phrase fallback: an
-		// undocumented future status value still surfaces as raw text
-		// instead of silently rendering blank. AVAILABLE with zero findings
-		// legitimately stays "" — docs/resources/mwaa.md §4 "Healthy rows
-		// render blank".
+		// As in rds.go's status-phrase fallback, an undocumented status value
+		// surfaces as raw text instead of rendering blank. AVAILABLE with zero
+		// findings stays "": healthy rows render blank.
 		statusPhrase = rawStatus
 	}
 
@@ -184,7 +180,7 @@ func buildMWAAResource(name string, env *mwaatypes.Environment) resource.Resourc
 
 // buildMWAADegradedResource builds the name-only degraded row for an
 // environment whose GetEnvironment call failed — ListEnvironments returns
-// names only (docs/resources/mwaa.md §3.1), so there are no list fields to
+// names only, so there are no list fields to
 // carry forward. err is the GetEnvironment call's error (nil for a nil
 // Environment body); it decides whether the row renders mwaa's own "details
 // denied" sentence or the neutral "details unavailable" one.
@@ -204,7 +200,7 @@ func buildMWAADegradedResource(name string, err error) resource.Resource {
 // computeMWAAFindings builds the ordered Finding slice for one environment:
 // the state-bucket finding (if Status != AVAILABLE), then the
 // last-update-failed background finding, then the webserver-public
-// background finding — docs/resources/mwaa.md §4 precedence order. Both
+// background finding — the precedence order in docs/resources/mwaa.md. Both
 // background findings apply regardless of Status (they stack after the
 // state finding on a non-green row, and are the only findings on an
 // AVAILABLE row).
@@ -248,7 +244,7 @@ func computeMWAAFindings(env *mwaatypes.Environment) ([]domain.Finding, map[doma
 	return findings, attentionDetails
 }
 
-// mwaaStateFindings maps Environment.Status to its docs/resources/mwaa.md §4
+// mwaaStateFindings maps Environment.Status to its
 // state-bucket code. AVAILABLE has no entry (Healthy — no finding).
 var mwaaStateFindings = map[mwaatypes.EnvironmentStatus]domain.FindingCode{ //nolint:gochecknoglobals // static lookup table, the transferLegacySecurityPolicies precedent
 	mwaatypes.EnvironmentStatusCreating:         mwaaCodeCreating,
@@ -264,7 +260,7 @@ var mwaaStateFindings = map[mwaatypes.EnvironmentStatus]domain.FindingCode{ //no
 	mwaatypes.EnvironmentStatusDeleted:          mwaaCodeDeleted,
 }
 
-// mwaaStateFinding maps Environment.Status to its docs/resources/mwaa.md §4
+// mwaaStateFinding maps Environment.Status to its
 // state-bucket Finding. ok is false for AVAILABLE (Healthy — no finding).
 func mwaaStateFinding(status mwaatypes.EnvironmentStatus) (domain.Finding, bool) {
 	code, ok := mwaaStateFindings[status]

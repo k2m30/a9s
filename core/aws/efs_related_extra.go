@@ -109,10 +109,7 @@ func checkEFSVPC(ctx context.Context, clients any, res resource.Resource, cache 
 // The backup fetcher (backup.go) indexes Resource.ID by BackupPlanId and
 // carries the plan's selected resource ARNs in Fields["resources"] as a CSV,
 // so this checker reverse-scans the backup cache for plans whose resources
-// CSV contains the EFS ARN. Returning recovery-point ARNs (the previous
-// implementation) produced an ID-format mismatch — drill-through landed
-// empty because recovery points are a different resource class and the
-// backup list is keyed by plan id.
+// CSV contains the EFS ARN.
 func checkEFSBackup(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	fs, ok := assertStruct[efstypes.FileSystemDescription](res.RawStruct)
 	if !ok {

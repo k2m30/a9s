@@ -18,12 +18,10 @@ import (
 // they are routed and ordered by the same facts: the screen that asked, the
 // sequence that says which of that screen's requests this is, the lane the
 // delivery gate matches on, and the load-more pair the activity flags read.
-// Built as two literals side by side they are one edit away from disagreeing,
-// and they did disagree — a failed page named no screen, so it was applied to
-// whichever list of its type was topmost.
+// Built as two literals side by side they are one edit away from disagreeing.
 //
 // A caller with no request behind it (a connect failure) fills in what it has
-// and leaves the rest zero, which costs it exactly what the literal did.
+// and leaves the rest zero.
 type FetchOutcome struct {
 	ResourceType string
 	// Gen is the session generation the dispatch was stamped at.

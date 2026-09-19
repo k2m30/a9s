@@ -31,7 +31,7 @@ type EKSFixtures struct {
 	UnavailableNodegroups map[string][]string
 }
 
-// Degraded-row witnesses. The node groups hang off the graph-root cluster.
+// Degraded rows. The node groups hang off the graph-root cluster.
 const (
 	WarnEKSDetailsDeniedID      = "warn-eks-details-denied"
 	WarnEKSDetailsUnavailableID = "warn-eks-details-unavailable"
@@ -130,7 +130,7 @@ func buildEKSClusters() []*ekstypes.Cluster {
 			Version: aws.String("1.30"),
 			Status:  ekstypes.ClusterStatusCreating,
 			RoleArn: aws.String(eksClusterRoleARN),
-			// EKSPublicEndpoint witness: the Kubernetes endpoint answers from
+			// EKSPublicEndpoint: the Kubernetes endpoint answers from
 			// anywhere on the internet.
 			ResourcesVpcConfig: &ekstypes.VpcConfigResponse{
 				VpcId:                aws.String(eksVPCID),
@@ -145,7 +145,7 @@ func buildEKSClusters() []*ekstypes.Cluster {
 				"Environment": "dev",
 			},
 		},
-		// EKSPublicEndpointRestricted witness: public, but scoped to the
+		// EKSPublicEndpointRestricted: public, but scoped to the
 		// ranges below rather than to the whole internet.
 		{
 			Name:     aws.String(EKSPublicEndpointRestricted),
@@ -173,7 +173,7 @@ func buildEKSClusters() []*ekstypes.Cluster {
 				"Environment": "qa",
 			},
 		},
-		// Witness for eks.state.pending.
+		// Raises eks.state.pending.
 		{
 			Name:    aws.String("acme-sandbox-pending"),
 			Arn:     aws.String("arn:aws:eks:us-east-1:123456789012:cluster/acme-sandbox-pending"),
@@ -191,7 +191,7 @@ func buildEKSClusters() []*ekstypes.Cluster {
 				"Environment": "sandbox",
 			},
 		},
-		// Witness for eks.state.deleting.
+		// Raises eks.state.deleting.
 		{
 			Name:    aws.String("acme-sandbox-retiring"),
 			Arn:     aws.String("arn:aws:eks:us-east-1:123456789012:cluster/acme-sandbox-retiring"),
@@ -220,7 +220,7 @@ func buildEKSClusters() []*ekstypes.Cluster {
 				VpcId:     aws.String(eksVPCID),
 				SubnetIds: []string{eksSubnetA, eksSubnetB},
 			},
-			// EKSLoggingIncomplete witness: audit and scheduler output never
+			// EKSLoggingIncomplete: audit and scheduler output never
 			// reaches CloudWatch.
 			Logging: &ekstypes.Logging{ClusterLogging: []ekstypes.LogSetup{
 				{Enabled: aws.Bool(true), Types: []ekstypes.LogType{
@@ -247,10 +247,10 @@ func buildEKSClusters() []*ekstypes.Cluster {
 				VpcId:     aws.String(eksVPCID),
 				SubnetIds: []string{eksSubnetA, eksSubnetB, eksSubnetC},
 			},
-			// EKSVersionUnsupported witness: 1.27 is the one demo minor the
+			// EKSVersionUnsupported: 1.27 is the one demo minor the
 			// registry reports as out of standard support. It is the
-			// EKSSecretsNoKMS witness too, EncryptionConfig deliberately
-			// absent: from 1.28 AWS envelope-encrypts secrets with an
+			// EKSSecretsNoKMS cluster too, with no EncryptionConfig:
+			// from 1.28 AWS envelope-encrypts secrets with an
 			// AWS-owned key on every cluster, so only a cluster below 1.28 has
 			// no encryption at all, and a cluster that old is out of support
 			// as well. One row carries both because a real cluster would.
@@ -383,7 +383,7 @@ func buildEKSNodegroups() map[string][]ekstypes.Nodegroup {
 					"Environment": "staging",
 				},
 			},
-			// Witness for ng.health-issue: ACTIVE, so no state finding, but
+			// Raises ng.health-issue: ACTIVE, so no state finding, but
 			// Health.Issues[] is non-empty — health is tracked independently
 			// of the lifecycle state.
 			{
@@ -581,7 +581,7 @@ func buildEKSNodegroups() map[string][]ekstypes.Nodegroup {
 	}
 }
 
-// Witness clusters for the eks posture findings. Each names the ONE demo
+// Clusters carrying the eks posture findings. Each names the ONE demo
 // cluster that carries its finding; every other cluster is set to the
 // healthy value for that condition.
 const (
@@ -629,7 +629,7 @@ func eksSecretsEncryption() []ekstypes.EncryptionConfig {
 
 // EKSVersionSupport is what the demo registry reports for each Kubernetes
 // minor the fixtures use, backing DescribeClusterVersions. Only 1.27 is out of
-// standard support, which is what makes acme-degraded-prod the sole witness.
+// standard support, so acme-degraded-prod is the only unsupported cluster.
 var EKSVersionSupport = map[string]ekstypes.VersionStatus{ //nolint:gochecknoglobals // static demo data
 	"1.27": ekstypes.VersionStatusExtendedSupport,
 	"1.29": ekstypes.VersionStatusStandardSupport,

@@ -23,7 +23,7 @@ type shardIssue struct{ id, status string }
 
 // computeShardIssues returns one entry per non-available NodeGroup on a
 // multi-shard (cluster-mode-enabled) replication group, ordered alphabetically
-// by shard id so rule-7 precedence is stable. Returns nil when the RG has ≤1
+// by shard id so precedence is stable. Returns nil when the RG has ≤1
 // NodeGroup — single-shard RGs use the RG-level phrase instead.
 func computeShardIssues(nodeGroups []elasticachetypes.NodeGroup) []shardIssue {
 	if len(nodeGroups) <= 1 {
@@ -65,7 +65,6 @@ func FetchRedisPage(ctx context.Context, api ElastiCacheDescribeReplicationGroup
 	var resources []resource.Resource
 
 	for _, rg := range output.ReplicationGroups {
-		// Engine filter: skip any RG whose engine is not "redis".
 		if rg.Engine == nil || !strings.EqualFold(aws.ToString(rg.Engine), "redis") {
 			continue
 		}

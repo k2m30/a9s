@@ -175,8 +175,8 @@ var sharedCloudWatchFixtures = sync.OnceValue(func() *CloudWatchFixtures {
 					{Name: aws.String("DBInstanceIdentifier"), Value: aws.String("prod-dbi-1")},
 				},
 			},
-			// prod-dbi-aurora-1 alarm — required for the "all pivots
-			// non-zero" graph-root assertion on the Aurora dbi fixture.
+			// prod-dbi-aurora-1 alarm — required so every related pivot on
+			// the Aurora dbi fixture is non-zero.
 			{
 				AlarmName:             aws.String("rds-prod-dbi-aurora-1-cpu"),
 				AlarmArn:              aws.String("arn:aws:cloudwatch:us-east-1:123456789012:alarm:rds-prod-dbi-aurora-1-cpu"),
@@ -1113,9 +1113,9 @@ func minimalAlarmHistory(alarmName string) []cwtypes.AlarmHistoryItem {
 	}
 }
 
-// AlarmActionsDisabled is the ONE demo alarm with its actions switched off
-// for the w6a batch. It has actions configured, so it is distinct from the
-// no-actions witness.
+// AlarmActionsDisabled is the ONE demo alarm with its actions switched off.
+// It has actions configured, so it is distinct from the alarm with no
+// actions.
 const AlarmActionsDisabled = "acme-actions-disabled-alarm"
 
 func init() {

@@ -3,8 +3,7 @@
 // Package costs is the pure domain layer for the Cost Explorer feature:
 // query/record/period types, cache-key derivation, grid aggregation, and
 // drill-chain rules consumed by core/aws (SDK mapping) and core/app
-// (view-state assembly). No AWS SDK or TUI imports — see
-// specs/021-cost-explorer/data-model.md for the full contract.
+// (view-state assembly). No AWS SDK or TUI imports.
 package costs
 
 import (
@@ -28,8 +27,7 @@ const (
 )
 
 // APIGranularity returns the CE granularity that backs g: DAILY for
-// week/day, MONTHLY for month/year. Single source for the aggregation rule
-// (FR-005).
+// week/day, MONTHLY for month/year. Single source for the aggregation rule.
 func (g Granularity) APIGranularity() string {
 	switch g {
 	case GranularityWeek, GranularityDay:

@@ -14,7 +14,6 @@ import (
 )
 
 // checkDdbKMS reads SSEDescription.KMSMasterKeyArn from the TableDescription RawStruct.
-// Pattern F — no cache needed.
 func checkDdbKMS(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	table, ok := assertStruct[ddbtypes.TableDescription](res.RawStruct)
 	if !ok {
@@ -28,7 +27,6 @@ func checkDdbKMS(ctx context.Context, clients any, res resource.Resource, cache 
 
 // checkDdbAlarm searches the alarm cache for alarms with a "TableName" dimension
 // matching this DynamoDB table's name.
-// Pattern D — dimension-based lookup.
 func checkDdbAlarm(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	tableName := res.ID
 	if tableName == "" {
@@ -100,7 +98,7 @@ func checkDdbBackup(ctx context.Context, clients any, res resource.Resource, cac
 }
 
 // checkDdbKinesis resolves Kinesis Data Streams connected to this DynamoDB table
-// via dynamodb:DescribeKinesisStreamingDestination (Pattern C: 1 API call).
+// via dynamodb:DescribeKinesisStreamingDestination (1 API call).
 // KinesisDataStreamDestinations[].StreamArn values are returned as resource IDs.
 func checkDdbKinesis(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	tableName := res.ID
@@ -136,7 +134,7 @@ func truncatedResultDDB(target string, ids []string) resource.RelatedCheckResult
 }
 
 // checkDdbLambda finds Lambda functions wired to this DynamoDB table's stream
-// (Pattern A — live API). DDB Streams are consumed through
+// (live API). DDB Streams are consumed through
 // lambda:ListEventSourceMappings; the EventSourceArn on each mapping matches
 // the table's LatestStreamArn. Lambda FunctionConfiguration does not embed
 // event-source info, so there is no cache-only path. Returns an unknown

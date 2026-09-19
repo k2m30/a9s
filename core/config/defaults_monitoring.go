@@ -33,7 +33,6 @@ func monitoringDefaultViews() map[string]ViewDef {
 				{Key: "latest_delivery_error", Label: "Latest Delivery Error"},
 			},
 		},
-		// Child views for monitoring resources
 		"alarm_history": {
 			Detail: []DetailField{
 				{Path: "Timestamp"}, {Path: "HistoryItemType"}, {Path: "HistorySummary"},

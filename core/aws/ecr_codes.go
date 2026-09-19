@@ -16,5 +16,3 @@ const (
 	// CodeECRMutableTags — ImageTagMutability is MUTABLE.
 	CodeECRMutableTags domain.FindingCode = "ecr.mutable-tags"
 )
-
-// S5 operator sentences.

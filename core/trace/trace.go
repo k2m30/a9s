@@ -6,11 +6,9 @@
 // (core/aws's coalescing decorators — executed vs served-from-memo), the
 // on-demand enrich engine's session-scoped cache reads/writes
 // (core/aws/detail_enrich_engine.go), and the fold that accepts or rejects
-// each async result back in core/app (core/app/handle.go). Ten review rounds
-// on this lifecycle found ~50 "action B landed while action A was still in
-// flight" defects that thousands of green example-based tests never
-// surfaced; this package exists so that sequence can be observed directly
-// instead of re-derived from reading code under review.
+// each async result back in core/app (core/app/handle.go). It makes the
+// "action B landed while action A was still in flight" sequence observable
+// directly instead of re-derived from reading code.
 //
 // Every one of those emit sites also runs on the ordinary, undiagnosed path
 // (a plain detail open with tracing off), so cost there must be as close to
@@ -24,8 +22,8 @@
 // asserts against directly (Records/Duplicates); this package is a
 // human/tool-consumable JSON-lines stream, enabled process-wide by the
 // cmd/a9s --trace flag or directly by a test via Enable. Both instrument the
-// same call sites for the same reason (the ten-round review's defect shape)
-// but serve different consumers, so neither depends on the other.
+// same call sites but serve different consumers, so neither depends on the
+// other.
 //
 // core/aws, core/runtime and core/app all need to emit from their own call
 // sites, so this package must sit below all three with no import-cycle risk

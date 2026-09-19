@@ -47,7 +47,7 @@ func EnrichSESAccount(ctx context.Context, clients *ServiceClients, resources []
 		return result, err
 	}
 
-	// Decide the single account-level finding using §4 precedence, then
+	// Decide the single account-level finding by precedence, then
 	// replicate it onto every identity row.
 	code, rows, hasFinding := sesAccountFinding(out)
 	if hasFinding {
@@ -103,11 +103,11 @@ func sesIdentityDKIM(ctx context.Context, clients *ServiceClients, result *Issue
 }
 
 // sesAccountFinding derives the single account-level finding from GetAccount output.
-// Returns (code, phrase, severityGlyph, rows, hasFinding) when a finding exists,
-// or ("", "", "", nil, false) when the account is healthy and below the quota threshold.
+// Returns (code, rows, true) when a finding exists, or ("", nil, false)
+// when the account is healthy and below the quota threshold.
 //
-// U11 contract: phrase is the short S4 phrase only; per-account context lives in
-// rows (Enforcement Status / Sent Last 24h / Max 24h Send). strings.Contains(phrase, rowValue) == false.
+// Per-account context lives in rows (Enforcement Status / Sent Last 24h /
+// Max 24h Send), never in the finding's phrase.
 func sesAccountFinding(out *sesv2.GetAccountOutput) (domain.FindingCode, []domain.DetailRow, bool) {
 	if out == nil {
 		return "", nil, false
@@ -129,7 +129,6 @@ func sesAccountFinding(out *sesv2.GetAccountOutput) (domain.FindingCode, []domai
 		}, true
 	}
 
-	// Check quota threshold (strict > 80%).
 	if out.SendQuota != nil && out.SendQuota.Max24HourSend > 0 {
 		sent := out.SendQuota.SentLast24Hours
 		max := out.SendQuota.Max24HourSend

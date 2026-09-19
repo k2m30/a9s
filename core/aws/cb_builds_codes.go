@@ -4,11 +4,9 @@ package aws
 
 import "github.com/k2m30/a9s/v3/core/domain"
 
-// CodeBuild build-state findings emitted by FetchCBBuilds. Severity carries
-// the color signal so the list view can render the row red/yellow/dim from
-// the wave1 Finding alone — no per-status Color fallback against a status
-// string — wave1 Findings are the sole severity signal for this
-// fetcher.
+// CodeBuild build-state findings emitted by FetchCBBuilds. wave1 Findings are
+// the sole severity signal for this fetcher: the list view renders the row
+// red/yellow/dim from the Finding alone.
 const (
 	CodeCBBuildFailed     domain.FindingCode = "cb-build.broken.failed"
 	CodeCBBuildFault      domain.FindingCode = "cb-build.broken.fault"

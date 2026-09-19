@@ -41,7 +41,6 @@ func checkEIPENI(_ context.Context, _ any, res resource.Resource, _ resource.Res
 // checkEIPNAT checks the NAT gateway cache for NAT gateways using this Elastic IP
 // allocation (Pattern C — search target cache by AllocationId).
 func checkEIPNAT(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
-	// Resolve the allocation ID from the RawStruct or from res.ID.
 	allocationID := res.ID
 	raw, ok := assertStruct[ec2types.Address](res.RawStruct)
 	if ok && raw.AllocationId != nil && *raw.AllocationId != "" {
@@ -71,7 +70,6 @@ func checkEIPNAT(ctx context.Context, clients any, res resource.Resource, cache 
 			}
 			continue
 		}
-		// Fallback: check Fields keys for allocation ID values.
 		for _, v := range natRes.Fields {
 			if v == allocationID {
 				ids = append(ids, natRes.ID)

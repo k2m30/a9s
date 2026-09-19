@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
 
-// Generic helpers shared by every *_related.go checker (moved out of ec2_related.go — they are not EC2-specific).
+// Generic helpers shared by every *_related.go checker.
 package aws
 
 import (
@@ -220,7 +220,7 @@ type typedRow[T any] struct {
 }
 
 // cachedTypedRows reads the shortName entry directly from cache — it never
-// fetches. Tri-state contract (the ng_related.go original): cache absent →
+// fetches. Tri-state contract: cache absent →
 // (nil, false, false) = unknown; entry present but zero rows assert to T
 // (disk-seeded, no RawStruct) → (nil, false, false) = unknown; entry present
 // and typed → the asserting rows only (non-asserting rows are dropped).
@@ -246,9 +246,9 @@ func cachedTypedRows[T any](cache resource.ResourceCache, shortName string) (row
 // lambdaEventSourceMappingLambdaCheck is shared by checkKinesisLambda and
 // checkMSKLambda. Both pivots need the same mechanism: a stream/cluster ARN
 // is the Lambda event source, and lambda:ListEventSourceMappings filtered by
-// EventSourceArn (one call per open resource — budget rule 7 in
-// docs/related-resources.md) is itself the authoritative mechanism per
-// kinesis.md/msk.md §2 — its FunctionArn values are the definitive answer,
+// EventSourceArn (one call per open resource — the per-open call budget in
+// docs/related-resources.md) is itself the authoritative mechanism —
+// its FunctionArn values are the definitive answer,
 // each read as the function name the lambda list is keyed by.
 func lambdaEventSourceMappingLambdaCheck(ctx context.Context, clients any, eventSourceArn string, cache resource.ResourceCache) resource.RelatedCheckResult {
 	c, ok := clients.(*ServiceClients)

@@ -3,10 +3,7 @@
 package tui
 
 // app_enrich_fold_whitebox_test.go — Model.applyEnrichment is the TUI's
-// per-type Wave-2 clear, run by handleRefresh before a re-fetch. It is
-// unexported and its only production caller passes no data, so nothing outside
-// this package could reach it; the clear ran on every refresh with no test
-// asserting what it keeps.
+// per-type Wave-2 clear, run by handleRefresh before a re-fetch.
 //
 // What it must keep is the part that cannot be recomputed: wave-1 supporting
 // rows come from data only the fetcher held, so a clear that drops them leaves

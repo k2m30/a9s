@@ -27,12 +27,9 @@ func (f *RedshiftFake) DescribeClusters(_ context.Context, _ *redshift.DescribeC
 	return &redshift.DescribeClustersOutput{Clusters: f.fix.Clusters}, nil
 }
 
-// DescribeLoggingStatus routes by ClusterIdentifier:
-//   - acme-warehouse → CloudWatch logging enabled (connectionlog, userlog, useractivitylog)
-//   - acme-reporting → S3 logging enabled (BucketName = RedshiftAuditBucket)
-//   - the audit-logging-off witness → logging disabled
-//   - all others     → CloudWatch logging enabled (the healthy default, so
-//     exactly one demo row carries the audit-logging-off finding)
+// DescribeLoggingStatus routes by ClusterIdentifier. A cluster without its
+// own case gets CloudWatch logging enabled, the healthy default, so exactly
+// one demo row carries the audit-logging-off finding.
 func (f *RedshiftFake) DescribeLoggingStatus(_ context.Context, in *redshift.DescribeLoggingStatusInput, _ ...func(*redshift.Options)) (*redshift.DescribeLoggingStatusOutput, error) {
 	if in == nil || in.ClusterIdentifier == nil {
 		return &redshift.DescribeLoggingStatusOutput{}, nil

@@ -20,7 +20,7 @@ import (
 // FetchEKSClustersPage fetches a single page of EKS clusters using the registered
 // paginated fetcher pattern. For each cluster name returned by ListClusters,
 // DescribeCluster is called. Per-item describe failures are aggregated into a
-// composite error returned alongside partial results (E2, E3, E5).
+// composite error returned alongside partial results.
 func FetchEKSClustersPage(ctx context.Context, c *ServiceClients, continuationToken string) (resource.FetchResult, error) {
 	input := &eks.ListClustersInput{
 		MaxResults: aws.Int32(DefaultPageSize),
@@ -124,7 +124,6 @@ func buildEKSResource(name string, cluster *ekstypes.Cluster, versions map[strin
 	r := resource.Resource{
 		ID:   name,
 		Name: clusterName,
-		// Status intentionally unset — lifecycle state is emitted as a Finding.
 		Fields: map[string]string{
 			"cluster_name":        clusterName,
 			"version":             version,
@@ -168,8 +167,8 @@ var eksControlPlaneLogTypes = []ekstypes.LogType{ //nolint:gochecknoglobals // s
 
 // eksVersionCatalogue reads what AWS says about every Kubernetes minor, keyed
 // by version. It returns nil when the catalogue cannot be read, which is the
-// answer "unknown" rather than "old" — this row exists precisely so a9s never
-// asserts a support state it did not get from AWS.
+// answer "unknown" rather than "old": a9s never asserts a support state it
+// did not get from AWS.
 //
 // One call for the whole page: the support state belongs to the version, not
 // to the cluster, so a per-cluster lookup would ask the same question N times.
@@ -203,9 +202,6 @@ func eksSupportWords(status ekstypes.VersionStatus) string {
 	return strings.ToLower(strings.ReplaceAll(string(status), "_", " "))
 }
 
-// addEKSPostureFindings evaluates the four w6b posture signals against the
-// DescribeCluster response the fetcher already holds, plus the version
-// catalogue read once for the page.
 // The closed vocabulary of the four posture words. eksPostureFindings matches
 // these and nothing else, so a token the fetcher never wrote — a stale cache, a
 // hand-built row, a later spelling — reports nothing rather than reading as the
@@ -267,7 +263,7 @@ func eksPostureOf(cluster *ekstypes.Cluster, versions map[string]ekstypes.Cluste
 	for _, ec := range cluster.EncryptionConfig {
 		// Resources is the only field that says WHICH resources a key covers,
 		// and "covers secrets specifically" is the condition being reported.
-		// The SDK marks it deprecated because EKS now encrypts API data by
+		// The SDK marks it deprecated because EKS encrypts API data by
 		// default, but it is still what DescribeCluster returns and still what
 		// distinguishes a cluster with its own key from one without.
 		//nolint:staticcheck // SA1019: no replacement field carries this fact
@@ -293,8 +289,8 @@ func eksPostureOf(cluster *ekstypes.Cluster, versions map[string]ekstypes.Cluste
 // API data with an AWS-owned key without being asked. AWS turned that on for
 // 1.28 and every version after it.
 //
-// An unparseable or absent version reads as false: the finding then fires as it
-// did before, which is the safe direction for a security signal. A patch
+// An unparseable or absent version reads as false: the finding then fires,
+// which is the safe direction for a security signal. A patch
 // component is ignored and a major above 1 is ahead of the change, so neither
 // shape reads as a version that leaves secrets unencrypted.
 func eksEncryptsByDefault(version string) bool {
@@ -362,8 +358,7 @@ func eksPostureFindings(status, version string, p eksPosture) []domain.Finding {
 	// From 1.28 AWS envelope-encrypts Kubernetes API data with an AWS-owned
 	// key on every cluster, so an empty EncryptionConfig there means no
 	// CUSTOMER-managed key rather than no encryption. Below 1.28 it does mean
-	// the secrets are stored with etcd's own protection alone, which is the
-	// condition this code was written for.
+	// the secrets are stored with etcd's own protection alone.
 	if p.SecretsEncryption == eksSecretsNone && !eksEncryptsByDefault(version) {
 		findings = append(findings, wave1Finding(CodeEKSSecretsNotKMS))
 	}

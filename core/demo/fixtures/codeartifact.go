@@ -15,7 +15,7 @@ type CodeArtifactFixtures struct {
 	Repositories []codeartifacttypes.RepositorySummary
 	// Domains maps domain name -> domain description, served by
 	// DescribeDomain. Required for the codeartifact:kms related-panel pivot
-	// witness (checkCodeartifactKMS reads Domain.EncryptionKey — CodeArtifact
+	// (checkCodeartifactKMS reads Domain.EncryptionKey — CodeArtifact
 	// encryption is a domain-level, not repository-level, property).
 	Domains map[string]codeartifacttypes.DomainDescription
 	// PermissionsPolicies maps repository name to its GetRepositoryPermissionsPolicy

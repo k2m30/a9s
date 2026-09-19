@@ -18,7 +18,7 @@ const (
 	CodeDBCNoAutomatedBackups    domain.FindingCode = "dbc.warn.no_automated_backups"
 )
 
-// Security-posture findings (Prowler gap closure). The same conditions the
+// Security-posture findings. The same conditions the
 // dbi instance fetcher evaluates, on the cluster shapes — emitted by both
 // computeDBCFindings (DocumentDB) and computeRDSDBClusterFindings (Aurora /
 // Multi-AZ) through the shared predicates in rds_posture.go.

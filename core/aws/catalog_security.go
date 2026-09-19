@@ -155,7 +155,7 @@ var securityTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stat
 			// Partial failure: inline group policy enumeration failed for some
 			// groups. Preserve the inline results we did get, then propagate the
 			// composite error so app.go's ResourcesLoadedMsg handler surfaces it
-			// via FlashMsg → `!` log (per E1–E6). Managed policies above are
+			// via FlashMsg → `!` log. Managed policies above are
 			// still returned in result.Resources regardless.
 			result.Resources = append(result.Resources, inlines...)
 			if result.Pagination != nil {
@@ -167,20 +167,18 @@ var securityTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stat
 		// (core/runtime/probes.go's ProbeResourceAvailability, via
 		// resource.GetAvailabilityFetcher): managed policies alone are
 		// sufficient for an availability/count signal, so this never reaches
-		// fetchInlineGroupPolicies's per-group IAM sweep — the live symptom
-		// this registration exists to prevent ("availability policy:
-		// ListGroupPolicies failed for N of M IDs" on a wide-group account).
+		// fetchInlineGroupPolicies's per-group IAM sweep, which on a wide-group
+		// account fails ListGroupPolicies for some of the groups.
 		// IsTruncated is forced true regardless of what ListPolicies itself
-		// reports: this probe deliberately never checks group-inline
-		// policies, so it can never confirm a true zero/exact total — an
-		// inline-only account (zero managed policies, many inline ones on
-		// groups) would otherwise report a confirmed-empty "0" instead of
-		// the honest lower-bound "N+", making it look unnavigable.
+		// reports: this probe never checks group-inline policies, so it can
+		// never confirm a true zero/exact total — an inline-only account (zero
+		// managed policies, many inline ones on groups) would otherwise report a
+		// confirmed-empty "0" instead of the lower-bound "N+", making it look
+		// unnavigable.
 		// LowerBoundOnly marks this pairing (IsTruncated=true, no cursor) as
 		// deliberate: without it, resource.sanitizeFetchResult cannot tell this
 		// apart from a fetcher that hit a local cap and forgot to wire a
-		// cursor, and would downgrade it back to a confirmed "0", the exact
-		// bug this registration exists to prevent.
+		// cursor, and would downgrade it to a confirmed "0".
 		AvailabilityFetcher: fetcherWithClients(func(ctx context.Context, c *ServiceClients, continuationToken string) (resource.FetchResult, error) {
 			result, err := FetchIAMPoliciesPage(ctx, c.IAM, continuationToken)
 			if result.Pagination == nil {
@@ -343,8 +341,6 @@ var securityTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stat
 			{TargetType: "logs", DisplayName: "Log Groups", Checker: checkWAFLogs},
 			{TargetType: "ct-events", DisplayName: "CloudTrail Events", Checker: ctEventsCheckerFor("waf")},
 		},
-		// wafv2types.WebACLSummary: no cross-ref fields — Name, Id, ARN, Description, LockToken only.
-		// Associations (ELB/APIGW/CF) are resolved via checkWAF* related checkers at runtime.
 		Findings: []catalog.FindingDef{
 			{Code: wafCodeOrphan, Phrase: "not associated with any resource", Severity: domain.SevWarn, Source: "wave2", Detail: "This web ACL is not attached to any load balancer, gateway stage or distribution, so none of its rules are inspecting traffic. Associate it with the resource it was written for, or delete it."},
 			{Code: wafCodeNoLogging, Phrase: "no logging configuration", Severity: domain.SevWarn, Source: "wave2", Detail: "This web ACL is not writing request logs anywhere, so a blocked or allowed request leaves no trace to investigate an incident with. Attach a logging configuration pointing at a Kinesis Firehose stream, S3 bucket, or CloudWatch log group."},
@@ -353,7 +349,7 @@ var securityTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // stat
 	},
 }
 
-// securityChildTypes carries the migrated child-type entries for the security
+// securityChildTypes carries the child-type entries for the security
 // category. Replayed onto resource.childTypes + paginatedChildRegistry by
 // aws.Install() via the bridge in install.go.
 var securityChildTypes = []catalog.ResourceTypeDef{ //nolint:gochecknoglobals // static catalog: intentional package-level var

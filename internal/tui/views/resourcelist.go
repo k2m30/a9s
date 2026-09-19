@@ -45,7 +45,8 @@ type ResourceListModel struct {
 }
 
 // newResourceListCtrl creates a stub controller for a top-level resource-list
-// screen. Used by NewResourceList for backward-compat paths and unit tests.
+// screen. Used by NewResourceList when no controller is passed, and by unit
+// tests.
 // Routes via ActionCommand so the menu stack is correctly initialised when the
 // type is a registered menu entry. Falls back to PushChildListScreen for types
 // that are not menu entries (unit-test types, ad-hoc types).
@@ -79,8 +80,7 @@ func newChildListCtrl(typeDef resource.ResourceTypeDef, core *runtime.Core) *app
 }
 
 // NewResourceList creates a ResourceListModel in loading state.
-// ctrl is optional — when nil a stub controller is constructed for backward
-// compatibility with callers that do not yet pass a controller.
+// ctrl is optional — when nil a stub controller is constructed.
 func NewResourceList(typeDef resource.ResourceTypeDef, viewConfig *config.ViewsConfig, k keys.Map, ctrl ...*app.Controller) ResourceListModel {
 	sp := spinner.New()
 	var c *app.Controller
@@ -219,9 +219,9 @@ func (m ResourceListModel) Init() (ResourceListModel, tea.Cmd) {
 
 // Update handles messages: spinner ticks drive the loading animation; key
 // events are translated to controller Actions or emitted as navigation
-// messages. A list result is not among them — every one reaches the screen
-// through the controller, where the request sequence is checked, and a view
-// that applied one itself would be a second apply point past that check.
+// messages. Every list result reaches the screen through the controller,
+// where the request sequence is checked; a view that applied one itself would
+// be a second apply point past that check.
 func (m ResourceListModel) Update(msg tea.Msg) (ResourceListModel, tea.Cmd) {
 	switch msg := msg.(type) {
 	case spinner.TickMsg:
@@ -407,11 +407,8 @@ func (m ResourceListModel) Update(msg tea.Msg) (ResourceListModel, tea.Cmd) {
 // value it paints comes from body — the cells, their colours, the sort, the
 // horizontal scroll, the pagination hint. The model supplies only the terminal
 // geometry the controller cannot know: width, height, and the scroll offset.
-//
-// Nothing here re-derives a presentation decision the controller already made.
-// body.EnrichmentFindings in particular is not consulted: the status cell and
-// the row colour are resolved once, in core/app, and arrive already settled
-// (tests/unit/tui_viewstate_purity_list_test.go holds this).
+// The status cell and the row colour are resolved once, in core/app, and
+// arrive already settled.
 func (m *ResourceListModel) RenderList(body app.ListBody) string {
 	if body.Loading {
 		return m.spinner.View() + " Loading..."
@@ -496,7 +493,7 @@ func (m *ResourceListModel) RenderList(body app.ListBody) string {
 		sb.WriteString(styles.DimText.Render("── refreshing... ──"))
 	}
 
-	// Per cache contract C4: a fetch failure over cached content swaps the refreshing
+	// A fetch failure over cached content swaps the refreshing
 	// marker for an error marker — cached rows stay on screen, nothing goes
 	// blank. LastFetchError is consumed verbatim (already-classified text
 	// from HandleAPIError); this view performs no further formatting.
@@ -552,10 +549,8 @@ func renderListVisibleWindow(selected, total, viewHeight int) (int, int) {
 // renderListDataRow renders a single data row as a pure consumer of
 // app.ListRow: cell text comes from row.Cells verbatim. The status-column
 // override is already baked into the cell by core/app's buildListBody, which
-// is where the rule that docs/resources/*.md §4 states for each type lives.
-// No re-derivation from an enrichment findings map happens here, and no
-// marker is prepended to any cell — a row's colour already carries its worst
-// finding.
+// is where the rule that docs/resources/*.md states for each type lives. A
+// row's colour carries its worst finding.
 func renderListDataRow(cols []listCol, row app.ListRow, base lipgloss.Style, totalWidth int, isSelected bool, cellOffset int) string {
 	var b strings.Builder
 	b.WriteString(base.Render(" "))

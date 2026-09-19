@@ -9,7 +9,7 @@ import (
 )
 
 // ExtractTarget derives the TARGET section rows for a CloudTrail event.
-// It implements the #246 §4 fallback algorithm:
+// Fallback order:
 //  1. resources[] envelope → one Row per ResourceRef (ARN-stripped)
 //  2. Per-event-name lookup table (per-service heuristics on requestParameters)
 //  3. Catch-all: scan top-level requestParameters for *Id / *Name / *Arn keys
@@ -21,14 +21,13 @@ import (
 //   - Returns non-nil cleanedParams (never mutates the input params map).
 //   - When params is nil, cleanedParams is an empty non-nil map.
 func ExtractTarget(eventName string, eventSource string, recipientAccountID string, resources []ResourceRef, params map[string]any) (rows []Row, cleanedParams map[string]any) {
-	// Guarantee: cleanedParams is always non-nil.
 	if params == nil {
 		cleanedParams = map[string]any{}
 	} else {
 		cleanedParams = cloneMap(params)
 	}
 
-	// §1: resources[] envelope wins — one Row per ResourceRef.
+	// resources[] envelope wins — one Row per ResourceRef.
 	if len(resources) > 0 {
 		for _, ref := range resources {
 			rows = append(rows, resourceRefToRow(ref, recipientAccountID))
@@ -36,13 +35,11 @@ func ExtractTarget(eventName string, eventSource string, recipientAccountID stri
 		return rows, cleanedParams
 	}
 
-	// §2: Per-event-name fallback table.
 	rows, cleanedParams = extractByEventName(eventName, params, cleanedParams)
 	if len(rows) > 0 {
 		return rows, cleanedParams
 	}
 
-	// §3: Catch-all — scan top-level params for *Id / *Name / *Arn keys.
 	rows, cleanedParams = catchAllScan(params, cleanedParams)
 	return rows, cleanedParams
 }

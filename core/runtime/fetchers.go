@@ -87,8 +87,7 @@ func (c *Core) FetchChildResources(ctx context.Context, clients *awsclient.Servi
 
 // FetchMoreResources fetches the next page of resources using the given
 // params. It tries filtered fetch, then child fetch, then top-level paginated
-// fetch — matching the routing logic from the original app_fetchers.go.
-// When no fetcher is registered for the type, the returned error describes the
+// fetch. When no fetcher is registered for the type, the returned error describes the
 // missing type.
 func (c *Core) FetchMoreResources(ctx context.Context, clients *awsclient.ServiceClients, p FetchMoreParams) (resource.FetchResult, error) {
 	ctx, cancel := context.WithTimeout(ctx, fetchTimeout)

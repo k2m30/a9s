@@ -36,8 +36,8 @@ func (f *TransferFake) ListServers(_ context.Context, _ *transfer.ListServersInp
 }
 
 // DescribeServer returns the fixture's described server for the given id.
-// Ids in DeniedServerIDs return AccessDeniedException — the live-witnessed
-// IAM shape where a role may list servers but not read one's full details.
+// Ids in DeniedServerIDs return AccessDeniedException — the IAM shape where
+// a role may list servers but not read one's full details.
 // Unknown ids return ResourceNotFoundException.
 func (f *TransferFake) DescribeServer(_ context.Context, input *transfer.DescribeServerInput, _ ...func(*transfer.Options)) (*transfer.DescribeServerOutput, error) {
 	id := aws.ToString(input.ServerId)

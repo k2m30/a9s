@@ -18,8 +18,8 @@ import (
 const DefaultPageSize = 50
 
 // ParentContext holds key-value pairs passed from a parent view to a child
-// fetcher. Declaration lives in core/domain/contracts.go; this alias keeps
-// existing consumers compiling.
+// fetcher. Declaration lives in core/domain/contracts.go; this alias
+// re-exports it.
 type ParentContext = domain.ParentContext
 
 // fieldKeyRegistry maps resource short names to their valid Fields keys.
@@ -33,7 +33,7 @@ func SetFieldKeysForTest(shortName string, keys []string) {
 }
 
 // GetFieldKeys returns the registered Fields keys for the given resource type,
-// or nil if none are registered. Legacy-first: runtime map wins so test
+// or nil if none are registered. The runtime map wins so test
 // overrides via SetFieldKeysForTest take effect; otherwise reads the catalog
 // FieldKeys field for the type (or its child type when the name is a child).
 func GetFieldKeys(shortName string) []string {
@@ -79,7 +79,7 @@ func SetIssueEnricherFieldKeysForTest(shortName string, keys []string) {
 
 // GetIssueEnricherFieldKeys returns the accumulated Wave 2 issue-enricher
 // field keys for the given resource short name, or nil if none are registered.
-// Legacy-first: test overrides via SetIssueEnricherFieldKeysForTest take effect;
+// Test overrides via SetIssueEnricherFieldKeysForTest take effect first;
 // otherwise reads the catalog IssueEnricherFieldKeys field.
 func GetIssueEnricherFieldKeys(shortName string) []string {
 	if keys, ok := issueEnricherFieldKeysRegistry[shortName]; ok {
@@ -142,7 +142,7 @@ func SetFieldAliasesForTest(shortName string, aliases map[string]string) {
 // does not exist, it's copied. Returns the original map unchanged when no copies
 // are needed. Returns nil if fields is nil.
 // Overrides (registered after init) take precedence over builtins; builtins
-// fall back to catalog FieldAliases when the legacy map is empty.
+// fall back to catalog FieldAliases when the runtime map is empty.
 func ApplyFieldAliases(shortName string, fields map[string]string) map[string]string {
 	aliases := fieldAliasOverrides[shortName]
 	if len(aliases) == 0 {
@@ -204,10 +204,8 @@ func SetChildTypeForTest(def ResourceTypeDef) {
 // the child registry first, so a type a test registered is a type, then the
 // installed catalog, parents and children alike (catalog.FindAny). Every
 // getter below and in related.go and enricher.go asks here, so none of them
-// answers for half the catalog — a child type's Related and Navigable were
-// declarations nothing read, because the getters that read them looked among
-// the parents only. Exported because core/aws's Wave 2 lookup is one of those
-// readers and had the same half-catalog bug.
+// answers for half the catalog. Exported because core/aws's Wave 2 lookup is
+// one of those readers.
 func TypeDef(shortName string) *ResourceTypeDef {
 	if td := GetChildType(shortName); td != nil {
 		return td
@@ -217,26 +215,22 @@ func TypeDef(shortName string) *ResourceTypeDef {
 
 // GetChildType returns the child type definition for the given short name,
 // or nil if no child type is registered. One registry: a test registration
-// lands in the same map the installed children live in, so there is no
-// precedence question to get wrong and no second map to read first.
+// lands in the same map the installed children live in.
 func GetChildType(shortName string) *ResourceTypeDef {
 	return catalog.ChildOnly(shortName)
 }
 
 // AllChildTypes returns all registered child type definitions.
-// The returned slice is in no guaranteed order.
-// Combines legacy registry entries with catalog child entries; legacy wins
-// on name collision so test overrides remain visible. This is the child half
-// of the union TypeDef resolves a single name against, and core/aws's AllWave2
-// walks it for the same reason: an enumeration over the parents alone answers
-// for half the catalog.
+// The returned slice is in no guaranteed order. This is the child half of
+// the union TypeDef resolves a single name against, and core/aws's AllWave2
+// walks it for the same reason: an enumeration over the parents alone
+// answers for half the catalog.
 func AllChildTypes() []ResourceTypeDef {
 	return catalog.AllChildren()
 }
 
 // AllChildShortNamesForTest returns the ShortName of every registered child
-// type. Includes both legacy registry entries and catalog child entries.
-// Test-only: no production caller.
+// type. Test-only: no production caller.
 func AllChildShortNamesForTest() []string {
 	children := catalog.AllChildren()
 	names := make([]string, 0, len(children))
@@ -253,13 +247,11 @@ func CleanupChildTypeForTest(shortName string) {
 }
 
 // PaginatedFetcher returns a single page of resources.
-// Declaration lives in core/domain/contracts.go; this alias keeps
-// existing consumers compiling.
+// Declaration lives in core/domain/contracts.go; this alias re-exports it.
 type PaginatedFetcher = domain.PaginatedFetcher
 
 // PaginatedChildFetcher returns a single page of child resources.
-// Declaration lives in core/domain/contracts.go; this alias keeps
-// existing consumers compiling.
+// Declaration lives in core/domain/contracts.go; this alias re-exports it.
 type PaginatedChildFetcher = domain.PaginatedChildFetcher
 
 // paginatedRegistry maps resource short names to their paginated fetcher functions.
@@ -292,8 +284,7 @@ func SetPaginatedForTest(shortName string, f PaginatedFetcher) {
 // its own it can never confirm an exact total (e.g. core/aws/catalog_security.go's
 // "policy" AvailabilityFetcher, which never checks inline group policies) sets
 // this alongside IsTruncated=true to report an honest, permanent "N+" instead
-// of a wrongly-confirmed exact count. That pairing passes through untouched —
-// downgrading it would recreate the exact-zero bug the flag exists to prevent.
+// of a wrongly-confirmed exact count. That pairing passes through untouched.
 //
 // Applied at the single seam every registered fetcher's result passes
 // through (GetPaginatedFetcher and its three siblings below), so a fetcher
@@ -317,7 +308,7 @@ func sanitizeFetchResult(res FetchResult, err error) (FetchResult, error) {
 }
 
 // GetPaginatedFetcher returns the paginated fetcher for the given resource short name.
-// Legacy-first: the runtime map wins so SetPaginatedForTest test overrides take
+// The runtime map wins so SetPaginatedForTest test overrides take
 // effect. Catalog is the read-only fallback. The returned function's result
 // always passes through sanitizeFetchResult first.
 func GetPaginatedFetcher(shortName string) PaginatedFetcher {
@@ -352,9 +343,8 @@ type AvailabilityFetcher = PaginatedFetcher
 // availability-fetcher overrides. Deliberately separate from
 // catalog.ResourceTypeDef.AvailabilityFetcher (the permanent production
 // registration) — a flat single map would let CleanupAvailabilityFetcherForTest
-// delete a real production registration a test never set, the same
-// legacy-first split GetPaginatedFetcher/paginatedRegistry already uses for
-// exactly this reason.
+// delete a real production registration a test never set, the same split
+// GetPaginatedFetcher/paginatedRegistry uses for the same reason.
 var availabilityRegistry = map[string]AvailabilityFetcher{}
 
 // SetAvailabilityFetcherForTest registers f as the availability fetcher for
@@ -365,7 +355,7 @@ func SetAvailabilityFetcherForTest(shortName string, f AvailabilityFetcher) {
 
 // GetAvailabilityFetcher returns the availability fetcher for shortName, or
 // nil when none is registered — callers (Core.ProbeResourceAvailability)
-// fall back to GetPaginatedFetcher in that case. Legacy-first: the runtime
+// fall back to GetPaginatedFetcher in that case. The runtime
 // test-override map wins so SetAvailabilityFetcherForTest takes effect;
 // catalog.ResourceTypeDef.AvailabilityFetcher (the permanent production
 // registration, e.g. core/aws/catalog_security.go's "policy" entry) is
@@ -400,7 +390,7 @@ func SetPaginatedChildForTest(shortName string, f PaginatedChildFetcher) {
 }
 
 // GetPaginatedChildFetcher returns the paginated child fetcher for the given short name.
-// Legacy-first: test overrides via SetPaginatedChildForTest take effect;
+// Test overrides via SetPaginatedChildForTest take effect first;
 // otherwise reads the catalog child-type ChildFetcher field. The returned
 // function's result always passes through sanitizeFetchResult first,
 // mirroring GetPaginatedFetcher.
@@ -425,8 +415,7 @@ func CleanupPaginatedChildForTest(shortName string) {
 }
 
 // FilteredPaginatedFetcher returns a single page of resources filtered server-side.
-// Declaration lives in core/domain/contracts.go; this alias keeps
-// existing consumers compiling.
+// Declaration lives in core/domain/contracts.go; this alias re-exports it.
 type FilteredPaginatedFetcher = domain.FilteredPaginatedFetcher
 
 var filteredPaginatedRegistry = map[string]FilteredPaginatedFetcher{}
@@ -437,7 +426,7 @@ func SetFilteredPaginatedForTest(shortName string, f FilteredPaginatedFetcher) {
 }
 
 // GetFilteredPaginatedFetcher returns the filtered paginated fetcher for the given short name.
-// Legacy-first: test overrides via SetFilteredPaginatedForTest take effect;
+// Test overrides via SetFilteredPaginatedForTest take effect first;
 // otherwise reads the catalog FilteredFetcher field. The returned function's
 // result always passes through sanitizeFetchResult first, mirroring
 // GetPaginatedFetcher.
@@ -462,8 +451,7 @@ func CleanupFilteredPaginatedForTest(shortName string) {
 }
 
 // RevealFetcher is the function signature for reveal value fetchers.
-// Declaration lives in core/domain/contracts.go; this alias keeps
-// existing consumers compiling.
+// Declaration lives in core/domain/contracts.go; this alias re-exports it.
 type RevealFetcher = domain.RevealFetcher
 
 // revealRegistry maps resource short names to their reveal fetcher functions.
@@ -476,7 +464,7 @@ func SetRevealFetcherForTest(shortName string, f RevealFetcher) {
 }
 
 // GetRevealFetcher returns the reveal fetcher for the given resource short name.
-// Legacy-first: runtime map wins so test overrides via SetRevealFetcherForTest
+// The runtime map wins so test overrides via SetRevealFetcherForTest
 // take effect. Catalog is the read-only fallback.
 func GetRevealFetcher(shortName string) RevealFetcher {
 	if fn, ok := revealRegistry[shortName]; ok {
@@ -494,7 +482,7 @@ func CleanupRevealFetcherForTest(shortName string) {
 }
 
 // HasRevealFetcher returns true if a reveal fetcher is registered for the given short name.
-// Legacy-first: runtime map wins so test overrides via SetRevealFetcherForTest
+// The runtime map wins so test overrides via SetRevealFetcherForTest
 // are honored. Catalog is the read-only fallback.
 func HasRevealFetcher(shortName string) bool {
 	if _, ok := revealRegistry[shortName]; ok {

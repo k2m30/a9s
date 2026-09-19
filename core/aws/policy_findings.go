@@ -30,8 +30,7 @@ import (
 // AdministratorAccess is the only member. PowerUserAccess is deliberately not
 // one: AWS's document allows "*" on "*" only with a NotAction that excludes
 // IAM, Organizations and Account, so its holder can neither grant itself
-// permissions nor touch the account. Calling it administrator-equivalent
-// reported every developer as an admin.
+// permissions nor touch the account.
 var adminManagedPolicyResources = []string{ //nolint:gochecknoglobals // static AWS-managed policy set
 	"policy/AdministratorAccess",
 }
@@ -135,7 +134,7 @@ func adminAttachedPolicyName(attached []iamtypes.AttachedPolicy) string {
 	return ""
 }
 
-// adminAttachedPhrase is the S4 cause for every admin-attached finding. It
+// adminAttachedPhrase is the cause for every admin-attached finding. It
 // names the class rather than one policy, so the set can grow without the
 // phrase becoming a lie; the Policy row says which one is attached.
 const adminAttachedPhrase = "has an administrator policy"

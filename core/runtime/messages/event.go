@@ -16,7 +16,7 @@ import (
 // a single by-ID lookup, or a nested child-resource fetch. A consumer that
 // needs to know whether a result IS the type's canonical population — the
 // shared per-type RowStore, the persisted disk cache, the menu badge sync,
-// the C6 FilteredRowsSet seed — calls CanonicalList() instead of inferring
+// the FilteredRowsSet seed — calls CanonicalList() instead of inferring
 // it from fields a given consumer happens to have access to (ScreenID,
 // ListState.EscPops/ParentContext) and that another consumer of the same
 // event (runtime.Core, which owns no screen stack) never can.
@@ -78,12 +78,12 @@ type ResourcesLoaded struct {
 	// intent). Non-zero only when the message originates from the
 	// Ctrl+R-for-rerun wrapped fetch: it carries the per-type enrichment
 	// generation captured at dispatch time. The handler applies the list
-	// update unconditionally, then — after its existing write-through block
+	// update unconditionally, then — after its write-through block
 	// — checks this field; if it matches the current per-type gen, it seeds
 	// probeResources and dispatches probeEnrichment.
 	TypeGen domain.Gen
 	// Gen is the session AvailabilityGen captured at dispatch time. A
-	// ResourcesLoaded whose Gen no longer matches the current session gen is
+	// ResourcesLoaded whose Gen does not match the current session gen is
 	// silently discarded (profile/region switch happened between dispatch and
 	// delivery). AvailabilityGen is seeded at 1 and every production dispatch
 	// site stamps the live value, so Gen==0 only ever originates from a
@@ -111,7 +111,7 @@ type ResourcesLoaded struct {
 	// a continuation always returns to the screen that asked for it even when
 	// another list of the same type and lane has since opened on top. Zero
 	// means the result carries no screen claim — a cache-seed replay, a
-	// synthetic construction — and is routed by type and lane as before.
+	// synthetic construction — and is routed by type and lane.
 	ScreenID domain.Gen
 	// Superseded is the runtime seam's answer about this message: a later
 	// request for the same list was already handed out, so nothing this
@@ -172,13 +172,12 @@ type APIError struct {
 	// CanonicalList() agreement (core/app/handle.go) — instead of blindly
 	// applying to whatever screen happens to be topmost, which would let a
 	// navigate-away-before-failure race mark an unrelated screen with this
-	// request's error. The zero value (FetchProvenanceUnknown) means the
-	// caller predates this contract (e.g. a hand-built APIError with no paired
-	// fetch, or the ClientsReady-wrong-client-type path in
-	// internal/tui/runtime_adapter.go's emitAPIErrorCmd, which carries no
-	// ResourceType either) — ClearActiveListLoadingIntent's consumer falls
-	// back to the pre-existing "active list screen" behavior for those,
-	// exactly like FetchResourcesPayload.Provenance's own zero-value grace.
+	// request's error. The zero value (FetchProvenanceUnknown) — a
+	// hand-built APIError with no paired fetch, or the
+	// ClientsReady-wrong-client-type path in internal/tui/runtime_adapter.go's
+	// emitAPIErrorCmd, which carries no ResourceType either — makes
+	// ClearActiveListLoadingIntent's consumer fall back to the active list
+	// screen, like FetchResourcesPayload.Provenance's own zero-value grace.
 	Provenance FetchProvenance
 	// ListSeq, ScreenID and Superseded carry the same facts they carry on
 	// ResourcesLoaded, for the same reason: a failure is the other outcome of
@@ -208,8 +207,7 @@ func (Flash) isEvent() {}
 // name exactly which fetch failed, so a consumer holding a placeholder for
 // that same (TargetType, ID) can act on it unambiguously, never by sniffing
 // an unrelated error Flash that happens to arrive while a placeholder is on
-// screen (S3: the msg.IsError + GetListAutoOpenSingle heuristic it replaces
-// could not tell "my own fetch failed" from "something else failed").
+// screen.
 type ByIDFetchFailed struct {
 	TargetType string
 	ID         string
@@ -344,7 +342,7 @@ type AvailabilityCacheLoaded struct {
 	// Profile and Region name the pair this load describes, taken from the
 	// Store it was read from. The load is dispatched asynchronously and can
 	// be delivered after the operator has switched pairs; the handler drops
-	// it rather than painting one account's counts onto another's menu (C9).
+	// it rather than painting one account's counts onto another's menu.
 	// Empty on a synthetic construction that names no pair — such an event
 	// carries no claim about which pair it belongs to and is applied as-is.
 	Profile string
@@ -372,7 +370,7 @@ type AvailabilityPrefetched struct {
 	// issues rather than silently missing types.
 	PrefetchErr error
 	// PrefetchSoftErr aggregates PARTIAL per-type failures (rows arrived
-	// alongside a composite per-item error — the E5 contract). Recorded in
+	// alongside a composite per-item error). Recorded in
 	// the `!` error log only, never as a blocking banner: the rows already
 	// carry their degraded-state findings on screen.
 	PrefetchSoftErr error
@@ -402,7 +400,7 @@ type AvailabilityChecked struct {
 	Issues       int                 // count of IsIssueRowColor() resources (red/yellow only)
 	Resources    []resource.Resource // Populated on success AND on partial-success (Err non-nil but partial results present)
 	// Duration is the wall time ExecuteTaskAt spent inside
-	// ProbeResourceAvailability for this probe (runtime.ProbeStatus.Duration, #462).
+	// ProbeResourceAvailability for this probe (runtime.ProbeStatus.Duration).
 	Duration time.Duration
 }
 
@@ -450,7 +448,7 @@ type EnrichmentChecked struct {
 	TypeGen      domain.Gen // per-type generation counter; bumped on every rerun for that type. Stale
 	// results whose TypeGen doesn't match the current per-type gen are discarded.
 	// Duration is the wall time ExecuteTaskAt spent inside ProbeEnrichment for
-	// this probe (runtime.ProbeStatus.Duration, #462) — summed onto the
+	// this probe (runtime.ProbeStatus.Duration) — summed onto the
 	// type's availability-probe duration, not tracked separately.
 	Duration time.Duration
 }
@@ -499,7 +497,7 @@ func (IdentityError) AcceptZeroGen() bool    { return true }
 // EnrichDetailResult delivers an enriched resource back to the detail view.
 // On success, the detail view replaces its resource and rebuilds the field
 // list. OperationID is the core/runtime.DetailOperation.ID stamped by the
-// dispatcher; discarded when it no longer matches the session's active
+// dispatcher; discarded when it does not match the session's active
 // operation (a Ctrl+R refresh or navigating to a different resource begins a
 // new operation). DetailOpGen is seeded at 1 and every OperationID is minted
 // by domain.Gen.Bump() (never 0 in production), so a zero OperationID only
@@ -546,7 +544,7 @@ func (EnrichDetailResult) AcceptZeroGen() bool    { return true }
 
 // CostsLoaded delivers one Cost Explorer fetch result: the query shape that
 // was fetched, the mapped grid/attrs/anomalies, and the request count for
-// the session $-counter (FR-013 — counted even when Err is set).
+// the session $-counter (counted even when Err is set).
 type CostsLoaded struct {
 	Query costs.Query
 	// Grid carries the grid (GetCostAndUsage[WithResources]) fetch's own
@@ -561,7 +559,7 @@ type CostsLoaded struct {
 	// cover (FetchCostsPayload.Window, threaded through unchanged) —
 	// ApplyCostsLoaded stamps Store.MergeCoverage against this, not against
 	// whichever periods Grid.Records happens to mention, so a period CE
-	// genuinely returned zero groups for (R2) is remembered as covered.
+	// genuinely returned zero groups for is remembered as covered.
 	Window    []costs.Period
 	Anomalies []costs.AnomalyMark
 	// AnomaliesTruncated mirrors Grid.Truncated for the anomaly overlay: true

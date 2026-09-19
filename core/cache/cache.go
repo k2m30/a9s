@@ -2,13 +2,13 @@
 
 // Package cache provides per-profile+region, per-resource-type persistence
 // of what the menu and top-level list screens have learned from the AWS
-// API. See docs/design/cache-requirements.md for the full contract (C1-C10).
+// API. See docs/design/cache-requirements.md for the full contract.
 //
 // Layout: one directory per profile+region pair
 // (<cache root>/<profile>--<region>/), containing one YAML file per resource
 // type (<shortName>.yaml). Loading the directory never fails — a missing
 // directory yields an empty Store, and an unreadable or wrong-version file is
-// skipped (one log line) without affecting sibling files (C7). Saving writes
+// skipped (one log line) without affecting sibling files. Saving writes
 // ONLY the touched type's file via atomic temp+rename, so a session that only
 // touched one type physically cannot disturb another type's file.
 package cache
@@ -32,21 +32,20 @@ import (
 )
 
 // SchemaVersion is the current on-disk format marker. Every TypeFile's
-// Version field is stamped with this value on save (C7a: encode/decode is a
+// Version field is stamped with this value on save. Encode/decode is a
 // single chokepoint inside this package; a version bump only changes this
-// constant plus the encode/decode logic, never callers).
+// constant plus the encode/decode logic, never callers.
 //
-// v2 (#463) adds Row.FindingFirstSeen. LoadDirIn also accepts a v1 file,
-// backfilling FindingFirstSeen from the file's own SavedAt so a pre-#463
-// cache never regresses to "no cache" on the next load.
+// v2 adds Row.FindingFirstSeen. LoadDirIn also accepts a v1 file,
+// backfilling FindingFirstSeen from the file's own SavedAt so a v1 cache
+// still loads instead of reading as "no cache".
 const SchemaVersion = 2
 
 // Row is a render-sufficient snapshot of one list row, persisted alongside
 // the type's TypeFile so a cold start can seed the list screen with real
 // cells and issue markers before any live fetch completes.
 //
-// NO RawStruct, color, glyph, or status text is carried on disk (C6):
-// colors/glyphs/status are derived at render time from Fields + Findings by
+// Colors, glyphs and status are derived at render time from Fields + Findings by
 // the same classification rules live data uses. What Fields carries for a
 // column is decided by runtime.saveFieldKey, the one place that knows the
 // render cascade's precedence: the value the live cell showed, under the
@@ -61,7 +60,7 @@ type Row struct {
 	// currently on this row, keyed by domain.FindingCode. Carried forward
 	// across saves (core/runtime.stampFindingFirstSeen) while the finding
 	// persists; a code absent here that reappears later is treated as newly
-	// observed, not re-dated to its original first sighting (#463).
+	// observed, not re-dated to its original first sighting.
 	FindingFirstSeen map[domain.FindingCode]time.Time `yaml:"finding_first_seen,omitempty"`
 
 	// Uninspected is set when the last Wave-2 sweep that answered for this
@@ -79,8 +78,8 @@ type Row struct {
 // reference-typed fields (see its doc comment), so a fresh slice with copied
 // elements is sufficient for Findings; Fields and FindingFirstSeen (maps)
 // each need an explicit per-row maps.Clone — any reference-typed field added
-// to Row in the future needs the same treatment here, or SaveType's
-// marshal-vs-mutation race (below) reopens for that field.
+// to Row needs the same treatment here, or SaveType's encode races a
+// mutation of that field.
 //
 // Required because Row.Fields commonly ALIASES a live resource.Resource's
 // own Fields map (runtime.SaveTypeRows only copies when
@@ -114,9 +113,9 @@ func deepCopyRows(rows []Row) []Row {
 }
 
 // TypeFile is the on-disk, self-contained state for one resource type within
-// one profile+region pair. Version MUST stay the first field (C7a: a future
+// one profile+region pair. Version MUST stay the first field: a future
 // encrypted format is detected by this marker before the rest of the file is
-// parsed).
+// parsed.
 type TypeFile struct {
 	Version int `yaml:"version"`
 
@@ -134,10 +133,10 @@ type TypeFile struct {
 }
 
 // Population is how many resources this file knows the type has: its Count,
-// which is authoritative and may exceed the rows it stored (C6a — a
-// counts-only observation never touches Rows), or the row depth when that is
-// larger. The single accessor every C6a consumer reads, so a verify walk and
-// a save projection can never disagree about a type's size.
+// which is authoritative and may exceed the rows it stored (a counts-only
+// observation never touches Rows), or the row depth when that is larger. The
+// single accessor every size consumer reads, so a verify walk and a save
+// projection can never disagree about a type's size.
 func (tf TypeFile) Population() int {
 	return max(tf.Count, len(tf.Rows))
 }
@@ -192,7 +191,7 @@ func Root() string {
 // is safe to use as one path element (e.g. a profile or region name) in a
 // cache file/directory name. NOT injective — "team/a" and "team_a" collapse
 // to the same element — so the pair-directory layout uses EncodePathElem
-// instead; this remains only for core/costs' single-file-per-profile layout,
+// instead; this serves only core/costs' single-file-per-profile layout,
 // which has one element and therefore no joiner to forge.
 func SanitizePathElem(s string) string {
 	s = strings.ReplaceAll(s, "/", "_")
@@ -213,10 +212,9 @@ func SanitizePathElem(s string) string {
 // encoded element contains "--", starts with "-" or ends with "-", so the
 // first "--" in a directory name is always the separator and the split back
 // into (profile, region) is unique. A boundary hyphen alone is enough to
-// forge one — ("team-","us-east-1") and ("team","-us-east-1") both joined to
-// "team---us-east-1" before it was escaped. Names without those characters —
-// every ordinary profile and region — pass through byte-identical, so the
-// common cache directory keeps its existing name and content.
+// forge one — ("team-","us-east-1") and ("team","-us-east-1") both join to
+// "team---us-east-1" unescaped. Names without those characters — every
+// ordinary profile and region — pass through byte-identical.
 func EncodePathElem(s string) string {
 	var b strings.Builder
 	for i := 0; i < len(s); i++ {
@@ -240,12 +238,9 @@ func EncodePathElem(s string) string {
 //
 // dir is captured ONCE, at LoadDirIn construction time, from DirIn(root,
 // profile, region) — every subsequent SaveType call reuses this captured value instead
-// of recomputing Dir/cacheRoot (which reads A9S_CONFIG_FOLDER live). Without
-// this, a Store's save path stays bound to whatever the environment variable
-// happens to be at the moment SaveType's goroutine finally runs, not at the
-// moment the Store was created — the exact seam a leaked
-// runAvailabilitySaveLoop writer exploited to land in a since-repurposed (or
-// already-removed) directory. A profile/region switch always constructs a
+// of recomputing Dir/cacheRoot (which reads A9S_CONFIG_FOLDER live), so a
+// save that runs late still targets the directory the Store was created for,
+// never a since-repurposed one. A profile/region switch always constructs a
 // brand-new Store via a fresh LoadDir call (see Session.Rotate +
 // ensureCacheStoreLocked), so this capture is naturally per-pair and never
 // goes stale across a rotation. Always used by pointer (LoadDir/LoadDirIn are
@@ -291,16 +286,14 @@ func LoadDirForTest(profile, region string) *Store {
 // DirIn(root, profile, region) into memory and returns a Store. Never fails:
 // a missing directory yields an empty (non-nil) Store; an unreadable or
 // wrong-version file is skipped (one log line) without affecting the other
-// files' load (C7). Takes root explicitly so a caller that pinned its own
+// files' load. Takes root explicitly so a caller that pinned its own
 // root at construction time (see session.Session.cacheRoot) never re-reads
 // Root() — and therefore A9S_CONFIG_FOLDER — on a later, possibly
 // differently-configured call.
 //
-// A pair reads its own DirIn directory and nothing else. There is no fallback
-// to the older, non-injective SanitizePathElem layout: that name is shared by
-// every pair it collapses, so reading it would hand one pair another's rows.
-// A pair whose name needs escaping therefore starts cold once and writes its
-// own directory from then on.
+// A pair reads its own DirIn directory and nothing else: a SanitizePathElem
+// name is shared by every pair it collapses, so reading it would hand one
+// pair another's rows.
 func LoadDirIn(root, profile, region string) *Store {
 	dir := DirIn(root, profile, region)
 	s := &Store{
@@ -318,8 +311,7 @@ func LoadDirIn(root, profile, region string) *Store {
 	loadedFrom := make(map[string]string, len(entries))
 	if entries == nil {
 		// Missing (or otherwise unreadable) directory: "no cache" for every
-		// type. Not an error condition per C1/C7 — a fresh pair has no
-		// history yet.
+		// type. Not an error condition — a fresh pair has no history yet.
 		return s
 	}
 
@@ -352,11 +344,10 @@ func LoadDirIn(root, profile, region string) *Store {
 		case SchemaVersion:
 			// current format, nothing to backfill.
 		case SchemaVersion - 1:
-			// v1 file: FindingFirstSeen never existed, so every finding
+			// v1 file: it has no FindingFirstSeen, so every finding
 			// currently on the row is stamped with the file's own SavedAt —
 			// the closest available approximation of when it was first
-			// observed — rather than losing the row (#463: a pre-existing
-			// cache must not regress to "no cache" on the next load).
+			// observed — rather than losing the row.
 			for i, r := range tf.Rows {
 				if len(r.Findings) == 0 {
 					continue
@@ -392,8 +383,8 @@ func LoadDirIn(root, profile, region string) *Store {
 
 // Pair returns the profile and region this Store was loaded for. Every
 // answer derived from a Store therefore carries the pair it describes,
-// without a caller having to remember which pair it asked about (C9: no
-// frame mixes two pairs).
+// without a caller having to remember which pair it asked about, so no
+// frame mixes two pairs.
 func (s *Store) Pair() (profile, region string) { return s.profile, s.region }
 
 // Type returns the loaded (or since-Put) TypeFile for shortName.
@@ -415,7 +406,7 @@ func (s *Store) Types() map[string]TypeFile {
 // carries a zero-valued SavedAt — the normal case for every caller except a
 // deliberate backdate/round-trip) SavedAt=now. A caller that explicitly sets
 // a non-zero SavedAt before calling Put (e.g. to preserve a prior save's
-// timestamp across a re-Put) has that value honored as-is — C1 requires no
+// timestamp across a re-Put) has that value honored as-is — the cache has no
 // TTL / age-based discard, so nothing downstream depends on SavedAt being
 // "now"; this only avoids clobbering a caller-supplied value. Does not touch
 // disk — call SaveType to persist.
@@ -443,8 +434,8 @@ type WritePlan struct {
 	// assigned by PrepareSave. CommitSave skips a plan whose seq is older
 	// than the newest one already committed for that path, so a plan
 	// suspended after preparation can never land its staler bytes on top of
-	// a newer plan's (C6a/C7: the file's newest known state is what a
-	// restart must find).
+	// a newer plan's: the file's newest known state is what a restart must
+	// find.
 	seq uint64
 }
 
@@ -456,17 +447,16 @@ type WritePlan struct {
 // against another WritePlan for the same path — two renames into the same
 // path have no ordering guarantee against each other without it).
 func (wp WritePlan) commit() error {
-	// A hand-built zero WritePlan has no target. Without this it reached
-	// MkdirAll with an empty directory and failed naming neither the plan nor
-	// the type — a caller reading the log learned only that "" is not a
-	// directory. Only PrepareSave can produce a usable plan.
+	// A hand-built zero WritePlan has no target; only PrepareSave can
+	// produce a usable plan. The error names that instead of MkdirAll
+	// reporting that "" is not a directory.
 	if wp.dir == "" || wp.path == "" {
 		return errors.New("cache: unusable WritePlan (zero value) — a plan must come from Store.PrepareSave")
 	}
 	if err := os.MkdirAll(wp.dir, 0700); err != nil {
 		return fmt.Errorf("creating cache directory %s: %w", wp.dir, err)
 	}
-	// Enforce 0700 even on a pre-existing directory (C7b). gosec's G302 rule
+	// Enforce 0700 even on a pre-existing directory. gosec's G302 rule
 	// flags any Chmod call expecting file-oriented (<=0600) permissions; 0700
 	// is the correct, more-restrictive owner-only mode for a DIRECTORY (needs
 	// the execute bit to remain traversable by its owner), not a file.
@@ -554,9 +544,8 @@ func SetEncodeHookForTest(fn func()) func() {
 // cache.Row.Fields directly onto resource.Resource.Fields whenever
 // materializeResourceFields finds nothing left to add — no copy is made in
 // that case). The encode can run on a different goroutine than the one still
-// holding that live resource, and yaml's reflect-based map/slice walk racing a
-// mutation of the identical map was a real, reproduced data race (go test
-// -race), not a theoretical one. The copy is what makes the encoded snapshot
+// holding that live resource, and yaml's reflect-based map/slice walk races a
+// mutation of the identical map. The copy is what makes the encoded snapshot
 // independent of whatever live structure Rows/Fields/Findings aliased, and it
 // belongs immediately before the encode it protects rather than under a lock
 // that protects nothing about it.
@@ -643,7 +632,7 @@ func (s *Store) CommitSave(wp WritePlan) error {
 // SaveType atomically writes shortName's current staged state (as set by
 // Put) to its own file — <dir>/<shortName>.yaml — via a temp file in the same
 // directory followed by rename. No other type's file is opened or touched
-// (C7: per-type files, no merge logic). The directory is created (0700) if
+// (per-type files, no merge logic). The directory is created (0700) if
 // missing; the written file is 0600.
 //
 // A thin PrepareSave+CommitSave composition, for callers that don't need to

@@ -1,24 +1,13 @@
 // SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
 
-// related_cold_fetch_roundtrip_test.go — end-to-end coverage for the
-// permanent-"Loading…" regression fixed by FetchResourcesPayload/
-// FetchMorePayload's Provenance override (core/runtime/handlers_related.go)
-// and activeListRefreshTasks' matching fix (core/app/actions_list.go).
-//
-// Every prior test in this area either stopped at the TaskRequest
-// HandleRelatedNavigate returns (tests/unit/runtime_handlers_related_test.go)
-// or started from an already-populated cache — neither shape can catch a
-// wrong Provenance stamp, because that defect only manifests once the task's
-// RESULT reaches handleResourcesLoadedEvent's symmetric canonical/non-
-// canonical gate (core/app/handle.go). A live account hit permanent
-// "Loading…" on an uncached related drill that 12 shuffled runs of the
-// existing suite never reproduced.
-//
-// These tests drive the FULL round trip a real cold-cache related navigate
-// takes: dispatch (Apply) -> app.DrainSync (the real Core.ExecuteTaskAt,
-// same executor a live session uses) -> Handle -> Snapshot. The assertion in
-// every case is the rendered ListBody's Rows/Loading/LoadingMore — the one
-// thing a permanently-stuck "Loading…" screen cannot fake.
+// related_cold_fetch_roundtrip_test.go drives the FULL round trip a real
+// cold-cache related navigate takes: dispatch (Apply) -> app.DrainSync (the
+// real Core.ExecuteTaskAt, same executor a live session uses) -> Handle ->
+// Snapshot. A wrong Provenance stamp shows only once the task's RESULT
+// reaches handleResourcesLoadedEvent's canonical/non-canonical gate
+// (core/app/handle.go), so the assertion in every case is the rendered
+// ListBody's Rows/Loading/LoadingMore — the one thing a permanently-stuck
+// "Loading…" screen cannot fake.
 package app_test
 
 import (
@@ -261,10 +250,10 @@ func TestColdFetch_RelatedIDs_CacheMiss_RowsLandOnScreen(t *testing.T) {
 // the second half of branch 3: multiple RelatedIDs where the RowStore already
 // has ONE of them cached behind a truncated first page — relatedFetchTasks'
 // "tr.Pagination.IsTruncated" path, which emits a KindFetchMore continuation
-// instead of a full KindFetchResources refetch. This is the exact shape the
-// mechanical pin fix in tests/unit/runtime_handlers_related_test.go's Case H
-// covers at the TaskRequest level; this test instead executes that
-// KindFetchMore task for real and asserts the missing ID actually lands.
+// instead of a full KindFetchResources refetch.
+// tests/unit/runtime_handlers_related_test.go covers this shape at the
+// TaskRequest level; this test executes that KindFetchMore task for real and
+// asserts the missing ID actually lands.
 func TestColdFetch_RelatedIDs_PartialCoverageTruncated_RowsLandOnScreen(t *testing.T) {
 	const cachedID = "i-partial-0001"
 	const pendingID = "i-partial-0002"
@@ -294,9 +283,8 @@ func TestColdFetch_RelatedIDs_PartialCoverageTruncated_RowsLandOnScreen(t *testi
 		t.Fatalf("tasks = %+v, want a single KindFetchMore task for ec2 (partial coverage + truncated cache)", tasks)
 	}
 
-	// Precondition: the cache-hit half (seedRelatedExactRows) already seeded
-	// the cached row before any task runs — the "zero visible rows" shape is
-	// a different bug than the one under test here.
+	// Precondition: the cache-hit half (seedRelatedExactRows) seeds the
+	// cached row before any task runs.
 	if pre := drillRows(t, c); len(pre.Rows) != 1 || pre.Rows[0].ResourceID != cachedID {
 		t.Fatalf("precondition failed: expected the cache-hit half to seed exactly [%s] before the page-2 fetch runs; got %+v",
 			cachedID, pre.Rows)
@@ -313,9 +301,9 @@ func TestColdFetch_RelatedIDs_PartialCoverageTruncated_RowsLandOnScreen(t *testi
 	}
 }
 
-// TestColdFetch_CtrlROnAlreadyOpenDrillList_RowsSurviveRefresh covers the
-// sibling defect the same fix caught: Ctrl+R (ActionRefresh) issued while
-// already sitting on an open related-navigation drill list: a zero Provenance
+// TestColdFetch_CtrlROnAlreadyOpenDrillList_RowsSurviveRefresh covers
+// Ctrl+R (ActionRefresh) issued while already sitting on an open
+// related-navigation drill list: a zero Provenance
 // on the refresh task would mismatch a non-canonical drill screen's
 // isTopLevelCanonicalList()==false and be rejected forever by
 // handleResourcesLoadedEvent's gate.
@@ -342,9 +330,9 @@ func TestColdFetch_CtrlROnAlreadyOpenDrillList_RowsSurviveRefresh(t *testing.T) 
 	})
 
 	// Land on the drill screen for real first (the same round trip
-	// TestColdFetch_RelatedIDs_CacheMiss_RowsLandOnScreen exercises) — Ctrl+R's
-	// own regression only shows once a non-canonical drill screen is already
-	// open and receives a SECOND fetch result.
+	// TestColdFetch_RelatedIDs_CacheMiss_RowsLandOnScreen exercises) — a Ctrl+R
+	// mismatch only shows once a non-canonical drill screen is already open and
+	// receives a SECOND fetch result.
 	initialTasks := selectFirstRelatedRow(t, c)
 	app.DrainSync(c, initialTasks)
 	if pre := drillRows(t, c); pre.Loading || len(pre.Rows) != len(ids) {

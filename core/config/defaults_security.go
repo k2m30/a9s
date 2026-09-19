@@ -38,7 +38,6 @@ func securityDefaultViews() map[string]ViewDef {
 				{Path: "Name"}, {Path: "Id"}, {Path: "ARN"}, {Path: "Description"}, {Path: "LockToken"},
 			},
 		},
-		// Child views for security resources
 		"role_policies": {
 			Detail: []DetailField{
 				{Path: "PolicyName"}, {Path: "PolicyArn"}, {Path: "PolicyType"}, {Path: "Document"},

@@ -30,7 +30,7 @@ const (
 // states do not count toward the numerator). Severity is graduated: "~" when
 // 0 < unhealthy < total, "!" when every reporting target is unhealthy.
 // Summary: "unhealthy targets: X/Y".
-// Per-TG errors are aggregated and returned as a composite error alongside partial findings (E3, E4, E5).
+// Per-TG errors are aggregated and returned as a composite error alongside partial findings.
 func EnrichTargetGroupHealth(ctx context.Context, clients *ServiceClients, resources []resource.Resource, _ resource.ResourceCache) (IssueEnricherResult, error) {
 	result := IssueEnricherResult{
 		Findings:     make(map[string][]domain.Finding),

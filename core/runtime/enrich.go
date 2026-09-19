@@ -4,8 +4,7 @@
 //
 // enrich.go owns the KindEnrichDetail task family. Dispatch is decided by
 // Core.BeginDetailOperation (detail_op.go) — a resource type either has a
-// registered detail enricher or it doesn't; there is no separate policy
-// gate here anymore.
+// registered detail enricher or it doesn't.
 package runtime
 
 import (

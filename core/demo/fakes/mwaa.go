@@ -41,7 +41,7 @@ func (f *MWAAFake) ListEnvironments(_ context.Context, _ *mwaa.ListEnvironmentsI
 // GetEnvironment returns the fixture's environment for the given name.
 // Unknown names return ResourceNotFoundException, mirroring the real MWAA
 // API — MWAA has no ARN-typed parameters, so this is the fake's strictness
-// witness (analogous to SFNFake's ARN-shape validation).
+// check (analogous to SFNFake's ARN-shape validation).
 func (f *MWAAFake) GetEnvironment(_ context.Context, input *mwaa.GetEnvironmentInput, _ ...func(*mwaa.Options)) (*mwaa.GetEnvironmentOutput, error) {
 	name := aws.ToString(input.Name)
 	if slices.Contains(f.fix.DeniedNames, name) {

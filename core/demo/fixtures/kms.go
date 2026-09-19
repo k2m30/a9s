@@ -32,12 +32,12 @@ type KMSFixtures struct {
 }
 
 // KMSAccessDeniedKeyID names the ListKeys entry whose DescribeKey call the
-// KMSFake denies with AccessDeniedException — witnesses
+// KMSFake denies with AccessDeniedException, raising
 // FetchKMSKeysPage's kms.access-denied finding (real key state unreadable,
 // key still shown).
 const KMSAccessDeniedKeyID = "b8c9d0e1-f2a3-5678-90bc-eeffaabbccdd"
 
-// KMSPublicPolicy is the witness key for kms.public-policy: its default key
+// KMSPublicPolicy is the key raising kms.public-policy: its default key
 // policy grants kms:Decrypt to a wildcard principal. Every other demo key
 // either has no policy fixture or names concrete principals.
 const KMSPublicPolicy = "c9d0e1f2-a3b4-6789-01cd-ffaabbccddee"
@@ -95,7 +95,7 @@ var sharedKMSFixtures = sync.OnceValue(func() *KMSFixtures {
 			CreationDate: aws.Time(time.Date(2024, 8, 1, 9, 0, 0, 0, time.UTC)),
 			Enabled:      false,
 		},
-		// CT-event cross-reference key required by ctdetail nav tests.
+		// CT-event cross-reference key.
 		{
 			KeyId:        aws.String("2f7e9a5b-8c1d-4e3f-9a0b-1c2d3e4f5a6b"),
 			Arn:          aws.String("arn:aws:kms:us-east-1:123456789012:key/2f7e9a5b-8c1d-4e3f-9a0b-1c2d3e4f5a6b"),
@@ -151,7 +151,7 @@ var sharedKMSFixtures = sync.OnceValue(func() *KMSFixtures {
 			Enabled:      false,
 		},
 		// Access-denied key — DescribeKey is denied for this ID (see
-		// KMSFake.DescribeKey), witnessing kms.access-denied. Real key state
+		// KMSFake.DescribeKey), raising kms.access-denied. Real key state
 		// is unreadable; the row is synthesized from ListKeys alone.
 		{
 			KeyId:      aws.String(KMSAccessDeniedKeyID),
@@ -282,7 +282,7 @@ var sharedKMSFixtures = sync.OnceValue(func() *KMSFixtures {
 			MultiRegion:          aws.Bool(false),
 			Origin:               kmstypes.OriginTypeAwsKms,
 		},
-		// Witness: key policy open to any AWS principal.
+		// Key policy open to any AWS principal.
 		{
 			KeyId:                aws.String(KMSPublicPolicy),
 			Arn:                  aws.String("arn:aws:kms:us-east-1:123456789012:key/" + KMSPublicPolicy),
@@ -558,6 +558,6 @@ func NewKMSFixtures() *KMSFixtures {
 func init() {
 	// dim: colorKMS (core/aws/catalog_secrets.go) has exactly three branches —
 	// Enabled→Healthy, Disabled→Warning, Pending*/Unavailable→Broken — and
-	// docs/resources/kms.md §3.1/§3.2 documents no Dim-producing signal.
+	// docs/resources/kms.md documents no Dim-producing signal.
 	Register(Pin{ShortName: "kms", Rows: 22, Issues: 8, CoverageGaps: []string{"dim"}})
 }

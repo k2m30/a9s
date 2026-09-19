@@ -21,8 +21,6 @@ func TestSession_New_InitializesMaps(t *testing.T) {
 		t.Fatal("session.New() returned nil")
 	}
 
-	// EnrichmentFindings was moved to tui.Model in PR-03a-fold; it is no
-	// longer a Session field and is not initialized here.
 	if s.EnrichmentRan == nil {
 		t.Error("EnrichmentRan must be non-nil after New()")
 	}
@@ -50,22 +48,18 @@ func TestSession_New_InitializesMaps(t *testing.T) {
 	if s.EnrichmentGen != 1 {
 		t.Errorf("EnrichmentGen = %d, want 1", s.EnrichmentGen)
 	}
-	// AvailabilityGen seeded at 1 so the prefetch path captures a non-zero gen
-	// (AS-648-h4 / AS-659): AvailabilityPrefetched.AcceptZeroGen() returns
+	// AvailabilityGen seeded at 1 so the prefetch path captures a non-zero gen:
+	// AvailabilityPrefetched.AcceptZeroGen() returns
 	// false, so a zero stamp would otherwise be dropped after Rotate() bumps
 	// the counter, contaminating a freshly rotated session's menu counts.
 	if s.AvailabilityGen != 1 {
 		t.Errorf("AvailabilityGen = %d, want 1", s.AvailabilityGen)
 	}
-	// ConnectGen was the one counter that shipped seeded at 0 instead of 1 —
-	// a fresh session's identity/reveal/costs dispatch captured stamp 0 and
-	// slipped past every AspectConnect event's IsStale check once a
-	// profile/region switch bumped ConnectGen off zero, installing the
-	// previous account's identity, a decrypted secret, or cost data into the
-	// new session (the ConnectGen cross-account leak). This omission from
-	// the seed-value assertion above is precisely why the bug shipped
-	// unnoticed: the other three counters were pinned at 1, ConnectGen never
-	// was.
+	// A ConnectGen seeded at 0 lets a fresh session's identity/reveal/costs
+	// dispatch capture stamp 0, which slips past every AspectConnect event's
+	// IsStale check once a profile/region switch bumps ConnectGen off zero,
+	// installing the previous account's identity, a decrypted secret, or cost
+	// data into the new session.
 	if s.ConnectGen != 1 {
 		t.Errorf("ConnectGen = %d, want 1", s.ConnectGen)
 	}
@@ -104,10 +98,6 @@ func TestSession_Rotate_ClearsCaches(t *testing.T) {
 
 	s := session.New()
 
-	// Populate caches with data from a fictional "old session".
-	// Note: EnrichmentFindings was moved to tui.Model in PR-03a-fold and is
-	// no longer on Session; it is cleared explicitly by profile/region switch
-	// handlers in handleProfileSelected / handleRegionSelected.
 	s.RowStore.Observe("ec2", []resource.Resource{{ID: "i-001"}}, nil, session.OriginFetch, false)
 	s.RowStore.ObservePartial("rds", []resource.Resource{{ID: "db-001"}})
 	s.EnrichmentRan["ec2"] = true
@@ -125,8 +115,6 @@ func TestSession_Rotate_ClearsCaches(t *testing.T) {
 	if tr := s.RowStore.Snapshot("rds"); tr.Gen != 0 {
 		t.Errorf("RowStore.Snapshot(\"rds\").Gen after Rotate() = %d, want 0 (never observed this session)", tr.Gen)
 	}
-	// EnrichmentFindings is on tui.Model (not Session) after PR-03a-fold;
-	// Session.Rotate() no longer clears it — the handler does so explicitly.
 	if len(s.EnrichmentRan) != 0 {
 		t.Errorf("EnrichmentRan not empty after Rotate(): len=%d", len(s.EnrichmentRan))
 	}
@@ -186,21 +174,17 @@ func TestSession_Rotate_ResetsQueueState(t *testing.T) {
 	}
 }
 
-// TestSession_Rotate_ConnectGenAndIdentityLatches pins the PR-05a-h2 contract
+// TestSession_Rotate_ConnectGenAndIdentityLatches pins the contract
 // for the lifecycle fields that Rotate() OWNS: ConnectGen must increment by
 // exactly 1, and Identity / IdentityFetching / PendingRefresh / HasPrevState /
-// PrevProfile / PrevRegion must all be zeroed.
-//
-// Without this test a future regression that forgets to bump ConnectGen would
-// allow a pre-switch ClientsReadyMsg to be accepted as fresh after a profile
-// switch, and a regression that fails to clear Identity / IdentityFetching
-// would leak the previous account's caller identity into the new session.
+// PrevProfile / PrevRegion must all be zeroed. An unbumped ConnectGen accepts
+// a pre-switch ClientsReadyMsg as fresh, and an uncleared Identity leaks the
+// previous account's caller identity into the new session.
 func TestSession_Rotate_ConnectGenAndIdentityLatches(t *testing.T) {
 	t.Parallel()
 
 	s := session.New()
 
-	// Seed the latches with non-zero values from a fictional pre-switch state.
 	s.ConnectGen = 5
 	s.Identity = &awsclient.CallerIdentity{AccountID: "111122223333"}
 	s.IdentityFetching = true
@@ -235,7 +219,7 @@ func TestSession_Rotate_ConnectGenAndIdentityLatches(t *testing.T) {
 }
 
 // TestSession_Rotate_PreservesProfileRegionClientsCommandNoCache pins the
-// PR-05a-h2 preserve-list contract. Rotate() MUST NOT touch Profile, Region,
+// preserve-list contract. Rotate() MUST NOT touch Profile, Region,
 // Clients, PreSuppliedClients, Command, or NoCache — the caller
 // (handleProfileSelected / handleRegionSelected / cmd/a9s/main.go bootstrap)
 // owns those fields and writes the next target into Profile/Region
@@ -246,8 +230,6 @@ func TestSession_Rotate_PreservesProfileRegionClientsCommandNoCache(t *testing.T
 
 	s := session.New()
 
-	// Seed the preserve-list. Use distinguishable values so a regression that
-	// zeros them is obvious in the test output.
 	preClients := &awsclient.ServiceClients{}
 	preSupplied := &awsclient.ServiceClients{}
 	s.Profile = "dev-account"
@@ -287,7 +269,6 @@ func TestSession_Rotate_SwapsPolicyDocCache(t *testing.T) {
 
 	s := session.New()
 
-	// Capture pointer identity before rotation.
 	beforePtr := s.PolicyDocCache
 
 	s.Rotate()

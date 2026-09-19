@@ -52,7 +52,6 @@ func checkLogsAlarms(ctx context.Context, clients any, res resource.Resource, ca
 
 // checkLogsKMS extracts the KMS key ID from the CloudWatch Log Group's KmsKeyId
 // field. The value may be a full ARN (arn:aws:kms:…/key-id) or a plain key ID.
-// Pattern F — no cache needed.
 func checkLogsKMS(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	lg, ok := assertStruct[cloudwatchlogstypes.LogGroup](res.RawStruct)
 	if !ok || lg.KmsKeyId == nil || *lg.KmsKeyId == "" {
@@ -67,7 +66,7 @@ func checkLogsKMS(ctx context.Context, clients any, res resource.Resource, cache
 
 // checkLogsAPIGW matches log groups whose name indicates API Gateway execution
 // logs (API-Gateway-Execution-Logs_{rest-api-id}/{stage}) and resolves the
-// referenced REST API from the apigw cache. Pattern N+C.
+// referenced REST API from the apigw cache.
 func checkLogsAPIGW(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	logGroupName := res.ID
 	if logGroupName == "" {
@@ -95,7 +94,7 @@ func checkLogsAPIGW(ctx context.Context, clients any, res resource.Resource, cac
 }
 
 // checkLogsECSTask matches log groups named /ecs/{task-family}. The family is
-// extracted and searched in the ecs-task cache. Pattern N+C.
+// extracted and searched in the ecs-task cache.
 func checkLogsECSTask(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	logGroupName := res.ID
 	if logGroupName == "" {
@@ -158,7 +157,7 @@ func logsSubscriptionFilters(ctx context.Context, clients any, logGroupName stri
 
 // checkLogsKinesis calls cloudwatchlogs:DescribeSubscriptionFilters and
 // returns the Kinesis stream names whose ARNs appear as subscription-filter
-// destinations on this log group. Pattern C — single API call.
+// destinations on this log group.
 func checkLogsKinesis(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	filters, err := logsSubscriptionFilters(ctx, clients, res.ID)
 	if err != nil {
@@ -173,7 +172,7 @@ func checkLogsKinesis(ctx context.Context, clients any, res resource.Resource, c
 // checkLogsS3 calls cloudwatchlogs:DescribeSubscriptionFilters and returns S3
 // bucket names whose ARNs appear as subscription-filter destinations (via a
 // Firehose delivery stream that fans out to S3, or direct S3 destination for
-// newer filter features). Pattern C — single API call.
+// newer filter features).
 func checkLogsS3(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	filters, err := logsSubscriptionFilters(ctx, clients, res.ID)
 	if err != nil {

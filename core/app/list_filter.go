@@ -114,7 +114,6 @@ func listRowMatches(q string, columns []ColumnDef, td *resource.ResourceTypeDef,
 	return false
 }
 
-// listHasIssueFinding mirrors hasIssueFinding in views.
 func listHasIssueFinding(r resource.Resource) bool {
 	for _, f := range r.Findings {
 		if f.Severity.IsIssue() {
@@ -158,10 +157,10 @@ func listSortResources(columns []ColumnDef, td *resource.ResourceTypeDef, ls *Li
 
 		// The cell, on every frame. A live row still carries its SDK struct and
 		// a replayed one does not, so a comparator that read the struct where
-		// it was there answered from a representation the cached frame cannot
-		// reach — and the list re-ordered under the operator the moment the
-		// fetch landed. sortStrings reads a number as a number; the orders only
-		// a struct comparison could add are the ones the cache cannot express
+		// it was there would answer from a representation the cached frame
+		// cannot reach, and re-order the list under the operator the moment the
+		// fetch lands. sortStrings reads a number as a number; the orders only a
+		// struct comparison could add are the ones the cache cannot express
 		// anyway.
 		return sortStrings(ExtractCellValue(col, td, a), ExtractCellValue(col, td, b), sortAsc)
 	})

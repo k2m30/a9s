@@ -1,9 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
 
-// controller_selected_related_test.go — regression test for SelectedRelatedRow,
-// the accessor the TUI Enter/yank path uses after the stack-lift removed the
-// right-column widget ResourceID sync. Related navigation must source
-// ResourceIDs from controller state (DetailState.RelatedRows), not the widget.
+// controller_selected_related_test.go — SelectedRelatedRow, the accessor the
+// TUI Enter/yank path uses: related navigation sources ResourceIDs from
+// controller state (DetailState.RelatedRows).
 package app_test
 
 import (
@@ -14,9 +13,7 @@ import (
 
 // TestSelectedRelatedRow_SourcesIDsFromControllerState verifies that the focused
 // related row (TargetType, DisplayName, ResourceIDs) is readable from controller
-// state and only when the related panel has focus. Pre-lift the Enter path read
-// these IDs from the right-column widget (fed by an adapter sync); that sync is
-// gone, so a regression here would break keyboard related-navigation.
+// state and only when the related panel has focus.
 func TestSelectedRelatedRow_SourcesIDsFromControllerState(t *testing.T) {
 	res := fakeEC2Resources()[0]
 	c := newControllerAtDetail(t, res, "ec2")

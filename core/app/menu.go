@@ -157,7 +157,7 @@ func menuSkipUnavailable(ms *MenuState, visible []resource.ResourceTypeDef, dire
 // (MenuSelected), so the cursor can never land somewhere it refuses to open.
 //
 // "Confirmed" means verified THIS session: a zero read from disk is
-// knowledge worth showing (C1) but not proof the type is still empty, and
+// knowledge worth showing but not proof the type is still empty, and
 // dimming it shut would leave the operator unable to open a type until the
 // sweep happens to reach it.
 func menuIsConfirmedEmpty(ms *MenuState, item resource.ResourceTypeDef) bool {
@@ -204,7 +204,7 @@ func menuActiveKey(ms *MenuState, item resource.ResourceTypeDef) string {
 // may clear a stale truncation flag no authoritative observation set. canon
 // must already be the canonical resource short name — callers resolve aliases before calling in. Mirrors
 // the issue-count half of the exact-total menu sync-back
-// (syncExactTotalToMenu); extracted as the single chokepoint both the sweep
+// (syncExactTotalToMenu); the single chokepoint both the sweep
 // lane (handle.go's syncExactTotalToMenu) and the in-list Wave-2 enrichment
 // lane (list_filter.go's applyEnrichmentState) call, so a session with no
 // background sweep (e.g. the web/headless lane) still gets the menu badge
@@ -326,9 +326,9 @@ func (c *Controller) assignMenuIssueCount(ms *MenuState, canon string, issues in
 // Truncated with the same rule, so an exact result that shrinks the count also
 // clears the lower-bound marker.
 //
-// Cache contract C5 forbids a truncated probe DOWNGRADING an exact total; a
-// same-count update that only flips the marker is not that downgrade, which is
-// why the truncated branch compares with >= rather than >.
+// A truncated probe must never downgrade an exact total; a same-count
+// update that only flips the marker is not a downgrade, which is why the
+// truncated branch compares with >= rather than >.
 func applyAvailabilityObservation(ms *MenuState, key string, count int, truncated bool) {
 	if ms.Availability == nil {
 		ms.Availability = make(map[string]int)
@@ -361,12 +361,11 @@ func applyAvailabilityObservation(ms *MenuState, key string, count int, truncate
 // every key event needs (Apply/Handle take it for their whole duration), and
 // the save performs synchronous file I/O (temp file, chmod, rename) —
 // running it inline here would serialize user input behind disk latency on
-// every Wave-2 result. Instead the pair is handed to a single writer
-// goroutine over a latest-wins channel, one pending save per pair, so a
-// burst of calls (e.g. the startup availability sweep) collapses into one
-// disk write per pair. A write failure is silently dropped, mirroring the
-// existing TaskKindSaveCache/probe-completion paths that already treat cache
-// writes as best-effort.
+// every Wave-2 result. Instead the pair is staged on the controller's one
+// ordered write queue (queueAvailabilitySave), where back-to-back saves for
+// one pair coalesce, so a burst of calls (e.g. the startup availability
+// sweep) collapses into one disk write per pair. A write failure is
+// silently dropped, like every other best-effort cache write.
 //
 // Close (below) is the deterministic shutdown hook: it stops the writer and
 // blocks until the last queued save has run, so the sync-back's
@@ -416,7 +415,7 @@ func (c *Controller) queueAvailabilitySave(pair session.Pair) {
 }
 
 // Close deterministically shuts down the availability-cache writer: it
-// signals runAvailabilitySaveLoop to stop, and blocks until that goroutine
+// signals the cache writer (runCacheWriteLoop) to stop, and blocks until that goroutine
 // has persisted any snapshot still queued and returned — so the menu badge's
 // final state durably lands on disk (the sync-back's restart guarantee) even though no write along
 // the way ever blocked a live key event. Idempotent and safe to call on a

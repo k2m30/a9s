@@ -2,10 +2,9 @@
 
 // mwaa_related.go contains MWAA environment related-resource checker
 // functions. Every checker here is zero-extra-API-call: the fetcher's
-// GetEnvironment pass already carries every field these checkers read, so
-// each one is a Pattern F (RawStruct read) checker, plus the alarm
-// sibling-cache scan which may fetch the alarm list's first page on cache
-// miss. docs/resources/mwaa.md §2.
+// GetEnvironment pass already carries every field these checkers read
+// from the RawStruct, plus the alarm sibling-cache scan which may fetch
+// the alarm list's first page on cache miss. See docs/resources/mwaa.md.
 package aws
 
 import (
@@ -20,12 +19,12 @@ import (
 // CloudWatch alarms in the AWS/MWAA namespace whose EnvironmentName
 // dimension matches this environment's name. Environment carries no ARN
 // field usable for a forward lookup, so this is a workflow pivot (cache
-// scan), not a Pattern F read — docs/resources/mwaa.md §2 `alarm`.
+// scan).
 func checkMWAAAlarms(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	return alarmIDsByDimension(ctx, clients, cache, "AWS/MWAA", "EnvironmentName", res.ID)
 }
 
-// checkMWAAKMS reads Environment.KmsKey directly (Pattern F).
+// checkMWAAKMS reads Environment.KmsKey directly.
 func checkMWAAKMS(ctx context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	env, ok := assertStruct[mwaatypes.Environment](res.RawStruct)
 	if !ok {
@@ -38,7 +37,7 @@ func checkMWAAKMS(ctx context.Context, clients any, res resource.Resource, cache
 }
 
 // checkMWAALogs reads the five LoggingConfiguration CloudWatchLogGroupArn
-// fields directly (Pattern F).
+// fields directly.
 func checkMWAALogs(_ context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	env, ok := assertStruct[mwaatypes.Environment](res.RawStruct)
 	if !ok {
@@ -62,7 +61,7 @@ func checkMWAALogs(_ context.Context, clients any, res resource.Resource, cache 
 	return relatedRefs("logs", ids, refContext(clients, cache, "logs"))
 }
 
-// checkMWAARole returns the role in ExecutionRoleArn (Pattern F).
+// checkMWAARole returns the role in ExecutionRoleArn.
 func checkMWAARole(_ context.Context, clients any, res resource.Resource, cache resource.ResourceCache) resource.RelatedCheckResult {
 	env, ok := assertStruct[mwaatypes.Environment](res.RawStruct)
 	if !ok {
@@ -74,8 +73,7 @@ func checkMWAARole(_ context.Context, clients any, res resource.Resource, cache 
 	return relatedRefs("role", []string{*env.ExecutionRoleArn}, refContext(clients, cache, "role"))
 }
 
-// checkMWAAS3 extracts the bare bucket name from SourceBucketArn
-// (Pattern F).
+// checkMWAAS3 extracts the bare bucket name from SourceBucketArn.
 func checkMWAAS3(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	env, ok := assertStruct[mwaatypes.Environment](res.RawStruct)
 	if !ok {
@@ -91,8 +89,7 @@ func checkMWAAS3(_ context.Context, _ any, res resource.Resource, _ resource.Res
 	return relatedResult("s3", []string{a.Resource})
 }
 
-// checkMWAASG reads NetworkConfiguration.SecurityGroupIds directly
-// (Pattern F).
+// checkMWAASG reads NetworkConfiguration.SecurityGroupIds directly.
 func checkMWAASG(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	env, ok := assertStruct[mwaatypes.Environment](res.RawStruct)
 	if !ok {
@@ -104,8 +101,7 @@ func checkMWAASG(_ context.Context, _ any, res resource.Resource, _ resource.Res
 	return relatedResult("sg", env.NetworkConfiguration.SecurityGroupIds)
 }
 
-// checkMWAASubnet reads NetworkConfiguration.SubnetIds directly
-// (Pattern F).
+// checkMWAASubnet reads NetworkConfiguration.SubnetIds directly.
 func checkMWAASubnet(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 	env, ok := assertStruct[mwaatypes.Environment](res.RawStruct)
 	if !ok {

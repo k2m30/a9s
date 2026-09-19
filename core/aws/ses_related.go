@@ -181,7 +181,6 @@ func checkSESEbRule(ctx context.Context, clients any, res resource.Resource, cac
 		return resource.UnknownRelated("eb-rule")
 	}
 
-	// Collect bus names from EventBridge destinations.
 	busNames := map[string]struct{}{}
 	for _, dest := range out.EventDestinations {
 		if dest.EventBridgeDestination == nil {
@@ -200,7 +199,6 @@ func checkSESEbRule(ctx context.Context, clients any, res resource.Resource, cac
 		return resource.KnownRelated("eb-rule", nil, false)
 	}
 
-	// Scan the eb-rule cache for rules on matching buses.
 	ebRules, truncated, cacheErr := relatedResourcesFor(ctx, clients, cache, "eb-rule")
 	if cacheErr != nil {
 		return resource.ErrorRelated("eb-rule", cacheErr)
@@ -245,7 +243,6 @@ func sesRuleAppliesToIdentity(rule sestypes.ReceiptRule, identityName, identityT
 		return true
 	}
 
-	// Collect non-empty recipients.
 	var valid []string
 	for _, r := range rule.Recipients {
 		trimmed := strings.TrimSpace(r)
@@ -265,7 +262,6 @@ func sesRuleAppliesToIdentity(rule sestypes.ReceiptRule, identityName, identityT
 		// Derive domain from identity (e.g. "billing@sub.acme.com" → "sub.acme.com").
 		domain, _ := emailDomain(identityName)
 		for _, r := range valid {
-			// Exact email match.
 			if strings.EqualFold(r, identityName) {
 				return true
 			}

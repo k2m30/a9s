@@ -25,7 +25,6 @@ const (
 	sqsCodePublicPolicy domain.FindingCode = "sqs.public-policy"
 )
 
-// S5 operator sentences for the queue posture codes above.
 // EnrichSQSAttributes calls GetQueueAttributes per queue (cap EnrichmentCap)
 // to surface missing DLQ and missing KMS encryption as Wave 2 findings.
 // Per-queue errors set Truncated=true + TruncatedIDs[id]=true for the affected

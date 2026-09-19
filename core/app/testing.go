@@ -15,14 +15,14 @@ import (
 // typeName is the canonical short name (e.g. "ec2", "s3").
 // appendPage=true accumulates onto the existing cache page; false replaces it.
 //
-// Mirrors handleResourcesLoadedEvent: the same C6 scope gate (the disk-cache
+// Mirrors handleResourcesLoadedEvent: the same scope gate (the disk-cache
 // save only fires when the top-of-stack screen is the canonical top-level
 // ScreenResourceList, not ScreenChildList and not a filtered/related-nav
 // list) and the same menu sync-back, so what this seam leaves on the menu and
 // on disk is what the real task-result lane leaves.
 func (c *Controller) ApplyResourcesLoaded(typeName string, resources []resource.Resource, pagination *resource.PaginationMeta, appendPage bool) {
 	// The queued per-type save runs after the lock is released, exactly as
-	// Handle runs it (C4) — deferred first so it fires last. This seam then
+	// Handle runs it — deferred first so it fires last. This seam then
 	// BLOCKS until it has landed: a test that seeds through here reads the
 	// file it just wrote on the next line, and the real lane's asynchrony
 	// would only make every such test poll for something this seam can wait

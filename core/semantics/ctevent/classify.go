@@ -8,7 +8,7 @@ import "strings"
 // "R" (read), "W" (write), "D" (destructive), "S" (service event),
 // "I" (insight), "N" (network activity), "?" (unknown).
 //
-// Implements §2.1 of docs/historical/design/ct-event-list-v2.md. Order matters; first match wins.
+// Order matters; first match wins.
 //  1. eventCategory == "Insight" → "I"
 //  2. eventCategory == "NetworkActivity" → "N"
 //  3. eventType == "AwsServiceEvent" → "S"
@@ -42,7 +42,7 @@ func ClassifyCTVerb(eventName, eventCategory, eventType string) string {
 	if strings.HasPrefix(eventName, "BatchDelete") {
 		return "D"
 	}
-	// KMS use-key ops and STS role-vending — exact matches (§2.1 row 2 additional).
+	// KMS use-key ops and STS role-vending — exact matches.
 	// All AssumeRole* operations are STS session vending (identity exchange, not state
 	// mutation). They are exact-matched here so the "Assume" W-prefix below only catches
 	// non-STS Assume* events from other services (if any).
@@ -61,7 +61,6 @@ func ClassifyCTVerb(eventName, eventCategory, eventType string) string {
 		return "W"
 	}
 
-	// Destructive prefix table (§2.1 row 1).
 	for _, p := range []string{
 		"Delete", "Terminate", "Destroy", "Remove", "Revoke", "Disable",
 		"Stop", "Detach", "Cancel", "Reject", "Abort", "Purge",
@@ -72,7 +71,6 @@ func ClassifyCTVerb(eventName, eventCategory, eventType string) string {
 		}
 	}
 
-	// Read prefix table (§2.1 row 2).
 	for _, p := range []string{
 		"Get", "Describe", "List", "Lookup", "Search", "Query",
 		"Scan", "Head", "Test", "Check", "Validate", "Verify",
@@ -82,7 +80,6 @@ func ClassifyCTVerb(eventName, eventCategory, eventType string) string {
 		}
 	}
 
-	// Write prefix table (§2.1 row 4).
 	for _, p := range []string{
 		"Create", "Put", "Update", "Modify", "Set", "Add",
 		"Attach", "Associate", "Register", "Enable", "Start", "Run",

@@ -44,7 +44,7 @@ func (f *EventBridgeFake) ListTargetsByRule(_ context.Context, input *eventbridg
 // any rule with a target whose Arn matches the requested TargetArn, deriving
 // the reverse (target -> rule names) lookup generically rather than
 // requiring a second fixture map. Required for the pipeline:eb-rule and
-// sfn:eb-rule related-panel pivot witnesses (both call this API directly
+// sfn:eb-rule related-panel pivots (both call this API directly
 // with the pipeline/state-machine ARN as TargetArn).
 func (f *EventBridgeFake) ListRuleNamesByTarget(_ context.Context, input *eventbridge.ListRuleNamesByTargetInput, _ ...func(*eventbridge.Options)) (*eventbridge.ListRuleNamesByTargetOutput, error) {
 	if input == nil || input.TargetArn == nil || *input.TargetArn == "" {

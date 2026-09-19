@@ -52,8 +52,8 @@ func plainDetailLine(rawLine string) string {
 // decided. The renderer does not arrive at a width of its own: the same body
 // is painted by the web lane, which has no renderer to ask.
 // Each FieldItem is rendered according to its type: header, sub-field, navigable, or normal.
-// Bug3 fix: applies styles.RowSelected to the cursor row when left column is focused.
-// Bug4 fix: suppresses NavigableField underline on the cursor row (RowSelected takes over).
+// Applies styles.RowSelected to the cursor row when left column is focused.
+// Suppresses NavigableField underline on the cursor row (RowSelected takes over).
 func (m DetailModel) renderFromFieldList(keyW int) string {
 	if len(m.fieldList) == 0 {
 		return styles.DimText.Render("  No detail data available")
@@ -181,7 +181,7 @@ func (m DetailModel) renderFromFieldList(keyW int) string {
 				line = " " + label + value
 			}
 		}
-		// Bug3 fix: apply background highlight to the cursor row (left focused only).
+		// Apply background highlight to the cursor row (left focused only).
 		// Keep this as background-only to preserve existing ANSI contract checks.
 		if isCursorRow {
 			// Ensure selection background spans full viewport width, not just text width.
