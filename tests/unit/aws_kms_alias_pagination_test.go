@@ -19,11 +19,6 @@ import (
 	awsclient "github.com/k2m30/a9s/v3/core/aws"
 )
 
-// ---------------------------------------------------------------------------
-// Fake: KMSAPI — supports paginated ListAliases, paginated ListKeys,
-// and per-key DescribeKey.
-// ---------------------------------------------------------------------------
-
 // kmsAliasPaginationFake implements awsclient.KMSAPI with programmable
 // paginated responses for ListAliases and single-page ListKeys + DescribeKey.
 type kmsAliasPaginationFake struct {
@@ -103,25 +98,11 @@ func (f *kmsAliasPaginationFake) GetKeyPolicy(
 	return &kms.GetKeyPolicyOutput{}, nil
 }
 
-// Compile-time check: kmsAliasPaginationFake satisfies awsclient.KMSAPI.
 var _ awsclient.KMSAPI = (*kmsAliasPaginationFake)(nil)
 
-// ---------------------------------------------------------------------------
-// TestFetchKMSKeysPage_FullyPaginatesListAliases
-//
-// Verifies that FetchKMSKeysPage fully paginates ListAliases across three pages
-// before building the alias map. All three customer-managed keys must have their
-// correct alias populated (not left blank for keys on page 2 or 3).
-//
-// Setup:
-//   - ListKeys returns [key-a, key-b, key-c], not truncated.
-//   - ListAliases page 1: alias for key-a only, Truncated=true, NextMarker="m1".
-//   - ListAliases page 2: alias for key-b only, Truncated=true, NextMarker="m2".
-//   - ListAliases page 3: alias for key-c only, Truncated=false.
-//   - DescribeKey returns all three as CUSTOMER-managed.
-//
-// Expected: all three resources have their expected aliases populated.
-// ---------------------------------------------------------------------------
+// TestFetchKMSKeysPage_FullyPaginatesListAliases verifies that FetchKMSKeysPage
+// fully paginates ListAliases across three pages before building the alias
+// map, so keys whose alias is on page 2 or 3 still get it.
 
 func TestFetchKMSKeysPage_FullyPaginatesListAliases(t *testing.T) {
 
@@ -145,7 +126,6 @@ func TestFetchKMSKeysPage_FullyPaginatesListAliases(t *testing.T) {
 		},
 		aliasPages: []*kms.ListAliasesOutput{
 			{
-				// Page 1: only key-a alias
 				Aliases: []kmstypes.AliasListEntry{
 					{TargetKeyId: aws.String(keyA), AliasName: aws.String(aliasA)},
 				},
@@ -153,7 +133,6 @@ func TestFetchKMSKeysPage_FullyPaginatesListAliases(t *testing.T) {
 				NextMarker: aws.String("m1"),
 			},
 			{
-				// Page 2: only key-b alias
 				Aliases: []kmstypes.AliasListEntry{
 					{TargetKeyId: aws.String(keyB), AliasName: aws.String(aliasB)},
 				},
@@ -161,7 +140,6 @@ func TestFetchKMSKeysPage_FullyPaginatesListAliases(t *testing.T) {
 				NextMarker: aws.String("m2"),
 			},
 			{
-				// Page 3: only key-c alias, last page
 				Aliases: []kmstypes.AliasListEntry{
 					{TargetKeyId: aws.String(keyC), AliasName: aws.String(aliasC)},
 				},
@@ -207,13 +185,11 @@ func TestFetchKMSKeysPage_FullyPaginatesListAliases(t *testing.T) {
 		t.Fatalf("len(resources) = %d, want 3", len(result.Resources))
 	}
 
-	// Build alias-by-ID map from result
 	gotAlias := make(map[string]string, 3)
 	for _, r := range result.Resources {
 		gotAlias[r.ID] = r.Fields["alias"]
 	}
 
-	// All three keys must have their alias from the correct page.
 	type wantAlias struct {
 		keyID string
 		alias string
@@ -234,15 +210,11 @@ func TestFetchKMSKeysPage_FullyPaginatesListAliases(t *testing.T) {
 		}
 	}
 
-	// Verify ListAliases was called 3 times (all pages consumed).
 	if fake.aliasCallIdx != 3 {
 		t.Errorf("ListAliases called %d times, want 3 (full pagination)", fake.aliasCallIdx)
 	}
 }
 
-// ---------------------------------------------------------------------------
-// TestFetchKMSKeysPage_TruncatedAliasesWithNilMarkerTerminates
-//
 // A ListAliases response with Truncated=true and a nil NextMarker must end
 // pagination, not reset the marker to nil and restart from page 1.
 // kmsRunawayAliasFake always returns that exact malformed response regardless
@@ -250,7 +222,6 @@ func TestFetchKMSKeysPage_FullyPaginatesListAliases(t *testing.T) {
 // test the instant ListAliases is called more times than the guard could ever
 // need, instead of letting a runaway loop spin the suite for real. The
 // nil-marker guard breaks out on the very first call.
-// ---------------------------------------------------------------------------
 
 // kmsRunawayAliasFake implements awsclient.KMSAPI. Its ListAliases always
 // reports Truncated=true with a nil NextMarker — the malformed response
@@ -293,7 +264,6 @@ func (f *kmsRunawayAliasFake) GetKeyPolicy(_ context.Context, _ *kms.GetKeyPolic
 	return &kms.GetKeyPolicyOutput{}, nil
 }
 
-// Compile-time check: kmsRunawayAliasFake satisfies awsclient.KMSAPI.
 var _ awsclient.KMSAPI = (*kmsRunawayAliasFake)(nil)
 
 func TestFetchKMSKeysPage_TruncatedAliasesWithNilMarkerTerminates(t *testing.T) {

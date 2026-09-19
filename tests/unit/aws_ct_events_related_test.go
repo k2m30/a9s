@@ -261,10 +261,6 @@ func TestRelated_CtEvents_Role_NilCache(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// FetchFilter propagation: checkIAMUserCtEvents (iam-user → ct-events)
-// ---------------------------------------------------------------------------
-
 // TestRelated_CtEvents_IAMUser_FetchFilterSet verifies that checkIAMUserCtEvents
 // sets FetchFilter["Username"] to the user's ID on all return paths (match found).
 func TestRelated_CtEvents_IAMUser_FetchFilterSet(t *testing.T) {
@@ -299,7 +295,6 @@ func TestRelated_CtEvents_IAMUser_FetchFilterSet(t *testing.T) {
 // FetchFilter["Username"] is set even when no match is found in a truncated cache.
 func TestRelated_CtEvents_IAMUser_FetchFilterSet_NoMatch_Truncated(t *testing.T) {
 	userName := "alice"
-	// Cache has no matching event but is marked truncated.
 	unrelatedEvent := resource.Resource{
 		ID:     "evt-iam-user-002",
 		Fields: map[string]string{"user": "other-user"},
@@ -349,10 +344,9 @@ func TestRelated_CtEvents_IAMUser_FetchFilterSet_EmptyUsername(t *testing.T) {
 	}
 }
 
-// TestRelated_CtEvents_IAMUser_FetchFilterSet_Match_Truncated is a regression
-// test for the bug where checkIAMUserCtEvents returned the in-cache match count
-// instead of -1 when the cache was truncated. A truncated cache means the real
-// count is unknown, so -1 must be returned regardless of in-cache matches.
+// TestRelated_CtEvents_IAMUser_FetchFilterSet_Match_Truncated: a truncated
+// cache means the real count is unknown, so -1 is returned regardless of
+// in-cache matches.
 func TestRelated_CtEvents_IAMUser_FetchFilterSet_Match_Truncated(t *testing.T) {
 	userName := "alice"
 	matchingEvent := resource.Resource{
@@ -393,10 +387,6 @@ func TestRelated_CtEvents_IAMUser_FetchFilterSet_Match_Truncated(t *testing.T) {
 		t.Errorf("FetchFilter[Username] = %q, want %q", result.FetchFilter()["Username"], userName)
 	}
 }
-
-// ---------------------------------------------------------------------------
-// FetchFilter propagation: checkEC2CloudTrailEvents (ec2 → ct-events)
-// ---------------------------------------------------------------------------
 
 // ec2CtEventsRelatedChecker captures the ec2→ct-events checker on first use,
 // before any test mutates the ec2 related registry. Snapshot timing matters:
@@ -496,10 +486,9 @@ func TestRelated_CtEvents_EC2_FetchFilterSet_NoMatch_Truncated(t *testing.T) {
 	}
 }
 
-// TestRelated_CtEvents_EC2_FetchFilterSet_Match_Truncated is a regression test
-// for the bug where checkEC2CloudTrailEvents returned the in-cache match count
-// instead of -1 when the cache was truncated. A truncated cache means the real
-// count is unknown, so -1 must be returned regardless of in-cache matches.
+// TestRelated_CtEvents_EC2_FetchFilterSet_Match_Truncated: a truncated cache
+// means the real count is unknown, so -1 is returned regardless of in-cache
+// matches.
 func TestRelated_CtEvents_EC2_FetchFilterSet_Match_Truncated(t *testing.T) {
 	instanceID := "i-abc123"
 	matchingEvent := resource.Resource{
@@ -530,10 +519,6 @@ func TestRelated_CtEvents_EC2_FetchFilterSet_Match_Truncated(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// AssumedRole JSON extraction: checkCtEventsRole via CloudTrailEvent JSON
-// ---------------------------------------------------------------------------
-
 // TestRelated_CtEvents_Role_AssumedRoleViaCTEventJSON verifies that when
 // Resources is empty and Username has no "/", the role name is extracted from
 // CloudTrailEvent JSON at userIdentity.sessionContext.sessionIssuer.userName.
@@ -556,7 +541,7 @@ func TestRelated_CtEvents_Role_AssumedRoleViaCTEventJSON(t *testing.T) {
 			EventId:         aws.String("evt-assumed-role-001"),
 			Username:        aws.String("session-name"), // no "/" — not a service role path
 			CloudTrailEvent: aws.String(ctEventJSON),
-			Resources:       []cloudtrailtypes.Resource{}, // empty
+			Resources:       []cloudtrailtypes.Resource{},
 		},
 	}
 
@@ -680,8 +665,7 @@ func TestRelated_CtEvents_Role_MatchInTruncatedCacheCounts(t *testing.T) {
 		t.Errorf("Count = %d, want 1", result.Count())
 	}
 	// The role is confirmed, so it counts, but a page the checker never read
-	// may carry another role of the same name, and the role pivot is not
-	// special-cased against the rule every other pivot follows.
+	// may carry another role of the same name, as for every other pivot.
 	if !result.Truncated() {
 		t.Error("Truncated = false, want true (a later page was never read)")
 	}
@@ -855,7 +839,7 @@ func TestRelated_CtEvents_CFN_TruncatedResolvesStackNameNotUUID(t *testing.T) {
 			// acme-vpc-stack is IN the list: this test is about the stack
 			// NAME being extracted from the ARN rather than the uuid, so the
 			// list has to confirm it for the extraction to be observable at
-			// all (row 6 — an unconfirmed id is Unknown, not a count).
+			// all: an unconfirmed id is Unknown, not a count.
 			Resources:   []resource.Resource{{ID: "acme-vpc-stack", Name: "acme-vpc-stack"}, {ID: "other-stack", Name: "other-stack"}},
 			IsTruncated: true,
 		},
@@ -1004,22 +988,15 @@ func TestRelated_CtEvents_RDS_DBInstanceEventResolves(t *testing.T) {
 	result := checker(context.Background(), nil, res, cache)
 
 	// The cache is cold, so nothing has confirmed that my-instance still
-	// exists. The sibling test above pins the real point — a DBCluster id is
-	// never reported as a dbi relation.
+	// exists.
 	if got := result.EffectiveState(); got != domain.RelatedUnknown {
 		t.Errorf("state = %v with a cold cache, want RelatedUnknown; Count=%d IDs=%v",
 			got, result.Count(), result.ResourceIDs())
 	}
 }
 
-// ---------------------------------------------------------------------------
-// §7b.10 completeness: all 13 typed RelatedDef entries must be registered
-// ---------------------------------------------------------------------------
-
 // TestCtEventsRelatedGroups_AllTypedRegistered asserts that the "ct-events" related
-// registry contains entries for every resource type listed in §7b.10 of
-// docs/historical/design/ct-event-detail.md. The test is intentionally expected to FAIL until
-// all 11 missing registrations are added to ct_events.go.
+// registry contains an entry for every typed resource pivot.
 func TestCtEventsRelatedGroups_AllTypedRegistered(t *testing.T) {
 	expected := []string{
 		"role", "iam-user", "ec2", "s3", "lambda",
@@ -1066,14 +1043,9 @@ func TestCtEventsRelatedGroups_AllTypedRegistered(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// §7b.10 self-pivot rows: ct-events → ct-events (4 pivot RelatedDefs)
-// ---------------------------------------------------------------------------
-
 // TestCtEventsRelatedGroups_PivotsRegistered asserts that the "ct-events" related
 // registry contains exactly 4 self-pivot entries (TargetType == "ct-events") with
-// the DisplayNames specified in §7b.10 of docs/historical/design/ct-event-detail.md.
-// The test is expected to FAIL until all 4 pivot registrations are added.
+// the expected DisplayNames.
 func TestCtEventsRelatedGroups_PivotsRegistered(t *testing.T) {
 	expectedPivots := []string{
 		"CT events by AccessKeyId",
@@ -1084,7 +1056,6 @@ func TestCtEventsRelatedGroups_PivotsRegistered(t *testing.T) {
 
 	defs := resource.GetRelated("ct-events")
 
-	// Collect only self-pivot entries.
 	var pivots []resource.RelatedDef
 	for _, def := range defs {
 		if def.TargetType == "ct-events" {
@@ -1092,13 +1063,11 @@ func TestCtEventsRelatedGroups_PivotsRegistered(t *testing.T) {
 		}
 	}
 
-	// Index pivots by DisplayName for O(1) lookup.
 	pivotByName := make(map[string]bool, len(pivots))
 	for _, p := range pivots {
 		pivotByName[p.DisplayName] = true
 	}
 
-	// Build expected set for reverse lookup.
 	expectedSet := make(map[string]bool, len(expectedPivots))
 	for _, name := range expectedPivots {
 		expectedSet[name] = true
@@ -1167,10 +1136,6 @@ func TestRelated_CtEvents_Role_AssumedRole_NotRoleType(t *testing.T) {
 		t.Errorf("Count = %d, want 0 (IAMUser type should not extract role from JSON)", result.Count())
 	}
 }
-
-// ---------------------------------------------------------------------------
-// checkCtEventsSG tests (ct-events → sg checker)
-// ---------------------------------------------------------------------------
 
 // TestRelated_CtEvents_SG_MatchByResourcesSlice verifies that the SG checker
 // returns Count=1 when the event's Resources slice contains an
@@ -1323,7 +1288,6 @@ func TestCtJSONStringSlice_MissingKey(t *testing.T) {
 		"ec2": resource.ResourceCacheEntry{Resources: []resource.Resource{}},
 	}
 
-	// requestParameters has no instancesSet key.
 	ctEventJSON := `{"requestParameters":{"filters":[{"name":"instance-id","values":["i-0abc"]}]}}`
 	res := resource.Resource{
 		ID:     "evt-ec2-slicepath-002",
@@ -1350,7 +1314,6 @@ func TestCtJSONStringSlice_NonSliceLeaf(t *testing.T) {
 		"ec2": resource.ResourceCacheEntry{Resources: []resource.Resource{}},
 	}
 
-	// instancesSet is a string, not an object with items.
 	ctEventJSON := `{"requestParameters":{"instancesSet":"not-a-slice"}}`
 	res := resource.Resource{
 		ID:     "evt-ec2-slicepath-003",
@@ -1370,12 +1333,10 @@ func TestCtJSONStringSlice_NonSliceLeaf(t *testing.T) {
 	}
 }
 
-// TestRelated_CtEvents_User_MatchOnTruncatedPageIsALowerBound pins the half of
-// row 16 that the no-match pins cannot see. Before this batch the user pivot
-// returned through a helper that took no truncation flag, so a user confirmed
-// on a page that was cut short rendered as an exact count and read as complete.
-// It is a lower bound: the user is real, and a page nobody read may carry
-// another of the same name.
+// TestRelated_CtEvents_User_MatchOnTruncatedPageIsALowerBound: a user
+// confirmed on a page that was cut short is a lower bound, not an exact
+// count: the user is real, and a page nobody read may carry another of the
+// same name.
 func TestRelated_CtEvents_User_MatchOnTruncatedPageIsALowerBound(t *testing.T) {
 	cache := resource.ResourceCache{
 		"iam-user": resource.ResourceCacheEntry{

@@ -26,7 +26,6 @@ func ssmCheckerByTarget(t *testing.T, target string) resource.RelatedChecker {
 	return nil
 }
 
-// ssmSecureRes returns a canonical SecureString SSM parameter for tests.
 func ssmSecureRes() resource.Resource {
 	return resource.Resource{
 		ID:   "/app/db-password",
@@ -43,9 +42,6 @@ func ssmSecureRes() resource.Resource {
 	}
 }
 
-// ssmKMSCache returns a KMS ResourceCache containing one key whose alias matches
-// the alias referenced by ssmSecureRes. The "alias" field is set to "alias/my-key"
-// so matchesKMSKeyRef can match it against the SSM KeyId "alias/my-key".
 func ssmKMSCache() resource.ResourceCache {
 	return resource.ResourceCache{
 		"kms": resource.ResourceCacheEntry{
@@ -67,8 +63,6 @@ func ssmKMSCache() resource.ResourceCache {
 		},
 	}
 }
-
-// --- KMS checker tests ---
 
 func TestRelated_SSM_KMS_Match(t *testing.T) {
 	checker := ssmCheckerByTarget(t, "kms")
@@ -165,5 +159,3 @@ func TestRelated_SSM_NilClients(t *testing.T) {
 		t.Errorf("State = %v, Count = %d, Truncated = %v, want resolved 0, truncated", result.State(), result.Count(), result.Truncated())
 	}
 }
-
-// --- Demo checker test ---

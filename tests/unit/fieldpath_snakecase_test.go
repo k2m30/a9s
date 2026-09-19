@@ -10,11 +10,11 @@ import (
 // conversion including its acronym edge cases. This is a CHARACTERIZATION test — its
 // purpose is to make current behavior a conscious contract, not an accidental one.
 //
-// WARNING: If a future change "fixes" ACM → a_c_m, review both call sites first:
-//   - core/fieldpath/extract.go ExtractFieldList fallback lookup (line ~400)
+// WARNING: before changing ACM → a_c_m, audit both call sites:
+//   - core/fieldpath/extract.go ExtractFieldList fallback lookup
 //   - the config-driven detail fallback lookup
 //
-// Both only pass PascalCase paths like VpcId today, so the limitation never fires.
+// Both pass only PascalCase paths like VpcId, so the limitation never fires.
 // If you need acronym-aware snake_case, add a new function — don't edit this one
 // without auditing those call sites.
 func TestToSnakeCase_CharacterizationPinnedBehavior(t *testing.T) {

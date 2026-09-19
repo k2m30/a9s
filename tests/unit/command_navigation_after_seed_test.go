@@ -1,22 +1,13 @@
-// command_navigation_after_seed_test.go — the navigation-race half of D11:
 // `-p <profile> -c <type>` must not race the one-shot -c navigation against
-// the disk-cache ProbeResources seed (an EmitNavigate fired straight from
-// handleClientsReadySuccess, before handleAvailabilityCacheLoaded has seeded
-// session.ProbeResources from the on-disk per-type cache, lets HandleNavigate
-// see an empty ProbeResources map and push a bare Loading list with no title
-// count).
+// the disk-cache ProbeResources seed: a HandleNavigate that runs before
+// handleAvailabilityCacheLoaded seeds session.ProbeResources from the on-disk
+// per-type cache pushes a bare Loading list with no title count.
 //
-// The one-shot -c navigation is armed at ClientsReady (StackDepth==1 gate)
-// but the actual EmitNavigate task is emitted from
-// handleAvailabilityCacheLoaded, AFTER ProbeResources seeding, so a
-// HandleNavigate driven by that task always sees a seeded cache entry.
-// The demo / NoCache early-return path (handleAvailabilityPrefetched is
-// synchronous — there is no seed race to lose) keeps firing EmitNavigate
-// directly from handleClientsReadySuccess.
-//
-// Tests are driven entirely through Core's public API (HandleClientsReady,
-// HandleEvent, HandleNavigate, Session()) — no reach into unexported
-// runtime/session fields.
+// The navigation is armed at ClientsReady (StackDepth==1) and its EmitNavigate
+// task is emitted from handleAvailabilityCacheLoaded, after the seed. The
+// demo / NoCache path fires EmitNavigate directly from
+// handleClientsReadySuccess: handleAvailabilityPrefetched is synchronous, so
+// there is no seed race to lose.
 package unit
 
 import (
@@ -54,12 +45,8 @@ func emitNavigatePayloadOf(tasks []runtime.TaskRequest) (runtime.EmitNavigatePay
 }
 
 // seedDiskCacheWithS3Rows writes a real on-disk per-type cache file for
-// profile/region carrying 2 s3 rows, via the same cache.Store.Put +
-// SaveType path production code uses (TestPerTypeSave_* /
-// TestAllLoadedPages_* in app_web_live_cold_boot_test.go establish this as
-// the standard fixture-writing pattern for the round-2 cache surface).
-// Returns the freshly-reloaded *cache.Store for the pair, mirroring what
-// EnsureCacheStore/CacheStoreToEvent would see on a real cold start.
+// profile/region carrying 2 s3 rows through cache.Store.Put + SaveType, and
+// returns the reloaded *cache.Store a real cold start would see.
 func seedDiskCacheWithS3Rows(t *testing.T, profile, region string) *cache.Store {
 	t.Helper()
 	store := cache.LoadDirForTest(profile, region)
@@ -86,14 +73,6 @@ func newLiveCoreForCommandNav(profile, region, command string) *runtime.Core {
 	return c
 }
 
-// TestCommandNavigation_AfterSeed_Deterministic pins the fixed ordering:
-// HandleClientsReady (StackDepth==1, Command="s3") must NOT emit
-// TaskKindEmitNavigate yet — only once the follow-up AvailabilityCacheLoaded
-// event has been processed (and ProbeResources seeded from it) does
-// EmitNavigate appear, exactly once.
-//
-// RED today: handleClientsReadySuccess emits EmitNavigate directly, so the
-// first assertion (no EmitNavigate yet after HandleClientsReady) fails.
 func TestCommandNavigation_AfterSeed_Deterministic(t *testing.T) {
 	t.Setenv("A9S_CONFIG_FOLDER", t.TempDir())
 	profile, region := "cmdnav-profile", "us-east-1"
@@ -141,15 +120,10 @@ func TestCommandNavigation_AfterSeed_Deterministic(t *testing.T) {
 		Target:       runtime.NavigateTargetResourceList,
 		ResourceType: payload.ResourceType,
 	})
-	// HandleNavigate's cache-miss branch (session.ResourceCache has no entry
-	// yet — a fresh fetch is still dispatched to confirm/replace the probe
-	// data) is the EXPECTED path here, not a promotion to
-	// NavigateKindPushResourceListCached: per the handler's own doc comment,
-	// ProbeResources/ProbeTruncated are a distinct, lower-confidence knowledge
-	// source from session.ResourceCache, so the seed rides
-	// NavigateKindPushResourceList's CachedEntry fallback instead. What
-	// D11 actually requires is that THAT fallback is already
-	// populated with real rows — not empty — by the time this call runs.
+	// ProbeResources/ProbeTruncated are a lower-confidence knowledge source than
+	// session.ResourceCache, so the seed rides NavigateKindPushResourceList's
+	// CachedEntry fallback rather than NavigateKindPushResourceListCached; that
+	// fallback must already hold real rows when this call runs.
 	if navResult.Kind != runtime.NavigateKindPushResourceList {
 		t.Errorf("HandleNavigate(s3) Kind = %v, want NavigateKindPushResourceList (cache-miss branch with a ProbeResources-seeded CachedEntry fallback)", navResult.Kind)
 	}
@@ -158,11 +132,9 @@ func TestCommandNavigation_AfterSeed_Deterministic(t *testing.T) {
 	}
 }
 
-// TestCommandNavigation_NoCacheDir_StillFires verifies the armed -c
-// navigation still fires when the profile/region pair has NO on-disk cache
-// directory at all (a cold machine, first-ever run for this pair) — the
-// AvailabilityCacheLoaded event still carries Expired:true / empty Entries
-// in that case, and the armed command navigation must not be silently lost.
+// A pair with no on-disk cache directory (first run on a cold machine) still
+// gets an AvailabilityCacheLoaded event, with Expired:true and empty Entries,
+// and the armed command navigation must fire from it.
 func TestCommandNavigation_NoCacheDir_StillFires(t *testing.T) {
 	t.Setenv("A9S_CONFIG_FOLDER", t.TempDir())
 	profile, region := "cmdnav-cold-profile", "eu-west-1"
@@ -178,10 +150,8 @@ func TestCommandNavigation_NoCacheDir_StillFires(t *testing.T) {
 		t.Fatal("HandleClientsReady returned TaskKindEmitNavigate immediately on a cold-cache machine — navigation must still be deferred to the post-seed event")
 	}
 
-	// No cache.LoadDirForTest/Put/SaveType ever ran for this pair — mirrors a
-	// genuinely cold machine. EnsureCacheStore's LoadDir call returns a
-	// non-nil-but-empty Store (per cache.LoadDirForTest's "never fails" contract),
-	// so build the event exactly as production does for that case.
+	// EnsureCacheStore's LoadDir returns a non-nil, empty Store for a pair with no
+	// cache directory.
 	store := c.CacheStore()
 	event := runtime.CacheStoreToEvent(store)
 	if len(event.Entries) != 0 {
@@ -206,14 +176,9 @@ func TestCommandNavigation_NoCacheDir_StillFires(t *testing.T) {
 	}
 }
 
-// TestCommandNavigation_DemoLane_StillFires verifies the demo / --no-cache
-// lane is unaffected by the seed-ordering fix: handleAvailabilityPrefetched
-// is a SYNCHRONOUS prefetch (no disk read, no seed race to lose), so the
-// -c navigation for that lane continues to fire directly from
-// handleClientsReadySuccess, exactly like the pre-existing
-// TestHandleClientsReady_Success_Command_StackDepth1 pin in
-// core/runtime/handlers_test.go (mirrored here through Core's public
-// API since tests/unit cannot reach unexported runtime internals).
+// handleAvailabilityPrefetched is a synchronous prefetch with no disk read, so
+// the demo / --no-cache lane fires the -c navigation directly from
+// handleClientsReadySuccess.
 func TestCommandNavigation_DemoLane_StillFires(t *testing.T) {
 	c := runtime.Bootstrap(demo.DemoProfile, demo.DemoRegion, catalog.All())
 	c.SetNoCache(true)
@@ -248,14 +213,9 @@ func TestCommandNavigation_DemoLane_StillFires(t *testing.T) {
 	}
 }
 
-// TestCommandNavigation_Rotate_PreservesArmedCommand verifies that
-// session.Rotate() (invoked by HandleProfileSelected/HandleRegionSelected
-// on every profile/region switch) does NOT clear CommandArmed/PendingCommand
-// — mirroring the pre-existing rationale for why Command itself survives
-// Rotate (an initial connect that armed the -c navigation but then failed
-// and rolled back must not lose the flag on the retry/switch). Accessed via
-// Core.Session() since these are plain exported fields on *session.Session,
-// not a case that needs a narrow accessor.
+// session.Rotate() runs on every profile/region switch and must keep
+// CommandArmed/PendingCommand: an initial connect that armed the -c navigation
+// and then failed must not lose the flag on the retry or switch.
 func TestCommandNavigation_Rotate_PreservesArmedCommand(t *testing.T) {
 	t.Setenv("A9S_CONFIG_FOLDER", t.TempDir())
 	profile, region := "cmdnav-rotate-profile", "us-east-1"

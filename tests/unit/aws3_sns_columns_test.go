@@ -2,10 +2,9 @@
 
 package unit
 
-// aws3_sns_columns_test.go — a list column shows what its heading names:
-// "Topic Name" shows the topic's name and "Confirmed" the subscription's
-// confirmation state, so two headings on the same list never read from the
-// same field.
+// A list column shows what its heading names: "Topic Name" shows the topic's
+// name and "Confirmed" the subscription's confirmation state, so two headings
+// on the same list never read from the same field.
 
 import (
 	"context"

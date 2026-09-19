@@ -15,10 +15,6 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// ---------------------------------------------------------------------------
-// ASG Scaling Activities fetcher tests (child of Auto Scaling Groups)
-// ---------------------------------------------------------------------------
-
 // TestFetchAsgActivities_Basic verifies parsing of 1 activity with all fields
 // populated, checking ID, Name, Status, all Fields, and RawStruct.
 func TestFetchAsgActivities_Basic(t *testing.T) {
@@ -82,9 +78,7 @@ func TestFetchAsgActivities_Basic(t *testing.T) {
 		}
 	})
 
-	// status_code is the key the built-in column and the YAML view both read;
-	// "status" was the same string under a second name (aws5 row 1). Do not
-	// restore the pair.
+	// status_code is the key the built-in column and the YAML view both read.
 	t.Run("Status_is_string_StatusCode", func(t *testing.T) {
 		if r.Fields["status_code"] != "Successful" {
 			t.Errorf("Fields[\"status_code\"]: expected %q, got %q", "Successful", r.Fields["status_code"])
@@ -131,7 +125,6 @@ func TestFetchAsgActivities_Basic(t *testing.T) {
 		}
 	})
 
-	// Verify required fields are present
 	t.Run("required_fields_present", func(t *testing.T) {
 		requiredFields := []string{"start_time", "status_code", "description", "cause"}
 		for _, key := range requiredFields {
@@ -208,7 +201,6 @@ func TestFetchAsgActivities_NilOptionalFields(t *testing.T) {
 					Cause:                aws.String("Manual scaling"),
 					StartTime:            &ts,
 					StatusCode:           asgtypes.ScalingActivityStatusCodeSuccessful,
-					// All optional fields are nil
 				},
 			},
 		},
@@ -218,7 +210,6 @@ func TestFetchAsgActivities_NilOptionalFields(t *testing.T) {
 		"asg_name": "nil-asg",
 	}
 
-	// Should not panic
 	result, err := awsclient.FetchAsgActivities(
 		context.Background(),
 		mock,
@@ -444,7 +435,6 @@ func TestFetchAsgActivities_RawStruct(t *testing.T) {
 func TestFetchAsgActivities_Pagination(t *testing.T) {
 	ts := time.Date(2024, 3, 22, 10, 0, 0, 0, time.UTC)
 
-	// Page 1: 3 items with NextToken indicating more pages exist.
 	page1Mock := &mockASGDescribeScalingActivitiesClient{
 		output: &autoscaling.DescribeScalingActivitiesOutput{
 			NextToken: aws.String("page2-token"),
@@ -478,7 +468,6 @@ func TestFetchAsgActivities_Pagination(t *testing.T) {
 		"asg_name": "paginated-asg",
 	}
 
-	// First call: no continuation token — fetches page 1.
 	result1, err := awsclient.FetchAsgActivities(
 		context.Background(),
 		page1Mock,
@@ -551,17 +540,13 @@ func TestFetchAsgActivities_Pagination(t *testing.T) {
 	})
 
 	t.Run("page1_single_api_call", func(t *testing.T) {
-		// The new implementation makes exactly one API call per FetchAsgActivities invocation.
-		// Verify resources were returned from the single call.
 		if len(result1.Resources) == 0 {
 			t.Error("expected resources from single API call")
 		}
 	})
 
-	// Page 2: 2 items with no NextToken — last page.
 	page2Mock := &mockASGDescribeScalingActivitiesClient{
 		output: &autoscaling.DescribeScalingActivitiesOutput{
-			// No NextToken — last page
 			Activities: []asgtypes.Activity{
 				{
 					ActivityId:           aws.String("act-p2-1"),
@@ -581,7 +566,6 @@ func TestFetchAsgActivities_Pagination(t *testing.T) {
 		},
 	}
 
-	// Second call: pass continuation token from page 1 to fetch page 2.
 	result2, err := awsclient.FetchAsgActivities(
 		context.Background(),
 		page2Mock,
@@ -633,7 +617,6 @@ func TestFetchAsgActivities_Pagination(t *testing.T) {
 func TestFetchAsgActivities_LargePage(t *testing.T) {
 	ts := time.Date(2024, 6, 15, 12, 0, 0, 0, time.UTC)
 
-	// Build one page of 50 activities with a NextToken indicating more pages exist.
 	var activities []asgtypes.Activity
 	for i := range 50 {
 		actTs := ts.Add(time.Duration(i) * time.Second)

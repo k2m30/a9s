@@ -1,29 +1,5 @@
-// app_menu_test.go — PR-C slice 1a: controller-side MENU machinery.
-//
-// Covers the four behavioral areas introduced by PR-C:
-//
-//  2. Menu intents → MenuState: ApplyIntents with PatchMenuAvailability,
-//     PatchMenu, PatchMenuIssueBatch, PatchMenuCheckProgress,
-//     PatchMenuEnrichProgress, and MenuClearAvailabilityIntent apply their
-//     payloads to MenuState, visible via Snapshot().Body.Menu.
-//
-//  3. Menu actions: ActionMoveUp/Down/Top/Bottom/PageUp/PageDown move
-//     MenuBody.Selected; ActionToggleAttention flips AttentionOnly;
-//     ActionSetFilter{Arg:"ec"} narrows visible entries; ActionSelect
-//     navigates to a resource list (BodyKindList) or is blocked for
-//     confirmed-empty types.
-//
-//  4. Snapshot MenuBody visibility parity: MenuBody.Entries reflect the
-//     same visibility / badge logic as mainmenu.go's applyFilter +
-//     isVisibleUnderIssueFilter — that file is the oracle.
-//
-// Oracle references:
-//   - internal/tui/views/mainmenu.go: applyFilter, isVisibleUnderIssueFilter,
-//     skipUnavailable, issueBadge, FrameTitle.
-//
-// All scenarios are hermetic (no AWS clients, no real config on disk).
-// Tests use resource.AllResourceTypes() to compute expectations so they
-// stay correct when new resource types are registered.
+// Expectations come from resource.AllResourceTypes(), so they follow newly
+// registered resource types.
 package unit_test
 
 import (
@@ -38,7 +14,7 @@ import (
 )
 
 // newMenuController returns a Controller that starts with ScreenMenu as the
-// root (PR-C contract). Profile/region are set to recognisable fake values.
+// root. Profile/region are set to recognisable fake values.
 func newMenuController(t *testing.T) *app.Controller {
 	t.Helper()
 	t.Setenv("A9S_CONFIG_FOLDER", t.TempDir())
@@ -65,13 +41,6 @@ func requireMenuBody(t *testing.T, c *app.Controller) *app.MenuBody {
 	return vs.Body.Menu
 }
 
-// =============================================================================
-// 2. Menu intents → MenuState
-// =============================================================================
-
-// TestMenuIntent_PatchMenuAvailability_SetsCountOnEntry verifies that
-// ApplyIntents(PatchMenuAvailability{ResourceType:"ec2", Count:5}) causes the
-// ec2 entry in Snapshot().Body.Menu to show Availability == 5.
 func TestMenuIntent_PatchMenuAvailability_SetsCountOnEntry(t *testing.T) {
 	c := newMenuController(t)
 
@@ -95,8 +64,6 @@ func TestMenuIntent_PatchMenuAvailability_SetsCountOnEntry(t *testing.T) {
 	}
 }
 
-// TestMenuIntent_PatchMenuAvailability_TruncatedCount verifies that
-// Availability is set when Count is a truncated lower bound (Truncated=true).
 func TestMenuIntent_PatchMenuAvailability_TruncatedCount(t *testing.T) {
 	c := newMenuController(t)
 
@@ -116,8 +83,6 @@ func TestMenuIntent_PatchMenuAvailability_TruncatedCount(t *testing.T) {
 	t.Error("rds entry not present in MenuBody.Entries after PatchMenuAvailability")
 }
 
-// TestMenuIntent_PatchMenuAvailability_ZeroCount_ConfirmedEmpty verifies that
-// a confirmed-empty type (Count=0, Truncated=false) shows Availability == 0.
 func TestMenuIntent_PatchMenuAvailability_ZeroCount_ConfirmedEmpty(t *testing.T) {
 	c := newMenuController(t)
 
@@ -137,9 +102,6 @@ func TestMenuIntent_PatchMenuAvailability_ZeroCount_ConfirmedEmpty(t *testing.T)
 	t.Error("lambda entry not present in MenuBody.Entries after PatchMenuAvailability(0)")
 }
 
-// TestMenuIntent_PatchMenu_SetsIssueBadgeOnEntry verifies that
-// ApplyIntents(PatchMenu{ResourceType:"s3", Issues:7}) causes the s3 entry
-// to carry an IssueBadge with Count==7.
 func TestMenuIntent_PatchMenu_SetsIssueBadgeOnEntry(t *testing.T) {
 	c := newMenuController(t)
 
@@ -159,8 +121,6 @@ func TestMenuIntent_PatchMenu_SetsIssueBadgeOnEntry(t *testing.T) {
 	t.Error("s3 entry not present in MenuBody.Entries after PatchMenu")
 }
 
-// TestMenuIntent_PatchMenuIssueBatch_PopulatesBadges verifies that
-// PatchMenuIssueBatch atomically applies issue counts for multiple types.
 func TestMenuIntent_PatchMenuIssueBatch_PopulatesBadges(t *testing.T) {
 	c := newMenuController(t)
 
@@ -205,19 +165,14 @@ func TestMenuIntent_PatchMenuIssueBatch_PopulatesBadges(t *testing.T) {
 	}
 }
 
-// TestMenuIntent_MenuClearAvailabilityIntent_ClearsAllCounts verifies that
-// MenuClearAvailabilityIntent resets all availability and issue state so the
-// menu returns to the "no data yet" state — matching mainmenu.go ClearAvailability.
 func TestMenuIntent_MenuClearAvailabilityIntent_ClearsAllCounts(t *testing.T) {
 	c := newMenuController(t)
 
-	// Seed some availability and issue data.
 	c.ApplyIntents([]runtime.UIIntent{
 		runtime.PatchMenuAvailability{ResourceType: "ec2", Count: 5},
 		runtime.PatchMenu{ResourceType: "ec2", Issues: 3},
 	})
 
-	// Clear everything via MenuClearAvailabilityIntent.
 	c.ApplyIntents([]runtime.UIIntent{runtime.MenuClearAvailabilityIntent{}})
 
 	menu := requireMenuBody(t, c)
@@ -231,9 +186,6 @@ func TestMenuIntent_MenuClearAvailabilityIntent_ClearsAllCounts(t *testing.T) {
 	}
 }
 
-// TestMenuIntent_PatchMenuCheckProgress_SurfacesInMenuBody verifies that
-// PatchMenuCheckProgress results in MenuBody.Progress carrying a non-empty
-// progress string while in-progress (Checked < Total).
 func TestMenuIntent_PatchMenuCheckProgress_SurfacesInMenuBody(t *testing.T) {
 	c := newMenuController(t)
 
@@ -247,17 +199,12 @@ func TestMenuIntent_PatchMenuCheckProgress_SurfacesInMenuBody(t *testing.T) {
 	}
 }
 
-// TestMenuIntent_PatchMenuCheckProgress_ZeroTotalClearsProgress verifies that
-// PatchMenuCheckProgress{Total:0} clears the progress indicator — matching
-// mainmenu.go SetCheckProgress(0,0) semantics ("scan complete").
 func TestMenuIntent_PatchMenuCheckProgress_ZeroTotalClearsProgress(t *testing.T) {
 	c := newMenuController(t)
 
-	// First set a progress state.
 	c.ApplyIntents([]runtime.UIIntent{
 		runtime.PatchMenuCheckProgress{Checked: 4, Total: 10},
 	})
-	// Then signal completion.
 	c.ApplyIntents([]runtime.UIIntent{
 		runtime.PatchMenuCheckProgress{Checked: 10, Total: 0},
 	})
@@ -268,8 +215,6 @@ func TestMenuIntent_PatchMenuCheckProgress_ZeroTotalClearsProgress(t *testing.T)
 	}
 }
 
-// TestMenuIntent_PatchMenuEnrichProgress_SurfacesInMenuBody verifies that
-// PatchMenuEnrichProgress results in MenuBody.Progress carrying enrichment info.
 func TestMenuIntent_PatchMenuEnrichProgress_SurfacesInMenuBody(t *testing.T) {
 	c := newMenuController(t)
 
@@ -283,8 +228,6 @@ func TestMenuIntent_PatchMenuEnrichProgress_SurfacesInMenuBody(t *testing.T) {
 	}
 }
 
-// TestMenuIntent_PatchMenuEnrichProgress_ZeroTotalClearsProgress verifies that
-// PatchMenuEnrichProgress{Total:0} clears the progress indicator.
 func TestMenuIntent_PatchMenuEnrichProgress_ZeroTotalClearsProgress(t *testing.T) {
 	c := newMenuController(t)
 
@@ -301,12 +244,6 @@ func TestMenuIntent_PatchMenuEnrichProgress_ZeroTotalClearsProgress(t *testing.T
 	}
 }
 
-// =============================================================================
-// 3. Menu actions
-// =============================================================================
-
-// TestMenuAction_MoveDown_AdvancesSelected verifies that ActionMoveDown
-// increments MenuBody.Selected by one.
 func TestMenuAction_MoveDown_AdvancesSelected(t *testing.T) {
 	c := newMenuController(t)
 
@@ -323,8 +260,6 @@ func TestMenuAction_MoveDown_AdvancesSelected(t *testing.T) {
 	}
 }
 
-// TestMenuAction_MoveUp_DecrementsSelected verifies that ActionMoveUp after
-// a MoveDown returns to the original position.
 func TestMenuAction_MoveUp_DecrementsSelected(t *testing.T) {
 	c := newMenuController(t)
 	c.Apply(app.Action{Kind: app.ActionMoveDown})
@@ -338,8 +273,6 @@ func TestMenuAction_MoveUp_DecrementsSelected(t *testing.T) {
 	}
 }
 
-// TestMenuAction_MoveDown_Then_MoveUp_ReturnToStart verifies the round-trip:
-// down then up leaves the cursor at position 0.
 func TestMenuAction_MoveDown_Then_MoveUp_ReturnToStart(t *testing.T) {
 	c := newMenuController(t)
 
@@ -352,12 +285,9 @@ func TestMenuAction_MoveDown_Then_MoveUp_ReturnToStart(t *testing.T) {
 	}
 }
 
-// TestMenuAction_MoveTop_JumpsToFirstEntry verifies that ActionMoveTop
-// sets Selected to 0 regardless of current position.
 func TestMenuAction_MoveTop_JumpsToFirstEntry(t *testing.T) {
 	c := newMenuController(t)
 
-	// Move down a few positions first.
 	c.Apply(app.Action{Kind: app.ActionMoveDown})
 	c.Apply(app.Action{Kind: app.ActionMoveDown})
 	c.Apply(app.Action{Kind: app.ActionMoveDown})
@@ -370,8 +300,6 @@ func TestMenuAction_MoveTop_JumpsToFirstEntry(t *testing.T) {
 	}
 }
 
-// TestMenuAction_MoveBottom_JumpsToLastEntry verifies that ActionMoveBottom
-// sets Selected to the last visible entry index.
 func TestMenuAction_MoveBottom_JumpsToLastEntry(t *testing.T) {
 	c := newMenuController(t)
 
@@ -387,8 +315,6 @@ func TestMenuAction_MoveBottom_JumpsToLastEntry(t *testing.T) {
 	}
 }
 
-// TestMenuAction_PageDown_AdvancesSelectedByPageSize verifies that
-// ActionPageDown moves Selected forward by a page (> 1 position).
 func TestMenuAction_PageDown_AdvancesSelectedByPageSize(t *testing.T) {
 	c := newMenuController(t)
 
@@ -404,9 +330,6 @@ func TestMenuAction_PageDown_AdvancesSelectedByPageSize(t *testing.T) {
 	}
 }
 
-// TestMenuAction_PageUp_DecreasesSelectedOrClampsToZero verifies that
-// ActionPageUp after PageDown moves Selected backward (or stays at 0 if
-// already at top).
 func TestMenuAction_PageUp_DecreasesSelectedOrClampsToZero(t *testing.T) {
 	c := newMenuController(t)
 
@@ -420,9 +343,6 @@ func TestMenuAction_PageUp_DecreasesSelectedOrClampsToZero(t *testing.T) {
 	}
 }
 
-// TestMenuAction_PageDown_ActionN_CustomPageSize verifies that Action.N controls
-// the cursor jump for ActionPageDown. When N>0 the cursor moves by exactly N
-// (clamped to the last entry); when N==0 the default page size (10) is used.
 func TestMenuAction_PageDown_ActionN_CustomPageSize(t *testing.T) {
 	c := newMenuController(t)
 
@@ -442,7 +362,6 @@ func TestMenuAction_PageDown_ActionN_CustomPageSize(t *testing.T) {
 		t.Errorf("ActionPageDown{N:3}: expected Selected=3, got %d", afterN3.Selected)
 	}
 
-	// Reset cursor to 0 via MoveTop.
 	c.Apply(app.Action{Kind: app.ActionMoveTop})
 	if requireMenuBody(t, c).Selected != 0 {
 		t.Fatalf("reset: expected cursor at 0 after MoveTop")
@@ -462,8 +381,6 @@ func TestMenuAction_PageDown_ActionN_CustomPageSize(t *testing.T) {
 	}
 }
 
-// TestMenuAction_ToggleAttention_FlipsAttentionOnly verifies that
-// ActionToggleAttention toggles MenuBody.AttentionOnly between false and true.
 func TestMenuAction_ToggleAttention_FlipsAttentionOnly(t *testing.T) {
 	c := newMenuController(t)
 
@@ -479,7 +396,6 @@ func TestMenuAction_ToggleAttention_FlipsAttentionOnly(t *testing.T) {
 		t.Error("ActionToggleAttention: AttentionOnly should be true after first toggle")
 	}
 
-	// Second toggle reverts.
 	c.Apply(app.Action{Kind: app.ActionToggleAttention})
 	reverted := requireMenuBody(t, c)
 	if reverted.AttentionOnly {
@@ -487,10 +403,6 @@ func TestMenuAction_ToggleAttention_FlipsAttentionOnly(t *testing.T) {
 	}
 }
 
-// TestMenuAction_SetFilter_NarrowsVisibleEntries verifies that
-// ActionSetFilter{Arg:"ec"} narrows MenuBody.Entries to only types whose
-// ShortName or display name contains "ec" (case-insensitive), mirroring the
-// ≥2-char filter in mainmenu.go applyFilter.
 func TestMenuAction_SetFilter_NarrowsVisibleEntries(t *testing.T) {
 	c := newMenuController(t)
 
@@ -510,7 +422,6 @@ func TestMenuAction_SetFilter_NarrowsVisibleEntries(t *testing.T) {
 		t.Errorf("ActionSetFilter(ec): entry count did not decrease (%d → %d)", allCount, len(filtered.Entries))
 	}
 
-	// Every remaining entry must contain "ec" in its ShortName or Display name.
 	for _, e := range filtered.Entries {
 		nameLC := strings.ToLower(e.Display)
 		shortLC := strings.ToLower(e.ShortName)
@@ -520,8 +431,7 @@ func TestMenuAction_SetFilter_NarrowsVisibleEntries(t *testing.T) {
 	}
 }
 
-// TestMenuAction_SetFilter_SingleChar_NoFilter verifies that a one-character
-// filter is ignored (too ambiguous), mirroring mainmenu.go's < 2 char guard.
+// A one-character filter is too ambiguous and is ignored.
 func TestMenuAction_SetFilter_SingleChar_NoFilter(t *testing.T) {
 	c := newMenuController(t)
 
@@ -536,8 +446,6 @@ func TestMenuAction_SetFilter_SingleChar_NoFilter(t *testing.T) {
 	}
 }
 
-// TestMenuAction_SetFilter_StoresFilterInMenuBody verifies that the filter
-// text appears in MenuBody.Filter so renderers can display it.
 func TestMenuAction_SetFilter_StoresFilterInMenuBody(t *testing.T) {
 	c := newMenuController(t)
 
@@ -549,9 +457,6 @@ func TestMenuAction_SetFilter_StoresFilterInMenuBody(t *testing.T) {
 	}
 }
 
-// TestMenuAction_Select_NavigatesToResourceList verifies that ActionSelect on
-// a visible, non-empty (or unknown) menu entry navigates to the resource list,
-// changing the body kind to BodyKindList.
 func TestMenuAction_Select_NavigatesToResourceList(t *testing.T) {
 	c := newMenuController(t)
 
@@ -568,20 +473,15 @@ func TestMenuAction_Select_NavigatesToResourceList(t *testing.T) {
 	}
 }
 
-// TestMenuAction_Select_BlockedForConfirmedEmpty verifies that ActionSelect is
-// a no-op (stays on BodyKindMenu) when the selected entry is confirmed empty
-// (Availability==0 and not truncated), mirroring mainmenu.go Enter semantics.
 func TestMenuAction_Select_BlockedForConfirmedEmpty(t *testing.T) {
 	c := newMenuController(t)
 
-	// Find the first resource type and mark it confirmed empty.
 	menu := requireMenuBody(t, c)
 	if len(menu.Entries) == 0 {
 		t.Fatal("MenuBody.Entries is empty")
 	}
 	target := menu.Entries[0].ShortName
 
-	// Mark as confirmed empty: count=0, truncated=false.
 	c.ApplyIntents([]runtime.UIIntent{
 		runtime.PatchMenuAvailability{ResourceType: target, Count: 0, Truncated: false},
 	})
@@ -593,9 +493,7 @@ func TestMenuAction_Select_BlockedForConfirmedEmpty(t *testing.T) {
 	}
 }
 
-// TestMenuAction_Select_AllowedForTruncatedZero verifies that ActionSelect is
-// allowed when availability is 0 but truncated=true, mirroring mainmenu.go:
-// "truncated-zero is not confirmed empty — more pages may exist."
+// A truncated zero is not confirmed empty: more pages may exist.
 func TestMenuAction_Select_AllowedForTruncatedZero(t *testing.T) {
 	c := newMenuController(t)
 
@@ -605,7 +503,6 @@ func TestMenuAction_Select_AllowedForTruncatedZero(t *testing.T) {
 	}
 	target := menu.Entries[0].ShortName
 
-	// Truncated zero — navigation must be allowed.
 	c.ApplyIntents([]runtime.UIIntent{
 		runtime.PatchMenuAvailability{ResourceType: target, Count: 0, Truncated: true},
 	})
@@ -616,13 +513,6 @@ func TestMenuAction_Select_AllowedForTruncatedZero(t *testing.T) {
 	}
 }
 
-// =============================================================================
-// 4. Snapshot MenuBody visibility parity
-// =============================================================================
-
-// TestMenuSnapshot_AllRegisteredTypesVisibleByDefault verifies that without
-// any filter or attention toggle, all registered resource types appear in
-// MenuBody.Entries — one entry per type.
 func TestMenuSnapshot_AllRegisteredTypesVisibleByDefault(t *testing.T) {
 	c := newMenuController(t)
 
@@ -636,7 +526,6 @@ func TestMenuSnapshot_AllRegisteredTypesVisibleByDefault(t *testing.T) {
 		t.Errorf("MenuBody.Entries count: got %d want %d (all resource types + costs)", len(menu.Entries), wantCount)
 	}
 
-	// Build a set of expected short names, plus the one synthetic entry.
 	expectedSet := make(map[string]bool, len(allTypes)+1)
 	for _, rt := range allTypes {
 		expectedSet[rt.ShortName] = true
@@ -649,16 +538,12 @@ func TestMenuSnapshot_AllRegisteredTypesVisibleByDefault(t *testing.T) {
 	}
 }
 
-// TestMenuSnapshot_AttentionOnly_ColdStart_AllExceptExcluded verifies that when
-// AttentionOnly is enabled but no type has been probed yet (issueKnown is
-// empty), all types are visible EXCEPT those with ExcludeFromIssueBadge=true.
 // ExcludeFromIssueBadge is checked before the cold-start guard, so excluded
-// types are always hidden in attention mode regardless of probe state.
+// types are hidden in attention mode regardless of probe state.
 func TestMenuSnapshot_AttentionOnly_ColdStart_AllExceptExcluded(t *testing.T) {
 	c := newMenuController(t)
 	allTypes := resource.AllResourceTypes()
 
-	// Count how many types have ExcludeFromIssueBadge=true (e.g. "ct-events").
 	excludedCount := 0
 	var excludedShortName string
 	var normalShortName string
@@ -690,14 +575,12 @@ func TestMenuSnapshot_AttentionOnly_ColdStart_AllExceptExcluded(t *testing.T) {
 		t.Errorf("cold-start attention-only: got %d entries want %d (all except %d excluded types, +costs)", len(menu.Entries), want, excludedCount)
 	}
 
-	// The excluded type (e.g. ct-events) must be absent.
 	for _, e := range menu.Entries {
 		if e.ShortName == excludedShortName {
 			t.Errorf("ExcludeFromIssueBadge type %q must be hidden in attention mode even at cold-start", excludedShortName)
 		}
 	}
 
-	// A normal (non-excluded) type must be present.
 	found := false
 	for _, e := range menu.Entries {
 		if e.ShortName == normalShortName {
@@ -710,9 +593,6 @@ func TestMenuSnapshot_AttentionOnly_ColdStart_AllExceptExcluded(t *testing.T) {
 	}
 }
 
-// TestMenuSnapshot_AttentionOnly_HidesNeutralTypes verifies that after
-// at least one type has been probed and AttentionOnly is enabled, types
-// with zero issues (confirmed no issues) are hidden.
 func TestMenuSnapshot_AttentionOnly_HidesNeutralTypes(t *testing.T) {
 	c := newMenuController(t)
 
@@ -733,14 +613,12 @@ func TestMenuSnapshot_AttentionOnly_HidesNeutralTypes(t *testing.T) {
 		t.Fatal("AttentionOnly should be true after toggle")
 	}
 
-	// s3 with 0 issues (not truncated, known) must not appear.
 	for _, e := range menu.Entries {
 		if e.ShortName == "s3" {
 			t.Error("s3 with confirmed-zero issues should be hidden under AttentionOnly filter")
 		}
 	}
 
-	// ec2 with 3 issues must appear.
 	var ec2Found bool
 	for _, e := range menu.Entries {
 		if e.ShortName == "ec2" {
@@ -752,9 +630,8 @@ func TestMenuSnapshot_AttentionOnly_HidesNeutralTypes(t *testing.T) {
 	}
 }
 
-// TestMenuSnapshot_AttentionOnly_TruncatedZeroIssues_Visible verifies that
-// a type with truncated issue count zero is visible under AttentionOnly — more
-// pages may carry issues. Mirrors isVisibleUnderIssueFilter truncated path.
+// A truncated zero issue count stays visible under AttentionOnly: more pages
+// may carry issues.
 func TestMenuSnapshot_AttentionOnly_TruncatedZeroIssues_Visible(t *testing.T) {
 	c := newMenuController(t)
 
@@ -782,13 +659,11 @@ func TestMenuSnapshot_AttentionOnly_TruncatedZeroIssues_Visible(t *testing.T) {
 	}
 }
 
-// TestMenuSnapshot_ExcludeFromIssueBadge_HiddenUnderAttentionOnly verifies
-// that types marked ExcludeFromIssueBadge are always hidden when AttentionOnly
-// is active — they are never probed, so they have no issue signal.
+// ExcludeFromIssueBadge types are never probed, so they carry no issue signal
+// and are hidden under AttentionOnly.
 func TestMenuSnapshot_ExcludeFromIssueBadge_HiddenUnderAttentionOnly(t *testing.T) {
 	c := newMenuController(t)
 
-	// Collect all ExcludeFromIssueBadge types.
 	var excluded []string
 	for _, rt := range resource.AllResourceTypes() {
 		if rt.ExcludeFromIssueBadge {
@@ -832,9 +707,6 @@ func TestMenuSnapshot_ExcludeFromIssueBadge_HiddenUnderAttentionOnly(t *testing.
 	}
 }
 
-// TestMenuSnapshot_IssueBadge_OnlyShownWhenKnownAndNonZero verifies that the
-// issue badge appears only for types where the issue count is both known
-// (issueKnown[type]==true) and non-zero — mirroring mainmenu.go issueBadge().
 func TestMenuSnapshot_IssueBadge_OnlyShownWhenKnownAndNonZero(t *testing.T) {
 	c := newMenuController(t)
 
@@ -867,9 +739,6 @@ func TestMenuSnapshot_IssueBadge_OnlyShownWhenKnownAndNonZero(t *testing.T) {
 	}
 }
 
-// TestMenuSnapshot_IssueBadge_UnknownType_NoBadge verifies that a type not
-// yet probed (not in issueKnown) carries no issue badge — the badge is not
-// shown for unknown types, only for confirmed-known ones.
 func TestMenuSnapshot_IssueBadge_UnknownType_NoBadge(t *testing.T) {
 	c := newMenuController(t)
 
@@ -894,8 +763,6 @@ func TestMenuSnapshot_IssueBadge_UnknownType_NoBadge(t *testing.T) {
 	t.Error("s3 entry not found in MenuBody.Entries")
 }
 
-// TestMenuSnapshot_IssueBadgeTruncated_ReflectsInEntry verifies that
-// IssueBadge.Truncated is set when the issue count is a lower bound.
 func TestMenuSnapshot_IssueBadgeTruncated_ReflectsInEntry(t *testing.T) {
 	c := newMenuController(t)
 
@@ -919,14 +786,11 @@ func TestMenuSnapshot_IssueBadgeTruncated_ReflectsInEntry(t *testing.T) {
 	t.Error("ec2 entry not found")
 }
 
-// TestMenuSnapshot_ConfirmedEmptyEntry_StillInEntries verifies that a
-// confirmed-empty entry (availability known, count=0, not truncated) is still
-// present in MenuBody.Entries — it just carries Availability==0 so the renderer
-// can dim it. The entry must NOT be hidden from the list.
+// A confirmed-empty entry stays in MenuBody.Entries with Availability==0 so
+// the renderer can dim it.
 func TestMenuSnapshot_ConfirmedEmptyEntry_StillInEntries(t *testing.T) {
 	c := newMenuController(t)
 
-	// Mark ec2 as confirmed empty.
 	c.ApplyIntents([]runtime.UIIntent{
 		runtime.PatchMenuAvailability{ResourceType: "ec2", Count: 0, Truncated: false},
 	})
@@ -943,9 +807,6 @@ func TestMenuSnapshot_ConfirmedEmptyEntry_StillInEntries(t *testing.T) {
 	t.Error("confirmed-empty ec2 entry not found in MenuBody.Entries — must be present (renderer dims it)")
 }
 
-// TestMenuSnapshot_EntryDisplayNameMatchesCatalog verifies that each
-// MenuEntry.Display matches the corresponding ResourceTypeDef.Name from the
-// catalog. This pins the Display-vs-ShortName mapping contract.
 func TestMenuSnapshot_EntryDisplayNameMatchesCatalog(t *testing.T) {
 	c := newMenuController(t)
 
@@ -956,10 +817,8 @@ func TestMenuSnapshot_EntryDisplayNameMatchesCatalog(t *testing.T) {
 	}
 
 	for _, e := range menu.Entries {
-		// The permanent synthetic "costs" (Cost Explorer) entry has no
-		// backing resource.ResourceTypeDef — it is not fetchable resource
-		// data — so it is deliberately excluded from this catalog-parity
-		// check rather than failing it.
+		// The synthetic "costs" (Cost Explorer) entry has no backing
+		// resource.ResourceTypeDef.
 		if e.ShortName == "costs" {
 			continue
 		}
@@ -974,9 +833,6 @@ func TestMenuSnapshot_EntryDisplayNameMatchesCatalog(t *testing.T) {
 	}
 }
 
-// TestMenuSnapshot_Filter_ClearedByEmptyString verifies that setting an empty
-// filter after a non-empty one restores all entries. Mirroring applyFilter
-// which treats len < 2 as "no filter".
 func TestMenuSnapshot_Filter_ClearedByEmptyString(t *testing.T) {
 	c := newMenuController(t)
 
@@ -996,36 +852,25 @@ func TestMenuSnapshot_Filter_ClearedByEmptyString(t *testing.T) {
 	}
 }
 
-// TestMenuSnapshot_Back_FromResourceList_ReturnsToMenu verifies the full
-// navigation: ActionSelect navigates to BodyKindList, then ActionBack
-// returns to BodyKindMenu.
 func TestMenuSnapshot_Back_FromResourceList_ReturnsToMenu(t *testing.T) {
 	c := newMenuController(t)
 
-	// Navigate into the resource list.
 	vs, _ := c.Apply(app.Action{Kind: app.ActionSelect})
 	if vs.Body.Kind != app.BodyKindList {
 		t.Skipf("ActionSelect did not navigate to list (got %q) — skipping back test", vs.Body.Kind)
 	}
 
-	// Navigate back to menu.
 	vs, _ = c.Apply(app.Action{Kind: app.ActionBack})
 	if vs.Body.Kind != app.BodyKindMenu {
 		t.Errorf("ActionBack from resource list: got BodyKind %q want BodyKindMenu", vs.Body.Kind)
 	}
 }
 
-// TestMenuFrameTitle_CtrlZShowsFilteredCount is the live-seam replacement for
-// the retired qa_bug_issue_count_test.go's TestMainMenuFrameTitle_CtrlZShowsFilteredCount
-// (022-codebase-cleanup wave 3): MainMenuModel.SetIssues/Toggle/FrameTitle are
-// production-dead (Controller.MenuFrameTitle is the only reachable frame-
-// title source — see internal/tui/renderer.go). Verifies that under
-// AttentionOnly, MenuFrameTitle() shows "<visible>/<total> [!]" where visible
-// counts only the types with known nonzero issues: the synthetic "costs"
-// entry is never explicitly probed here, and per
-// menuIsVisibleUnderIssueFilter an unknown type is visible only during true
-// cold-start (no type probed at all) — once any other type's issue state is
-// known, "costs" itself hides.
+// Under AttentionOnly, MenuFrameTitle() shows "<visible>/<total> [!]", where
+// visible counts the types with known nonzero issues. The synthetic "costs"
+// entry is never probed here, and menuIsVisibleUnderIssueFilter shows an
+// unknown type only during cold start (no type probed), so "costs" hides once
+// another type's issue state is known.
 func TestMenuFrameTitle_CtrlZShowsFilteredCount(t *testing.T) {
 	c := newMenuController(t)
 	allTypes := resource.AllResourceTypes()

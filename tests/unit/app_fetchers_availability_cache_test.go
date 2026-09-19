@@ -1,25 +1,10 @@
 package unit
 
-// Tests for the disk-cache load path feeding internal/tui/probe_adapter.go's
-// loadAvailabilityCache (cache.LoadDirForTest / cache.Store / cache.TypeFile,
-// docs/design/cache-requirements.md C7).
-//
-// loadAvailabilityCache delegates to Core.LoadAvailabilityCache, which in
-// turn reads the per-pair Store via cache.LoadDirForTest and maps each type's
-// TypeFile into AvailabilityCacheLoadedMsg. Testing cache.LoadDirForTest/Store.Type
-// directly covers the same logic branches at the data-transformation level:
-//
-//   (a) missing directory  → empty Store, no types
-//   (b) valid type file    → populated TypeFile fields
-//   (c) corrupt type file  → that type skipped, siblings unaffected (C7)
-//   (d) error entry        → excluded from Entries by the non-empty-error guard
-//   (e) issue fields       → IssueCounts / IssueKnown / IssueTruncated populated
-//   (f) truncated entry    → Exact=false / truncated-lower-bound populated
-//
-// There is no TTL (C1), so there is no expiry case.
-//
-// We also test profile/region isolation of cache.DirForTest to verify the loading
-// key correctly selects the right per-pair directory.
+// loadAvailabilityCache (internal/tui/probe_adapter.go) delegates to
+// Core.LoadAvailabilityCache, which reads the per-pair Store via
+// cache.LoadDirForTest and maps each type's TypeFile into
+// AvailabilityCacheLoadedMsg, so testing cache.LoadDirForTest/Store.Type covers
+// the same branches.
 
 import (
 	"os"
@@ -43,12 +28,6 @@ func writeTypeFileRaw(t *testing.T, profile, region, shortName, content string) 
 	}
 }
 
-// -------------------------------------------------------------------------
-// cache.LoadDirForTest — branch coverage
-// -------------------------------------------------------------------------
-
-// TestCacheLoadDir_MissingDirectory verifies a non-nil, empty Store when the
-// per-pair directory does not exist.
 func TestCacheLoadDir_MissingDirectory(t *testing.T) {
 	tmp := t.TempDir()
 	t.Setenv("A9S_CONFIG_FOLDER", tmp)
@@ -62,8 +41,6 @@ func TestCacheLoadDir_MissingDirectory(t *testing.T) {
 	}
 }
 
-// TestCacheLoadDir_ValidTypeFile verifies a per-type entry is populated
-// correctly after Put+SaveType+LoadDir.
 func TestCacheLoadDir_ValidTypeFile(t *testing.T) {
 	tmp := t.TempDir()
 	t.Setenv("A9S_CONFIG_FOLDER", tmp)
@@ -90,9 +67,7 @@ func TestCacheLoadDir_ValidTypeFile(t *testing.T) {
 	}
 }
 
-// TestCacheLoadDir_CorruptTypeFile verifies a corrupt per-type file is
-// skipped (absent from the Store) rather than surfacing an error to the
-// caller — C7's "no cache for that type only" degradation.
+// A corrupt per-type file degrades to no cache for that type only.
 func TestCacheLoadDir_CorruptTypeFile(t *testing.T) {
 	tmp := t.TempDir()
 	t.Setenv("A9S_CONFIG_FOLDER", tmp)
@@ -108,9 +83,8 @@ func TestCacheLoadDir_CorruptTypeFile(t *testing.T) {
 	}
 }
 
-// TestCacheLoadDir_ErrorEntryRetained verifies error entries are present in
-// the raw Store (the exclusion into AvailabilityCacheLoadedMsg.Entries
-// happens in the adapter, not in cache.LoadDirForTest).
+// Error entries stay in the raw Store; the adapter excludes them from
+// AvailabilityCacheLoadedMsg.Entries.
 func TestCacheLoadDir_ErrorEntryRetained(t *testing.T) {
 	tmp := t.TempDir()
 	t.Setenv("A9S_CONFIG_FOLDER", tmp)
@@ -134,8 +108,6 @@ func TestCacheLoadDir_ErrorEntryRetained(t *testing.T) {
 	}
 }
 
-// TestCacheLoadDir_IssueFields verifies issues/issues_known/issues_truncated
-// round-trip correctly through Put+SaveType+LoadDir.
 func TestCacheLoadDir_IssueFields(t *testing.T) {
 	tmp := t.TempDir()
 	t.Setenv("A9S_CONFIG_FOLDER", tmp)
@@ -175,9 +147,6 @@ func TestCacheLoadDir_IssueFields(t *testing.T) {
 	}
 }
 
-// TestCacheLoadDir_ProfileRegionIsolation verifies that profile+region
-// determine which directory is read (different keys read different
-// directories).
 func TestCacheLoadDir_ProfileRegionIsolation(t *testing.T) {
 	tmp := t.TempDir()
 	t.Setenv("A9S_CONFIG_FOLDER", tmp)
@@ -188,7 +157,6 @@ func TestCacheLoadDir_ProfileRegionIsolation(t *testing.T) {
 		t.Fatalf("SaveType: %v", err)
 	}
 
-	// Load for profile-b / eu-west-1 — directory does not exist.
 	storeB := cache.LoadDirForTest("profile-b", "eu-west-1")
 	if storeB == nil {
 		t.Fatal("LoadDir for missing profile must return a non-nil empty Store")
@@ -197,21 +165,15 @@ func TestCacheLoadDir_ProfileRegionIsolation(t *testing.T) {
 		t.Error("profile-b/eu-west-1 should have no ec2 entry (no file for this key)")
 	}
 
-	// Load for profile-a / us-west-2 — should succeed.
 	reloadedA := cache.LoadDirForTest("profile-a", "us-west-2")
 	if e, ok := reloadedA.Type("ec2"); !ok || e.Count != 99 {
 		t.Errorf("ec2 entry: got %+v (ok=%v), want Count=99", e, ok)
 	}
 }
 
-// TestCacheLoadDir_StaleTypeFileDoesNotCorrupt_SiblingIsolation verifies
-// that an unrecognized per-type file (from an old a9s version or renamed
-// type) loads under its own name without corrupting or shadowing a sibling
-// recognized type's file — cache.LoadDirForTest performs no registry cross-check
-// itself (registry filtering, if any, is a caller concern), so the
-// unrecognized type's TypeFile DOES surface via Store.Type/Types like any
-// other loaded file; this test only pins that its presence leaves ec2's
-// own per-type file unaffected.
+// cache.LoadDirForTest does no registry cross-check, so a per-type file for an
+// unrecognized type (an old a9s version or a renamed type) loads under its own
+// name; it never corrupts or shadows a sibling's file.
 func TestCacheLoadDir_StaleTypeFileDoesNotCorrupt_SiblingIsolation(t *testing.T) {
 	tmp := t.TempDir()
 	t.Setenv("A9S_CONFIG_FOLDER", tmp)
@@ -224,14 +186,9 @@ func TestCacheLoadDir_StaleTypeFileDoesNotCorrupt_SiblingIsolation(t *testing.T)
 	writeTypeFileRaw(t, "test-profile", "us-east-1", "old_deprecated_type", "version: 1\nhas_resources: false\ncount: 0\n")
 
 	reloaded := cache.LoadDirForTest("test-profile", "us-east-1")
-	// Known key must survive.
 	if _, ok := reloaded.Type("ec2"); !ok {
 		t.Error("ec2 (registered type) should still load from its own per-type file")
 	}
-	// The deprecated type's file loads under its own name in this
-	// per-type-file world (no registry cross-check inside cache.LoadDirForTest
-	// itself — registry filtering, if any, is a caller concern) but must
-	// not corrupt or shadow ec2's entry.
 	if e, ok := reloaded.Type("ec2"); ok && e.Count != 2 {
 		t.Errorf("ec2 Count = %d, want 2 — a sibling per-type file must not affect ec2's own file", e.Count)
 	}

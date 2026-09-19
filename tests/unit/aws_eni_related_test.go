@@ -25,8 +25,6 @@ func eniCheckerByTarget(t *testing.T, target string) resource.RelatedChecker {
 	return nil
 }
 
-// --- Navigable Field Registration ---
-
 func TestNavigableFields_ENI_Registered(t *testing.T) {
 	expected := map[string]string{
 		"VpcId":                    "vpc",
@@ -46,8 +44,6 @@ func TestNavigableFields_ENI_Registered(t *testing.T) {
 		}
 	}
 }
-
-// --- EC2 checker (Pattern C — cache-based, matches Attachment.InstanceId) ---
 
 func TestRelated_ENI_EC2_Found(t *testing.T) {
 	ec2Res := resource.Resource{
@@ -161,8 +157,6 @@ func TestRelated_ENI_EC2_CacheMissNoClients(t *testing.T) {
 	}
 }
 
-// --- Security Groups checker (Pattern C — cache-based, matches Groups[].GroupId) ---
-
 func TestRelated_ENI_SG_Found(t *testing.T) {
 	sgRes1 := resource.Resource{
 		ID: "sg-test1",
@@ -247,8 +241,6 @@ func TestRelated_ENI_SG_CacheMissNoClients(t *testing.T) {
 		t.Errorf("Count = %d, want 1 (event-derived, no fetch)", result.Count())
 	}
 }
-
-// --- Elastic IPs checker (Pattern C — cache-based, matches Association.AllocationId) ---
 
 func TestRelated_ENI_EIP_Found(t *testing.T) {
 	eipRes := resource.Resource{

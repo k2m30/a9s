@@ -13,13 +13,6 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// ---------------------------------------------------------------------------
-// Lambda Invocations fetcher tests (child of Lambda, cross-service CW Logs)
-// ---------------------------------------------------------------------------
-
-// TestFetchLambdaInvocations_Basic verifies parsing of REPORT lines from
-// FilterLogEvents into invocation resources with correct ID, Name, Status,
-// all computed Fields, and RawStruct.
 func TestFetchLambdaInvocations_Basic(t *testing.T) {
 	mock := &mockCWLogsFilterLogEventsClient{
 		outputs: []*cloudwatchlogs.FilterLogEventsOutput{
@@ -124,7 +117,6 @@ func TestFetchLambdaInvocations_Basic(t *testing.T) {
 		}
 	})
 
-	// Verify required fields on all invocations
 	t.Run("required_fields_present", func(t *testing.T) {
 		requiredFields := []string{"request_id", "timestamp", "status", "duration_ms", "memory_used", "cold_start"}
 		for i, r := range resources {
@@ -181,8 +173,6 @@ func TestFetchLambdaInvocations_ColdStartDetection(t *testing.T) {
 // TestFetchLambdaInvocations_ErrorStatus verifies that invocations with
 // ERROR log lines are detected and the status is set accordingly.
 func TestFetchLambdaInvocations_ErrorStatus(t *testing.T) {
-	// The fetcher should cross-reference REPORT lines with any ERROR lines
-	// and set status to "ERROR" if the request had errors.
 	mock := &mockCWLogsFilterLogEventsClient{
 		outputs: []*cloudwatchlogs.FilterLogEventsOutput{
 			{
@@ -208,16 +198,13 @@ func TestFetchLambdaInvocations_ErrorStatus(t *testing.T) {
 		t.Fatalf("expected 1 resource, got %d", len(resources))
 	}
 
-	// A simple REPORT without error markers should be "OK"
 	if resources[0].Fields["status"] != "OK" {
 		t.Errorf("Fields[\"status\"]: expected %q for normal REPORT, got %q", "OK", resources[0].Fields["status"])
 	}
 }
 
-// TestFetchLambdaInvocations_TimeoutStatus verifies that invocations where
-// Duration >= timeout threshold are marked with TIMEOUT status.
+// A REPORT line carrying "Status: timeout" marks the invocation TIMEOUT.
 func TestFetchLambdaInvocations_TimeoutStatus(t *testing.T) {
-	// A REPORT line where "Task timed out" is present should indicate TIMEOUT.
 	mock := &mockCWLogsFilterLogEventsClient{
 		outputs: []*cloudwatchlogs.FilterLogEventsOutput{
 			{
@@ -243,15 +230,12 @@ func TestFetchLambdaInvocations_TimeoutStatus(t *testing.T) {
 		t.Fatalf("expected at least 1 resource, got %d", len(resources))
 	}
 
-	// The fetcher should detect timeout status
 	r := resources[0]
 	if r.Fields["status"] == "" {
 		t.Error("Fields[status] should not be empty")
 	}
 }
 
-// TestFetchLambdaInvocations_Empty verifies that an empty response returns
-// an empty slice with no error.
 func TestFetchLambdaInvocations_Empty(t *testing.T) {
 	mock := &mockCWLogsFilterLogEventsClient{
 		outputs: []*cloudwatchlogs.FilterLogEventsOutput{
@@ -272,7 +256,6 @@ func TestFetchLambdaInvocations_Empty(t *testing.T) {
 	}
 }
 
-// TestFetchLambdaInvocations_APIError verifies that API errors are propagated.
 func TestFetchLambdaInvocations_APIError(t *testing.T) {
 	mock := &mockCWLogsFilterLogEventsClient{
 		err: fmt.Errorf("AWS API error: throttling exception"),
@@ -318,7 +301,6 @@ func TestFetchLambdaInvocations_MultipleInvocations(t *testing.T) {
 		t.Fatalf("expected 10 resources, got %d", len(resources))
 	}
 
-	// Each invocation should have a unique request_id
 	seen := make(map[string]bool)
 	for i, r := range resources {
 		rid := r.Fields["request_id"]
@@ -331,7 +313,6 @@ func TestFetchLambdaInvocations_MultipleInvocations(t *testing.T) {
 		seen[rid] = true
 	}
 
-	// Results must be sorted newest-first (descending timestamp)
 	for i := 1; i < len(resources); i++ {
 		prev := resources[i-1].Fields["timestamp"]
 		curr := resources[i].Fields["timestamp"]
@@ -341,8 +322,6 @@ func TestFetchLambdaInvocations_MultipleInvocations(t *testing.T) {
 	}
 }
 
-// TestFetchLambdaInvocations_NilFields verifies that events with nil
-// Message, nil Timestamp do not panic.
 func TestFetchLambdaInvocations_NilFields(t *testing.T) {
 	mock := &mockCWLogsFilterLogEventsClient{
 		outputs: []*cloudwatchlogs.FilterLogEventsOutput{
@@ -356,7 +335,6 @@ func TestFetchLambdaInvocations_NilFields(t *testing.T) {
 		},
 	}
 
-	// Should not panic
 	result, err := awsclient.FetchLambdaInvocations(context.Background(), mock, "nil-func", "/aws/lambda/nil-func", "")
 	if err != nil {
 		t.Fatalf("expected no error for nil fields, got %v", err)
@@ -366,8 +344,6 @@ func TestFetchLambdaInvocations_NilFields(t *testing.T) {
 	_ = result
 }
 
-// TestFetchLambdaInvocations_RawStruct verifies that RawStruct is the
-// original cwlogstypes.FilteredLogEvent, preserving all SDK fields.
 func TestFetchLambdaInvocations_RawStruct(t *testing.T) {
 	mock := &mockCWLogsFilterLogEventsClient{
 		outputs: []*cloudwatchlogs.FilterLogEventsOutput{
@@ -443,7 +419,6 @@ func TestFetchLambdaInvocations_ParentContext(t *testing.T) {
 		t.Fatalf("expected no error, got %v", err)
 	}
 
-	// Verify the mock was called with the correct log group
 	if mock.lastInput == nil {
 		t.Fatal("expected FilterLogEvents to be called")
 	}
@@ -501,15 +476,10 @@ func TestFetchLambdaInvocations_Pagination(t *testing.T) {
 // ResourceNotFoundException (log group doesn't exist because the function was
 // never invoked) returns an empty slice, not an error.
 //
-// Previously this built its error with fmt.Errorf embedding the exception
-// name as a plain substring of the message. ClassifyAWSError classifies via
-// errors.As(smithy.APIError), not string matching, so that fabricated error
-// never actually exercised the real classification path — it only proved
-// fmt.Errorf-with-a-recognizable-substring produced an empty list, which is a
-// different (and no longer supported) mechanism. Do NOT go back to
-// fmt.Errorf here; only a real typed error proves this branch. See
+// ClassifyAWSError classifies via errors.As(smithy.APIError), not string
+// matching, so only a real typed error exercises this branch; see
 // TestFetchLambdaInvocations_UnrelatedErrorContainingExceptionNameIsNotSwallowed
-// below for the negative control this fix exists to guarantee.
+// for the negative control.
 func TestFetchLambdaInvocations_LogGroupNotFound(t *testing.T) {
 	mock := &mockCWLogsFilterLogEventsClient{
 		err: &cwlogstypes.ResourceNotFoundException{Message: aws.String("The specified log group does not exist.")},
@@ -579,8 +549,6 @@ func TestFetchLambdaInvocations_PageCapStopsScanAndReportsTruncated(t *testing.T
 	}
 }
 
-// TestLambdaInvocationColumns verifies that LambdaInvocationColumns returns
-// the expected columns with correct keys.
 func TestLambdaInvocationColumns(t *testing.T) {
 	cols := resource.LambdaInvocationColumns()
 

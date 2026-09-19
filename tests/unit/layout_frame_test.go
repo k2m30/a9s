@@ -198,15 +198,7 @@ func TestLayoutCenterTitle_MinimalWidth(t *testing.T) {
 	}
 }
 
-// ── RenderFrame drawing-behavior tests (022-codebase-cleanup re-audit:
-// "port+delete: RenderFrame + RenderFramePrepadded + TwoColumn ... Port
-// layout_frame_test.go RenderFrame/Prepadded pins onto RenderFrameWithHints
-// (nil-hints output is documented identical)"). RenderFrame and
-// RenderFrameWithHints(..., nil, ...) share byte-for-byte identical top-border
-// and content-row code in frame.go, differing only in the bottom border,
-// which BottomBorderWithHints(nil, w) renders identically to RenderFrame's
-// hardcoded bottom line — every RenderFrame drawing assertion below is
-// ported verbatim onto RenderFrameWithHints with hints=nil. ─────────────────
+// RenderFrameWithHints with nil hints draws a plain bottom border.
 
 func TestLayoutRenderFrameWithHints_NilHints_BasicBox(t *testing.T) {
 	lines := []string{"hello", "world"}
@@ -381,18 +373,8 @@ func TestLayoutRenderHeader_LeftRightSeparation(t *testing.T) {
 	}
 }
 
-// ── RenderFramePrepadded drawing-behavior tests, ported onto
-// RenderFrameWithHints(..., nil, ...) alongside the RenderFrame section above.
-// RenderFramePrepadded's only functional difference from RenderFrame is
-// skipping a now-redundant lipgloss.Width() re-measurement on already-correct-
-// width lines — a performance optimization, not a distinct output shape — so
-// feeding the same pre-padded lines into RenderFrameWithHints (which does its
-// own width check unconditionally) produces byte-identical output, preserving
-// every original assertion. TestLayoutRenderFramePrepadded_MatchesRenderFrame
-// (which asserted RenderFrame(raw)==RenderFramePrepadded(padded), i.e. exactly
-// the equivalence this file's own header comment now documents as proven) is
-// dropped rather than ported: with both original sides now the same function,
-// there is nothing distinct left to assert.
+// Pre-padded lines render through RenderFrameWithHints, which checks width
+// itself.
 
 func TestLayoutRenderFrameWithHints_NilHints_PrepaddedBasicBox(t *testing.T) {
 	// Pre-pad lines to innerW = 20-2 = 18
@@ -706,11 +688,7 @@ func TestBottomBorderWithHints_HintOrder(t *testing.T) {
 // ── RenderFrameWithHints tests ───────────────────────────────────────────────
 
 // TestRenderFrameWithHints_NilAndEmptyHintsEquivalent verifies that nil and an
-// empty hint slice produce byte-identical output — a genuine invariant
-// (BottomBorderWithHints must not distinguish "no hints" from "zero hints")
-// independent of RenderFrame, whose deletion made the prior two tests'
-// RenderFrame-as-oracle comparison moot (022-codebase-cleanup re-audit:
-// "leave zero test references to the two dead functions").
+// empty hint slice produce byte-identical output.
 func TestRenderFrameWithHints_NilAndEmptyHintsEquivalent(t *testing.T) {
 	lines := []string{"hello", "world"}
 	withNil := layout.RenderFrameWithHints(lines, "title", nil, 40, 8)

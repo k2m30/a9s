@@ -1,26 +1,10 @@
 package unit
 
-// call_ledger_test.go — regression coverage for core/aws/call_ledger.go: the
-// CallLedger makes coalesce.go's "at most one call per (operation, api,
-// arguments)" contract mechanically checkable. Reuses aws_coalesce_test.go's
-// fakes (coalesceSfnFake, coalesceS3Fake, coalesceLambdaFake) and its
-// concurrentGateSleep idiom — same package, same file's block-channel
-// pattern, no new fakes needed.
-//
-// Landed-code note (re-read before trusting the concurrent-callers pin): all
-// four decorators (coalescingSFN/SNS/S3/Lambda) capture
-// singleflight.Group.Do's `shared` return value and record a CallServed for
-// a goroutine that JOINED another's in-flight call without executing it
-// itself (`if shared && !executed { ledger.record(..., CallServed) }`) —
-// join-recording is symmetric across all four, not SFN-only. A joiner is
-// therefore visible in Records() both when it arrives concurrently (joins
-// the in-flight singleflight call) and when it arrives sequentially after
-// completion (hits completedResultMemo) — TestLambdaGetFunction_ECRCheckerAndEnricher_Ledger_BothAskersVisible
-// drives the real checker+enricher SEQUENTIALLY (mirroring
-// TestLambdaGetFunction_ECRCheckerAndEnricher_ShareOneUnderlyingCallPerOperation
-// and coalesce.go's own doc comment on the real web-drain sequence), and
-// TestCallLedger_LambdaConcurrentJoin_BothAskersVisible drives the same
-// scenario CONCURRENTLY, both landing on (executed=1, served=1).
+// The CallLedger makes coalesce.go's "at most one call per (operation, api,
+// arguments)" contract checkable. Every coalescing decorator records a
+// CallServed for a caller that joined an in-flight call or hit the
+// completed-result memo.
+
 import (
 	"context"
 	"sync"
@@ -39,7 +23,6 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// clCountOutcomes tallies how many records in recs carry each CallOutcome.
 func clCountOutcomes(recs []awsclient.CallRecord) (executed, served int) {
 	for _, r := range recs {
 		switch r.Outcome {
@@ -51,11 +34,6 @@ func clCountOutcomes(recs []awsclient.CallRecord) (executed, served int) {
 	}
 	return executed, served
 }
-
-// ---------------------------------------------------------------------------
-// General ledger contract — driven via SFN (the one decorator with full
-// join-recording), so "N concurrent callers" exercises exactly what's landed.
-// ---------------------------------------------------------------------------
 
 func TestCallLedger_ConcurrentCallers_OneExecutedNMinusOneServed(t *testing.T) {
 	const arn = "arn:aws:states:us-east-1:123456789012:stateMachine:order-processing"
@@ -136,10 +114,8 @@ func TestCallLedger_DifferentOperations_EachExecutes(t *testing.T) {
 	}
 }
 
-// TestCallLedger_OperationZero_NeverCountsAsDuplicate pins call_ledger.go's
-// own documented carve-out: opID 0 (no active DetailOperation) is never
-// memoized by coalesce.go, so repeated fetches under it are ordinary
-// behavior — Duplicates() must not misreport them.
+// opID 0 (no active DetailOperation) is never memoized, so repeated fetches
+// under it are not duplicates.
 func TestCallLedger_OperationZero_NeverCountsAsDuplicate(t *testing.T) {
 	const arn = "arn:aws:states:us-east-1:123456789012:stateMachine:order-processing"
 	fake := &coalesceSfnFake{}
@@ -162,13 +138,8 @@ func TestCallLedger_OperationZero_NeverCountsAsDuplicate(t *testing.T) {
 	}
 }
 
-// TestCallLedger_Duplicates_OnlyCountsExecutions_NeverReportsServed drives a
-// GENUINE double-execution (S3's retryable-error path is never memoized —
-// TestNewCoalescingS3_SequentialCalls_RetryableError_NotMemoizedWithinOp
-// already pins this at the coalesce.go level) alongside a normal
-// successful-and-memoized key in the SAME operation, and asserts
-// Duplicates() reports only the genuinely double-executed key — a
-// CallServed entry sharing a key must never inflate the count.
+// S3's retryable-error path is never memoized, so it yields a genuine double
+// execution; a CallServed entry sharing a key never inflates Duplicates().
 func TestCallLedger_Duplicates_OnlyCountsExecutions_NeverReportsServed(t *testing.T) {
 	const retryBucket = "retry-bucket"
 	const normalBucket = "normal-bucket"
@@ -185,8 +156,6 @@ func TestCallLedger_Duplicates_OnlyCountsExecutions_NeverReportsServed(t *testin
 	decorated := awsclient.NewCoalescingS3WithLedger(fake, ledger)
 	ctx := awsclient.WithDetailOp(context.Background(), domain.Gen(5))
 
-	// Retryable error: never memoized, so both sequential calls genuinely
-	// re-execute — a real duplicate.
 	if _, err := decorated.GetBucketPolicy(ctx, &s3.GetBucketPolicyInput{Bucket: aws.String(retryBucket)}); err == nil {
 		t.Fatal("first retry-bucket call: expected the retryable error, got nil")
 	}
@@ -194,8 +163,6 @@ func TestCallLedger_Duplicates_OnlyCountsExecutions_NeverReportsServed(t *testin
 		t.Fatal("second retry-bucket call: expected the retryable error, got nil")
 	}
 
-	// Normal successful key: memoized after the first call — one execution,
-	// one serve, NOT a duplicate.
 	if _, err := decorated.GetBucketPolicy(ctx, &s3.GetBucketPolicyInput{Bucket: aws.String(normalBucket)}); err != nil {
 		t.Fatalf("first normal-bucket call error: %v", err)
 	}
@@ -219,15 +186,6 @@ func TestCallLedger_Duplicates_OnlyCountsExecutions_NeverReportsServed(t *testin
 		}
 	}
 }
-
-// ---------------------------------------------------------------------------
-// The real regression: checkLambdaECR + enrichLambda for the same function,
-// one operation — the exact defect that reached main in the enrichment work.
-// Mirrors TestLambdaGetFunction_ECRCheckerAndEnricher_ShareOneUnderlyingCallPerOperation
-// (aws_coalesce_test.go) verbatim, swapping in the ledger-enabled
-// constructor and asserting on Records() rather than only the fake's raw
-// call count.
-// ---------------------------------------------------------------------------
 
 func TestLambdaGetFunction_ECRCheckerAndEnricher_Ledger_BothAskersVisible(t *testing.T) {
 	const fnName = "image-fn"
@@ -275,13 +233,6 @@ func TestLambdaGetFunction_ECRCheckerAndEnricher_Ledger_BothAskersVisible(t *tes
 	}
 }
 
-// TestCallLedger_LambdaConcurrentJoin_BothAskersVisible is the CONCURRENT
-// twin of TestLambdaGetFunction_ECRCheckerAndEnricher_Ledger_BothAskersVisible:
-// two goroutines racing on the identical FunctionName under one operation —
-// one executes, one joins the in-flight singleflight call — and both must be
-// visible in Records(), exactly like coalescingSFN's already-covered
-// concurrent axis (join-recording is symmetric across all four decorators;
-// see this file's header comment).
 func TestCallLedger_LambdaConcurrentJoin_BothAskersVisible(t *testing.T) {
 	const fnName = "process-payment"
 	fake := &coalesceLambdaFake{getFunctionBlock: make(chan struct{})}
@@ -310,23 +261,8 @@ func TestCallLedger_LambdaConcurrentJoin_BothAskersVisible(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// Operation-0 gap (coalesceCall's memoHit/memo.set both gate on opID != 0,
-// but g.Do is called unconditionally): no automated pin existed for either
-// half before this — an "obviously fine" branch that silently changes shape
-// during the next refactor of coalesce.go. The sequential case is pinned
-// side by side with the non-zero contrast (TestCallLedger_SequentialSameOp_
-// OneExecutedOneServed's own SFN case, deliberately repeated here rather than
-// only cross-referenced) so a reader sees both behaviors in one place;
-// covers SFN and Lambda so this is a property of the shared coalesceCall
-// helper, not one client.
-// ---------------------------------------------------------------------------
-
-// TestCallLedger_OpIDZero_SequentialCalls_NeverMemoized_VsNonZeroMemoizes
-// pins the two sequential behaviors coalesceCall's opID guard is responsible
-// for, per decorator: opID 0 never hits the memo (ordinary list/probe
-// traffic must re-execute every time, never be silently cached), while a
-// real (non-zero) operation memoizes its second identical call.
+// opID 0 never hits the memo: list and probe traffic re-executes every time.
+// A non-zero operation memoizes its second identical call.
 func TestCallLedger_OpIDZero_SequentialCalls_NeverMemoized_VsNonZeroMemoizes(t *testing.T) {
 	const sfnArn = "arn:aws:states:us-east-1:123456789012:stateMachine:order-processing"
 	const fnName = "process-payment"
@@ -412,15 +348,8 @@ func TestCallLedger_OpIDZero_SequentialCalls_NeverMemoized_VsNonZeroMemoizes(t *
 	}
 }
 
-// TestCallLedger_OpIDZero_ConcurrentCalls_StillDedupViaSingleflight is the
-// CONCURRENT twin of the sequential opID-0 case above: opID 0 bypasses the
-// memo entirely, but g.Do is still called unconditionally, so two genuinely
-// concurrent identical callers under opID 0 must still coalesce into one
-// execution — ordinary (non-operation) traffic gets the same in-flight
-// dedup as operation-scoped traffic, just never the memo's "already
-// finished" half. Uses the file's existing blocked-fake + concurrentGateSleep
-// idiom so the overlap is deterministic rather than hoped for. Covers SFN
-// and Lambda.
+// opID 0 bypasses the memo but still goes through singleflight, so two
+// concurrent identical callers coalesce into one execution.
 func TestCallLedger_OpIDZero_ConcurrentCalls_StillDedupViaSingleflight(t *testing.T) {
 	const sfnArn = "arn:aws:states:us-east-1:123456789012:stateMachine:order-processing"
 	const fnName = "process-payment"

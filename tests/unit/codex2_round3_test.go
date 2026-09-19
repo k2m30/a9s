@@ -1,7 +1,7 @@
 package unit
 
-// codex2_round3_test.go — an IAM entity that vanished between the list call
-// and the per-ID describe is the deleted-resource race, not a failure.
+// An IAM entity that vanished between the list call and the per-ID describe is
+// the deleted-resource race, not a failure.
 
 import (
 	"context"
@@ -16,10 +16,8 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// TestIsNotFoundErr_CoversTheIAMSpellingOfAVanishedEntity pins the code the
-// one not-found table lacked. IAM answers NoSuchEntity for a role, user,
-// group, policy or instance profile that is gone, so without it every IAM
-// per-ID lane reads an ordinary race as a failure to report.
+// IAM answers NoSuchEntity for a role, user, group, policy or instance profile
+// that is gone.
 func TestIsNotFoundErr_CoversTheIAMSpellingOfAVanishedEntity(t *testing.T) {
 	for _, err := range []error{
 		&iamtypes.NoSuchEntityException{Message: aws.String("Role with name acme-deploy-role cannot be found.")},
@@ -34,11 +32,9 @@ func TestIsNotFoundErr_CoversTheIAMSpellingOfAVanishedEntity(t *testing.T) {
 	}
 }
 
-// TestIsNotFoundErr_LeavesTheSubConfigurationAbsencesAlone is the negative
-// control and the reason the sweep is not "add every code that says
-// not-found". These codes mean "this optional configuration is not set",
-// which is an ANSWER about a live resource. Folding them in would mark a
-// perfectly healthy bucket, table or function as data-incomplete.
+// These codes mean "this optional configuration is not set", an answer about a
+// live resource; reading them as not-found would mark a healthy bucket, table
+// or function as data-incomplete.
 func TestIsNotFoundErr_LeavesTheSubConfigurationAbsencesAlone(t *testing.T) {
 	for _, code := range []string{
 		"NoSuchBucketPolicy",

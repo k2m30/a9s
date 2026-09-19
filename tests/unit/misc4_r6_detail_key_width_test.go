@@ -2,12 +2,9 @@
 
 package unit_test
 
-// misc4_r6_detail_key_width_test.go — misc4 row 6.
-//
-// The detail key column was sized from the widest field name alone, with no
-// upper bound. A field name as wide as the terminal reserved the whole line
-// for the label and pushed every value off the right edge, which is the one
-// thing the reader opened the detail view for.
+// The detail key column has an upper bound: a field name as wide as the
+// terminal must not reserve the whole line for the label and push every value,
+// the thing the reader opened the detail view for, off the right edge.
 
 import (
 	"strings"
@@ -48,9 +45,8 @@ func TestDetailValueSurvivesAKeyAsWideAsTheViewport(t *testing.T) {
 	}
 }
 
-// TestDetailKeyFloorHoldsWhereTheViewportAllows pins that capping the key
-// column did not move the ordinary case: a short field name in a wide
-// viewport still pads to the 22-column floor.
+// TestDetailKeyFloorHoldsWhereTheViewportAllows pins the ordinary case: a
+// short field name in a wide viewport pads to the 22-column floor.
 func TestDetailKeyFloorHoldsWhereTheViewportAllows(t *testing.T) {
 	got := misc4RenderAt(120, []app.FieldRow{{Key: "Status", Value: "ok"}})
 	if !strings.Contains(got, text.PadOrTrunc("Status:", 22)) {

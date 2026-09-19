@@ -17,11 +17,6 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// ---------------------------------------------------------------------------
-// fakeWAFv2CR — implements WAFv2API (ListWebACLs, ListResourcesForWebACL,
-// GetLoggingConfiguration) for WAF related checker tests.
-// ---------------------------------------------------------------------------
-
 type fakeWAFv2CR struct {
 	listResourcesOutput *wafv2.ListResourcesForWebACLOutput
 	listResourcesErr    error
@@ -55,12 +50,6 @@ func (f *fakeWAFv2CR) GetLoggingConfiguration(_ context.Context, _ *wafv2.GetLog
 
 var _ awsclient.WAFv2API = (*fakeWAFv2CR)(nil)
 
-// The fake CloudFront client for WAF→CF related checker tests now lives in
-// fakes_cloudfront_test.go (fakeCloudFrontAPI) — see that file's header for
-// the one-fake-per-interface convention.
-
-// wafCheckerByTarget retrieves the RelatedChecker for the given targetType
-// and fails the test if the checker is nil or not found.
 func wafCheckerByTarget(t *testing.T, target string) resource.RelatedChecker {
 	t.Helper()
 	for _, def := range resource.GetRelated("waf") {
@@ -75,7 +64,6 @@ func wafCheckerByTarget(t *testing.T, target string) resource.RelatedChecker {
 	return nil
 }
 
-// wafSrcResource returns a canonical REGIONAL WAF Web ACL test resource.
 func wafSrcResource() resource.Resource {
 	return resource.Resource{
 		ID:   "a1b2c3d4-5678-90ab-cdef-111111111111",
@@ -88,10 +76,6 @@ func wafSrcResource() resource.Resource {
 	}
 }
 
-// --- ELB checker nil-clients test ---
-
-// TestRelated_WAF_ELB_NilClients verifies that the elb checker returns
-// State: RelatedUnknown when clients are nil (ListResourcesForWebACL cannot be called).
 func TestRelated_WAF_ELB_NilClients(t *testing.T) {
 	res := wafSrcResource()
 	checker := wafCheckerByTarget(t, "elb")
@@ -101,10 +85,6 @@ func TestRelated_WAF_ELB_NilClients(t *testing.T) {
 	}
 }
 
-// --- APIGW checker nil-clients test ---
-
-// TestRelated_WAF_APIGW_NilClients verifies that the apigw checker returns
-// State: RelatedUnknown when clients are nil (ListResourcesForWebACL cannot be called).
 func TestRelated_WAF_APIGW_NilClients(t *testing.T) {
 	res := wafSrcResource()
 	checker := wafCheckerByTarget(t, "apigw")
@@ -114,9 +94,7 @@ func TestRelated_WAF_APIGW_NilClients(t *testing.T) {
 	}
 }
 
-// --- CF checker: real scope-based dispatch ---
-
-// TestRelated_WAF_CF_RegionalReturnsZero: REGIONAL scope → definitively no CF association.
+// A REGIONAL web ACL cannot be associated with a CloudFront distribution.
 func TestRelated_WAF_CF_RegionalReturnsZero(t *testing.T) {
 	res := wafSrcResource()
 	checker := wafCheckerByTarget(t, "cf")
@@ -129,10 +107,7 @@ func TestRelated_WAF_CF_RegionalReturnsZero(t *testing.T) {
 	}
 }
 
-// TestRelated_WAF_CF_CloudfrontScopeUnknown: CLOUDFRONT scope with a resolvable
-// WebACL ARN but no CloudFront client available → State: RelatedUnknown (would need
-// cloudfront:ListDistributionsByWebACLId) — docs/resources/waf.md §2 `cf`.
-// Fields["arn"] must be set: checkWAFCF reads Fields["arn"], not Fields["id"].
+// checkWAFCF reads the web ACL ARN from Fields["arn"].
 func TestRelated_WAF_CF_CloudfrontScopeUnknown(t *testing.T) {
 	res := resource.Resource{
 		ID:   "a1b2c3d4-5678-90ab-cdef-222222222222",
@@ -151,12 +126,8 @@ func TestRelated_WAF_CF_CloudfrontScopeUnknown(t *testing.T) {
 	}
 }
 
-// --- Alarm checker (Pattern C — cache scan, WebACL dimension match) ---
-
-// TestRelated_WAF_Alarm_MatchByWebACLDimension verifies that an alarm with
-// dimension "WebACL" equal to the WAF resource name is returned.
 func TestRelated_WAF_Alarm_MatchByWebACLDimension(t *testing.T) {
-	res := wafSrcResource() // name = "my-waf"
+	res := wafSrcResource()
 
 	alarmRes := resource.Resource{
 		ID: "waf-blocked-requests-alarm",
@@ -185,10 +156,8 @@ func TestRelated_WAF_Alarm_MatchByWebACLDimension(t *testing.T) {
 	}
 }
 
-// TestRelated_WAF_Alarm_NoMatch verifies that alarms with non-matching
-// WebACL dimension return Count=0.
 func TestRelated_WAF_Alarm_NoMatch(t *testing.T) {
-	res := wafSrcResource() // name = "my-waf"
+	res := wafSrcResource()
 
 	alarmRes := resource.Resource{
 		ID: "other-waf-alarm",
@@ -211,8 +180,6 @@ func TestRelated_WAF_Alarm_NoMatch(t *testing.T) {
 	}
 }
 
-// TestRelated_WAF_Alarm_CacheMissNoClients verifies that an empty alarm cache
-// with no clients returns Count=-1 (unknown).
 func TestRelated_WAF_Alarm_CacheMissNoClients(t *testing.T) {
 	res := wafSrcResource()
 
@@ -224,8 +191,6 @@ func TestRelated_WAF_Alarm_CacheMissNoClients(t *testing.T) {
 	}
 }
 
-// TestRelated_WAF_Alarm_EmptyName verifies that a WAF resource with no name
-// returns Count=0 immediately.
 func TestRelated_WAF_Alarm_EmptyName(t *testing.T) {
 	res := resource.Resource{
 		ID:     "a1b2c3d4-1234-5678-abcd-111111111111",
@@ -241,10 +206,6 @@ func TestRelated_WAF_Alarm_EmptyName(t *testing.T) {
 	}
 }
 
-// --- Logs checker (Pattern C — getLoggingConfiguration, empty ARN → 0) ---
-
-// TestRelated_WAF_Logs_EmptyARN verifies that a WAF resource without an ARN
-// returns Count=0 (no logging configured by definition).
 func TestRelated_WAF_Logs_EmptyARN(t *testing.T) {
 	res := resource.Resource{
 		ID:     "a1b2c3d4-1234-5678-abcd-111111111111",
@@ -260,8 +221,6 @@ func TestRelated_WAF_Logs_EmptyARN(t *testing.T) {
 	}
 }
 
-// TestRelated_WAF_Logs_NilClients verifies that a WAF resource with an ARN
-// but nil clients returns Count=-1 (cannot call GetLoggingConfiguration).
 func TestRelated_WAF_Logs_NilClients(t *testing.T) {
 	res := resource.Resource{
 		ID:   "a1b2c3d4-1234-5678-abcd-111111111111",
@@ -281,13 +240,7 @@ func TestRelated_WAF_Logs_NilClients(t *testing.T) {
 	}
 }
 
-// --- ELB checker: real dispatch with fake WAFv2 ---
-
-// TestRelated_WAF_ELB_ExtractsNameFromARN verifies that the elb checker correctly
-// extracts the load balancer name from the ARN segment parts[len(parts)-2].
 func TestRelated_WAF_ELB_ExtractsNameFromARN(t *testing.T) {
-	// ARN format: arn:aws:elasticloadbalancing:us-east-1:123456789012:loadbalancer/app/my-alb/abcdef012345
-	// parts[len-2] = "my-alb"
 	res := resource.Resource{
 		ID:   "a1b2c3d4-5678-90ab-cdef-111111111111",
 		Name: "my-waf",
@@ -318,8 +271,6 @@ func TestRelated_WAF_ELB_ExtractsNameFromARN(t *testing.T) {
 	}
 }
 
-// TestRelated_WAF_ELB_NoMatch verifies that when ListResourcesForWebACL returns
-// no ARNs the checker returns Count=0.
 func TestRelated_WAF_ELB_NoMatch(t *testing.T) {
 	res := resource.Resource{
 		ID:     "a1b2c3d4-5678-90ab-cdef-111111111111",
@@ -340,8 +291,6 @@ func TestRelated_WAF_ELB_NoMatch(t *testing.T) {
 	}
 }
 
-// TestRelated_WAF_ELB_ShortARNSkipped verifies that ARNs with fewer than 3
-// slash-delimited parts are skipped (no panic, no spurious IDs).
 func TestRelated_WAF_ELB_ShortARNSkipped(t *testing.T) {
 	res := resource.Resource{
 		ID:     "a1b2c3d4-5678-90ab-cdef-111111111111",
@@ -359,18 +308,12 @@ func TestRelated_WAF_ELB_ShortARNSkipped(t *testing.T) {
 	checker := wafCheckerByTarget(t, "elb")
 	result := checker(context.Background(), clients, res, nil)
 
-	// ARN "only/two" splits to ["only","two"] — len < 3, skipped.
 	if result.Count() != 0 {
 		t.Errorf("Count = %d, want 0 (short ARN skipped)", result.Count())
 	}
 }
 
-// --- APIGW checker: real dispatch with fake WAFv2 ---
-
-// TestRelated_WAF_APIGW_ExtractsAPIIDFromARN verifies that the apigw checker
-// correctly extracts the API ID from the restapis path segment.
 func TestRelated_WAF_APIGW_ExtractsAPIIDFromARN(t *testing.T) {
-	// ARN format: arn:aws:apigateway:us-east-1::/restapis/abc123def/stages/prod
 	res := resource.Resource{
 		ID:   "a1b2c3d4-5678-90ab-cdef-111111111111",
 		Name: "my-waf",
@@ -399,12 +342,8 @@ func TestRelated_WAF_APIGW_ExtractsAPIIDFromARN(t *testing.T) {
 	}
 }
 
-// TestRelated_WAF_APIGW_NoRestAPIsInARN verifies that an API ARN without
-// /restapis/ is read through the apigw resolver like any other: "/apis/<id>"
-// names the API <id>.
-//
-// The checker does not parse the ARN itself; the apigw resolver reads both
-// API ARN shapes.
+// The apigw resolver reads both API ARN shapes: "/restapis/<id>" and
+// "/apis/<id>".
 func TestRelated_WAF_APIGW_NoRestAPIsInARN(t *testing.T) {
 	res := resource.Resource{
 		ID:     "a1b2c3d4-5678-90ab-cdef-111111111111",
@@ -427,12 +366,7 @@ func TestRelated_WAF_APIGW_NoRestAPIsInARN(t *testing.T) {
 	}
 }
 
-// --- Logs checker: real dispatch with fake WAFv2 ---
-
-// TestRelated_WAF_Logs_CWLogGroupNameExtracted verifies that the logs checker
-// extracts the log-group name from a CW Logs ARN containing ":log-group:".
 func TestRelated_WAF_Logs_CWLogGroupNameExtracted(t *testing.T) {
-	// CW Logs ARN: arn:aws:logs:us-east-1:123456789012:log-group:/aws/waf/my-waf:*
 	res := resource.Resource{
 		ID:   "a1b2c3d4-5678-90ab-cdef-111111111111",
 		Name: "my-waf",
@@ -495,8 +429,8 @@ func TestRelated_WAF_Logs_FirehoseARNPassthrough(t *testing.T) {
 	}
 }
 
-// TestRelated_WAF_Logs_NoLoggingConfigured verifies that WAFNonexistentItemException
-// (no logging configured) causes the checker to return Count=0 instead of -1.
+// GetLoggingConfiguration answers WAFNonexistentItemException when the web
+// ACL has no logging configured.
 func TestRelated_WAF_Logs_NoLoggingConfigured(t *testing.T) {
 	res := resource.Resource{
 		ID:   "a1b2c3d4-5678-90ab-cdef-111111111111",
@@ -506,7 +440,6 @@ func TestRelated_WAF_Logs_NoLoggingConfigured(t *testing.T) {
 		},
 	}
 
-	// Simulate WAFNonexistentItemException (logging not configured)
 	notFoundErr := &wafv2types.WAFNonexistentItemException{Message: aws.String("no logging config")}
 	fake := &fakeWAFv2CR{loggingErr: notFoundErr}
 	clients := &awsclient.ServiceClients{WAFv2: fake}
@@ -522,12 +455,8 @@ func TestRelated_WAF_Logs_NoLoggingConfigured(t *testing.T) {
 	}
 }
 
-// --- CF checker: real dispatch with fake CloudFront ---
-
-// TestRelated_WAF_CF_CloudfrontScopeReturnsDistributionIDs verifies that
-// a CLOUDFRONT-scope WebACL with a fake CloudFront client returns distribution
-// IDs. checkWAFCF passes the full WebACL ARN (Fields["arn"], not Fields["id"])
-// to cloudfront:ListDistributionsByWebACLId — docs/resources/waf.md §2 `cf`.
+// checkWAFCF passes the full web ACL ARN to
+// cloudfront:ListDistributionsByWebACLId.
 func TestRelated_WAF_CF_CloudfrontScopeReturnsDistributionIDs(t *testing.T) {
 	res := resource.Resource{
 		ID:   "a1b2c3d4-5678-90ab-cdef-222222222222",
@@ -566,8 +495,6 @@ func TestRelated_WAF_CF_CloudfrontScopeReturnsDistributionIDs(t *testing.T) {
 	}
 }
 
-// TestRelated_WAF_CF_CloudfrontScopeEmptyDistributionList verifies that
-// a CLOUDFRONT-scope WebACL with zero distributions returns Count=0.
 func TestRelated_WAF_CF_CloudfrontScopeEmptyDistributionList(t *testing.T) {
 	res := resource.Resource{
 		ID:   "a1b2c3d4-5678-90ab-cdef-222222222222",
@@ -596,16 +523,9 @@ func TestRelated_WAF_CF_CloudfrontScopeEmptyDistributionList(t *testing.T) {
 	}
 }
 
-// TestRelated_WAF_CF_NilDistributionListIsUnknown pins the boundary between an
-// empty answer and no answer. An empty DistributionList is CloudFront saying
-// this web ACL protects no distribution, and a zero is the truth. A nil one is
-// a successful call that carried no list at all, which is not a count of any
-// kind — the same "nothing was read" the nil-list branches answer Unknown for,
-// one layer out at the API rather than the cache.
-//
-// The gate that holds the cache-side sites keys on a variable a fetch helper
-// returned, and this is a nil field on a response, so it cannot see this site.
-// The behaviour is pinned here instead.
+// An empty DistributionList is CloudFront saying this web ACL protects no
+// distribution, and a zero is the truth. A nil one is a successful call that
+// carried no list at all, which is not a count of any kind.
 func TestRelated_WAF_CF_NilDistributionListIsUnknown(t *testing.T) {
 	res := resource.Resource{
 		ID:   "a1b2c3d4-5678-90ab-cdef-222222222222",

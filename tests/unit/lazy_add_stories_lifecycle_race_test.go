@@ -1,21 +1,5 @@
 package unit
 
-// lazy_add_stories_lifecycle_race_test.go — orchestration pin tests for
-// lazy-add user stories:
-//   Section D (LA-030..LA-034) — session lifecycle
-//   Section E (LA-040..LA-044) — idempotence
-//   Section F (LA-050..LA-054) — race / timing
-//
-// LA-032 is OCQ#4 (refresh of filtered list — spec unresolved). SKIPPED.
-//
-// Pattern: register temporary resource types with unique "test-<la-id>-*" short
-// names, exercise the orchestration via rootApplyMsg, assert on the observable
-// behavior of RelatedCheckResultMsg fields, then clean up with t.Cleanup.
-//
-// State isolation: LA-030/031/053/054 drive session switch by dispatching
-// messages.ProfileSelected / RegionSelectedMsg and then constructing a
-// fresh model — ensuring no state leaks from the pre-switch session.
-
 import (
 	"context"
 	"sync/atomic"
@@ -28,19 +12,7 @@ import (
 	"github.com/k2m30/a9s/v3/core/runtime/messages"
 )
 
-// ---------------------------------------------------------------------------
-// Section D — Session lifecycle
-// ---------------------------------------------------------------------------
-
-// Test_LA_030_ProfileSwitch_ClearsLazyAddedTargets pins that after a profile
-// switch (ProfileSelectedMsg → resetForSessionSwitch), a new RelatedCheckResultMsg
-// with LazyAddedResources does NOT inherit entries seeded before the switch.
-//
-// Phase 1: seed cache[test-target-la030] via LazyAddedResources.
-// Phase 2: dispatch ProfileSelectedMsg (triggers resetForSessionSwitch).
-// Phase 3: construct fresh model and dispatch a new check; verify it does NOT
-//
-//	see the phase-1 resource IDs.
+// A profile switch clears lazy-added entries, so the next check lazy-adds again.
 func Test_LA_030_ProfileSwitch_ClearsLazyAddedTargets(t *testing.T) {
 	const (
 		srcType    = "test-la030-source"
@@ -70,7 +42,6 @@ func Test_LA_030_ProfileSwitch_ClearsLazyAddedTargets(t *testing.T) {
 		resource.CleanupFetchByIDsForTest(targetType)
 	})
 
-	// Phase 1: seed cache on a pre-switch model.
 	m := newBlessedModel(t, "profile-A", "us-east-1")
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 36})
 
@@ -88,17 +59,11 @@ func Test_LA_030_ProfileSwitch_ClearsLazyAddedTargets(t *testing.T) {
 		t.Fatal("LA-030: expected LazyAddedResources to be populated in phase-1")
 	}
 
-	// Feed the lazy-add back to the model so the cache is seeded.
 	m, _ = rootApplyMsg(m, resultMsg)
 
-	// Phase 2: profile switch → resetForSessionSwitch.
 	_, _ = rootApplyMsg(m, messages.ProfileSelected{Profile: "profile-B"}) //nolint:ineffassign // m not used after this; m2 is the post-switch model
 
-	// Phase 3: fresh model simulates the new session; the process-wide
-	// FetchByIDs registry is still wired but the session-scoped resourceCache
-	// is cleared.  A new check must produce LazyAddedResources again (not a
-	// cache hit), and must NOT contain the pre-switch stale ID from the old
-	// model's cache.
+	// The FetchByIDs registry is process-wide; the resource cache is session-scoped.
 	m2 := newBlessedModel(t, "profile-B", "us-east-1")
 	m2, _ = rootApplyMsg(m2, tea.WindowSizeMsg{Width: 120, Height: 36})
 
@@ -113,17 +78,11 @@ func Test_LA_030_ProfileSwitch_ClearsLazyAddedTargets(t *testing.T) {
 		t.Fatal("LA-030: no RelatedCheckResultMsg in phase-3")
 	}
 
-	// The new result's ResourceIDs must still reference the checker output (same
-	// checker wired), but the LazyAddedResources must be non-nil because the
-	// fresh model's cache is empty — meaning the lazy-add path ran again.
-	// This proves the pre-switch cache was not inherited.
 	if resultMsg2.LazyAddedResources == nil {
 		t.Error("LA-030: fresh model after profile switch should not have a cache hit; LazyAddedResources must be populated (stale cache leaked)")
 	}
 }
 
-// Test_LA_031_RegionSwitch_ClearsLazyAddedTargets mirrors LA-030 but uses
-// RegionSelectedMsg to trigger the reset.
 func Test_LA_031_RegionSwitch_ClearsLazyAddedTargets(t *testing.T) {
 	const (
 		srcType    = "test-la031-source"
@@ -153,7 +112,6 @@ func Test_LA_031_RegionSwitch_ClearsLazyAddedTargets(t *testing.T) {
 		resource.CleanupFetchByIDsForTest(targetType)
 	})
 
-	// Phase 1: seed cache on pre-switch model.
 	m := newBlessedModel(t, "test-profile", "us-east-1")
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 36})
 
@@ -172,10 +130,8 @@ func Test_LA_031_RegionSwitch_ClearsLazyAddedTargets(t *testing.T) {
 	}
 	m, _ = rootApplyMsg(m, resultMsg)
 
-	// Phase 2: region switch → resetForSessionSwitch.
 	_, _ = rootApplyMsg(m, messages.RegionSelected{Region: "eu-west-1"}) //nolint:ineffassign // m not used after this; m2 is the post-switch model
 
-	// Phase 3: fresh model representing eu-west-1 session.
 	m2 := newBlessedModel(t, "test-profile", "eu-west-1")
 	m2, _ = rootApplyMsg(m2, tea.WindowSizeMsg{Width: 120, Height: 36})
 
@@ -190,26 +146,16 @@ func Test_LA_031_RegionSwitch_ClearsLazyAddedTargets(t *testing.T) {
 		t.Fatal("LA-031: no RelatedCheckResultMsg in phase-3")
 	}
 
-	// Fresh session cache is empty; FetchByIDs runs again → LazyAddedResources != nil.
 	if resultMsg2.LazyAddedResources == nil {
 		t.Error("LA-031: fresh model after region switch should not have a cache hit; LazyAddedResources must be populated (stale cache leaked)")
 	}
 }
 
-// Test_LA_032 — OCQ#4 (refresh of filtered list). Skipped.
 func Test_LA_032_Skip_OCQ4(t *testing.T) {
 	t.Skip("LA-032: OCQ#4 — refresh semantics on filtered drill-through list are unspecified")
 }
 
-// Test_LA_033_SourceDetailRefresh_RerunsChecker pins that a refresh (RelatedGen
-// bump via RefreshMsg path) causes a subsequent RelatedCheckStartedMsg dispatch
-// to stamp a new generation, and a stale result (old gen) is dropped while the
-// fresh result (new gen) lands.
-//
-// Focus: orchestration only. We don't exercise the TUI refresh key-path; instead
-// we directly model the gen-bump by observing that after bumping relatedGen via
-// a ProfileSelectedMsg on the same model, the old result is dropped and a new
-// one is accepted.
+// Ctrl+R on the source detail re-runs the checker, replacing an earlier result.
 func Test_LA_033_SourceDetailRefresh_RerunsChecker(t *testing.T) {
 	const (
 		srcType    = "test-la033-source"
@@ -218,7 +164,6 @@ func Test_LA_033_SourceDetailRefresh_RerunsChecker(t *testing.T) {
 	const idA = "la033-id-A"
 	const idB = "la033-id-B"
 
-	// Checker always returns idB — simulates "after refresh, checker sees updated IDs".
 	resource.SetRelatedForTest(srcType, []resource.RelatedDef{
 		{
 			TargetType:  targetType,
@@ -246,10 +191,6 @@ func Test_LA_033_SourceDetailRefresh_RerunsChecker(t *testing.T) {
 
 	src := resource.Resource{ID: "la033-src-001"}
 
-	// Dispatch first check — simulates "before refresh, checker emitted idA".
-	// We inject a result manually stamped with the session's current (pre-any-
-	// operation) DetailOpGen — AcceptZeroGen is irrelevant here since this is
-	// the live value, not a sentinel.
 	staleResult := messages.RelatedCheckResult{
 		ResourceType:     srcType,
 		SourceResourceID: src.ID,
@@ -259,25 +200,20 @@ func Test_LA_033_SourceDetailRefresh_RerunsChecker(t *testing.T) {
 	}
 	m, _ = rootApplyMsg(m, staleResult)
 
-	// Open the source detail. Since a RelatedCache entry already exists for
-	// (srcType, src.ID), replayRelatedCache (D6: no re-fan-out over cached
-	// data) serves it from cache and does NOT dispatch the checker again.
+	// A RelatedCache entry for (srcType, src.ID) is replayed without running the checker.
 	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetDetail,
 		ResourceType: srcType,
 		Resource:     &src,
 	})
 
-	// Ctrl+R is the only entry point that unconditionally invalidates the
-	// RelatedCache and begins a fresh DetailOperation (core/app/actions_list.go
-	// handleActionRefresh), so the checker's CURRENT return value (idB) lands.
+	// Ctrl+R invalidates the RelatedCache and begins a fresh DetailOperation.
 	_, batchCmd := rootApplyMsg(m, ctrlR())
 	freshResult, found := collectRelatedResult(t, batchCmd)
 	if !found {
 		t.Fatal("LA-033: no RelatedCheckResultMsg from re-run")
 	}
 
-	// Fresh result must contain idB (what the checker emits), not idA.
 	if len(freshResult.Result.ResourceIDs()) == 0 {
 		t.Fatal("LA-033: fresh check result has no ResourceIDs")
 	}
@@ -286,21 +222,8 @@ func Test_LA_033_SourceDetailRefresh_RerunsChecker(t *testing.T) {
 	}
 }
 
-// Test_LA_034_MainMenuRoundtrip_LazyAddEntryMarkedTruncated pins that a sparse
-// lazy-add cache entry is created with IsTruncated=true (not as an authoritative
-// full page). This ensures:
-//
-//  1. The LazyAddedResources write-back creates a new entry with pagination
-//     IsTruncated=true (the "main-menu will refetch" signal).
-//  2. After seeding, a subsequent NavigateMsg to the same target type is served
-//     from the cache-hit path (no second paginated fetch at nav time); this is
-//     correct — the list shows with IsTruncated=true, causing the view to render
-//     a "m: load more" footer.
-//  3. The paginated fetcher is NOT automatically called by the cache-hit path
-//     (it is only triggered by the user pressing 'm' or a Ctrl+R refresh).
-//
-// This pins the actual observable behavior of the IsTruncated=true write-back
-// contract in app.go:604-610.
+// A lazy-add write-back creates a sparse cache entry marked IsTruncated, and
+// the write-back itself does not call the paginated fetcher.
 func Test_LA_034_MainMenuRoundtrip_LazyAddEntryMarkedTruncated(t *testing.T) {
 	const (
 		srcType    = "test-la034-source"
@@ -347,7 +270,6 @@ func Test_LA_034_MainMenuRoundtrip_LazyAddEntryMarkedTruncated(t *testing.T) {
 
 	src := resource.Resource{ID: "la034-src-001"}
 
-	// Seed sparse cache via lazy-add (no entry for targetType in cache yet).
 	m, batchCmd := rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetDetail,
 		ResourceType: srcType,
@@ -358,50 +280,29 @@ func Test_LA_034_MainMenuRoundtrip_LazyAddEntryMarkedTruncated(t *testing.T) {
 		t.Fatal("LA-034: no RelatedCheckResultMsg")
 	}
 
-	// Verify lazy-add produced a non-nil LazyAddedResources (cache was empty).
 	if resultMsg.LazyAddedResources == nil {
 		t.Fatal("LA-034: LazyAddedResources must be non-nil (cache was empty before first drill)")
 	}
 
-	// Feed the result back so the model applies the write-back.
 	m, _ = rootApplyMsg(m, resultMsg)
 
-	// Pin: after lazy-add write-back the sparse entry has IsTruncated=true.
-	// Verify by dispatching a second check for the SAME source; because the cache
-	// now has an entry for targetType (sparse, IsTruncated=true), the checker sees
-	// the ID as already present and LazyAddedResources will be nil on the second
-	// dispatch. A plain re-navigate would hit replayRelatedCache's cache-hit
-	// suppression (D6: no re-fan-out over cached data) and never invoke the
-	// checker again, so Ctrl+R (the only unconditional re-dispatch entry point)
-	// drives the second check.
+	// A plain re-navigate replays the cached related result without running the
+	// checker; Ctrl+R invalidates the cache and runs it again.
 	_, batchCmd2 := rootApplyMsg(m, ctrlR())
 	resultMsg2, found2 := collectRelatedResult(t, batchCmd2)
 	if !found2 {
 		t.Fatal("LA-034: no RelatedCheckResultMsg on second dispatch")
 	}
 
-	// Second dispatch: the lazy-add resource is now in cache, so LazyAddedResources
-	// should be nil (no new IDs to add).
 	if resultMsg2.LazyAddedResources != nil {
 		t.Errorf("LA-034: second dispatch LazyAddedResources=%v, want nil (sparse entry already in cache — IsTruncated write-back worked)", resultMsg2.LazyAddedResources)
 	}
 
-	// Pin: the paginated fetcher is NOT automatically triggered by the cache-hit
-	// path. It is only triggered explicitly (by the user pressing 'm' or Ctrl+R).
-	// After the lazy-add write-back, paginatedCalls must remain 0 because
-	// NeedsTargetCache=false (default) for our test checker.
 	if paginatedCalls.Load() != 0 {
 		t.Errorf("LA-034: paginatedCalls=%d, want 0 — paginated fetcher must not be called implicitly by lazy-add write-back", paginatedCalls.Load())
 	}
 }
 
-// ---------------------------------------------------------------------------
-// Section E — Idempotence
-// ---------------------------------------------------------------------------
-
-// Test_LA_040_RepeatDrill_Idempotent verifies that dispatching the same
-// RelatedCheckStartedMsg twice produces results with identical ResourceIDs,
-// and the total unique IDs after both dispatches equals the set after one.
 func Test_LA_040_RepeatDrill_Idempotent(t *testing.T) {
 	const (
 		srcType    = "test-la040-source"
@@ -444,26 +345,21 @@ func Test_LA_040_RepeatDrill_Idempotent(t *testing.T) {
 		Resource:     &src,
 	}
 
-	// First dispatch.
 	m, cmd1 := rootApplyMsg(m, startMsg)
 	result1, found1 := collectRelatedResult(t, cmd1)
 	if !found1 {
 		t.Fatal("LA-040: no result from first dispatch")
 	}
-	// Feed first result back so cache is populated.
 	m, _ = rootApplyMsg(m, result1)
 
-	// Second dispatch: a plain re-navigate would hit replayRelatedCache's
-	// cache-hit suppression (D6: no re-fan-out over cached data) and never
-	// invoke the checker again, so Ctrl+R (the only unconditional re-dispatch
-	// entry point) drives the second, genuinely fresh run.
+	// A plain re-navigate replays the cached related result without running the
+	// checker; Ctrl+R invalidates the cache and runs it again.
 	_, cmd2 := rootApplyMsg(m, ctrlR())
 	result2, found2 := collectRelatedResult(t, cmd2)
 	if !found2 {
 		t.Fatal("LA-040: no result from second dispatch")
 	}
 
-	// Both dispatches must have identical ResourceIDs.
 	if len(result1.Result.ResourceIDs()) != len(result2.Result.ResourceIDs()) {
 		t.Fatalf("LA-040: ResourceIDs length mismatch: first=%v, second=%v",
 			result1.Result.ResourceIDs(), result2.Result.ResourceIDs())
@@ -474,19 +370,12 @@ func Test_LA_040_RepeatDrill_Idempotent(t *testing.T) {
 		}
 	}
 
-	// LazyAddedResources on second dispatch should be nil — cache hit, no re-fetch.
-	// This is the idempotence invariant: second drill adds nothing new.
 	if result2.LazyAddedResources != nil {
 		t.Errorf("LA-040: second dispatch's LazyAddedResources=%v, want nil (cache should have been warm)", result2.LazyAddedResources)
 	}
 }
 
-// Test_LA_041_RepeatDrill_DifferentSource_SameTarget_SingleEntry pins that
-// two sources (alpha, beta) with checkers emitting the same target ID cause
-// the target to appear exactly once in the cache after both drills.
-//
-// Specifically: beta's LazyAddedResources is nil because alpha already seeded
-// the cache for the shared target.
+// Two sources whose checkers emit the same target ID lazy-add it once.
 func Test_LA_041_RepeatDrill_DifferentSource_SameTarget_SingleEntry(t *testing.T) {
 	const (
 		srcTypeAlpha = "test-la041-source-alpha"
@@ -522,7 +411,6 @@ func Test_LA_041_RepeatDrill_DifferentSource_SameTarget_SingleEntry(t *testing.T
 	m := newBlessedModel(t, "test-profile", "us-east-1")
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 36})
 
-	// Alpha drill.
 	_, cmdAlpha := rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetDetail,
 		ResourceType: srcTypeAlpha,
@@ -535,10 +423,8 @@ func Test_LA_041_RepeatDrill_DifferentSource_SameTarget_SingleEntry(t *testing.T
 	if resAlpha.LazyAddedResources == nil {
 		t.Fatal("LA-041: alpha's LazyAddedResources must be non-nil (cache was empty)")
 	}
-	// Feed alpha result — seeds cache with sharedTarget.
 	m, _ = rootApplyMsg(m, resAlpha)
 
-	// Beta drill (cache already has sharedTarget from alpha).
 	_, cmdBeta := rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetDetail,
 		ResourceType: srcTypeBeta,
@@ -549,7 +435,6 @@ func Test_LA_041_RepeatDrill_DifferentSource_SameTarget_SingleEntry(t *testing.T
 		t.Fatal("LA-041: no result from beta")
 	}
 
-	// Beta's result must contain the shared target ID.
 	found := false
 	for _, id := range resBeta.Result.ResourceIDs() {
 		if id == sharedTarget {
@@ -561,15 +446,11 @@ func Test_LA_041_RepeatDrill_DifferentSource_SameTarget_SingleEntry(t *testing.T
 		t.Errorf("LA-041: beta result.ResourceIDs=%v, want to contain %q", resBeta.Result.ResourceIDs(), sharedTarget)
 	}
 
-	// Beta's LazyAddedResources must be nil — alpha already seeded the cache.
 	if resBeta.LazyAddedResources != nil {
 		t.Errorf("LA-041: beta LazyAddedResources=%v, want nil (shared target was already in cache from alpha)", resBeta.LazyAddedResources)
 	}
 }
 
-// Test_LA_042_EscUnrelatedNav_ReDrill_Stable pins that a second drill of
-// target X produces the same ResourceIDs as the first, even when an unrelated
-// target Y was drilled between the two X drills.
 func Test_LA_042_EscUnrelatedNav_ReDrill_Stable(t *testing.T) {
 	const (
 		srcType = "test-la042-source"
@@ -626,7 +507,6 @@ func Test_LA_042_EscUnrelatedNav_ReDrill_Stable(t *testing.T) {
 		Resource:     &src,
 	}
 
-	// Helper to collect X result from a batch (there are two defs; pick targetX).
 	collectX := func(t *testing.T, batchCmd tea.Cmd) (messages.RelatedCheckResult, bool) {
 		t.Helper()
 		if batchCmd == nil {
@@ -652,7 +532,6 @@ func Test_LA_042_EscUnrelatedNav_ReDrill_Stable(t *testing.T) {
 		return messages.RelatedCheckResult{}, false
 	}
 
-	// First X drill.
 	m, cmd1 := rootApplyMsg(m, startMsg)
 	res1, found1 := collectX(t, cmd1)
 	if !found1 {
@@ -660,7 +539,6 @@ func Test_LA_042_EscUnrelatedNav_ReDrill_Stable(t *testing.T) {
 	}
 	m, _ = rootApplyMsg(m, res1)
 
-	// Simulate "Esc + drill Y" — feed a Y result; this is the unrelated nav.
 	yResult := messages.RelatedCheckResult{
 		ResourceType:     srcType,
 		SourceResourceID: src.ID,
@@ -670,17 +548,14 @@ func Test_LA_042_EscUnrelatedNav_ReDrill_Stable(t *testing.T) {
 	}
 	m, _ = rootApplyMsg(m, yResult)
 
-	// Second X drill: a plain re-navigate would hit replayRelatedCache's
-	// cache-hit suppression (D6: no re-fan-out over cached data) and never
-	// invoke either checker again, so Ctrl+R (the only unconditional
-	// re-dispatch entry point) drives the genuinely fresh re-run.
+	// A plain re-navigate replays the cached related result without running the
+	// checker; Ctrl+R invalidates the cache and runs it again.
 	_, cmd2 := rootApplyMsg(m, ctrlR())
 	res2, found2 := collectX(t, cmd2)
 	if !found2 {
 		t.Fatal("LA-042: no X result from second drill")
 	}
 
-	// Second X result must equal the first.
 	if len(res1.Result.ResourceIDs()) != len(res2.Result.ResourceIDs()) {
 		t.Fatalf("LA-042: ResourceIDs length mismatch: first=%v, second=%v",
 			res1.Result.ResourceIDs(), res2.Result.ResourceIDs())
@@ -692,14 +567,8 @@ func Test_LA_042_EscUnrelatedNav_ReDrill_Stable(t *testing.T) {
 	}
 }
 
-// Test_LA_043_SourceDetailReEntry_UsesCachedResult documents that relatedCache
-// is a per-message routing cache (not a checker-memoization layer) — the checker
-// function runs on every RelatedCheckStartedMsg dispatch, but the RESULT cache
-// (m.RelatedCache, keyed by resourceType:resourceID) enables re-entry fast paths.
-//
-// Observable pin: the second dispatch produces the same ResourceIDs as the first.
-// relatedCache is at the message-routing level (see app.go:553-560), not a
-// checker memoization.
+// The checker runs on every dispatch: RelatedCache holds results for re-entry,
+// not checker memoization.
 func Test_LA_043_SourceDetailReEntry_UsesCachedResult(t *testing.T) {
 	const (
 		srcType    = "test-la043-source"
@@ -742,7 +611,6 @@ func Test_LA_043_SourceDetailReEntry_UsesCachedResult(t *testing.T) {
 		Resource:     &src,
 	}
 
-	// First dispatch.
 	m, cmd1 := rootApplyMsg(m, startMsg)
 	res1, found1 := collectRelatedResult(t, cmd1)
 	if !found1 {
@@ -750,18 +618,14 @@ func Test_LA_043_SourceDetailReEntry_UsesCachedResult(t *testing.T) {
 	}
 	m, _ = rootApplyMsg(m, res1)
 
-	// Second dispatch: a plain re-navigate would hit replayRelatedCache's
-	// cache-hit suppression (D6: no re-fan-out over cached data) at the
-	// navigation level and never invoke the checker at all, so Ctrl+R (the
-	// only unconditional re-dispatch entry point) drives a genuinely fresh
-	// checker invocation for the "not checker-memoized" pin below.
+	// A plain re-navigate replays the cached related result without running the
+	// checker; Ctrl+R invalidates the cache and runs it again.
 	_, cmd2 := rootApplyMsg(m, ctrlR())
 	res2, found2 := collectRelatedResult(t, cmd2)
 	if !found2 {
 		t.Fatal("LA-043: no result from second dispatch")
 	}
 
-	// The ResourceIDs must match across both dispatches.
 	if len(res1.Result.ResourceIDs()) != len(res2.Result.ResourceIDs()) {
 		t.Fatalf("LA-043: ResourceIDs length mismatch: first=%v, second=%v",
 			res1.Result.ResourceIDs(), res2.Result.ResourceIDs())
@@ -770,23 +634,15 @@ func Test_LA_043_SourceDetailReEntry_UsesCachedResult(t *testing.T) {
 		t.Errorf("LA-043: second dispatch ResourceIDs[0]=%q, want %q", res2.Result.ResourceIDs()[0], targetID)
 	}
 
-	// Document behavior: the checker runs on every dispatch because a9s does NOT
-	// memoize checkers — relatedCache is at the message-routing level
-	// (app.go:553-560), not at the checker invocation level.
-	// Two dispatches → checker called at least twice.
 	if checkerCalls.Load() < 2 {
 		t.Errorf("LA-043: checker calls=%d, want >=2 — relatedCache is routing-level, not checker-memoization", checkerCalls.Load())
 	}
 }
 
-// Test_LA_044_NoRelatedPivots_ReturnsNilCmd verifies that opening detail for a
-// resource type with no RelatedDefs registered (and no detail enricher)
-// dispatches no task at all — DetailOperationTasks returns nil for both, and
-// with no related panel to auto-show, handleNavigate's PushDetail case
-// returns a nil cmd overall.
+// A type with no RelatedDefs and no detail enricher dispatches no task on
+// detail open.
 func Test_LA_044_NoRelatedPivots_ReturnsNilCmd(t *testing.T) {
 	const srcType = "test-la044-source-no-defs"
-	// Deliberately do NOT register any RelatedDefs for srcType.
 
 	m := newBlessedModel(t, "test-profile", "us-east-1")
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 36})
@@ -797,23 +653,11 @@ func Test_LA_044_NoRelatedPivots_ReturnsNilCmd(t *testing.T) {
 		Resource:     &resource.Resource{ID: "la044-src-001"},
 	})
 
-	// No related defs and no detail enricher registered for srcType — no task
-	// dispatches, so the overall cmd must be nil.
 	if cmd != nil {
 		t.Errorf("LA-044: cmd=%v, want nil — no RelatedDefs or detail enricher registered for %q", cmd, srcType)
 	}
 }
 
-// ---------------------------------------------------------------------------
-// Section F — Race / timing
-// ---------------------------------------------------------------------------
-
-// Test_LA_050_DrillDuringEnrichment_ResultLandsWithoutDrop pins the weaker
-// invariant: the tea.Cmd returned by handleRelatedCheckStarted is not nil and,
-// when invoked synchronously, returns a RelatedCheckResultMsg.
-//
-// The checker simulates a 100ms delay to model in-flight enrichment.
-// We assert the result lands within 1 second.
 func Test_LA_050_DrillDuringEnrichment_ResultLandsWithoutDrop(t *testing.T) {
 	const (
 		srcType    = "test-la050-source"
@@ -852,12 +696,10 @@ func Test_LA_050_DrillDuringEnrichment_ResultLandsWithoutDrop(t *testing.T) {
 		Resource:     &resource.Resource{ID: "la050-src-001"},
 	})
 
-	// batchCmd must not be nil.
 	if batchCmd == nil {
 		t.Fatal("LA-050: batchCmd is nil — opening detail must dispatch the related-check task")
 	}
 
-	// Run with a 1-second timeout via a channel to catch hangs.
 	done := make(chan messages.RelatedCheckResult, 1)
 	go func() {
 		if r, ok := collectRelatedResult(t, batchCmd); ok {
@@ -880,10 +722,7 @@ func Test_LA_050_DrillDuringEnrichment_ResultLandsWithoutDrop(t *testing.T) {
 	}
 }
 
-// Test_LA_052_RapidConsecutiveDispatches_CheckerRunsEachTime pins that five
-// consecutive RelatedCheckStartedMsg dispatches each invoke the checker exactly
-// once (the orchestrator does not deduplicate at the dispatch level) and that
-// each result has the expected ResourceIDs.
+// The orchestrator does not deduplicate dispatches: each run invokes the checker.
 func Test_LA_052_RapidConsecutiveDispatches_CheckerRunsEachTime(t *testing.T) {
 	const (
 		srcType    = "test-la052-source"
@@ -926,11 +765,8 @@ func Test_LA_052_RapidConsecutiveDispatches_CheckerRunsEachTime(t *testing.T) {
 		Resource:     &src,
 	}
 
-	// Collect and run all five batches. The first is a genuine cache-miss
-	// Navigate; a plain re-navigate afterward would hit replayRelatedCache's
-	// cache-hit suppression (D6: no re-fan-out over cached data) and never
-	// invoke the checker again, so the remaining four use Ctrl+R (the only
-	// unconditional re-dispatch entry point) to force a genuinely fresh run.
+	// A plain re-navigate replays the cached related result without running the
+	// checker; Ctrl+R invalidates the cache and runs it again.
 	var results []messages.RelatedCheckResult
 	for i := 0; i < repeats; i++ {
 		var batchCmd tea.Cmd
@@ -944,17 +780,13 @@ func Test_LA_052_RapidConsecutiveDispatches_CheckerRunsEachTime(t *testing.T) {
 			t.Fatalf("LA-052: no result from dispatch %d", i+1)
 		}
 		results = append(results, r)
-		// Feed each result back so the model stays consistent.
 		m, _ = rootApplyMsg(m, r)
 	}
 
-	// Pin observed behavior: the checker runs once per dispatch.
-	// a9s does NOT memoize checkers at the orchestration level.
 	if int(checkerCalls.Load()) != repeats {
 		t.Errorf("LA-052: checker calls=%d, want %d (one per dispatch — no orchestration-level dedup)", checkerCalls.Load(), repeats)
 	}
 
-	// All results must have the same ResourceIDs.
 	for i, r := range results {
 		if len(r.Result.ResourceIDs()) == 0 || r.Result.ResourceIDs()[0] != "la052-id" {
 			t.Errorf("LA-052: result[%d].ResourceIDs=%v, want [la052-id]", i, r.Result.ResourceIDs())
@@ -962,11 +794,8 @@ func Test_LA_052_RapidConsecutiveDispatches_CheckerRunsEachTime(t *testing.T) {
 	}
 }
 
-// Test_LA_053_ProfileSwitchMidResolution_StaleResultDiscarded is LA-030 +
-// LA-051 combined: open detail (begins a DetailOperation), bump the
-// session's DetailOpGen via ProfileSelectedMsg (Rotate()), then deliver the
-// pre-switch result. Assert the stale result is dropped by the acceptance
-// guard (messages.IsStale against AspectDetailOp).
+// A result from before a profile switch is dropped as stale (Rotate() bumps
+// DetailOpGen).
 func Test_LA_053_ProfileSwitchMidResolution_StaleResultDiscarded(t *testing.T) {
 	const (
 		srcType    = "test-la053-source"
@@ -998,8 +827,6 @@ func Test_LA_053_ProfileSwitchMidResolution_StaleResultDiscarded(t *testing.T) {
 	m := newBlessedModel(t, "profile-A", "us-east-1")
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 36})
 
-	// Open detail (begins a DetailOperation) and collect the in-flight
-	// result, but don't deliver it yet.
 	_, batchCmd := rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetDetail,
 		ResourceType: srcType,
@@ -1010,13 +837,10 @@ func Test_LA_053_ProfileSwitchMidResolution_StaleResultDiscarded(t *testing.T) {
 		t.Fatal("LA-053: no in-flight result")
 	}
 
-	// Simulate profile switch mid-resolution: Rotate() bumps DetailOpGen.
 	m, _ = rootApplyMsg(m, messages.ProfileSelected{Profile: "profile-B-la053"})
 
-	// Deliver the stale (pre-switch operation) result.
 	_, dropCmd := rootApplyMsg(m, inFlightResult)
 
-	// The stale message must be dropped — no downstream cmd carrying the stale operation.
 	if dropCmd != nil {
 		raw := dropCmd()
 		if r, ok := raw.(messages.RelatedCheckResult); ok {
@@ -1026,8 +850,6 @@ func Test_LA_053_ProfileSwitchMidResolution_StaleResultDiscarded(t *testing.T) {
 		}
 	}
 
-	// Additionally: a new check on the post-switch model should produce a
-	// fresh result stamped with a new operation ID (not the pre-switch one).
 	_, freshCmd := rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetDetail,
 		ResourceType: srcType,
@@ -1042,8 +864,6 @@ func Test_LA_053_ProfileSwitchMidResolution_StaleResultDiscarded(t *testing.T) {
 	}
 }
 
-// Test_LA_054_RegionSwitchMidResolution_StaleResultDiscarded mirrors LA-053
-// but uses RegionSelectedMsg to trigger the generation bump.
 func Test_LA_054_RegionSwitchMidResolution_StaleResultDiscarded(t *testing.T) {
 	const (
 		srcType    = "test-la054-source"
@@ -1075,7 +895,6 @@ func Test_LA_054_RegionSwitchMidResolution_StaleResultDiscarded(t *testing.T) {
 	m := newBlessedModel(t, "test-profile", "us-east-1")
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 36})
 
-	// Open detail (begins a DetailOperation) and collect the in-flight result.
 	_, batchCmd := rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetDetail,
 		ResourceType: srcType,
@@ -1086,10 +905,8 @@ func Test_LA_054_RegionSwitchMidResolution_StaleResultDiscarded(t *testing.T) {
 		t.Fatal("LA-054: no in-flight result")
 	}
 
-	// Region switch mid-resolution: Rotate() bumps DetailOpGen.
 	m, _ = rootApplyMsg(m, messages.RegionSelected{Region: "eu-west-1"})
 
-	// Deliver the stale (pre-switch operation) result.
 	_, dropCmd := rootApplyMsg(m, inFlightResult)
 
 	if dropCmd != nil {
@@ -1101,7 +918,6 @@ func Test_LA_054_RegionSwitchMidResolution_StaleResultDiscarded(t *testing.T) {
 		}
 	}
 
-	// Fresh result after switch must carry a different (newer) operation ID.
 	_, freshCmd := rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetDetail,
 		ResourceType: srcType,

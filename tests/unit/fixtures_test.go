@@ -208,7 +208,7 @@ func fixtureRDSInstances() []resource.Resource {
 
 // fixtureRedisClusters returns sanitized ElastiCache Redis replication group data for testing.
 // Source: sanitized from real AWS data (1 replication group).
-// Post-phase-7: RawStruct is ReplicationGroup (list uses DescribeReplicationGroups).
+// RawStruct is ReplicationGroup (list uses DescribeReplicationGroups).
 func fixtureRedisClusters() []resource.Resource {
 	return []resource.Resource{
 		{
@@ -217,12 +217,9 @@ func fixtureRedisClusters() []resource.Resource {
 			Fields: map[string]string{
 				"cluster_id": "test-redis-1",
 				"node_type":  "cache.t2.micro",
-				// Post-spec-rewrite (2026-04-23): Healthy rows carry empty
-				// Fields["status"] per redis.md §4 ("Healthy rows render blank").
+				// Healthy rows render a blank status.
 				"status": "",
-				// nodes matches RawStruct.MemberClusters count (0 — MemberClusters
-				// intentionally omitted to avoid YAML list items that would break
-				// TestQA_YAML_KeyValueFormat_AllTypes).
+				// nodes matches the RawStruct.MemberClusters count.
 				"nodes":    "0",
 				"endpoint": "",
 			},
@@ -231,9 +228,8 @@ func fixtureRedisClusters() []resource.Resource {
 				Description:        aws.String("Test Redis replication group"),
 				Status:             aws.String("available"),
 				CacheNodeType:      aws.String("cache.t2.micro"),
-				// MemberClusters omitted: empty slice emits YAML list items (- elem)
-				// which would break TestQA_YAML_KeyValueFormat_AllTypes.
-				// ConfigurationEndpoint is nil (matches empty endpoint in Fields)
+				// A MemberClusters list emits YAML list items (- elem), which break
+				// TestQA_YAML_KeyValueFormat_AllTypes.
 			},
 		},
 	}

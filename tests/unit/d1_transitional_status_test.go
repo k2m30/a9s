@@ -53,10 +53,6 @@ func d1AssertFinding(t *testing.T, f domain.Finding, phrase string, sev domain.S
 	}
 }
 
-// ---------------------------------------------------------------------------
-// dbi-snap
-// ---------------------------------------------------------------------------
-
 func d1FetchDbiSnap(t *testing.T, snap rdstypes.DBSnapshot) []domain.Finding {
 	t.Helper()
 	rows := fetchSnap(t, snap)
@@ -269,10 +265,6 @@ func TestD1_DbcSnapBrokenStatusesDoNotFireTransitional(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// dbi
-// ---------------------------------------------------------------------------
-
 func TestD1_DbiDeletingCarriesTheTransitionalWarning(t *testing.T) {
 	inst := findDBI(t, fixtures.ProdDbiID)
 	inst.DBInstanceStatus = aws.String("deleting")
@@ -317,12 +309,8 @@ func TestD1_DbiUnknownStatusEmitsNoLifecycleFinding(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// The demo witnesses
-// ---------------------------------------------------------------------------
-
-// A finding nobody can see in the demo is a finding the acceptance bench cannot
-// check, so each new code needs a fixture that reaches it and reaches it alone.
+// Each finding code needs a demo fixture that reaches it and reaches it
+// alone, so the finding is visible in the demo.
 func TestD1_DbiSnapCopyingWitnessCarriesTheTransitionalFindingAlone(t *testing.T) {
 	fix := fixtures.NewDBISnapFixtures()
 	mock := &fakeRDSDescribeDBSnapshots{Output: snapOutput(fix.Instances...)}
@@ -383,11 +371,10 @@ func TestD1_DbcSnapCopyingWitnessCarriesTheTransitionalFindingAlone(t *testing.T
 	}
 }
 
-// A witness has to survive wave 2 to be worth anything: a row that picks up a
-// Broken cross-ref finding renders that phrase in the status column instead, so
-// the state the fixture exists to demonstrate is never shown. Both lifecycle
-// witnesses are checked, because the parent lookup is the same for each and a
-// parent that only exists in the legacy pool is easy to miss.
+// A lifecycle fixture row that picks up a Broken cross-ref finding in wave 2
+// renders that phrase in the status column instead, hiding the state it
+// demonstrates. Both lifecycle fixtures are checked because the parent
+// lookup is the same for each.
 func TestD1_DbiSnapLifecycleWitnessesSurviveWave2(t *testing.T) {
 	enricher := dbiSnapEnricher(t)
 	fix := fixtures.NewDBISnapFixtures()

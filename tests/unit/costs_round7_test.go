@@ -1,17 +1,3 @@
-// costs_round7_test.go — Cost Explorer: seven contract pins.
-//
-// package unit_test (not unit): every finding here is reachable via the
-// headless app.Controller / pure core/costs / core/app package
-// surface — no TUI-level helper is needed, so this file reuses
-// costs_state_test.go's newCostsController/topDrill/fixedCostsNow/
-// monthRecord and costs_interaction_test.go's findFetchCostsTask directly
-// (same package).
-//
-// Item 7 (14-day cutoff day-truncation): the TestClampResourceDrillWindow_*
-// tests in costs_drill_test.go use a midnight `now`
-// (time.Date(2026,7,15,0,0,0,0,UTC)), where a missing day-truncation is
-// invisible (midnight minus 14 days is still midnight); the test below
-// covers a mid-afternoon `now`.
 package unit_test
 
 import (
@@ -46,9 +32,7 @@ func round7FullWindowRecords(window []costs.Period, rowKey string, amount float6
 // round7FullDailyRecords tiles every day of every period in window with one
 // costs.Record each — the native-daily shape a week-granularity fetch
 // actually returns and Store.Lookup's lookupContained requires to resolve
-// a week column at all (mirrors round5/round6's identical helper, package
-// unit_test's own local copy since this file cannot reach the package unit
-// one).
+// a week column.
 func round7FullDailyRecords(t *testing.T, window []costs.Period, rowKey string, amount float64) []costs.Record {
 	t.Helper()
 	var recs []costs.Record
@@ -72,13 +56,9 @@ func round7FullDailyRecords(t *testing.T, window []costs.Period, rowKey string, 
 	return recs
 }
 
-// ===========================================================================
-// Item 1 (P2, core/app/costs_state.go:~221 ForceRefreshCosts) — Ctrl+R
-// on a warm WEEK view must actually refresh: ExpireOpenPeriod receives the
-// DISPLAY window's week-length periods, but the store keys native DAY-
-// length periods for week granularity (APIGranularity()=="DAILY"), so the
-// delete-by-periodKey misses every entry and nothing expires.
-// ===========================================================================
+// ExpireOpenPeriod receives the display window's week-length periods, but
+// the store keys native day-length periods for week granularity
+// (APIGranularity()=="DAILY").
 
 func TestCostsRound7_Item1_ForceRefreshCosts_WarmWeekView_ExpiresNativeDailyPeriods(t *testing.T) {
 	c := newCostsController(t, fixedCostsNow)
@@ -97,7 +77,6 @@ func TestCostsRound7_Item1_ForceRefreshCosts_WarmWeekView_ExpiresNativeDailyPeri
 		t.Fatalf("precondition: expected Granularity week, got %q", weekTop.Granularity)
 	}
 
-	// Warm it: native DAILY records tiling the whole week window.
 	c.Handle(messages.CostsLoaded{
 		Query:    payload.Query,
 		Grid:     costs.GridResult{Fetched: true, Records: round7FullDailyRecords(t, weekTop.Window, "Amazon EC2", 10)},
@@ -114,12 +93,8 @@ func TestCostsRound7_Item1_ForceRefreshCosts_WarmWeekView_ExpiresNativeDailyPeri
 	}
 }
 
-// ===========================================================================
-// Item 2 (P2, core/costs/drill.go:~76 ResourceDrillAllowed) — the gate
-// must require the pinned SERVICE to be exactly "Amazon Elastic Compute
-// Cloud - Compute" (CE's hard requirement for GetCostAndUsageWithResources),
-// not merely one service.
-// ===========================================================================
+// CE's GetCostAndUsageWithResources requires the pinned SERVICE to be
+// exactly "Amazon Elastic Compute Cloud - Compute".
 
 func TestCostsRound7_Item2_ResourceDrillAllowed_RequiresExactlyEC2_NotAnySingleService(t *testing.T) {
 	now := time.Date(2026, 7, 10, 12, 0, 0, 0, time.UTC)
@@ -137,8 +112,6 @@ func TestCostsRound7_Item2_ResourceDrillAllowed_RequiresExactlyEC2_NotAnySingleS
 		t.Error("ResourceDrillAllowed refused the RDS drill with no reason — must explain honestly (FR-007), not silently no-op")
 	}
 
-	// Sanity control: EC2 itself must still be allowed (the existing,
-	// already-passing case this gate must not regress).
 	ec2 := costs.DrillLevel{
 		Filter: costs.Filter{Equals: map[costs.Dimension][]string{costs.DimensionService: {"Amazon Elastic Compute Cloud - Compute"}}},
 		Window: withinWindow,
@@ -148,12 +121,8 @@ func TestCostsRound7_Item2_ResourceDrillAllowed_RequiresExactlyEC2_NotAnySingleS
 	}
 }
 
-// ===========================================================================
-// Item 3 (P2, core/app/costs_state.go:~727 ApplyCostsLoaded/DataThrough)
-// — for open/estimated periods the inclusive data-through date caps at
-// cs.Now's date, not the bucket's exclusive-end-minus-one. Closed periods
-// are unchanged (kept exact via the reconciled D3 tests above).
-// ===========================================================================
+// For open/estimated periods the inclusive data-through date caps at
+// cs.Now's date; closed periods use the bucket's exclusive end minus one.
 
 func TestCostsRound7_Item3_DataThrough_CapsAtNowForOpenPeriod(t *testing.T) {
 	now := time.Date(2026, 7, 11, 15, 0, 0, 0, time.UTC)
@@ -187,31 +156,8 @@ func TestCostsRound7_Item3_DataThrough_ClosedPeriod_StillUsesExclusiveEndMinusOn
 	}
 }
 
-// ===========================================================================
-// Item 4 (P2, core/web/static/app.js + core/app/viewstate.go:72) —
-// the web costs screen must wire what its own footer hints
-// (CostsFooterHintsFor("web")) advertise: b/+/-/0-9 posting the costs
-// actions, and R triggering ForceRefreshCosts, not the generic list
-// refresh.
-//
-// Tested at two honest tiers (weaknesses flagged per tier, mirroring
-// round6 item 1's precedent):
-//
-//   A. app.js's keyMap is a static source-text check — it can catch a
-//      missing action-kind literal outright, but not a case that exists
-//      yet posts the wrong kind or arg.
-//   B. The Go-side control proves the underlying MECHANISM split: the
-//      exact action kind app.js's "R" key posts today ({kind:"refresh"})
-//      routes to the generic handleActionRefresh, never
-//      ForceRefreshCosts — which is currently reachable ONLY from
-//      internal/tui/runtime_adapter_navigate.go, a TUI-only call site with
-//      no equivalent in core/web/handlers.go's handleAction. This is a
-//      controller-level proxy for "the web POST route never reaches the
-//      costs handlers" — handleAction itself is unexported with zero
-//      existing core/web unit tests, so the actual HTTP layer is
-//      untestable from tests/unit (as item 1 of round6 already
-//      established for a sibling web gap).
-// ===========================================================================
+// app.js's keyMap is checked as source text: a missing action-kind literal
+// fails, a literal that posts the wrong kind or arg does not.
 
 func TestCostsRound7_Item4A_WebAppJS_KeyMapMissingCostsActions(t *testing.T) {
 	raw, err := os.ReadFile("../../core/web/static/app.js")
@@ -245,32 +191,19 @@ func TestCostsRound7_Item4B_GenericRefreshAction_DoesNotReachForceRefreshCosts(t
 		t.Fatal("precondition: SERVICE shape still Loading after a full warming delivery")
 	}
 
-	// The exact action kind app.js's "R" key posts today
-	// (keyMap: {key:"R", action:{kind:"refresh"}}). handleActionRefresh now
-	// special-cases the costs screen (c.topCostsState() != nil) and routes
-	// straight into forceRefreshCostsLocked() before falling through to the
-	// generic detail/list handling below it — so ActionRefresh on a warm
-	// costs shape DOES force-refresh today, same as the TUI-only
-	// ForceRefreshCosts() path.
+	// app.js's "R" key posts {kind:"refresh"}; handleActionRefresh routes the
+	// costs screen (c.topCostsState() != nil) into forceRefreshCostsLocked().
 	_, refreshTasks := c.Apply(app.Action{Kind: app.ActionRefresh})
 	if _, found := findFetchCostsTask(refreshTasks); !found {
 		t.Error("ActionRefresh (what web's \"R\" key posts today) emitted no KindFetchCosts task for the warm costs shape — want a force-refresh (handleActionRefresh routes costs screens through forceRefreshCostsLocked)")
 	}
 
-	// Control: ForceRefreshCosts itself (the TUI-only path) DOES correctly
-	// refresh the same warm shape — same mechanism ActionRefresh now reaches
-	// on the costs screen via handleActionRefresh.
 	directTasks := c.ForceRefreshCosts()
 	if _, found := findFetchCostsTask(directTasks); !found {
 		t.Error("control failed: ForceRefreshCosts() itself emitted no KindFetchCosts task for the warm shape — sanity check for this test's own setup, not the finding under test")
 	}
 }
 
-// TestCostsRound7_Item4B_GenericRefreshAction_NonCostsScreen_KeepsOldBehavior
-// pins the OTHER half of the ActionRefresh contract: on a non-costs screen
-// (a plain resource list), ActionRefresh must still route to the generic
-// list-refresh handler — the costs special-case in handleActionRefresh must
-// not leak into every screen kind.
 func TestCostsRound7_Item4B_GenericRefreshAction_NonCostsScreen_KeepsOldBehavior(t *testing.T) {
 	c := newTestController(t)
 	c.Apply(app.Action{Kind: app.ActionCommand, Arg: "ec2"})
@@ -284,13 +217,6 @@ func TestCostsRound7_Item4B_GenericRefreshAction_NonCostsScreen_KeepsOldBehavior
 		t.Error("ActionRefresh on a non-costs (ec2) list screen emitted a KindFetchCosts task — the costs special-case in handleActionRefresh must not fire outside a costs screen")
 	}
 }
-
-// ===========================================================================
-// Item 5 (P2, web sync partition) — a KindFetchCosts task from a cold web
-// navigation must be classified background/renderable like
-// KindFetchResources, so the POST returns the loading costs shell instead
-// of blocking until CE answers.
-// ===========================================================================
 
 func TestCostsRound7_Item5_KindFetchCosts_ClassifiedLikeKindFetchResources(t *testing.T) {
 	tests := []struct {
@@ -311,18 +237,6 @@ func TestCostsRound7_Item5_KindFetchCosts_ClassifiedLikeKindFetchResources(t *te
 	}
 }
 
-// ===========================================================================
-// Item 6 (core/app/costs_body.go + costs_state.go) — hiding zero rows must
-// keep SELECTION aligned, not just the highlight: applyCostsMoveRow and
-// applyCostsSelect index the same FILTERED view the display shows (one
-// source of truth), never the raw unfiltered liveCostGrid with a
-// render-only remap that is never written back into cs.DrillStack. The
-// mechanism is BuildViewModel's clamped Cursor, pinned at the typed seam in
-// costs_screen_test.go
-// (TestCostsScreen_BuildViewModel_CursorClamp_AlwaysValidIndex); this is
-// the full-stack pin.
-// ===========================================================================
-
 func TestCostsRound7_Item6_HiddenRowAbove_SelectionStaysAlignedWithDisplayedHighlight(t *testing.T) {
 	c := newCostsController(t, fixedCostsNow)
 	root := topDrill(t, c)
@@ -337,8 +251,7 @@ func TestCostsRound7_Item6_HiddenRowAbove_SelectionStaysAlignedWithDisplayedHigh
 
 	// "AWS Support (Business)" (hidden noise, single column 0.004 -> "0.0")
 	// sorts ABOVE "Amazon EC2" (net-zero total: +100/-100, abs total 0) in
-	// BuildGrid's raw desc-by-abs-total order, since 0.004 > 0 — exactly
-	// the "hidden row above a visible one" shape this finding needs.
+	// BuildGrid's raw desc-by-abs-total order, since 0.004 > 0.
 	c.Handle(messages.CostsLoaded{
 		Query: payload.Query,
 		Grid: costs.GridResult{Fetched: true, Records: []costs.Record{
@@ -360,9 +273,6 @@ func TestCostsRound7_Item6_HiddenRowAbove_SelectionStaysAlignedWithDisplayedHigh
 		t.Fatalf("precondition: expected CursorRow 0 (highlighting the only displayed row), got %d", vs.Body.Costs.CursorRow)
 	}
 
-	// The user sees "EC2" highlighted. Enter must drill INTO EC2 — not the
-	// hidden noise row that happens to rank first in the raw, unfiltered
-	// grid.
 	c.Apply(app.Action{Kind: app.ActionSelect})
 
 	stack := c.GetCostsDrillStack()
@@ -375,14 +285,9 @@ func TestCostsRound7_Item6_HiddenRowAbove_SelectionStaysAlignedWithDisplayedHigh
 		t.Errorf("drilled SERVICE = %v, want [\"Amazon EC2\"] (the row the user sees highlighted) — got the hidden noise row instead, proving Cursor.Row indexes the raw grid while the rendered highlight indexes the filtered one", got)
 	}
 
-	// Breadcrumb (not FooterNote, which only ever carries the cursor
-	// cell's own anomaly/delta note — verified directly, buildCostsBreadcrumb
-	// is the actual mechanism that names a drilled dimension value) must
-	// name the row the user actually saw highlighted. buildCostsBreadcrumb
-	// strips the "Amazon " vendor prefix off a SERVICE segment
-	// (stripCostsServiceVendorPrefix), same as the "EC2" row label already
-	// asserted above (line 355) — so the breadcrumb segment is "EC2", not
-	// the raw filter value "Amazon EC2" pinned in child.Filter.Equals above.
+	// buildCostsBreadcrumb names the drilled dimension value and strips the
+	// "Amazon " vendor prefix off a SERVICE segment
+	// (stripCostsServiceVendorPrefix).
 	breadcrumb := c.Snapshot().Body.Costs.Breadcrumb
 	found = false
 	for _, seg := range breadcrumb {
@@ -394,13 +299,6 @@ func TestCostsRound7_Item6_HiddenRowAbove_SelectionStaysAlignedWithDisplayedHigh
 		t.Errorf("Breadcrumb after drilling = %v, want a segment naming \"EC2\" (the row the user saw highlighted), not the hidden noise row", breadcrumb)
 	}
 }
-
-// ===========================================================================
-// Item 7 (P3, core/costs/drill.go:~50 ClampResourceDrillWindow) — the
-// 14-day retention cutoff must truncate now to the start of its day: a
-// period starting exactly 14 days ago at date level survives regardless of
-// time-of-day.
-// ===========================================================================
 
 func TestCostsRound7_Item7_ClampResourceDrillWindow_CutoffTruncatesToDayStart(t *testing.T) {
 	now := time.Date(2026, 7, 15, 15, 30, 0, 0, time.UTC) // mid-afternoon

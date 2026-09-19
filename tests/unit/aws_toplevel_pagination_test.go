@@ -28,10 +28,6 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// ---------------------------------------------------------------------------
-// Paginated mock: EC2 DescribeInstances
-// ---------------------------------------------------------------------------
-
 type mockEC2PaginatedClient struct {
 	outputs []*ec2.DescribeInstancesOutput
 	inputs  []*ec2.DescribeInstancesInput
@@ -148,10 +144,6 @@ func TestFetchEC2Instances_Pagination(t *testing.T) {
 		}
 	})
 }
-
-// ---------------------------------------------------------------------------
-// Paginated mock: Lambda ListFunctions
-// ---------------------------------------------------------------------------
 
 type mockLambdaPaginatedClient struct {
 	outputs []*lambda.ListFunctionsOutput
@@ -340,10 +332,6 @@ func TestFetchRDSInstances_Pagination(t *testing.T) {
 	})
 }
 
-// ---------------------------------------------------------------------------
-// Paginated mock: IAM ListRoles
-// ---------------------------------------------------------------------------
-
 type mockIAMListRolesPaginatedClient struct {
 	outputs []*iam.ListRolesOutput
 	inputs  []*iam.ListRolesInput
@@ -431,10 +419,6 @@ func TestFetchIAMRoles_Pagination(t *testing.T) {
 		}
 	})
 }
-
-// ---------------------------------------------------------------------------
-// Paginated mock: IAM ListUsers
-// ---------------------------------------------------------------------------
 
 type mockIAMListUsersPaginatedClient struct {
 	outputs []*iam.ListUsersOutput
@@ -524,10 +508,6 @@ func TestFetchIAMUsers_Pagination(t *testing.T) {
 	})
 }
 
-// ---------------------------------------------------------------------------
-// Paginated mock: IAM ListPolicies
-// ---------------------------------------------------------------------------
-
 type mockIAMListPoliciesPaginatedClient struct {
 	outputs []*iam.ListPoliciesOutput
 	inputs  []*iam.ListPoliciesInput
@@ -611,10 +591,6 @@ func TestFetchIAMPolicies_Pagination(t *testing.T) {
 		}
 	})
 }
-
-// ---------------------------------------------------------------------------
-// Paginated mock: CloudWatch Logs DescribeLogGroups
-// ---------------------------------------------------------------------------
 
 type mockCWLogsPaginatedClient struct {
 	outputs []*cloudwatchlogs.DescribeLogGroupsOutput
@@ -701,10 +677,6 @@ func TestFetchCloudWatchLogGroups_Pagination(t *testing.T) {
 		}
 	})
 }
-
-// ---------------------------------------------------------------------------
-// Paginated mock: DynamoDB ListTables
-// ---------------------------------------------------------------------------
 
 type mockDDBListTablesPaginatedClient struct {
 	outputs []*dynamodb.ListTablesOutput
@@ -901,13 +873,6 @@ func TestFetchSQSQueues_Pagination(t *testing.T) {
 	})
 }
 
-// ---------------------------------------------------------------------------
-// Paginated mock: SNS ListTopics
-// ---------------------------------------------------------------------------
-// The fake client for this operation now lives in fakes_sns_test.go
-// (fakeSNSListTopics) — see that file's header for the one-fake-per-
-// interface convention.
-
 func TestFetchSNSTopics_Pagination(t *testing.T) {
 	mock := &fakeSNSListTopics{
 		Pages: []*sns.ListTopicsOutput{
@@ -970,10 +935,6 @@ func TestFetchSNSTopics_Pagination(t *testing.T) {
 	})
 }
 
-// ---------------------------------------------------------------------------
-// Paginated mocks: KMS ListKeys + ListAliases
-// ---------------------------------------------------------------------------
-
 type mockKMSListKeysPaginatedClient struct {
 	outputs []*kms.ListKeysOutput
 	inputs  []*kms.ListKeysInput
@@ -1031,11 +992,9 @@ func (m *mockKMSListAliasesPaginatedClient) ListAliases(
 	return m.outputs[idx], nil
 }
 
-// kmsFullPaginatedFake composes the paginated ListKeys/ListAliases mocks
-// above with the plain mockKMSDescribeKeyClient into one awsclient.KMSAPI
-// value — FetchKMSKeysPage reads all three off a single *ServiceClients.KMS
-// field. GetKeyRotationStatus/ListGrants/GetKeyPolicy are stubbed empty since
-// the paginated fetcher never calls them.
+// kmsFullPaginatedFake composes the paginated ListKeys/ListAliases mocks with
+// mockKMSDescribeKeyClient: FetchKMSKeysPage reads all three off a single
+// *ServiceClients.KMS field.
 type kmsFullPaginatedFake struct {
 	*mockKMSListKeysPaginatedClient
 	*mockKMSDescribeKeyClient
@@ -1155,10 +1114,8 @@ func TestFetchKMSKeys_Pagination(t *testing.T) {
 	})
 
 	t.Run("list_aliases_called_four_times", func(t *testing.T) {
-		// FetchKMSKeysPage fully re-drains ListAliases (2 pages) from scratch
-		// on every single key page it fetches — 2 key pages x 2 alias pages
-		// each = 4 total calls, not 2 (the old FetchKMSKeys wrapper drained
-		// aliases exactly once for the whole multi-page fetch).
+		// FetchKMSKeysPage re-drains ListAliases (2 pages) on every key page:
+		// 2 key pages x 2 alias pages = 4 calls.
 		if listAliasesMock.calls != 4 {
 			t.Errorf("expected 4 ListAliases API calls, got %d", listAliasesMock.calls)
 		}
@@ -1173,10 +1130,6 @@ func TestFetchKMSKeys_Pagination(t *testing.T) {
 		}
 	})
 }
-
-// ---------------------------------------------------------------------------
-// Pagination error on second page tests
-// ---------------------------------------------------------------------------
 
 func TestFetchEC2Instances_PaginationErrorOnSecondPage(t *testing.T) {
 	errMock := &mockEC2PaginatedErrorOnPage2Client{

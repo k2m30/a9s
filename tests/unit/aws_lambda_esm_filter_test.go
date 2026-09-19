@@ -1,16 +1,8 @@
 package unit
 
-// Tests for the LambdaFake.ListEventSourceMappings ARN filter loop
-// (core/demo/fakes/lambda.go:30-41).
-//
-// The fixture has exactly one event source mapping:
-//   - function: process-orders
-//   - SQS ARN: arn:aws:sqs:us-east-1:123456789012:order-processing-queue
-//
-// Three paths:
-//   - nil EventSourceArn → returns all mappings (count > 0)
-//   - matching ARN → returns filtered subset (count == 1)
-//   - unknown ARN → returns empty (count == 0)
+// Tests for the LambdaFake.ListEventSourceMappings ARN filter
+// (core/demo/fakes/lambda.go). The fixture has exactly one event source
+// mapping: process-orders ← arn:aws:sqs:us-east-1:123456789012:order-processing-queue.
 
 import (
 	"context"
@@ -44,7 +36,6 @@ func TestLambdaFake_ListEventSourceMappings_NilARN(t *testing.T) {
 func TestLambdaFake_ListEventSourceMappings_MatchingARN(t *testing.T) {
 	f := fakes.NewLambda()
 
-	// First get total count for comparison.
 	allOut, _ := f.ListEventSourceMappings(context.Background(), &lambda.ListEventSourceMappingsInput{})
 	total := len(allOut.EventSourceMappings)
 

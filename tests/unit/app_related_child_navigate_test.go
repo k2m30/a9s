@@ -9,17 +9,10 @@ import (
 	"github.com/k2m30/a9s/v3/core/runtime/messages"
 )
 
-// ═══════════════════════════════════════════════════════════════════════════
-// handleRelatedNavigateChild tests
-// Coverage gap: child type routing from the related panel.
-// ═══════════════════════════════════════════════════════════════════════════
-
-// TestHandleRelatedNavigateChild_ValidChildType verifies that sending a
-// RelatedNavigateMsg with a registered child type produces an EnterChildViewMsg.
 func TestHandleRelatedNavigateChild_ValidChildType(t *testing.T) {
 	m := newRootSizedModel()
 
-	// "ecr_images" is a registered child type (ecr_images.go init).
+	// ecr_images is registered as a child type.
 	msg := messages.RelatedNavigate{
 		TargetType: "ecr_images",
 	}
@@ -37,13 +30,9 @@ func TestHandleRelatedNavigateChild_ValidChildType(t *testing.T) {
 	if enterMsg.ChildType != "ecr_images" {
 		t.Errorf("EnterChildViewMsg.ChildType = %q, want %q", enterMsg.ChildType, "ecr_images")
 	}
-	// Model state is unchanged (handleRelatedNavigateChild does not mutate stack).
 	_ = newM
 }
 
-// TestHandleRelatedNavigateChild_UnknownChildType verifies that sending a
-// RelatedNavigateMsg with an unregistered child type produces a FlashMsg with
-// IsError=true.
 func TestHandleRelatedNavigateChild_UnknownChildType(t *testing.T) {
 	m := newRootSizedModel()
 
@@ -57,8 +46,6 @@ func TestHandleRelatedNavigateChild_UnknownChildType(t *testing.T) {
 	}
 
 	result := cmd()
-	// The root model routes unknown types through ResolveRelatedNavigate which
-	// returns NavigationKindFlash for unregistered types (neither child nor top-level).
 	flashMsg, ok := result.(messages.Flash)
 	if !ok {
 		t.Fatalf("cmd() returned %T, want messages.Flash", result)
@@ -71,9 +58,6 @@ func TestHandleRelatedNavigateChild_UnknownChildType(t *testing.T) {
 	}
 }
 
-// TestResolveRelatedNavigate_ChildTypeReturnsKindEnterChildView verifies the
-// pure resolver returns NavigationKindEnterChildView for a registered child type,
-// exercising the handleRelatedNavigateChild dispatch condition directly.
 func TestResolveRelatedNavigate_ChildTypeReturnsKindEnterChildView(t *testing.T) {
 	ev := runtime.RelatedNavigateEvent{
 		TargetType: "ecr_images",
@@ -90,8 +74,6 @@ func TestResolveRelatedNavigate_ChildTypeReturnsKindEnterChildView(t *testing.T)
 	}
 }
 
-// TestResolveRelatedNavigate_UnknownTypeReturnsKindFlash verifies the pure
-// resolver returns NavigationKindFlash for an entirely unknown type.
 func TestResolveRelatedNavigate_UnknownTypeReturnsKindFlash(t *testing.T) {
 	ev := runtime.RelatedNavigateEvent{
 		TargetType: "nonexistent_xyz",

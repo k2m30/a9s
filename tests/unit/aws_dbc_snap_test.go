@@ -1,28 +1,11 @@
 package unit
 
-// aws_dbc_snap_test.go — Table-driven unit tests for the dbc-snap §4 phrase
-// computers.
+// computeDBCSnapFindings and computeRDSDBClusterSnapshotFindings are
+// unexported; these tests reach them through the per-SDK page fetchers.
 //
-// Spec: docs/resources/dbc-snap.md §3.1 + §4
-//
-// computeDBCSnapFindings/computeRDSDBClusterSnapshotFindings (core/aws) are
-// unexported, so these tests drive them black-box through the exported
-// per-SDK page fetchers (FetchDocDBClusterSnapshotsPage /
-// FetchRDSDBClusterSnapshotsPage — mirrors dbi-snap's fetchSnap pattern in
-// aws_dbi_snap_test.go), reading the computed phrase/Findings back off the
-// returned Resource:
-//
-//   Broken: failed, incompatible-* (exit early, Issues=[keyword])
-//   Warning: creating (Issues=["creating"])
-//   Warning: manual age > 365d (Issues=["manual, unused <N>d"])
-//   Healthy: ("", nil) — Status="available" AND not manual-old
-//
-// The manual-age rule applies ONLY to manual snapshots; automated-old is not
-// a fetcher-local signal (it is the cross-ref enricher's past-retention rule).
-//
-// DBClusterSnapshot has no PercentProgress-style cause for the "creating" state
-// (spec §4 note: "no per-snapshot failure-reason field on DBClusterSnapshot"),
-// so the Issues slice carries just "creating", not "creating: <pct>%".
+// DBClusterSnapshot carries no progress or failure-reason field, so a creating
+// snapshot's Issues holds just "creating". Old automated snapshots belong to the
+// cross-ref enricher's past-retention rule, not to the fetcher.
 
 import (
 	"context"
@@ -40,9 +23,6 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// dbcSnapDocDBSinglePageMock implements awsclient.DocDBDescribeDBClusterSnapshotsAPI
-// with a single fixed page — used to drive one DBClusterSnapshot through
-// FetchDocDBClusterSnapshotsPage per table-driven case.
 type dbcSnapDocDBSinglePageMock struct {
 	output *docdb.DescribeDBClusterSnapshotsOutput
 }
@@ -55,9 +35,6 @@ func (m *dbcSnapDocDBSinglePageMock) DescribeDBClusterSnapshots(
 	return m.output, nil
 }
 
-// dbcSnapRDSSinglePageMock implements awsclient.RDSDescribeDBClusterSnapshotsAPI
-// with a single fixed page — used to drive one DBClusterSnapshot through
-// FetchRDSDBClusterSnapshotsPage per table-driven case.
 type dbcSnapRDSSinglePageMock struct {
 	output *rds.DescribeDBClusterSnapshotsOutput
 }
@@ -70,7 +47,6 @@ func (m *dbcSnapRDSSinglePageMock) DescribeDBClusterSnapshots(
 	return m.output, nil
 }
 
-// findingPhrases extracts the ordered Phrase list from a Findings slice.
 func findingPhrases(findings []domain.Finding) []string {
 	phrases := make([]string, len(findings))
 	for i, f := range findings {
@@ -79,8 +55,6 @@ func findingPhrases(findings []domain.Finding) []string {
 	return phrases
 }
 
-// TestComputeDBCSnapStatusAndIssues pins the §4 phrase output and Issues slice
-// for each signal in docs/resources/dbc-snap.md §3.1.
 func TestComputeDBCSnapStatusAndIssues(t *testing.T) {
 	now := time.Now().UTC()
 	age400d := now.Add(-400 * 24 * time.Hour)
@@ -104,8 +78,6 @@ func TestComputeDBCSnapStatusAndIssues(t *testing.T) {
 			wantIssues: nil,
 		},
 		{
-			// DBClusterSnapshot has no PercentProgress-style field exposed for
-			// "creating" on the §4 table; Issues carries just "creating".
 			name: "creating_status",
 			snap: docdbtypes.DBClusterSnapshot{
 				DBClusterSnapshotIdentifier: aws.String("snap-creating"),
@@ -139,9 +111,6 @@ func TestComputeDBCSnapStatusAndIssues(t *testing.T) {
 			wantIssues: []string{"incompatible-restore"},
 		},
 		{
-			// manual-old: Status="available", SnapshotType="manual", age > 365d.
-			// List text per spec §4 table: "manual, unused <N>d" where N is the
-			// actual age in days. Snap is 400d old so phrase is "manual, unused 400d".
 			name: "manual_old_available",
 			snap: docdbtypes.DBClusterSnapshot{
 				DBClusterSnapshotIdentifier: aws.String("snap-manual-old"),
@@ -153,7 +122,6 @@ func TestComputeDBCSnapStatusAndIssues(t *testing.T) {
 			wantIssues: []string{"manual, unused 400d"},
 		},
 		{
-			// manual-young: Status="available", SnapshotType="manual", age=10d → healthy.
 			name: "manual_young_available",
 			snap: docdbtypes.DBClusterSnapshot{
 				DBClusterSnapshotIdentifier: aws.String("snap-manual-young"),
@@ -165,9 +133,6 @@ func TestComputeDBCSnapStatusAndIssues(t *testing.T) {
 			wantIssues: nil,
 		},
 		{
-			// automated-old: manual-age rule applies ONLY to manual snapshots per §3.1.
-			// An automated snapshot 400d old with available status is HEALTHY (the
-			// cross-ref enricher handles automated past-retention, not this function).
 			name: "automated_old_available_healthy",
 			snap: docdbtypes.DBClusterSnapshot{
 				DBClusterSnapshotIdentifier: aws.String("snap-automated-old"),
@@ -179,8 +144,6 @@ func TestComputeDBCSnapStatusAndIssues(t *testing.T) {
 			wantIssues: nil,
 		},
 		{
-			// Broken precedence wins; the manual-age Warning is suppressed when
-			// Status=failed (parity with dbi-snap §0.1).
 			name: "failed_with_manual_age_suppressed",
 			snap: docdbtypes.DBClusterSnapshot{
 				DBClusterSnapshotIdentifier: aws.String("snap-failed-manual-old"),
@@ -227,9 +190,6 @@ func TestComputeDBCSnapStatusAndIssues(t *testing.T) {
 	}
 }
 
-// TestComputeRDSDBClusterSnapshotStatusAndIssues pins the §4 phrase output and
-// Issues slice for ComputeRDSDBClusterSnapshotStatusAndIssues (rdstypes shape).
-// Algorithm mirrors ComputeDBCSnapStatusAndIssues — same precedence ladder.
 func TestComputeRDSDBClusterSnapshotStatusAndIssues(t *testing.T) {
 	now := time.Now().UTC()
 	age400d := now.Add(-400 * 24 * time.Hour)
@@ -286,8 +246,6 @@ func TestComputeRDSDBClusterSnapshotStatusAndIssues(t *testing.T) {
 			wantIssues: []string{"incompatible-restore"},
 		},
 		{
-			// manual-old: available + manual + age > 365d → "manual, unused Nd".
-			// 400d old → phrase is "manual, unused 400d".
 			name: "manual_old_available",
 			snap: rdstypes.DBClusterSnapshot{
 				DBClusterSnapshotIdentifier: aws.String("dbc-snap-manual-old"),
@@ -299,7 +257,6 @@ func TestComputeRDSDBClusterSnapshotStatusAndIssues(t *testing.T) {
 			wantIssues: []string{"manual, unused 400d"},
 		},
 		{
-			// manual-young: available + manual + age=10d → healthy (no issue).
 			name: "manual_young_available",
 			snap: rdstypes.DBClusterSnapshot{
 				DBClusterSnapshotIdentifier: aws.String("dbc-snap-manual-young"),
@@ -311,8 +268,6 @@ func TestComputeRDSDBClusterSnapshotStatusAndIssues(t *testing.T) {
 			wantIssues: nil,
 		},
 		{
-			// automated-old: manual-age rule applies ONLY to manual snapshots.
-			// An automated snapshot 400d old is healthy at the fetcher level.
 			name: "automated_old_available_healthy",
 			snap: rdstypes.DBClusterSnapshot{
 				DBClusterSnapshotIdentifier: aws.String("dbc-snap-auto-old"),
@@ -324,7 +279,6 @@ func TestComputeRDSDBClusterSnapshotStatusAndIssues(t *testing.T) {
 			wantIssues: nil,
 		},
 		{
-			// Broken precedence: failed suppresses the manual-age Warning.
 			name: "failed_with_manual_age_suppressed",
 			snap: rdstypes.DBClusterSnapshot{
 				DBClusterSnapshotIdentifier: aws.String("dbc-snap-failed-manual-old"),
@@ -336,7 +290,6 @@ func TestComputeRDSDBClusterSnapshotStatusAndIssues(t *testing.T) {
 			wantIssues: []string{"failed"},
 		},
 		{
-			// nil Status: should not panic; returns ("", nil).
 			name: "nil_status",
 			snap: rdstypes.DBClusterSnapshot{
 				DBClusterSnapshotIdentifier: aws.String("dbc-snap-nil-status"),
@@ -384,14 +337,6 @@ func TestComputeRDSDBClusterSnapshotStatusAndIssues(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// dbc-snap dual-SDK dedup-by-ID — DocDB-side wins.
-// ---------------------------------------------------------------------------
-
-// dbcSnapDocDBMock embeds fullDocDBMock (defined in aws_dbc_test.go, same
-// package) so it inherits all DocDBAPI methods, then overrides
-// DescribeDBClusterSnapshots to return scripted snapshot pages. Used to drive
-// the dbc-snap paginated fetcher through the dual-SDK overlap path.
 type dbcSnapDocDBMock struct {
 	fullDocDBMock
 	dbClusterSnapshotsPages []docdb.DescribeDBClusterSnapshotsOutput
@@ -411,8 +356,6 @@ func (m *dbcSnapDocDBMock) DescribeDBClusterSnapshots(
 	return &out, nil
 }
 
-// dbcSnapRDSMock embeds fullRDSMock and overrides DescribeDBClusterSnapshots
-// for the RDS side of the dual-SDK dedup test.
 type dbcSnapRDSMock struct {
 	fullRDSMock
 	dbClusterSnapshotsPages []rds.DescribeDBClusterSnapshotsOutput
@@ -432,12 +375,9 @@ func (m *dbcSnapRDSMock) DescribeDBClusterSnapshots(
 	return &out, nil
 }
 
-// TestDBCSnapFetcher_DedupesAcrossDualAPIByID pins the dedup rule
-// for cluster snapshots: when DocDB and RDS DescribeDBClusterSnapshots both
-// return the same DBClusterSnapshotIdentifier on the same fetch tick, the
-// dbc-snap fetcher must dedup by Resource.ID with first-occurrence wins.
-// DocDB-side rows are appended first, so the docdb-side row must be preserved
-// (engine-correct RawStruct used by detail enrichment / related-panel pivots).
+// DocDB and RDS DescribeDBClusterSnapshots can both return the same snapshot
+// identifier. The fetcher keeps the first occurrence and appends DocDB rows
+// first, so the engine-correct DocDB RawStruct survives.
 func TestDBCSnapFetcher_DedupesAcrossDualAPIByID(t *testing.T) {
 	fetcher := resource.GetPaginatedFetcher("dbc-snap")
 	if fetcher == nil {
@@ -447,8 +387,6 @@ func TestDBCSnapFetcher_DedupesAcrossDualAPIByID(t *testing.T) {
 	now := time.Now().UTC()
 	age10d := now.Add(-10 * 24 * time.Hour)
 
-	// Sub-test 1: same snapshot identifier on both DocDB and RDS pages — 1 row,
-	// docdb-side RawStruct preserved.
 	t.Run("overlap_keeps_docdb_side", func(t *testing.T) {
 		const sharedID = "shared-snap-01"
 		docdbMock := &dbcSnapDocDBMock{
@@ -501,7 +439,6 @@ func TestDBCSnapFetcher_DedupesAcrossDualAPIByID(t *testing.T) {
 		}
 	})
 
-	// Sub-test 2: distinct snapshot identifiers on each side — both rows preserved.
 	t.Run("no_overlap_keeps_both", func(t *testing.T) {
 		docdbMock := &dbcSnapDocDBMock{
 			dbClusterSnapshotsPages: []docdb.DescribeDBClusterSnapshotsOutput{
@@ -555,8 +492,6 @@ func TestDBCSnapFetcher_DedupesAcrossDualAPIByID(t *testing.T) {
 		}
 	})
 
-	// Sub-test 3: shared snapshot id + RDS-only unique on the same tick —
-	// deduped pair plus the unique RDS row both survive.
 	t.Run("overlap_plus_rds_only_keeps_two", func(t *testing.T) {
 		const sharedID = "shared-snap-02"
 		docdbMock := &dbcSnapDocDBMock{

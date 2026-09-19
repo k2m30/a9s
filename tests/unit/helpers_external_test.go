@@ -1,8 +1,7 @@
 package unit_test
 
 // helpers_external_test.go consolidates shared helpers for the unit_test
-// (external test) package.  Previously these lived inside qa_detail_test.go,
-// which duplicated helpers from helpers_test.go (package unit).
+// (external test) package.
 //
 // Shared by: qa_detail_test.go, qa_list_rawstruct_test.go,
 //            qa_s3_object_detail_test.go
@@ -102,10 +101,9 @@ func configForType(typeName string) *config.ViewsConfig {
 // ---------------------------------------------------------------------------
 
 // collectAllPages drains a paginated fetcher (a *Page function bound to its
-// ctx/api args via closure) until IsTruncated is false, mirroring the
-// deleted all-pages FetchX wrappers' exact semantics: append each page's
-// resources, stop on the first error (discarding any partial results), and
-// stop once Pagination is nil or IsTruncated is false.
+// ctx/api args via closure): append each page's resources, stop on the first
+// error (discarding any partial results), and stop once Pagination is nil or
+// IsTruncated is false.
 func collectAllPages(fetch func(token string) (resource.FetchResult, error)) ([]resource.Resource, error) {
 	return unit.CollectAllPages(fetch)
 }

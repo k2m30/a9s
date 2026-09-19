@@ -1,11 +1,8 @@
 package unit_test
 
-// aws6_one_key_per_fact_test.go — one Fields key per fact, and the standing
-// gate that keeps it that way.
-//
-// A fact written under two spellings is a fact that can disagree with itself:
-// one writer updates the key it knows and every reader of the other spelling
-// keeps rendering the stale value. The rule pinned here is that a row never
+// One Fields key per fact. A fact written under two spellings is a fact that
+// can disagree with itself: one writer updates the key it knows and every
+// reader of the other spelling keeps rendering the stale value. A row never
 // carries the same value under two keys that NAME THE SAME FACT — two
 // spellings of one name, differing only in case, underscores, or a trailing
 // id/name/arn suffix.
@@ -36,8 +33,8 @@ import (
 
 // oneFactAllowlist names a (source, key-a, key-b) triple that is permitted to
 // carry one value under two spellings, with the reason it cannot be one key.
-// It is empty: no such pair has a reason today, and a new entry needs one
-// written here before the gate accepts it.
+// It is empty; a new entry needs its reason written here before the gate
+// accepts it.
 var oneFactAllowlist = map[string]string{}
 
 // sameFactKey normalizes a Fields key to the FACT it names: case and
@@ -101,13 +98,9 @@ func reportDuplicateFacts(t *testing.T, source string, fields map[string]string)
 	}
 }
 
-// TestAMIStubCreatorWritesOneKeyPerFact pins the AMI stub: the id a pivot
-// named is one fact, so it is written once.
-//
-// A stub stands in for a row nobody listed, and it is the row the detail and
-// the console link read. Four keys for one id means four places a later real
-// fetch has to overwrite in step, and the path-cased pair exists only because
-// two readers each learned a different spelling.
+// The id a pivot named is one fact, so the AMI stub writes it once: a stub is
+// the row the detail and the console link read, and every extra key is another
+// place a later real fetch has to overwrite in step.
 func TestAMIStubCreatorWritesOneKeyPerFact(t *testing.T) {
 	td := resource.FindResourceType("ami")
 	if td == nil {
@@ -120,9 +113,8 @@ func TestAMIStubCreatorWritesOneKeyPerFact(t *testing.T) {
 	reportDuplicateFacts(t, "ami StubCreator", stub.Fields)
 }
 
-// TestAMIStubIDReadableUnderTheFetcherKey pins the SURVIVING spelling. Deleting
-// the duplicates is only correct if the key that stays is the one the fetcher
-// writes, so a stub row and a fetched row answer the same lookup.
+// The key the stub keeps is the one the fetcher writes, so a stub row and a
+// fetched row answer the same lookup.
 func TestAMIStubIDReadableUnderTheFetcherKey(t *testing.T) {
 	td := resource.FindResourceType("ami")
 	if td == nil {
@@ -147,14 +139,10 @@ func TestAMIStubIDReadableUnderTheFetcherKey(t *testing.T) {
 	}
 }
 
-// TestNoDemoRowCarriesAPathCasedFieldsKey is the reader half of row 1. A
-// path-cased reader ("ImageId", "InstanceId") only works because some writer
-// puts the value there; once no writer does, the second spelling reads nothing
-// and every reader has to use the fetcher's key.
-//
-// Pinning the absence of the key rather than the presence of the reader is what
-// makes the rule hold for readers nobody has written yet: there is no second
-// spelling to find.
+// A path-cased reader ("ImageId", "InstanceId") only works while some writer
+// puts the value there; with no writer, every reader uses the fetcher's key.
+// Pinning the absence of the key rather than the presence of a reader covers
+// readers nobody has written yet.
 func TestNoDemoRowCarriesAPathCasedFieldsKey(t *testing.T) {
 	clients := demo.NewServiceClients()
 	byType, _ := buildVisibilityTypeCache(t)
@@ -199,9 +187,8 @@ func TestNoDemoRowCarriesAPathCasedFieldsKey(t *testing.T) {
 	}
 }
 
-// TestTransferAgreementProfileIsOneKey pins row 2 on the demo bench: the
-// agreement detail enricher resolves each profile's AS2 id once and writes it
-// once.
+// The agreement detail enricher resolves each profile's AS2 id once and writes
+// it once.
 func TestTransferAgreementProfileIsOneKey(t *testing.T) {
 	clients := demo.NewServiceClients()
 	rows := demoTransferAgreements(t, clients)
@@ -230,9 +217,8 @@ func TestTransferAgreementProfileIsOneKey(t *testing.T) {
 	}
 }
 
-// TestTransferAgreementProfileReadableAfterDedup pins which spelling survives:
-// the detail must still show the AS2 id after the duplicate is deleted, so the
-// key that stays is the one the rendered detail reads.
+// The detail still shows the AS2 id, so the key that stays is the one the
+// rendered detail reads.
 func TestTransferAgreementProfileReadableAfterDedup(t *testing.T) {
 	clients := demo.NewServiceClients()
 	rows := demoTransferAgreements(t, clients)
@@ -275,12 +261,9 @@ func TestTransferAgreementProfileReadableAfterDedup(t *testing.T) {
 	}
 }
 
-// TestNoRowCarriesOneFactTwice is the standing gate row 3 asks for: the demo
-// account, walked the way the app walks it, carries no row with one fact under
-// two keys — through the fetcher, the StubCreator, and the detail enricher.
-//
-// It replaces the hand-run sweep. A hand-run parser is only as current as the
-// last time somebody remembered to run it, and it missed a form once.
+// The demo account, walked the way the app walks it, carries no row with one
+// fact under two keys — through the fetcher, the StubCreator, and the detail
+// enricher.
 func TestNoRowCarriesOneFactTwice(t *testing.T) {
 	clients := demo.NewServiceClients()
 	byType, _ := buildVisibilityTypeCache(t)

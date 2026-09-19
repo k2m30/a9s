@@ -10,18 +10,6 @@ import (
 	"github.com/k2m30/a9s/v3/core/runtime/messages"
 )
 
-// ═══════════════════════════════════════════════════════════════════════════
-// Demo pilot regression tests — fail before F1+F2 land, pass after.
-// ═══════════════════════════════════════════════════════════════════════════
-
-// ---------------------------------------------------------------------------
-// 1. TestDemo_S3ListDoesNotPanic
-//
-// Pre-fix: demo.NewServiceClients() returns nil S3 client → FetchS3BucketsPage
-// calls ListBuckets on nil *s3.Client → panic.
-// Post-fix: legacy demo transport handles ListBuckets, no nil client.
-// ---------------------------------------------------------------------------
-
 func TestDemo_S3ListDoesNotPanic(t *testing.T) {
 	m := newDemoColdCacheApp(t)
 
@@ -98,7 +86,6 @@ func TestDemo_S3ListDoesNotPanic(t *testing.T) {
 
 	switch v := res.msg.(type) {
 	case messages.ResourcesLoaded:
-		// After F1 lands the legacy transport should populate fixtures.
 		if len(v.Resources) == 0 {
 			t.Error("S3 fetch returned zero resources; expected demo fixture buckets")
 		}
@@ -110,18 +97,6 @@ func TestDemo_S3ListDoesNotPanic(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// 2. TestDemo_EC2RelatedPanelsPopulate
-//
-// Pre-fix: only EC2-backed checkers succeed. The four transport-dependent
-// checkers (tg, asg, alarm, cfn) require prefetch of their respective resource
-// types via nil clients → panic inside the fetcher → Count=-1.
-// Post-fix: legacy demo transport satisfies the prefetch, all four return Count >= 0.
-//
-// The test asserts these four named defs specifically — they are the ones that
-// need F1 (hybrid client) to pass.
-// ---------------------------------------------------------------------------
-
 func TestDemo_EC2RelatedPanelsPopulate(t *testing.T) {
 	m := newDemoColdCacheApp(t)
 
@@ -130,7 +105,6 @@ func TestDemo_EC2RelatedPanelsPopulate(t *testing.T) {
 	clients := demo.NewServiceClients()
 	*m, _ = rootApplyMsg(*m, messages.ClientsReady{Clients: clients, Gen: 1})
 
-	// Navigate to EC2 list.
 	var navCmd tea.Cmd
 	*m, navCmd = rootApplyMsg(*m, messages.Navigate{
 		Target:       messages.TargetResourceList,
@@ -151,7 +125,6 @@ func TestDemo_EC2RelatedPanelsPopulate(t *testing.T) {
 	}
 	*m, _ = rootApplyMsg(*m, loaded)
 
-	// Open detail for the first EC2 instance.
 	firstInstance := loaded.Resources[0]
 	var relatedCmd tea.Cmd
 	*m, relatedCmd = rootApplyMsg(*m, messages.Navigate{
@@ -183,12 +156,10 @@ func TestDemo_EC2RelatedPanelsPopulate(t *testing.T) {
 		t.Fatalf("expected at least one RelatedCheckResult from detail init, got: %v", types)
 	}
 
-	// Deliver all results to the model.
 	for _, r := range results {
 		*m, _ = rootApplyMsg(*m, r)
 	}
 
-	// Build a map of DisplayName → Count for easy lookup.
 	countByName := make(map[string]int)
 	for _, r := range results {
 		countByName[r.DefDisplayName] = r.Result.Count()
@@ -217,18 +188,6 @@ func TestDemo_EC2RelatedPanelsPopulate(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// 3. TestDemo_CtxCommandBlocked
-//
-// Pre-fix: handleNavigate(TargetProfile) calls m.fetchProfiles() with no demo
-// guard — no FlashMsg, no error, just starts a real AWS profile lookup that
-// would hang or return unexpected results in tests.
-// Post-fix (F2): guard checks preSuppliedClients != nil and returns an error
-// FlashMsg with a descriptive message.
-//
-// Same shape for :region.
-// ---------------------------------------------------------------------------
-
 func TestDemo_CtxCommandBlocked(t *testing.T) {
 	t.Run("ctx_blocked", func(t *testing.T) {
 		m := newDemoColdCacheApp(t)
@@ -244,9 +203,8 @@ func TestDemo_CtxCommandBlocked(t *testing.T) {
 			t.Fatal("expected a cmd after NavigateMsg{TargetProfile}, got nil")
 		}
 
-		// Pre-fix: profileCmd is m.fetchProfiles() — it returns a SelectorModel push,
-		// not a FlashMsg. The test fails because msg is not a FlashMsg.
-		// Post-fix: profileCmd returns FlashMsg{IsError: true}.
+		// In demo mode profileCmd returns FlashMsg{IsError: true} rather than
+		// pushing a selector.
 		msg := profileCmd()
 		flash, ok := msg.(messages.Flash)
 		if !ok {
@@ -271,8 +229,7 @@ func TestDemo_CtxCommandBlocked(t *testing.T) {
 		var regionCmd tea.Cmd
 		*m, regionCmd = rootApplyMsg(*m, messages.Navigate{Target: messages.TargetRegion})
 
-		// Pre-fix: TargetRegion pushes a view inline and returns nil cmd (no guard).
-		// Post-fix (F2): guard fires before pushing view, returns FlashMsg cmd.
+		// The guard fires before the view is pushed and returns a FlashMsg cmd.
 		if regionCmd == nil {
 			t.Fatalf("TargetRegion in demo mode returned nil cmd — " +
 				"demo guard is missing; pre-fix pushes region selector inline instead of blocking")

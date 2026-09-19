@@ -35,8 +35,7 @@ func TestDemo_NoDemoModeBranches(t *testing.T) {
 			if !strings.HasSuffix(path, ".go") {
 				return nil
 			}
-			// Skip test files — they are allowed to reference demoMode in helper
-			// harnesses or setup code during the migration period.
+			// Test files may reference demoMode in helper harnesses and setup code.
 			if strings.HasSuffix(path, "_test.go") {
 				return nil
 			}

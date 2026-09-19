@@ -7,10 +7,6 @@ import (
 	"github.com/k2m30/a9s/v3/core/semantics/ctevent"
 )
 
-// ---------------------------------------------------------------------------
-// helpers
-// ---------------------------------------------------------------------------
-
 // mustParseEvent calls Parse and fails immediately if it returns an error or nil.
 // Use only in happy-path subtests.
 func mustParseEvent(t *testing.T, rawJSON string) *ctevent.Event {
@@ -24,10 +20,6 @@ func mustParseEvent(t *testing.T, rawJSON string) *ctevent.Event {
 	}
 	return ev
 }
-
-// ---------------------------------------------------------------------------
-// 1. Happy path × all userIdentity variants
-// ---------------------------------------------------------------------------
 
 func TestCTDetailParse_UserIdentity_IAMUser(t *testing.T) {
 	raw := `{
@@ -121,7 +113,7 @@ func TestCTDetailParse_UserIdentity_AssumedRole(t *testing.T) {
 }
 
 func TestCTDetailParse_UserIdentity_IdentityCenterUser(t *testing.T) {
-	// IdentityCenterUser / SSO — bearer-token-based direct IDC API calls (§4.9)
+	// IdentityCenterUser / SSO — bearer-token-based direct IDC API calls
 	raw := `{
 		"eventVersion": "1.11",
 		"eventTime": "2024-01-15T12:00:00Z",
@@ -394,7 +386,7 @@ func TestCTDetailParse_UserIdentity_Directory(t *testing.T) {
 	}
 }
 
-// AssumedRole with AWSReservedSSO_ issuer — SSO "human via permission set" pattern (§4.3)
+// AssumedRole with AWSReservedSSO_ issuer — SSO "human via permission set" pattern
 func TestCTDetailParse_UserIdentity_AssumedRole_SSO(t *testing.T) {
 	raw := `{
 		"eventVersion": "1.11",
@@ -443,10 +435,6 @@ func TestCTDetailParse_UserIdentity_AssumedRole_SSO(t *testing.T) {
 		t.Errorf("SessionIssuer.UserName %q does not have AWSReservedSSO_ prefix", issuer.UserName)
 	}
 }
-
-// ---------------------------------------------------------------------------
-// 2. Dispatch matrix — EventCategory × EventType
-// ---------------------------------------------------------------------------
 
 func TestCTDetailParse_Dispatch_Management_AwsApiCall(t *testing.T) {
 	raw := `{
@@ -571,12 +559,7 @@ func TestCTDetailParse_Dispatch_NetworkActivity(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// 3. Missing optional fields — no error, zero-valued
-// ---------------------------------------------------------------------------
-
 func TestCTDetailParse_MissingOptionalFields(t *testing.T) {
-	// No responseElements, no errorCode, no sessionContext.webIdFederationData
 	raw := `{
 		"eventVersion": "1.11",
 		"eventTime": "2024-03-01T10:00:00Z",
@@ -611,27 +594,19 @@ func TestCTDetailParse_MissingOptionalFields(t *testing.T) {
 	}`
 	ev := mustParseEvent(t, raw)
 
-	// ResponseElements absent → nil map
 	if ev.ResponseElements != nil {
 		t.Errorf("ResponseElements = %v, want nil", ev.ResponseElements)
 	}
-	// ErrorCode absent → empty string
 	if ev.ErrorCode != "" {
 		t.Errorf("ErrorCode = %q, want empty", ev.ErrorCode)
 	}
-	// ErrorMessage absent → empty string
 	if ev.ErrorMessage != "" {
 		t.Errorf("ErrorMessage = %q, want empty", ev.ErrorMessage)
 	}
-	// No webIdFederationData → field is nil
 	if ev.UserIdentity.SessionContext != nil && ev.UserIdentity.SessionContext.WebIDFederationData != nil {
 		t.Errorf("WebIDFederationData should be nil when not present in JSON")
 	}
 }
-
-// ---------------------------------------------------------------------------
-// 4. Error paths
-// ---------------------------------------------------------------------------
 
 func TestCTDetailParse_Error_EmptyInput(t *testing.T) {
 	_, err := ctevent.Parse("")
@@ -652,10 +627,6 @@ func TestCTDetailParse_Error_MalformedJSON(t *testing.T) {
 		t.Errorf("error message = %q, want to contain %q", err.Error(), "ctdetail: parse failed:")
 	}
 }
-
-// ---------------------------------------------------------------------------
-// 5. Verb classification
-// ---------------------------------------------------------------------------
 
 func TestCTDetailParse_Verb_Read(t *testing.T) {
 	raw := `{
@@ -734,10 +705,6 @@ func TestCTDetailParse_Verb_Write(t *testing.T) {
 		t.Errorf("Verb = %q for PutObject, want %q", ev.Verb, "W")
 	}
 }
-
-// ---------------------------------------------------------------------------
-// 6. Unknown identity type — graceful fallback
-// ---------------------------------------------------------------------------
 
 func TestCTDetailParse_UserIdentity_FuturePrincipal(t *testing.T) {
 	// A hypothetical future type not yet in the taxonomy must parse without error.

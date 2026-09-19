@@ -40,8 +40,6 @@ func snsSrcResource() resource.Resource {
 	}
 }
 
-// --- Alarm checker tests (Pattern C — reverse lookup in alarm cache) ---
-
 func TestRelated_SNS_Alarm_Found(t *testing.T) {
 	alarmRes := resource.Resource{
 		ID:     "test-alarm",
@@ -70,7 +68,7 @@ func TestRelated_SNS_Alarm_Found(t *testing.T) {
 }
 
 func TestRelated_SNS_Alarm_MultipleActions(t *testing.T) {
-	// Alarm has the same topic ARN in both AlarmActions and OKActions — should still count=1 (same alarm).
+	// An alarm naming the topic in several action lists counts once.
 	alarmRes := resource.Resource{
 		ID:     "multi-action-alarm",
 		Fields: map[string]string{},
@@ -173,17 +171,10 @@ func TestRelated_SNS_Alarm_EmptyCache(t *testing.T) {
 	checker := snsCheckerByTarget(t, "alarm")
 	result := checker(context.Background(), nil, snsSrcResource(), cache)
 
-	// No clients, cache miss → -1 (unknown).
 	if result.State() != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (unknown — empty cache, no clients)", result.Count())
 	}
 }
-
-// TestRelated_SNS_CFN_ReturnsUnknown was deleted: sns→cfn is in the Explicitly
-// excluded list (unanimous sometimes — tag-heuristic only).
-// See docs/related-resources.md "Explicitly excluded" section.
-
-// --- InsufficientDataActions coverage ---
 
 func TestRelated_SNS_Alarm_InsufficientDataActions(t *testing.T) {
 	alarmRes := resource.Resource{
@@ -205,5 +196,3 @@ func TestRelated_SNS_Alarm_InsufficientDataActions(t *testing.T) {
 		t.Errorf("Count = %d, want 1 (InsufficientDataActions match)", result.Count())
 	}
 }
-
-// --- Demo checker test ---

@@ -1,28 +1,8 @@
-// costs_review2_test.go — Cost Explorer coverage and grid-label pins.
-//
-// package unit (not unit_test): R7 needs the full TUI Model
-// (newRootSizedModel/rootApplyMsg/ctrlR/drainCmds, package-unit-only)
-// alongside the headless-Controller/Store/aws-layer pins, and Go permits
-// only one package per file. The review*-prefixed helpers (reviewNow,
-// reviewCostsController, reviewCostsControllerNoIsolation, reviewTopDrill,
-// reviewBaseServiceQuery, reviewFullMetricRecord, reviewFindFetchCostsTask)
-// are defined in costs_review_findings_test.go.
-//
-//  1. core/costs/store.go: Store.MergeCoverage(q Query, covered []Period,
-//     now time.Time) stamps every period in `covered` as fetched-at-now,
-//     including periods with zero matching records — Merge alone can only
-//     learn a period exists from its own records' Period field, so a CE
-//     result with zero groups for a period (a young account, or spend fully
-//     filtered out) would otherwise be invisible to it and Lookup would
-//     report that period missing forever. Follows Merge's own
-//     closed-immutable/open-always-refreshes rule.
-//  2. core/costs/grid.go: ApplyRowAttrs(g Grid, attrs map[string]string)
-//     Grid relabels Rows[i].Label to "name (id)" when attrs has an entry for
-//     Rows[i].Key, leaving unmatched keys as the raw ID, as a post-processing
-//     step over an already-built Grid rather than a BuildGrid parameter.
-//
-// Contract: specs/021-cost-explorer/data-model.md, spec.md FR-007/FR-012/
-// FR-014/FR-017.
+// Store.MergeCoverage stamps every period in `covered` as fetched-at-now,
+// including periods with zero matching records: Merge learns a period exists
+// only from its records' Period field, so a CE result with zero groups for a
+// period (a young account, or spend fully filtered out) would leave Lookup
+// reporting that period missing forever.
 package unit
 
 import (
@@ -61,10 +41,8 @@ func review2WindowContainsPeriod(window []costs.Period, target costs.Period) boo
 	return false
 }
 
-// ===========================================================================
-// R2 (P2) — a successfully fetched period with ZERO records (young account,
-// or spend fully filtered out) must be remembered as covered.
-// ===========================================================================
+// A successfully fetched period with zero records (young account, or spend
+// fully filtered out) must be remembered as covered.
 
 func TestCostsReview2_R2_ZeroRecordPeriod_MergeCoverage_NotReportedMissing(t *testing.T) {
 	t.Setenv("A9S_CONFIG_FOLDER", t.TempDir())
@@ -106,11 +84,8 @@ func TestCostsReview2_R2_ZeroRecordPeriod_MergeCoverage_NotReportedMissing(t *te
 	}
 }
 
-// ===========================================================================
-// R3 (P1) — opening the costs screen with a warm cache must perform ZERO CE
-// fetches: HandleNavigate must not emit an unconditional KindFetchCosts —
-// ensureCostsShapeFetched decides (SC-002).
-// ===========================================================================
+// Opening the costs screen with a warm cache performs zero CE fetches:
+// ensureCostsShapeFetched decides, not HandleNavigate.
 
 func TestCostsReview2_R3_MainMenuNavigateToCosts_WarmCache_ZeroFetches(t *testing.T) {
 	t.Setenv("A9S_CONFIG_FOLDER", t.TempDir())
@@ -127,11 +102,8 @@ func TestCostsReview2_R3_MainMenuNavigateToCosts_WarmCache_ZeroFetches(t *testin
 		recs = append(recs, reviewFullMetricRecord(p, "Amazon EC2", 1000.0+float64(i)))
 	}
 	seed.Merge(reviewBaseServiceQuery(), recs, now) // every closed + the fresh open period covered
-	// Also seed a fresh anomaly slot (screen.PlanFetch's Grid/Anomalies
-	// freshness derive independently now) so this test's "zero fetches"
-	// expectation still holds unconditionally, not just for the grid half.
-	// covered is the window under test — the exact range this scenario's
-	// anomaly snapshot is standing in for.
+	// A fresh anomaly slot keeps the zero-fetch expectation true for the anomaly
+	// half too: Grid and Anomalies freshness derive independently.
 	seed.PutAnomalies(nil, now, costs.Period{Start: window[0].Start, End: window[len(window)-1].End})
 	if err := seed.Save(); err != nil {
 		t.Fatalf("seeding on-disk cost cache: %v", err)
@@ -144,11 +116,9 @@ func TestCostsReview2_R3_MainMenuNavigateToCosts_WarmCache_ZeroFetches(t *testin
 	c := newBlessedController(t, core)
 	t.Cleanup(c.Close)
 
-	// Navigate to Costs via the real headless menu-select path (the same
-	// code HandleNavigate/applyNavResult chain a web/headless client uses —
-	// SC-002), not the ApplyIntents/EnsureCostsState test-seam shortcut
-	// reviewCostsControllerNoIsolation uses (that seam bypasses HandleNavigate
-	// entirely, so it cannot exercise this bug).
+	// The real headless menu-select path runs HandleNavigate/applyNavResult; the
+	// ApplyIntents/EnsureCostsState seam in reviewCostsControllerNoIsolation
+	// bypasses HandleNavigate.
 	c.Apply(app.Action{Kind: app.ActionSetFilter, Arg: "costs"})
 	c.Apply(app.Action{Kind: app.ActionMoveTop})
 	vs, tasks := c.Apply(app.Action{Kind: app.ActionSelect})
@@ -164,18 +134,14 @@ func TestCostsReview2_R3_MainMenuNavigateToCosts_WarmCache_ZeroFetches(t *testin
 	}
 }
 
-// ===========================================================================
-// R4 (P1) — a CostsLoaded whose Query does not match the awaited top-frame
-// query must not clear Loading or install ErrorMsg for the active shape
-// (its records may still merge); only the matching result clears Loading.
-// ===========================================================================
+// A CostsLoaded whose Query does not match the awaited top-frame query must
+// not clear Loading or install ErrorMsg for the active shape; its records
+// still merge.
 
 func TestCostsReview2_R4_ApplyCostsLoaded_MismatchedQuery_DoesNotClearLoadingOrError_ButStillMerges(t *testing.T) {
 	c := newCostsScreenController(t, reviewNow)
 	window := reviewTopDrill(t, c).Window
 
-	// Shape A: the default root frame (SERVICE pivot) against an empty
-	// store — re-evaluating it dispatches (and awaits) its fetch.
 	_, tasksA := c.Apply(app.Action{Kind: app.ActionCostPivot, N: 1}) // SERVICE, already the current pivot
 	if _, found := reviewFindFetchCostsTask(tasksA); !found {
 		t.Fatal("precondition: shape A (SERVICE) did not emit a KindFetchCosts task against the empty store")
@@ -246,11 +212,9 @@ func TestCostsReview2_R4_ApplyCostsLoaded_MismatchedQuery_DoesNotClearLoadingOrE
 	}
 }
 
-// ===========================================================================
-// R5 (P2) — after a drill, the body's Pivot/row-label header must reflect
-// the TOP DrillLevel's actual RowDim, not the stale digit-key pivot from
-// before the drill; popping restores the outer label.
-// ===========================================================================
+// After a drill, the body's Pivot/row-label header reflects the top
+// DrillLevel's RowDim, not the digit-key pivot from before the drill; popping
+// restores the outer label.
 
 func TestCostsReview2_R5_Drill_PivotHeaderReflectsTopFrameRowDim_NotStaleDigitPivot(t *testing.T) {
 	c := newCostsScreenController(t, reviewNow)
@@ -274,9 +238,8 @@ func TestCostsReview2_R5_Drill_PivotHeaderReflectsTopFrameRowDim_NotStaleDigitPi
 		Requests: 1,
 	})
 
-	// Drill (Enter) into the cursor's cell — FR-006 pivots the CHILD
-	// frame's RowDim to the next dimension in the chain, without touching
-	// cs.Pivot (only the digit-key handler writes that field).
+	// Drilling pivots the child frame's RowDim to the next dimension in the chain
+	// without touching cs.Pivot, which only the digit-key handler writes.
 	c.Apply(app.Action{Kind: app.ActionSelect})
 
 	top := reviewTopDrill(t, c)
@@ -295,11 +258,9 @@ func TestCostsReview2_R5_Drill_PivotHeaderReflectsTopFrameRowDim_NotStaleDigitPi
 	}
 }
 
-// ===========================================================================
-// R6 (P2) — anomaly marks must flow end to end through the demo transport:
-// fetch -> CostsLoaded.Anomalies -> Store -> grid CELL mark -> footer root
-// cause when the cursor is on the flagged cell.
-// ===========================================================================
+// Anomaly marks flow end to end through the demo transport: fetch ->
+// CostsLoaded.Anomalies -> Store -> grid cell mark -> footer root cause when
+// the cursor is on the flagged cell.
 
 func TestCostsReview2_R6_DemoTransport_AnomalyFlowsToCellMarkAndFooter(t *testing.T) {
 	t.Setenv("A9S_CONFIG_FOLDER", t.TempDir())
@@ -318,9 +279,6 @@ func TestCostsReview2_R6_DemoTransport_AnomalyFlowsToCellMarkAndFooter(t *testin
 	// CostsGrowthMonth, a fixed offset inside that same window).
 	c.EnsureCostsState(costsFixtureAnchorNow(t))
 
-	// Force the default root frame's shape fetch and execute it for real
-	// against the demo transport — the exact code path FR-014's anomaly
-	// overlay must flow through end to end.
 	_, tasks := c.Apply(app.Action{Kind: app.ActionCostPivot, N: 1}) // SERVICE, already current
 	payload, found := reviewFindFetchCostsTask(tasks)
 	if !found {
@@ -353,10 +311,8 @@ func TestCostsReview2_R6_DemoTransport_AnomalyFlowsToCellMarkAndFooter(t *testin
 	growthRowLabel := strings.TrimPrefix(strings.TrimPrefix(fixtures.CostsGrowthService, "Amazon "), "AWS ")
 
 	vs := c.Snapshot()
-	// The cursor's column is preserved across a pivot now (it no longer
-	// resets to 0) — the root frame opened at the newest column (FR-002),
-	// so that's where we start from; the scroll arithmetic below must be a
-	// DELTA from here, not an absolute count of right-scrolls from 0.
+	// The cursor's column is preserved across a pivot and the root frame opens at
+	// the newest column, so the scroll arithmetic below is a delta from there.
 	startCol := vs.Body.Costs.CursorCol
 	rowIdx, colIdx := -1, -1
 	for ri, row := range vs.Body.Costs.Rows {
@@ -408,7 +364,6 @@ func TestCostsReview2_R6_DemoTransport_AnomalyFlowsToCellMarkAndFooter(t *testin
 	}
 }
 
-// review2ContainsAll reports whether s contains every one of subs.
 func review2ContainsAll(s string, subs ...string) bool {
 	for _, sub := range subs {
 		if !strings.Contains(s, sub) {
@@ -418,10 +373,8 @@ func review2ContainsAll(s string, subs ...string) bool {
 	return true
 }
 
-// ===========================================================================
-// R7 (P2) — Ctrl+R on the costs screen must force-refresh: the open period
-// is re-fetched even though the cache is fresh (FR-012).
-// ===========================================================================
+// Ctrl+R on the costs screen force-refreshes: the open period is re-fetched
+// even though the cache is fresh.
 
 func TestCostsReview2_R7_CtrlR_OnCostsScreen_ForcesOpenPeriodRefetch(t *testing.T) {
 	m := newRootSizedModel()
@@ -439,9 +392,7 @@ func TestCostsReview2_R7_CtrlR_OnCostsScreen_ForcesOpenPeriodRefetch(t *testing.
 	}
 
 	m, navCmd := rootApplyMsg(m, messages.Navigate{Target: messages.TargetCosts})
-	// Drain the navigation's own cmd chain first, so whatever it does or
-	// does not fetch (a separate concern from R7) is resolved before
-	// isolating Ctrl+R's own effect.
+	// Draining the navigation's own cmd chain first isolates Ctrl+R's effect.
 	m, _ = drainCmds(t, m, navCmd, 10)
 
 	m, refreshCmd := rootApplyMsg(m, ctrlR())
@@ -459,10 +410,8 @@ func TestCostsReview2_R7_CtrlR_OnCostsScreen_ForcesOpenPeriodRefetch(t *testing.
 	}
 }
 
-// ===========================================================================
-// R8 (P2) — LINKED_ACCOUNT pivot rows must label as "name (id)" using the
-// store's attrs; raw ID only when no attr exists for that key.
-// ===========================================================================
+// LINKED_ACCOUNT pivot rows label as "name (id)" from the store's attrs, raw
+// ID only when no attr exists for that key.
 
 func TestCostsReview2_R8_LinkedAccountPivot_RowLabel_NameParensID(t *testing.T) {
 	g := costs.Grid{
@@ -487,38 +436,25 @@ func TestCostsReview2_R8_LinkedAccountPivot_RowLabel_NameParensID(t *testing.T) 
 	}
 }
 
-// ===========================================================================
-// R9 (P1) — the resource-drill 14-day gate must validate the WINDOW the
-// drill will actually query (BuildWindow's finer-granularity output, which
-// can start earlier than the clipped selected period), not merely the
-// selected cell's own period. Contract (explicitly pinned): CLAMP the
-// expanded window to now-14d and allow the drill; refuse only when nothing
-// remains after clamping.
-// ===========================================================================
+// The resource-drill 14-day gate validates the window the drill will query
+// (BuildWindow's finer-granularity output, which can start earlier than the
+// clipped selected period): the expanded window is clamped to now-14d and the
+// drill is allowed; it is refused only when nothing remains after clamping.
 
 func TestCostsReview2_R9_ResourceDrillGate_NearBoundary_ClampsExpandedWindow_NotRefuse(t *testing.T) {
-	// Midnight UTC (not reviewNow's noon) so the 14-day cutoff falls on a
-	// clean date boundary that lines up exactly with the clipped week
-	// period's Start below — isolates the window-expansion bug from any
-	// time-of-day rounding.
+	// Midnight UTC puts the 14-day cutoff on the date boundary the clipped week
+	// period's Start lines up with, clear of time-of-day rounding.
 	now := time.Date(2026, time.July, 15, 0, 0, 0, 0, time.UTC)
 	cutoff := now.AddDate(0, 0, -14) // 2026-07-01, 00:00 UTC
 
 	c := newCostsScreenController(t, now)
 
-	// Move the cursor to the last (open) column — July 2026 — of the
-	// default 12-month root window, then drill in twice: SERVICE ->
-	// USAGE_TYPE (week granularity) -> RESOURCE_ID (day granularity, the
-	// gated drill).
 	rootWindow := reviewTopDrill(t, c).Window
 
-	// Seed the root SERVICE-pivoted grid so the first Enter pins a REAL
-	// service, not "" — round7's ResourceDrillAllowed now requires the
-	// pinned SERVICE to be exactly EC2 (CE's GetCostAndUsageWithResources
-	// hard constraint), and an empty string is no longer vacuously
-	// accepted by a count-only check. Cursor starts at (row 0, col
-	// len-1==newest), and this is the ONLY seeded row, so row 0 resolves
-	// to it regardless of which column the cursor is later scrolled to.
+	// ResourceDrillAllowed requires the pinned SERVICE to be exactly EC2 (CE's
+	// GetCostAndUsageWithResources constraint), so the root grid is seeded with a
+	// real service row. It is the only row, so row 0 resolves to it whichever
+	// column the cursor is on.
 	c.Handle(messages.CostsLoaded{
 		Query:    reviewBaseServiceQuery(),
 		Grid:     costs.GridResult{Fetched: true, Records: []costs.Record{reviewFullMetricRecord(rootWindow[len(rootWindow)-1], "Amazon Elastic Compute Cloud - Compute", 1200.0)}},
@@ -540,20 +476,17 @@ func TestCostsReview2_R9_ResourceDrillGate_NearBoundary_ClampsExpandedWindow_Not
 		t.Fatalf("precondition: week[0].Start got %q want %q — the boundary scenario depends on this exact clip", weekTop.Window[0].Start, "2026-07-01")
 	}
 
-	// The pushed child frame now opens with the cursor on its own newest
-	// column (FR-002, applyCostsSelect's PushDrill case) — scroll it back
-	// to col 0 so the record delivered below, and the next Select, target
-	// week[0], the exact boundary-adjacent cell this test is about.
-	// ActionScrollLeft clamps at col 0 (WEEK granularity never triggers the
-	// month-only scroll-to-load extension), so over-scrolling is safe.
+	// A pushed child frame opens on its current column (applyCostsSelect's
+	// PushDrill case); scrolling back to col 0 targets week[0], the
+	// boundary-adjacent cell. ActionScrollLeft clamps at col 0 (week granularity
+	// never triggers the month-only scroll-to-load extension).
 	for range weekTop.Window {
 		c.Apply(app.Action{Kind: app.ActionScrollLeft})
 	}
 
-	// Loading gates Select unconditionally now (screen.Select's
-	// WaitForRows) — the USAGE_TYPE frame's own fetch must land before the
-	// next Enter. Seeded at week[0] (the cursor's cell after scrolling back
-	// to col 0) so the grid still has a real row there after landing.
+	// Loading gates Select (screen.Select's WaitForRows), so the USAGE_TYPE fetch
+	// lands before the next Enter, seeded at week[0] so the grid has a real row
+	// under the cursor.
 	drill1Payload, found := reviewFindFetchCostsTask(drill1Tasks)
 	if !found {
 		t.Fatal("precondition: SERVICE -> USAGE_TYPE drill did not emit a fetch task")
@@ -565,8 +498,6 @@ func TestCostsReview2_R9_ResourceDrillGate_NearBoundary_ClampsExpandedWindow_Not
 		Requests: 1,
 	})
 
-	// Drill again: USAGE_TYPE -> RESOURCE_ID. Cursor is scrolled back to
-	// col 0, pointing at week[0].
 	c.Apply(app.Action{Kind: app.ActionSelect})
 
 	stack := c.GetCostsDrillStack()

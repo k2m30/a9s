@@ -26,8 +26,6 @@ func dbiSnapCheckerByTarget(t *testing.T, target string) resource.RelatedChecker
 	return nil
 }
 
-// --- Navigable Fields ---
-
 func TestNavigableFields_DBISnap_Registered(t *testing.T) {
 	nav := resource.IsFieldNavigableForTest("dbi-snap", "DBInstanceIdentifier")
 	if nav == nil {
@@ -43,7 +41,6 @@ func TestNavigableFields_DBISnap_FieldPathsResolve(t *testing.T) {
 		t.Fatal("no navigable fields registered for dbi-snap")
 	}
 
-	// DBInstanceIdentifier must resolve to dbi.
 	found := false
 	for _, f := range fields {
 		if f.FieldPath == "DBInstanceIdentifier" && f.TargetType == "dbi" {
@@ -54,8 +51,6 @@ func TestNavigableFields_DBISnap_FieldPathsResolve(t *testing.T) {
 		t.Error("navigable field DBInstanceIdentifier → dbi not registered for dbi-snap")
 	}
 }
-
-// --- DBI checker (Pattern C — cache-based, matches DBInstanceIdentifier) ---
 
 func TestRelated_DBISnap_DBI_Found(t *testing.T) {
 	dbiRes := resource.Resource{
@@ -148,8 +143,6 @@ func TestRelated_DBISnap_DBI_CacheMissNoClients(t *testing.T) {
 		t.Errorf("Count = %d, want -1 (unknown/cache miss)", result.Count())
 	}
 }
-
-// --- KMS checker (Pattern C — cache-based, KmsKeyId ARN suffix) ---
 
 func TestRelated_DBISnap_KMS_Found(t *testing.T) {
 	const keyID = "d4e5f6a7-8901-23de-fghi-444444444444"
@@ -257,18 +250,10 @@ func TestRelated_DBISnap_KMS_CacheMissNoClients(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// checkDBISnapBackup — Pattern C: cache scan of backup PLAN list,
-// matching snapshot ARN against each plan's Fields["resources"] / ["not_resources"].
-// ---------------------------------------------------------------------------
-
-// TestRelated_DBISnap_Backup_Match verifies that the checker returns plan IDs
-// (not recovery-point ARNs) when the loaded backup PLAN cache contains plans
-// whose Resources include the snapshot's PARENT DB ARN. AWS Backup tracks the
-// parent DB instance, not individual snapshots, so the checker resolves
-// snap.DBInstanceIdentifier through the dbi cache to get DBInstanceArn, then
-// reverse-scans plan selections for that parent ARN. Drill-through requires
-// plan IDs because the backup target's Resource.ID space is plan IDs.
+// AWS Backup tracks the parent DB instance, not individual snapshots, so the
+// checker resolves snap.DBInstanceIdentifier through the dbi cache to its
+// DBInstanceArn and reverse-scans plan selections for that ARN. It returns plan
+// IDs because the backup target's Resource.ID space is plan IDs.
 func TestRelated_DBISnap_Backup_Match(t *testing.T) {
 	const parentDBName = "mydb"
 	const parentDBARN = "arn:aws:rds:us-east-1:123456789012:db:mydb"
@@ -285,7 +270,6 @@ func TestRelated_DBISnap_Backup_Match(t *testing.T) {
 		},
 	}
 	cache := resource.ResourceCache{
-		// dbi cache resolves the parent DB → ARN.
 		"dbi": resource.ResourceCacheEntry{
 			Resources: []resource.Resource{
 				{
@@ -298,8 +282,6 @@ func TestRelated_DBISnap_Backup_Match(t *testing.T) {
 				},
 			},
 		},
-		// backup plan cache — Resources lists the parent DB ARN (real
-		// AWS Backup behaviour), NOT the snapshot ARN.
 		"backup": resource.ResourceCacheEntry{
 			Resources: []resource.Resource{
 				{
@@ -346,10 +328,7 @@ func TestRelated_DBISnap_Backup_Match(t *testing.T) {
 	}
 }
 
-// TestRelated_DBISnap_Backup_NoParentInDbi verifies that an orphan snapshot
-// (parent not in the loaded dbi cache) returns Count=0 — there's no parent ARN
-// to match against plan selections, and AWS Backup would never have covered a
-// snapshot whose parent is gone.
+// An orphan snapshot has no parent ARN to match against plan selections.
 func TestRelated_DBISnap_Backup_NoParentInDbi(t *testing.T) {
 	src := resource.Resource{
 		ID:   "rds:mydb-2025-01-15-03-00",
@@ -385,9 +364,8 @@ func TestRelated_DBISnap_Backup_NoParentInDbi(t *testing.T) {
 	}
 }
 
-// TestRelated_DBISnap_Backup_NoDbiCacheLoaded verifies that the checker returns
-// UnknownRelated (Count=-1) when the dbi cache hasn't been loaded yet — without
-// the parent DB ARN we can't say whether any plan covers the snapshot.
+// Without the parent DB ARN no plan selection can be matched, so the answer
+// is unknown.
 func TestRelated_DBISnap_Backup_NoDbiCacheLoaded(t *testing.T) {
 	src := resource.Resource{
 		ID:   "rds:mydb-2025-01-15-03-00",
@@ -408,9 +386,6 @@ func TestRelated_DBISnap_Backup_NoDbiCacheLoaded(t *testing.T) {
 	}
 }
 
-// TestRelated_DBISnap_Backup_NoPlansLoaded verifies that the checker returns
-// UnknownRelated (Count=-1) when the dbi cache resolves the parent ARN but the
-// backup PLAN cache hasn't been loaded yet.
 func TestRelated_DBISnap_Backup_NoPlansLoaded(t *testing.T) {
 	const parentDBName = "mydb"
 	src := resource.Resource{
@@ -437,7 +412,6 @@ func TestRelated_DBISnap_Backup_NoPlansLoaded(t *testing.T) {
 				},
 			},
 		},
-		// backup cache absent — checker must report UnknownRelated.
 	}
 	checker := dbiSnapCheckerByTarget(t, "backup")
 	result := checker(context.Background(), nil, src, cache)
@@ -447,8 +421,6 @@ func TestRelated_DBISnap_Backup_NoPlansLoaded(t *testing.T) {
 	}
 }
 
-// TestRelated_DBISnap_Backup_NoParentReference verifies a snapshot with no
-// DBInstanceIdentifier returns Count=0 (cannot pivot without a parent reference).
 func TestRelated_DBISnap_Backup_NoParentReference(t *testing.T) {
 	src := resource.Resource{
 		ID:     "rds:orphan-no-parent-ref",
@@ -456,7 +428,6 @@ func TestRelated_DBISnap_Backup_NoParentReference(t *testing.T) {
 		Fields: map[string]string{},
 		RawStruct: rdstypes.DBSnapshot{
 			DBSnapshotIdentifier: aws.String("rds:orphan-no-parent-ref"),
-			// no DBInstanceIdentifier
 		},
 	}
 	checker := dbiSnapCheckerByTarget(t, "backup")
@@ -466,7 +437,3 @@ func TestRelated_DBISnap_Backup_NoParentReference(t *testing.T) {
 		t.Errorf("Count = %d, want 0 (no parent reference)", result.Count())
 	}
 }
-
-// dbc pivot is intentionally NOT registered for dbi-snap — Aurora cluster
-// snapshots live in dbc-snap (DBClusterSnapshot), not dbi-snap (DBSnapshot).
-// Real AWS rejects CreateDBSnapshot on Aurora cluster members. See dbi_snap.go.

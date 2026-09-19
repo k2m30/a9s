@@ -1,11 +1,8 @@
 package unit
 
-// aws_retry_slowdown_test.go — "SlowDown" is a legitimate S3 (and DynamoDB)
-// throttle error code, so ClassifyAWSError must recognize it and
-// RetryOnThrottle must back off and retry like it does for Throttling /
-// ThrottlingException / TooManyRequestsException / RequestLimitExceeded.
-//
-// Reuses MockAPIError from mocks_test.go (same package unit).
+// "SlowDown" is an S3 (and DynamoDB) throttle error code, retried like
+// Throttling / ThrottlingException / TooManyRequestsException /
+// RequestLimitExceeded.
 
 import (
 	"context"
@@ -17,7 +14,6 @@ import (
 	awsclient "github.com/k2m30/a9s/v3/core/aws"
 )
 
-// TestClassifyAWSError_SlowDown pins retryable=true for Code "SlowDown".
 func TestClassifyAWSError_SlowDown(t *testing.T) {
 	err := &MockAPIError{Code: "SlowDown", Message: "Please reduce your request rate.", Fault: smithy.FaultClient}
 	code, message, retryable := awsclient.ClassifyAWSError(err)
@@ -32,9 +28,6 @@ func TestClassifyAWSError_SlowDown(t *testing.T) {
 	}
 }
 
-// TestRetryOnThrottle_RetriesSlowDownThenSucceeds pins the end-to-end
-// behavior: RetryOnThrottle must back off and retry a SlowDown error
-// instead of returning it on the first attempt.
 func TestRetryOnThrottle_RetriesSlowDownThenSucceeds(t *testing.T) {
 	slowDownErr := &smithy.GenericAPIError{Code: "SlowDown", Message: "Please reduce your request rate."}
 	calls := 0

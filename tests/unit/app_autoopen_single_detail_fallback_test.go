@@ -1,27 +1,11 @@
 package unit
 
-// app_autoopen_single_detail_fallback_test.go — coverage for
-// autoOpenSingleDetail's two new zero-row fallbacks (core/app/handle.go):
-// when the placeholder list's single related-ID target row hasn't loaded and
-// the list came back empty, either (1) pagination remains — chase it via a
-// KindFetchMore task, marking the list LoadingMore, or (2) pagination is
-// exhausted and the target type has a catalog StubCreator — synthesize a
-// stub resource and pop straight to its detail. When neither applies, the
-// function must no-op cleanly: no panic, the placeholder list stays put.
-//
-// Driven entirely through the real production entry points a web/headless
-// host uses: Apply(ActionCommand) to open a real catalog type's list (the
-// same construction the whitebox core/app/handle_autoopen_test.go uses,
-// translated to this package's exported surface — SetListAutoOpenSingle /
-// PatchListRelatedIDSet are the exported equivalents of that test's direct
-// ls.AutoOpenSingle/ls.RelatedIDSet field pokes, unreachable from here), then
-// Handle(messages.ResourcesLoaded) with zero resources to trigger the chase.
-//
-// Transplanted verbatim from ref/detail-enrichment-261-attempt1 (git show) —
-// every symbol it references (newTestController, SetListAutoOpenSingle,
-// PatchListRelatedIDSet, GetDetailResource, BodyKindDetail/BodyKindList,
-// KindFetchMore/FetchMorePayload) is still current v2 API; no adaptation
-// required.
+// autoOpenSingleDetail (core/app/handle.go) has two zero-row fallbacks for a
+// placeholder list whose single related-ID target row has not loaded: while
+// pagination remains it chases via a KindFetchMore task and marks the list
+// LoadingMore; once pagination is exhausted and the target type has a catalog
+// StubCreator it synthesizes a stub resource and opens its detail. Otherwise
+// the placeholder list stays put.
 
 import (
 	"testing"
@@ -32,10 +16,6 @@ import (
 	"github.com/k2m30/a9s/v3/core/runtime/messages"
 )
 
-// TestApply_AutoOpenSingleDetail_ZeroRowsWithPagination_QueuesFetchMore
-// covers the paginated-chase fallback: a zero-row page with an unexhausted
-// pagination token must queue KindFetchMore (scoped to the list's type,
-// carrying the continuation token) and mark the list LoadingMore.
 func TestApply_AutoOpenSingleDetail_ZeroRowsWithPagination_QueuesFetchMore(t *testing.T) {
 	c := newTestController(t)
 	c.Apply(app.Action{Kind: app.ActionCommand, Arg: "ec2"})
@@ -80,11 +60,7 @@ func TestApply_AutoOpenSingleDetail_ZeroRowsWithPagination_QueuesFetchMore(t *te
 	}
 }
 
-// TestApply_AutoOpenSingleDetail_ZeroRowsNoPaginationWithStubCreator_OpensSynthesizedDetail
-// covers the StubCreator-synthesis fallback using the one real catalog
-// StubCreator (core/aws/catalog_compute.go's "ami" entry): pagination
-// exhausted, target row never loaded — the function must synthesize a stub
-// resource for the target ID and pop straight to its detail.
+// "ami" is the catalog type with a StubCreator (core/aws/catalog_compute.go).
 func TestApply_AutoOpenSingleDetail_ZeroRowsNoPaginationWithStubCreator_OpensSynthesizedDetail(t *testing.T) {
 	const targetID = "ami-0stub00000000001"
 	c := newTestController(t)
@@ -108,11 +84,7 @@ func TestApply_AutoOpenSingleDetail_ZeroRowsNoPaginationWithStubCreator_OpensSyn
 	}
 }
 
-// TestApply_AutoOpenSingleDetail_ZeroRowsNoPaginationNoStubCreator_PlaceholderRemains
-// covers the give-up path using a real catalog type with no StubCreator
-// ("ec2" — the only StubCreator registered in the whole catalog is "ami"):
-// nothing left to chase or synthesize, so the function must not panic and
-// must leave the placeholder list in place (never pop to a detail screen).
+// "ec2" registers no StubCreator, so nothing is left to chase or synthesize.
 func TestApply_AutoOpenSingleDetail_ZeroRowsNoPaginationNoStubCreator_PlaceholderRemains(t *testing.T) {
 	c := newTestController(t)
 	c.Apply(app.Action{Kind: app.ActionCommand, Arg: "ec2"})
@@ -142,12 +114,9 @@ func TestApply_AutoOpenSingleDetail_ZeroRowsNoPaginationNoStubCreator_Placeholde
 	}
 }
 
-// TestApply_AutoOpenSingleDetail_NonEmptyPageMissingTarget_StillChasesViaFetchMore
-// pins: a page that HAS rows but does not contain the target must still
-// chase via KindFetchMore when pagination remains — keying the decision on
-// "was the target found" (matched == nil) rather than len(ls.Rows) == 0, so
-// a target that never lands on the first page of a large listing is not
-// stranded.
+// The chase keys on whether the target was found (matched == nil), not on
+// len(ls.Rows) == 0, so a target past the first page of a large listing is
+// still reached.
 func TestApply_AutoOpenSingleDetail_NonEmptyPageMissingTarget_StillChasesViaFetchMore(t *testing.T) {
 	const targetID = "i-0target00000002"
 	c := newTestController(t)
@@ -158,10 +127,8 @@ func TestApply_AutoOpenSingleDetail_NonEmptyPageMissingTarget_StillChasesViaFetc
 
 	_, tasks := handlePage(c, messages.ResourcesLoaded{
 		ResourceType: "ec2",
-		// Non-empty page, but none of these rows is the target — the target
-		// is somewhere on a LATER page.
-		Resources:  []resource.Resource{{ID: "i-0other0000000001", Type: "ec2"}},
-		Pagination: &resource.PaginationMeta{IsTruncated: true, NextToken: "chase-tok-2"}, Provenance: messages.FetchProvenanceFilteredList,
+		Resources:    []resource.Resource{{ID: "i-0other0000000001", Type: "ec2"}},
+		Pagination:   &resource.PaginationMeta{IsTruncated: true, NextToken: "chase-tok-2"}, Provenance: messages.FetchProvenanceFilteredList,
 	})
 
 	var fetchMore *runtime.TaskRequest
@@ -187,20 +154,15 @@ func TestApply_AutoOpenSingleDetail_NonEmptyPageMissingTarget_StillChasesViaFetc
 	}
 }
 
-// TestApply_AutoOpenSingleDetail_LoadingMoreAlreadyTrue_NoPrematureStubCreation
-// pins the LoadingMore guard: while the TOP-of-stack placeholder list's own
-// chase is already in flight (ls.LoadingMore == true), autoOpenSingleDetail
-// must never fall through to StubCreator synthesis for it — even for a type
-// ("ami") that has one registered. Handle's ResourcesLoaded case
-// unconditionally clears LoadingMore on the SCREEN THE INCOMING EVENT
-// MATCHES (handleResourcesLoadedEvent resolves ls by ResourceType, not
-// simply "top of stack" — see Handle's own doc comment), so this drives a
-// ResourcesLoaded for a DIFFERENT, unrelated resource type ("ec2", not on
-// the stack at all): it never touches the "ami" placeholder's LoadingMore,
-// yet autoOpenSingleDetail still evaluates whatever is currently on top
-// ("ami") on every ResourcesLoaded event. Without the guard, this unrelated
-// event would misread "ami"'s still-in-flight chase as exhausted and
-// synthesize a premature stub.
+// While the top-of-stack placeholder's own chase is in flight
+// (ls.LoadingMore), autoOpenSingleDetail never falls through to StubCreator
+// synthesis for it, even for "ami", which has one. Handle's ResourcesLoaded
+// case clears LoadingMore on the screen the incoming event matches
+// (handleResourcesLoadedEvent resolves ls by ResourceType, not top of stack),
+// so a ResourcesLoaded for "ec2", which is not on the stack, leaves the "ami"
+// placeholder's LoadingMore set while autoOpenSingleDetail still evaluates the
+// top of stack. Without the guard that event would read "ami"'s in-flight
+// chase as exhausted and synthesize a premature stub.
 func TestApply_AutoOpenSingleDetail_LoadingMoreAlreadyTrue_NoPrematureStubCreation(t *testing.T) {
 	const targetID = "ami-0race0000000001"
 	c := newTestController(t)
@@ -232,20 +194,12 @@ func TestApply_AutoOpenSingleDetail_LoadingMoreAlreadyTrue_NoPrematureStubCreati
 	}
 }
 
-// ---------------------------------------------------------------------------
 // The stub fallback must not fire while the placeholder's OWN fetch is
 // still outstanding (its very first response has
 // not landed at all yet — LoadingMore is still false, HasPagination is still
 // false, exactly the zero-value shape "fetched, empty, exhausted" also has).
 // An unrelated ResourcesLoaded arriving in that window must be a pure no-op
 // for the placeholder; only its OWN type's response may resolve it.
-// ---------------------------------------------------------------------------
-
-// TestApply_AutoOpenSingleDetail_UnrelatedResourcesLoaded_NoStubNoDetailOpen
-// pins the core regression: a by-ID placeholder pending its OWN fetch (never
-// having received any ResourcesLoaded of its own yet) must not react to an
-// unrelated type's ResourcesLoaded at all — no stub, no detail open, no
-// state change.
 func TestApply_AutoOpenSingleDetail_UnrelatedResourcesLoaded_NoStubNoDetailOpen(t *testing.T) {
 	const targetID = "ami-0pending000000001"
 	c := newTestController(t)
@@ -268,10 +222,6 @@ func TestApply_AutoOpenSingleDetail_UnrelatedResourcesLoaded_NoStubNoDetailOpen(
 	}
 }
 
-// TestApply_AutoOpenSingleDetail_UnrelatedThenOwnTypeEmptyNoPagination_StubFiresOnOwnType
-// extends the above: after the unrelated event is correctly ignored, the
-// placeholder's OWN type resolving empty with no pagination must still
-// trigger the StubCreator fallback exactly as before the guard.
 func TestApply_AutoOpenSingleDetail_UnrelatedThenOwnTypeEmptyNoPagination_StubFiresOnOwnType(t *testing.T) {
 	const targetID = "ami-0pending000000002"
 	c := newTestController(t)
@@ -295,11 +245,6 @@ func TestApply_AutoOpenSingleDetail_UnrelatedThenOwnTypeEmptyNoPagination_StubFi
 	}
 }
 
-// TestApply_AutoOpenSingleDetail_UnrelatedThenOwnTypePagination_ChaseFallbackStillFires
-// pins that the pagination-chase fallback is unaffected by the type guard:
-// after an unrelated event is ignored, the placeholder's OWN type resolving
-// with pagination still queues KindFetchMore rather than giving up or
-// synthesizing a stub early.
 func TestApply_AutoOpenSingleDetail_UnrelatedThenOwnTypePagination_ChaseFallbackStillFires(t *testing.T) {
 	const targetID = "ami-0pending000000003"
 	c := newTestController(t)
@@ -337,12 +282,8 @@ func TestApply_AutoOpenSingleDetail_UnrelatedThenOwnTypePagination_ChaseFallback
 	}
 }
 
-// TestApply_AutoOpenSingleDetail_UnrelatedThenOwnTypeRealResult_OpensRealResourceNotStub
-// pins the last axis: once the placeholder's OWN type actually delivers the
-// target row, the REAL resource opens — not a stub — even after an
-// unrelated event was seen first. ami's StubCreator sets Name to the bare
-// ID; a real row's distinct Name is the observable proof this is not that
-// synthesized shape.
+// ami's StubCreator sets Name to the bare ID; a real row's distinct Name
+// tells the real resource apart from a stub.
 func TestApply_AutoOpenSingleDetail_UnrelatedThenOwnTypeRealResult_OpensRealResourceNotStub(t *testing.T) {
 	const targetID = "ami-0pending000000004"
 	const realName = "real-production-ami"

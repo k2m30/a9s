@@ -33,8 +33,6 @@ func eksCheckerByTarget(t *testing.T, target string) resource.RelatedChecker {
 	return nil
 }
 
-// --- Navigable Field Registration ---
-
 func TestNavigableFields_EKS(t *testing.T) {
 	expected := map[string]string{
 		"ResourcesVpcConfig.VpcId":                  "vpc",
@@ -51,8 +49,6 @@ func TestNavigableFields_EKS(t *testing.T) {
 		}
 	}
 }
-
-// --- Node Groups checker (Pattern C — cache, ClusterName match) ---
 
 func TestRelated_EKS_NodeGroups_Found(t *testing.T) {
 	ngRes1 := resource.Resource{
@@ -153,7 +149,6 @@ func TestRelated_EKS_NodeGroups_EmptyClusterName(t *testing.T) {
 	cache := resource.ResourceCache{
 		"ng": resource.ResourceCacheEntry{Resources: []resource.Resource{ngRes}},
 	}
-	// Cluster with empty name — should not match any node group.
 	source := resource.Resource{
 		ID:   "",
 		Name: "",
@@ -169,8 +164,6 @@ func TestRelated_EKS_NodeGroups_EmptyClusterName(t *testing.T) {
 		t.Errorf("Count = %d, want 0 for empty cluster name", result.Count())
 	}
 }
-
-// --- CloudWatch Alarms checker (Pattern C — cache, ClusterName dimension) ---
 
 func TestRelated_EKS_Alarms_MatchClusterName(t *testing.T) {
 	alarmRes := resource.Resource{
@@ -253,8 +246,7 @@ func TestRelated_EKS_Alarms_CacheMissNoClients(t *testing.T) {
 	}
 }
 
-// --- CloudFormation checker (Pattern C — cache, aws:cloudformation:stack-name tag) ---
-// Note: ekstypes.Cluster has Tags map[string]string (not a slice of Tag structs).
+// ekstypes.Cluster has Tags map[string]string, not a slice of Tag structs.
 
 func TestRelated_EKS_CFN_FromTags(t *testing.T) {
 	cfnRes := resource.Resource{
@@ -303,7 +295,6 @@ func TestRelated_EKS_CFN_NoTag(t *testing.T) {
 	cache := resource.ResourceCache{
 		"cfn": resource.ResourceCacheEntry{Resources: []resource.Resource{cfnRes}},
 	}
-	// Cluster has no CFN tag — not created by CloudFormation.
 	source := resource.Resource{
 		ID:   "acme-services",
 		Name: "acme-services",
@@ -342,8 +333,6 @@ func TestRelated_EKS_CFN_CacheMissNoClients(t *testing.T) {
 		t.Errorf("Count = %d, want -1 (unknown)", result.Count())
 	}
 }
-
-// --- AMI checker tests (Pattern A — EKS.ListNodegroups + EKS.DescribeNodegroup + EC2.DescribeLaunchTemplateVersions) ---
 
 func eksClusterSrcResource() resource.Resource {
 	return resource.Resource{
@@ -427,7 +416,7 @@ func TestRelated_EKS_AMI_Match(t *testing.T) {
 }
 
 // TestRelated_EKS_AMI_Empty verifies that node groups without a launch template
-// (managed NGs) produce Count=0 (SSM-based AMI resolution is deferred).
+// (managed NGs) produce Count=0.
 func TestRelated_EKS_AMI_Empty(t *testing.T) {
 	eksNodegroups := map[string]*ekstypes.Nodegroup{
 		"ng-managed": {
@@ -536,8 +525,6 @@ func TestRelated_EKS_AMI_SoftSkipsDeletedLaunchTemplate(t *testing.T) {
 	}
 }
 
-// --- EC2 checker tests (Pattern A — EKS.ListNodegroups + EKS.DescribeNodegroup + ASG.DescribeAutoScalingGroups) ---
-
 // TestRelated_EKS_EC2_Match verifies that instance IDs gathered via node group
 // ASGs produce Count=N with all IDs in ResourceIDs.
 func TestRelated_EKS_EC2_Match(t *testing.T) {
@@ -638,10 +625,6 @@ func TestRelated_EKS_EC2_WrongRawStruct(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// checkEKSKMS tests — Pattern F (no cache, reads EncryptionConfig[0].Provider.KeyArn)
-// ---------------------------------------------------------------------------
-
 // TestRelated_EKS_KMS_Match verifies that a cluster with a KMS encryption config
 // returns the key ID (last "/" segment of KeyArn) as a single ResourceID.
 func TestRelated_EKS_KMS_Match(t *testing.T) {
@@ -716,10 +699,6 @@ func TestRelated_EKS_KMS_WrongRawStruct(t *testing.T) {
 		t.Errorf("Count = %d, want 0 (wrong RawStruct type → assertStruct fails)", result.Count())
 	}
 }
-
-// ---------------------------------------------------------------------------
-// checkEKSRole tests — Pattern F (no cache, reads RoleArn)
-// ---------------------------------------------------------------------------
 
 // TestRelated_EKS_Role_Match verifies that a cluster with a RoleArn returns the
 // role name (last "/" segment of the ARN) as a single ResourceID.

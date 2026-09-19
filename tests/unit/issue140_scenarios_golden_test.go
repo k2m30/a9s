@@ -16,7 +16,7 @@ import (
 	"github.com/k2m30/a9s/v3/tests/unit/tuitest"
 )
 
-// Scenario-driven golden snapshots for Issue #140.
+// Scenario-driven golden snapshots.
 //
 // Generation:
 //   UPDATE_GOLDEN=1 go test ./tests/unit -run TestGenerateIssue140Scenarios -v
@@ -379,60 +379,13 @@ func TestIssue140StoryMapCoversAllStories(t *testing.T) {
 	}
 
 	addStoryEvidence([]string{"scenario:ec2_001_initial_detail", "file:tests/unit/left_column_preview_regressions_test.go", "file:tests/unit/issue140_story_render_contract_test.go"}, "Wide terminals show EC2 detail and related resources side by side", "EC2 detail shows the configured curated field set instead of raw YAML", "Section headers and nested fields are visibly structured", "Long detail values wrap instead of forcing horizontal detail scrolling", "Updated detail flow no longer depends on a word-wrap toggle", "Pressing `w` does not introduce a separate wrap mode in the updated detail screen")
-	// detail_focus_test.go was legacy-DetailModel-only (deleted, wave3
-	// detail-family cleanup, specs/022-codebase-cleanup, DetailModel cluster —
-	// its own test functions had already been removed in an earlier round,
-	// leaving only orphaned dead-API helpers with zero real story coverage).
-	// "scenario:ec2_021_right_focus_after_tab" is a golden snapshot, not
-	// enforced coverage: TestIssue140ScenarioGoldens only diffs
-	// ec2_001_initial_detail/ec2_020_counts_arrived against disk (see its own
-	// "Perf: render and compare only 2 representative scenarios" comment
-	// above) — ec2_021's golden is written by TestGenerateIssue140Scenarios
-	// but never compared automatically, so it is dropped from this mapping.
-	// "Tab switches focus" and "Enter dispatches for the focused row" are
-	// covered by TestPreview_RightColumnTabFocus_SkipsDimRowsOnEnter.
-	// TestPreview_RightColumnFocus_HLAndTabToggleFocus proves "H and L switch
-	// focus instead of horizontally scrolling" via the real 'l'/'h' key
-	// routing and "Focus indicator changes with the active detail column"
-	// via the footer-hint text swap.
-	//
-	// "Tab flips focus between the two visible columns in both directions"
-	// names the underlying UX goal: the detail screen has exactly two
-	// columns, so a single `Tab` toggles focus in both directions (press it
-	// twice to return to the start) — no separate Shift+Tab binding is
-	// provided (it would be redundant). keys.Default() (internal/tui/keys/
-	// keys.go) binds only "tab", and every production call site
-	// (app_input.go, app_stack.go) matches via key.Matches(msg, m.keys.Tab).
-	// TestPreview_RightColumnFocus_HLAndTabToggleFocus's two-Tab-press
-	// assertion proves that bidirectional round trip through the real root
-	// model, so this story is genuinely covered by the same file as the
-	// other Tab/focus stories above, not left as an unimplemented-behavior
-	// gap.
+	// ec2_021_right_focus_after_tab's golden is written by
+	// TestGenerateIssue140Scenarios but never compared, so it is not evidence.
+	// The detail screen has two columns, so the single Tab binding toggles focus
+	// in both directions.
 	addStoryEvidence([]string{"file:tests/unit/preview_design_regression_test.go"}, "Focus indicator changes with the active detail column", "Tab switches focus between detail and related columns", "H and L switch focus instead of horizontally scrolling the detail view", "Tab flips focus between the two visible columns in both directions")
-	// ec2_stories_cursor_enter_test.go was legacy-DetailModel-only (deleted,
-	// wave3 detail-family cleanup, specs/022-codebase-cleanup). Cursor
-	// movement/jump/paging on the live controller path is pinned by
-	// detail_livepath_migration_test.go (skip-over-sections) and
-	// detail_ports_test.go (boundary clamp at top/bottom). Enter-on-
-	// navigable-field dispatch is a single generic code path
-	// (resource.IsFieldNavigableForTest + actions_nav.go:573) regardless of target
-	// type — VpcId/SubnetId/security-group-ID/ImageId/EBS/ENI are DATA
-	// differences, not separate code paths — pinned generically by
-	// detail_ports_test.go's TestWave3_Detail_EnterOnNavigableField_
-	// TUIKeyRoute_NavigatesToTarget, which presses the real Enter key through
-	// app_stack.go and asserts the navigate lands (the navigable-field
-	// footer-hint test in the same file only proves the hint TEXT, never
-	// presses Enter).
 	addStoryEvidence([]string{"file:tests/unit/detail_livepath_migration_test.go", "file:tests/unit/detail_ports_test.go"}, "Left-column cursor moves row by row across both plain and navigable fields", "Left-column jump keys go to the first and last detail rows", "Detail paging works on the focused column", "Enter on a plain non-navigable detail row does not leave the view", "Enter on VpcId opens the VPC detail screen", "Enter on SubnetId opens the subnet detail screen", "Enter on a security group ID opens the security group detail screen", "Enter on ImageId opens the AMI detail screen", "Enter on an attached EBS volume ID opens the EBS volume detail screen", "Enter on a network interface ID opens the ENI detail screen")
-	// detail_rendering_spec007_test.go was legacy-DetailModel-only (deleted,
-	// wave3 detail-family cleanup) — navigable-vs-plain rendering distinction
-	// is now pinned on the live RenderDetail(body) seam by
-	// detail_ports_test.go's IsNavigable-wins-over-ColorTier goldens.
 	addStoryEvidence([]string{"scenario:ec2_017_vpcid_selected", "file:tests/unit/issue140_story_render_contract_test.go", "file:tests/unit/detail_ports_test.go"}, "Navigable EC2 field values are visibly different from plain values", "Selected navigable fields use row selection instead of underline")
-	// qa_search_views_test.go was legacy-DetailModel-only (deleted, wave3
-	// detail-family cleanup) — live search coverage moved to
-	// detail_ports_test.go (real key-path activate/highlight/next/prev/
-	// esc through the live rs.search/ActionSearch seam).
 	addStoryEvidence([]string{"file:tests/unit/detail_ports_test.go", "file:tests/unit/issue119_scenarios_golden_test.go"}, "Left-column search uses the header and highlights matching detail rows", "Search match indicator is visible in the left detail column", "Search next and previous keys only apply to left-column search", "Search highlighting outranks the navigable underline cue", "Left-column search persists internally when focus moves away", "Escape cancels detail search input before clearing search results or leaving the view", "Escape clears existing search results before popping EC2 detail")
 	addStoryEvidence([]string{"file:tests/unit/ec2_stories_rightcol_misc_test.go", "file:tests/unit/qa_copy_test.go"}, "Copy from the left detail column copies the active field value", "YAML shortcut works from EC2 detail regardless of column focus", "Detail help reflects the two-column interaction model")
 

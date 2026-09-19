@@ -15,10 +15,6 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// ---------------------------------------------------------------------------
-// EBS Snapshot fetcher tests
-// ---------------------------------------------------------------------------
-
 func TestFetchEBSSnapshots_ParsesMultipleSnapshots(t *testing.T) {
 	startTime := time.Date(2025, 2, 20, 9, 15, 0, 0, time.UTC)
 
@@ -63,7 +59,6 @@ func TestFetchEBSSnapshots_ParsesMultipleSnapshots(t *testing.T) {
 		t.Fatalf("expected 2 resources, got %d", len(resources))
 	}
 
-	// Verify first snapshot (completed, with Name tag)
 	r0 := resources[0]
 	if r0.ID != "snap-0aabb11cc" {
 		t.Errorf("resource[0].ID: expected %q, got %q", "snap-0aabb11cc", r0.ID)
@@ -71,12 +66,10 @@ func TestFetchEBSSnapshots_ParsesMultipleSnapshots(t *testing.T) {
 	if r0.Name != "prod-snap-daily" {
 		t.Errorf("resource[0].Name: expected %q, got %q", "prod-snap-daily", r0.Name)
 	}
-	// Post-fold contract: completed state is healthy → no Status, no Finding.
 	if len(r0.Findings) != 0 {
 		t.Errorf("resource[0].Findings: expected 0 for completed snapshot, got %d", len(r0.Findings))
 	}
 
-	// Verify second snapshot (pending, no Name tag)
 	r1 := resources[1]
 	if r1.ID != "snap-0ccdd22ee" {
 		t.Errorf("resource[1].ID: expected %q, got %q", "snap-0ccdd22ee", r1.ID)
@@ -84,7 +77,6 @@ func TestFetchEBSSnapshots_ParsesMultipleSnapshots(t *testing.T) {
 	if r1.Name != "" {
 		t.Errorf("resource[1].Name: expected empty string (no Name tag), got %q", r1.Name)
 	}
-	// Post-fold contract: pending state emits SevWarn Finding, not Status.
 	if len(r1.Findings) != 1 {
 		t.Fatalf("resource[1].Findings: expected 1 for pending snapshot, got %d", len(r1.Findings))
 	}
@@ -166,7 +158,6 @@ func TestFetchEBSSnapshots_FieldExtraction(t *testing.T) {
 
 	r := resources[0]
 
-	// Verify all FieldKeys are present and have exact values
 	if r.Fields["snapshot_id"] != "snap-0aabb11cc" {
 		t.Errorf("Fields[\"snapshot_id\"]: expected %q, got %q", "snap-0aabb11cc", r.Fields["snapshot_id"])
 	}

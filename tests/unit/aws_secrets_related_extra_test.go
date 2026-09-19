@@ -1,6 +1,3 @@
-// aws_secrets_related_extra_test.go covers the Secrets Manager related-panel
-// checkers: secrets→codeartifact, secrets→eb, secrets→ecs-task,
-// secrets→logs, secrets→role, secrets→sns.
 package unit_test
 
 import (
@@ -22,9 +19,6 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// secretsCheckerByTarget is defined in aws_secrets_related_test.go.
-
-// secretsSourceWithARN returns a secret resource with the given ARN and name.
 func secretsSourceWithARN(secretARN, secretName string) resource.Resource {
 	return resource.Resource{
 		ID:   secretName,
@@ -39,7 +33,6 @@ func secretsSourceWithARN(secretARN, secretName string) resource.Resource {
 	}
 }
 
-// secretsSourceWithRotation returns a secret with RotationLambdaARN set.
 func secretsSourceWithRotation(secretARN, secretName, rotationLambdaARN string) resource.Resource {
 	return resource.Resource{
 		ID:   secretName,
@@ -55,12 +48,6 @@ func secretsSourceWithRotation(secretARN, secretName, rotationLambdaARN string) 
 	}
 }
 
-// ---------------------------------------------------------------------------
-// secrets→codeartifact (heuristic: secret name contains "codeartifact")
-// ---------------------------------------------------------------------------
-
-// TestRelated_Secrets_CodeArtifact_MatchByName verifies that a secret whose
-// name says codeartifact counts the loaded repository its name names.
 // The secret's own name is no codeartifact row, so it is never the ID.
 func TestRelated_Secrets_CodeArtifact_MatchByName(t *testing.T) {
 	source := resource.Resource{
@@ -86,9 +73,6 @@ func TestRelated_Secrets_CodeArtifact_MatchByName(t *testing.T) {
 	}
 }
 
-// TestRelated_Secrets_CodeArtifact_NoMatch verifies that checkSecretsCodeArtifact
-// returns Count=0 when the secret name does not contain "codeartifact" and has no
-// relevant tags.
 func TestRelated_Secrets_CodeArtifact_NoMatch(t *testing.T) {
 	source := resource.Resource{
 		ID:   "prod/db/postgres-password",
@@ -110,8 +94,6 @@ func TestRelated_Secrets_CodeArtifact_NoMatch(t *testing.T) {
 	}
 }
 
-// TestRelated_Secrets_CodeArtifact_WrongRawStruct verifies that
-// checkSecretsCodeArtifact returns Count=-1 for wrong RawStruct type.
 func TestRelated_Secrets_CodeArtifact_WrongRawStruct(t *testing.T) {
 	res := resource.Resource{
 		ID:        "prod/codeartifact/token",
@@ -126,20 +108,11 @@ func TestRelated_Secrets_CodeArtifact_WrongRawStruct(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// secrets→eb (reverse-scan: EB environments whose option settings contain
-//  {{resolve:secretsmanager:<arn>}})
-// ---------------------------------------------------------------------------
-
-// TestRelated_Secrets_EB_MatchByResolveReference verifies that checkSecretsEB
-// counts EB environments whose DescribeConfigurationSettings contains a
-// {{resolve:secretsmanager:<arn>}} reference.
 func TestRelated_Secrets_EB_MatchByResolveReference(t *testing.T) {
 	const secretARN = "arn:aws:secretsmanager:us-east-1:123456789012:secret:prod/db/password"
 
 	source := secretsSourceWithARN(secretARN, "prod/db/password")
 
-	// eb env that references the secret via resolve syntax
 	matchingEnv := resource.Resource{
 		ID:   "my-matching-env",
 		Name: "my-matching-env",
@@ -148,7 +121,6 @@ func TestRelated_Secrets_EB_MatchByResolveReference(t *testing.T) {
 			ApplicationName: aws.String("my-app"),
 		},
 	}
-	// eb env that does NOT reference this secret
 	otherEnv := resource.Resource{
 		ID:   "my-other-env",
 		Name: "my-other-env",
@@ -158,7 +130,6 @@ func TestRelated_Secrets_EB_MatchByResolveReference(t *testing.T) {
 		},
 	}
 
-	// EB fake: DescribeConfigurationSettings returns option with secret reference for matching-env only
 	fakeEB := &fakeEBChecker{
 		describeConfigSettingsFn: func(input *elasticbeanstalk.DescribeConfigurationSettingsInput) (*elasticbeanstalk.DescribeConfigurationSettingsOutput, error) {
 			envName := ""
@@ -206,8 +177,6 @@ func TestRelated_Secrets_EB_MatchByResolveReference(t *testing.T) {
 	}
 }
 
-// TestRelated_Secrets_EB_MatchTruncated verifies that checkSecretsEB propagates
-// Truncated=true when cache is truncated.
 func TestRelated_Secrets_EB_MatchTruncated(t *testing.T) {
 	const secretARN = "arn:aws:secretsmanager:us-east-1:123456789012:secret:prod/db/password"
 
@@ -250,8 +219,6 @@ func TestRelated_Secrets_EB_MatchTruncated(t *testing.T) {
 	}
 }
 
-// TestRelated_Secrets_EB_WrongRawStruct verifies that checkSecretsEB returns
-// Count=-1 for wrong RawStruct type.
 func TestRelated_Secrets_EB_WrongRawStruct(t *testing.T) {
 	res := resource.Resource{
 		ID:        "prod/db/password",
@@ -266,14 +233,6 @@ func TestRelated_Secrets_EB_WrongRawStruct(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// secrets→ecs-task (reverse-scan: ECS tasks whose task definition Secrets
-//  reference this secret's ARN via Secrets[].ValueFrom)
-// ---------------------------------------------------------------------------
-
-// TestRelated_Secrets_ECSTask_MatchBySecretsValueFrom verifies that
-// checkSecretsECSTask counts ECS tasks whose task definition contains a
-// container secret with ValueFrom = this secret's ARN.
 func TestRelated_Secrets_ECSTask_MatchBySecretsValueFrom(t *testing.T) {
 	const secretARN = "arn:aws:secretsmanager:us-east-1:123456789012:secret:prod/db/password"
 	const taskDefARN = "arn:aws:ecs:us-east-1:123456789012:task-definition/api-task:7"
@@ -281,7 +240,6 @@ func TestRelated_Secrets_ECSTask_MatchBySecretsValueFrom(t *testing.T) {
 
 	source := secretsSourceWithARN(secretARN, "prod/db/password")
 
-	// ecs-task cache entry that references our secret (via TaskDefinitionArn)
 	matchingTask := resource.Resource{
 		ID:   "task-abc123",
 		Name: "task-abc123",
@@ -292,7 +250,6 @@ func TestRelated_Secrets_ECSTask_MatchBySecretsValueFrom(t *testing.T) {
 			TaskDefinitionArn: aws.String(taskDefARN),
 		},
 	}
-	// ecs-task cache entry that does NOT reference our secret
 	otherTask := resource.Resource{
 		ID:   "task-def456",
 		Name: "task-def456",
@@ -304,7 +261,6 @@ func TestRelated_Secrets_ECSTask_MatchBySecretsValueFrom(t *testing.T) {
 		},
 	}
 
-	// ECS fake: DescribeTaskDefinition returns a task def with secret reference for matching task
 	fakeECS := &fakeECSForSvcPivots{
 		describeTaskDefFn: func(input *ecs.DescribeTaskDefinitionInput) (*ecs.DescribeTaskDefinitionOutput, error) {
 			if input.TaskDefinition != nil && *input.TaskDefinition == taskDefARN {
@@ -325,7 +281,6 @@ func TestRelated_Secrets_ECSTask_MatchBySecretsValueFrom(t *testing.T) {
 					},
 				}, nil
 			}
-			// Other task definitions have no secrets
 			return &ecs.DescribeTaskDefinitionOutput{
 				TaskDefinition: &ecstypes.TaskDefinition{
 					TaskDefinitionArn: aws.String(""),
@@ -357,8 +312,6 @@ func TestRelated_Secrets_ECSTask_MatchBySecretsValueFrom(t *testing.T) {
 	}
 }
 
-// TestRelated_Secrets_ECSTask_Truncated verifies that checkSecretsECSTask
-// propagates Truncated=true when the ecs-task cache is truncated.
 func TestRelated_Secrets_ECSTask_Truncated(t *testing.T) {
 	const secretARN = "arn:aws:secretsmanager:us-east-1:123456789012:secret:prod/db/password"
 	const taskDefARN = "arn:aws:ecs:us-east-1:123456789012:task-definition/api-task:7"
@@ -404,8 +357,6 @@ func TestRelated_Secrets_ECSTask_Truncated(t *testing.T) {
 	}
 }
 
-// TestRelated_Secrets_ECSTask_WrongRawStruct verifies that checkSecretsECSTask
-// returns Count=-1 for wrong RawStruct type.
 func TestRelated_Secrets_ECSTask_WrongRawStruct(t *testing.T) {
 	res := resource.Resource{
 		ID:        "prod/db/password",
@@ -420,13 +371,6 @@ func TestRelated_Secrets_ECSTask_WrongRawStruct(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// secrets→logs (forward: RotationLambdaARN → Lambda GetFunction →
-//  FunctionName → /aws/lambda/<name> log group)
-// ---------------------------------------------------------------------------
-
-// TestRelated_Secrets_Logs_MatchByRotationLambda verifies that checkSecretsLogs
-// derives the expected log group path from the rotation Lambda's function name.
 func TestRelated_Secrets_Logs_MatchByRotationLambda(t *testing.T) {
 	const lambdaARN = "arn:aws:lambda:us-east-1:123456789012:function:rotate-docdb-credentials"
 	const lambdaName = "rotate-docdb-credentials"
@@ -460,8 +404,6 @@ func TestRelated_Secrets_Logs_MatchByRotationLambda(t *testing.T) {
 	}
 }
 
-// TestRelated_Secrets_Logs_NoRotationLambda verifies that checkSecretsLogs
-// returns Count=0 when the secret has no rotation Lambda ARN.
 func TestRelated_Secrets_Logs_NoRotationLambda(t *testing.T) {
 	source := resource.Resource{
 		ID:   "prod/api/stripe-key",
@@ -484,8 +426,6 @@ func TestRelated_Secrets_Logs_NoRotationLambda(t *testing.T) {
 	}
 }
 
-// TestRelated_Secrets_Logs_WrongRawStruct verifies that checkSecretsLogs
-// returns Count=-1 for wrong RawStruct type.
 func TestRelated_Secrets_Logs_WrongRawStruct(t *testing.T) {
 	res := resource.Resource{
 		ID:        "prod/docdb/password",
@@ -500,19 +440,11 @@ func TestRelated_Secrets_Logs_WrongRawStruct(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// secrets→role (forward: GetResourcePolicy → Principal role ARNs +
-//  RotationLambdaARN → Lambda GetFunction → Configuration.Role)
-// ---------------------------------------------------------------------------
-
-// TestRelated_Secrets_Role_MatchByResourcePolicy verifies that checkSecretsRole
-// extracts role ARNs from the secret's resource policy Principal.
 func TestRelated_Secrets_Role_MatchByResourcePolicy(t *testing.T) {
 	const secretARN = "arn:aws:secretsmanager:us-east-1:123456789012:secret:prod/db/password"
 	const role1ARN = "arn:aws:iam::123456789012:role/api-service-role"
 	const role2ARN = "arn:aws:iam::123456789012:role/batch-processor-role"
 
-	// IAM policy granting two roles access to the secret
 	policyJSON := `{
 		"Version": "2012-10-17",
 		"Statement": [
@@ -561,8 +493,6 @@ func TestRelated_Secrets_Role_MatchByResourcePolicy(t *testing.T) {
 	}
 }
 
-// TestRelated_Secrets_Role_MatchIncludesRotationLambdaRole verifies that
-// checkSecretsRole also includes the execution role of the rotation Lambda.
 func TestRelated_Secrets_Role_MatchIncludesRotationLambdaRole(t *testing.T) {
 	const secretARN = "arn:aws:secretsmanager:us-east-1:123456789012:secret:prod/db/password"
 	const lambdaARN = "arn:aws:lambda:us-east-1:123456789012:function:rotate-db-creds"
@@ -599,12 +529,9 @@ func TestRelated_Secrets_Role_MatchIncludesRotationLambdaRole(t *testing.T) {
 	}
 }
 
-// TestRelated_Secrets_Role_CrossAccountExcluded reproduces the live failure
-// where a resource policy grants access to both a same-account role and a
-// cross-account role. Only the same-account role is fetchable via iam:GetRole
-// here, so the cross-account principal must be dropped — never counted and
-// never passed to FetchByIDs (a cross-account ARN would dead-end the drill,
-// and a full ARN of any account fails GetRole with ValidationError).
+// Only a same-account role is fetchable via iam:GetRole here, so a
+// cross-account principal is dropped: never counted and never passed to
+// FetchByIDs. A full ARN of any account fails GetRole with ValidationError.
 func TestRelated_Secrets_Role_CrossAccountExcluded(t *testing.T) {
 	const secretARN = "arn:aws:secretsmanager:us-east-1:123456789012:secret:prod/app/creds"
 	const localRoleARN = "arn:aws:iam::123456789012:role/local-access-role"
@@ -645,8 +572,6 @@ func TestRelated_Secrets_Role_CrossAccountExcluded(t *testing.T) {
 	}
 }
 
-// TestRelated_Secrets_Role_NoPolicy verifies that checkSecretsRole returns
-// Count=0 when the secret has no resource policy and no rotation Lambda.
 func TestRelated_Secrets_Role_NoPolicy(t *testing.T) {
 	source := resource.Resource{
 		ID:   "prod/api/stripe-key",
@@ -674,8 +599,6 @@ func TestRelated_Secrets_Role_NoPolicy(t *testing.T) {
 	}
 }
 
-// TestRelated_Secrets_Role_WrongRawStruct verifies that checkSecretsRole
-// returns Count=-1 for wrong RawStruct type.
 func TestRelated_Secrets_Role_WrongRawStruct(t *testing.T) {
 	res := resource.Resource{
 		ID:        "prod/db/password",
@@ -690,13 +613,6 @@ func TestRelated_Secrets_Role_WrongRawStruct(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// secrets→sns (forward weak: RotationLambdaARN → Lambda GetFunction →
-//  DeadLetterConfig.TargetArn starting with "arn:aws:sns:")
-// ---------------------------------------------------------------------------
-
-// TestRelated_Secrets_Sns_MatchByDLQ verifies that checkSecretsSNS returns
-// Count=1 when the rotation Lambda's DLQ TargetArn is an SNS topic ARN.
 func TestRelated_Secrets_Sns_MatchByDLQ(t *testing.T) {
 	const lambdaARN = "arn:aws:lambda:us-east-1:123456789012:function:rotate-docdb-credentials"
 	const lambdaName = "rotate-docdb-credentials"
@@ -727,8 +643,6 @@ func TestRelated_Secrets_Sns_MatchByDLQ(t *testing.T) {
 	}
 }
 
-// TestRelated_Secrets_Sns_DLQNotSNS verifies that checkSecretsSNS returns
-// Count=0 when the rotation Lambda's DLQ is an SQS queue (not SNS).
 func TestRelated_Secrets_Sns_DLQNotSNS(t *testing.T) {
 	const lambdaARN = "arn:aws:lambda:us-east-1:123456789012:function:rotate-docdb-credentials"
 	const sqsARN = "arn:aws:sqs:us-east-1:123456789012:rotation-dlq"
@@ -755,8 +669,6 @@ func TestRelated_Secrets_Sns_DLQNotSNS(t *testing.T) {
 	}
 }
 
-// TestRelated_Secrets_Sns_NoRotationLambda verifies that checkSecretsSNS returns
-// Count=0 when the secret has no rotation Lambda.
 func TestRelated_Secrets_Sns_NoRotationLambda(t *testing.T) {
 	source := resource.Resource{
 		ID:   "prod/api/stripe-key",
@@ -779,8 +691,6 @@ func TestRelated_Secrets_Sns_NoRotationLambda(t *testing.T) {
 	}
 }
 
-// TestRelated_Secrets_Sns_WrongRawStruct verifies that checkSecretsSNS returns
-// Count=-1 for wrong RawStruct type.
 func TestRelated_Secrets_Sns_WrongRawStruct(t *testing.T) {
 	res := resource.Resource{
 		ID:        "prod/docdb/password",

@@ -36,9 +36,8 @@ func sdkStyleDNSNotFound() error {
 }
 
 // The region gap is decided once, by ErrClass, and the assertions read the
-// class the branches read; a branch and a class that agree only by luck is a
-// defect, so there is no second predicate. A resolver failure that is not a
-// missing host is its own class ("dns"), not a plain false.
+// class the branches read. A resolver failure that is not a missing host is
+// its own class ("dns"), not a plain false.
 func TestRegionGapClassification(t *testing.T) {
 	cases := []struct {
 		name string
@@ -91,11 +90,8 @@ func TestHandleAvailabilityChecked_RegionGapLogsPlainLanguage(t *testing.T) {
 		}
 	}
 	logView := stripANSI(rootViewContent(logModel))
-	// The phrase moved into the class table (task menu row 4: the region gap
-	// is a class of its own, and its cause is worded once so the menu row's
-	// "no service" and this line cannot drift). Read it from the table rather
-	// than restoring the old literal, which would pin the wording in a second
-	// place — the thing the row removed.
+	// The region-gap cause is worded once in the class table so the menu
+	// row's "no service" and this line cannot drift; read it from the table.
 	if want := awsclient.CauseOf(sdkStyleDNSNotFound()); !strings.Contains(logView, want) {
 		t.Errorf("`!` error log must carry the plain-language region-gap line %q; got view:\n%s", want, logView)
 	}

@@ -2,11 +2,9 @@
 
 package unit
 
-// aws3_r3_view_migration_test.go — a built-in column whose SOURCE changed
-// reaches an operator who has already run a9s once: the merge upgrades a
-// column whose title is present but whose source is stale, and both of the
-// corrected SNS columns keep their titles. These pin the upgrade, and the two
-// cases it must not touch.
+// A built-in column whose source changed reaches an operator who has already
+// run a9s once: the merge upgrades a column whose title is present but whose
+// source is stale, and both corrected SNS columns keep their titles.
 
 import (
 	"os"
@@ -35,7 +33,7 @@ func aws3ViewsAt(t *testing.T, name, body string) string {
 	return dir
 }
 
-// The two files as the build before this task generated them.
+// The two view files as an earlier build generated them.
 const (
 	aws3SNSViewV1 = `generated: 1
 list:
@@ -103,9 +101,8 @@ func aws3ColumnOnDisk(t *testing.T, dir, view, title string) config.ListColumn {
 	return config.ListColumn{}
 }
 
-// TestUpgradeCarriesACorrectedColumnSource pins the reject: a view file an
-// earlier build wrote takes this build's source and width for a column it
-// still carries under the same title.
+// A view file an earlier build wrote takes this build's source and width for a
+// column it still carries under the same title.
 func TestUpgradeCarriesACorrectedColumnSource(t *testing.T) {
 	dir := aws3ViewsAt(t, "sns", aws3SNSViewV1)
 	if err := os.WriteFile(filepath.Join(dir, "sns-sub.yaml"), []byte(aws3SNSSubViewV1), 0600); err != nil {
@@ -193,9 +190,8 @@ func aws3CellFromDir(t *testing.T, dir, shortName, title string, r resource.Reso
 	return ""
 }
 
-// TestEarlierBuildStillShowsTheNameAndTheConfirmationState is the two row-9
-// pins on an existing installation: after the upgrade, the rendered cells say
-// what their headings say.
+// After the upgrade on an existing installation, the rendered cells say what
+// their headings say.
 func TestEarlierBuildStillShowsTheNameAndTheConfirmationState(t *testing.T) {
 	dir := aws3ViewsAt(t, "sns", aws3SNSViewV1)
 	if err := os.WriteFile(filepath.Join(dir, "sns-sub.yaml"), []byte(aws3SNSSubViewV1), 0600); err != nil {
@@ -234,10 +230,8 @@ func TestEarlierBuildStillShowsTheNameAndTheConfirmationState(t *testing.T) {
 	}
 }
 
-// TestUpgradeKeepsAWidthTheOperatorSet pins the narrower half of the width
-// rule: the corrected source reaches a column nobody re-sourced, but a width
-// they widened is still theirs. Found by probing the migration before the
-// gates — the first form reverted it.
+// The corrected source reaches a column nobody re-sourced, but a width the
+// operator widened stays theirs.
 func TestUpgradeKeepsAWidthTheOperatorSet(t *testing.T) {
 	wider := strings.Replace(aws3SNSViewV1,
 		"  Topic Name:\n    path: TopicArn\n    width: 40\n",

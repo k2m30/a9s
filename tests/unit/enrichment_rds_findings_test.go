@@ -1,18 +1,8 @@
 package unit
 
 // enrichment_rds_findings_test.go — Behavioral tests for EnrichDBIMaintenance
-// plus the stacked wave-1+wave-2 case for EnrichDBIMaintenance.
-//
-// EnrichDBIMaintenance exercises the maintenance-window mechanics per
-// docs/resources/dbi.md §3.2:
-//
-//   - Returns IssueEnricherResult.Findings keyed by Resource.ID (ARN-suffix match).
-//   - Severity "~" for all findings (informational, excluded from menu badge).
-//   - Summary format: "maintenance scheduled" (dbi's S4 phrase, see dbi.md §4).
-//   - IssueCount always 0 (severity "~" rule).
-//   - Empty result → non-nil empty Findings map.
-//   - Off-input-slice ARNs must not leak into Findings (EnrichDBIMaintenance only
-//     emits for probeIDs present in the input resources slice).
+// plus the stacked wave-1+wave-2 case for EnrichDBIMaintenance
+// (docs/resources/dbi.md).
 
 import (
 	"context"
@@ -108,9 +98,8 @@ func TestEnrichDBIMaintenance_SeverityTilde(t *testing.T) {
 	}
 }
 
-// TestEnrichDBIMaintenance_SummaryFormat verifies the summary matches the
-// dbi.md §4 S4 phrase contract: "maintenance scheduled" — Action/Description
-// live in Rows, not the summary phrase.
+// TestEnrichDBIMaintenance_SummaryFormat verifies the phrase is "maintenance
+// scheduled" — Action/Description live in Rows, not the phrase.
 func TestEnrichDBIMaintenance_SummaryFormat(t *testing.T) {
 	fake := &enrichRDSFake{
 		actions: []rdstypes.ResourcePendingMaintenanceActions{
@@ -250,15 +239,6 @@ func (f *dbiStackedFake) DescribePendingMaintenanceActions(
 //     by the enricher).
 //   - The wave-2 "pending maintenance" finding lands in result.Findings[id]
 //     and is grafted onto resource.Findings later by applyEnrichment.
-//
-// Contract for THIS enricher run:
-//   - result.Findings[id] is populated with the wave-2 Finding (1 entry).
-//   - result.FieldUpdates is empty (or its [id] sub-map is empty/missing) —
-//     no status overlay, no "(+1)" suffix arithmetic from the enricher side.
-//   - The wave-1 Finding on input resource.Findings remains in place; combined
-//     with the new wave-2 Finding, the unified r.Findings carries 2 entries
-//     once applyEnrichment runs upstream. The render-layer phraseFromFindings
-//     consumes both to produce "stopped (+1)".
 func TestEnrichDBI_Wave1StoppedPlusWave2_StackedFindings_AS140(t *testing.T) {
 	const resourceID = "stacked-stopped-plus-maint"
 	const arn = "arn:aws:rds:us-east-1:123456789012:db:" + resourceID
@@ -275,9 +255,9 @@ func TestEnrichDBI_Wave1StoppedPlusWave2_StackedFindings_AS140(t *testing.T) {
 	}
 	clients := &awsclient.ServiceClients{RDS: fake}
 
-	// Input resource already carries a wave-1 "stopped" finding from the fetcher.
-	// Post-PR-03e fetcher contract: Findings populated, Fields["status"] carries
-	// the §4 phrase, Resource.Status intentionally empty.
+	// Input resource already carries a wave-1 "stopped" finding from the
+	// fetcher: Findings populated, Fields["status"] carries the list phrase,
+	// Resource.Status empty.
 	wave1Finding := domain.Finding{
 		Code:     "dbi.broken.stopped",
 		Phrase:   "stopped",
@@ -306,7 +286,7 @@ func TestEnrichDBI_Wave1StoppedPlusWave2_StackedFindings_AS140(t *testing.T) {
 		t.Fatalf("expected wave-2 Finding for %q; result.Findings keys = %v", resourceID, findingKeys(result.Findings))
 	}
 	wave2 := wave2s[0]
-	// docs/resources/dbi.md §4 row "Pending maintenance overdue": List text (S4).
+	// docs/resources/dbi.md, "Pending maintenance overdue": the list phrase.
 	if wave2.Phrase != "maintenance scheduled" {
 		t.Errorf("wave-2 Phrase = %q, want %q", wave2.Phrase, "maintenance scheduled")
 	}
@@ -314,9 +294,9 @@ func TestEnrichDBI_Wave1StoppedPlusWave2_StackedFindings_AS140(t *testing.T) {
 		t.Errorf("wave-2 Severity = %v, want SevWarn", wave2.Severity)
 	}
 
-	// Detail (S5) is the one static sentence FindingDef declares for
-	// dbiCodePendingMaintenance (catalog_databases.go); it no longer depends
-	// on this test's Action/Description, which live in AttentionDetail rows.
+	// Detail is the one static sentence FindingDef declares for
+	// dbiCodePendingMaintenance (catalog_databases.go); Action/Description
+	// live in AttentionDetail rows.
 	const wantWave2Detail = "AWS has a maintenance action pending for this instance and will apply it in a maintenance window of its choosing once the target date passes; the action, apply method and earliest date are listed below. Apply it yourself in a window that suits you."
 	if wave2.Detail != wantWave2Detail {
 		t.Errorf("wave-2 Detail = %q, want %q", wave2.Detail, wantWave2Detail)

@@ -1,8 +1,7 @@
 package unit_test
 
-// aws6_one_normalizer_test.go — the one normalizer answers every spelling the
-// column cascade can produce, and the test harness resolves columns the way
-// the app does.
+// The one normalizer answers every spelling the column cascade can produce,
+// and the test harness resolves columns the way the app does.
 //
 // A fact is reached by four spellings: the RawStruct path a column declares
 // ("SourceType"), the dotted path a nested one declares ("Source.Type"), the
@@ -26,7 +25,6 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// TestOneNormalizerFoldsEverySpelling pins row 15's rule directly.
 func TestOneNormalizerFoldsEverySpelling(t *testing.T) {
 	groups := [][]string{
 		{"source_type", "SourceType", "Source.Type", "Source Type", "sourcetype"},
@@ -65,9 +63,9 @@ func TestOneNormalizerFoldsEverySpelling(t *testing.T) {
 // view file: the cell the bench renders and the cell an installation renders
 // are the same cell.
 //
-// The demo bench, which is what acceptance looks at, and an installation
-// with a loaded view file must read cells by one rule; otherwise a defect
-// can be invisible on the bench and on screen for everyone.
+// The demo bench and an installation with a loaded view file must read cells
+// by one rule; otherwise a defect can be on every operator's screen and
+// invisible on the bench.
 //
 // The comparison needs no second opinion about which spelling is right: a
 // column that renders one thing under the built-in defaults and another under
@@ -131,9 +129,6 @@ func TestAnOperatorsOwnViewFileRendersTheSameCells(t *testing.T) {
 // shipped view file must declare it too, since the view owns which columns
 // there are — otherwise the column exists on the bench, which resolves its own
 // set, and on no operator's screen.
-//
-// This pins only that the two agree for lambda, not whether a column list
-// should have two owners at all.
 func TestLambdaListShowsItsHandler(t *testing.T) {
 	byType, _ := buildVisibilityTypeCache(t)
 	rows := byType["lambda"]
@@ -161,9 +156,9 @@ func TestLambdaListShowsItsHandler(t *testing.T) {
 	}
 }
 
-// TestHarnessCellMatchesTheBenchCell is row 14. A harness that resolves its
-// columns differently from the controller renders a different cell, and a test
-// written against it pins something no operator ever sees.
+// A harness that resolves its columns differently from the controller renders
+// a different cell, and a test written against it pins something no operator
+// ever sees.
 func TestHarnessCellMatchesTheBenchCell(t *testing.T) {
 	byType, _ := buildVisibilityTypeCache(t)
 	td := resource.FindResourceType("cb")

@@ -4,15 +4,6 @@ package unit_test
 // related checker (checkCfR53). The checker is unexported; we retrieve it via
 // resource.GetRelated("cf") and the "r53" TargetType entry, matching the pattern
 // used by other related-checker tests (see aws_sg_related_test.go).
-//
-// Invariants tested:
-//   - Exact zone-name match: alias == zone.Name → Count=1
-//   - Subdomain suffix match: alias ends with "."+zone.Name → Count=1
-//   - Multiple aliases across multiple zones → Count=len(matched zones)
-//   - No-match: different domain → Count=0
-//   - Truncated cache with no matches → Truncated=true
-//   - No aliases → Count=0
-//   - Trailing dot normalisation: zone "example.com." matches alias "example.com"
 
 import (
 	"context"
@@ -82,10 +73,6 @@ func r53Cache(truncated bool, zones ...resource.Resource) resource.ResourceCache
 	}
 }
 
-// ---------------------------------------------------------------------------
-// TestCheckCfR53_MatchesExactZoneName
-// ---------------------------------------------------------------------------
-
 // TestCheckCfR53_MatchesExactZoneName: alias "example.com" matches zone "example.com".
 func TestCheckCfR53_MatchesExactZoneName(t *testing.T) {
 	checker := cfR53Checker(t)
@@ -107,10 +94,6 @@ func TestCheckCfR53_MatchesExactZoneName(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// TestCheckCfR53_MatchesSubdomainOfZone
-// ---------------------------------------------------------------------------
-
 // TestCheckCfR53_MatchesSubdomainOfZone: alias "www.example.com" matches zone "example.com".
 func TestCheckCfR53_MatchesSubdomainOfZone(t *testing.T) {
 	checker := cfR53Checker(t)
@@ -129,10 +112,6 @@ func TestCheckCfR53_MatchesSubdomainOfZone(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// TestCheckCfR53_MultipleAliasesAcrossMultipleZones
-// ---------------------------------------------------------------------------
-
 // TestCheckCfR53_MultipleAliasesAcrossMultipleZones: two aliases matching two
 // different zones each → Count=2.
 func TestCheckCfR53_MultipleAliasesAcrossMultipleZones(t *testing.T) {
@@ -141,7 +120,6 @@ func TestCheckCfR53_MultipleAliasesAcrossMultipleZones(t *testing.T) {
 	res := makeCFResource("E3GHI", []string{"www.example.com", "api.other.com"})
 	zone1 := makeR53Resource("/hostedzone/Z003", "example.com")
 	zone2 := makeR53Resource("/hostedzone/Z004", "other.com")
-	// An unrelated zone must NOT be counted.
 	zone3 := makeR53Resource("/hostedzone/Z005", "unrelated.io")
 	cache := r53Cache(false, zone1, zone2, zone3)
 
@@ -153,7 +131,6 @@ func TestCheckCfR53_MultipleAliasesAcrossMultipleZones(t *testing.T) {
 	if len(result.ResourceIDs()) != 2 {
 		t.Errorf("ResourceIDs = %v, want 2 entries ([%q, %q])", result.ResourceIDs(), zone1.ID, zone2.ID)
 	}
-	// Verify both zone IDs are present (order may vary).
 	idSet := make(map[string]bool)
 	for _, id := range result.ResourceIDs() {
 		idSet[id] = true
@@ -165,10 +142,6 @@ func TestCheckCfR53_MultipleAliasesAcrossMultipleZones(t *testing.T) {
 		t.Errorf("ResourceIDs missing zone2 %q; got %v", zone2.ID, result.ResourceIDs())
 	}
 }
-
-// ---------------------------------------------------------------------------
-// TestCheckCfR53_NoMatchDifferentDomain
-// ---------------------------------------------------------------------------
 
 // TestCheckCfR53_NoMatchDifferentDomain: alias "example.com" does NOT match zone "other.com".
 func TestCheckCfR53_NoMatchDifferentDomain(t *testing.T) {
@@ -191,10 +164,6 @@ func TestCheckCfR53_NoMatchDifferentDomain(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// TestCheckCfR53_TruncatedEmptyCacheReturnsTruncated
-// ---------------------------------------------------------------------------
-
 // TestCheckCfR53_TruncatedEmptyCacheReturnsTruncated: when r53 cache is
 // truncated and contains no matching zones, the result must be Truncated=true
 // (not a hard zero — more zones may exist beyond the cache window).
@@ -202,9 +171,8 @@ func TestCheckCfR53_TruncatedEmptyCacheReturnsTruncated(t *testing.T) {
 	checker := cfR53Checker(t)
 
 	res := makeCFResource("E5MNO", []string{"example.com"})
-	// Cache is truncated and the zone "other.com" does not match.
 	zone := makeR53Resource("/hostedzone/Z007", "other.com")
-	cache := r53Cache(true, zone) // IsTruncated=true
+	cache := r53Cache(true, zone)
 
 	result := checker(context.Background(), nil, res, cache)
 
@@ -218,15 +186,10 @@ func TestCheckCfR53_TruncatedEmptyCacheReturnsTruncated(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// TestCheckCfR53_NoAliasesReturnsZero
-// ---------------------------------------------------------------------------
-
 // TestCheckCfR53_NoAliasesReturnsZero: distribution with no aliases → Count=0.
 func TestCheckCfR53_NoAliasesReturnsZero(t *testing.T) {
 	checker := cfR53Checker(t)
 
-	// Build distribution with empty Aliases.Items.
 	zero := int32(0)
 	dist := cftypes.DistributionSummary{
 		Aliases: &cftypes.Aliases{
@@ -250,10 +213,6 @@ func TestCheckCfR53_NoAliasesReturnsZero(t *testing.T) {
 		t.Errorf("Count = %d, want 0 for distribution with no aliases", result.Count())
 	}
 }
-
-// ---------------------------------------------------------------------------
-// TestCheckCfR53_TrailingDotNormalized
-// ---------------------------------------------------------------------------
 
 // TestCheckCfR53_TrailingDotNormalized: zone name "example.com." (with trailing
 // dot, as Route 53 stores it) matches alias "example.com" after normalisation.

@@ -1,24 +1,5 @@
 package unit
 
-// aws_dbi_issue_enrichment_test.go — Wave 2 enricher tests for dbi.
-//
-// EnrichDBIMaintenance never writes FieldUpdates["status"]. The merged §4
-// status phrase is computed
-// at render time by phraseFromFindings(r.Findings) in extractCellValue —
-// wave-1 findings reach r.Findings via the fetcher, wave-2 findings via
-// applyEnrichment.
-//
-// Tests drive aws.EnrichDBIMaintenance (the dbi-specific enricher) and assert:
-//   - Findings keyed by Resource.ID (ARN suffix-matched).
-//   - Severity "~" (informational, no S1 badge bump).
-//   - Summary is the short S5 phrase "pending maintenance" — Action and
-//     Description never appear in Summary (they belong in Rows per the
-//     resource.EnrichmentFinding contract).
-//   - FieldUpdates is nil or empty in every case (no status overlay,
-//     no "(+N)" suffix arithmetic on the enricher side).
-//   - nil RDS client returns empty result gracefully.
-//   - Multi-page response: all actions from both pages processed.
-
 import (
 	"context"
 	"strings"
@@ -34,12 +15,6 @@ import (
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
-
-// ---------------------------------------------------------------------------
-// mock — satisfies awsclient.RDSAPI via embedding; overrides
-// DescribePendingMaintenanceActions to return test-controlled data.
-// Supports multi-page via the pages slice.
-// ---------------------------------------------------------------------------
 
 type dbiMaintenanceFake struct {
 	awsclient.RDSAPI
@@ -74,10 +49,6 @@ func (f *dbiMaintenanceFake) DescribePendingMaintenanceActions(
 	}, nil
 }
 
-// ---------------------------------------------------------------------------
-// helpers
-// ---------------------------------------------------------------------------
-
 // buildDbiResources converts all DBIFixtures.Instances into []resource.Resource
 // by running them through FetchRDSInstancesPage (so Resource.Status is
 // correctly derived by the fetcher, not hardcoded in tests).
@@ -92,12 +63,6 @@ func buildDbiResources(t *testing.T) []resource.Resource {
 	return result.Resources
 }
 
-// ---------------------------------------------------------------------------
-// Tests
-// ---------------------------------------------------------------------------
-
-// TestDBI_Enrich_MaintenancePending_HealthyRow verifies the full Wave 2 contract
-// on the maint-dbi-scheduled fixture (spec §3.2 + §4 table row "Pending maintenance overdue").
 func TestDBI_Enrich_MaintenancePending_HealthyRow(t *testing.T) {
 	resources := buildDbiResources(t)
 	fix := fixtures.NewDBIFixtures()
@@ -121,9 +86,8 @@ func TestDBI_Enrich_MaintenancePending_HealthyRow(t *testing.T) {
 		t.Errorf("Severity = %v, want SevWarn", finding.Severity)
 	}
 
-	// Phrase is the short S4 phrase — concrete details (Action, Description)
-	// must NOT appear here; they belong in AttentionDetail rows and in Detail.
-	// docs/resources/dbi.md §4 row "Pending maintenance overdue": List text (S4).
+	// Concrete details (Action, Description) belong in AttentionDetail rows and
+	// in Detail, not in the phrase.
 	if finding.Phrase != "maintenance scheduled" {
 		t.Errorf("Phrase = %q, want %q", finding.Phrase, "maintenance scheduled")
 	}
@@ -131,15 +95,13 @@ func TestDBI_Enrich_MaintenancePending_HealthyRow(t *testing.T) {
 		t.Errorf("Phrase must not embed Row content; got %q", finding.Phrase)
 	}
 
-	// Detail is the one static S5 sentence FindingDef declares for
-	// dbiCodePendingMaintenance (catalog_databases.go) — one sentence per
-	// code, never keyed by this fixture's Action/Description. Those concrete
-	// facts live only in AttentionDetail rows below.
+	// Detail is the one static sentence FindingDef declares for
+	// dbiCodePendingMaintenance (catalog_databases.go); the concrete facts live
+	// in the AttentionDetail rows.
 	const wantDetail = "AWS has a maintenance action pending for this instance and will apply it in a maintenance window of its choosing once the target date passes; the action, apply method and earliest date are listed below. Apply it yourself in a window that suits you."
 	if finding.Detail != wantDetail {
 		t.Errorf("Detail = %q, want %q", finding.Detail, wantDetail)
 	}
-	// The same facts must be present in AttentionDetail rows.
 	wantRows := map[string]string{
 		"Action":          "system-update",
 		"Description":     "New minor engine patch 16.2.3",
@@ -163,10 +125,6 @@ func TestDBI_Enrich_MaintenancePending_HealthyRow(t *testing.T) {
 
 }
 
-// TestDBI_Enrich_MaintenancePending_NilDescription verifies that when the
-// PendingMaintenanceAction.Description is nil, Summary stays the short phrase
-// and the Description Row is simply omitted (rather than the Summary mutating
-// to reflect missing details — see resource.EnrichmentFinding contract).
 func TestDBI_Enrich_MaintenancePending_NilDescription(t *testing.T) {
 	const resourceID = "inline-no-desc"
 	const arn = "arn:aws:rds:us-east-1:123456789012:db:" + resourceID
@@ -210,22 +168,12 @@ func TestDBI_Enrich_MaintenancePending_NilDescription(t *testing.T) {
 		}
 	}
 
-	// Detail (S5) is the one static sentence FindingDef declares for
-	// dbiCodePendingMaintenance; it does not depend on Action/Description
-	// being present. A nil Description omits the Description row (asserted
-	// above) but the finding still fires and still carries its definition's
-	// sentence unchanged.
 	const wantDetail = "AWS has a maintenance action pending for this instance and will apply it in a maintenance window of its choosing once the target date passes; the action, apply method and earliest date are listed below. Apply it yourself in a window that suits you."
 	if finding.Detail != wantDetail {
 		t.Errorf("Detail = %q, want %q (nil Description must not blank the definition's sentence)", finding.Detail, wantDetail)
 	}
 }
 
-// TestDBI_Enrich_NonHealthyStatus_NoFieldUpdates verifies that when the
-// fetcher already set a non-empty Status (e.g. "publicly accessible"), the
-// enricher still emits a Finding (for S5 visibility) but MUST NOT write
-// FieldUpdates["status"]. The merged "publicly accessible (+1)" display is
-// computed at render time by phraseFromFindings(r.Findings).
 func TestDBI_Enrich_NonHealthyStatus_NoFieldUpdates(t *testing.T) {
 	const resourceID = "inline-already-warning"
 	const arn = "arn:aws:rds:us-east-1:123456789012:db:" + resourceID
@@ -243,7 +191,6 @@ func TestDBI_Enrich_NonHealthyStatus_NoFieldUpdates(t *testing.T) {
 		},
 	}
 	clients := &awsclient.ServiceClients{RDS: fake}
-	// Resource already has a Wave-1 warning status set.
 	resources := []resource.Resource{
 		{
 			ID:     resourceID,
@@ -257,21 +204,15 @@ func TestDBI_Enrich_NonHealthyStatus_NoFieldUpdates(t *testing.T) {
 		t.Fatalf("EnrichDBIMaintenance error: %v", err)
 	}
 
-	// Finding must be present (S5 visibility) — wave-1 stacking must NOT
-	// suppress the wave-2 maintenance finding.
 	if _, ok := result.Findings[resourceID]; !ok {
 		t.Errorf("expected finding for %q on non-healthy row (S5 still needed)", resourceID)
 	}
 
-	// FieldUpdates must be empty — no status overlay, no "(+1)" suffix
-	// arithmetic on the enricher side.
 	if updates, ok := result.FieldUpdates[resourceID]; ok && len(updates) != 0 {
 		t.Errorf("AS-140: expected empty FieldUpdates for %q (status overlay removed); got %v", resourceID, updates)
 	}
 }
 
-// TestDBI_Enrich_NoMatchNoFinding verifies that when the API returns ARNs
-// for instances NOT in the resources slice, the result has no Findings.
 func TestDBI_Enrich_NoMatchNoFinding(t *testing.T) {
 	fake := &dbiMaintenanceFake{
 		pages: [][]rdstypes.ResourcePendingMaintenanceActions{
@@ -299,8 +240,6 @@ func TestDBI_Enrich_NoMatchNoFinding(t *testing.T) {
 	}
 }
 
-// TestDBI_Enrich_NilRDSClient verifies that nil RDS client returns an empty
-// result without error (degraded gracefully).
 func TestDBI_Enrich_NilRDSClient(t *testing.T) {
 	clients := &awsclient.ServiceClients{RDS: nil}
 	result, err := awsclient.EnrichDBIMaintenance(context.Background(), clients, nil, nil)
@@ -315,8 +254,6 @@ func TestDBI_Enrich_NilRDSClient(t *testing.T) {
 	}
 }
 
-// TestDBI_Enrich_Pagination verifies that findings from both pages of a
-// two-page DescribePendingMaintenanceActions response are processed.
 func TestDBI_Enrich_Pagination(t *testing.T) {
 	past := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
 
@@ -356,15 +293,6 @@ func TestDBI_Enrich_Pagination(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// Wave 1 + Wave 2 stacking — (+N) suffix (spec §4 universal rule 7)
-// ---------------------------------------------------------------------------
-
-// TestDBI_Enrich_Wave1PlusWave2_NoFieldUpdates verifies that when a
-// resource already has a Wave-1 warning status ("publicly accessible") and a
-// Wave-2 maintenance finding stacks on top, the Finding is still emitted but
-// FieldUpdates is left empty — the merged "publicly accessible (+1)" display
-// is computed at render time by phraseFromFindings(r.Findings).
 func TestDBI_Enrich_Wave1PlusWave2_NoFieldUpdates(t *testing.T) {
 	const resourceID = fixtures.WarnDbiPublicMaintID
 	const arn = fixtures.WarnDbiPublicMaintARN
@@ -382,7 +310,6 @@ func TestDBI_Enrich_Wave1PlusWave2_NoFieldUpdates(t *testing.T) {
 		},
 	}
 	clients := &awsclient.ServiceClients{RDS: fake}
-	// Simulate the fetcher-produced status for this fixture (Wave 1 warning).
 	resources := []resource.Resource{
 		{
 			ID:     resourceID,
@@ -396,7 +323,6 @@ func TestDBI_Enrich_Wave1PlusWave2_NoFieldUpdates(t *testing.T) {
 		t.Fatalf("EnrichDBIMaintenance error: %v", err)
 	}
 
-	// Finding must be present with SevWarn severity.
 	findings, ok := result.Findings[resourceID]
 	if !ok {
 		t.Fatalf("expected finding for %q; Findings keys = %v", resourceID, findingKeys(result.Findings))
@@ -406,19 +332,12 @@ func TestDBI_Enrich_Wave1PlusWave2_NoFieldUpdates(t *testing.T) {
 		t.Errorf("Severity = %v, want SevWarn", finding.Severity)
 	}
 
-	// FieldUpdates must be empty.
 	if updates, ok := result.FieldUpdates[resourceID]; ok && len(updates) != 0 {
 		t.Errorf("AS-140: expected empty FieldUpdates for %q (status overlay removed); got %v", resourceID, updates)
 	}
 
 }
 
-// TestDBI_Enrich_Wave1PlusWave2_PostPR03eShape_NoFieldUpdates covers the
-// fetcher shape with Findings populated, Status empty and Fields["status"]
-// carrying the merged §4 phrase: the Wave-2 maintenance finding is emitted to
-// result.Findings, but FieldUpdates is empty — the render-layer
-// phraseFromFindings(r.Findings) computes the merged "publicly accessible
-// (+1)" display from the stacked findings.
 func TestDBI_Enrich_Wave1PlusWave2_PostPR03eShape_NoFieldUpdates(t *testing.T) {
 	const resourceID = fixtures.WarnDbiPublicMaintID
 	const arn = fixtures.WarnDbiPublicMaintARN
@@ -437,8 +356,6 @@ func TestDBI_Enrich_Wave1PlusWave2_PostPR03eShape_NoFieldUpdates(t *testing.T) {
 	}
 	clients := &awsclient.ServiceClients{RDS: fake}
 
-	// Post-PR-03e fetcher shape: Findings populated, Status empty, Fields["status"]
-	// carrying the merged §4 phrase.
 	resources := []resource.Resource{
 		{
 			ID:   resourceID,
@@ -447,7 +364,6 @@ func TestDBI_Enrich_Wave1PlusWave2_PostPR03eShape_NoFieldUpdates(t *testing.T) {
 				{Code: awsclient.CodeDBIPubliclyAccessible, Phrase: "publicly accessible", Severity: domain.SevWarn, Source: "wave1"},
 			},
 			Fields: map[string]string{"status": "publicly accessible"},
-			// Status: "" — intentionally unset; mirrors the fetcher's post-PR-03e contract.
 		},
 	}
 
@@ -456,21 +372,15 @@ func TestDBI_Enrich_Wave1PlusWave2_PostPR03eShape_NoFieldUpdates(t *testing.T) {
 		t.Fatalf("EnrichDBIMaintenance error: %v", err)
 	}
 
-	// The wave-2 maintenance Finding must still be emitted.
 	if _, ok := result.Findings[resourceID]; !ok {
 		t.Errorf("expected finding for %q on post-PR-03e wave-1 shape", resourceID)
 	}
 
-	// FieldUpdates must be empty.
 	if updates, ok := result.FieldUpdates[resourceID]; ok && len(updates) != 0 {
 		t.Errorf("AS-140: expected empty FieldUpdates for %q (status overlay removed); got %v", resourceID, updates)
 	}
 }
 
-// TestDBI_Enrich_Wave1MultiPlusWave2_NoFieldUpdates verifies that when a
-// resource already carries a Wave-1 multi-warning status, the enricher still
-// emits its wave-2 Finding but does NOT touch FieldUpdates. The merged
-// "(+N+1)" display is computed at render time from r.Findings.
 func TestDBI_Enrich_Wave1MultiPlusWave2_NoFieldUpdates(t *testing.T) {
 	const resourceID = "inline-3warn-plus-maint"
 	const arn = "arn:aws:rds:us-east-1:123456789012:db:" + resourceID
@@ -488,7 +398,6 @@ func TestDBI_Enrich_Wave1MultiPlusWave2_NoFieldUpdates(t *testing.T) {
 		},
 	}
 	clients := &awsclient.ServiceClients{RDS: fake}
-	// Simulate a 3-warning Wave-1 status already set by the fetcher.
 	resources := []resource.Resource{
 		{
 			ID:     resourceID,
@@ -510,9 +419,6 @@ func TestDBI_Enrich_Wave1MultiPlusWave2_NoFieldUpdates(t *testing.T) {
 	}
 }
 
-// TestDBI_Enrich_HealthyPlusWave2_NoFieldUpdates_Regression covers the
-// healthy-resource case: a wave-2 finding is emitted (severity "~",
-// Summary "pending maintenance") but FieldUpdates is empty.
 func TestDBI_Enrich_HealthyPlusWave2_NoFieldUpdates_Regression(t *testing.T) {
 	fix := fixtures.NewDBIFixtures()
 	resources := buildDbiResources(t)
@@ -535,14 +441,10 @@ func TestDBI_Enrich_HealthyPlusWave2_NoFieldUpdates_Regression(t *testing.T) {
 	}
 }
 
-// TestDBI_Enrich_VariousExistingStatuses_NoFieldUpdates covers a matrix of
-// pre-existing Wave-1 statuses: the enricher emits its Finding but never
-// writes FieldUpdates regardless of the prior status value; bump arithmetic
-// belongs to phraseFromFindings at render time.
 func TestDBI_Enrich_VariousExistingStatuses_NoFieldUpdates(t *testing.T) {
 	cases := []struct {
 		name           string
-		existingStatus string // Wave-1 status already on the resource
+		existingStatus string
 	}{
 		{name: "no_existing_suffix", existingStatus: "publicly accessible"},
 		{name: "existing_suffix_1", existingStatus: "publicly accessible (+1)"},
@@ -583,22 +485,16 @@ func TestDBI_Enrich_VariousExistingStatuses_NoFieldUpdates(t *testing.T) {
 				t.Fatalf("EnrichDBIMaintenance error: %v", err)
 			}
 
-			// Finding must still be emitted regardless of pre-existing status.
 			if _, ok := result.Findings[id]; !ok {
 				t.Errorf("expected finding for %q", id)
 			}
 
-			// FieldUpdates always empty — no status overlay.
 			if updates, ok := result.FieldUpdates[id]; ok && len(updates) != 0 {
 				t.Errorf("AS-140: expected empty FieldUpdates for %q (existingStatus=%q); got %v", id, tc.existingStatus, updates)
 			}
 		})
 	}
 }
-
-// ---------------------------------------------------------------------------
-// internal helpers
-// ---------------------------------------------------------------------------
 
 func findingKeys(m map[string][]domain.Finding) []string {
 	keys := make([]string, 0, len(m))

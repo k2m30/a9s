@@ -16,14 +16,12 @@ import (
 	"github.com/k2m30/a9s/v3/internal/tui"
 )
 
-// liveProfile returns the AWS profile to use for live R1-R4 tests, or "" if
-// unset. Tests skip when this returns "".
 func liveProfile() string {
 	return strings.TrimSpace(os.Getenv("A9S_REPRO_PROFILE"))
 }
 
-// newLiveR1R4Scenario builds a live scenario with both Wave 1 and Wave 2
-// enrichment fully drained so R1-R4 assertions are against a settled menu.
+// newLiveR1R4Scenario builds a live scenario with Wave 1 and Wave 2 drained,
+// so assertions run against a settled menu.
 func newLiveR1R4Scenario(t *testing.T) *fullIntegrationScenario {
 	t.Helper()
 	profile := liveProfile()
@@ -33,10 +31,6 @@ func newLiveR1R4Scenario(t *testing.T) *fullIntegrationScenario {
 
 	scenario := fullIntegrationNewLiveScenario(t, profile, "")
 
-	// Wave 1: drain AvailabilityPrefetchedMsg (or AvailabilityCheckedMsg chain)
-	// fullIntegrationNewLiveScenario applies ClientsReadyMsg. We now need to
-	// wait for Wave 1 completion.  Use the same extraction pattern as the full
-	// integration test.
 	m := tui.New(profile, "", tui.WithNoCache(true))
 	m, _ = fullIntegrationApplyMsg(m, tea.WindowSizeMsg{Width: 240, Height: 220})
 
@@ -61,14 +55,12 @@ func newLiveR1R4Scenario(t *testing.T) *fullIntegrationScenario {
 	var wave2Cmd tea.Cmd
 	m, wave2Cmd = fullIntegrationApplyMsg(m, availMsg)
 
-	// R1: drain Wave 2 — applying AvailabilityPrefetchedMsg returns the
-	// startEnrichment batch. Every EnrichmentCheckedMsg it produces must be
-	// applied back to the model so menu badges reflect post-Wave-2 state.
-	// Without this drain, tests only validate Wave 1 and miss Wave 2 findings
-	// (e.g. RDS pending maintenance surfaced via EnrichRDSDocDBMaintenance).
+	// Applying AvailabilityPrefetchedMsg returns the startEnrichment batch;
+	// every EnrichmentCheckedMsg it produces is applied back so menu badges
+	// include Wave 2 findings (e.g. RDS pending maintenance from
+	// EnrichRDSDocDBMaintenance).
 	m = drainWave2Enrichment(t, m, wave2Cmd)
 
-	// Rebuild scenario from the fully-initialised model so its view is current.
 	scenario.model = m
 	return scenario
 }
@@ -134,28 +126,17 @@ func drainWave2EnrichmentCollect(t *testing.T, m tui.Model, cmd tea.Cmd) (tui.Mo
 	return m, collected
 }
 
-// TestLiveR1_IssueCountsVisibleOnMenuAfterWave1 verifies R1: after Wave 1
-// completes, the main menu renders non-zero issue counts for any resource type
-// that has unhealthy (non-green) resources in the account.
 func TestLiveR1_IssueCountsVisibleOnMenuAfterWave1(t *testing.T) {
 	scenario := newLiveR1R4Scenario(t)
 
 	view := scenario.currentView()
-	// At least one resource type should show issue annotations if the account
-	// has any non-healthy resources. We check generically for "issue" text;
-	// an account with no unhealthy resources will produce an empty assertion
-	// but the test still verifies the menu rendered without crashing.
 	t.Logf("R1: main menu view (excerpt):\n%s", firstLines(view, 40))
 
-	// The menu must render. No panic = R1 basic structural invariant holds.
 	if view == "" {
 		t.Error("R1: main menu rendered empty view after Wave 1")
 	}
 }
 
-// TestLiveR2_MenuCountMatchesListCount verifies R2: for every resource type,
-// the count shown on the main menu equals the count of resources actually
-// loaded when opening that type's list.
 func TestLiveR2_MenuCountMatchesListCount(t *testing.T) {
 	profile := liveProfile()
 	if profile == "" {
@@ -198,8 +179,8 @@ func TestLiveR2_MenuCountMatchesListCount(t *testing.T) {
 			}
 
 			listCount := len(s2.currentListResources)
-			// For truncated lists the menu shows N+ and list returns first page.
-			// We just verify list is non-empty when menu says > 0.
+			// A truncated list shows N+ on the menu and loads only its first page,
+			// so only emptiness is compared.
 			if menuCount > 0 && listCount == 0 {
 				t.Errorf("R2: menu count=%d for %q but list loaded 0 resources", menuCount, rt.Name)
 			}
@@ -211,8 +192,6 @@ func TestLiveR2_MenuCountMatchesListCount(t *testing.T) {
 	}
 }
 
-// TestLiveR3_IssueBadgeNeverExceedsListCount verifies R3: the issue count
-// badge on the main menu never exceeds the total resource count for any type.
 func TestLiveR3_IssueBadgeNeverExceedsListCount(t *testing.T) {
 	if liveProfile() == "" {
 		t.Skip("A9S_REPRO_PROFILE not set; skipping live R3 test")
@@ -236,7 +215,7 @@ func TestLiveR3_IssueBadgeNeverExceedsListCount(t *testing.T) {
 		countStr := strings.TrimSpace(after[:end])
 		slash := strings.Index(countStr, "/")
 		if slash == -1 {
-			continue // no issue annotation
+			continue
 		}
 
 		totalStr := strings.TrimSuffix(strings.TrimSpace(countStr[:slash]), "+")
@@ -262,10 +241,6 @@ func TestLiveR3_IssueBadgeNeverExceedsListCount(t *testing.T) {
 	}
 }
 
-// TestLiveR4_CtrlZShowsOnlyTypesWithIssues verifies R4: the ctrl+z issue filter
-// hides resource types whose zero issue count is confirmed (not truncated) and
-// preserves types that do have issues. Post-AlwaysHealthy-purge only
-// ExcludeFromIssueBadge types (ct-events) are unconditionally hidden.
 func TestLiveR4_CtrlZShowsOnlyTypesWithIssues(t *testing.T) {
 	if liveProfile() == "" {
 		t.Skip("A9S_REPRO_PROFILE not set; skipping live R4 test")
@@ -274,7 +249,6 @@ func TestLiveR4_CtrlZShowsOnlyTypesWithIssues(t *testing.T) {
 	scenario := newLiveR1R4Scenario(t)
 	menuView := scenario.currentView()
 
-	// Identify which types have non-zero issue counts from the settled menu.
 	// Menu format: "<Display Name> (<total>)        :<shortname>" followed on the
 	// same line by " issues:<N>" or " issues:<N>+" when a type has findings.
 	// We scan per line to avoid confusing a badge from one line with a name on
@@ -290,7 +264,6 @@ func TestLiveR4_CtrlZShowsOnlyTypesWithIssues(t *testing.T) {
 				continue
 			}
 			after := line[badgeIdx+len(" issues:"):]
-			// Grab the integer count up to the first non-digit / non-'+' char.
 			end := 0
 			for end < len(after) && (after[end] >= '0' && after[end] <= '9') {
 				end++
@@ -308,9 +281,7 @@ func TestLiveR4_CtrlZShowsOnlyTypesWithIssues(t *testing.T) {
 	scenario.Press("ctrl+z")
 	filteredView := scenario.currentView()
 
-	// ExcludeFromIssueBadge types must always be hidden under ctrl+z.
-	// (Post-AlwaysHealthy-purge; every other type's visibility is driven by
-	// its per-type probe state.)
+	// ExcludeFromIssueBadge types are always hidden under ctrl+z.
 	for _, name := range []string{
 		"CloudTrail Events",
 	} {
@@ -319,7 +290,6 @@ func TestLiveR4_CtrlZShowsOnlyTypesWithIssues(t *testing.T) {
 		}
 	}
 
-	// Types confirmed to have issues must still be visible
 	for name := range typesWithIssues {
 		if !strings.Contains(filteredView, name) {
 			t.Errorf("R4: %q has issues but disappeared under ctrl+z", name)
@@ -329,7 +299,6 @@ func TestLiveR4_CtrlZShowsOnlyTypesWithIssues(t *testing.T) {
 	t.Logf("R4: types with issues in account: %v", typesWithIssues)
 }
 
-// firstLines returns the first n lines of s.
 func firstLines(s string, n int) string {
 	lines := strings.SplitN(s, "\n", n+1)
 	if len(lines) > n {
@@ -338,23 +307,12 @@ func firstLines(s string, n int) string {
 	return strings.Join(lines, "\n")
 }
 
-// TestLiveR_DBIDetailShowsPendingMaintenance verifies the end-to-end finding
-// surfacing path: with Wave 2 drained, a dbi detail view opened on a resource
-// that has a pending-maintenance finding must render the "Attention"
-// section. This pins the path the user observed as broken in the original bug
-// report.
-//
-// Runs only against a live profile where DB instances with pending maintenance
-// actually exist (both dev and prod read-only profiles had
-// findings on the last run: 2 and 3 respectively). Skips on profiles that
-// happen to have no pending maintenance.
 func TestLiveR_DBIDetailShowsPendingMaintenance(t *testing.T) {
 	profile := liveProfile()
 	if profile == "" {
 		t.Skip("A9S_REPRO_PROFILE not set; skipping live DBI detail test")
 	}
 
-	// Build the settled model AND capture the findings observed during Wave 2.
 	scenario := fullIntegrationNewLiveScenario(t, profile, "")
 	m := tui.New(profile, "", tui.WithNoCache(true))
 	m, _ = fullIntegrationApplyMsg(m, tea.WindowSizeMsg{Width: 240, Height: 220})
@@ -382,7 +340,6 @@ func TestLiveR_DBIDetailShowsPendingMaintenance(t *testing.T) {
 		t.Skipf("no dbi findings in profile %q; cannot validate Pending Maintenance end-to-end", profile)
 	}
 
-	// Pick the first affected dbi instance ID.
 	var targetID string
 	for id := range dbiFindings {
 		targetID = id
@@ -390,7 +347,6 @@ func TestLiveR_DBIDetailShowsPendingMaintenance(t *testing.T) {
 	}
 	t.Logf("opening dbi detail for %q (expects Pending Maintenance finding)", targetID)
 
-	// Navigate: open dbi list, then open the affected resource's detail view.
 	scenario.OpenList("dbi")
 	if scenario.lastAPIError != nil {
 		t.Fatalf("API error opening dbi list: %v", scenario.lastAPIError.Err)

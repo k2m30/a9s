@@ -14,10 +14,6 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// ---------------------------------------------------------------------------
-// Local mock: IAMGetGroupAPI
-// ---------------------------------------------------------------------------
-
 type mockIAMGetGroupClient struct {
 	outputs   []*iam.GetGroupOutput
 	err       error
@@ -42,11 +38,6 @@ func (m *mockIAMGetGroupClient) GetGroup(
 	return out, nil
 }
 
-// ---------------------------------------------------------------------------
-// Tests
-// ---------------------------------------------------------------------------
-
-// TestFetchIAMGroupMembers_Basic verifies parsing of 2 users with all fields.
 func TestFetchIAMGroupMembers_Basic(t *testing.T) {
 	createDate1 := time.Date(2023, 1, 15, 10, 30, 0, 0, time.UTC)
 	createDate2 := time.Date(2024, 6, 1, 14, 0, 0, 0, time.UTC)
@@ -132,8 +123,6 @@ func TestFetchIAMGroupMembers_Basic(t *testing.T) {
 	})
 }
 
-// TestFetchIAMGroupMembers_Empty verifies that a group with no users
-// returns an empty slice with no error.
 func TestFetchIAMGroupMembers_Empty(t *testing.T) {
 	mock := &mockIAMGetGroupClient{
 		outputs: []*iam.GetGroupOutput{
@@ -154,7 +143,6 @@ func TestFetchIAMGroupMembers_Empty(t *testing.T) {
 	}
 }
 
-// TestFetchIAMGroupMembers_APIError verifies that API errors are propagated.
 func TestFetchIAMGroupMembers_APIError(t *testing.T) {
 	mock := &mockIAMGetGroupClient{
 		err: fmt.Errorf("AWS API error: group not found"),
@@ -167,8 +155,6 @@ func TestFetchIAMGroupMembers_APIError(t *testing.T) {
 	}
 }
 
-// TestFetchIAMGroupMembers_NilFields verifies that nil fields on iamtypes.User
-// do not cause a panic.
 func TestFetchIAMGroupMembers_NilFields(t *testing.T) {
 	mock := &mockIAMGetGroupClient{
 		outputs: []*iam.GetGroupOutput{
@@ -204,7 +190,6 @@ func TestFetchIAMGroupMembers_Pagination(t *testing.T) {
 
 	parentCtx := map[string]string{"group_name": "big-group"}
 
-	// Page 1: 1 user with IsTruncated=true and Marker indicating more pages.
 	page1Mock := &mockIAMGetGroupClient{
 		outputs: []*iam.GetGroupOutput{
 			{
@@ -218,7 +203,6 @@ func TestFetchIAMGroupMembers_Pagination(t *testing.T) {
 		},
 	}
 
-	// First call: no continuation token — fetches page 1.
 	result1, err := awsclient.FetchIAMGroupMembers(context.Background(), page1Mock, parentCtx, "")
 	if err != nil {
 		t.Fatalf("page 1: expected no error, got %v", err)
@@ -254,7 +238,6 @@ func TestFetchIAMGroupMembers_Pagination(t *testing.T) {
 		}
 	})
 
-	// Page 2: 2 users with IsTruncated=false — last page.
 	page2Mock := &mockIAMGetGroupClient{
 		outputs: []*iam.GetGroupOutput{
 			{
@@ -268,7 +251,6 @@ func TestFetchIAMGroupMembers_Pagination(t *testing.T) {
 		},
 	}
 
-	// Second call: pass continuation token from page 1 to fetch page 2.
 	result2, err := awsclient.FetchIAMGroupMembers(context.Background(), page2Mock, parentCtx, result1.Pagination.NextToken)
 	if err != nil {
 		t.Fatalf("page 2: expected no error, got %v", err)
@@ -398,8 +380,6 @@ func TestFetchIAMGroupMembers_PasswordLastUsedAlwaysNA(t *testing.T) {
 	}
 }
 
-// TestFetchIAMGroupMembers_RawStruct verifies that RawStruct is the
-// original iamtypes.User.
 func TestFetchIAMGroupMembers_RawStruct(t *testing.T) {
 	createDate := time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)
 
@@ -444,7 +424,6 @@ func TestFetchIAMGroupMembers_RawStruct(t *testing.T) {
 	}
 }
 
-// TestIAMGroupMemberColumns verifies the column count, keys, titles, and widths.
 func TestIAMGroupMemberColumns(t *testing.T) {
 	cols := resource.IAMGroupMemberColumns()
 
@@ -480,8 +459,6 @@ func TestIAMGroupMemberColumns(t *testing.T) {
 	}
 }
 
-// TestIAMGroupMembers_PaginatedChildFetcherRegistered verifies that the paginated
-// child fetcher is registered under the correct short name.
 func TestIAMGroupMembers_PaginatedChildFetcherRegistered(t *testing.T) {
 	f := resource.GetPaginatedChildFetcher("iam_group_members")
 	if f == nil {
@@ -489,8 +466,6 @@ func TestIAMGroupMembers_PaginatedChildFetcherRegistered(t *testing.T) {
 	}
 }
 
-// TestIAMGroupMembers_ParentHasChildDef verifies that the iam-group parent
-// resource type has a Children entry for iam_group_members.
 func TestIAMGroupMembers_ParentHasChildDef(t *testing.T) {
 	var groupType *resource.ResourceTypeDef
 	for _, rt := range resource.AllResourceTypes() {

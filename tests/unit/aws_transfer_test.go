@@ -1,18 +1,9 @@
 package unit
 
-// aws_transfer_test.go — fetcher tests for FetchTransferServersPage plus the
-// Agreements child fetcher (FetchTransferAgreements) and its detail-view
-// cert/profile enrichment (docs/resources/transfer.md §3/§4,
-// docs/resources/transfer-impl-plan.md §0/§1).
-//
-// Transfer is an in-fetcher N+1 (ListServers + DescribeServer per id, the
-// mwaa/eks pattern) — every §3.2 signal is emitted fetcher-side with
-// Source "wave1". Unlike mwaa, a details-denied row stays RICH: it is built
-// from the ListedServer fields (state finding included) with the
-// transfer.warn.details_denied finding appended, never degraded to a
-// name-only row. These tests exercise the fetcher and the agreements child
-// fetcher directly against the shared demo fixtures plus inline adversarial
-// fakes.
+// Transfer is an in-fetcher N+1 (ListServers + DescribeServer per id); every
+// signal is emitted fetcher-side with Source "wave1". A row whose
+// DescribeServer is denied stays rich: it is built from the ListedServer fields
+// with the transfer.warn.details_denied finding appended.
 
 import (
 	"context"
@@ -39,13 +30,8 @@ import (
 	"github.com/k2m30/a9s/v3/core/session"
 )
 
-// ---------------------------------------------------------------------------
-// Shared helpers
-// ---------------------------------------------------------------------------
-
-// fetchTransferDemoPage fetches the shared demo fixture page. The demo set
-// includes the details-denied witness, so the fetch is a designed E5 partial
-// success (rows + composite error naming only that fixture); any OTHER error
+// The demo set includes a server whose DescribeServer is denied, so the fetch
+// returns rows plus a composite error naming only that server; any other error
 // fails the test.
 func fetchTransferDemoPage(t *testing.T) resource.FetchResult {
 	t.Helper()
@@ -57,8 +43,6 @@ func fetchTransferDemoPage(t *testing.T) resource.FetchResult {
 	return result
 }
 
-// mustFindTransferResource returns the resource with the given ID from a
-// slice of fetched resources, failing the test if absent.
 func mustFindTransferResource(t *testing.T, resources []resource.Resource, id string) resource.Resource {
 	t.Helper()
 	for _, r := range resources {
@@ -70,9 +54,6 @@ func mustFindTransferResource(t *testing.T, resources []resource.Resource, id st
 	return resource.Resource{}
 }
 
-// transferAsDescribedServer asserts RawStruct is a DescribedServer (healthy
-// row contract, docs/resources/transfer-impl-plan.md §0), accepting either
-// the pointer or value form.
 func transferAsDescribedServer(t *testing.T, raw any) *transfertypes.DescribedServer {
 	t.Helper()
 	switch v := raw.(type) {
@@ -86,8 +67,6 @@ func transferAsDescribedServer(t *testing.T, raw any) *transfertypes.DescribedSe
 	}
 }
 
-// transferAsListedServer asserts RawStruct is a ListedServer (degraded
-// details-denied row contract), accepting either the pointer or value form.
 func transferAsListedServer(t *testing.T, raw any) *transfertypes.ListedServer {
 	t.Helper()
 	switch v := raw.(type) {
@@ -131,10 +110,6 @@ func (transferUnimplementedAPI) DescribeCertificate(
 	return nil, fmt.Errorf("DescribeCertificate should not be called in this test")
 }
 
-// ---------------------------------------------------------------------------
-// online_silence
-// ---------------------------------------------------------------------------
-
 func TestFetchTransferServersPage_OnlineSilence(t *testing.T) {
 	result := fetchTransferDemoPage(t)
 	r := mustFindTransferResource(t, result.Resources, fixtures.ProdAS2GatewayID)
@@ -150,11 +125,6 @@ func TestFetchTransferServersPage_OnlineSilence(t *testing.T) {
 		t.Errorf("RawStruct.ServerId = %q, want %q", aws.ToString(described.ServerId), fixtures.ProdAS2GatewayID)
 	}
 }
-
-// ---------------------------------------------------------------------------
-// state_phrases — exact §4 phrase + severity + Detail per state; no raw enum
-// leaks into Phrase or Fields["status"].
-// ---------------------------------------------------------------------------
 
 func TestFetchTransferServersPage_StatePhrases(t *testing.T) {
 	result := fetchTransferDemoPage(t)
@@ -222,11 +192,6 @@ func TestFetchTransferServersPage_StatePhrases(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// legacy_policy — finding present, Detail names the policy, Phrase does NOT
-// (Phrase/Row anti-duplication, transfer-impl-plan.md §1 item 11).
-// ---------------------------------------------------------------------------
-
 func TestFetchTransferServersPage_LegacyPolicyFinding(t *testing.T) {
 	result := fetchTransferDemoPage(t)
 	r := mustFindTransferResource(t, result.Resources, fixtures.WarnTransferLegacyPolicyID)
@@ -245,10 +210,8 @@ func TestFetchTransferServersPage_LegacyPolicyFinding(t *testing.T) {
 		t.Errorf("Severity = %v, want SevWarn", finding.Severity)
 	}
 	const policyName = "TransferSecurityPolicy-2018-11"
-	// Detail is the one static sentence FindingDef declares for
-	// transferCodeLegacyPolicy (catalog_networking.go); the policy name
-	// stays in the resource's own fields (§3.2 SecurityPolicyName), not in
-	// Detail or Phrase.
+	// Detail is the static sentence FindingDef declares for
+	// transferCodeLegacyPolicy; the policy name stays in the resource's own fields.
 	const wantDetail = "The server's security policy still allows weak ciphers and old TLS versions, so a client can be steered onto a breakable connection. Move the server to a current security policy."
 	if finding.Detail != wantDetail {
 		t.Errorf("Detail = %q, want %q", finding.Detail, wantDetail)
@@ -261,9 +224,7 @@ func TestFetchTransferServersPage_LegacyPolicyFinding(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// no_logging — LoggingRole nil AND StructuredLogDestinations empty.
-// ---------------------------------------------------------------------------
+// No logging means LoggingRole nil and StructuredLogDestinations empty.
 
 func TestFetchTransferServersPage_NoLoggingFinding(t *testing.T) {
 	result := fetchTransferDemoPage(t)
@@ -288,10 +249,7 @@ func TestFetchTransferServersPage_NoLoggingFinding(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// multi_stack — OFFLINE + legacy policy + no logging: findings ordered per
-// §4 precedence (state, then legacy-policy, then no-logging).
-// ---------------------------------------------------------------------------
+// Findings are ordered state, then legacy policy, then no logging.
 
 func TestFetchTransferServersPage_MultiStackOrdered(t *testing.T) {
 	result := fetchTransferDemoPage(t)
@@ -306,12 +264,6 @@ func TestFetchTransferServersPage_MultiStackOrdered(t *testing.T) {
 		t.Errorf("ordered Findings phrases = %v, want %v", got, want)
 	}
 }
-
-// ---------------------------------------------------------------------------
-// details_denied_rich — a denied DescribeServer keeps the row, built from
-// ListedServer fields (State ONLINE → no state finding), with the
-// transfer.warn.details_denied finding appended; composite error names the id.
-// ---------------------------------------------------------------------------
 
 func TestFetchTransferServersPage_DetailsDeniedRich(t *testing.T) {
 	clients := &awsclient.ServiceClients{Transfer: fakes.NewTransfer()}
@@ -356,15 +308,6 @@ func TestFetchTransferServersPage_DetailsDeniedRich(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// list_denied_is_error — AccessDenied on ListServers must never render as an
-// empty successful result.
-// ---------------------------------------------------------------------------
-
-// The fake client for ListServers/DescribeServer now lives in
-// fakes_transfer_test.go (fakeTransferServers) — see that file's header for
-// the one-fake-per-interface convention.
-
 func TestFetchTransferServersPage_ListDeniedIsError(t *testing.T) {
 	fake := &fakeTransferServers{
 		ListErr:     &transfertypes.AccessDeniedException{Message: aws.String("User is not authorized to perform transfer:ListServers")},
@@ -383,11 +326,6 @@ func TestFetchTransferServersPage_ListDeniedIsError(t *testing.T) {
 		t.Errorf("Resources: expected 0 on error, got %d", len(result.Resources))
 	}
 }
-
-// ---------------------------------------------------------------------------
-// partial_describe — U12/E5: 5 listed, 2 describes fail → 5 rows (2
-// rich-degraded) + composite error naming both, in "N of M" form.
-// ---------------------------------------------------------------------------
 
 func transferPartialListedServer(id string) transfertypes.ListedServer {
 	return transfertypes.ListedServer{
@@ -467,10 +405,8 @@ func TestFetchTransferServersPage_PartialDescribe(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// wave3_anti — no Wave-3 metric/history strings anywhere; UserCount==0 and a
-// lone nil LoggingRole (structured logs still present) never become findings.
-// ---------------------------------------------------------------------------
+// UserCount 0 and a lone nil LoggingRole (structured logs still present) are
+// never findings.
 
 func TestFetchTransferServersPage_WaveThreeAntiTests(t *testing.T) {
 	result := fetchTransferDemoPage(t)
@@ -486,16 +422,12 @@ func TestFetchTransferServersPage_WaveThreeAntiTests(t *testing.T) {
 		}
 	}
 
-	// prod-as2-gateway has UserCount 0 — legitimately zero for an AS2/external-IdP
-	// server (spec §3.1) — must never raise a finding.
+	// UserCount 0 is legitimate for an AS2/external-IdP server.
 	gateway := mustFindTransferResource(t, result.Resources, fixtures.ProdAS2GatewayID)
 	if len(gateway.Findings) != 0 {
 		t.Errorf("UserCount==0 must not raise a finding, got Findings: %+v", gateway.Findings)
 	}
 
-	// LoggingRole nil ALONE (StructuredLogDestinations still populated) must
-	// not raise the no-logging finding — only the AND-condition (both empty)
-	// does (spec §3.2).
 	id := "wave3-anti-logging-role-nil"
 	listed := transferPartialListedServer(id)
 	described := transferPartialDescribedServer(id)
@@ -514,10 +446,6 @@ func TestFetchTransferServersPage_WaveThreeAntiTests(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// E7 sanity — Resource.ID is ServerId; Fields["arn"] holds the full ARN.
-// ---------------------------------------------------------------------------
-
 func TestFetchTransferServersPage_ResourceIDAndArnMapping(t *testing.T) {
 	result := fetchTransferDemoPage(t)
 	r := mustFindTransferResource(t, result.Resources, fixtures.ProdAS2GatewayID)
@@ -530,11 +458,6 @@ func TestFetchTransferServersPage_ResourceIDAndArnMapping(t *testing.T) {
 		t.Errorf(`Fields["arn"] = %q, want %q`, r.Fields["arn"], wantArn)
 	}
 }
-
-// ---------------------------------------------------------------------------
-// Agreements child fetcher — INACTIVE agreement carries the "inactive:
-// partner traffic rejected" finding; ACTIVE carries none.
-// ---------------------------------------------------------------------------
 
 func fetchTransferAgreementsForServer(t *testing.T, serverID string) []resource.Resource {
 	t.Helper()
@@ -569,15 +492,9 @@ func TestFetchTransferAgreements_InactiveFinding(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// Agreement detail — inline profile/cert resolution via DetailEnrich:
-// expired cert → Broken "expired"; <30d cert → Warning "expires in <N>d".
-// ---------------------------------------------------------------------------
-
-// transferAgreementsChildShortName discovers the registered Agreements
-// child-type ShortName from the "transfer" catalog entry's own Children
-// list, rather than guessing a literal — Agreements is documented as the
-// only server-scoped child (docs/resources/transfer.md §2.1).
+// transferAgreementsChildShortName reads the Agreements child ShortName from
+// the transfer catalog entry's Children; Agreements is the only server-scoped
+// child.
 func transferAgreementsChildShortName(t *testing.T) string {
 	t.Helper()
 	def := resource.FindResourceType("transfer")
@@ -644,21 +561,9 @@ func TestTransferAgreementDetailEnrich_CertExpiry(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// Agreement detail — the resolved As2Id must be visible through the SAME
-// config-driven render path projection.buildItems actually uses
-// (the generic projector + fieldpath.ExtractFieldList), not merely present
-// somewhere on the enricher's return value. defaults_networking.go's
-// transfer_agreements Detail declares {Key: "local_profile"} /
-// {Key: "partner_profile"} (docs/resources/transfer.md §2.1).
-// ---------------------------------------------------------------------------
-
-// TestTransferAgreementDetailEnrich_As2IdVisibleInRenderedDetail verifies that
-// enrichTransferAgreement's resolved As2Id values actually reach the rendered
-// detail content, not just Resource.Fields: the enricher writes
-// Fields["local_profile"]/Fields["partner_profile"] and the Detail declares
-// those keys directly (one key per fact), so the resolved As2Id, not the bare
-// profile id, reaches the render path.
+// The enricher writes Fields["local_profile"] and Fields["partner_profile"],
+// and the Detail declares those keys, so the resolved As2Id, not the bare
+// profile id, reaches the rendered detail.
 func TestTransferAgreementDetailEnrich_As2IdVisibleInRenderedDetail(t *testing.T) {
 	childShortName := transferAgreementsChildShortName(t)
 	enrich := resource.GetDetailEnricher(childShortName)
@@ -675,10 +580,8 @@ func TestTransferAgreementDetailEnrich_As2IdVisibleInRenderedDetail(t *testing.T
 		t.Fatalf("DetailEnrich returned error: %v", err)
 	}
 
-	// projection.buildItems (core/semantics/projection/generic.go) sets r.Type =
-	// m.resourceType before invoking the projector whenever the resource
-	// itself carries no Type — mirror that exactly so this test exercises
-	// the real config-driven render path rather than a synthetic shortcut.
+	// projection.buildItems sets r.Type to the view's resource type when the
+	// resource carries none.
 	enriched.Type = childShortName
 
 	sections := projection.GenericWithConfig(config.DefaultConfig())(enriched)
@@ -703,16 +606,10 @@ func TestTransferAgreementDetailEnrich_As2IdVisibleInRenderedDetail(t *testing.T
 	}
 }
 
-// newTestController builds a hermetic *app.Controller paired with
-// t.TempDir()/t.Cleanup(c.Close) in the correct LIFO order — this package's
-// own copy of app_controller_test.go's helper of the same name (that one
-// lives in the separate package unit_test and is not visible here).
-// Required by TestControllerConstructionDisciplineGate
-// (qa_controller_construction_discipline_test.go): a direct app.New(...)
-// call is only exempt from that gate's ratchet when its enclosing function
-// is one of the blessed helper names, because only those helpers are known
-// to close the async-availability-cache-save TempDir-leak race (see that
-// gate's file-level doc comment).
+// newTestController builds a hermetic *app.Controller, closing it before its
+// t.TempDir is removed. TestControllerConstructionDisciplineGate allows a
+// direct app.New only inside such blessed helpers; the unit_test package has
+// its own copy.
 func newTestController(t *testing.T) *app.Controller {
 	t.Helper()
 	t.Setenv("A9S_CONFIG_FOLDER", t.TempDir())
@@ -725,29 +622,11 @@ func newTestController(t *testing.T) *app.Controller {
 	return c
 }
 
-// ---------------------------------------------------------------------------
-// Agreement detail — BOTH independently-evaluated cert findings (Broken
-// "expired" + Warning "expires in <N>d") must reach an ALREADY-OPEN detail's
-// Attention block, Broken first, not just the enricher's own return value
-// (universal rule 7 / S5: no finding silently disappears).
-// ---------------------------------------------------------------------------
-
-// TestTransferAgreementDetailEnrich_BothCertFindingsReachOpenDetailAttention
-// reproduces the production on-demand detail-enrichment sequence exactly:
-// EnsureDetailState opens a detail for the pre-enrichment agreement (zero
-// findings, since an ACTIVE agreement carries none), then
-// Controller.ApplyDetailEnrichmentForResource is called the same way
-// internal/tui/runtime_adapter_resources.go's handleEnrichDetailResult calls
-// it: `ef, ad := primaryWave2Finding(msg.EnrichedRes)` followed by
-// `ApplyDetailEnrichmentForResource(msg.ResourceType, msg.ResourceID,
-// msg.EnrichedRes, ef, ad)`.
-//
-// primaryWave2Finding (internal/tui/app_enrich_fold.go) must recognize
-// findings whose Source is "wave1" (transfer_children.go's
-// transferCertificateFinding), not only the "wave2:" prefix, or neither cert
-// finding — not even the Broken "expired" one — would reach ds.Findings even
-// though enriched.Findings holds both. This pins that both findings survive
-// the same fold+apply sequence internal/tui's on-demand path runs.
+// An ACTIVE agreement opens with no findings; enrichment then adds an
+// "expired" (Broken) and an "expires in <N>d" (Warning) cert finding, both
+// with Source "wave1". Both reach the open detail's Attention block, Broken
+// first, through the same ApplyDetailEnrichmentForResource call
+// handleEnrichDetailResult makes.
 func TestTransferAgreementDetailEnrich_BothCertFindingsReachOpenDetailAttention(t *testing.T) {
 	childShortName := transferAgreementsChildShortName(t)
 	enrich := resource.GetDetailEnricher(childShortName)
@@ -780,9 +659,8 @@ func TestTransferAgreementDetailEnrich_BothCertFindingsReachOpenDetailAttention(
 	})
 	ctrl.EnsureDetailState(agreement, childShortName)
 
-	// Reproduce handleEnrichDetailResult's exact production call: for this
-	// exact enriched resource, primaryWave2Finding computes (nil, nil) today
-	// (see doc comment above) — passed through verbatim.
+	// primaryWave2Finding yields (nil, nil) for this resource;
+	// handleEnrichDetailResult passes that through.
 	ctrl.ApplyDetailEnrichmentForResource(childShortName, agreement.ID, enriched, nil, nil)
 
 	snap := ctrl.Snapshot()

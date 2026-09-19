@@ -9,8 +9,6 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// --- Navigable Fields ---
-
 func TestNavigableFields_R53_None(t *testing.T) {
 	fields := resource.GetNavigableFields("r53")
 	if len(fields) != 0 {
@@ -18,8 +16,6 @@ func TestNavigableFields_R53_None(t *testing.T) {
 	}
 }
 
-// r53CheckerByTarget returns the RelatedChecker for the given target type registered
-// under "r53". It fails the test immediately if the checker is nil or not found.
 func r53CheckerByTarget(t *testing.T, target string) resource.RelatedChecker {
 	t.Helper()
 	for _, def := range resource.GetRelated("r53") {
@@ -34,8 +30,6 @@ func r53CheckerByTarget(t *testing.T, target string) resource.RelatedChecker {
 	return nil
 }
 
-// TestRelated_R53_Registered verifies the 3 related defs are registered with
-// correct display names and non-nil checkers.
 func TestRelated_R53_Registered(t *testing.T) {
 	defs := resource.GetRelated("r53")
 	if len(defs) == 0 {
@@ -67,7 +61,7 @@ func TestRelated_R53_Registered(t *testing.T) {
 	}
 }
 
-// --- r53→elb: requires per-zone ListResourceRecordSets (outside budget) ---
+// Resolving r53→elb needs a per-zone ListResourceRecordSets call, outside the checker's call budget.
 
 func TestRelated_R53_ELB_Unknown(t *testing.T) {
 	source := resource.Resource{ID: "Z1ABC123", Name: "example.com."}
@@ -90,7 +84,7 @@ func TestRelated_R53_ELB_EmptyInput(t *testing.T) {
 	}
 }
 
-// --- r53→cf: requires per-zone ListResourceRecordSets (outside budget) ---
+// Resolving r53→cf needs a per-zone ListResourceRecordSets call, outside the checker's call budget.
 
 func TestRelated_R53_CF_Unknown(t *testing.T) {
 	source := resource.Resource{ID: "Z1ABC123", Name: "example.com."}
@@ -113,7 +107,7 @@ func TestRelated_R53_CF_EmptyInput(t *testing.T) {
 	}
 }
 
-// --- r53→acm: requires per-zone ListResourceRecordSets + DescribeCertificate (outside budget) ---
+// Resolving r53→acm needs per-zone ListResourceRecordSets and DescribeCertificate calls, outside the checker's call budget.
 
 func TestRelated_R53_ACM_Unknown(t *testing.T) {
 	source := resource.Resource{ID: "Z1ABC123", Name: "example.com."}

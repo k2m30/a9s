@@ -12,10 +12,6 @@ import (
 	awsclient "github.com/k2m30/a9s/v3/core/aws"
 )
 
-// ---------------------------------------------------------------------------
-// EIP - Test FetchElasticIPs response parsing
-// ---------------------------------------------------------------------------
-
 func TestFetchElasticIPs_ParsesMultipleAddresses(t *testing.T) {
 	mock := &mockEC2DescribeAddressesClient{
 		output: &ec2.DescribeAddressesOutput{
@@ -53,7 +49,6 @@ func TestFetchElasticIPs_ParsesMultipleAddresses(t *testing.T) {
 		t.Fatalf("expected 2 resources, got %d", len(resources))
 	}
 
-	// Verify required fields exist
 	requiredFields := []string{"allocation_id", "public_ip", "association_id", "instance_id", "domain"}
 	for i, r := range resources {
 		for _, key := range requiredFields {
@@ -63,7 +58,6 @@ func TestFetchElasticIPs_ParsesMultipleAddresses(t *testing.T) {
 		}
 	}
 
-	// Verify first EIP
 	r0 := resources[0]
 	if r0.ID != "eipalloc-0a1b2c3d4e5f00001" {
 		t.Errorf("resource[0].ID: expected %q, got %q", "eipalloc-0a1b2c3d4e5f00001", r0.ID)
@@ -87,7 +81,6 @@ func TestFetchElasticIPs_ParsesMultipleAddresses(t *testing.T) {
 		t.Errorf("resource[0].Fields[\"domain\"]: expected %q, got %q", "vpc", r0.Fields["domain"])
 	}
 
-	// Verify second EIP (unassociated)
 	r1 := resources[1]
 	if r1.ID != "eipalloc-0a1b2c3d4e5f00002" {
 		t.Errorf("resource[1].ID: expected %q, got %q", "eipalloc-0a1b2c3d4e5f00002", r1.ID)

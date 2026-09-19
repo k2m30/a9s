@@ -1,17 +1,3 @@
-// list_ports_test.go — pins on the LIVE controller seams for the
-// ResourceList/MainMenu family:
-//
-//  1. listFilterResources (core/app/list_filter.go) — Fields-value and
-//     Findings-phrase text-filter match branches. core/app/list_test.go's
-//     TestListFilter_* only exercises Name-based matches.
-//  2. reapplyCheckerAgainst (core/app/list_filter.go), driven through the
-//     real c.Handle(messages.ResourcesLoaded{...}) event path — merge-across-
-//     LoadMore, non-truncated extension, zero-initial filtering, and sort
-//     preservation. reapply_checker_leak_test.go and
-//     headless_regression_test.go only pin leak-prevention and payload
-//     shape, never the merge/grow/sort behavior itself.
-//  3. IdentityColumnIndex (core/app/list_columns.go) — the identity-column
-//     cascade across every real catalog type. Self-contained on purpose.
 package unit_test
 
 import (
@@ -28,13 +14,7 @@ import (
 	"github.com/k2m30/a9s/v3/internal/tui/views"
 )
 
-// ---------------------------------------------------------------------------
-// Shared controller helper (distinctly named to avoid colliding with — and
-// avoid depending on — the doomed parity/purity test files' own helpers).
-// ---------------------------------------------------------------------------
-
-// openListController builds a Controller (via the blessed newTestController
-// helper — see qa_controller_construction_discipline_test.go) pre-navigated
+// openListController builds a Controller via newTestController, pre-navigated
 // to a ScreenResourceList for the given resource type ShortName.
 func openListController(t *testing.T, shortName string) *app.Controller {
 	t.Helper()
@@ -43,16 +23,11 @@ func openListController(t *testing.T, shortName string) *app.Controller {
 	return c
 }
 
-// newListController is a compatibility shim: qa_controller_frame_title_issue_badge_test.go
-// and qa_title_warning_findings_test.go depend on a helper of this exact
-// name; construction is routed through openListController/newTestController.
+// newListController is the helper name other test files call; construction
+// routes through openListController.
 func newListController(t *testing.T, shortName string) *app.Controller {
 	return openListController(t, shortName)
 }
-
-// ===========================================================================
-// 1. listFilterResources — Fields-value + Findings-phrase match branches
-// ===========================================================================
 
 // wave3FilterEC2Resources returns 3 EC2 instances distinguishing the filter
 // branches under test: private IP and instance type live in Fields (matched
@@ -142,12 +117,8 @@ func TestListFilter_MatchesFieldsValue_InstanceType(t *testing.T) {
 	}
 }
 
-// TestListFilter_MatchesFindingsPhrase_CaseInsensitive isolates the
-// third listFilterResources branch (r.Findings[i].Phrase), which no
-// controller-path test exercised before this file: cache-node has no Name or
-// Fields value containing "degraded" — it can only be found via its finding
-// phrase. Also proves the match is case-insensitive, mirroring the ID/Name/
-// Fields branches.
+// cache-node has no Name or Fields value containing "degraded"; only its
+// finding phrase matches, case-insensitively.
 func TestListFilter_MatchesFindingsPhrase_CaseInsensitive(t *testing.T) {
 	c := openListController(t, "ec2")
 	c.ApplyResourcesLoaded("ec2", wave3FilterEC2Resources(), nil, false)
@@ -162,13 +133,8 @@ func TestListFilter_MatchesFindingsPhrase_CaseInsensitive(t *testing.T) {
 	}
 }
 
-// ===========================================================================
-// 2. reapplyCheckerAgainst — merge-across-LoadMore, non-truncated extension,
-//    zero-initial filtering, sort preservation, no-checker inert.
-//    Driven through the REAL c.Handle(messages.ResourcesLoaded{...}) event
-//    path (handle.go calls reapplyCheckerAgainst only from there — the
-//    ApplyResourcesLoaded test seam does not).
-// ===========================================================================
+// reapplyCheckerAgainst runs only from c.Handle(messages.ResourcesLoaded{...});
+// the ApplyResourcesLoaded seam does not call it.
 
 // wave3VPCSGChecker mirrors the shape of a real reverse-scan checker (e.g.
 // checkVPCSecurityGroup): matches "sg" resources whose Fields["vpc_id"]
@@ -197,17 +163,12 @@ func wave3SG(id, vpcID string) resource.Resource {
 	}
 }
 
-// TestRelatedCheckerCarry_ZeroInitialGrowsOnLoadMore verifies that a
-// (0+) truncated pivot (empty initial RelatedIDSet, non-nil so it hides
-// everything) both hides unrelated rows immediately AND grows as further
-// LoadMore pages arrive — the merge accumulates across pages, it does not
-// reset.
+// A (0+) truncated pivot with an empty, non-nil RelatedIDSet hides unrelated
+// rows at once and grows across load-more pages.
 func TestRelatedCheckerCarry_ZeroInitialGrowsOnLoadMore(t *testing.T) {
 	c := openListController(t, "sg")
 	c.PatchListReapplyChecker(wave3VPCSGChecker, resource.Resource{ID: "vpc-target"})
 
-	// Page 1: two SGs, neither in vpc-target. Zero-initial carry must hide
-	// both immediately (nil filter != empty filter).
 	handlePage(c, messages.ResourcesLoaded{ResourceType: "sg", Resources: []resource.Resource{
 		wave3SG("sg-1", "vpc-other-1"),
 		wave3SG("sg-2", "vpc-other-2"),
@@ -217,7 +178,6 @@ func TestRelatedCheckerCarry_ZeroInitialGrowsOnLoadMore(t *testing.T) {
 		t.Fatalf("after page1 (no matches): want 0 visible rows, got %d", len(lb.Rows))
 	}
 
-	// Page 2 (load-more): one new match.
 	handlePage(c, messages.ResourcesLoaded{ResourceType: "sg", Append: true, Resources: []resource.Resource{
 		wave3SG("sg-3", "vpc-target"),
 		wave3SG("sg-4", "vpc-other-3"),
@@ -230,7 +190,6 @@ func TestRelatedCheckerCarry_ZeroInitialGrowsOnLoadMore(t *testing.T) {
 		t.Errorf("after page2: wrong matched row: got %q want sg-3", lb.Rows[0].ResourceID)
 	}
 
-	// Page 3 (load-more): two more matches — the set must grow, not reset.
 	handlePage(c, messages.ResourcesLoaded{ResourceType: "sg", Append: true, Resources: []resource.Resource{
 		wave3SG("sg-5", "vpc-target"),
 		wave3SG("sg-6", "vpc-target"),
@@ -241,10 +200,7 @@ func TestRelatedCheckerCarry_ZeroInitialGrowsOnLoadMore(t *testing.T) {
 	}
 }
 
-// TestRelatedCheckerCarry_NonTruncatedStillExtends verifies that even a
-// non-truncated pivot (initial RelatedIDSet seeded from an exact match count,
-// not a (0+)/(N+) scan) keeps extending on LoadMore — the carry mechanism is
-// identical regardless of how the initial set was seeded.
+// A non-truncated pivot extends on load-more the same way.
 func TestRelatedCheckerCarry_NonTruncatedStillExtends(t *testing.T) {
 	c := openListController(t, "sg")
 	c.PatchListRelatedIDSet([]string{"sg-a", "sg-b"})
@@ -263,10 +219,6 @@ func TestRelatedCheckerCarry_NonTruncatedStillExtends(t *testing.T) {
 	}
 }
 
-// TestRelatedCheckerCarry_PreservesSortAfterMerge verifies that when the
-// checker-carry merge grows the RelatedIDSet, the active sort is honored for
-// the newly visible rows — they land in sorted position, not in arrival
-// order.
 func TestRelatedCheckerCarry_PreservesSortAfterMerge(t *testing.T) {
 	c := openListController(t, "sg")
 
@@ -284,8 +236,6 @@ func TestRelatedCheckerCarry_PreservesSortAfterMerge(t *testing.T) {
 	c.PatchListReapplyChecker(alwaysMatch, resource.Resource{ID: "vpc-target"})
 	c.Apply(app.Action{Kind: app.ActionSort, Arg: "group_name"})
 
-	// Rows arrive in reverse-alpha order; if sort is re-applied after the
-	// merge, visible order must be alphabetical ascending regardless.
 	handlePage(c, messages.ResourcesLoaded{ResourceType: "sg", Resources: []resource.Resource{
 		wave3SG("sg-zeta", "vpc-target"),
 		wave3SG("sg-mu", "vpc-target"),
@@ -305,13 +255,9 @@ func TestRelatedCheckerCarry_PreservesSortAfterMerge(t *testing.T) {
 	}
 }
 
-// TestRelatedCheckerCarry_NoChecker_Inert verifies that a list without a
-// carried checker is unaffected by the merge machinery — the feature is
-// opt-in and must not regress ordinary (non-related) list loads.
 func TestRelatedCheckerCarry_NoChecker_Inert(t *testing.T) {
 	c := openListController(t, "ec2")
 	c.PatchListRelatedIDSet([]string{"i-1", "i-2"})
-	// No PatchListReapplyChecker call.
 
 	handlePage(c, messages.ResourcesLoaded{Provenance: messages.FetchProvenanceCanonicalList, ResourceType: "ec2", Resources: []resource.Resource{
 		{ID: "i-3", Name: "i-3", Type: "ec2", Fields: map[string]string{"instance_id": "i-3"}},
@@ -322,14 +268,8 @@ func TestRelatedCheckerCarry_NoChecker_Inert(t *testing.T) {
 	}
 }
 
-// ===========================================================================
-// 3. IdentityColumnIndex — S13 marker-glyph placement check. Verifies
-//    RenderList(ListBody) places the enrichment glyph (row.Decorator) at the
-//    exact cell body.IdentityCol/body.ScrollX identify, across every real
-//    catalog type. The legacy ResourceListModel.View() byte-parity oracle
-//    this once ran against is gone (View() is dead code); this now asserts
-//    directly against the already-resolved body fields instead.
-// ===========================================================================
+// RenderList places the enrichment glyph at the cell body.IdentityCol and
+// body.ScrollX identify, for every catalog type.
 
 func wave3IdentityColResources(td resource.ResourceTypeDef, n int) []resource.Resource {
 	statuses := []string{"running", "stopped", "pending", "available", "active", "terminated"}
@@ -358,16 +298,9 @@ func wave3IdentityColResources(td resource.ResourceTypeDef, n int) []resource.Re
 	return out
 }
 
-// ===========================================================================
-// 4. applyListFilters attention branch: a resource whose Wave-1 Color
-//    always resolves Healthy and whose embedded r.Findings is empty must
-//    still be shown under the attention filter (ctrl+z) when it carries a
-//    Wave-2 enrichment finding correlated by ID only
-//    (c.listEnrichmentFindings, fed by ApplyEnrichmentState).
-//    core/app/list_test.go's TestListAttention_* only exercise resources
-//    with a populated r.Findings — this branch (`len(r.Findings) == 0` +
-//    `findings[r.ID]` lookup in applyListFilters) is pinned here.
-// ===========================================================================
+// A resource whose Wave-1 Color resolves Healthy and whose r.Findings is
+// empty is still shown under the attention filter when it carries a Wave-2
+// enrichment finding keyed by ID.
 
 func TestAttentionFilter_IncludesResourcesWithWave2OnlyFindings(t *testing.T) {
 	c := openListController(t, "s3")
@@ -397,16 +330,9 @@ func TestAttentionFilter_IncludesResourcesWithWave2OnlyFindings(t *testing.T) {
 	}
 }
 
-// TestAttentionFilter_ReappliesOnLateEnrichmentArrival ports
-// qa_attention_filter_enrichment_test.go's TestAttentionFilter_
-// SetEnrichmentState_ReappliesFilter: unlike the sibling test above (which
-// applies enrichment BEFORE toggling attention), this activates the
-// attention filter FIRST — mimicking a user pressing ctrl+z while Wave 2 is
-// still in flight — then applies enrichment. Every render derives Body.List
-// fresh from current filter+enrichment state (no cached filtered-rows
-// snapshot to go stale), so this ordering is structurally safe by
-// architecture; kept as a regression pin against exactly the historical bug
-// (ResourceListModel.SetEnrichmentState not re-running applySortAndFilter).
+// Enabling the attention filter before Wave 2 lands still surfaces the
+// enriched row: every render derives Body.List from the current filter and
+// enrichment state.
 func TestAttentionFilter_ReappliesOnLateEnrichmentArrival(t *testing.T) {
 	c := openListController(t, "s3")
 
@@ -417,7 +343,6 @@ func TestAttentionFilter_ReappliesOnLateEnrichmentArrival(t *testing.T) {
 	}
 	c.ApplyResourcesLoaded("s3", resources, nil, false)
 
-	// Enable the attention filter BEFORE Wave 2 lands.
 	c.Apply(app.Action{Kind: app.ActionToggleAttention})
 	if got := len(c.Snapshot().Body.List.Rows); got != 0 {
 		t.Fatalf("precondition: attention filter with no findings yet should hide all healthy rows, got %d visible", got)
@@ -437,15 +362,9 @@ func TestAttentionFilter_ReappliesOnLateEnrichmentArrival(t *testing.T) {
 	}
 }
 
-// ===========================================================================
-// 5. handleResourcesLoadedEvent mismatched/alias ResourceType routing — a
-//    ResourcesLoaded event is applied only to a screen whose canonicalized
-//    ResourceType (resource.FindResourceType(...).ShortName) matches the
-//    message's own canonicalized ResourceType; a late fetch for a different
-//    type must never populate the active list, and an alias on either side
-//    (e.g. "rds" wire-stamped for canonical "dbi") must still match
-//    (core/app/handle.go documents the canonicalization intent).
-// ===========================================================================
+// A ResourcesLoaded event applies only to a screen whose canonical
+// ResourceType matches the message's: a late fetch for another type never
+// populates the active list, and an alias on either side still matches.
 
 func TestResourcesLoaded_DropsMismatchedType(t *testing.T) {
 	cases := []struct {
@@ -520,13 +439,8 @@ func TestResourcesLoaded_AppliesMatchingType(t *testing.T) {
 	}
 }
 
-// ===========================================================================
-// 6. RenderList narrow-screen column fit: a narrow terminal must shrink a
-// wide column, never DROP it. m.fitColumns (resourcelist.go) is called from
-// the live RenderList seam. log_events's real catalog columns (Timestamp:22,
-// Message:120) already exceed an 80-col terminal, so no synthetic type is
-// needed.
-// ===========================================================================
+// A narrow terminal shrinks a wide column, never drops it. log_events's
+// catalog columns (Timestamp:22, Message:120) exceed 80 columns.
 
 func TestRenderList_NarrowScreen_ShrinksWideColumnInsteadOfDropping(t *testing.T) {
 	td := resource.GetChildType("log_events")
@@ -549,11 +463,8 @@ func TestRenderList_NarrowScreen_ShrinksWideColumnInsteadOfDropping(t *testing.T
 	m := views.NewResourceList(*td, nil, keys.Default())
 	m.SetSize(80, 20) // narrow — 80 cols can't fit 22+120
 
-	// This test does not call tuitest.NoColor(t), so it runs with the
-	// package's TestMain "colors on" baseline — headers and cells are real
-	// candidates for SGR-wrapped styling. Strip ANSI before substring
-	// checks so a styling change can't split "Timestamp"/"Message"/
-	// "Downloading"/"snowflake" mid-string and produce a false negative.
+	// Colors are on (the package TestMain baseline), so ANSI is stripped before
+	// substring checks.
 	out := stripAnsi(m.RenderList(body))
 	if !strings.Contains(out, "Timestamp") {
 		t.Errorf("Timestamp header should be visible on narrow screen:\n%s", out)
@@ -566,24 +477,12 @@ func TestRenderList_NarrowScreen_ShrinksWideColumnInsteadOfDropping(t *testing.T
 	}
 }
 
-// ===========================================================================
-// 7. Controller.PatchListDisplayName / PatchListParentContext — port of
-// child_view_resourcelist_test.go's NewChildResourceList constructor pins
-// (ResourceType/FrameTitle/ParentContext on the dead ResourceListModel).
-// NewResourceList's child-view constructor (resourcelist.go:120) calls these
-// two Controller setters directly; GetListDisplayName/GetListParentContext
-// had ZERO test callers anywhere before this port — the display-name (child
-// breadcrumb, e.g. an S3 bucket name) and parent-context (feeds the
-// related-panel ContextKeys lookup, docs/related-resources.md) wiring was
-// otherwise completely unpinned at the live seam.
-// ===========================================================================
+// NewChildResourceList calls PatchListDisplayName and PatchListParentContext.
+// The display name is the child breadcrumb; the parent context feeds the
+// related-panel ContextKeys lookup (docs/related-resources.md).
 
-// TestChildList_DisplayNameAndParentContext_SetByConstructorPath drives
-// the actual production constructor, views.NewChildResourceList (which itself
-// calls PatchListDisplayName/PatchListParentContext internally,
-// resourcelist.go:120) — a direct c.PatchListDisplayName/PatchListParentContext
-// call from the test bypasses that wiring entirely and would stay green even
-// if the constructor stopped calling either setter.
+// Drives views.NewChildResourceList rather than the setters, so the test
+// fails if the constructor stops calling either one.
 func TestChildList_DisplayNameAndParentContext_SetByConstructorPath(t *testing.T) {
 	c := wave3ChildListController(t, "s3_objects")
 	td := resource.GetChildType("s3_objects")
@@ -628,17 +527,8 @@ func TestChildList_ParentContext_EmptyForTopLevelList(t *testing.T) {
 	}
 }
 
-// ===========================================================================
-// 8. ct-events default sort (event_time RFC3339, not the display "time"
-// string) across a real month boundary — port of aws_ct_events_review_fixes_
-// test.go's TestCTSort_RFC3339_AcrossMonthBoundary. ct-events's TIME column
-// config sets SortKey:"event_time" (core/config/defaults_monitoring.go), and
-// ensureListState seeds SortCol="event_time"/SortDir="desc" automatically
-// (core/app/list_defaults_test.go's TestEnsureListState_SeedsCTEventsDefaultSort
-// pins the SEEDED column/direction only, not that a real cross-month
-// comparison actually resolves correctly) — this closes that gap on the live
-// ApplyResourcesLoaded seam.
-// ===========================================================================
+// ct-events sorts by event_time (RFC3339), not the display time string, so
+// the default sort holds across a month boundary.
 
 func TestCTEventsSort_RFC3339_AcrossMonthBoundary(t *testing.T) {
 	c := openListController(t, "ct-events")
@@ -674,19 +564,9 @@ func TestCTEventsSort_RFC3339_AcrossMonthBoundary(t *testing.T) {
 	}
 }
 
-// ===========================================================================
-// 9. buildListBody's enrichment-map-only status-cell override — port of
-// wave2_risk_text_s4_s5_test.go's TestWave2_ListStatusColumn_
-// ShowsConcretePhrase_ForIssueFinding. list_body.go's S4 fallback branch
-// ("This override is only a fallback for the case where Wave-2 enrichment
-// has landed in the enrichment-store map but has NOT yet been mutated onto
-// r.Findings") is a DISTINCT code path from phase03_view_reads_test.go's
-// TestViews_ListStatusColumn_Wave2OverridesLifecycle, which drives the
-// resource's own r.Findings directly — this test drives the finding only
-// through ApplyEnrichmentState's separate map, and had zero other coverage
-// (hasWave2Finding/statusCol fallback never appeared in any test file).
-// Reuses loadListController from phase03_view_reads_test.go (same package).
-// ===========================================================================
+// A Wave-2 finding present only in the enrichment-store map, not on
+// r.Findings, still overrides the status cell. loadListController comes from
+// phase03_view_reads_test.go.
 
 func TestListStatusColumn_EnrichmentMapOnlyFinding_OverridesRawState(t *testing.T) {
 	td := resource.ResourceTypeDef{
@@ -719,19 +599,9 @@ func TestListStatusColumn_EnrichmentMapOnlyFinding_OverridesRawState(t *testing.
 	}
 }
 
-// ===========================================================================
-// 10. buildListFooterHints's "t" (CloudTrail) hint gate — port of
-// ct_events_t_key_test.go's TestResourceList_TKey_NoHintOnCtEventsList /
-// TestResourceList_TKey_SuppressedOnChildList (dead
-// ResourceListModel.BottomHints()). Those fixtures used ct-events/s3_objects,
-// neither of which sets CloudTrailKey, so they never actually exercised the
-// "ls.ParentContext == nil" half of the guard (core/app/footer.go:72) — the
-// hint was absent for the trivial reason (empty CloudTrailKey) in both
-// cases. This port uses a synthetic type WITH CloudTrailKey set and checks
-// both halves: the hint appears at top level and is suppressed once the
-// screen carries a ParentContext, proving the ParentContext check (not just
-// CloudTrailKey) drives the suppression.
-// ===========================================================================
+// The 't' CloudTrail hint needs a CloudTrailKey and no ParentContext. The
+// synthetic type sets CloudTrailKey, so the ParentContext half of the guard
+// is what suppresses the hint on a child list.
 
 func hasTKeyHint(hints []app.KeyHint) bool {
 	for _, h := range hints {

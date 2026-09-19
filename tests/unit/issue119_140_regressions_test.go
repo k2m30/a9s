@@ -11,13 +11,10 @@ import (
 )
 
 // TestIssue119_StackedWidth_ToggleRelated verifies that at 80-99 columns
-// (stacked mode), pressing r still toggles the related panel off and on —
-// the live replacement for the retired views.NewDetail(...).Update(KeyPress
-// "r").View() chain (DetailModel.Update/View are dead; see
-// specs/022-codebase-cleanup/wave3-map-detail.md). Drives the real tui.Model
-// root path (real "r" keypresses) rather than raw Controller.Apply: the TUI
-// adapter syncs the renderer's auto-show state into the controller before
-// dispatching the toggle, a step a bare Controller.Apply call skips.
+// (stacked mode), pressing r still toggles the related panel off and on. It
+// drives the tui.Model root path rather than Controller.Apply: the TUI adapter
+// syncs the renderer's auto-show state into the controller before dispatching
+// the toggle.
 func TestIssue119_StackedWidth_ToggleRelated(t *testing.T) {
 	withIssue140EC2RelatedDefs(t)
 	m := newPreviewDemoModel(t, 85, 30)

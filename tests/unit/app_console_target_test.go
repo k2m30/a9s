@@ -1,16 +1,5 @@
-// app_console_target_test.go — Controller.ConsoleTarget() related-panel
-// resolution (the closure wave: a single controller-owned resolver used by
-// both the TUI's o/O keys and the web ConsoleURL snapshot field, replacing
-// the TUI's own now-deleted duplicate). Follows the newRelatedSkipController
-// pattern in app_related_cursor_skip_test.go: ScreenDetail pushed via
-// ApplyIntents, related rows injected via the public ApplyDetailRelated
-// seam, RelatedFocus turned on via ActionToggleFocus.
-//
-// Controller construction uses the blessed newTestController helper
-// (app_controller_test.go, same package) rather than a local app.New(...)
-// call — see TestControllerConstructionDisciplineGate in
-// qa_controller_construction_discipline_test.go, which hard-fails any new
-// unblessed construction site.
+// Controller.ConsoleTarget() is the single resolver behind the TUI's o/O keys
+// and the web ConsoleURL snapshot field.
 package unit_test
 
 import (
@@ -24,9 +13,8 @@ import (
 )
 
 // pushDetailWithRelatedRow pushes ScreenDetail for (res, resourceType), sets
-// exactly one related row (row), and turns RelatedFocus on — landing the
-// cursor on that single row (mirrors newRelatedSkipController but for a
-// single-row case, so no dim-skip is involved).
+// exactly one related row, and turns RelatedFocus on, landing the cursor on
+// that row.
 func pushDetailWithRelatedRow(c *app.Controller, res resource.Resource, resourceType string, row app.DetailRelatedRow) {
 	c.ApplyIntents([]runtime.UIIntent{runtime.PushScreen{ID: runtime.ScreenDetail}})
 	c.EnsureDetailState(res, resourceType)
@@ -35,19 +23,10 @@ func pushDetailWithRelatedRow(c *app.Controller, res resource.Resource, resource
 	c.Apply(app.Action{Kind: app.ActionToggleFocus})
 }
 
-// ─── (a) focused single-target row of a type whose rows are loaded resolves
-// the FULL cached row, not a bare-ID stub ────────────────────────────────
-
-// TestConsoleTarget_RelatedRow_CachedFullRow_ResolvesFieldsHungryURL pins the
-// resolution-order contract in consoleTargetFromRelatedRow: the full row
-// already in the session's RowStore (seeded here via a real top-level
-// dbc-list open + ApplyResourcesLoaded) wins over both StubCreator and the
-// bare-ID fallback. dbc is a deliberately Fields-hungry type — its
-// ConsoleURL needs Fields["engine"], which a bare-ID stub never carries (see
-// TestConsoleURL_RelatedPanelStub_FieldHungryTypeYieldsNoLink in
-// console_url_types_test.go for the OLD stub-only behavior this supersedes)
-// — so a resolved, non-empty URL here is only possible via the full cached
-// row.
+// consoleTargetFromRelatedRow prefers the full row already in the session's
+// RowStore over StubCreator and the bare-ID fallback. dbc's ConsoleURL needs
+// Fields["engine"], which a bare-ID stub never carries, so a non-empty URL
+// here comes only from the full cached row.
 func TestConsoleTarget_RelatedRow_CachedFullRow_ResolvesFieldsHungryURL(t *testing.T) {
 	c := newTestController(t)
 
@@ -63,8 +42,6 @@ func TestConsoleTarget_RelatedRow_CachedFullRow_ResolvesFieldsHungryURL(t *testi
 	}
 	c.ApplyResourcesLoaded("dbc", []resource.Resource{fullRow}, nil, false)
 
-	// Push a detail screen for a DIFFERENT resource (a dbi instance) whose
-	// related panel points at the dbc cluster above.
 	pushDetailWithRelatedRow(c, resource.Resource{ID: "acme-prod-db", Name: "acme-prod-db"}, "dbi", app.DetailRelatedRow{
 		TargetType:  "dbc",
 		DisplayName: "RDS Clusters",
@@ -97,8 +74,7 @@ func TestConsoleTarget_RelatedRow_CachedFullRow_ResolvesFieldsHungryURL(t *testi
 	}
 }
 
-// ─── (b) a related row with 0 or multiple targets has no single resource to
-// link to ───────────────────────────────────────────────────────────────
+// A related row with 0 or multiple targets has no single resource to link to.
 
 func TestConsoleTarget_RelatedRow_ZeroTargets_NoTarget(t *testing.T) {
 	c := newTestController(t)
@@ -107,7 +83,7 @@ func TestConsoleTarget_RelatedRow_ZeroTargets_NoTarget(t *testing.T) {
 		DisplayName: "RDS Clusters",
 		State:       domain.RelatedResolved,
 		Count:       0,
-		ResourceIDs: nil, // aggregate/empty row — nothing to link to
+		ResourceIDs: nil,
 	})
 
 	if _, _, ok := c.ConsoleTarget(); ok {
@@ -122,7 +98,7 @@ func TestConsoleTarget_RelatedRow_MultipleTargets_NoTarget(t *testing.T) {
 		DisplayName: "RDS Clusters",
 		State:       domain.RelatedResolved,
 		Count:       2,
-		ResourceIDs: []string{"cluster-a", "cluster-b"}, // aggregate row — no single target
+		ResourceIDs: []string{"cluster-a", "cluster-b"},
 	})
 
 	if _, _, ok := c.ConsoleTarget(); ok {
@@ -130,15 +106,9 @@ func TestConsoleTarget_RelatedRow_MultipleTargets_NoTarget(t *testing.T) {
 	}
 }
 
-// ─── (c) a type with StubCreator and no cached row still resolves via the
-// stub ──────────────────────────────────────────────────────────────────
-
-// TestConsoleTarget_RelatedRow_NoCachedRow_FallsBackToStubCreator pins the
-// second resolution-order step: "ami" is the only catalog type carrying a
-// StubCreator (core/aws/catalog_compute.go), and its ConsoleURL only needs
-// r.ID (no Fields), so the synthesized stub resolves a real console URL even
-// though the ami RowStore was never populated (no top-level ami list open in
-// this test).
+// "ami" is the catalog type with a StubCreator (core/aws/catalog_compute.go),
+// and its ConsoleURL needs only r.ID, so the synthesized stub resolves a real
+// console URL with the ami RowStore empty.
 func TestConsoleTarget_RelatedRow_NoCachedRow_FallsBackToStubCreator(t *testing.T) {
 	c := newTestController(t)
 	pushDetailWithRelatedRow(c, resource.Resource{ID: "i-0a1b2c3d4e5f60001", Name: "web-prod-01"}, "ec2", app.DetailRelatedRow{

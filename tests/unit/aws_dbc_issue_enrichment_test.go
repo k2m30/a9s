@@ -1,23 +1,5 @@
 package unit
 
-// aws_dbc_issue_enrichment_test.go — Wave 2 enricher tests for dbc.
-//
-// EnrichDBCMaintenance never writes FieldUpdates["status"]. The merged §4
-// status phrase is computed
-// at render time by phraseFromFindings(r.Findings) in extractCellValue.
-//
-// Tests drive aws.EnrichDBCMaintenance (the dbc-specific enricher) and assert:
-//   - Findings keyed by Resource.ID (ARN suffix-matched, "cluster" segment only).
-//   - Severity "!" (S1-badge-bumping — different from dbi's "~").
-//   - IssueCount increments for each overdue finding.
-//   - Summary is "maintenance overdue" (short phrase; rows carry concrete detail).
-//   - FieldUpdates is nil or empty in every case (no status overlay,
-//     no "(+N)" suffix arithmetic on the enricher side).
-//   - Future-dated actions (not yet overdue) are NOT emitted.
-//   - nil DocDB client returns empty result gracefully.
-//   - Instance ARNs ("db:" prefix) are filtered out — only "cluster:" matches.
-//   - Multi-page response: both pages are accumulated.
-
 import (
 	"context"
 	"testing"
@@ -32,11 +14,6 @@ import (
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
-
-// ---------------------------------------------------------------------------
-// fake — implements DocDBAPI; all methods return stubs except
-// DescribePendingMaintenanceActions, which is under test control.
-// ---------------------------------------------------------------------------
 
 type dbcMaintenanceFake struct {
 	pages [][]docdbtypes.ResourcePendingMaintenanceActions
@@ -94,12 +71,7 @@ func (f *dbcMaintenanceFake) DescribePendingMaintenanceActions(
 	}, nil
 }
 
-// Compile-time check: dbcMaintenanceFake satisfies DocDBAPI.
 var _ awsclient.DocDBAPI = (*dbcMaintenanceFake)(nil)
-
-// ---------------------------------------------------------------------------
-// helpers
-// ---------------------------------------------------------------------------
 
 // buildDBCResources converts all DBCFixtures.DBClusters into []resource.Resource
 // by running them through FetchDocDBClustersPage so Resource.Status/Fields are
@@ -115,19 +87,16 @@ func buildDBCResources(t *testing.T) []resource.Resource {
 	return result.Resources
 }
 
-// pastDate returns a time in the past used as AutoAppliedAfterDate.
 func pastDate() *time.Time {
 	t := time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC)
 	return &t
 }
 
-// futureDate returns a time far in the future.
 func futureDate() *time.Time {
 	t := time.Date(2099, 1, 1, 0, 0, 0, 0, time.UTC)
 	return &t
 }
 
-// dbcFindingKeys returns all keys in the findings map (for error reporting).
 func dbcFindingKeys(m map[string][]domain.Finding) []string {
 	keys := make([]string, 0, len(m))
 	for k := range m {
@@ -136,12 +105,6 @@ func dbcFindingKeys(m map[string][]domain.Finding) []string {
 	return keys
 }
 
-// ---------------------------------------------------------------------------
-// Tests
-// ---------------------------------------------------------------------------
-
-// TestDBC_Enrich_MaintenanceOverdue_HealthyRow verifies the full Wave 2
-// contract for the MaintDbcOverdueID fixture (healthy + overdue maintenance).
 func TestDBC_Enrich_MaintenanceOverdue_HealthyRow(t *testing.T) {
 	resources := buildDBCResources(t)
 	fix := fixtures.NewDBCFixtures()
@@ -162,12 +125,11 @@ func TestDBC_Enrich_MaintenanceOverdue_HealthyRow(t *testing.T) {
 	}
 	finding := findings[0]
 
-	// Severity SevBroken — DBC maintenance is S1-badge-bumping (unlike DBI's "~").
+	// DocumentDB cluster maintenance raises the badge, unlike dbi's "~".
 	if finding.Severity != domain.SevBroken {
 		t.Errorf("Severity = %v, want SevBroken", finding.Severity)
 	}
 
-	// Phrase is the short S5 phrase.
 	if finding.Phrase != "maintenance overdue" {
 		t.Errorf("Phrase = %q, want %q", finding.Phrase, "maintenance overdue")
 	}
@@ -179,8 +141,6 @@ func TestDBC_Enrich_MaintenanceOverdue_HealthyRow(t *testing.T) {
 	}
 }
 
-// TestDBC_Enrich_FutureDate_NoFinding verifies that when AutoAppliedAfterDate
-// is in the future, the enricher does NOT emit a finding (not yet overdue).
 func TestDBC_Enrich_FutureDate_NoFinding(t *testing.T) {
 	const clusterID = "future-dbc"
 	const arn = "arn:aws:rds:us-east-1:123456789012:cluster:" + clusterID
@@ -211,9 +171,6 @@ func TestDBC_Enrich_FutureDate_NoFinding(t *testing.T) {
 	}
 }
 
-// TestDBC_Enrich_InstanceARN_Filtered verifies that maintenance ARNs whose
-// resource-type segment is "db" (RDS instances) are filtered out — only
-// "cluster:" ARNs match the dbc enricher.
 func TestDBC_Enrich_InstanceARN_Filtered(t *testing.T) {
 	const clusterID = "actual-cluster"
 	const clusterARN = "arn:aws:rds:us-east-1:123456789012:cluster:" + clusterID
@@ -222,14 +179,12 @@ func TestDBC_Enrich_InstanceARN_Filtered(t *testing.T) {
 	fake := &dbcMaintenanceFake{
 		pages: [][]docdbtypes.ResourcePendingMaintenanceActions{
 			{
-				// Instance ARN — must be filtered.
 				{
 					ResourceIdentifier: aws.String(instanceARN),
 					PendingMaintenanceActionDetails: []docdbtypes.PendingMaintenanceAction{
 						{Action: aws.String("os-upgrade"), AutoAppliedAfterDate: pastDate()},
 					},
 				},
-				// Cluster ARN — must match.
 				{
 					ResourceIdentifier: aws.String(clusterARN),
 					PendingMaintenanceActionDetails: []docdbtypes.PendingMaintenanceAction{
@@ -242,25 +197,20 @@ func TestDBC_Enrich_InstanceARN_Filtered(t *testing.T) {
 	clients := &awsclient.ServiceClients{DocDB: fake}
 	resources := []resource.Resource{
 		{ID: clusterID, Fields: map[string]string{"status": ""}},
-		// The instance is NOT in the dbc resource list.
 	}
 
 	result, err := awsclient.EnrichDBCMaintenance(context.Background(), clients, resources, nil)
 	if err != nil {
 		t.Fatalf("EnrichDBCMaintenance error: %v", err)
 	}
-	// Cluster ARN → finding.
 	if _, ok := result.Findings[clusterID]; !ok {
 		t.Errorf("expected finding for cluster %q; Findings = %v", clusterID, dbcFindingKeys(result.Findings))
 	}
-	// Instance ARN → no extra finding.
 	if len(result.Findings) != 1 {
 		t.Errorf("expected exactly 1 finding (cluster only), got %d: %v", len(result.Findings), dbcFindingKeys(result.Findings))
 	}
 }
 
-// TestDBC_Enrich_NilDocDBClient verifies graceful degradation when the DocDB
-// client is nil — returns an empty result without error.
 func TestDBC_Enrich_NilDocDBClient(t *testing.T) {
 	clients := &awsclient.ServiceClients{DocDB: nil}
 	result, err := awsclient.EnrichDBCMaintenance(context.Background(), clients, nil, nil)
@@ -275,11 +225,6 @@ func TestDBC_Enrich_NilDocDBClient(t *testing.T) {
 	}
 }
 
-// TestDBC_Enrich_Wave1PlusWave2_NoFieldUpdates verifies that when the
-// fetcher already populated Status (Wave 1 warning), the Wave-2 maintenance
-// Finding is still emitted with severity "!" but FieldUpdates is left empty.
-// The merged "no automated backups (+1)" display is computed at render time
-// by phraseFromFindings(r.Findings).
 func TestDBC_Enrich_Wave1PlusWave2_NoFieldUpdates(t *testing.T) {
 	const clusterID = fixtures.WarnDbcNoBkpMaintID
 	const arn = fixtures.WarnDbcNoBkpMaintARN
@@ -297,7 +242,6 @@ func TestDBC_Enrich_Wave1PlusWave2_NoFieldUpdates(t *testing.T) {
 		},
 	}
 	clients := &awsclient.ServiceClients{DocDB: fake}
-	// Simulate Wave-1 status set by the fetcher for the no-backup cluster.
 	resources := []resource.Resource{
 		{
 			ID:     clusterID,
@@ -311,7 +255,6 @@ func TestDBC_Enrich_Wave1PlusWave2_NoFieldUpdates(t *testing.T) {
 		t.Fatalf("EnrichDBCMaintenance error: %v", err)
 	}
 
-	// Finding present with SevBroken severity.
 	findings, ok := result.Findings[clusterID]
 	if !ok {
 		t.Fatalf("expected finding for %q; Findings = %v", clusterID, dbcFindingKeys(result.Findings))
@@ -321,14 +264,11 @@ func TestDBC_Enrich_Wave1PlusWave2_NoFieldUpdates(t *testing.T) {
 		t.Errorf("Severity = %v, want SevBroken", finding.Severity)
 	}
 
-	// FieldUpdates must be empty.
 	if updates, ok := result.FieldUpdates[clusterID]; ok && len(updates) != 0 {
 		t.Errorf("AS-140: expected empty FieldUpdates for %q (status overlay removed); got %v", clusterID, updates)
 	}
 }
 
-// TestDBC_Enrich_NoMatchNoFinding verifies that maintenance actions for ARNs
-// not present in the resources slice produce no findings.
 func TestDBC_Enrich_NoMatchNoFinding(t *testing.T) {
 	fake := &dbcMaintenanceFake{
 		pages: [][]docdbtypes.ResourcePendingMaintenanceActions{
@@ -356,8 +296,6 @@ func TestDBC_Enrich_NoMatchNoFinding(t *testing.T) {
 	}
 }
 
-// TestDBC_Enrich_Pagination verifies that findings from both pages of a
-// two-page DescribePendingMaintenanceActions response are processed.
 func TestDBC_Enrich_Pagination(t *testing.T) {
 	const cluster1 = "dbc-page1"
 	const cluster2 = "dbc-page2"
@@ -400,8 +338,6 @@ func TestDBC_Enrich_Pagination(t *testing.T) {
 	}
 }
 
-// TestDBC_Enrich_FindingRows verifies that Action, Apply Method, Earliest Target,
-// and Description are emitted as rows under the finding.
 func TestDBC_Enrich_FindingRows(t *testing.T) {
 	const clusterID = "rows-cluster"
 	const arn = "arn:aws:rds:us-east-1:123456789012:cluster:" + clusterID
@@ -458,8 +394,6 @@ func TestDBC_Enrich_FindingRows(t *testing.T) {
 	}
 }
 
-// TestDBC_Enrich_ForcedApplyDate_Overdue verifies that ForcedApplyDate in the
-// past also triggers the overdue finding (not just AutoAppliedAfterDate).
 func TestDBC_Enrich_ForcedApplyDate_Overdue(t *testing.T) {
 	const clusterID = "forced-overdue-cluster"
 	const arn = "arn:aws:rds:us-east-1:123456789012:cluster:" + clusterID
@@ -474,7 +408,6 @@ func TestDBC_Enrich_ForcedApplyDate_Overdue(t *testing.T) {
 						{
 							Action:          aws.String("system-update"),
 							ForcedApplyDate: &past,
-							// AutoAppliedAfterDate is nil — ForcedApplyDate must still trigger.
 						},
 					},
 				},

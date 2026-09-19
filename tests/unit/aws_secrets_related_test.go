@@ -27,7 +27,6 @@ func secretsCheckerByTarget(t *testing.T, target string) resource.RelatedChecker
 	return nil
 }
 
-// secretsSource returns a canonical source resource for Secrets Manager tests.
 func secretsSource() resource.Resource {
 	return resource.Resource{
 		ID: "prod/docdb/acme-docdb-prod",
@@ -38,8 +37,6 @@ func secretsSource() resource.Resource {
 		},
 	}
 }
-
-// --- Navigable Fields ---
 
 func TestNavigableFields_Secrets_KmsKey(t *testing.T) {
 	nav := resource.IsFieldNavigableForTest("secrets", "KmsKeyId")
@@ -60,8 +57,6 @@ func TestNavigableFields_Secrets_RotationLambda(t *testing.T) {
 		t.Errorf("expected TargetType=lambda, got %q", nav.TargetType)
 	}
 }
-
-// --- KMS checker (forward: KmsKeyId ARN → kms cache by UUID) ---
 
 func TestRelated_Secrets_KMS_Found(t *testing.T) {
 	kmsRes := resource.Resource{
@@ -142,8 +137,6 @@ func TestRelated_Secrets_KMS_NoKmsKey(t *testing.T) {
 	}
 }
 
-// --- Lambda checker (forward: RotationLambdaARN → lambda cache by function name) ---
-
 func TestRelated_Secrets_Lambda_Found(t *testing.T) {
 	// Lambda cache ID is the function name (last segment of ARN).
 	lambdaRes := resource.Resource{
@@ -169,7 +162,6 @@ func TestRelated_Secrets_Lambda_Found(t *testing.T) {
 }
 
 func TestRelated_Secrets_Lambda_NotFound(t *testing.T) {
-	// rotate-db-credentials is a different function — should not match rotate-docdb-credentials.
 	lambdaRes := resource.Resource{
 		ID:   "rotate-db-credentials",
 		Name: "rotate-db-credentials",
@@ -219,11 +211,6 @@ func TestRelated_Secrets_Lambda_NoRotation(t *testing.T) {
 	}
 }
 
-// --- DBI checker: reverse lookup — scan dbi cache for DBInstance entries whose
-// MasterUserSecret.SecretArn matches this secret's ARN ---
-
-// TestRelated_Secrets_DBI_MatchesByARN verifies the reverse lookup: the checker
-// finds RDS instances whose MasterUserSecret.SecretArn equals this secret's ARN.
 func TestRelated_Secrets_DBI_MatchesByARN(t *testing.T) {
 	const secretARN = "arn:aws:secretsmanager:us-east-1:123456789012:secret:rds!db-linked"
 	checker := secretsCheckerByTarget(t, "dbi")
@@ -281,8 +268,6 @@ func TestRelated_Secrets_DBI_MatchesByARN(t *testing.T) {
 	}
 }
 
-// TestRelated_Secrets_DBI_NotFound verifies Count=0 when no DBInstance's
-// MasterUserSecret references this secret's ARN.
 func TestRelated_Secrets_DBI_NotFound(t *testing.T) {
 	source := resource.Resource{
 		ID:     "prod/api/stripe-key",
@@ -312,9 +297,6 @@ func TestRelated_Secrets_DBI_NotFound(t *testing.T) {
 	}
 }
 
-// TestRelated_Secrets_DBI_CacheMiss verifies Count=-1 when the dbi cache is
-// empty and we have no clients to fetch (unknown) — but only when the secret
-// has an ARN. Without an ARN the checker correctly returns Count=0.
 func TestRelated_Secrets_DBI_CacheMiss(t *testing.T) {
 	source := resource.Resource{
 		ID:     "prod/docdb/acme-docdb-prod",
@@ -330,8 +312,6 @@ func TestRelated_Secrets_DBI_CacheMiss(t *testing.T) {
 		t.Errorf("Count = %d, want -1 (empty cache, no clients)", result.Count())
 	}
 }
-
-// --- CFN checker (tag-based: aws:cloudformation:stack-name → cfn cache) ---
 
 func TestRelated_Secrets_CFN_Found(t *testing.T) {
 	source := resource.Resource{

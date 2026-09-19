@@ -14,15 +14,6 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// ---------------------------------------------------------------------------
-// ECS Service Tasks fetcher tests (child of ECS Services)
-// IMPORTANT: This tests the NEW "ecs_tasks" child type, which is DIFFERENT
-// from the existing "ecs-task" top-level resource type.
-// ---------------------------------------------------------------------------
-
-// TestFetchEcsSvcTasks_Basic verifies parsing of 2 running tasks from a service,
-// checking all computed fields: task_id, status, health, task_def_short,
-// started_at, stopped_reason.
 func TestFetchEcsSvcTasks_Basic(t *testing.T) {
 	startedAt := time.Date(2024, 3, 22, 10, 0, 0, 0, time.UTC)
 
@@ -84,7 +75,6 @@ func TestFetchEcsSvcTasks_Basic(t *testing.T) {
 
 	t.Run("task_0_task_id", func(t *testing.T) {
 		r := result.Resources[0]
-		// task_id should be the last segment of the task ARN
 		if r.Fields["task_id"] != "abc123def456" {
 			t.Errorf("Fields[task_id]: expected %q, got %q", "abc123def456", r.Fields["task_id"])
 		}
@@ -109,7 +99,6 @@ func TestFetchEcsSvcTasks_Basic(t *testing.T) {
 
 	t.Run("task_0_task_def_short", func(t *testing.T) {
 		r := result.Resources[0]
-		// task_def_short should be "family:revision" extracted from TaskDefinitionArn
 		if r.Fields["task_def_short"] != "web-app:5" {
 			t.Errorf("Fields[task_def_short]: expected %q, got %q", "web-app:5", r.Fields["task_def_short"])
 		}
@@ -124,7 +113,6 @@ func TestFetchEcsSvcTasks_Basic(t *testing.T) {
 
 	t.Run("task_0_stopped_reason", func(t *testing.T) {
 		r := result.Resources[0]
-		// Running task should have empty stopped_reason
 		if r.Fields["stopped_reason"] != "" {
 			t.Errorf("Fields[stopped_reason]: expected empty for running task, got %q", r.Fields["stopped_reason"])
 		}
@@ -150,7 +138,6 @@ func TestFetchEcsSvcTasks_Basic(t *testing.T) {
 		}
 	})
 
-	// Verify required fields on all tasks
 	t.Run("required_fields_present", func(t *testing.T) {
 		requiredFields := []string{"task_id", "status", "health", "task_def_short", "started_at", "stopped_reason"}
 		for i, r := range result.Resources {
@@ -163,8 +150,6 @@ func TestFetchEcsSvcTasks_Basic(t *testing.T) {
 	})
 }
 
-// TestFetchEcsSvcTasks_MixedStatus verifies handling of RUNNING and STOPPED
-// tasks together.
 func TestFetchEcsSvcTasks_MixedStatus(t *testing.T) {
 	startedAt := time.Date(2024, 3, 22, 10, 0, 0, 0, time.UTC)
 	stoppedAt := time.Date(2024, 3, 22, 11, 0, 0, 0, time.UTC)
@@ -224,9 +209,8 @@ func TestFetchEcsSvcTasks_MixedStatus(t *testing.T) {
 		t.Fatalf("expected 2 resources, got %d", len(result.Resources))
 	}
 
-	// Post-PR-03c: fetcher no longer writes Status for RUNNING/STOPPED tasks.
-	// RUNNING and STOPPED are healthy/terminal states — no Finding emitted.
-	// State lives in Fields["status"].
+	// RUNNING and STOPPED are healthy or terminal states with no Finding; the
+	// state lives in Fields["status"].
 	t.Run("running_task_status", func(t *testing.T) {
 		r := result.Resources[0]
 		if r.Fields["status"] != "RUNNING" {
@@ -260,7 +244,6 @@ func TestFetchEcsSvcTasks_MixedStatus(t *testing.T) {
 	})
 }
 
-// TestFetchEcsSvcTasks_Empty verifies that no tasks returns an empty slice.
 func TestFetchEcsSvcTasks_Empty(t *testing.T) {
 	listTasksMock := &mockECSListTasksClient{
 		outputs: map[string]*ecs.ListTasksOutput{
@@ -288,11 +271,8 @@ func TestFetchEcsSvcTasks_Empty(t *testing.T) {
 	}
 }
 
-// TestFetchEcsSvcTasks_EmptyPageWithNextToken pins the truncation-honesty
-// fix: a ListTasks page with zero TaskArns but a NextToken must still report
-// IsTruncated=true. Before the fix, an early return for
-// len(allTaskArns) == 0 unconditionally reported a proven zero, discarding
-// the NextToken and hiding every task on the pages that followed.
+// A ListTasks page with zero TaskArns but a NextToken is not a proven zero;
+// later pages may hold tasks.
 func TestFetchEcsSvcTasks_EmptyPageWithNextToken(t *testing.T) {
 	const cluster = "arn:aws:ecs:us-east-1:123456789012:cluster/quiet-cluster"
 	listTasksMock := &mockECSListTasksClient{
@@ -320,7 +300,6 @@ func TestFetchEcsSvcTasks_EmptyPageWithNextToken(t *testing.T) {
 	}
 }
 
-// TestFetchEcsSvcTasks_ListTasksError verifies that ListTasks errors propagate.
 func TestFetchEcsSvcTasks_ListTasksError(t *testing.T) {
 	listTasksMock := &mockECSListTasksClient{
 		err: fmt.Errorf("AWS API error: throttling exception"),
@@ -344,7 +323,6 @@ func TestFetchEcsSvcTasks_ListTasksError(t *testing.T) {
 	}
 }
 
-// TestFetchEcsSvcTasks_DescribeTasksError verifies that DescribeTasks errors propagate.
 func TestFetchEcsSvcTasks_DescribeTasksError(t *testing.T) {
 	listTasksMock := &mockECSListTasksClient{
 		outputs: map[string]*ecs.ListTasksOutput{
@@ -376,8 +354,6 @@ func TestFetchEcsSvcTasks_DescribeTasksError(t *testing.T) {
 	}
 }
 
-// TestFetchEcsSvcTasks_ComputedFields verifies that computed fields are correct:
-// task_id from ARN, task_def_short from TaskDefinitionArn.
 func TestFetchEcsSvcTasks_ComputedFields(t *testing.T) {
 	startedAt := time.Date(2024, 3, 22, 10, 0, 0, 0, time.UTC)
 
@@ -435,8 +411,6 @@ func TestFetchEcsSvcTasks_ComputedFields(t *testing.T) {
 	})
 }
 
-// TestFetchEcsSvcTasks_NilFields verifies that nil StartedAt, nil StoppedReason,
-// nil HealthStatus, nil TaskArn, nil TaskDefinitionArn do not cause a panic.
 func TestFetchEcsSvcTasks_NilFields(t *testing.T) {
 	listTasksMock := &mockECSListTasksClient{
 		outputs: map[string]*ecs.ListTasksOutput{
@@ -451,14 +425,11 @@ func TestFetchEcsSvcTasks_NilFields(t *testing.T) {
 	describeTasksMock := &mockECSDescribeTasksClient{
 		output: &ecs.DescribeTasksOutput{
 			Tasks: []ecstypes.Task{
-				{
-					// All pointer fields nil, zero-value enums
-				},
+				{},
 			},
 		},
 	}
 
-	// Should not panic
 	result, err := awsclient.FetchEcsSvcTasks(
 		context.Background(),
 		listTasksMock,
@@ -478,7 +449,6 @@ func TestFetchEcsSvcTasks_NilFields(t *testing.T) {
 	r := result.Resources[0]
 
 	t.Run("no_panic", func(t *testing.T) {
-		// If we got here, no panic occurred
 	})
 
 	t.Run("task_id_empty", func(t *testing.T) {
@@ -500,8 +470,6 @@ func TestFetchEcsSvcTasks_NilFields(t *testing.T) {
 	})
 }
 
-// TestFetchEcsSvcTasks_RawStruct verifies that RawStruct preserves the original
-// ecstypes.Task, including all SDK fields.
 func TestFetchEcsSvcTasks_RawStruct(t *testing.T) {
 	startedAt := time.Date(2024, 3, 22, 10, 0, 0, 0, time.UTC)
 
@@ -587,8 +555,6 @@ func TestFetchEcsSvcTasks_RawStruct(t *testing.T) {
 	})
 }
 
-// TestEcsSvcTaskColumns verifies that EcsSvcTaskColumns returns the expected
-// columns with correct keys.
 func TestEcsSvcTaskColumns(t *testing.T) {
 	cols := resource.EcsSvcTaskColumns()
 
@@ -625,8 +591,6 @@ func TestEcsSvcTaskColumns(t *testing.T) {
 	})
 }
 
-// TestEcsSvcTasks_ChildTypeRegistered verifies that the child type is
-// registered under the correct short name.
 func TestEcsSvcTasks_ChildTypeRegistered(t *testing.T) {
 	td := resource.GetChildType("ecs_tasks")
 	if td == nil {
@@ -640,7 +604,6 @@ func TestEcsSvcTasks_ChildTypeRegistered(t *testing.T) {
 	}
 }
 
-// mockPaginatedECSListTasksClient supports pagination via NextToken for testing.
 type mockPaginatedECSListTasksClient struct {
 	pages []*ecs.ListTasksOutput
 	idx   int
@@ -655,7 +618,6 @@ func (m *mockPaginatedECSListTasksClient) ListTasks(ctx context.Context, params 
 	return out, nil
 }
 
-// mockBatchingDescribeTasksClient tracks batch sizes for pagination testing.
 type mockBatchingDescribeTasksClient struct {
 	allTasks   []ecstypes.Task
 	batchSizes []int
@@ -673,10 +635,8 @@ func (m *mockBatchingDescribeTasksClient) DescribeTasks(ctx context.Context, par
 	}, nil
 }
 
-// TestFetchEcsSvcTasks_Pagination verifies that the fetcher handles pagination
-// (NextToken on ListTasks) and batching (DescribeTasks max 100 per call).
+// DescribeTasks accepts at most 100 task ARNs per call.
 func TestFetchEcsSvcTasks_Pagination(t *testing.T) {
-	// Build 150 task ARNs across 2 pages of RUNNING tasks
 	page1Arns := make([]string, 100)
 	for i := range page1Arns {
 		page1Arns[i] = fmt.Sprintf("arn:aws:ecs:us-east-1:123456789012:task/cluster/task%03d", i)
@@ -691,11 +651,10 @@ func TestFetchEcsSvcTasks_Pagination(t *testing.T) {
 		pages: []*ecs.ListTasksOutput{
 			{TaskArns: page1Arns, NextToken: &nextToken},
 			{TaskArns: page2Arns},
-			{}, // STOPPED status: empty
+			{},
 		},
 	}
 
-	// Build matching tasks for DescribeTasks
 	allTasks := make([]ecstypes.Task, 150)
 	for i := range allTasks {
 		arn := fmt.Sprintf("arn:aws:ecs:us-east-1:123456789012:task/cluster/task%03d", i)
@@ -716,7 +675,6 @@ func TestFetchEcsSvcTasks_Pagination(t *testing.T) {
 		t.Errorf("expected 150 tasks, got %d", len(results.Resources))
 	}
 
-	// Should have called DescribeTasks twice: 100 + 50
 	if len(describeMock.batchSizes) != 2 {
 		t.Fatalf("expected 2 DescribeTasks calls (batching at 100), got %d", len(describeMock.batchSizes))
 	}
@@ -728,9 +686,6 @@ func TestFetchEcsSvcTasks_Pagination(t *testing.T) {
 	}
 }
 
-// TestEcsSvcTasks_PaginatedChildFetcherRegistered verifies that the paginated
-// child fetcher is
-// registered under the correct short name.
 func TestEcsSvcTasks_PaginatedChildFetcherRegistered(t *testing.T) {
 	f := resource.GetPaginatedChildFetcher("ecs_tasks")
 	if f == nil {
@@ -738,8 +693,6 @@ func TestEcsSvcTasks_PaginatedChildFetcherRegistered(t *testing.T) {
 	}
 }
 
-// TestEcsSvcTasks_ParentHasChildDef verifies that the parent ecs-svc resource
-// type has a child view definition for ecs_tasks with key "enter".
 func TestEcsSvcTasks_ParentHasChildDef(t *testing.T) {
 	rt := resource.FindResourceType("ecs-svc")
 	if rt == nil {
@@ -766,25 +719,13 @@ func TestEcsSvcTasks_ParentHasChildDef(t *testing.T) {
 	}
 }
 
-// TestFetchEcsSvcTasks_ContinuationToken previously fed a plain string
-// ("my-continuation-token") that is not valid JSON, so the compound-cursor
-// decoder introduced by the truncation-honesty fix could never parse it — it
-// silently fell back to "start fresh", and the assertion "the token should
-// NOT be forwarded" held only because of that fallback, not because
-// forwarding was actually absent. That made the test vacuous: it could never
-// fail even if forwarding were completely broken, which is worse than no
-// test at all. It now round-trips a REAL cursor — obtained from an actual
-// FetchEcsSvcTasks call, the only legitimate source of this token — through
-// a second call, and asserts the AWS-side continuation token embedded in it
-// IS forwarded verbatim to ListTasks. Do NOT restore the old "should NOT be
-// forwarded" assertion, and do NOT feed it a hand-written string; both
-// defeat the point of this test.
+// The cursor comes from a real FetchEcsSvcTasks call, the only legitimate
+// source of this token; the AWS-side continuation token inside it is
+// forwarded verbatim to ListTasks.
 func TestFetchEcsSvcTasks_ContinuationToken(t *testing.T) {
 	const cluster = "arn:aws:ecs:us-east-1:123456789012:cluster/prod-cluster"
 	startedAt := time.Date(2024, 3, 22, 10, 0, 0, 0, time.UTC)
 
-	// Step 1: produce a REAL continuation cursor the way the app actually
-	// gets one — from a truncated first page.
 	firstPageList := &mockECSListTasksClient{
 		outputs: map[string]*ecs.ListTasksOutput{
 			cluster: {
@@ -816,8 +757,6 @@ func TestFetchEcsSvcTasks_ContinuationToken(t *testing.T) {
 		t.Fatal("expected a non-empty continuation cursor from a truncated first page")
 	}
 
-	// Step 2: feed the REAL cursor back and assert the AWS-side token it
-	// carries is forwarded to ListTasks, not dropped.
 	wrapper := &tokenCapturingECSListTasksMock{
 		inner: &mockECSListTasksClient{
 			outputs: map[string]*ecs.ListTasksOutput{cluster: {TaskArns: []string{}}},
@@ -835,8 +774,6 @@ func TestFetchEcsSvcTasks_ContinuationToken(t *testing.T) {
 	}
 }
 
-// tokenCapturingECSListTasksMock wraps the ECS ListTasks mock to capture NextToken
-// from the first call only.
 type tokenCapturingECSListTasksMock struct {
 	inner             *mockECSListTasksClient
 	capturedNextToken *string
@@ -851,14 +788,10 @@ func (m *tokenCapturingECSListTasksMock) ListTasks(ctx context.Context, params *
 	return m.inner.ListTasks(ctx, params, optFns...)
 }
 
-// TestFetchEcsSvcTasks_MalformedContinuationToken pins both halves of the
-// decodeEcsSvcTasksCursor contract. A non-empty token that isn't valid JSON
-// has no legitimate origin (see decodeEcsSvcTasksCursor's doc comment in
-// core/aws/ecs_svc_tasks.go) and must return an error without returning any
-// page-1 rows — silently restarting would duplicate or drop tasks with no
-// signal. The empty-token subtest is the positive control: it must still
-// fetch page 1 with no error, proving the malformed-token guard didn't also
-// break the legitimate "first page" path.
+// A non-empty token that is not valid JSON has no legitimate origin (see
+// decodeEcsSvcTasksCursor in core/aws/ecs_svc_tasks.go); restarting silently
+// would duplicate or drop tasks, so it is an error with no rows. The empty
+// token still fetches page 1.
 func TestFetchEcsSvcTasks_MalformedContinuationToken(t *testing.T) {
 	const cluster = "arn:aws:ecs:us-east-1:123456789012:cluster/prod-cluster"
 

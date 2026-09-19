@@ -2,10 +2,6 @@ package unit
 
 // ctevent_summarizer_test.go verifies that BuildSections routes each registered
 // EventSource to its service-specific summarizer rather than SummarizeGeneric.
-//
-// After the static-map migration, RegisterSummarizer no longer exists — duplicate
-// keys in a map literal are a compile error, strictly better than a runtime panic.
-// The old TestRegisterSummarizer_DuplicatePanics test is intentionally removed.
 
 import (
 	"testing"
@@ -161,7 +157,6 @@ func TestCTEventSummarizer_S3_RoutesToSummarizeS3(t *testing.T) {
 		t.Fatal("S3 event: expected REQUEST section in BuildSections output; got none")
 	}
 
-	// Both residual fields must appear in REQUEST.
 	wantKeys := []string{"x-amz-server-side-encryption", "x-amz-storage-class"}
 	emitted := make(map[string]bool, len(req.Rows))
 	for _, r := range req.Rows {

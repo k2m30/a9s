@@ -13,15 +13,7 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// ---------------------------------------------------------------------------
-// Target Health fetcher tests (child of Target Groups)
-// ---------------------------------------------------------------------------
-
-// TestFetchTargetHealth_Basic verifies parsing of 4 targets with varied health
-// states, checking ID, Name, Status, all Fields, and RawStruct.
-// The target's health is one field: "health" is the type's LifecycleKey and
-// its column key, and "status" was the same string under a second name (aws5
-// row 1). These assertions moved to "health"; do not restore the pair.
+// "health" is the type's LifecycleKey and its column key.
 func TestFetchTargetHealth_Basic(t *testing.T) {
 	port80 := int32(80)
 	port443 := int32(443)
@@ -173,7 +165,6 @@ func TestFetchTargetHealth_Basic(t *testing.T) {
 		}
 	})
 
-	// Verify all targets have required fields
 	t.Run("required_fields_present", func(t *testing.T) {
 		requiredFields := []string{"target_id", "port", "az", "health", "reason", "description"}
 		for i, r := range resources {
@@ -186,8 +177,6 @@ func TestFetchTargetHealth_Basic(t *testing.T) {
 	})
 }
 
-// TestFetchTargetHealth_Empty verifies that an empty response returns an empty
-// slice with no error.
 func TestFetchTargetHealth_Empty(t *testing.T) {
 	mock := &mockELBv2DescribeTargetHealthClient{
 		output: &elbv2.DescribeTargetHealthOutput{
@@ -209,7 +198,6 @@ func TestFetchTargetHealth_Empty(t *testing.T) {
 	}
 }
 
-// TestFetchTargetHealth_APIError verifies that API errors are propagated correctly.
 func TestFetchTargetHealth_APIError(t *testing.T) {
 	mock := &mockELBv2DescribeTargetHealthClient{
 		err: fmt.Errorf("AWS API error: access denied"),
@@ -229,8 +217,6 @@ func TestFetchTargetHealth_APIError(t *testing.T) {
 	}
 }
 
-// TestFetchTargetHealth_AllStates verifies one target per health state:
-// healthy, unhealthy, draining, initial, unavailable, unused.
 func TestFetchTargetHealth_AllStates(t *testing.T) {
 	port := int32(80)
 
@@ -292,7 +278,6 @@ func TestFetchTargetHealth_AllStates(t *testing.T) {
 	}
 }
 
-// TestFetchTargetHealth_IPTargets verifies IP-based targets instead of instance IDs.
 func TestFetchTargetHealth_IPTargets(t *testing.T) {
 	port8080 := int32(8080)
 	port9090 := int32(9090)
@@ -374,8 +359,6 @@ func TestFetchTargetHealth_IPTargets(t *testing.T) {
 	})
 }
 
-// TestFetchTargetHealth_NilFields verifies that nil TargetHealth, nil Reason,
-// nil Description do not cause a panic and produce empty strings.
 func TestFetchTargetHealth_NilFields(t *testing.T) {
 	port := int32(80)
 
@@ -383,7 +366,6 @@ func TestFetchTargetHealth_NilFields(t *testing.T) {
 		output: &elbv2.DescribeTargetHealthOutput{
 			TargetHealthDescriptions: []elbtypes.TargetHealthDescription{
 				{
-					// Target with nil TargetHealth
 					Target: &elbtypes.TargetDescription{
 						Id:   aws.String("i-nil-health"),
 						Port: &port,
@@ -391,23 +373,18 @@ func TestFetchTargetHealth_NilFields(t *testing.T) {
 					TargetHealth: nil,
 				},
 				{
-					// Target with TargetHealth but zero-value Reason (no reason set)
 					Target: &elbtypes.TargetDescription{
 						Id:   aws.String("i-no-reason"),
 						Port: &port,
 					},
 					TargetHealth: &elbtypes.TargetHealth{
 						State: elbtypes.TargetHealthStateEnumHealthy,
-						// Reason is zero value (empty string enum)
-						// Description is nil
 					},
 				},
 				{
-					// Target with nil AvailabilityZone
 					Target: &elbtypes.TargetDescription{
 						Id:   aws.String("i-no-az"),
 						Port: &port,
-						// AvailabilityZone is nil
 					},
 					TargetHealth: &elbtypes.TargetHealth{
 						State: elbtypes.TargetHealthStateEnumHealthy,
@@ -437,7 +414,6 @@ func TestFetchTargetHealth_NilFields(t *testing.T) {
 		if r.ID != "i-nil-health" {
 			t.Errorf("ID: expected %q, got %q", "i-nil-health", r.ID)
 		}
-		// With nil TargetHealth, status/health/reason/description should be empty
 		if r.Fields["health"] != "" {
 			t.Errorf("Fields[health]: expected empty with nil TargetHealth, got %q", r.Fields["health"])
 		}
@@ -467,8 +443,6 @@ func TestFetchTargetHealth_NilFields(t *testing.T) {
 	})
 }
 
-// TestFetchTargetHealth_RawStruct verifies that RawStruct preserves the original
-// elbtypes.TargetHealthDescription, including all sub-structs.
 func TestFetchTargetHealth_RawStruct(t *testing.T) {
 	port := int32(443)
 
@@ -554,8 +528,6 @@ func TestFetchTargetHealth_RawStruct(t *testing.T) {
 	})
 }
 
-// TestTargetHealthColumns verifies that TargetHealthColumns returns the expected
-// 6 columns: target_id, port, az, health, reason, description.
 func TestTargetHealthColumns(t *testing.T) {
 	cols := resource.TargetHealthColumns()
 

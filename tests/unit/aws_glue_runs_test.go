@@ -16,13 +16,6 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// ---------------------------------------------------------------------------
-// Glue Job Runs fetcher tests (child of Glue Jobs)
-// ---------------------------------------------------------------------------
-
-// TestFetchGlueJobRuns_Basic verifies parsing of 1 SUCCEEDED run with all
-// fields populated, checking Resource.ID, Name, Status, all Fields keys,
-// and RawStruct.
 func TestFetchGlueJobRuns_Basic(t *testing.T) {
 	startTs := time.Date(2024, 8, 10, 14, 30, 0, 0, time.UTC)
 	dpuSec := 45000.0
@@ -152,8 +145,6 @@ func TestFetchGlueJobRuns_Basic(t *testing.T) {
 	})
 }
 
-// TestFetchGlueJobRuns_Empty verifies that a job with no runs returns an
-// empty slice with no error.
 func TestFetchGlueJobRuns_Empty(t *testing.T) {
 	mock := &mockGlueGetJobRunsClient{
 		output: &glue.GetJobRunsOutput{
@@ -175,7 +166,6 @@ func TestFetchGlueJobRuns_Empty(t *testing.T) {
 	}
 }
 
-// TestFetchGlueJobRuns_APIError verifies that API errors are propagated.
 func TestFetchGlueJobRuns_APIError(t *testing.T) {
 	mock := &mockGlueGetJobRunsClient{
 		err: fmt.Errorf("AWS API error: access denied"),
@@ -198,21 +188,17 @@ func TestFetchGlueJobRuns_APIError(t *testing.T) {
 	}
 }
 
-// TestFetchGlueJobRuns_NilOptionalFields verifies that nil ErrorMessage,
-// nil DPUSeconds, nil StartedOn, nil Id, nil JobName do not cause a panic.
 func TestFetchGlueJobRuns_NilOptionalFields(t *testing.T) {
 	mock := &mockGlueGetJobRunsClient{
 		output: &glue.GetJobRunsOutput{
 			JobRuns: []gluetypes.JobRun{
 				{
-					// All optional pointer fields are nil
 					JobRunState: gluetypes.JobRunStateRunning,
 				},
 			},
 		},
 	}
 
-	// Should not panic
 	result, err := awsclient.FetchGlueJobRuns(
 		context.Background(),
 		mock,
@@ -228,7 +214,6 @@ func TestFetchGlueJobRuns_NilOptionalFields(t *testing.T) {
 	}
 
 	t.Run("nil_Id", func(t *testing.T) {
-		// ID may be empty; just ensure no panic occurred
 		_ = result.Resources[0].ID
 	})
 
@@ -492,8 +477,6 @@ func TestFetchGlueJobRuns_ErrorMessageNewlineStripping(t *testing.T) {
 	}
 }
 
-// TestFetchGlueJobRuns_Pagination verifies that paginated responses via
-// NextToken are followed and all job runs collected across multiple pages.
 // TestFetchGlueJobRuns_Pagination verifies the single-page pagination contract:
 // one API call is made per invocation, resources from that page are returned,
 // and IsTruncated/NextToken reflect whether more pages exist. A second call
@@ -502,7 +485,6 @@ func TestFetchGlueJobRuns_ErrorMessageNewlineStripping(t *testing.T) {
 func TestFetchGlueJobRuns_Pagination(t *testing.T) {
 	startTs := time.Date(2024, 8, 10, 14, 30, 0, 0, time.UTC)
 
-	// Page 1: 2 runs with NextToken indicating more pages exist.
 	page1Mock := &mockGlueGetJobRunsClient{
 		outputs: []*glue.GetJobRunsOutput{
 			{
@@ -523,7 +505,6 @@ func TestFetchGlueJobRuns_Pagination(t *testing.T) {
 		},
 	}
 
-	// First call: no continuation token — fetches page 1.
 	result1, err := awsclient.FetchGlueJobRuns(
 		context.Background(),
 		page1Mock,
@@ -590,11 +571,9 @@ func TestFetchGlueJobRuns_Pagination(t *testing.T) {
 		}
 	})
 
-	// Page 2: 1 run with no NextToken — last page.
 	page2Mock := &mockGlueGetJobRunsClient{
 		outputs: []*glue.GetJobRunsOutput{
 			{
-				// No NextToken — last page
 				JobRuns: []gluetypes.JobRun{
 					{
 						Id:          aws.String("run-p2-1"),
@@ -606,7 +585,6 @@ func TestFetchGlueJobRuns_Pagination(t *testing.T) {
 		},
 	}
 
-	// Second call: pass continuation token from page 1 to fetch page 2.
 	result2, err := awsclient.FetchGlueJobRuns(
 		context.Background(),
 		page2Mock,
@@ -658,13 +636,12 @@ func TestFetchGlueJobRuns_Pagination(t *testing.T) {
 }
 
 // TestFetchGlueJobRuns_MaxRunsCap verifies that a single API page of 50 runs
-// is returned as-is with correct IsTruncated=true metadata when the API
-// indicates more pages exist. The 200-item cap no longer applies — each call
-// returns one page and the caller drives pagination via continuation tokens.
+// is returned as-is with IsTruncated=true when the API indicates more pages
+// exist; each call returns one page and the caller drives pagination via
+// continuation tokens.
 func TestFetchGlueJobRuns_MaxRunsCap(t *testing.T) {
 	startTs := time.Date(2024, 8, 10, 14, 30, 0, 0, time.UTC)
 
-	// Build one page of 50 runs with a NextToken indicating more pages exist.
 	var runs []gluetypes.JobRun
 	for i := range 50 {
 		runs = append(runs, gluetypes.JobRun{
@@ -754,8 +731,6 @@ func TestFetchGlueJobRuns_MaxRunsCap(t *testing.T) {
 	})
 }
 
-// TestFetchGlueJobRuns_RawStruct verifies that RawStruct is the original
-// gluetypes.JobRun value.
 func TestFetchGlueJobRuns_RawStruct(t *testing.T) {
 	startTs := time.Date(2024, 8, 10, 14, 30, 0, 0, time.UTC)
 
@@ -798,12 +773,6 @@ func TestFetchGlueJobRuns_RawStruct(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// Column definitions test
-// ---------------------------------------------------------------------------
-
-// TestGlueRunColumns verifies that GlueRunColumns returns the expected 6
-// columns with correct keys, widths, titles, and sortability.
 func TestGlueRunColumns(t *testing.T) {
 	cols := resource.GlueRunColumns()
 
@@ -862,12 +831,6 @@ func TestGlueRunColumns(t *testing.T) {
 
 }
 
-// ---------------------------------------------------------------------------
-// Registration tests
-// ---------------------------------------------------------------------------
-
-// TestGlueRuns_ChildTypeRegistered verifies that "glue_runs" is registered
-// as a child resource type.
 func TestGlueRuns_ChildTypeRegistered(t *testing.T) {
 	td := resource.GetChildType("glue_runs")
 	if td == nil {
@@ -881,9 +844,6 @@ func TestGlueRuns_ChildTypeRegistered(t *testing.T) {
 	}
 }
 
-// TestGlueRuns_PaginatedChildFetcherRegistered verifies that the paginated
-// child fetcher is
-// registered under the correct short name.
 func TestGlueRuns_PaginatedChildFetcherRegistered(t *testing.T) {
 	f := resource.GetPaginatedChildFetcher("glue_runs")
 	if f == nil {
@@ -891,9 +851,6 @@ func TestGlueRuns_PaginatedChildFetcherRegistered(t *testing.T) {
 	}
 }
 
-// TestGlueRuns_ParentHasChildDef verifies that the parent glue resource
-// type has a child view definition for glue_runs with key "enter" and
-// correct ContextKeys.
 func TestGlueRuns_ParentHasChildDef(t *testing.T) {
 	rt := resource.FindResourceType("glue")
 	if rt == nil {
@@ -920,8 +877,6 @@ func TestGlueRuns_ParentHasChildDef(t *testing.T) {
 	}
 }
 
-// TestGlueRuns_CopyField verifies that the glue_runs child type has
-// CopyField set to "error_message".
 func TestGlueRuns_CopyField(t *testing.T) {
 	td := resource.GetChildType("glue_runs")
 	if td == nil {
@@ -932,12 +887,6 @@ func TestGlueRuns_CopyField(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// Config defaults test
-// ---------------------------------------------------------------------------
-
-// TestConfigDefaultViewDef_GlueRuns verifies that the glue_runs view
-// definition has the expected list columns and non-empty detail paths.
 func TestConfigDefaultViewDef_GlueRuns(t *testing.T) {
 	vd := config.DefaultViewDef("glue_runs")
 
@@ -954,8 +903,6 @@ func TestConfigDefaultViewDef_GlueRuns(t *testing.T) {
 	})
 }
 
-// TestFetchGlueJobRuns_ContinuationToken verifies that a non-empty
-// continuation token is forwarded to the API as NextToken.
 func TestFetchGlueJobRuns_ContinuationToken(t *testing.T) {
 	startTs := time.Date(2024, 8, 10, 14, 30, 0, 0, time.UTC)
 

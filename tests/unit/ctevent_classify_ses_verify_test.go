@@ -32,7 +32,7 @@ func TestClassifyCTVerb_SESVerifyIsWrite(t *testing.T) {
 }
 
 // TestClassifyCTVerb_NonSESVerifyIsRead asserts that other Verify* operations
-// (e.g. KMS Verify) still classify as "R" via the existing exact-match.
+// (e.g. KMS Verify) classify as "R" via the exact-match table.
 // This guards against the SES override being too broad (accidentally catching
 // the bare "Verify" name used by KMS GenerateDataKey operations).
 func TestClassifyCTVerb_NonSESVerifyIsRead(t *testing.T) {

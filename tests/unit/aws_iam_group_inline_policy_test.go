@@ -36,7 +36,6 @@ func runIAMGroupRelatedCheck(t *testing.T, groupName string) messages.RelatedChe
 	clients := demo.NewServiceClients()
 	*m, _ = rootApplyMsg(*m, messages.ClientsReady{Clients: clients, Gen: 1})
 
-	// Navigate to IAM groups list.
 	var navCmd tea.Cmd
 	*m, navCmd = rootApplyMsg(*m, messages.Navigate{
 		Target:       messages.TargetResourceList,
@@ -57,7 +56,6 @@ func runIAMGroupRelatedCheck(t *testing.T, groupName string) messages.RelatedChe
 	}
 	*m, _ = rootApplyMsg(*m, loaded)
 
-	// Locate the target group.
 	targetIdx := -1
 	for i, r := range loaded.Resources {
 		if r.ID == groupName || r.Name == groupName {
@@ -76,9 +74,8 @@ func runIAMGroupRelatedCheck(t *testing.T, groupName string) messages.RelatedChe
 	targetGroup := loaded.Resources[targetIdx]
 
 	// Open detail — the enrich + related-check tasks dispatch directly as
-	// a (possibly nested) tea.Batch off this one cmd; RunRelatedDef already
-	// recovers per-checker panics into a RelatedCheckResult carrying
-	// LazyAddError, so no extra recovery wrapper is needed here.
+	// a (possibly nested) tea.Batch off this one cmd; RunRelatedDef recovers
+	// per-checker panics into a RelatedCheckResult carrying LazyAddError.
 	var relatedCmd tea.Cmd
 	*m, relatedCmd = rootApplyMsg(*m, messages.Navigate{
 		Target:       messages.TargetDetail,
@@ -107,7 +104,6 @@ func runIAMGroupRelatedCheck(t *testing.T, groupName string) messages.RelatedChe
 // The "developers" fixture group has acme-s3-read-only and acme-deploy-policy
 // attached (both customer-managed). checkGroupPolicy filters to customer-managed
 // only via customerManagedAttachedPolicyNames, so Count should be 2.
-// Exercises the existing ListAttachedGroupPolicies path — should PASS.
 func TestIAMGroup_ManagedPolicies_RelatedCount(t *testing.T) {
 	result := runIAMGroupRelatedCheck(t, "developers")
 
@@ -124,7 +120,6 @@ func TestIAMGroup_ManagedPolicies_RelatedCount(t *testing.T) {
 func TestIAMGroup_InlinePoliciesOnly_RelatedCount(t *testing.T) {
 	result := runIAMGroupRelatedCheck(t, "readonly")
 
-	// Fails until checkGroupPolicy calls ListGroupPolicies:
 	if result.Result.Count() <= 0 {
 		t.Errorf("readonly group (inline policies only) got Count=%d, want >0; "+
 			"BUG: checkGroupPolicy does not call ListGroupPolicies — "+
@@ -133,15 +128,10 @@ func TestIAMGroup_InlinePoliciesOnly_RelatedCount(t *testing.T) {
 	}
 }
 
-// TestIAMPolicyList_IncludesInlinePolicies reveals that FetchIAMPoliciesPage only
-// calls ListPolicies(Scope: Local) and never fetches inline group policies.
-// Inline policies from IAM groups (AllowAssumeRole, AllowChangeOwnPassword,
-// DenyS3Delete) are absent from the policy resource list, causing the "IAM Policies"
-// related panel to navigate to an empty or incomplete list.
-//
-// This test WILL FAIL until FetchIAMPoliciesPage (or a companion fetcher) also
-// calls ListGroupPolicies for each group and synthesises inline policy resources
-// with Fields["policy_type"] == "inline".
+// TestIAMPolicyList_IncludesInlinePolicies pins that the policy resource list
+// carries inline group policies (Fields["policy_type"] == "inline") beside the
+// ListPolicies(Scope: Local) results, so the "IAM Policies" related panel
+// navigates to a complete list.
 //
 // Fixture inline policies (core/demo/fixtures/iam.go):
 //
@@ -154,7 +144,6 @@ func TestIAMPolicyList_IncludesInlinePolicies(t *testing.T) {
 	clients := demo.NewServiceClients()
 	*m, _ = rootApplyMsg(*m, messages.ClientsReady{Clients: clients, Gen: 1})
 
-	// Navigate to the policy resource list.
 	var navCmd tea.Cmd
 	*m, navCmd = rootApplyMsg(*m, messages.Navigate{
 		Target:       messages.TargetResourceList,
@@ -164,14 +153,12 @@ func TestIAMPolicyList_IncludesInlinePolicies(t *testing.T) {
 		t.Fatal("expected a cmd after NavigateMsg{policy}, got nil")
 	}
 
-	// Drain the fetch command to get ResourcesLoadedMsg.
 	raw := extractMsg(t, navCmd, func(msg tea.Msg) bool {
 		_, ok := msg.(messages.ResourcesLoaded)
 		return ok
 	})
 	loaded := raw.(messages.ResourcesLoaded)
 
-	// Collect inline policy names from the returned resources.
 	var inlineNames []string
 	for _, r := range loaded.Resources {
 		if r.Fields["policy_type"] == "inline" {
@@ -179,7 +166,6 @@ func TestIAMPolicyList_IncludesInlinePolicies(t *testing.T) {
 		}
 	}
 
-	// These inline policy names must appear once the fetcher is fixed.
 	wantInline := []string{"AllowAssumeRole", "AllowChangeOwnPassword", "DenyS3Delete"}
 
 	if len(inlineNames) == 0 {
@@ -190,7 +176,6 @@ func TestIAMPolicyList_IncludesInlinePolicies(t *testing.T) {
 		return
 	}
 
-	// Verify each expected inline policy name is present.
 	nameSet := make(map[string]bool, len(inlineNames))
 	for _, n := range inlineNames {
 		nameSet[n] = true
@@ -203,17 +188,9 @@ func TestIAMPolicyList_IncludesInlinePolicies(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// fetchInlineGroupPolicies error-path tests
-//
-// fetchInlineGroupPolicies is unexported. We drive it via the registered
-// paginated fetcher for "policy", which calls FetchIAMPoliciesPage then
-// fetchInlineGroupPolicies. We construct a *awsclient.ServiceClients with a
-// controlled IAM stub that exercises the three defensive branches:
-//   - ListGroups error → function returns nil
-//   - group with nil GroupName → skipped, no resource emitted
-//   - ListGroupPolicies error → continue to next group
-// ---------------------------------------------------------------------------
+// fetchInlineGroupPolicies is unexported; these tests drive it through the
+// registered paginated fetcher for "policy", which calls FetchIAMPoliciesPage
+// then fetchInlineGroupPolicies.
 
 // stubGroupPolicyIAM satisfies awsclient.IAMAPI. Only ListGroups,
 // ListGroupPolicies, ListPolicies, and ListAttachedGroupPolicies are called by
@@ -307,7 +284,6 @@ func (s *stubGroupPolicyIAM) GetInstanceProfile(_ context.Context, _ *iam.GetIns
 	panic("stubGroupPolicyIAM.GetInstanceProfile called unexpectedly")
 }
 
-// compile-time check
 var _ awsclient.IAMAPI = (*stubGroupPolicyIAM)(nil)
 
 // callPolicyFetcher invokes the registered "policy" paginated fetcher with the
@@ -324,9 +300,8 @@ func callPolicyFetcher(t *testing.T, stub *stubGroupPolicyIAM) ([]resource.Resou
 }
 
 // TestFetchInlineGroupPolicies_ListGroupsError verifies that when ListGroups
-// returns an error, the composite inline-enumeration error is now propagated
-// to the caller (per E1-E6: no silent drop). Managed policies from
-// ListPolicies are still returned in resources — partial success is preserved.
+// returns an error, the composite inline-enumeration error is propagated to
+// the caller while managed policies from ListPolicies are still returned.
 func TestFetchInlineGroupPolicies_ListGroupsError(t *testing.T) {
 	stub := &stubGroupPolicyIAM{
 		listGroupsErr: fmt.Errorf("iam: ListGroups access denied"),
@@ -358,7 +333,6 @@ func TestFetchInlineGroupPolicies_NilGroupName(t *testing.T) {
 	if err != nil {
 		t.Errorf("unexpected error from fetcher: %v", err)
 	}
-	// nil GroupName group is skipped → ListGroupPolicies never called → no inline resources
 	for _, r := range resources {
 		if r.Fields["policy_type"] == "inline" {
 			t.Errorf("expected no inline resources for nil-GroupName group, got: %v", r.Name)
@@ -373,9 +347,6 @@ func TestFetchInlineGroupPolicies_ListGroupPoliciesError(t *testing.T) {
 	stub := &stubGroupPolicyIAM{
 		listGroupsOut: &iam.ListGroupsOutput{
 			Groups: []iamtypes.Group{
-				// Two groups: first will hit ListGroupPolicies error, second will succeed.
-				// Since our stub returns the same error for all calls, we verify that
-				// neither group panics and the function returns nil (all fail → continue).
 				{GroupName: aws.String("group-a"), GroupId: aws.String("AGPA001"), Arn: aws.String("arn:aws:iam::123:group/group-a"), Path: aws.String("/")},
 				{GroupName: aws.String("group-b"), GroupId: aws.String("AGPA002"), Arn: aws.String("arn:aws:iam::123:group/group-b"), Path: aws.String("/")},
 			},
@@ -386,7 +357,6 @@ func TestFetchInlineGroupPolicies_ListGroupPoliciesError(t *testing.T) {
 	if err == nil {
 		t.Error("expected ListGroupPolicies error to propagate (per E1-E6); got nil")
 	}
-	// ListGroupPolicies errors → continue for both groups → no inline resources emitted
 	for _, r := range resources {
 		if r.Fields["policy_type"] == "inline" {
 			t.Errorf("expected no inline resources when ListGroupPolicies errors, got: %v", r.Name)
@@ -404,7 +374,6 @@ func TestFetchInlineGroupPolicies_HappyPath(t *testing.T) {
 				{GroupName: aws.String("dev-group"), GroupId: aws.String("AGPA999"), Arn: aws.String("arn:aws:iam::123:group/dev-group"), Path: aws.String("/")},
 			},
 		},
-		// listGroupPoliciesErr is nil → stub returns ["inline-pol"]
 	}
 	resources, err := callPolicyFetcher(t, stub)
 	if err != nil {
@@ -429,20 +398,10 @@ func TestFetchInlineGroupPolicies_HappyPath(t *testing.T) {
 	}
 }
 
-// TestInlinePolicy_DetailShowsParentGroup reveals that checkPolicyGroup returns
-// Count=0 for inline policies because policyARNFromResource returns "" for them
-// (inline policies have no ARN). The checker exits early at line 117 of
-// core/aws/iam_policies_related.go without inspecting Fields["path"].
-//
-// For an inline policy with Fields["path"] == "inline/developers", the related
-// panel must show "IAM Groups (1)" pointing to the developers group.
-//
-// This test WILL FAIL until checkPolicyGroup is fixed to extract the group name
-// from Fields["path"] when the policy ARN is empty.
-//
-// NOTE: This test also requires TestIAMPolicyList_IncludesInlinePolicies to pass
-// first (i.e. the fetcher must emit inline policy resources). If that bug is still
-// present, this test will fail at the "find inline policy" step instead.
+// TestInlinePolicy_DetailShowsParentGroup pins that an inline policy, which
+// has no ARN, resolves its parent group from Fields["path"]: for
+// Fields["path"] == "inline/developers" the related panel shows
+// "IAM Groups (1)" pointing to the developers group.
 func TestInlinePolicy_DetailShowsParentGroup(t *testing.T) {
 	m := newDemoColdCacheApp(t)
 	*m, _ = rootApplyMsg(*m, tea.WindowSizeMsg{Width: 120, Height: 40})
@@ -450,7 +409,6 @@ func TestInlinePolicy_DetailShowsParentGroup(t *testing.T) {
 	clients := demo.NewServiceClients()
 	*m, _ = rootApplyMsg(*m, messages.ClientsReady{Clients: clients, Gen: 1})
 
-	// Fetch the policy list.
 	var navCmd tea.Cmd
 	*m, navCmd = rootApplyMsg(*m, messages.Navigate{
 		Target:       messages.TargetResourceList,
@@ -467,7 +425,6 @@ func TestInlinePolicy_DetailShowsParentGroup(t *testing.T) {
 	loaded := raw.(messages.ResourcesLoaded)
 	*m, _ = rootApplyMsg(*m, loaded)
 
-	// Find an inline policy with a known parent group.
 	// AllowAssumeRole belongs to "developers" (Fields["path"] == "inline/developers").
 	inlineIdx := -1
 	for i, r := range loaded.Resources {
@@ -484,13 +441,11 @@ func TestInlinePolicy_DetailShowsParentGroup(t *testing.T) {
 
 	inlinePolicy := loaded.Resources[inlineIdx]
 
-	// Verify the path field encodes the parent group.
 	if inlinePolicy.Fields["path"] != "inline/developers" {
 		t.Fatalf("expected Fields[\"path\"] == \"inline/developers\", got %q",
 			inlinePolicy.Fields["path"])
 	}
 
-	// Open detail for the inline policy — triggers related-check + enrichment commands.
 	var batchCmd tea.Cmd
 	*m, batchCmd = rootApplyMsg(*m, messages.Navigate{
 		Target:       messages.TargetDetail,
@@ -503,9 +458,8 @@ func TestInlinePolicy_DetailShowsParentGroup(t *testing.T) {
 	}
 
 	// The enrich + related-check tasks dispatch directly off batchCmd as a
-	// (possibly nested) tea.Batch; RunRelatedDef already recovers
-	// per-checker panics into a RelatedCheckResult carrying LazyAddError,
-	// so no extra recovery wrapper is needed here.
+	// (possibly nested) tea.Batch; RunRelatedDef recovers per-checker panics
+	// into a RelatedCheckResult carrying LazyAddError.
 	var groupResult messages.RelatedCheckResult
 	var found bool
 	for _, leaf := range extractLeafMsgs(batchCmd) {
@@ -521,8 +475,6 @@ func TestInlinePolicy_DetailShowsParentGroup(t *testing.T) {
 			"is checkPolicyGroup registered as a RelatedDef for policy?")
 	}
 
-	// Fails until checkPolicyGroup extracts the group from Fields["path"]:
-	// policyARNFromResource returns "" for inline policies → checker returns Count=0 at line 117.
 	if groupResult.Result.Count() < 1 {
 		t.Errorf("inline policy 'AllowAssumeRole' (path=inline/developers) got IAM Groups Count=%d, want >=1; "+
 			"BUG: checkPolicyGroup returns early when ARN is empty — "+

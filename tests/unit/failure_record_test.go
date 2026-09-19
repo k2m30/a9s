@@ -138,10 +138,10 @@ func TestEnricher_DeniedPerItemCall_OneLineWithActionCountAndExample(t *testing.
 }
 
 // TestErrCodeIs_AnswersForEveryShapeTheSitesRead pins the one classifier
-// against the four families the converted sites read: an absence AWS models
-// as an error, a denial, a throttle, and an invalid parameter. Each is fed
-// both as the modeled SDK type and as the generic shape, wrapped the way a
-// fetcher wraps it.
+// against the four families the sites read: an absence AWS models as an
+// error, a denial, a throttle, and an invalid parameter. Each is fed both as
+// the modeled SDK type and as the generic shape, wrapped the way a fetcher
+// wraps it.
 func TestErrCodeIs_AnswersForEveryShapeTheSitesRead(t *testing.T) {
 	for _, tc := range []struct {
 		name  string
@@ -241,9 +241,9 @@ func TestAggregateFailures_MixedClasses_KeepsEachCause(t *testing.T) {
 	}
 }
 
-// TestNamedPredicates_ReadWhatTheSitesUsedToMatch pins the two predicates the
-// converted sites needed by name: a refusal, whichever of the several codes
-// AWS spells it with, and the deleted-between-list-and-describe race.
+// TestNamedPredicates_ReadWhatTheSitesUsedToMatch pins the two named
+// predicates: a refusal, whichever of the several codes AWS spells it with,
+// and the deleted-between-list-and-describe race.
 func TestNamedPredicates_ReadWhatTheSitesUsedToMatch(t *testing.T) {
 	for _, tc := range []struct {
 		name             string
@@ -273,9 +273,7 @@ func TestNamedPredicates_ReadWhatTheSitesUsedToMatch(t *testing.T) {
 // TestAggregateFailures_ClassWithAPhrase_KeepsTheWholeSentence pins that
 // carrying the class out of the aggregate does not let the class speak in the
 // composite's place: "timeout" alone drops the count and the example the
-// operator needs. Found by probing the classes whose table entry supplies a
-// phrase (timeout, tls, dns, transport, region-unavailable) rather than the
-// denial class, which supplies none.
+// operator needs.
 func TestAggregateFailures_ClassWithAPhrase_KeepsTheWholeSentence(t *testing.T) {
 	agg := awsclient.AggregateFailures("ebs-snap-enrich", []awsclient.Failure{
 		awsclient.FailedCall("snap-0001", context.DeadlineExceeded),
@@ -293,8 +291,7 @@ func TestAggregateFailures_ClassWithAPhrase_KeepsTheWholeSentence(t *testing.T) 
 
 // TestAggregateFailures_RegionGap_NamesTheRegionOnce pins that a composite
 // whose records already name the region is not decorated with it a second
-// time. Found by probing the region-unavailable class against the carried
-// class, which is the one class CauseInRegion acts on.
+// time. region-unavailable is the one class CauseInRegion acts on.
 func TestAggregateFailures_RegionGap_NamesTheRegionOnce(t *testing.T) {
 	gap := &smithy.OperationError{
 		ServiceID: "CodeArtifact", OperationName: "ListRepositories",
@@ -368,7 +365,7 @@ func TestEnricher_UninspectedUser_SaysWhy(t *testing.T) {
 // response is an answer, not a refusal: DynamoDB reports "no resource policy"
 // as PolicyNotFoundException, but a response carrying no document at all must
 // not be recorded as a parse failure — the row would say a check failed when
-// nothing did. Found by driving the status-bar pin's fake.
+// nothing did.
 func TestEnricher_TableWithNoPolicy_IsNotAFailure(t *testing.T) {
 	clients := &awsclient.ServiceClients{DynamoDB: &ddbEmptyPolicyFake{}}
 	resources := []resource.Resource{

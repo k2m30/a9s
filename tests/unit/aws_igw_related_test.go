@@ -26,8 +26,6 @@ func igwCheckerByTarget(t *testing.T, target string) resource.RelatedChecker {
 	return nil
 }
 
-// --- Navigable Field Registration ---
-
 func TestNavigableFields_IGW_Registered(t *testing.T) {
 	expected := map[string]string{
 		"Attachments.VpcId": "vpc",
@@ -43,8 +41,6 @@ func TestNavigableFields_IGW_Registered(t *testing.T) {
 		}
 	}
 }
-
-// --- VPC checker (Pattern F — reads VpcId from RawStruct Attachments) ---
 
 func TestRelated_IGW_VPC_Found(t *testing.T) {
 	const igwID = "igw-0aaa111111111111a"
@@ -155,8 +151,6 @@ func TestRelated_IGW_VPC_CacheMissNoClients(t *testing.T) {
 	}
 }
 
-// --- Route Tables checker (Pattern C — cache, Routes.GatewayId matches IGW ID) ---
-
 func TestRelated_IGW_RTB_Found(t *testing.T) {
 	const igwID = "igw-0aaa111111111111a"
 
@@ -215,7 +209,6 @@ func TestRelated_IGW_RTB_NotFound(t *testing.T) {
 	const igwID = "igw-0aaa111111111111a"
 	const otherIGWID = "igw-0bbb222222222222b"
 
-	// RTB routes point to a different gateway, not our IGW.
 	rtbRes := resource.Resource{
 		ID:   "rtb-0ddd444444444444d",
 		Name: "staging-main",

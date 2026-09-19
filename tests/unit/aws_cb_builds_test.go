@@ -16,10 +16,6 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// ---------------------------------------------------------------------------
-// CodeBuild Builds fetcher tests (child of CodeBuild Projects)
-// ---------------------------------------------------------------------------
-
 // TestFetchCBBuilds_Basic verifies parsing of 1 build with all fields
 // populated, checking Resource.ID, Name, Status, all Fields keys, and RawStruct.
 func TestFetchCBBuilds_Basic(t *testing.T) {
@@ -230,12 +226,9 @@ func TestFetchCBBuilds_EmptyProject(t *testing.T) {
 	}
 }
 
-// TestFetchCBBuilds_EmptyPageWithNextToken pins the truncation-honesty fix:
-// a ListBuildsForProject page with zero Ids but a NextToken must still
-// report IsTruncated=true. Before the fix, an early return for
-// len(pageIDs) == 0 unconditionally reported a proven zero, silently
-// discarding the NextToken and hiding every build on the pages that
-// followed.
+// TestFetchCBBuilds_EmptyPageWithNextToken: a ListBuildsForProject page with
+// zero Ids but a NextToken reports IsTruncated=true, since builds may exist on
+// the pages that follow.
 func TestFetchCBBuilds_EmptyPageWithNextToken(t *testing.T) {
 	listMock := &mockCodeBuildListBuildsForProjectClient{
 		outputs: []*codebuild.ListBuildsForProjectOutput{
@@ -410,7 +403,6 @@ func TestFetchCBBuilds_InProgressDuration(t *testing.T) {
 						BuildNumber: aws.Int64(2),
 						BuildStatus: cbtypes.StatusTypeInProgress,
 						StartTime:   &startTs,
-						// EndTime is nil — build in progress
 					},
 				},
 			},
@@ -505,7 +497,6 @@ func TestFetchCBBuilds_NilFields(t *testing.T) {
 			{
 				Builds: []cbtypes.Build{
 					{
-						// All optional pointer fields are nil
 						BuildStatus: cbtypes.StatusTypeSucceeded,
 					},
 				},
@@ -515,7 +506,6 @@ func TestFetchCBBuilds_NilFields(t *testing.T) {
 
 	parentCtx := map[string]string{"project_name": "proj"}
 
-	// Should not panic
 	result, err := awsclient.FetchCBBuilds(
 		context.Background(),
 		listMock,
@@ -532,12 +522,10 @@ func TestFetchCBBuilds_NilFields(t *testing.T) {
 	}
 
 	t.Run("nil_Id", func(t *testing.T) {
-		// ID may be empty or derived; just ensure no panic occurred
 		_ = result.Resources[0].ID
 	})
 
 	t.Run("nil_BuildNumber", func(t *testing.T) {
-		// Name should handle nil BuildNumber gracefully
 		_ = result.Resources[0].Name
 	})
 
@@ -658,7 +646,7 @@ func TestFetchCBBuilds_LogFieldsNil(t *testing.T) {
 						BuildNumber: aws.Int64(11),
 						BuildStatus: cbtypes.StatusTypeSucceeded,
 						StartTime:   &startTs,
-						Logs:        nil, // no logs
+						Logs:        nil,
 					},
 				},
 			},
@@ -765,7 +753,6 @@ func TestFetchCBBuilds_ParentContext(t *testing.T) {
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
-	// If ListBuildsForProject was called without error, the project_name was used
 }
 
 // TestFetchCBBuilds_RawStruct verifies that RawStruct is the original
@@ -839,10 +826,6 @@ func TestFetchCBBuilds_RegistrationExists(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// Column definitions test
-// ---------------------------------------------------------------------------
-
 // TestCBBuildColumns verifies that CBBuildColumns returns columns with the
 // expected keys and titles.
 func TestCBBuildColumns(t *testing.T) {
@@ -852,7 +835,6 @@ func TestCBBuildColumns(t *testing.T) {
 		t.Fatal("CBBuildColumns() returned no columns")
 	}
 
-	// At minimum, the columns should contain these keys
 	wantKeys := []string{"build_number", "build_status", "start_time", "duration"}
 	for _, wantKey := range wantKeys {
 		found := false
@@ -877,10 +859,6 @@ func TestCBBuilds_PaginatedChildFetcherRegistered(t *testing.T) {
 		t.Fatal("cb_builds paginated child fetcher not registered")
 	}
 }
-
-// ---------------------------------------------------------------------------
-// Config defaults test
-// ---------------------------------------------------------------------------
 
 // TestConfigDefaultViewDef_CBBuilds verifies that the cb_builds view
 // definition has the expected list columns and non-empty detail paths.

@@ -1,21 +1,5 @@
 package unit
 
-// aws_ddb_issue_enrichment_test.go — Wave 2 PITR enricher tests for ddb.
-//
-// Tests drive EnrichDynamoDBPITR and assert:
-//   - PITR enabled  → no finding, no FieldUpdates["status"].
-//   - PITR disabled on Healthy row → Findings[id].Severity == "~",
-//     Findings[id].Summary == "PITR off". No
-//     FieldUpdates["status"] is written — the merged display phrase is
-//     computed at render time by phraseFromFindings(r.Findings).
-//   - PITR disabled on non-Healthy row (e.g. "archived: kms key lost") →
-//     same as above; no (+N) suffix is applied by this enricher.
-//   - Summary/Rows contract (U11): Summary is "PITR off"; Row values must
-//     NOT be substrings of Summary.
-//   - Error path: DescribeContinuousBackups errors → table skipped,
-//     Truncated=true, TruncatedIDs[id]=true.
-//   - IssueCount == 0 for every case ("~" does not bump S1 badge).
-
 import (
 	"context"
 	"fmt"
@@ -32,13 +16,6 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// ---------------------------------------------------------------------------
-// mock — DynamoDB DescribeContinuousBackups stub
-// ---------------------------------------------------------------------------
-
-// ddbContinuousBackupsFake implements DynamoDBDescribeContinuousBackupsAPI.
-// It returns responses keyed by table name; errTables causes an error return
-// for the named table (adversarial path).
 type ddbContinuousBackupsFake struct {
 	awsclient.DynamoDBAPI
 	responses map[string]*dynamodb.DescribeContinuousBackupsOutput
@@ -60,7 +37,6 @@ func (f *ddbContinuousBackupsFake) DescribeContinuousBackups(
 	if resp, ok := f.responses[name]; ok {
 		return resp, nil
 	}
-	// Default: PITR enabled (healthy baseline — tables not in map are not failing).
 	return &dynamodb.DescribeContinuousBackupsOutput{
 		ContinuousBackupsDescription: &ddbtypes.ContinuousBackupsDescription{
 			PointInTimeRecoveryDescription: &ddbtypes.PointInTimeRecoveryDescription{
@@ -70,7 +46,6 @@ func (f *ddbContinuousBackupsFake) DescribeContinuousBackups(
 	}, nil
 }
 
-// ddbPITREnabledOutput returns a DescribeContinuousBackupsOutput with PITR enabled.
 func ddbPITREnabledOutput() *dynamodb.DescribeContinuousBackupsOutput {
 	return &dynamodb.DescribeContinuousBackupsOutput{
 		ContinuousBackupsDescription: &ddbtypes.ContinuousBackupsDescription{
@@ -81,7 +56,6 @@ func ddbPITREnabledOutput() *dynamodb.DescribeContinuousBackupsOutput {
 	}
 }
 
-// ddbPITRDisabledOutput returns a DescribeContinuousBackupsOutput with PITR disabled.
 func ddbPITRDisabledOutput() *dynamodb.DescribeContinuousBackupsOutput {
 	return &dynamodb.DescribeContinuousBackupsOutput{
 		ContinuousBackupsDescription: &ddbtypes.ContinuousBackupsDescription{
@@ -92,17 +66,10 @@ func ddbPITRDisabledOutput() *dynamodb.DescribeContinuousBackupsOutput {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-// buildDDBEnricherClients wraps the fake as a ServiceClients.DynamoDB.
 func buildDDBEnricherClients(fake awsclient.DynamoDBAPI) *awsclient.ServiceClients {
 	return &awsclient.ServiceClients{DynamoDB: fake}
 }
 
-// makeDDBResource constructs a minimal Resource matching what FetchDynamoDBTablesPage
-// would produce for the given table id and pre-enrichment status.
 func makeDDBResource(id string, status string) resource.Resource {
 	arn := "arn:aws:dynamodb:us-east-1:123456789012:table/" + id
 	return resource.Resource{
@@ -115,12 +82,6 @@ func makeDDBResource(id string, status string) resource.Resource {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// Tests
-// ---------------------------------------------------------------------------
-
-// TestDDB_Enrich_PITREnabled_NoFinding verifies that a Healthy table with PITR
-// enabled produces no finding and no FieldUpdates["status"] entry.
 func TestDDB_Enrich_PITREnabled_NoFinding(t *testing.T) {
 	fake := &ddbContinuousBackupsFake{
 		responses: map[string]*dynamodb.DescribeContinuousBackupsOutput{
@@ -145,9 +106,6 @@ func TestDDB_Enrich_PITREnabled_NoFinding(t *testing.T) {
 	}
 }
 
-// TestDDB_Enrich_PITRDisabled_HealthyRow verifies a Healthy ACTIVE table with
-// PITR disabled produces the correct EnrichmentFinding. No FieldUpdates["status"] is written — the display phrase is
-// computed at render time by phraseFromFindings(r.Findings).
 func TestDDB_Enrich_PITRDisabled_HealthyRow(t *testing.T) {
 	fake := &ddbContinuousBackupsFake{
 		responses: map[string]*dynamodb.DescribeContinuousBackupsOutput{
@@ -155,7 +113,6 @@ func TestDDB_Enrich_PITRDisabled_HealthyRow(t *testing.T) {
 		},
 	}
 	clients := buildDDBEnricherClients(fake)
-	// audit-pitr-off is ACTIVE; fetcher produces Status="" (Healthy silence).
 	resources := []resource.Resource{makeDDBResource(fixtures.AuditPITROffID, "")}
 
 	result, err := awsclient.EnrichDynamoDBPITR(context.Background(), clients, resources, nil)
@@ -183,13 +140,7 @@ func TestDDB_Enrich_PITRDisabled_HealthyRow(t *testing.T) {
 
 }
 
-// TestDDB_Enrich_PITRDisabled_NonHealthyRow verifies that a table already
-// carrying "archived: kms key lost" (Wave-1 fetcher phrase) still gets the
-// Wave-2 EnrichmentFinding emitted when PITR is disabled. No FieldUpdates["status"] is written and no (+N) suffix is
-// applied; the merged display phrase is computed at render time by
-// phraseFromFindings(r.Findings).
 func TestDDB_Enrich_PITRDisabled_NonHealthyRow(t *testing.T) {
-	// legacy-archived: fetcher sets Status="archived: kms key lost"
 	existingStatus := "archived: kms key lost"
 	fake := &ddbContinuousBackupsFake{
 		responses: map[string]*dynamodb.DescribeContinuousBackupsOutput{
@@ -225,10 +176,8 @@ func TestDDB_Enrich_PITRDisabled_NonHealthyRow(t *testing.T) {
 
 }
 
-// TestDDB_Enrich_SummaryNotRows_Contract (covers U11): Finding.Summary is
-// "PITR off" and for every Row in the finding, the Row.Value must NOT be a
-// substring of Summary. This pins the enrichment contract that Summary and
-// Rows are distinct channels (no duplication).
+// Summary and Rows are distinct channels: no Row value repeats inside the
+// Summary.
 func TestDDB_Enrich_SummaryNotRows_Contract(t *testing.T) {
 	fake := &ddbContinuousBackupsFake{
 		responses: map[string]*dynamodb.DescribeContinuousBackupsOutput{
@@ -252,7 +201,6 @@ func TestDDB_Enrich_SummaryNotRows_Contract(t *testing.T) {
 	if finding.Phrase != "point-in-time recovery disabled" {
 		t.Errorf("Phrase = %q, want exactly %q", finding.Phrase, "point-in-time recovery disabled")
 	}
-	// U11: no Row value should appear in Phrase.
 	for _, row := range result.AttentionDetails[fixtures.AuditPITROffID][finding.Code].Rows {
 		if row.Value != "" && strings.Contains(finding.Phrase, row.Value) {
 			t.Errorf("Phrase %q embeds Row[%q].Value %q — Phrase and Rows must be distinct channels (U11)", finding.Phrase, row.Label, row.Value)
@@ -260,12 +208,8 @@ func TestDDB_Enrich_SummaryNotRows_Contract(t *testing.T) {
 	}
 }
 
-// TestDDB_Enrich_ErrorPath_TruncatedIDNotBadge verifies that when
-// DescribeContinuousBackups returns an error for a table, that table is
-// skipped and marked via TruncatedIDs[id]=true (a per-row "?" coverage gap),
-// while the aggregate Truncated flag stays false — ddb is a "~"-only
-// enricher (IssueCount always 0), so a coverage gap never lower-bounds the
-// issue badge.
+// ddb is a "~"-only enricher (IssueCount always 0), so a per-row coverage gap
+// never lower-bounds the issue badge.
 func TestDDB_Enrich_ErrorPath_TruncatedIDNotBadge(t *testing.T) {
 	errorTableID := fixtures.AuditPITROffID
 	fake := &ddbContinuousBackupsFake{
@@ -290,18 +234,11 @@ func TestDDB_Enrich_ErrorPath_TruncatedIDNotBadge(t *testing.T) {
 	if _, marked := result.TruncatedIDs[errorTableID]; !marked {
 		t.Errorf("TruncatedIDs[%q] = false, want true (error on this table)", errorTableID)
 	}
-	// The table with an error must NOT have a finding (partial data unusable).
 	if _, ok := result.Findings[errorTableID]; ok {
 		t.Errorf("unexpected finding for %q when DescribeContinuousBackups errored", errorTableID)
 	}
 }
 
-// TestDDB_Enrich_PITRDisabled_NoFieldUpdates_WithStackedWave1 verifies that when the existing status already carries a stacked
-// Wave-1 phrase (e.g. "kms key inaccessible (+2)"), the enricher must NOT
-// write FieldUpdates["status"] — no suffix-bump arithmetic happens here.
-// The merged display phrase is computed at render time by
-// phraseFromFindings(r.Findings), which aggregates Wave-1 findings on the
-// resource with this enricher's Wave-2 "PITR off" finding.
 func TestDDB_Enrich_PITRDisabled_NoFieldUpdates_WithStackedWave1(t *testing.T) {
 	id := "inline-bump-ddb-test"
 	existingStatus := "kms key inaccessible (+2)"
@@ -324,18 +261,14 @@ func TestDDB_Enrich_PITRDisabled_NoFieldUpdates_WithStackedWave1(t *testing.T) {
 		t.Fatalf("EnrichDynamoDBPITR error: %v", err)
 	}
 
-	// The Wave-2 PITR finding must still be emitted.
 	if _, ok := result.Findings[id]; !ok {
 		t.Errorf("expected PITR-off Finding for %q even when row carries stacked Wave-1 phrase", id)
 	}
-	// no FieldUpdates write — no suffix-bump arithmetic from this enricher.
 	if updates, ok := result.FieldUpdates[id]; ok && len(updates) != 0 {
 		t.Errorf("AS-140: expected empty FieldUpdates for %q (status overlay removed); got %v", id, updates)
 	}
 }
 
-// TestDDB_Enrich_NilDynamoDBClient verifies nil DynamoDB client returns empty
-// result gracefully without error.
 func TestDDB_Enrich_NilDynamoDBClient(t *testing.T) {
 	clients := &awsclient.ServiceClients{DynamoDB: nil}
 	result, err := awsclient.EnrichDynamoDBPITR(context.Background(), clients, nil, nil)
@@ -349,10 +282,6 @@ func TestDDB_Enrich_NilDynamoDBClient(t *testing.T) {
 		t.Errorf("len(Findings) = %d, want 0 (nil DynamoDB client, no resources)", len(result.Findings))
 	}
 }
-
-// ---------------------------------------------------------------------------
-// internal helpers
-// ---------------------------------------------------------------------------
 
 func findingKeysDDB(m map[string][]domain.Finding) []string {
 	keys := make([]string, 0, len(m))

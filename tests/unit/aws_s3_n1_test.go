@@ -1,9 +1,7 @@
 package unit
 
-// Tests for the S3 related-panel contract: lambda/sns/sqs pivots must resolve
-// non-zero when the bucket has a matching notification target. That requires
-// the paginated S3 fetcher to call GetBucketNotificationConfiguration per
-// bucket and populate Fields["notification_*"].
+// The lambda/sns/sqs pivots resolve from Fields["notification_*"], so the
+// paginated S3 fetcher calls GetBucketNotificationConfiguration per bucket.
 //
 // A registered pivot that never resolves is a contract bug, not a
 // performance optimization: avoiding the notification call would leave three
@@ -41,7 +39,6 @@ type countingS3RoundTripper struct {
 }
 
 func (t *countingS3RoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
-	// GetBucketNotificationConfiguration appends ?notification to the bucket URL.
 	if strings.Contains(req.URL.RawQuery, "notification") {
 		t.notificationCalls.Add(1)
 		// Return a valid empty notification config so the call doesn't error.
@@ -54,7 +51,6 @@ func (t *countingS3RoundTripper) RoundTrip(req *http.Request) (*http.Response, e
 		}, nil
 	}
 
-	// All other S3 calls (ListBuckets) get the canned bucket list.
 	return &http.Response{
 		StatusCode: 200,
 		Header:     http.Header{"Content-Type": []string{"application/xml"}},
@@ -71,10 +67,6 @@ func newS3ClientWithCountingTransport(transport *countingS3RoundTripper) *s3sdk.
 	return s3sdk.NewFromConfig(cfg, func(o *s3sdk.Options) { o.UsePathStyle = true })
 }
 
-// TestS3PaginatedFetcher_FetchesNotificationsPerBucket asserts the new
-// contract: exactly one GetBucketNotificationConfiguration call per bucket,
-// and the resulting Resource carries notification_* Fields so the lambda,
-// sns, and sqs s3-related pivots can resolve via Pattern F cache scan.
 func TestS3PaginatedFetcher_FetchesNotificationsPerBucket(t *testing.T) {
 	fetcher := resource.GetPaginatedFetcher("s3")
 	if fetcher == nil {
@@ -126,9 +118,6 @@ func TestS3PaginatedFetcher_FetchesNotificationsPerBucket(t *testing.T) {
 	}
 }
 
-// TestS3PaginatedFetcher_NotificationCallScalesLinearly confirms the N+1
-// relationship holds at larger bucket counts — a regression guard against
-// any future "optimization" that quietly drops notification enrichment.
 func TestS3PaginatedFetcher_NotificationCallScalesLinearly(t *testing.T) {
 	fetcher := resource.GetPaginatedFetcher("s3")
 	if fetcher == nil {

@@ -1,9 +1,5 @@
 package unit_test
 
-// aws_eni_related_extra_test.go — additional coverage for eni_related.go
-// Covers: checkENIVPC, checkENISubnet, checkENIELB, checkENILambda,
-//         checkENINAT, checkENIVPCE, lambdaFunctionNameFromENIDescription.
-
 import (
 	"context"
 	"testing"
@@ -15,8 +11,6 @@ import (
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
-
-// --- checkENIVPC (Pattern F — reads Fields["vpc_id"]) ---
 
 func TestRelated_ENI_VPC_Found(t *testing.T) {
 	source := resource.Resource{
@@ -56,8 +50,6 @@ func TestRelated_ENI_VPC_NoFields(t *testing.T) {
 		t.Errorf("Count = %d, want 0 (no vpc_id field)", result.Count())
 	}
 }
-
-// --- checkENISubnet (Pattern F — reads SubnetId from RawStruct) ---
 
 func TestRelated_ENI_Subnet_Found(t *testing.T) {
 	source := resource.Resource{
@@ -103,8 +95,6 @@ func TestRelated_ENI_Subnet_WrongRawStruct(t *testing.T) {
 		t.Errorf("Count = %d, want -1 (wrong RawStruct)", result.Count())
 	}
 }
-
-// --- checkENIELB (Pattern F — Description = "ELB app/NAME/HASH", RequesterId = "amazon-elb") ---
 
 func TestRelated_ENI_ELB_ALBDescription(t *testing.T) {
 	source := resource.Resource{
@@ -187,8 +177,6 @@ func TestRelated_ENI_ELB_WrongRawStruct(t *testing.T) {
 	}
 }
 
-// --- checkENILambda (Pattern F — RequesterId / Description heuristic) ---
-
 func TestRelated_ENI_Lambda_ExtractsFunctionName(t *testing.T) {
 	// Standard Lambda ENI description: "AWS Lambda VPC ENI-<name>-<uuid>"
 	source := resource.Resource{
@@ -236,8 +224,6 @@ func TestRelated_ENI_Lambda_WrongRawStruct(t *testing.T) {
 		t.Errorf("Count = %d, want -1 (wrong RawStruct)", result.Count())
 	}
 }
-
-// --- checkENINAT (Pattern C — scan nat cache for NatGatewayAddresses[].NetworkInterfaceId) ---
 
 func TestRelated_ENI_NAT_Found(t *testing.T) {
 	const eniID = "eni-0abc1234567890001"
@@ -322,8 +308,6 @@ func TestRelated_ENI_NAT_NilCacheNoClients(t *testing.T) {
 		t.Errorf("Count = %d, want -1 (empty cache, nil clients)", result.Count())
 	}
 }
-
-// --- checkENIVPCE (Pattern C — scan vpce cache for NetworkInterfaceIds) ---
 
 func TestRelated_ENI_VPCE_Found(t *testing.T) {
 	const eniID = "eni-0abc1234567890001"

@@ -14,14 +14,6 @@
 // land in whatever OTHER test's A9S_CONFIG_FOLDER is current by the time
 // the OS scheduler runs it, and the flake hits a different, seemingly
 // unrelated test on each shuffled run.
-//
-// This file drives the exact production seam
-// (Controller.Handle(messages.ResourcesLoaded{...}) ->
-// handleResourcesLoadedEvent -> syncExactTotalToMenu ->
-// persistMenuAvailabilityCache -> queueAvailabilitySave) against a
-// manually-owned temp directory, not through the shared newTestController*
-// helpers, then races os.RemoveAll against the writer with and without
-// Close.
 package unit_test
 
 import (
@@ -40,9 +32,8 @@ import (
 
 const availSaveRaceShortName = "ec2"
 
-// availSaveRaceFixture is a minimal AWS-SDK-shaped struct satisfying ec2's
-// real default columns via fieldpath's case-insensitive field-name
-// fallback — mirrors the s3RawFixture precedent in qa_cache_lifecycle_test.go.
+// availSaveRaceFixture satisfies ec2's default columns via fieldpath's
+// case-insensitive field-name fallback.
 type availSaveRaceFixture struct {
 	InstanceId string
 	State      string
@@ -84,17 +75,10 @@ func buildAvailSaveRaceController(t testing.TB, profile, region string) *app.Con
 	return c
 }
 
-// TestAvailSaveTempDirRace_WithoutClose_DirectoryNotEmptyOnRemoval
-// reproduces, at high probability across many iterations, the RemoveAll
-// failure — a leaked runAvailabilitySaveLoop goroutine recreating files
-// under a directory that is concurrently being torn down — by omitting Close
-// entirely (a test that never registers Close, or registers it after its
-// TempDir cleanup already ran).
-//
-// This test intentionally has NO t.TempDir()/t.Cleanup dependency of its
-// own: it owns and removes its directory manually so it can assert on the
-// exact failure condition without depending on testing.T's own cleanup
-// ordering (which is precisely the mechanism under test).
+// Without Close, a leaked runAvailabilitySaveLoop goroutine can recreate files
+// under a directory that is being torn down. The test owns and removes its
+// directory manually, so the failure shows without depending on testing.T's
+// own cleanup ordering.
 func TestAvailSaveTempDirRace_WithoutClose_DirectoryNotEmptyOnRemoval(t *testing.T) {
 	origEnv, hadEnv := os.LookupEnv("A9S_CONFIG_FOLDER")
 	t.Cleanup(func() {
@@ -116,10 +100,6 @@ func TestAvailSaveTempDirRace_WithoutClose_DirectoryNotEmptyOnRemoval(t *testing
 		os.Setenv("A9S_CONFIG_FOLDER", dir) //nolint:errcheck // test-owned env, single-threaded here
 
 		buildAvailSaveRaceController(t, "race-profile", "us-east-1")
-		// Deliberately NOT calling c.Close() — this is the bug class under
-		// test: the writer goroutine spawned by queueAvailabilitySave may
-		// still be running SaveType (MkdirAll/CreateTemp/Rename under dir)
-		// when RemoveAll below fires.
 
 		if err := os.RemoveAll(dir); err != nil {
 			incidents++
@@ -143,12 +123,8 @@ func TestAvailSaveTempDirRace_WithoutClose_DirectoryNotEmptyOnRemoval(t *testing
 	t.Logf("reproduced %d/%d iterations with a leaked-writer cleanup incident (expected without Close)", incidents, iterations)
 }
 
-// TestAvailSaveTempDirRace_WithClose_NeverFails is the GREEN counterpart:
-// identical loop, but Close() is called — and Close.Wait()s on
-// availSaveWG — strictly BEFORE RemoveAll, mirroring the correct
-// t.TempDir() + t.Cleanup(c.Close) LIFO ordering the harness fix enforces.
-// Zero incidents across the same iteration count is the contract this test
-// pins.
+// Close waits on availSaveWG, so a RemoveAll after Close never races the
+// writer.
 func TestAvailSaveTempDirRace_WithClose_NeverFails(t *testing.T) {
 	origEnv, hadEnv := os.LookupEnv("A9S_CONFIG_FOLDER")
 	t.Cleanup(func() {
@@ -180,16 +156,8 @@ func TestAvailSaveTempDirRace_WithClose_NeverFails(t *testing.T) {
 	}
 }
 
-// TestAvailSaveTempDirRace_HelperOrdering_MirrorsTTempDirLIFO pins the exact
-// same-test ordering rule Close's doc comment prescribes, using testing.T's
-// REAL TempDir/Cleanup machinery this time (as opposed to the two tests
-// above, which own their directories manually to isolate the race). A
-// helper that calls t.TempDir() THEN registers t.Cleanup(c.Close) is safe
-// (LIFO: Close runs before RemoveAll); this test exists so a future
-// refactor of the migrated helpers (newTestController et al.) cannot
-// silently invert that order without a test failing loudly — a wrongly
-// ordered registration here would surface as this exact test flaking under
-// -shuffle=on -count=N.
+// A helper that calls t.TempDir() and then registers t.Cleanup(c.Close) is
+// safe: cleanups run LIFO, so Close runs before TempDir's RemoveAll.
 func TestAvailSaveTempDirRace_HelperOrdering_MirrorsTTempDirLIFO(t *testing.T) {
 	dir := t.TempDir()
 	t.Setenv("A9S_CONFIG_FOLDER", dir)
@@ -217,11 +185,7 @@ func TestAvailSaveTempDirRace_HelperOrdering_MirrorsTTempDirLIFO(t *testing.T) {
 		Gen:        0, Provenance: messages.FetchProvenanceCanonicalList,
 	})
 
-	// Give the writer a fair chance to have actually run before this test
-	// function returns and cleanups fire, so a regression that removed the
-	// Close call (rather than just its ordering) would also be caught by a
-	// leftover-file assertion here rather than depending entirely on
-	// RemoveAll's own error surfacing.
+	// Wait until the writer has run, so the cleanups race a real save.
 
 	deadline := time.Now().Add(2 * time.Second)
 	saved := false

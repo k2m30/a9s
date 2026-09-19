@@ -1,27 +1,11 @@
 package unit
 
-// aws_s3_detail_enrich_test.go — coverage for enrichS3
-// (core/aws/s3_detail_enrichment.go), the on-demand detail enricher
-// registered for the "s3" resource type (#261).
-//
-// Covers:
-//   - wrong clients type / nil DetailEnrichmentCtx / nil Clients → error
-//     (s3 has no DetailDocs dependency — uncached, per the contract)
-//   - wrong RawStruct type → error
-//   - missing bucket Name → error
-//   - full success: Policy (parsed JSON), CORSRules, LifecycleRules all attached
-//   - each of the three absent-configuration error codes (NoSuchBucketPolicy,
-//     NoSuchCORSConfiguration, NoSuchLifecycleConfiguration) leaves the
-//     corresponding field nil with NO error, while the other two calls still
-//     populate their fields
-//   - the cross-region rejection pair isS3CrossRegionErr classifies
-//     (PermanentRedirect, IllegalLocationConstraintException) is handled
-//     identically to a benign-absence code per subcall: nil field, no error,
-//     siblings still populated; all three calls cross-region still attaches
-//     the BucketEnriched wrapper with every payload field nil, no error
-//   - a non-benign error from any of the three calls propagates and leaves
-//     res.RawStruct unchanged (the enricher returns before reassigning it)
-//   - BucketEnriched re-enrichment path accepted as RawStruct
+// NoSuchBucketPolicy, NoSuchCORSConfiguration and
+// NoSuchLifecycleConfiguration mean the bucket has no such configuration,
+// and a cross-region rejection (PermanentRedirect,
+// IllegalLocationConstraintException) is no failure of the bucket: either
+// leaves that field nil with no error while the sibling calls still populate
+// theirs.
 
 import (
 	"context"
@@ -36,10 +20,6 @@ import (
 	awsclient "github.com/k2m30/a9s/v3/core/aws"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
-
-// ---------------------------------------------------------------------------
-// enrichS3Fake — narrow S3API + GetBucketPolicy/Cors/Lifecycle fake
-// ---------------------------------------------------------------------------
 
 type enrichS3Fake struct {
 	getPolicyFn    func(*s3.GetBucketPolicyInput) (*s3.GetBucketPolicyOutput, error)
@@ -66,8 +46,6 @@ func (f *enrichS3Fake) GetBucketLifecycleConfiguration(_ context.Context, in *s3
 	return &s3.GetBucketLifecycleConfigurationOutput{}, nil
 }
 
-// --- Stubs for the rest of S3API (unused by enrichS3) ---
-
 func (f *enrichS3Fake) ListBuckets(_ context.Context, _ *s3.ListBucketsInput, _ ...func(*s3.Options)) (*s3.ListBucketsOutput, error) {
 	return &s3.ListBucketsOutput{}, nil
 }
@@ -86,13 +64,6 @@ var _ awsclient.S3GetBucketPolicyAPI = (*enrichS3Fake)(nil)
 var _ awsclient.S3GetBucketCorsAPI = (*enrichS3Fake)(nil)
 var _ awsclient.S3GetBucketLifecycleAPI = (*enrichS3Fake)(nil)
 
-// ---------------------------------------------------------------------------
-// enrichS3FakeNoBucketAPIs — implements only the S3API aggregate (ListBuckets,
-// ListObjectsV2, GetBucketNotificationConfiguration, GetPublicAccessBlock) —
-// none of S3GetBucketPolicyAPI/S3GetBucketCorsAPI/S3GetBucketLifecycleAPI —
-// to exercise the "client supports none of the per-bucket calls" parity path.
-// ---------------------------------------------------------------------------
-
 type enrichS3FakeNoBucketAPIs struct{}
 
 func (f *enrichS3FakeNoBucketAPIs) ListBuckets(_ context.Context, _ *s3.ListBucketsInput, _ ...func(*s3.Options)) (*s3.ListBucketsOutput, error) {
@@ -109,10 +80,6 @@ func (f *enrichS3FakeNoBucketAPIs) GetPublicAccessBlock(_ context.Context, _ *s3
 }
 
 var _ awsclient.S3API = (*enrichS3FakeNoBucketAPIs)(nil)
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
 
 func s3Enricher(t *testing.T) resource.DetailEnricher {
 	t.Helper()
@@ -143,7 +110,6 @@ func makeS3Res(name string) resource.Resource {
 	return resource.Resource{ID: name, RawStruct: makeS3Bucket(name)}
 }
 
-// fullS3Fake returns a fake that succeeds on all three calls with realistic payloads.
 func fullS3Fake() *enrichS3Fake {
 	return &enrichS3Fake{
 		getPolicyFn: func(_ *s3.GetBucketPolicyInput) (*s3.GetBucketPolicyOutput, error) {
@@ -170,10 +136,6 @@ func fullS3Fake() *enrichS3Fake {
 		},
 	}
 }
-
-// ---------------------------------------------------------------------------
-// Tests: invalid context
-// ---------------------------------------------------------------------------
 
 func TestEnrichS3_WrongClientsType_ReturnsError(t *testing.T) {
 	enricher := s3Enricher(t)
@@ -206,10 +168,6 @@ func TestEnrichS3_NilClients_ReturnsError(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// Tests: bad RawStruct / missing Name
-// ---------------------------------------------------------------------------
-
 func TestEnrichS3_WrongRawStructType_ReturnsError(t *testing.T) {
 	enricher := s3Enricher(t)
 	res := resource.Resource{ID: s3TestBucketName, RawStruct: "not-a-bucket"}
@@ -229,10 +187,6 @@ func TestEnrichS3_EmptyBucketName_ReturnsError(t *testing.T) {
 		t.Fatal("expected error for bucket with no name, got nil")
 	}
 }
-
-// ---------------------------------------------------------------------------
-// Tests: full success — all three payloads attached
-// ---------------------------------------------------------------------------
 
 func TestEnrichS3_FullSuccess_AllThreePayloadsAttached(t *testing.T) {
 	enricher := s3Enricher(t)
@@ -264,10 +218,6 @@ func TestEnrichS3_FullSuccess_AllThreePayloadsAttached(t *testing.T) {
 		t.Errorf("enriched.LifecycleRules = %+v, want one rule named expire-old-logs", enriched.LifecycleRules)
 	}
 }
-
-// ---------------------------------------------------------------------------
-// Tests: absent-configuration error codes → nil field, no error
-// ---------------------------------------------------------------------------
 
 func TestEnrichS3_NoSuchBucketPolicy_PolicyNilNoError(t *testing.T) {
 	fake := fullS3Fake()
@@ -334,10 +284,6 @@ func TestEnrichS3_NoSuchLifecycleConfiguration_LifecycleRulesNilNoError(t *testi
 		t.Error("enriched.Policy should still be populated when only the lifecycle call is absent")
 	}
 }
-
-// ---------------------------------------------------------------------------
-// Tests: cross-region rejection (isS3CrossRegionErr) → nil field, no error
-// ---------------------------------------------------------------------------
 
 func TestEnrichS3_PermanentRedirect_PolicyNilNoError(t *testing.T) {
 	fake := fullS3Fake()
@@ -423,10 +369,6 @@ func TestEnrichS3_AllThreeCallsCrossRegion_WrapperAttachedAllNilNoError(t *testi
 	}
 }
 
-// ---------------------------------------------------------------------------
-// Tests: real (non-benign) error propagated, res unchanged
-// ---------------------------------------------------------------------------
-
 func TestEnrichS3_RealError_PropagatedAndResUnchanged(t *testing.T) {
 	fake := fullS3Fake()
 	fake.getPolicyFn = func(_ *s3.GetBucketPolicyInput) (*s3.GetBucketPolicyOutput, error) {
@@ -460,11 +402,8 @@ func TestEnrichS3_GenericAPIError_Propagated(t *testing.T) {
 	}
 }
 
-// TestEnrichS3_ClientWithoutBucketAPIs_ReturnsError: when the S3 client
-// implements NONE of S3GetBucketPolicyAPI/S3GetBucketCorsAPI/
-// S3GetBucketLifecycleAPI, enrichS3 must return a hard error — matching the
-// other five enrichers' "client does not support <op>" contract — rather
-// than silently succeeding with all three fields left nil.
+// A client without the per-bucket calls is an error, as for every other
+// detail enricher.
 func TestEnrichS3_ClientWithoutBucketAPIs_ReturnsError(t *testing.T) {
 	enricher := s3Enricher(t)
 	res := makeS3Res(s3TestBucketName)
@@ -480,10 +419,6 @@ func TestEnrichS3_ClientWithoutBucketAPIs_ReturnsError(t *testing.T) {
 		t.Error("res.RawStruct must stay the original type when enrichment fails, got BucketEnriched")
 	}
 }
-
-// ---------------------------------------------------------------------------
-// Tests: re-enrichment path
-// ---------------------------------------------------------------------------
 
 func TestEnrichS3_BucketEnrichedRawStruct_Accepted(t *testing.T) {
 	enricher := s3Enricher(t)

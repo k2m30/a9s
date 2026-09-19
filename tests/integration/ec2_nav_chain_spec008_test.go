@@ -1,10 +1,5 @@
 package integration
 
-// ec2_nav_chain_spec008_test.go — Spec-008: EC2 full navigation chain tests.
-//
-// These tests verify the complete navigation chain in demo mode:
-//   Menu → EC2 list → EC2 detail → (related nav) → Target resource
-
 import (
 	"regexp"
 	"strings"
@@ -18,10 +13,6 @@ import (
 	"github.com/k2m30/a9s/v3/core/runtime/messages"
 	"github.com/k2m30/a9s/v3/internal/tui"
 )
-
-// ---------------------------------------------------------------------------
-// Local helpers (cannot use unit package helpers from integration package)
-// ---------------------------------------------------------------------------
 
 var navAnsiRe = regexp.MustCompile(`\x1b\[[0-9;]*[a-zA-Z]`)
 
@@ -50,11 +41,8 @@ func newNavDemoModel(t *testing.T) tui.Model {
 	return m
 }
 
-// firstEC2Resource returns the first EC2 resource from demo fixtures.
 func firstEC2Resource(t *testing.T) resource.Resource {
 	t.Helper()
-	// The first demo EC2 instance is i-0a1b2c3d4e5f60001 / web-prod-01
-	// We construct it directly to avoid import cycle with demo package.
 	return resource.Resource{
 		ID:   "i-0a1b2c3d4e5f60001",
 		Name: "web-prod-01",
@@ -73,15 +61,6 @@ func firstEC2Resource(t *testing.T) resource.Resource {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// TestEC2_008_NavChain_RightCol_Count1_OpensDetail
-// ---------------------------------------------------------------------------
-
-// TestEC2_008_NavChain_RightCol_Count1_OpensDrillTarget verifies that when a
-// RelatedNavigateMsg with TargetID arrives, the model mirrors manual Enter
-// on the target row. tg has Children[Key="enter"] → tg_health so the fast
-// path must enter that child view rather than push generic detail (rule
-// 2026-04-24: count-1 drill does exactly what Enter would do).
 func TestEC2_008_NavChain_RightCol_Count1_OpensDrillTarget(t *testing.T) {
 	m := newNavDemoModel(t)
 
@@ -92,7 +71,6 @@ func TestEC2_008_NavChain_RightCol_Count1_OpensDrillTarget(t *testing.T) {
 		Resource:     &ec2Res,
 	})
 
-	// Pre-populate TG cache
 	tgRes := resource.Resource{
 		ID:   "tg-ec2chain-001",
 		Name: "prod-api-tg",
@@ -107,7 +85,6 @@ func TestEC2_008_NavChain_RightCol_Count1_OpensDrillTarget(t *testing.T) {
 		Provenance:   messages.FetchProvenanceCanonicalList,
 	})
 
-	// Deliver RelatedNavigateMsg with TargetID (count=1 path).
 	// A related drill that narrows to exactly one resource opens that
 	// resource's DETAIL view for every target type; enter-keyed child views
 	// stay reachable only via Enter inside the target's own list.
@@ -134,14 +111,6 @@ func TestEC2_008_NavChain_RightCol_Count1_OpensDrillTarget(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// TestEC2_008_NavChain_RightCol_CountN_ShowsFilteredList
-// ---------------------------------------------------------------------------
-
-// TestEC2_008_NavChain_RightCol_CountN_ShowsFilteredList verifies that when a
-// RelatedNavigateMsg with RelatedIDs arrives, only the listed resources are shown.
-//
-// FAILS AT RUNTIME until handleRelatedNavigate filters by exact IDs.
 func TestEC2_008_NavChain_RightCol_CountN_ShowsFilteredList(t *testing.T) {
 	m := newNavDemoModel(t)
 
@@ -152,7 +121,6 @@ func TestEC2_008_NavChain_RightCol_CountN_ShowsFilteredList(t *testing.T) {
 		Resource:     &ec2Res,
 	})
 
-	// Pre-populate alarm cache with 3 alarms
 	alarmResources := []resource.Resource{
 		{ID: "alarm-chain-1", Name: "high-cpu", Fields: map[string]string{"status": "alarm"}},
 		{ID: "alarm-chain-2", Name: "status-check", Fields: map[string]string{"status": "ok"}},
@@ -164,7 +132,6 @@ func TestEC2_008_NavChain_RightCol_CountN_ShowsFilteredList(t *testing.T) {
 		Provenance:   messages.FetchProvenanceCanonicalList,
 	})
 
-	// Deliver RelatedNavigateMsg with RelatedIDs (count>1 path)
 	m, _ = navApplyMsg(m, messages.RelatedNavigate{
 		TargetType: "alarm",
 		RelatedIDs: []string{"alarm-chain-1", "alarm-chain-2"},
@@ -183,15 +150,6 @@ func TestEC2_008_NavChain_RightCol_CountN_ShowsFilteredList(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// TestEC2_008_NavChain_EscReturnsToEC2Detail
-// ---------------------------------------------------------------------------
-
-// TestEC2_008_NavChain_EscReturnsToEC2Detail verifies that pressing Esc after
-// a RelatedNavigateMsg navigation returns to the EC2 detail view.
-//
-// FAILS AT RUNTIME until handleRelatedNavigate pushes TargetDetail for single IDs
-// (regression guard — once the above tests pass, Esc must also work).
 func TestEC2_008_NavChain_EscReturnsToEC2Detail(t *testing.T) {
 	m := newNavDemoModel(t)
 
@@ -209,18 +167,15 @@ func TestEC2_008_NavChain_EscReturnsToEC2Detail(t *testing.T) {
 		Provenance:   messages.FetchProvenanceCanonicalList,
 	})
 
-	// Navigate to VPC detail via RelatedNavigateMsg
 	m, _ = navApplyMsg(m, messages.RelatedNavigate{
 		TargetType: "vpc",
 		TargetID:   "vpc-0abc123def456789a",
 	})
 
-	// Press Esc to go back
 	m, _ = navApplyMsg(m, tea.KeyPressMsg{Code: tea.KeyEscape})
 
 	view := navStripANSI(navViewContent(m))
 
-	// After Esc, we should be back on the EC2 detail (frame title = "web-prod-01")
 	if !strings.Contains(view, "web-prod-01") {
 		t.Errorf("after Esc from related navigation, view must show EC2 detail with name %q; got:\n%s", "web-prod-01", view)
 	}

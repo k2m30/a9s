@@ -13,10 +13,6 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// ---------------------------------------------------------------------------
-// T072 - Test CloudWatch Logs DescribeLogGroups response parsing
-// ---------------------------------------------------------------------------
-
 func TestFetchCloudWatchLogGroups_ParsesMultipleLogGroups(t *testing.T) {
 	mock := &mockCWLogsDescribeLogGroupsClient{
 		output: &cloudwatchlogs.DescribeLogGroupsOutput{
@@ -65,7 +61,6 @@ func TestFetchCloudWatchLogGroups_ParsesMultipleLogGroups(t *testing.T) {
 		}
 	}
 
-	// Verify first log group
 	r0 := resources[0]
 	if r0.ID != "/aws/lambda/prod-processor" {
 		t.Errorf("resource[0].ID: expected %q, got %q", "/aws/lambda/prod-processor", r0.ID)
@@ -86,7 +81,6 @@ func TestFetchCloudWatchLogGroups_ParsesMultipleLogGroups(t *testing.T) {
 		t.Error("resource[0].Fields[\"creation_time\"] should not be empty")
 	}
 
-	// Verify second log group
 	r1 := resources[1]
 	if r1.ID != "/aws/ecs/staging-service" {
 		t.Errorf("resource[1].ID: expected %q, got %q", "/aws/ecs/staging-service", r1.ID)

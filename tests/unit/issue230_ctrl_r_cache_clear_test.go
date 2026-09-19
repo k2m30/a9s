@@ -34,13 +34,11 @@ func TestContract_CtrlR_ClearsRelatedCache_ThenRechecks(t *testing.T) {
 			"related counts are loaded and visible.\nView:\n%s", viewBefore)
 	}
 
-	// Send the actual Ctrl+R key — exercises the LIVE global handler path.
 	m, refreshCmd := rootApplyMsg(m, ctrlR())
 
-	// Drain exactly one level (batch-aware — detail refresh for an enrichable
-	// type now returns a tea.Batch of the related-check cmd + the enrich cmd)
-	// to process any immediate leaf messages (e.g., a RelatedCheckResult).
-	// We stop before feeding checker results back to keep the right column in loading state.
+	// Drain exactly one level (batch-aware: detail refresh for an enrichable
+	// type returns a tea.Batch of the related-check and enrich cmds), stopping
+	// before checker results are fed back so the right column stays loading.
 	var immediateMsgs []tea.Msg
 	m, immediateMsgs = applyImmediateCmd(t, m, refreshCmd)
 
@@ -87,10 +85,8 @@ func TestContract_CtrlR_ClearsRelatedCache_ThenRechecks(t *testing.T) {
 func TestContract_CtrlR_FromDetail_ProducesRelatedCheckStarted(t *testing.T) {
 	m := setupEC2DetailWithResults(t)
 
-	// Send the actual Ctrl+R key press.
 	m, refreshCmd := rootApplyMsg(m, ctrlR())
 
-	// Drain the full cmd chain (up to 10 levels) and collect all messages.
 	_, chainMsgs := drainCmds(t, m, refreshCmd, 10)
 
 	found := false
@@ -124,15 +120,11 @@ func TestContract_CtrlR_RightColumnResets_BeforeRecheck(t *testing.T) {
 			"View:\n%s", viewBefore)
 	}
 
-	// Press Ctrl+R — exercises the real key path.
 	m, refreshCmd := rootApplyMsg(m, ctrlR())
 
-	// Drain exactly ONE level of the cmd chain (batch-aware — detail refresh for
-	// an enrichable type now returns a tea.Batch of the related-check cmd + the
-	// enrich cmd) to process any immediate leaf messages, including a
-	// RelatedCheckResult if it is among them. We intentionally do NOT feed
-	// further RelatedCheckResults back in — that would populate the right
-	// column again and mask the bug.
+	// Drain exactly one level (batch-aware: detail refresh for an enrichable
+	// type returns a tea.Batch of the related-check and enrich cmds). Feeding
+	// further RelatedCheckResults back would repopulate the right column.
 	m, _ = applyImmediateCmd(t, m, refreshCmd)
 
 	// The right column must be in loading/empty state — no stale counts

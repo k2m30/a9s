@@ -1,50 +1,3 @@
-// costs_screen_test.go — contract tests for the Cost Explorer domain seams
-// (specs/021-cost-explorer/architecture.md).
-//
-// Package attribution (from the doc's type signatures, to avoid an import
-// cycle):
-//
-//   - core/costs: AnomalyResult, FetchResult, (*Store).ApplyFetchResult,
-//     Money, TotalOutcome, SumCells, TrailingWindow, WindowWithin — BuildGrid
-//     calls SumCells directly, and (*Store) methods reference
-//     FetchResult/AnomalyResult directly; core/costs cannot import
-//     core/costs/screen (screen imports costs), so these types cannot live
-//     in screen without a cycle.
-//
-//   - core/costs/screen: CoverageView, FetchPlan, PlanFetch, DrillPath,
-//     SelectOutcome (+ NoSelection/PushDrill/OpenResource/Refuse — the sole
-//     consumer, applyCostsSelect, treats a loading shape and an unresolved
-//     row identically, so both are NoSelection), ScreenState, GridRowRef,
-//     PeriodRef, Select, ResourceLocator, ViewModel, CursorPos, Viewport,
-//     BuildViewModel — the screen-level "what should happen"/"what should
-//     render" decisions. Callers read Store.Recovered() directly.
-//
-//     type ScreenState struct {
-//     RowDim          costs.Dimension   // current frame's pivot/grouping dim
-//     Path            screen.DrillPath  // ancestor dims already pinned (order only)
-//     Filter          costs.Filter      // ancestor dims' actual pinned VALUES
-//     Granularity     costs.Granularity // current frame granularity
-//     Loading         bool              // shape in flight (blocks Select unconditionally)
-//     Now             time.Time
-//     ResourceTypeFor func(service string) (shortName string, ok bool) // catalog lookup, injected for purity
-//     }
-//     type GridRowRef struct { Present bool; Value string }
-//     type PeriodRef struct { Period costs.Period }
-//
-// PushDrill.Granularity is set by Select, the one place the finer
-// granularity is decided, alongside the Window it builds at that same step:
-//
-//	type PushDrill struct { Dim costs.Dimension; Value string; Window []costs.Period; Granularity costs.Granularity }
-//
-// Seam 8 (CostsViewModel): CursorPos/Viewport carry exactly what the adapter
-// mechanics need (core/app/costs_state.go's
-// liveCostGrid/costsVisibleColumnRange/costsGridCacheKey,
-// core/app/costs_body.go's buildCostsBody cursor-clamp block):
-//
-//	type CursorPos struct { Row, Col int } // Col indexes VisibleCols directly post-clamp
-//	type Viewport struct { Cols int; ScrollX int } // Cols<=0 means "unsliced, show everything"
-//
-// The outcome assertions (which fields, which values) are the contract.
 package unit_test
 
 import (
@@ -56,18 +9,8 @@ import (
 	"github.com/k2m30/a9s/v3/core/costs/screen"
 )
 
-// ===========================================================================
-// Seam 1 — FetchPlan / PlanFetch (core/costs/screen)
-//
-// "Freshness inputs are computed independently — cost coverage and anomaly
-// freshness have different lifecycles and never gate each other." Table
-// covers all four quadrants the doc's own bug classes name: grid-missing x
-// anomaly-fresh (the C4a/X2 collision's OPPOSITE quadrant — grid needs a
-// fetch but anomalies must NOT be re-requested), grid-warm x anomaly-stale
-// (X3's exact bug — warm rows must not suppress a still-needed anomaly
-// refresh), both fresh (X3's "no task at all" case), both stale (root
-// cold-open case).
-// ===========================================================================
+// Cost coverage and anomaly freshness have different lifecycles and never
+// gate each other.
 
 func TestCostsScreen_PlanFetch_GridAndAnomalyFreshnessDeriveIndependently(t *testing.T) {
 	const profile = "screen-planfetch"
@@ -115,17 +58,6 @@ func TestCostsScreen_PlanFetch_GridAndAnomalyFreshnessDeriveIndependently(t *tes
 		})
 	}
 }
-
-// ===========================================================================
-// Seam 2 + Seam 6 — AnomalyResult through (*costs.Store).ApplyFetchResult
-// (core/costs, extended)
-//
-// Reconciles the X2-vs-C4a collision: TestCostsSelfReview_C4a's intent
-// (authoritative-empty clears) is case "requested, empty" below; the X2
-// codex pin's intent (skip preserves) is case "not requested" below. Both
-// now express as distinct, non-overlapping AnomalyResult shapes instead of
-// a single ambiguous nil slice.
-// ===========================================================================
 
 func TestCostsScreen_ApplyFetchResult_AnomalyResult_WriteSemantics(t *testing.T) {
 	const profile = "screen-applyfetchresult"
@@ -227,14 +159,6 @@ type costsScreenTestError struct{ msg string }
 
 func (e *costsScreenTestError) Error() string { return e.msg }
 
-// ===========================================================================
-// Seam 3 — DrillPath.Next (core/costs/screen)
-//
-// "skips pinned" is the X5 behavior: from usage-type pivot, USAGE_TYPE
-// pinned, drilled to SERVICE and pinned that too — Next() must not offer
-// USAGE_TYPE again (the costs.NextDim algorithm on the DrillPath seam).
-// ===========================================================================
-
 func TestCostsScreen_DrillPath_Next(t *testing.T) {
 	tests := []struct {
 		name    string
@@ -244,10 +168,6 @@ func TestCostsScreen_DrillPath_Next(t *testing.T) {
 	}{
 		{"nothing pinned: SERVICE first", nil, costs.DimensionService, true},
 		{
-			// Ported from the retired costs.NextDim's TestNextDim_Chain ("pivot
-			// SERVICE with SERVICE already pinned in the filter drills to
-			// USAGE_TYPE") — the one case not already covered by the X5/
-			// canonical-order/leaf cases below (022-codebase-cleanup re-audit).
 			"SERVICE alone pinned -> USAGE_TYPE",
 			[]costs.Dimension{costs.DimensionService},
 			costs.DimensionUsageType, true,
@@ -279,25 +199,10 @@ func TestCostsScreen_DrillPath_Next(t *testing.T) {
 	}
 }
 
-// ===========================================================================
-// Seam 4 — Select outcomes (core/costs/screen)
-//
-// A fast Enter through a still-loading level is the "loading -> NoSelection"
-// case (state.Loading gates UNCONDITIONALLY). A stale cursor beyond the
-// filtered row count is orthogonal to this seam — clamping happens in the
-// reducer BEFORE Select ever sees a row (per the doc's "Selection/rendering
-// single source" note), so that stays a controller-level pin: by the time
-// Select runs, row is already the clamped one.
-//
-// applyCostsSelect treats a loading shape and an unresolved row as the
-// identical no-op, so the two scenarios below assert the SAME outcome type
-// (NoSelection); only the input still distinguishes them, kept for its own
-// documentation value.
-// ===========================================================================
+// state.Loading gates Select unconditionally. Cursor clamping happens in
+// the reducer before Select sees a row. applyCostsSelect treats a loading
+// shape and an unresolved row as the same no-op, so both yield NoSelection.
 
-// screenTestScreenState/screenTestGridRow/screenTestPeriodRef are this
-// file's working hypothesis for the doc's unspecified ScreenState/
-// GridRowRef/PeriodRef shapes — see the file-level doc comment.
 func screenTestState(rowDim costs.Dimension, pinned []costs.Dimension, filter costs.Filter, gran costs.Granularity, loading bool, now time.Time, resourceTypeFor func(string) (string, bool)) screen.ScreenState {
 	return screen.ScreenState{
 		RowDim:          rowDim,
@@ -377,11 +282,6 @@ func TestCostsScreen_Select_RowPresent_PushDrill_NonEmptyValue_WindowWithinSelec
 	}
 }
 
-// TestCostsScreen_Select_RowPresent_PushDrill_Granularity_YearCellStepsToMonth
-// pins the OTHER end of the finerGranularity chain the previous test covers
-// (month -> week): a year-granularity frame's PushDrill must report
-// GranularityMonth, with Window built at that same granularity — the one
-// place this decision is made, never re-derived by the caller.
 func TestCostsScreen_Select_RowPresent_PushDrill_Granularity_YearCellStepsToMonth(t *testing.T) {
 	now := fixedCostsNow
 	window := costs.BuildWindow(costs.GranularityYear, now)
@@ -481,29 +381,6 @@ func TestCostsScreen_Select_ResourceLeaf_OutOfWindow_Refuse(t *testing.T) {
 	}
 }
 
-// ===========================================================================
-// Seam 8 — ResourceLocator construction (core/costs/screen)
-//
-// Region/AccountID were cut from ResourceLocator by a later ponytail-review
-// pass (written-never-read — no consumer ever read either field off the
-// locator OpenResource carries). The only surviving locator contract is
-// Type/ID, already pinned by TestCostsScreen_Select_ResourceLeaf_
-// CatalogMapped_OpenResource above; this seam's own
-// PopulatesRegionAndAccountFromPinnedFilter test is deleted outright rather
-// than trimmed — nothing about the cut fields was worth re-pinning.
-// ===========================================================================
-
-// ===========================================================================
-// Seam 4 (window half) — TrailingWindow vs WindowWithin (core/costs,
-// extended: BuildGrid/ClampResourceDrillWindow, existing core/costs
-// functions, need these directly without an import cycle through screen).
-//
-// X4a landed as a green pin via the new constructor: WindowWithin(year,
-// month, now) must return Jan..Dec of the SELECTED year, not a trailing
-// 12-month window ending at the year's own January (the exact bug the old
-// BuildWindow(Month, anchor) had, per the architecture doc's own framing).
-// ===========================================================================
-
 func TestCostsScreen_WindowWithin_YearToMonths_InsideSelectedYear(t *testing.T) {
 	now := fixedCostsNow
 	yearPeriod := costs.Period{Start: "2026-01-01", End: "2027-01-01"}
@@ -574,14 +451,7 @@ func TestCostsScreen_TrailingWindow_AnchorAndNow_ClampCeilingComesFromNow(t *tes
 	}
 }
 
-// ===========================================================================
-// Seam 5 — Money / TotalOutcome / SumCells (core/costs, extended:
-// BuildGrid, existing core/costs, must call SumCells directly)
-//
-// A USD+EUR sum cannot leave the domain layer as a bare number; the
-// body-level pin (costs_codex_test.go, asserting the RENDERED note) covers
-// the controller/render half.
-// ===========================================================================
+// A USD+EUR sum cannot leave the domain layer as a bare number.
 
 func TestCostsScreen_SumCells_SingleUnit_TotalWithUnit(t *testing.T) {
 	cells := []costs.Money{{Value: 100, Unit: "USD"}, {Value: 80, Unit: "USD"}}
@@ -605,38 +475,9 @@ func TestCostsScreen_SumCells_MixedUnits_NoTotalValueConsumed(t *testing.T) {
 	}
 }
 
-// ===========================================================================
-// Seam 8 — CostsViewModel / BuildViewModel (core/costs/screen)
-//
-// "The renderer and Enter handler share one clamped view-model" — the
-// adapter's display filter, cursor clamp, viewport slice, and grid-cache
-// key all move here as one pure BuildViewModel. Traced against the CURRENT
-// adapter mechanics being extracted (core/app/costs_state.go's
-// liveCostGrid/filterCostsZeroDisplayGridRows/costsVisibleColumnRange/
-// costsGridCacheKey, core/app/costs_body.go's buildCostsBody
-// cursor-clamp block):
-//   - display filter: filterCostsZeroDisplayGridRows drops rows whose
-//     VISIBLE cells all round to "0.0" (costsAmountRoundsToZero) — EXCEPT
-//     liveCostGrid skips this filter entirely for RowDim==LINKED_ACCOUNT
-//     (applies costs.ApplyRowAttrs instead), the existing pivot exemption.
-//   - cursor clamp: cursorRow clamps to len(grid.Rows)-1 (the FILTERED
-//     rows), cursorCol clamps to the window, then a separate relCursorCol
-//     re-clamps into the visible slice — Seam 8 unifies this into one
-//     Cursor whose Col already indexes VisibleCols.
-//   - viewport slice: costsVisibleColumnRange's [start,count) window.
-//   - memoization key: costsGridCacheKey folds in grid identity (Query
-//     shape + window + metric), cursor/viewport (ViewportCols/ScrollX —
-//     the zero-row filter reads the visible range), and Store.Revision().
-// ===========================================================================
-
 func costsScreenViewModelGrid(rowDim costs.Dimension, rows []costs.GridRow, columns []costs.Period) costs.Grid {
 	return costs.Grid{RowDim: rowDim, Rows: rows, Columns: columns, Totals: make([]costs.CellValue, len(columns))}
 }
-
-// ---------------------------------------------------------------------------
-// 1. Display filter: sub-cent hidden on SERVICE, kept on LINKED_ACCOUNT;
-// offsetting non-zero rows always kept regardless of pivot.
-// ---------------------------------------------------------------------------
 
 func TestCostsScreen_BuildViewModel_DisplayFilter_SubCentHidden_LinkedAccountExempt(t *testing.T) {
 	columns := []costs.Period{{Start: "2026-07-01", End: "2026-08-01"}}
@@ -660,11 +501,6 @@ func TestCostsScreen_BuildViewModel_DisplayFilter_SubCentHidden_LinkedAccountExe
 	})
 }
 
-// ---------------------------------------------------------------------------
-// 2. Cursor clamp: the returned Cursor always indexes Rows/VisibleCols
-// validly, even when the raw input is out of bounds (X6's mechanism).
-// ---------------------------------------------------------------------------
-
 func TestCostsScreen_BuildViewModel_CursorClamp_AlwaysValidIndex(t *testing.T) {
 	columns := []costs.Period{
 		{Start: "2026-05-01", End: "2026-06-01"},
@@ -676,7 +512,6 @@ func TestCostsScreen_BuildViewModel_CursorClamp_AlwaysValidIndex(t *testing.T) {
 	}
 	g := costsScreenViewModelGrid(costs.DimensionService, rows, columns)
 
-	// Cursor far beyond both axes.
 	vm := screen.BuildViewModel(g, costs.DimensionService, screen.CursorPos{Row: 99, Col: 99}, screen.Viewport{}, 1)
 	if vm.Cursor.Row < 0 || vm.Cursor.Row >= len(vm.Rows) {
 		t.Errorf("Cursor.Row = %d does not validly index Rows (len %d)", vm.Cursor.Row, len(vm.Rows))
@@ -685,7 +520,6 @@ func TestCostsScreen_BuildViewModel_CursorClamp_AlwaysValidIndex(t *testing.T) {
 		t.Errorf("Cursor.Col = %d does not validly index VisibleCols (len %d)", vm.Cursor.Col, len(vm.VisibleCols))
 	}
 
-	// Cursor with negative components — same invariant.
 	vmNeg := screen.BuildViewModel(g, costs.DimensionService, screen.CursorPos{Row: -5, Col: -5}, screen.Viewport{}, 1)
 	if vmNeg.Cursor.Row < 0 || vmNeg.Cursor.Row >= len(vmNeg.Rows) {
 		t.Errorf("negative Cursor.Row = %d does not validly index Rows (len %d)", vmNeg.Cursor.Row, len(vmNeg.Rows))
@@ -707,13 +541,6 @@ func TestCostsScreen_BuildViewModel_CursorClamp_AlwaysValidIndex(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// 3. Viewport slice: VisibleCols is the scroll window applied — contents,
-// not copies (compare values, not pointer identity — Period is a plain
-// value type, so this asserts the SLICE CONTENTS match the expected window,
-// not that BuildViewModel reuses the same backing array).
-// ---------------------------------------------------------------------------
-
 func TestCostsScreen_BuildViewModel_ViewportSlice_AppliesScrollWindow(t *testing.T) {
 	columns := []costs.Period{
 		{Start: "2026-04-01", End: "2026-05-01"},
@@ -727,7 +554,6 @@ func TestCostsScreen_BuildViewModel_ViewportSlice_AppliesScrollWindow(t *testing
 	}}}
 	g := costsScreenViewModelGrid(costs.DimensionService, rows, columns)
 
-	// A 2-column viewport scrolled to start at index 1: expect columns[1:3].
 	vm := screen.BuildViewModel(g, costs.DimensionService, screen.CursorPos{}, screen.Viewport{Cols: 2, ScrollX: 1}, 1)
 	if len(vm.VisibleCols) != 2 {
 		t.Fatalf("VisibleCols length = %d, want 2", len(vm.VisibleCols))
@@ -743,13 +569,6 @@ func TestCostsScreen_BuildViewModel_ViewportSlice_AppliesScrollWindow(t *testing
 		t.Errorf("VisibleCols length with an unset viewport = %d, want %d (unsliced fallback)", len(vmFull.VisibleCols), len(columns))
 	}
 }
-
-// ---------------------------------------------------------------------------
-// 4. Memoization identity: same inputs -> equal outputs (pure); a revision
-// bump (accompanied by genuinely new grid data) yields a rebuilt result.
-// Internal caching mechanics (whether/how the seam memoizes) are
-// deliberately NOT pinned — only the black-box input/output contract.
-// ---------------------------------------------------------------------------
 
 func TestCostsScreen_BuildViewModel_Determinism_SameInputsEqualOutputs(t *testing.T) {
 	columns := []costs.Period{{Start: "2026-07-01", End: "2026-08-01"}}
@@ -793,16 +612,6 @@ func TestCostsScreen_BuildViewModel_RevisionBump_WithNewGrid_YieldsRebuiltResult
 		t.Errorf("BuildViewModel at a bumped revision with genuinely new grid data returned the same row count (%d) as before — a revision bump must yield a rebuilt result, not a stale one", len(vmBefore.Rows))
 	}
 }
-
-// ---------------------------------------------------------------------------
-// 5. Honesty notes: the empty finer-grain note is sourced from the
-// ViewModel (one source) — pinned for a grid with zero rows. The
-// controller-level pin (costs_codex_test.go) covers the depth-gated ("not at
-// root") refinement the adapter also applies; BuildViewModel's own pure
-// signature (grid, pivot, cursor, viewport, revision) carries no drill-depth
-// input, so this pins the seam's OWN observable contract: an empty grid
-// produces a non-empty, granularity-honest Note.
-// ---------------------------------------------------------------------------
 
 func TestCostsScreen_BuildViewModel_Note_EmptyFinerGrainHonesty(t *testing.T) {
 	columns := []costs.Period{{Start: "2026-07-01", End: "2026-08-01"}}

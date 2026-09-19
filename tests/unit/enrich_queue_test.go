@@ -1,7 +1,7 @@
 package unit
 
-// enrich_queue_test.go — Regression tests for declarative Wave 2 issue-enricher
-// priority metadata.
+// enrich_queue_test.go — declarative Wave 2 issue-enricher priority
+// metadata.
 //
 // Wave 2 enricher metadata is declared on each catalog.ResourceTypeDef
 // literal's Wave2 field; reads go through awsclient.AllWave2 /
@@ -80,21 +80,8 @@ func seedEnricherSubset(m tui.Model, names []string) (tui.Model, tea.Cmd) {
 	return m, cmd
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// TestBuildEnrichQueue_OrdersByMetadataPriority
-// ─────────────────────────────────────────────────────────────────────────────
-
 // TestBuildEnrichQueue_OrdersByMetadataPriority verifies that all Priority=10
 // types come before all Priority=100 types in the buildEnrichQueue output.
-//
-// We seed probeResources for all registered enricher types via a single
-// AvailabilityPrefetchedMsg (so all types are available when startEnrichment
-// fires), execute the resulting cmd tree, and assert no priority-10 type
-// appears after any priority-100 type in the collected EnrichmentCheckedMsg
-// sequence.
-//
-// GREEN: buildEnrichQueue already reads EnricherPriority correctly.
-// Any regression in the priority sort order will flip this to RED.
 func TestBuildEnrichQueue_OrdersByMetadataPriority(t *testing.T) {
 	tui.Version = "test"
 
@@ -130,17 +117,10 @@ func TestBuildEnrichQueue_OrdersByMetadataPriority(t *testing.T) {
 	}
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// TestBuildEnrichQueue_StableAlphabeticalWithinPriority
-// ─────────────────────────────────────────────────────────────────────────────
-
 // TestBuildEnrichQueue_StableAlphabeticalWithinPriority verifies alphabetical
 // ordering within the priority-10 tier by seeding exactly those seven types.
 //
 // Expected dispatch order (sorted): cb, dbi, ebs, glue, pipeline, sfn, tg.
-//
-// GREEN: sort.Slice in buildEnrichQueue already sorts by Priority then Name.
-// Any change that breaks the alphabetical-within-tier guarantee fails this.
 func TestBuildEnrichQueue_StableAlphabeticalWithinPriority(t *testing.T) {
 	tui.Version = "test"
 
@@ -175,7 +155,6 @@ func TestBuildEnrichQueue_StableAlphabeticalWithinPriority(t *testing.T) {
 		got = append(got, msg.ResourceType)
 	}
 
-	// Assert got is non-decreasing (alphabetical).
 	for i := 1; i < len(got); i++ {
 		if got[i] < got[i-1] {
 			t.Errorf("alphabetical order violated at index %d: %q appears before %q; full order: %v",
@@ -183,7 +162,6 @@ func TestBuildEnrichQueue_StableAlphabeticalWithinPriority(t *testing.T) {
 		}
 	}
 
-	// Also verify all priority-10 types were dispatched.
 	expected := make([]string, len(priority10Types))
 	copy(expected, priority10Types)
 	sort.Strings(expected)
@@ -199,20 +177,10 @@ func TestBuildEnrichQueue_StableAlphabeticalWithinPriority(t *testing.T) {
 	}
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// TestBuildEnrichQueue_IncludesAllRegisteredEnrichers
-// ─────────────────────────────────────────────────────────────────────────────
-
 // TestBuildEnrichQueue_IncludesAllRegisteredEnrichers verifies that every key in
 // EnricherRegistry that has a probeResources entry appears in the dispatch queue.
-//
-// After ARCH-04, the registry values carry an Enricher struct with Fn and Priority.
-// probeEnrichment reads Fn to invoke the enricher; a zero-value Enricher (Fn=nil)
-// silently skips. This test ensures every registered key is dispatched when seeded,
-// catching any partial migration that leaves a zero-value entry.
-//
-// GREEN: current buildEnrichQueue iterates EnricherRegistry correctly.
-// RED if any registry entry is silently dropped (e.g., after struct migration).
+// probeEnrichment reads Fn to invoke the enricher, and a zero-value Enricher
+// (Fn=nil) silently skips, so a zero-value entry would drop out of the queue.
 func TestBuildEnrichQueue_IncludesAllRegisteredEnrichers(t *testing.T) {
 	tui.Version = "test"
 
@@ -237,16 +205,8 @@ func TestBuildEnrichQueue_IncludesAllRegisteredEnrichers(t *testing.T) {
 	}
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// TestBuildEnrichQueue_SkipsTypesWithoutProbe
-// ─────────────────────────────────────────────────────────────────────────────
-
 // TestBuildEnrichQueue_SkipsTypesWithoutProbe verifies that a type registered in
 // EnricherRegistry without a probeResources entry is excluded from the queue.
-//
-// This test registers a test-only enricher, seeds probeResources for "dbi" only
-// (via AvailabilityPrefetchedMsg), and asserts no EnrichmentCheckedMsg is produced
-// for the test-only type.
 func TestBuildEnrichQueue_SkipsTypesWithoutProbe(t *testing.T) {
 	tui.Version = "test"
 
@@ -278,11 +238,10 @@ func TestBuildEnrichQueue_SkipsTypesWithoutProbe(t *testing.T) {
 }
 
 // TestBuildEnrichQueue_NewEnricherAutoParticipates proves the scheduling
-// contract for #277: a brand-new issue enricher added at runtime (as any real
-// new enricher would be added in production code via the catalog Wave2 field
-// init block) participates in the dispatch queue WITHOUT any change to
-// internal/tui/app_fetchers.go. Priority metadata on the registry entry is the
-// single source of scheduling truth.
+// contract: a brand-new issue enricher added at runtime (as a real enricher
+// is added via the catalog Wave2 field) participates in the dispatch queue
+// with no change to internal/tui/app_fetchers.go. Priority metadata on the
+// registry entry is the single source of scheduling truth.
 func TestBuildEnrichQueue_NewEnricherAutoParticipates(t *testing.T) {
 	tui.Version = "test"
 

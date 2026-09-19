@@ -1,14 +1,3 @@
-// aws_efs_related_test.go — graph-root related-pivot tests for EFS.
-//
-// Tests the CONTRACT from docs/resources/efs.md §2 and docs/historical/resources-impl-plans/efs-impl-plan.md §2.
-// One graph-root test per §2 pivot that has count shown: yes.
-// Expected counts (per impl-plan): alarm=2, backup=2, cfn=1, ecs-task=2,
-// eni=3, kms=1, lambda=2, sg=2, subnet=3, vpc=1, ec2=0 (intentional per spec §5).
-//
-// efsCheckerByTarget is the shared helper consumed by:
-//   - aws_efs_related_extra_test.go (checkEFSAlarm, checkEFSEC2, checkEFSENI, checkEFSVPC)
-//   - aws_efs_related_wave2_test.go (checkEFSSG, checkEFSSubnet)
-//   - aws_related_checkers_branch_coverage_test.go    (checkEFSLambda)
 package unit_test
 
 import (
@@ -29,13 +18,8 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// ---------------------------------------------------------------------------
-// Shared helper: efsCheckerByTarget
-//
-// Used by this file AND sibling files aws_efs_related_extra_test.go,
-// aws_efs_related_wave2_test.go, and aws_related_checkers_branch_coverage_test.go.
-// MUST NOT be removed or renamed.
-// ---------------------------------------------------------------------------
+// efsCheckerByTarget is shared with aws_efs_related_extra_test.go,
+// aws_efs_related_wave2_test.go and aws_related_checkers_branch_coverage_test.go.
 
 func efsCheckerByTarget(t *testing.T, target string) resource.RelatedChecker {
 	t.Helper()
@@ -50,10 +34,6 @@ func efsCheckerByTarget(t *testing.T, target string) resource.RelatedChecker {
 	t.Fatalf("efs related checker for %s not found", target)
 	return nil
 }
-
-// ---------------------------------------------------------------------------
-// Graph-root source resource
-// ---------------------------------------------------------------------------
 
 func efsGraphRootSource() resource.Resource {
 	fix := fixtures.NewEFSFixtures()
@@ -70,10 +50,6 @@ func efsGraphRootSource() resource.Resource {
 		RawStruct: fs,
 	}
 }
-
-// ---------------------------------------------------------------------------
-// Cache builders from fixture data
-// ---------------------------------------------------------------------------
 
 func efsAlarmCache() resource.ResourceCache {
 	fix := fixtures.NewCloudWatchFixtures()
@@ -123,12 +99,9 @@ func efsLambdaCache() resource.ResourceCache {
 	}
 }
 
-// efsECSTaskCacheWithEFSIDs builds an ecs-task cache where two tasks carry
-// Fields["efs_file_system_ids"] = ProdEFSID (the new Phase-7 contract).
-// The task IDs are the ECS task ARNs from the fixture tasks that use
-// api-gateway and web-frontend task definitions (which mount ProdEFSID).
+// Task IDs are the ECS task ARNs of the fixture tasks whose api-gateway and
+// web-frontend task definitions mount ProdEFSID.
 func efsECSTaskCacheWithEFSIDs() resource.ResourceCache {
-	// Two tasks that reference ProdEFSID via their task definitions.
 	taskA := resource.Resource{
 		ID:   "arn:aws:ecs:us-east-1:123456789012:task/acme-services/a1b2c3d4e5f6a1b2c3d4e5f6",
 		Name: "a1b2c3d4e5f6a1b2c3d4e5f6",
@@ -143,7 +116,6 @@ func efsECSTaskCacheWithEFSIDs() resource.ResourceCache {
 			"efs_file_system_ids": fixtures.ProdEFSID,
 		},
 	}
-	// Third task that does NOT reference ProdEFSID.
 	taskC := resource.Resource{
 		ID:   "arn:aws:ecs:us-east-1:123456789012:task/acme-batch/d4e5f6a1b2c3d4e5f6010203",
 		Name: "d4e5f6a1b2c3d4e5f6010203",
@@ -158,17 +130,9 @@ func efsECSTaskCacheWithEFSIDs() resource.ResourceCache {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// TEST: TestRelated_EFS_KMS_GraphRoot
-//
-// GIVEN: graph-root EFS (ProdEFSID) with KmsKeyId = ProdEFSKmsKeyARN.
-// THEN:  checkEFSKMS returns Count=1, ResourceIDs contains ProdEFSKmsKeyID
-//        (the bare key ID stripped from the ARN). The checker emits blindly;
-//        the related-check orchestrator's lazy-add path populates the kms
-//        cache with the referenced key (customer-managed or AWS-managed) at
-//        dispatch time, so passing a nil cache here is the correct test
-//        shape.
-// ---------------------------------------------------------------------------
+// checkEFSKMS emits the key ID without a cache lookup; the related-check
+// orchestrator's lazy-add path populates the kms cache at dispatch time, so a
+// nil cache is the correct shape here.
 
 func TestRelated_EFS_KMS_GraphRoot(t *testing.T) {
 	source := efsGraphRootSource()
@@ -186,13 +150,6 @@ func TestRelated_EFS_KMS_GraphRoot(t *testing.T) {
 		t.Errorf("ResourceIDs[0] = %q, want %q", result.ResourceIDs()[0], fixtures.ProdEFSKmsKeyID)
 	}
 }
-
-// ---------------------------------------------------------------------------
-// TEST: TestRelated_EFS_CFN_GraphRoot
-//
-// GIVEN: graph-root EFS with aws:cloudformation:stack-name = ProdEFSCFNStackName.
-// THEN:  checkEFSCFN returns Count=1, ResourceIDs contains ProdEFSCFNStackName.
-// ---------------------------------------------------------------------------
 
 func TestRelated_EFS_CFN_GraphRoot(t *testing.T) {
 	source := efsGraphRootSource()
@@ -216,14 +173,6 @@ func TestRelated_EFS_CFN_GraphRoot(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// TEST: TestRelated_EFS_Alarm_GraphRoot
-//
-// GIVEN: graph-root EFS; alarm cache contains ProdEFSAlarmAID and ProdEFSAlarmBID
-//        (Namespace=AWS/EFS, Dimension FileSystemId=ProdEFSID).
-// THEN:  checkEFSAlarm returns Count=2 and both alarm IDs in ResourceIDs.
-// ---------------------------------------------------------------------------
-
 func TestRelated_EFS_Alarm_GraphRoot(t *testing.T) {
 	source := efsGraphRootSource()
 	checker := efsCheckerByTarget(t, "alarm")
@@ -245,16 +194,6 @@ func TestRelated_EFS_Alarm_GraphRoot(t *testing.T) {
 		}
 	}
 }
-
-// ---------------------------------------------------------------------------
-// TEST: TestRelated_EFS_Lambda_GraphRoot
-//
-// GIVEN: graph-root EFS (ProdEFSID) with access points AP-A and AP-B.
-//        Lambda cache contains ProdEFSLambdaAName and ProdEFSLambdaBName,
-//        each with FileSystemConfigs referencing the respective AP ARNs.
-//        Live EFS client (EFSFake) returns access points for ProdEFSID.
-// THEN:  checkEFSLambda returns Count=2, both lambda names in ResourceIDs.
-// ---------------------------------------------------------------------------
 
 func TestRelated_EFS_Lambda_GraphRoot(t *testing.T) {
 	source := efsGraphRootSource()
@@ -281,25 +220,13 @@ func TestRelated_EFS_Lambda_GraphRoot(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// TEST: TestRelated_EFS_Backup_GraphRoot
-//
-// GIVEN: graph-root EFS (ProdEFSARN); backup cache contains plans whose
-//        Fields["resources"] CSV lists ProdEFSARN.
-// THEN:  checkEFSBackup returns Count=2 and both plan IDs in ResourceIDs.
-//
-// The checker now reverse-scans the backup cache (ID-format matches the
-// backup fetcher's Resource.ID=BackupPlanId). Recovery-point ARNs are not
-// a valid target ID for the `backup` resource type — drill-through would
-// land empty if the checker returned them. See 2026-04-24 bug.
-// ---------------------------------------------------------------------------
+// Recovery-point ARNs are not a valid ID for the backup type, so the checker
+// reverse-scans the backup cache and returns BackupPlanIds.
 
 func TestRelated_EFS_Backup_GraphRoot(t *testing.T) {
 	source := efsGraphRootSource()
 	checker := efsCheckerByTarget(t, "backup")
 
-	// Build a backup cache with two plans that reference ProdEFSARN in their
-	// resources CSV, and one plan that does NOT.
 	cache := resource.ResourceCache{
 		"backup": resource.ResourceCacheEntry{Resources: []resource.Resource{
 			{
@@ -343,14 +270,6 @@ func TestRelated_EFS_Backup_GraphRoot(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// TEST: TestRelated_EFS_ENI_GraphRoot
-//
-// GIVEN: graph-root EFS; ENI cache contains 3 mount-target ENIs for ProdEFSID
-//        (description "EFS mount target for <ProdEFSID>").
-// THEN:  checkEFSENI returns Count=3 and all three ENI IDs in ResourceIDs.
-// ---------------------------------------------------------------------------
-
 func TestRelated_EFS_ENI_GraphRoot(t *testing.T) {
 	source := efsGraphRootSource()
 	checker := efsCheckerByTarget(t, "eni")
@@ -372,14 +291,6 @@ func TestRelated_EFS_ENI_GraphRoot(t *testing.T) {
 		}
 	}
 }
-
-// ---------------------------------------------------------------------------
-// TEST: TestRelated_EFS_SG_GraphRoot
-//
-// GIVEN: graph-root EFS; ENI cache has 3 mount-target ENIs, each with SGs
-//        ProdEFSSecurityGroupAID and ProdEFSSecurityGroupBID.
-// THEN:  checkEFSSG returns Count=2 (deduplicated), both SG IDs in ResourceIDs.
-// ---------------------------------------------------------------------------
 
 func TestRelated_EFS_SG_GraphRoot(t *testing.T) {
 	source := efsGraphRootSource()
@@ -403,14 +314,6 @@ func TestRelated_EFS_SG_GraphRoot(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// TEST: TestRelated_EFS_Subnet_GraphRoot
-//
-// GIVEN: graph-root EFS; ENI cache has 3 mount-target ENIs in 3 subnets
-//        (ProdEFSSubnetAID, ProdEFSSubnetBID, ProdEFSSubnetCID).
-// THEN:  checkEFSSubnet returns Count=3, all three subnet IDs in ResourceIDs.
-// ---------------------------------------------------------------------------
-
 func TestRelated_EFS_Subnet_GraphRoot(t *testing.T) {
 	source := efsGraphRootSource()
 	checker := efsCheckerByTarget(t, "subnet")
@@ -433,13 +336,6 @@ func TestRelated_EFS_Subnet_GraphRoot(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// TEST: TestRelated_EFS_VPC_GraphRoot
-//
-// GIVEN: graph-root EFS; ENI cache has 3 mount-target ENIs, all in ProdEFSVpcID.
-// THEN:  checkEFSVPC returns Count=1 (deduplicated), ResourceIDs=[ProdEFSVpcID].
-// ---------------------------------------------------------------------------
-
 func TestRelated_EFS_VPC_GraphRoot(t *testing.T) {
 	source := efsGraphRootSource()
 	checker := efsCheckerByTarget(t, "vpc")
@@ -457,16 +353,6 @@ func TestRelated_EFS_VPC_GraphRoot(t *testing.T) {
 		t.Errorf("ResourceIDs[0] = %q, want %q", result.ResourceIDs()[0], fixtures.ProdEFSVpcID)
 	}
 }
-
-// ---------------------------------------------------------------------------
-// TEST: TestRelated_EFS_ECSTask_GraphRoot
-//
-// GIVEN: graph-root EFS (ProdEFSID); ecs-task cache contains 3 Resources:
-//        taskA and taskB have Fields["efs_file_system_ids"]=ProdEFSID,
-//        taskC has Fields["efs_file_system_ids"]="fs-0000000000000000".
-// THEN:  checkEFSECSTask returns Count=2, ResourceIDs=[taskA.ID, taskB.ID].
-//        (New Phase-7 contract: reads Fields["efs_file_system_ids"], NOT RawStruct.)
-// ---------------------------------------------------------------------------
 
 func TestRelated_EFS_ECSTask_GraphRoot(t *testing.T) {
 	source := efsGraphRootSource()
@@ -493,18 +379,8 @@ func TestRelated_EFS_ECSTask_GraphRoot(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// TEST: TestRelated_EFS_EC2_GraphRoot
-// EFS→EC2 pivot was removed (2026-04-24): the previous test asserted
-// Count=0 as "intentional per spec §5", but a registered pivot that always
-// returns 0 is a U9 violation regardless of the excuse. See
-// core/aws/efs_related.go for the removal rationale.
-// ---------------------------------------------------------------------------
-
-// ---------------------------------------------------------------------------
-// Compile-time smoke: ensure all expected fixture IDs are referenced by the
-// test file (prevents a rename in fixtures from silently breaking these tests).
-// ---------------------------------------------------------------------------
+// References every fixture ID these tests rely on, so a fixture rename fails
+// compilation here.
 
 var (
 	_ = fixtures.ProdEFSID
@@ -528,8 +404,6 @@ var (
 	_ = fixtures.ProdEFSBackupBRecoveryARN
 )
 
-// Verify that NewKMSFixtures, NewCFNFixtures, NewEC2Fixtures, NewLambdaFixtures
-// are not nil (compile-time check that these constructors are importable).
 var (
 	_ *kmstypes.KeyMetadata              = nil
 	_ *cfntypes.Stack                    = nil

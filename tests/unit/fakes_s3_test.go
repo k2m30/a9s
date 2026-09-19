@@ -1,12 +1,10 @@
 // fakes_s3_test.go is the single source for S3 SDK-interface fakes shared
 // across tests/unit.
 //
-// Convention (docs/go-codebase-checklist.md §DRY): one configurable fake per
-// SDK interface, in a service-named fakes_<service>_test.go file — never
-// re-implement the same interface under a new name in another file, and never
-// add another wave/batch-named fake file (fakes_us1_batchN_test.go,
-// fakes_related_checkers_branch_coverage_test.go, fakes_related_checkers_misc_test.go are historical
-// accretion naming, not a pattern to extend).
+// Convention (docs/go-codebase-checklist.md, DRY section): one configurable
+// fake per SDK interface, in a service-named fakes_<service>_test.go file —
+// never re-implement the same interface under a new name in another file, and
+// never add a wave/batch-named fake file.
 package unit
 
 import (

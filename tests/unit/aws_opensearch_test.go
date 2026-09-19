@@ -1,11 +1,5 @@
 package unit
 
-// aws_opensearch_test.go — fetcher classification tests for the opensearch resource type.
-//
-// Tests drive FetchOpenSearchDomains with a fake two-API setup
-// (ListDomainNames + DescribeDomains) and assert on Resource.Status,
-// Resource.Issues, and Resource.Fields per impl-plan §1.1.
-
 import (
 	"context"
 	"testing"
@@ -20,12 +14,6 @@ import (
 	domainpkg "github.com/k2m30/a9s/v3/core/domain"
 )
 
-// ---------------------------------------------------------------------------
-// Mocks
-// ---------------------------------------------------------------------------
-
-// mockOSListDomainNamesAPI returns the configured output when ListDomainNames
-// is called.
 type mockOSListDomainNamesAPI struct {
 	output *opensearch.ListDomainNamesOutput
 	err    error
@@ -39,8 +27,6 @@ func (m *mockOSListDomainNamesAPI) ListDomainNames(
 	return m.output, m.err
 }
 
-// mockOSDescribeDomainsAPI returns the configured output when DescribeDomains
-// is called.
 type mockOSDescribeDomainsAPI struct {
 	output *opensearch.DescribeDomainsOutput
 	err    error
@@ -53,10 +39,6 @@ func (m *mockOSDescribeDomainsAPI) DescribeDomains(
 ) (*opensearch.DescribeDomainsOutput, error) {
 	return m.output, m.err
 }
-
-// ---------------------------------------------------------------------------
-// Common base domain constructor (minimal healthy domain)
-// ---------------------------------------------------------------------------
 
 func osTestBaseDomain(name string) ostypes.DomainStatus {
 	return ostypes.DomainStatus{
@@ -79,18 +61,13 @@ func osTestBaseDomain(name string) ostypes.DomainStatus {
 		ServiceSoftwareOptions: &ostypes.ServiceSoftwareOptions{
 			UpdateAvailable: aws.Bool(false),
 		},
-		// Node-to-node encryption is read as off when the block is absent, so a
-		// baseline that omitted it would give every test below a posture finding
-		// it never meant to describe.
+		// Node-to-node encryption reads as off when the block is absent, so the
+		// baseline sets it to keep a posture finding out of every test.
 		NodeToNodeEncryptionOptions: &ostypes.NodeToNodeEncryptionOptions{
 			Enabled: aws.Bool(true),
 		},
 	}
 }
-
-// ---------------------------------------------------------------------------
-// T001 — healthy_happy_path: all signals clean
-// ---------------------------------------------------------------------------
 
 func TestOpenSearch_Fetch_HealthyHappyPath(t *testing.T) {
 	domain := osTestBaseDomain("staging-analytics")
@@ -140,10 +117,6 @@ func TestOpenSearch_Fetch_HealthyHappyPath(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// T002 — deleted_dim: Deleted=true → deleting phrase
-// ---------------------------------------------------------------------------
-
 func TestOpenSearch_Fetch_DeletedDim(t *testing.T) {
 	domain := osTestBaseDomain("obsolete-tenant-logs")
 	domain.Deleted = aws.Bool(true)
@@ -166,7 +139,6 @@ func TestOpenSearch_Fetch_DeletedDim(t *testing.T) {
 	r := resources[0]
 
 	const wantPhrase = "deleting: removal in progress"
-	// Fetcher does not write Resource.Status — it is always "".
 	if r.Fields["status"] != wantPhrase {
 		t.Errorf("Fields[\"status\"] = %q, want %q", r.Fields["status"], wantPhrase)
 	}
@@ -177,10 +149,6 @@ func TestOpenSearch_Fetch_DeletedDim(t *testing.T) {
 		t.Errorf("Fields[\"deleted\"] = %q, want %q", r.Fields["deleted"], "true")
 	}
 }
-
-// ---------------------------------------------------------------------------
-// T003 — isolated_broken: DomainProcessingStatus="Isolated"
-// ---------------------------------------------------------------------------
 
 func TestOpenSearch_Fetch_IsolatedBroken(t *testing.T) {
 	domain := osTestBaseDomain("legacy-search-isolated")
@@ -204,7 +172,6 @@ func TestOpenSearch_Fetch_IsolatedBroken(t *testing.T) {
 	r := resources[0]
 
 	const wantPhrase = "isolated: quarantined by AWS"
-	// Fetcher does not write Resource.Status — it is always "".
 	if r.Fields["status"] != wantPhrase {
 		t.Errorf("Fields[\"status\"] = %q, want %q", r.Fields["status"], wantPhrase)
 	}
@@ -215,10 +182,6 @@ func TestOpenSearch_Fetch_IsolatedBroken(t *testing.T) {
 		t.Errorf("Fields[\"domain_processing_status\"] = %q, want %q", r.Fields["domain_processing_status"], "Isolated")
 	}
 }
-
-// ---------------------------------------------------------------------------
-// T004 — processing_warning: Processing=true
-// ---------------------------------------------------------------------------
 
 func TestOpenSearch_Fetch_ProcessingWarning(t *testing.T) {
 	domain := osTestBaseDomain("acme-events")
@@ -243,7 +206,6 @@ func TestOpenSearch_Fetch_ProcessingWarning(t *testing.T) {
 	r := resources[0]
 
 	const wantPhrase = "processing: config change in flight"
-	// Fetcher does not write Resource.Status — it is always "".
 	if r.Fields["status"] != wantPhrase {
 		t.Errorf("Fields[\"status\"] = %q, want %q", r.Fields["status"], wantPhrase)
 	}
@@ -254,10 +216,6 @@ func TestOpenSearch_Fetch_ProcessingWarning(t *testing.T) {
 		t.Errorf("Fields[\"processing\"] = %q, want %q", r.Fields["processing"], "true")
 	}
 }
-
-// ---------------------------------------------------------------------------
-// T005 — upgrade_processing_warning: UpgradeProcessing=true
-// ---------------------------------------------------------------------------
 
 func TestOpenSearch_Fetch_UpgradeProcessingWarning(t *testing.T) {
 	domain := osTestBaseDomain("acme-search-alpha")
@@ -282,7 +240,6 @@ func TestOpenSearch_Fetch_UpgradeProcessingWarning(t *testing.T) {
 	r := resources[0]
 
 	const wantPhrase = "processing: config change in flight"
-	// Fetcher does not write Resource.Status — it is always "".
 	if r.Fields["status"] != wantPhrase {
 		t.Errorf("Fields[\"status\"] = %q, want %q", r.Fields["status"], wantPhrase)
 	}
@@ -294,17 +251,8 @@ func TestOpenSearch_Fetch_UpgradeProcessingWarning(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// T006 — update_available_healthy_bang: UpdateAvailable=true, past AutomatedUpdateDate
-// ---------------------------------------------------------------------------
-
-// The update-forced and encryption-off signals were an enricher's until d1 moved
-// them to wave 1; aws_opensearch_issue_enrichment_test.go covered them there and
-// is deleted, because these fetcher tests already assert the same behaviour on
-// the surface that now produces it.
 func TestOpenSearch_Fetch_UpdateAvailableHealthyBang(t *testing.T) {
 	domain := osTestBaseDomain("acme-product-search")
-	// AutomatedUpdateDate in the past relative to the injected now below.
 	domain.ServiceSoftwareOptions = &ostypes.ServiceSoftwareOptions{
 		UpdateAvailable:     aws.Bool(true),
 		AutomatedUpdateDate: aws.Time(time.Date(2026, 4, 20, 0, 0, 0, 0, time.UTC)),
@@ -323,8 +271,8 @@ func TestOpenSearch_Fetch_UpdateAvailableHealthyBang(t *testing.T) {
 		},
 	}
 
-	// Inject a fixed "now" — 2026-04-24 — so the "past AutomatedUpdateDate" branch
-	// is exercised deterministically regardless of the real wall clock.
+	// A fixed clock keeps the AutomatedUpdateDate comparison independent of the
+	// wall clock.
 	fixedNow := time.Date(2026, 4, 24, 0, 0, 0, 0, time.UTC)
 	resources, err := awsclient.FetchOpenSearchDomainsAt(context.Background(), listMock, describeMock, fixedNow)
 	if err != nil {
@@ -332,13 +280,10 @@ func TestOpenSearch_Fetch_UpdateAvailableHealthyBang(t *testing.T) {
 	}
 	r := resources[0]
 
-	// Fetcher does not write Resource.Status — it is always "".
 	if r.Fields["status"] != "software update forced soon" {
 		t.Errorf("Fields[\"status\"] = %q, want %q", r.Fields["status"], "software update forced soon")
 	}
-	// The phrase in the status column and the finding that produced it are one
-	// object. An assertion that the column shows a signal the row carries no
-	// finding for describes the split this batch removed.
+	// The status phrase and the finding that produced it are one object.
 	if len(r.Findings) != 1 || r.Findings[0].Code != "opensearch.update-forced" {
 		t.Errorf("Findings = %+v, want exactly the wave-1 update-forced finding", r.Findings)
 	}
@@ -347,13 +292,8 @@ func TestOpenSearch_Fetch_UpdateAvailableHealthyBang(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// T007 — update_available_future_date_silent: UpdateAvailable=true, future date
-// ---------------------------------------------------------------------------
-
 func TestOpenSearch_Fetch_UpdateAvailableFutureDateSilent(t *testing.T) {
 	domain := osTestBaseDomain("acme-product-search-future")
-	// AutomatedUpdateDate in the future.
 	domain.ServiceSoftwareOptions = &ostypes.ServiceSoftwareOptions{
 		UpdateAvailable:     aws.Bool(true),
 		AutomatedUpdateDate: aws.Time(time.Now().Add(48 * time.Hour)),
@@ -383,10 +323,6 @@ func TestOpenSearch_Fetch_UpdateAvailableFutureDateSilent(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// T008 — encryption_off_healthy_tilde: EncryptionAtRestOptions.Enabled=false
-// ---------------------------------------------------------------------------
-
 func TestOpenSearch_Fetch_EncryptionOffHealthyTilde(t *testing.T) {
 	domain := osTestBaseDomain("legacy-analytics")
 	domain.EncryptionAtRestOptions = &ostypes.EncryptionAtRestOptions{
@@ -410,13 +346,11 @@ func TestOpenSearch_Fetch_EncryptionOffHealthyTilde(t *testing.T) {
 	}
 	r := resources[0]
 
-	// Fetcher does not write Resource.Status — it is always "".
 	if r.Fields["status"] != "encryption at rest off" {
 		t.Errorf("Fields[\"status\"] = %q, want %q", r.Fields["status"], "encryption at rest off")
 	}
-	// Same reason as the update-forced row above: the status column reads from
-	// the findings, so a displayed phrase without a finding is not a state the
-	// fetcher can produce.
+	// The status column is built from the findings, so the phrase comes with its
+	// finding.
 	if len(r.Findings) != 1 || r.Findings[0].Code != "opensearch.encryption-off" {
 		t.Errorf("Findings = %+v, want exactly the wave-1 encryption-off finding", r.Findings)
 	}
@@ -424,11 +358,6 @@ func TestOpenSearch_Fetch_EncryptionOffHealthyTilde(t *testing.T) {
 		t.Errorf("Fields[\"encryption_at_rest_enabled\"] = %q, want %q", r.Fields["encryption_at_rest_enabled"], "false")
 	}
 }
-
-// ---------------------------------------------------------------------------
-// T009 — multi_w2_update_plus_encryption_suffix (U7a/U7d analog — multi-W2 stacking)
-// UpdateAvailable (past) AND EncryptionOff → Status suffix (+1)
-// ---------------------------------------------------------------------------
 
 func TestOpenSearch_Fetch_MultiW2UpdatePlusEncryptionSuffix(t *testing.T) {
 	domain := osTestBaseDomain("acme-metrics")
@@ -460,15 +389,13 @@ func TestOpenSearch_Fetch_MultiW2UpdatePlusEncryptionSuffix(t *testing.T) {
 	r := resources[0]
 
 	// Both signals read the DescribeDomains response the fetcher already holds
-	// and make no AWS call, so they are wave-1 findings on the row rather than
-	// enricher output. The status cell is built from those findings.
+	// and need no AWS call, so they are wave-1 findings on the row; the status
+	// cell is built from them.
 	if r.Fields["status"] != "software update forced soon (+1)" {
 		t.Errorf("Fields[\"status\"] = %q, want %q", r.Fields["status"], "software update forced soon (+1)")
 	}
 
-	// Each independently-evaluated condition keeps its own Finding with its own
-	// S5 sentence (owner contract #52) rather than one being demoted into a
-	// supporting row of the other.
+	// Each independently evaluated condition keeps its own Finding and sentence.
 	byCode := map[domainpkg.FindingCode]domainpkg.Finding{}
 	for _, f := range r.Findings {
 		byCode[f.Code] = f
@@ -520,11 +447,6 @@ func TestOpenSearch_Fetch_MultiW2UpdatePlusEncryptionSuffix(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// T010 — hardstate_plus_background_suffix (U7b analog — hard-state + background)
-// Processing=true AND UpdateAvailable (past) → Status suffix (+1)
-// ---------------------------------------------------------------------------
-
 func TestOpenSearch_Fetch_HardStatePlusBackgroundSuffix(t *testing.T) {
 	domain := osTestBaseDomain("acme-search-alpha-processing")
 	domain.Processing = aws.Bool(true)
@@ -552,14 +474,10 @@ func TestOpenSearch_Fetch_HardStatePlusBackgroundSuffix(t *testing.T) {
 	}
 	r := resources[0]
 
-	// Fetcher does not write Resource.Status — it is always "".
-	// Display: processing (hard-state) + software update (background) → suffix (+1).
 	if r.Fields["status"] != "processing: config change in flight (+1)" {
 		t.Errorf("Fields[\"status\"] = %q, want %q", r.Fields["status"], "processing: config change in flight (+1)")
 	}
-	// Both signals are findings. The "(+1)" in the column counts the second one,
-	// so a row that displayed the suffix while carrying one finding was counting
-	// something it could not show.
+	// The "(+1)" counts the second finding.
 	if len(r.Findings) != 2 {
 		t.Errorf("Findings len = %d, want 2 (processing and update-forced); Findings = %+v", len(r.Findings), r.Findings)
 	}
@@ -567,10 +485,6 @@ func TestOpenSearch_Fetch_HardStatePlusBackgroundSuffix(t *testing.T) {
 		t.Errorf("Findings[0].Phrase = %q, want %q", r.Findings[0].Phrase, "processing: config change in flight")
 	}
 }
-
-// ---------------------------------------------------------------------------
-// T011 — isolated_plus_encryption_off
-// ---------------------------------------------------------------------------
 
 func TestOpenSearch_Fetch_IsolatedPlusEncryptionOff(t *testing.T) {
 	domain := osTestBaseDomain("legacy-search-isolated-enc-off")
@@ -596,14 +510,11 @@ func TestOpenSearch_Fetch_IsolatedPlusEncryptionOff(t *testing.T) {
 	}
 	r := resources[0]
 
-	// Fetcher does not write Resource.Status — it is always "".
-	// Display: isolated (hard-state) + encryption-off (background) → suffix (+1).
 	if r.Fields["status"] != "isolated: quarantined by AWS (+1)" {
 		t.Errorf("Fields[\"status\"] = %q, want %q", r.Fields["status"], "isolated: quarantined by AWS (+1)")
 	}
-	// Only the hard-state (isolated) is in Findings; EncryptionOff is enricher territory.
-	// Same as the processing row: the second signal is a finding of its own, and
-	// isolated leads because it is the worse of the two.
+	// Isolated leads because it is the worse of the two signals; each is its own
+	// finding.
 	if len(r.Findings) != 2 {
 		t.Errorf("Findings len = %d, want 2 (isolated and encryption-off); Findings = %+v", len(r.Findings), r.Findings)
 	}
@@ -611,11 +522,6 @@ func TestOpenSearch_Fetch_IsolatedPlusEncryptionOff(t *testing.T) {
 		t.Errorf("Findings[0].Phrase = %q, want %q", r.Findings[0].Phrase, "isolated: quarantined by AWS")
 	}
 }
-
-// ---------------------------------------------------------------------------
-// T012 — deleted_plus_background_background_suppressed
-// Deleted=true AND EncryptionOff AND UpdateAvailable (past) → Status suffix (+2)
-// ---------------------------------------------------------------------------
 
 func TestOpenSearch_Fetch_DeletedPlusBackgroundBackgroundSuppressed(t *testing.T) {
 	domain := osTestBaseDomain("obsolete-tenant-logs-multi")
@@ -647,11 +553,8 @@ func TestOpenSearch_Fetch_DeletedPlusBackgroundBackgroundSuppressed(t *testing.T
 	}
 	r := resources[0]
 
-	// Fetcher does not write Resource.Status — it is always "".
-	// A domain being torn down returns the dim lifecycle finding and stops, so
-	// the posture signals are never evaluated. There is no second finding to
-	// count and the column carries the bare phrase; the old "(+2)" expected a
-	// count of signals the row deliberately does not report.
+	// A domain being torn down yields only the dim lifecycle finding; posture
+	// signals are not evaluated, so the column carries the bare phrase.
 	if r.Fields["status"] != "deleting: removal in progress" {
 		t.Errorf("Fields[\"status\"] = %q, want %q", r.Fields["status"], "deleting: removal in progress")
 	}
@@ -662,11 +565,6 @@ func TestOpenSearch_Fetch_DeletedPlusBackgroundBackgroundSuppressed(t *testing.T
 		t.Errorf("Findings[0].Phrase = %q, want %q", r.Findings[0].Phrase, "deleting: removal in progress")
 	}
 }
-
-// ---------------------------------------------------------------------------
-// T013 — anti_cluster_health_red_is_oos (Wave 3 anti-test)
-// No cluster_health finding should surface from the Wave 1/2 fetcher.
-// ---------------------------------------------------------------------------
 
 func TestOpenSearch_Fetch_Wave3ClusterHealthIsOutOfScope(t *testing.T) {
 	domain := osTestBaseDomain("staging-analytics-cw")
@@ -688,14 +586,12 @@ func TestOpenSearch_Fetch_Wave3ClusterHealthIsOutOfScope(t *testing.T) {
 	}
 	r := resources[0]
 
-	// Wave 3 metric fields must NOT be populated by the fetcher.
 	forbiddenKeys := []string{"cluster_health", "cluster_status_red", "cluster_status_yellow", "free_storage_space", "jvm_memory_pressure"}
 	for _, key := range forbiddenKeys {
 		if val, ok := r.Fields[key]; ok {
 			t.Errorf("Fields[%q] = %q should not exist — Wave 3 CloudWatch metrics are out of scope", key, val)
 		}
 	}
-	// Verify no cluster_health finding is raised.
 	for _, f := range r.Findings {
 		if f.Phrase == "cluster_health" || f.Phrase == "cluster health red" {
 			t.Errorf("Findings contains %q — Wave 3 signals must not surface in fetcher", f.Phrase)
@@ -703,16 +599,8 @@ func TestOpenSearch_Fetch_Wave3ClusterHealthIsOutOfScope(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// E5 partial success — DescribeDomains ITSELF errors (e.g. es:DescribeDomains
-// denied). ListDomainNames succeeded, so every domain it named is a real,
-// listed domain; a batch-level DescribeDomains failure must not make them all
-// vanish. FetchOpenSearchDomainsAt already has a per-name degraded-row pass
-// for domains individually missing from a (successful) DescribeDomains
-// response (opensearch.go's "described[name]" loop) — this pins the sibling
-// case where the DescribeDomains call fails outright, which today short-
-// circuits via an early `return nil, err` before that pass ever runs.
-// ---------------------------------------------------------------------------
+// ListDomainNames succeeded, so every domain it named is real: a batch-level
+// DescribeDomains failure keeps each one as a degraded row.
 
 func TestOpenSearch_Fetch_DescribeDomainsBatchError_KeepsListedDomainsAsDegradedRows(t *testing.T) {
 	listMock := &mockOSListDomainNamesAPI{

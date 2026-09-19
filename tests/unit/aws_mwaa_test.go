@@ -1,13 +1,11 @@
 package unit
 
 // aws_mwaa_test.go — fetcher tests for FetchMWAAEnvironmentsPage
-// (docs/resources/mwaa.md §3/§4, docs/resources/mwaa-impl-plan.md §0/§1).
+// (docs/resources/mwaa.md).
 //
-// MWAA has no issue/detail enricher: ListEnvironments returns names only, so
-// every §3.2 signal and every related-panel field comes from the same
-// GetEnvironment N+1 call (the eks pattern) and is emitted fetcher-side with
-// Source "wave1". These tests exercise that fetcher directly against the
-// shared demo fixtures plus inline adversarial fakes.
+// ListEnvironments returns names only, so every issue signal and every
+// related-panel field comes from the same GetEnvironment N+1 call and is
+// emitted fetcher-side with Source "wave1".
 
 import (
 	"context"
@@ -28,9 +26,8 @@ import (
 )
 
 // fetchMWAADemoPage fetches the shared demo fixture page. The demo set
-// includes the details-denied witness, so the fetch is a designed E5 partial
-// success (rows + composite error naming only that fixture); any OTHER error
-// fails the test.
+// includes the details-denied fixture, so the fetch returns rows plus a
+// composite error naming only that fixture; any other error fails the test.
 func fetchMWAADemoPage(t *testing.T) resource.FetchResult {
 	t.Helper()
 	clients := &awsclient.ServiceClients{MWAA: fakes.NewMWAA()}
@@ -54,10 +51,6 @@ func mustFindMWAAResource(t *testing.T, resources []domain.Resource, id string) 
 	return domain.Resource{}
 }
 
-// ---------------------------------------------------------------------------
-// U1 — healthy AVAILABLE silence + Silence bullet
-// ---------------------------------------------------------------------------
-
 func TestFetchMWAAEnvironmentsPage_HealthyAvailableSilence(t *testing.T) {
 	result := fetchMWAADemoPage(t)
 
@@ -68,10 +61,7 @@ func TestFetchMWAAEnvironmentsPage_HealthyAvailableSilence(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// U3 — LastUpdate.Status == FAILED on an AVAILABLE row (background finding)
-// U11 (adapted) — the short S4 Phrase must never echo the raw ErrorMessage
-// ---------------------------------------------------------------------------
+// The short Phrase never echoes the raw ErrorMessage.
 
 func TestFetchMWAAEnvironmentsPage_LastUpdateFailedFinding(t *testing.T) {
 	result := fetchMWAADemoPage(t)
@@ -122,10 +112,6 @@ func TestFetchMWAAEnvironmentsPage_LastUpdateFailedFinding(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// U3 — WebserverAccessMode public (background finding)
-// ---------------------------------------------------------------------------
-
 func TestFetchMWAAEnvironmentsPage_WebserverPublicFinding(t *testing.T) {
 	result := fetchMWAADemoPage(t)
 	r := mustFindMWAAResource(t, result.Resources, fixtures.WarnAirflowPublicID)
@@ -144,9 +130,8 @@ func TestFetchMWAAEnvironmentsPage_WebserverPublicFinding(t *testing.T) {
 		t.Errorf("Severity = %v, want SevWarn", finding.Severity)
 	}
 	// Detail is the one static sentence FindingDef declares for
-	// mwaaCodeWebserverPublic (catalog_data.go); the concrete access mode
-	// moved to its own "Access mode" AttentionDetail row, so Detail no
-	// longer embeds it.
+	// mwaaCodeWebserverPublic (catalog_data.go); the concrete access mode is its
+	// own "Access mode" AttentionDetail row.
 	const wantDetail = "The Airflow web server answers from the public internet, so its login page is reachable by anyone; the access mode is listed below. Switch the environment to private-only access from your VPC."
 	if finding.Detail != wantDetail {
 		t.Errorf("Detail = %q, want %q", finding.Detail, wantDetail)
@@ -169,10 +154,6 @@ func TestFetchMWAAEnvironmentsPage_WebserverPublicFinding(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// U7a analog — both background findings on the same green row, in §4 order
-// ---------------------------------------------------------------------------
-
 func TestFetchMWAAEnvironmentsPage_MultiFindingsOrderedOnGreenRow(t *testing.T) {
 	result := fetchMWAADemoPage(t)
 	r := mustFindMWAAResource(t, result.Resources, fixtures.WarnAirflowMultiID)
@@ -187,10 +168,8 @@ func TestFetchMWAAEnvironmentsPage_MultiFindingsOrderedOnGreenRow(t *testing.T) 
 	}
 }
 
-// ---------------------------------------------------------------------------
-// U7b/U7c analog — a finding on an already non-green row must stack, not
-// disappear; AttentionDetails still carries the failed-update Error rows.
-// ---------------------------------------------------------------------------
+// A finding on an already non-green row stacks rather than disappearing;
+// AttentionDetails still carries the failed-update Error rows.
 
 func TestFetchMWAAEnvironmentsPage_FindingStacksOnNonGreenRow(t *testing.T) {
 	result := fetchMWAADemoPage(t)
@@ -243,11 +222,8 @@ func TestFetchMWAAEnvironmentsPage_FindingStacksOnNonGreenRow(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// status_mapping_table_unit — all 12 EnvironmentStatus enum values, incl.
-// DELETED (no demo fixture: a deleted environment never appears in
-// ListEnvironments in practice).
-// ---------------------------------------------------------------------------
+// All 12 EnvironmentStatus enum values, including DELETED, which never
+// appears in ListEnvironments in practice.
 
 // mwaaStatusOnlyEnvironment builds a minimal-but-complete Environment for the
 // given status — used only to exercise the status→bucket mapping. LastUpdate
@@ -311,8 +287,6 @@ func TestFetchMWAAEnvironmentsPage_StatusMappingAllTwelveValues(t *testing.T) {
 		{mwaatypes.EnvironmentStatusCreateFailed, "create failed", domain.SevBroken},
 		{mwaatypes.EnvironmentStatusUpdateFailed, "update failed: rolled back", domain.SevBroken},
 		{mwaatypes.EnvironmentStatusUnavailable, "unavailable: not stable", domain.SevBroken},
-		// Task phrase7 row 2: "deleting" was Dim here and Warn on twelve other
-		// types, so one phrase carried two colours; this row took the split.
 		{mwaatypes.EnvironmentStatusDeleting, "deleting — environment teardown", domain.SevDim},
 		{mwaatypes.EnvironmentStatusDeleted, "deleted", domain.SevDim},
 	}
@@ -349,10 +323,8 @@ func TestFetchMWAAEnvironmentsPage_StatusMappingAllTwelveValues(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// access_denied_is_an_error_not_zero — AccessDenied on ListEnvironments must
-// never render as an empty successful result (honest-degradation contract).
-// ---------------------------------------------------------------------------
+// AccessDenied on ListEnvironments is an error, never an empty successful
+// result.
 
 type mwaaListErrorFake struct {
 	err error
@@ -391,10 +363,8 @@ func TestFetchMWAAEnvironmentsPage_AccessDeniedIsErrorNotZero(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// U12/E3/E5 — partial GetEnvironment failure: partial results survive,
+// A partial GetEnvironment failure keeps the partial results, and the
 // composite error names every failed environment and reason.
-// ---------------------------------------------------------------------------
 
 type mwaaPartialGetFailureFake struct {
 	names     []string
@@ -448,10 +418,9 @@ func TestFetchMWAAEnvironmentsPage_PartialGetFailure(t *testing.T) {
 		t.Fatalf("got %d resources, want 5 (the 2 failing environments are KEPT as name-only degraded "+
 			"rows — a denied GetEnvironment must never make a listed environment vanish)", len(result.Resources))
 	}
-	// env-denied → AccessDenied (auth) → "details denied" with mwaa's own §4
-	// sentence; env-missing → ResourceNotFound (non-auth) → the neutral
-	// "details unavailable". A not-found environment must never read as an
-	// IAM denial (docs/resources/mwaa.md §4; the shared DegradedDetails split).
+	// env-denied → AccessDenied (auth) → "details denied"; env-missing →
+	// ResourceNotFound (non-auth) → the neutral "details unavailable". A
+	// not-found environment never reads as an IAM denial.
 	wantByID := map[string]struct{ phrase, detail string }{
 		"env-denied":  {"details denied", "Reading this environment was denied, so its configuration and health are unjudged rather than clean. Grant the role you browse with permission to read the environment, then refresh."},
 		"env-missing": {"details unavailable", "The per-item describe call for this row failed, so a9s can show its name and nothing about its posture — the row is unjudged, not healthy. Retry the refresh; if it persists, check the service's health and whether the call is being throttled."},
@@ -479,10 +448,6 @@ func TestFetchMWAAEnvironmentsPage_PartialGetFailure(t *testing.T) {
 		}
 	}
 }
-
-// ---------------------------------------------------------------------------
-// Adversarial: nil Environment in GetEnvironment output
-// ---------------------------------------------------------------------------
 
 type mwaaNilEnvironmentFake struct{}
 
@@ -518,10 +483,6 @@ func TestFetchMWAAEnvironmentsPage_NilEnvironmentInGetEnvironmentOutput(t *testi
 		t.Errorf("degraded row status = %q, want %q", got, "details unavailable")
 	}
 }
-
-// ---------------------------------------------------------------------------
-// Adversarial: nil LoggingConfiguration/NetworkConfiguration must not panic
-// ---------------------------------------------------------------------------
 
 type mwaaNilSubConfigFake struct{}
 
@@ -561,10 +522,7 @@ func TestFetchMWAAEnvironmentsPage_NilLoggingAndNetworkConfiguration(t *testing.
 	}
 }
 
-// ---------------------------------------------------------------------------
-// wave3_anti_tests — no Wave-3 metric names anywhere; AirflowVersion and a
-// disabled logging component never become findings.
-// ---------------------------------------------------------------------------
+// AirflowVersion and a disabled logging component never become findings.
 
 func TestFetchMWAAEnvironmentsPage_WaveThreeAntiTests(t *testing.T) {
 	result := fetchMWAADemoPage(t)
@@ -592,24 +550,19 @@ func TestFetchMWAAEnvironmentsPage_WaveThreeAntiTests(t *testing.T) {
 	}
 
 	// prod-airflow-reporting has WebserverLogs.Enabled=false — a disabled
-	// logging component must never raise a finding (spec §3.2).
+	// logging component must never raise a finding.
 	reporting := mustFindMWAAResource(t, result.Resources, fixtures.ProdAirflowReportingID)
 	if len(reporting.Findings) != 0 {
 		t.Errorf("disabled WebserverLogs component must not raise a finding, got Findings: %+v", reporting.Findings)
 	}
 }
 
-// ---------------------------------------------------------------------------
-// E7 sanity — Resource.ID is the bare environment name; Fields["arn"] holds
-// the full ARN.
-// ---------------------------------------------------------------------------
-
 func TestFetchMWAAEnvironmentsPage_ResourceIDAndArnMapping(t *testing.T) {
 	clients := &awsclient.ServiceClients{MWAA: fakes.NewMWAA()}
 	result, err := awsclient.FetchMWAAEnvironmentsPage(context.Background(), clients, "")
 	if err != nil && !strings.Contains(err.Error(), fixtures.WarnAirflowDetailsDeniedID) {
-		// The demo set's details-denied witness makes the fetch a designed
-		// E5 partial success; any OTHER error is a real failure.
+		// The demo set's details-denied fixture makes the fetch return rows plus
+		// a composite error; any other error is a real failure.
 		t.Fatalf("expected only the details-denied composite error, got %v", err)
 	}
 	r := mustFindMWAAResource(t, result.Resources, fixtures.ProdAirflowEtlID)

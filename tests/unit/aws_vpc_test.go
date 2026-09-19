@@ -14,10 +14,6 @@ import (
 	"github.com/k2m30/a9s/v3/tests/testdata"
 )
 
-// ---------------------------------------------------------------------------
-// VPC fetcher tests
-// ---------------------------------------------------------------------------
-
 func TestFetchVPCs_ParsesMultipleVPCs(t *testing.T) {
 	mock := &mockEC2DescribeVpcsClient{
 		output: &ec2.DescribeVpcsOutput{
@@ -60,7 +56,6 @@ func TestFetchVPCs_ParsesMultipleVPCs(t *testing.T) {
 		t.Fatalf("expected 2 resources, got %d", len(resources))
 	}
 
-	// Verify first VPC
 	r0 := resources[0]
 	if r0.ID != "vpc-0001" {
 		t.Errorf("resource[0].ID: expected %q, got %q", "vpc-0001", r0.ID)
@@ -72,7 +67,6 @@ func TestFetchVPCs_ParsesMultipleVPCs(t *testing.T) {
 		t.Errorf("resource[0].Findings: expected none for available VPC, got %d", len(r0.Findings))
 	}
 
-	// Verify Fields
 	requiredFields := []string{"vpc_id", "name", "cidr_block", "state", "is_default"}
 	for i, r := range resources {
 		for _, key := range requiredFields {
@@ -82,7 +76,6 @@ func TestFetchVPCs_ParsesMultipleVPCs(t *testing.T) {
 		}
 	}
 
-	// Verify specific field values on first VPC
 	if r0.Fields["vpc_id"] != "vpc-0001" {
 		t.Errorf("resource[0].Fields[\"vpc_id\"]: expected %q, got %q", "vpc-0001", r0.Fields["vpc_id"])
 	}
@@ -99,7 +92,6 @@ func TestFetchVPCs_ParsesMultipleVPCs(t *testing.T) {
 		t.Errorf("resource[0].Fields[\"is_default\"]: expected %q, got %q", "true", r0.Fields["is_default"])
 	}
 
-	// Verify second VPC (no Name tag, pending state, not default)
 	r1 := resources[1]
 	if r1.ID != "vpc-0002" {
 		t.Errorf("resource[1].ID: expected %q, got %q", "vpc-0002", r1.ID)
@@ -176,12 +168,10 @@ func TestFetchVPCs_RawStructPopulated(t *testing.T) {
 
 	r := resources[0]
 
-	// Verify RawStruct is populated
 	if r.RawStruct == nil {
 		t.Fatal("RawStruct must not be nil")
 	}
 
-	// Verify it's the correct type (ec2types.Vpc)
 	vpc, ok := r.RawStruct.(ec2types.Vpc)
 	if !ok {
 		t.Fatalf("RawStruct should be ec2types.Vpc, got %T", r.RawStruct)
@@ -191,10 +181,6 @@ func TestFetchVPCs_RawStructPopulated(t *testing.T) {
 	}
 
 }
-
-// ---------------------------------------------------------------------------
-// T-VPC-REAL - Test VPC fetcher with real sanitized fixture data
-// ---------------------------------------------------------------------------
 
 func TestFetchVPCs_RealAWSData(t *testing.T) {
 	mock := &mockEC2DescribeVpcsClient{
@@ -210,12 +196,10 @@ func TestFetchVPCs_RealAWSData(t *testing.T) {
 		t.Fatalf("expected no error, got %v", err)
 	}
 
-	// Real data has exactly 2 VPCs
 	if len(resources) != 2 {
 		t.Fatalf("expected 2 resources from real data, got %d", len(resources))
 	}
 
-	// --- VPC 1: dev-vpc (non-default, 10.0.0.0/16) ---
 	r0 := resources[0]
 	if r0.ID != "vpc-0aaa1111bbb2222cc" {
 		t.Errorf("resource[0].ID: expected %q, got %q", "vpc-0aaa1111bbb2222cc", r0.ID)
@@ -239,7 +223,6 @@ func TestFetchVPCs_RealAWSData(t *testing.T) {
 		t.Errorf("resource[0].Fields[\"is_default\"]: expected %q, got %q", "false", r0.Fields["is_default"])
 	}
 
-	// RawStruct verification for VPC 1
 	if r0.RawStruct == nil {
 		t.Fatal("resource[0].RawStruct must not be nil")
 	}
@@ -254,7 +237,6 @@ func TestFetchVPCs_RealAWSData(t *testing.T) {
 		t.Errorf("resource[0].RawStruct.CidrBlockAssociationSet[0].CidrBlock: expected %q", "10.0.0.0/16")
 	}
 
-	// --- VPC 2: default VPC (172.31.0.0/16, no Name tag) ---
 	r1 := resources[1]
 	if r1.ID != "vpc-0ddd3333eee4444ff" {
 		t.Errorf("resource[1].ID: expected %q, got %q", "vpc-0ddd3333eee4444ff", r1.ID)
@@ -275,7 +257,6 @@ func TestFetchVPCs_RealAWSData(t *testing.T) {
 		t.Errorf("resource[1].Fields[\"is_default\"]: expected %q, got %q", "true", r1.Fields["is_default"])
 	}
 
-	// Verify the default VPC has an empty Tags slice (Tags exist but Name tag absent)
 	vpc1, ok := r1.RawStruct.(ec2types.Vpc)
 	if !ok {
 		t.Fatalf("resource[1].RawStruct should be ec2types.Vpc, got %T", r1.RawStruct)
@@ -283,6 +264,4 @@ func TestFetchVPCs_RealAWSData(t *testing.T) {
 	if len(vpc1.Tags) != 0 {
 		t.Errorf("resource[1].RawStruct should have 0 tags, got %d", len(vpc1.Tags))
 	}
-
-	// Verify DHCP Options ID is shared between both VPCs
 }

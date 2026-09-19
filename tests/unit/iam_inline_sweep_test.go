@@ -1,67 +1,24 @@
 package unit
 
 // iam_inline_sweep_test.go pins that the "policy" resource type's
-// availability/count probe must never block the whole main-menu badge
-// refresh on a per-group IAM inline-policy sweep.
+// availability/count probe never blocks the main-menu badge refresh on a
+// per-group IAM inline-policy sweep.
 //
-// The chain:
+// Core.ProbeResourceAvailability (core/runtime/probes.go) calls a type's
+// fetcher for the first page only, under a 10s timeout. The "policy" list
+// fetcher sweeps every IAM group with one ListGroupPolicies call each
+// (fetchInlineGroupPolicies, core/aws/iam_policies.go), so the probe uses a
+// registered availability fetcher instead (resource.GetAvailabilityFetcher,
+// falling back to resource.GetPaginatedFetcher when none is registered): a
+// first-page call carries no signal that tells a probe apart from a real
+// list-open, and per-type config is deterministic.
 //
-//  1. core/runtime/probes.go (Core.ProbeResourceAvailability) resolves the
-//     type's availability fetcher, opens a 10s context.WithTimeout, and
-//     calls it with continuationToken="" — the FIRST PAGE only.
-//  2. core/aws/catalog_security.go registers the "policy" Fetcher closure,
-//     which on the first page calls FetchIAMPoliciesPage (cheap,
-//     ListPolicies Scope=Local only) and then fetchInlineGroupPolicies(ctx,
-//     c.IAM) before returning.
-//  3. core/aws/iam_policies.go (fetchInlineGroupPolicies) lists ALL IAM
-//     groups via ListGroups, then issues one ListGroupPolicies per group,
-//     each wrapped in RetryOnThrottle (core/aws/retry.go). Context errors
-//     are not smithy.APIError, so ClassifyAWSError (core/aws/errors.go)
-//     returns retryable=false for them and a group whose call lands after
-//     the deadline fails fast.
-//  4. Per-group failures are collected into one composite via
-//     core/aws/partial_errors.go AggregateFailures("ListGroupPolicies",
-//     failures, total), formatted by core/runtime/handlers_availability.go
-//     as "availability policy: ListGroupPolicies failed for N of M IDs: ...".
+// fetchInlineGroupPolicies is unexported, so the sweep tests drive it through
+// resource.GetPaginatedFetcher("policy").
 //
-// Three behavior-level pins, each against the real seam:
-//
-//   - Item 1 — a per-type availability fetcher registry, following the
-//     per-type registration family in core/resource
-//     (SetPaginatedForTest / GetPaginatedFetcher / CleanupPaginatedForTest
-//     in accessors.go; SetFetchByIDsForTest / GetFetchByIDs /
-//     CleanupFetchByIDsForTest in related.go):
-//       - resource.SetAvailabilityFetcherForTest(shortName, f) /
-//         resource.GetAvailabilityFetcher(shortName) /
-//         resource.CleanupAvailabilityFetcherForTest(shortName) — same
-//         PaginatedFetcher shape.
-//       - Core.ProbeResourceAvailability calls
-//         resource.GetAvailabilityFetcher(shortName) first and uses it WHEN
-//         REGISTERED, falling back to resource.GetPaginatedFetcher(shortName)
-//         otherwise — zero behavior change for types that never register one.
-//       - core/aws registers a cheap managed-only availability fetcher for
-//         "policy" that never calls ListGroupPolicies.
-//     A single GetPaginatedFetcher("policy") call with continuationToken=""
-//     carries no signal that tells a "probe wants cheap managed-only" call
-//     apart from a "real list-open wants everything" call, and the repo
-//     prefers deterministic per-type config over signal-guessing.
-//   - Item 2 — TestFetchInlineGroupPolicies_SequentialSweepMissesDeadline and
-//     TestFetchInlineGroupPolicies_ConcurrencyStaysBounded: a deadline-bound
-//     completion assertion (a sequential sweep cannot finish 49 groups
-//     before a deadline sized to make that structurally impossible) plus a
-//     max-in-flight guard (at most 5 concurrent). fetchInlineGroupPolicies
-//     itself is unexported, so both tests drive it through the same
-//     resource.GetPaginatedFetcher("policy") seam (and the
-//     tests/unit/aws_iam_group_inline_policy_test.go callPolicyFetcher
-//     pattern) — there is no other way to reach it from package unit.
-//   - Item 3 — the three AggregateFailures tests: the composite builder must
-//     cap per-ID enumeration and summarize the remainder instead of joining
-//     an unbounded list.
-//
-// Timing values below are scaled down from the live 200ms/10s numbers to
-// keep this file fast (whole-file wall time budget: a few seconds), while
-// preserving the same structural ratio: sequential total time clearly
-// exceeds the deadline, bounded-concurrency time clearly does not.
+// Timing values are scaled down from 200ms per call and a 10s deadline to
+// keep this file fast while preserving the ratio: a sequential sweep exceeds
+// the deadline, bounded concurrency does not.
 
 import (
 	"context"
@@ -83,16 +40,10 @@ import (
 )
 
 // ---------------------------------------------------------------------------
-// Shared local mock: inlineSweepIAM
-//
-// Implements awsclient.IAMAPI. Only the methods the "policy" paginated
-// fetcher can reach (ListPolicies, ListGroups, ListGroupPolicies) have real
-// behavior; every other method panics so an unexpected call surfaces
-// immediately rather than silently returning a zero value. Mirrors the
-// panic-stub convention already used by stubGroupPolicyIAM in
-// tests/unit/aws_iam_group_inline_policy_test.go, kept local to this file
-// per QA mock-locality rules (a distinct type, not a shared import, since
-// the two files pin different scenarios).
+// inlineSweepIAM implements awsclient.IAMAPI. Only the methods the "policy"
+// paginated fetcher can reach (ListPolicies, ListGroups, ListGroupPolicies)
+// have real behavior; every other method panics so an unexpected call
+// surfaces immediately rather than returning a zero value.
 // ---------------------------------------------------------------------------
 
 type inlineSweepIAM struct {
@@ -235,7 +186,6 @@ func (s *inlineSweepIAM) GetInstanceProfile(_ context.Context, _ *iam.GetInstanc
 	panic("inlineSweepIAM.GetInstanceProfile called unexpectedly")
 }
 
-// compile-time check
 var _ awsclient.IAMAPI = (*inlineSweepIAM)(nil)
 
 // ---------------------------------------------------------------------------
@@ -263,9 +213,7 @@ func newInlineSweepGroups(n int) []iamtypes.Group {
 }
 
 // callInlineSweepPolicyFetcher drives the registered "policy" paginated
-// fetcher — the same function resource.GetPaginatedFetcher("policy") hands
-// to Core.ProbeResourceAvailability (core/runtime/probes.go:637-649) —
-// with continuationToken="" (first page), exactly as the probe calls it.
+// fetcher with continuationToken="" (first page).
 func callInlineSweepPolicyFetcher(t *testing.T, ctx context.Context, stub *inlineSweepIAM) ([]resource.Resource, error) {
 	t.Helper()
 	fetcher := resource.GetPaginatedFetcher("policy")
@@ -278,13 +226,12 @@ func callInlineSweepPolicyFetcher(t *testing.T, ctx context.Context, stub *inlin
 }
 
 // ---------------------------------------------------------------------------
-// Item 1 — availability probe must use a dedicated, explicitly-registered
-// availability fetcher when one exists, instead of guessing intent at the
-// shared paginated-fetcher seam.
+// The availability probe uses a dedicated, explicitly-registered
+// availability fetcher when one exists.
 // ---------------------------------------------------------------------------
 
-// policyManagedFixture is the same two-policy managed fixture the prior round
-// of this file used, shared by the two production-registration tests below.
+// policyManagedFixture is the two-policy managed fixture shared by the two
+// production-registration tests below.
 func policyManagedFixture() []iamtypes.Policy {
 	return []iamtypes.Policy{
 		{
@@ -344,9 +291,8 @@ func TestProbeResourceAvailability_UsesRegisteredAvailabilityFetcher(t *testing.
 }
 
 // TestProbeResourceAvailability_FallsBackWithoutRegisteredAvailabilityFetcher
-// pins the zero-behavior-change guarantee for the other 66 types: when no
-// availability fetcher is registered for a short name, the probe must still
-// call the registered paginated fetcher exactly as it does today.
+// pins that when no availability fetcher is registered for a short name, the
+// probe calls the registered paginated fetcher.
 func TestProbeResourceAvailability_FallsBackWithoutRegisteredAvailabilityFetcher(t *testing.T) {
 	const shortName = "inline-sweep-fallback-probe-type"
 
@@ -376,12 +322,10 @@ func TestProbeResourceAvailability_FallsBackWithoutRegisteredAvailabilityFetcher
 	}
 }
 
-// TestPolicyAvailabilityFetcher_RegisteredForPolicy_ManagedOnly pins the
-// third piece: core/aws must actually register a cheap, managed-only
-// availability fetcher for "policy" (not just leave the registry mechanism
-// unused). Fetches it directly via resource.GetAvailabilityFetcher("policy")
-// — bypassing SetAvailabilityFetcherForTest entirely — so this exercises the
-// real production registration, not a test override.
+// TestPolicyAvailabilityFetcher_RegisteredForPolicy_ManagedOnly reads the
+// production registration via resource.GetAvailabilityFetcher("policy"),
+// bypassing SetAvailabilityFetcherForTest, and pins that it is cheap and
+// managed-only.
 func TestPolicyAvailabilityFetcher_RegisteredForPolicy_ManagedOnly(t *testing.T) {
 	fetcher := resource.GetAvailabilityFetcher("policy")
 	if fetcher == nil {
@@ -420,19 +364,13 @@ func TestPolicyAvailabilityFetcher_RegisteredForPolicy_ManagedOnly(t *testing.T)
 }
 
 // ---------------------------------------------------------------------------
-// Item 2 — fetchInlineGroupPolicies must complete N slow groups within a
-// realistic deadline via bounded concurrency, without unbounded fan-out.
+// fetchInlineGroupPolicies completes N slow groups within a realistic
+// deadline via bounded concurrency, without unbounded fan-out.
 // ---------------------------------------------------------------------------
 
-// TestFetchInlineGroupPolicies_SequentialSweepMissesDeadline carries the RED
-// signal for item 2: 49 groups whose ListGroupPolicies each take 100ms
-// cannot all complete sequentially inside a 3s deadline (100ms * 49 = 4.9s).
-// A fix that fans the sweep out with bounded concurrency (4-5 workers) would
-// finish comfortably inside this deadline (49/5 * 100ms ~= 1s); today's
-// sequential loop cannot, and this test pins that gap. Numbers are scaled
-// down from the reported 200ms/49-groups/10s scenario to keep the file fast
-// while preserving the same "sequential clearly overruns, bounded
-// concurrency clearly doesn't" ratio.
+// 49 groups whose ListGroupPolicies each take 100ms cannot complete
+// sequentially inside a 3s deadline (100ms * 49 = 4.9s); bounded concurrency
+// (5 workers) finishes in about 1s (49/5 * 100ms).
 func TestFetchInlineGroupPolicies_SequentialSweepMissesDeadline(t *testing.T) {
 	const numGroups = 49
 	const perCallSleep = 100 * time.Millisecond
@@ -459,7 +397,6 @@ func TestFetchInlineGroupPolicies_SequentialSweepMissesDeadline(t *testing.T) {
 	}
 
 	if err == nil && inlineCount == numGroups {
-		// Would only happen once bounded concurrency ships — document the win.
 		t.Logf("all %d groups completed within %v (elapsed %v) — bounded concurrency is in place", numGroups, deadline, elapsed)
 	} else {
 		t.Errorf("RED: only %d/%d groups' inline policies were recovered within a %v deadline "+
@@ -470,9 +407,8 @@ func TestFetchInlineGroupPolicies_SequentialSweepMissesDeadline(t *testing.T) {
 			inlineCount, numGroups, deadline, numGroups, perCallSleep, numGroups*perCallSleep, deadline, err)
 	}
 
-	// Sanity: the function must still respect the context and return at (or
-	// shortly after) the deadline rather than hanging indefinitely, whether
-	// or not the fix has landed yet.
+	// The function must respect the context and return at (or shortly after)
+	// the deadline rather than hanging.
 	const slack = 1 * time.Second
 	if elapsed > deadline+slack {
 		t.Errorf("fetchInlineGroupPolicies took %v to return, want <= deadline(%v)+slack(%v)=%v; "+
@@ -481,19 +417,15 @@ func TestFetchInlineGroupPolicies_SequentialSweepMissesDeadline(t *testing.T) {
 	}
 }
 
-// TestFetchInlineGroupPolicies_ConcurrencyStaysBounded is the forward-looking
-// guard flagged in scoring: today's sequential loop trivially satisfies
-// "at most 5 concurrent ListGroupPolicies calls" (max in-flight is always 1),
-// so this assertion is green now. It becomes load-bearing the moment a
-// bounded-concurrency fix lands for item 2 above — it is what stops that fix
-// from regressing into unbounded goroutine fan-out (IAM throttling risk).
+// The bound stops the per-group sweep from fanning out unboundedly (IAM
+// throttling risk).
 func TestFetchInlineGroupPolicies_ConcurrencyStaysBounded(t *testing.T) {
 	const numGroups = 49
 	const perCallSleep = 10 * time.Millisecond
 	const maxAllowedInFlight = 5
-	// Deadline generous enough that even today's sequential loop
-	// (49 * 10ms ~= 490ms) finishes comfortably — this test isolates the
-	// concurrency-bound question from the deadline question above.
+	// Deadline generous enough that even a sequential sweep (49 * 10ms ~=
+	// 490ms) finishes — this test isolates the concurrency bound from the
+	// deadline.
 	const deadline = 5 * time.Second
 
 	stub := &inlineSweepIAM{
@@ -525,7 +457,7 @@ func TestFetchInlineGroupPolicies_ConcurrencyStaysBounded(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// Item 3 — partial-failure aggregation must cap enumeration
+// Partial-failure aggregation: one line per cause
 // ---------------------------------------------------------------------------
 
 // syntheticGroupFailures builds n realistic failure records in the exact
@@ -541,11 +473,9 @@ func syntheticGroupFailures(n, startIdx int) []awsclient.Failure {
 	return failures
 }
 
-// TestAggregateFailures_GroupsByCause_36of49GroupSweep reproduces the
-// reported scenario (49 groups, 36 failing): 36 resources failing the SAME
-// way is one fact, so the aggregate states the cause once with a count and
-// one example — never a wall of per-resource lines carrying request ids, and
-// no "and N more" suffix.
+// 36 of 49 groups failing the SAME way is one fact, so the aggregate states
+// the cause once with a count and one example — never a wall of per-resource
+// lines carrying request ids, and no "and N more" suffix.
 func TestAggregateFailures_GroupsByCause_36of49GroupSweep(t *testing.T) {
 	const total = 49
 	const failCount = 36
@@ -641,18 +571,12 @@ func TestAggregateFailures_DistinctCauses_EachNamedOnce(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// C7 (self-review, regression from this branch) — the "policy" availability
-// fetcher (core/aws/catalog_security.go's AvailabilityFetcher) is JUST
-// FetchIAMPoliciesPage — a direct pass-through of ListPolicies' own
-// IsTruncated flag. On an inline-only account (zero managed policies,
-// inline policies live entirely on groups this cheap probe deliberately
-// never checks), ListPolicies genuinely has no more MANAGED pages, so
-// IsTruncated comes back false — the probe then wrongly reports "confirmed
-// empty, 0 total, fully known" even though the account may have many
-// inline-only policies this probe structurally cannot see. The
-// availability fetcher's whole POINT is a cheap lower bound: it must never
-// claim IsTruncated=false, regardless of what ListPolicies itself says,
-// because it deliberately never checks group-inline coverage.
+// The "policy" availability fetcher reads managed policies only, so
+// ListPolicies' own IsTruncated says nothing about inline policies on groups.
+// On an inline-only account ListPolicies has no more managed pages; reporting
+// that as "confirmed empty, 0 total" would hide inline policies the probe
+// cannot see. The availability fetcher is a lower bound and always reports
+// IsTruncated=true.
 // ---------------------------------------------------------------------------
 
 func TestPolicyAvailabilityFetcher_InlineOnlyAccount_NeverConfirmedEmpty(t *testing.T) {
@@ -686,19 +610,11 @@ func TestPolicyAvailabilityFetcher_InlineOnlyAccount_NeverConfirmedEmpty(t *test
 }
 
 // ---------------------------------------------------------------------------
-// C8 (self-review) — fetchInlineGroupPolicies must surface ctx cancellation
-// honestly: a deadline expiring mid-sweep must yield a composite error
-// naming the unswept remainder, never nil-error-with-partial-rows. Traced
-// precisely: fetchInlineGroupPolicies (core/aws/iam_policies.go)
-// discards ForEachParallel's own return value (`_ =
-// ForEachParallel(ctx, n, ..., func(i int) {...})`), and groupFailures is
-// only appended to by a group's OWN ListGroupPolicies call actually
-// failing — a group whose turn never comes before the ctx deadline expires
-// (never scheduled at all under bounded concurrency) contributes NOTHING
-// to groupFailures. AggregateFailures returns nil when len(failures)==0
-// (partial_errors.go), so a ctx that expires before ANY group's call
-// starts failing yields (partialResources, nil) — a silent, undetectable
-// partial result.
+// A deadline expiring mid-sweep yields a composite error naming the unswept
+// remainder, never a nil error with partial rows. A group whose turn never
+// comes before the deadline makes no ListGroupPolicies call of its own to
+// fail, and AggregateFailures returns nil for an empty failure list, so the
+// sweep accounts for unscheduled groups itself.
 // ---------------------------------------------------------------------------
 
 func TestFetchInlineGroupPolicies_CtxCancelledMidSweep_NamesUnsweptRemainder(t *testing.T) {

@@ -124,12 +124,10 @@ func (m *mockEKSDescribeClusterClient) DescribeCluster(
 // mockEKSFullClient composes independently-configurable EKS mocks
 // (mockEKSListClustersClient/mockEKSDescribeClusterClient here,
 // mockEKSListNodegroupsClient/mockEKSDescribeNodegroupClient in
-// aws_nodegroups_test.go) into one awsclient.EKSAPI value — required because
-// FetchEKSClustersPage and the registered "ng" paginated fetcher each read
-// every EKS operation off a single *ServiceClients.EKS field, unlike the
-// removed signatures that took each operation as a separate parameter.
-// newMockEKSFull defaults any nil argument to a zero-value mock (safe empty
-// response) so callers only need to specify the parts they care about.
+// aws_nodegroups_test.go) into one awsclient.EKSAPI value: FetchEKSClustersPage
+// and the registered "ng" paginated fetcher read every EKS operation off a
+// single *ServiceClients.EKS field. newMockEKSFull defaults any nil argument to
+// a zero-value mock (safe empty response).
 type mockEKSFullClient struct {
 	*mockEKSListClustersClient
 	*mockEKSDescribeClusterClient
@@ -355,10 +353,6 @@ type mockLambdaListFunctionsClient struct {
 func (m *mockLambdaListFunctionsClient) ListFunctions(ctx context.Context, params *lambda.ListFunctionsInput, optFns ...func(*lambda.Options)) (*lambda.ListFunctionsOutput, error) {
 	return m.output, m.err
 }
-
-// SNS mocks: the fake client for ListTopics now lives in fakes_sns_test.go
-// (fakeSNSListTopics) — see that file's header for the one-fake-per-
-// interface convention.
 
 // mockSNSListSubscriptionsByTopicClient supports paginated responses.
 type mockSNSListSubscriptionsByTopicClient struct {

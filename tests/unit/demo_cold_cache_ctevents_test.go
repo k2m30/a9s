@@ -1,18 +1,5 @@
 package unit
 
-// T012 — Cold-cache CloudTrail events: open CT event detail and verify that
-// related-resource checks run through the live prefetch+checker path.
-//
-// The CT event detail has many RelatedDefs (IAM Roles, IAM Users, EC2, S3,
-// Lambda, RDS, KMS, Secrets, VPC Endpoints, SGs, DynamoDB, CFN, plus four
-// self-pivot ct-events entries). This test verifies that:
-//   1. Navigating to the ct-events list produces fixture events.
-//   2. Opening detail for the first event dispatches the related-check tasks
-//      directly (Core.BeginDetailOperation + Core.DetailOperationTasks).
-//   3. At least one checker returns a RelatedCheckResult with Count >= 0
-//      (not the -1 panic-recovery sentinel), confirming the live checker path
-//      works against the demo transport — no demoMode shortcut is taken.
-
 import (
 	"fmt"
 	"testing"
@@ -23,8 +10,6 @@ import (
 	"github.com/k2m30/a9s/v3/core/runtime/messages"
 )
 
-// TestDemoColdCacheCtEvents_ListPopulates verifies that ct-events list view
-// populates from the demo transport on a cold cache.
 func TestDemoColdCacheCtEvents_ListPopulates(t *testing.T) {
 	t.Parallel()
 	m := newDemoColdCacheApp(t)
@@ -57,7 +42,6 @@ func TestDemoColdCacheCtEvents_ListPopulates(t *testing.T) {
 
 	*m, _ = rootApplyMsg(*m, result)
 
-	// Verify the view renders with an event name visible.
 	plain := stripANSI(rootViewContent(*m))
 	hasEvent := false
 	for _, r := range result.Resources {
@@ -83,7 +67,6 @@ func TestDemoColdCacheCtEvents_DetailRelatedChecksRunLivePath(t *testing.T) {
 	clients := demo.NewServiceClients()
 	*m, _ = rootApplyMsg(*m, messages.ClientsReady{Clients: clients, Gen: 1})
 
-	// Load ct-events list.
 	var navCmd tea.Cmd
 	*m, navCmd = rootApplyMsg(*m, messages.Navigate{
 		Target:       messages.TargetResourceList,
@@ -105,7 +88,6 @@ func TestDemoColdCacheCtEvents_DetailRelatedChecksRunLivePath(t *testing.T) {
 
 	*m, _ = rootApplyMsg(*m, loaded)
 
-	// Open detail for the first event.
 	firstEvent := loaded.Resources[0]
 	var relatedCmd tea.Cmd
 	*m, relatedCmd = rootApplyMsg(*m, messages.Navigate{
@@ -140,7 +122,6 @@ func TestDemoColdCacheCtEvents_DetailRelatedChecksRunLivePath(t *testing.T) {
 			"all checkers panicked or returned unexpected types; leaves: %v", types)
 	}
 
-	// Build result map for diagnostics.
 	countByName := make(map[string]int, len(results))
 	for _, r := range results {
 		countByName[r.DefDisplayName] = r.Result.Count()
@@ -158,7 +139,6 @@ func TestDemoColdCacheCtEvents_DetailRelatedChecksRunLivePath(t *testing.T) {
 		"CT events by SharedEventId",
 	}
 
-	// Build a map from DefDisplayName to full result for FetchFilter checking.
 	resultByName := make(map[string]messages.RelatedCheckResult, len(results))
 	for _, r := range results {
 		resultByName[r.DefDisplayName] = r
@@ -187,7 +167,6 @@ func TestDemoColdCacheCtEvents_DetailRelatedChecksRunLivePath(t *testing.T) {
 			failures, countByName)
 	}
 
-	// At least one checker overall must succeed (Count >= 0).
 	anySuccess := false
 	for _, r := range results {
 		if r.Result.Count() >= 0 {
@@ -201,7 +180,6 @@ func TestDemoColdCacheCtEvents_DetailRelatedChecksRunLivePath(t *testing.T) {
 			countByName)
 	}
 
-	// Deliver all results to the model and verify the detail view renders.
 	for _, r := range results {
 		*m, _ = rootApplyMsg(*m, r)
 	}
@@ -288,15 +266,10 @@ func TestDemoColdCacheCtEvents_NoDemoShortcut(t *testing.T) {
 	}
 }
 
-// TestDemoColdCacheACM_HasLiveFetcher is a T012b verification stub.
 // ACM has a live fetcher (FetchACMCertificates / FetchACMCertificatesPage in
-// core/aws/acm.go backed by ACMListCertificatesAPI). It migrates to the
-// typed-fake pattern normally under T028 (no special case needed here).
-// This test is intentionally a no-op placeholder so the T012b requirement is
-// visible in the test suite.
+// core/aws/acm.go backed by ACMListCertificatesAPI), so it needs no demo
+// special case.
 func TestDemoColdCacheACM_HasLiveFetcher(t *testing.T) {
 	t.Parallel()
-	// T012b: ACM has a live fetcher (FetchACMCertificates in core/aws/acm.go).
-	// Typed-fake implementation tracked in T028. No skip needed.
 	t.Log("T012b: ACM live fetcher confirmed — migration to typed fake tracked under T028")
 }

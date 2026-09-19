@@ -58,8 +58,8 @@ func TestDefaultOnlyColumnKeepsItsOwnKey(t *testing.T) {
 	}
 }
 
-// TestCatalogArmStillBorrowsTheDefaultsHints pins the other arm unchanged:
-// efs has six catalog columns and six default ones, so the catalog drives.
+// TestCatalogArmStillBorrowsTheDefaultsHints pins the other arm: efs has six
+// catalog columns and six default ones, so the catalog drives.
 func TestCatalogArmStillBorrowsTheDefaultsHints(t *testing.T) {
 	got := misc4ResolvedColumn(t, "efs", "Encrypted")
 	if got.Key != "encrypted" {

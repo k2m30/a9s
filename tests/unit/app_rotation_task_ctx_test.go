@@ -1,54 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-// app_rotation_task_ctx_test.go — a profile/region switch cancels the
-// background AWS work dispatched for the pair being left.
-//
-// executeTaskCmd (internal/tui/app_dispatch.go) forwards m.pairCtx to every
-// Core.ExecuteTaskAt call dispatched through dispatchTaskRequests, including
-// the TaskKindProbeAvailability/TaskKindProbeEnrich background lanes. The
-// switch cancels that context and re-arms a fresh one (app_session.go), so an
-// already-dispatched probe stops with its pair instead of running until its
-// own 10s timeout (ProbeResourceAvailability, core/runtime/probes.go).
-// m.appCtx, the app-wide context, is cancelled only by tea.QuitMsg or
-// Model.Cancel() (pinned by app_cancellation_test.go, not duplicated here).
-// The 30s fetchTimeout in core/runtime/fetchers.go bounds the interactive
-// FetchResources/FetchIdentity lanes, not the background lanes this file
-// exercises.
-//
-// Harness design: runtime_fetch_ctx_deadline_test.go and
-// runtime_enrich_dispatch_window_test.go drive core.Core methods directly and
-// never pass through the TUI's executeTaskCmd/dispatchTaskRequests lane, so
-// this file assembles its own:
-//
-//  1. Registers resource.SetAvailabilityFetcherForTest fakes for
-//     resource.AllShortNames()[0:4] — the exact window
-//     Core.fireNextAvailabilityProbes(4) pops (core/runtime/handlers_availability.go:184/211/379)
-//     — one fake blocks on ctx and captures it, the other three return
-//     immediately. This avoids ever invoking a real production fetcher
-//     against the zero-value *awsclient.ServiceClients this test supplies
-//     (a real fetcher calling a nil AWS SDK sub-client would panic).
-//  2. Drives messages.ClientsReady BEFORE messages.AvailabilityCacheLoaded
-//     (the reverse of qa_sweep_once_per_session_test.go's
-//     fireAvailabilitySweep helper, which deliberately keeps Clients nil).
-//     Sending ClientsReady first sets session.Clients as a side effect of
-//     Update() — its own returned cmd (FetchIdentity + LoadAvailCache) is
-//     discarded unexecuted, since real identity/disk-cache work is not
-//     needed and would touch real credentials/files. Sending
-//     AvailabilityCacheLoaded second then produces a clean batch containing
-//     ONLY the 4 TaskKindProbeAvailability cmds (handleAvailabilityCacheLoaded
-//     has no other task source once Clients is already set and Command is
-//     empty).
-//  3. dispatchTaskRequests routes every TaskKindProbeAvailability through
-//     executeTaskCmd and coreUpdate wraps the
-//     result in nested tea.Batch — runBatchConcurrently below walks the
-//     resulting tea.BatchMsg tree and runs every leaf cmd on its own
-//     goroutine, the concurrent counterpart to
-//     qa_enrichment_rerun_overlap_test.go's msgIsReenrichOrRefetch (that
-//     helper walks sequentially and would hang on this file's deliberately
-//     blocking probe).
-//  4. Rotation is driven through messages.ProfileSelected — the same
-//     public message TestBug193_* (qa_correctness_bugs_test.go) uses for
-//     the established profile-switch flow.
 package unit
 
 import (
@@ -66,10 +17,9 @@ import (
 	"github.com/k2m30/a9s/v3/internal/tui"
 )
 
-// stubAvailFetcher is a resource.AvailabilityFetcher that returns
-// immediately with an empty result — used for every dispatch-window member
-// this file does not care about, so none of them touch a real production
-// fetcher against a zero-value *awsclient.ServiceClients.
+// stubAvailFetcher returns immediately with an empty result, so no probe in
+// the window reaches a real fetcher against a zero-value
+// *awsclient.ServiceClients.
 func stubAvailFetcher(_ context.Context, _ any, _ string) (resource.FetchResult, error) {
 	return resource.FetchResult{}, nil
 }
@@ -155,8 +105,6 @@ func startBatch(cmd tea.Cmd) (wait func()) {
 // registerProbeWindow overrides the availability fetcher for the first 4
 // names in resource.AllShortNames() — the exact window
 // Core.fireNextAvailabilityProbes(4) pops on a fresh, never-swept pair.
-// names[0] gets fake, every other member gets stubAvailFetcher. Registers
-// t.Cleanup for every override.
 func registerProbeWindow(t *testing.T, fake resource.AvailabilityFetcher) (target string) {
 	t.Helper()
 	names := resource.AllShortNames()
@@ -173,13 +121,11 @@ func registerProbeWindow(t *testing.T, fake resource.AvailabilityFetcher) (targe
 	return target
 }
 
-// dispatchProbeWindow drives the ClientsReady-then-AvailabilityCacheLoaded
-// sequence documented in this file's package comment and returns the
-// resulting model plus the clean 4-cmd probe batch. gen must match the
-// session's current ConnectGen (1 on a fresh model — ConnectGen seeds at 1 in
-// session.New() — bumped by 1 per ProfileSelected/RegionSelected via
-// Session.Rotate) or Core.HandleClientsReady's staleness guard silently drops
-// the event.
+// dispatchProbeWindow sends ClientsReady then AvailabilityCacheLoaded and
+// returns the model plus the 4-cmd probe batch. ClientsReady's own cmd is
+// discarded unexecuted, so no identity or disk-cache work runs. gen must match
+// the session's ConnectGen (session.New seeds 1, each Rotate adds 1) or
+// HandleClientsReady drops the event as stale.
 func dispatchProbeWindow(t *testing.T, m tui.Model, region string, gen domain.Gen) (tui.Model, tea.Cmd) {
 	t.Helper()
 	m, _ = rootApplyMsg(m, messages.ClientsReady{
@@ -190,25 +136,12 @@ func dispatchProbeWindow(t *testing.T, m tui.Model, region string, gen domain.Ge
 	return rootApplyMsg(m, messages.AvailabilityCacheLoaded{})
 }
 
-// TestExecuteTaskCmd_ProbeAvailabilityCtx_CancelledByProfileSwitch pins the
-// upcoming fix: a background TaskKindProbeAvailability task already in
-// flight when the user switches profile must have its ctx cancelled by the
-// switch, not merely by its own probe-local timeout or by quit.
-//
-// RED today: session.Rotate() (invoked by Core.HandleProfileSelected) never
-// touches m.appCtx, and executeTaskCmd forwards m.appCtx unchanged to every
-// background task — so the captured ctx stays alive well past the switch.
 func TestExecuteTaskCmd_ProbeAvailabilityCtx_CancelledByProfileSwitch(t *testing.T) {
 	capture := newCtxCaptureAvailFetcher()
 	registerProbeWindow(t, capture.fetch)
 
-	// WithNoCache(true) is the blessed direct-construction escape hatch
-	// (qa_controller_construction_discipline_test.go) — it only changes
-	// ClientsReady's OWN task list (DemoPrefetchCounts instead of
-	// FetchIdentity+LoadAvailCache), which this test discards unexecuted
-	// either way; session.Clients still gets installed unconditionally
-	// before that branch, and handleAvailabilityCacheLoaded never reads
-	// NoCache at all, so the probe-dispatch flow below is unaffected.
+	// WithNoCache(true) only changes ClientsReady's own task list, which is
+	// discarded unexecuted; session.Clients is installed either way.
 	m := newBlessedModel(t, "profile-a", "us-east-1", tui.WithNoCache(true))
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 80, Height: 40})
 	// Gen:1 — ConnectGen seeds at 1 (session.New()); this model is never rotated.
@@ -228,14 +161,10 @@ func TestExecuteTaskCmd_ProbeAvailabilityCtx_CancelledByProfileSwitch(t *testing
 		t.Fatal("probe started but captured a nil ctx")
 	}
 
-	// The established profile-switch flow (TestBug193_* in
-	// qa_correctness_bugs_test.go), fired while the probe above is still
-	// in flight.
 	_, _ = rootApplyMsg(m, messages.ProfileSelected{Profile: "profile-b"})
 
 	select {
 	case <-probeCtx.Done():
-		// Fixed: the switch cancelled this task's ctx.
 	case <-time.After(150 * time.Millisecond):
 		t.Errorf(
 			"probe ctx not Done() within 150ms of ProfileSelected — a " +
@@ -249,12 +178,6 @@ func TestExecuteTaskCmd_ProbeAvailabilityCtx_CancelledByProfileSwitch(t *testing
 	}
 }
 
-// TestExecuteTaskCmd_ProbeAvailabilityCtx_LiveAfterProfileSwitch pins the
-// forward-looking half of the fix's contract: a background task dispatched
-// for the NEW pair, after a profile switch has completed, must receive a
-// live (not pre-cancelled) context — the fix must re-arm per pair, not just
-// cancel-and-never-renew. GREEN today (nothing cancels m.appCtx short of
-// quit) and must stay GREEN once the fix lands.
 func TestExecuteTaskCmd_ProbeAvailabilityCtx_LiveAfterProfileSwitch(t *testing.T) {
 	capture := newCtxCaptureAvailFetcher()
 	registerProbeWindow(t, capture.fetch)
@@ -262,11 +185,8 @@ func TestExecuteTaskCmd_ProbeAvailabilityCtx_LiveAfterProfileSwitch(t *testing.T
 	m := newBlessedModel(t, "profile-a", "us-east-1", tui.WithNoCache(true))
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 80, Height: 40})
 
-	// Rotate to a new pair before ever dispatching a probe for the first —
-	// mirrors a switch made from the main menu before its sweep started.
-	// Session.Rotate() (invoked by HandleProfileSelected) bumps ConnectGen
-	// from 1 (session.New()'s seed) to 2, so the follow-up ClientsReady below
-	// must stamp Gen:2 or HandleClientsReady's staleness guard silently drops it.
+	// Session.Rotate() bumps ConnectGen from 1 to 2, so the follow-up ClientsReady
+	// must stamp Gen:2 or HandleClientsReady drops it as stale.
 	m, _ = rootApplyMsg(m, messages.ProfileSelected{Profile: "profile-b"})
 	_, batchCmd := dispatchProbeWindow(t, m, "us-west-2", 2)
 

@@ -1,8 +1,3 @@
-// costs_review6_test.go — Round 6, four new external-review findings.
-// package unit_test (headless-only; reuses newCostsController / topDrill /
-// findFetchCostsTask / fullMetricRecord / codexMoveCursorToRow /
-// codexMoveCursorToNewestColumn, same helpers costs_review3_test.go and
-// siblings already share).
 package unit_test
 
 import (
@@ -16,17 +11,10 @@ import (
 	"github.com/k2m30/a9s/v3/core/runtime/messages"
 )
 
-// ===========================================================================
-// Q1 (core/app/handle.go:~170) — Store.Save marshals the store's own
-// maps AFTER c.mu is released (the write-must-not-block-under-the-lock
-// design, handle.go's own doc comment). costs.Store carries no mutex of its
-// own (confirmed by reading its field list — profile/path/data/recovered/
-// revision, nothing synchronization-shaped) and costsDirtyStore is the SAME
-// *Store pointer as cs.Store (costs_state.go:1030 `c.costsDirtyStore =
-// cs.Store`), not a copy — a concurrent delivery's c.mu-protected mutation
-// of cs.Store's maps races, unsynchronized, against Save's yaml.Marshal
-// walking those same maps outside the lock.
-// ===========================================================================
+// Store.Save marshals the store's maps after c.mu is released, costs.Store has
+// no mutex of its own, and costsDirtyStore is the same *Store pointer as
+// cs.Store, so Save must not walk maps a concurrent delivery mutates under
+// c.mu.
 
 func TestCostsReview6_Q1_ConcurrentDeliveryDuringSave_NeverCorruptsOnDiskCache(t *testing.T) {
 	c := newCostsController(t, fixedCostsNow)
@@ -79,36 +67,25 @@ func TestCostsReview6_Q1_ConcurrentDeliveryDuringSave_NeverCorruptsOnDiskCache(t
 	}
 	wg.Wait()
 
-	// The final on-disk cache must round-trip cleanly. A concurrent map
-	// mutation racing yaml.Marshal's reflection walk of the SAME map can
-	// panic mid-marshal, write a torn/garbled temp file, or silently drop
-	// keys — LoadStore's own Recovered() is exactly the "the file on disk
-	// did not parse, set aside" signal every other corrupt-cache pin in
-	// this suite (X9, R4) already keys off.
+	// A concurrent map mutation racing yaml.Marshal's walk of the same map can
+	// panic mid-marshal, write a torn temp file, or drop keys; LoadStore's
+	// Recovered() reports a file on disk that did not parse.
 	reloaded := costs.LoadStore("test-profile")
 	if reloaded.Recovered() {
 		t.Error("the on-disk cost cache was corrupt and had to be recovered (set aside) after concurrent deliveries overlapped Store.Save's yaml.Marshal — Save must never marshal the live, still-mutable Store maps unsynchronized against concurrent Merge/MergeCoverage calls (either a lock Save holds across the marshal, or a deep copy taken before c.mu is released)")
 	}
 }
 
-// ===========================================================================
-// Q2 (core/app/costs_state.go) — the N3 granularity fallback re-plans a
-// RESOURCE_ID-shaped frame at its parent granularity/period and must
-// re-apply ClampResourceDrillWindow (core/costs/drill.go): a
-// clamped-then-allowed RESOURCE_ID drill whose finer (day-level) fetch
-// genuinely returns zero must not re-query the UNCLAMPED parent (week)
-// window, which can start before the 14-day resource-drill retention cutoff.
+// The granularity fallback re-plans a RESOURCE_ID-shaped frame at its parent
+// granularity and period and must re-apply ClampResourceDrillWindow
+// (core/costs/drill.go): the unclamped parent week can start before the
+// 14-day resource-drill retention cutoff.
 //
-// Repro: now=2026-07-17 puts the retention cutoff at 2026-07-03. July's
-// first (month-clipped) week is {Start:2026-07-01, End:2026-07-06} — its
-// OWN Start (07-01) is before the cutoff (07-03), so
-// ClampResourceDrillWindow treats the whole week as stale (single-period
-// clamp is all-or-nothing). But daysWithinPeriod's day-tiling of that same
-// week yields July 1-5, of which July 3-5 survive clamping — so the
-// RESOURCE_ID drill from that week cell is genuinely ALLOWED (window
-// non-empty), while the week cell ITSELF, as the fallback's own
+// now=2026-07-17 puts the cutoff at 2026-07-03. July's first, month-clipped
+// week {2026-07-01, 2026-07-06} starts before the cutoff, so a single-period
+// clamp drops it whole, while its day tiling (July 1-5) keeps July 3-5: the
+// RESOURCE_ID drill from that week cell is allowed, but the week itself, as
 // Fallback.SelectedPeriod, is not.
-// ===========================================================================
 
 func TestCostsReview6_Q2_FallbackOnResourceFrame_ReclampsAgainstRetentionCutoff(t *testing.T) {
 	now := time.Date(2026, time.July, 17, 12, 0, 0, 0, time.UTC)
@@ -146,10 +123,9 @@ func TestCostsReview6_Q2_FallbackOnResourceFrame_ReclampsAgainstRetentionCutoff(
 		t.Fatalf("test assumption wrong: the week period %+v survives ClampResourceDrillWindow at now=%v (cutoff %s) — pick a staler week", weekPeriod, now, cutoff)
 	}
 
-	// The pushed child frame now opens with the cursor on its own newest
-	// column (FR-002, applyCostsSelect's PushDrill case) — scroll it back
-	// to col 0 so the stale week[0] cell stays selected below. ActionScrollLeft
-	// clamps at col 0, so over-scrolling is safe.
+	// A pushed child frame opens on its current column (applyCostsSelect's
+	// PushDrill case); scrolling back to col 0 keeps the stale week[0] cell
+	// selected. ActionScrollLeft clamps at col 0.
 	for range usageTop.Window {
 		c.Apply(app.Action{Kind: app.ActionScrollLeft})
 	}
@@ -177,8 +153,8 @@ func TestCostsReview6_Q2_FallbackOnResourceFrame_ReclampsAgainstRetentionCutoff(
 		t.Fatalf("precondition: Fallback.SelectedPeriod = %+v, want the stale week %+v", resourceTop.Fallback.SelectedPeriod, weekPeriod)
 	}
 
-	// The RESOURCE_ID frame's own (already-clamped) fetch genuinely
-	// returns zero records — N3 fires.
+	// The RESOURCE_ID frame's already-clamped fetch returns zero records, which
+	// fires the fallback.
 	_, fallbackTasks := c.Handle(messages.CostsLoaded{
 		Query:    resourcePayload.Query,
 		Grid:     costs.GridResult{Fetched: true},
@@ -191,18 +167,9 @@ func TestCostsReview6_Q2_FallbackOnResourceFrame_ReclampsAgainstRetentionCutoff(
 			t.Errorf("N3 fallback on a RESOURCE_ID frame re-planned using the UNCLAMPED stale parent week (Start=%s) — the re-fetch queries a Range starting %s, before the 14-day resource-drill retention cutoff (%s); ClampResourceDrillWindow must be re-applied to the fallback's own re-planned Window before dispatching, exactly as the original PushDrill applies it", weekPeriod.Start, fallbackTask.Query.Range.Start, cutoff)
 		}
 	}
-	// A nil/no-task outcome (the fix refuses the re-plan entirely once
-	// clamping empties the parent window) is an equally valid fixed
-	// behavior — not asserted as a failure here, only a dispatched task
-	// whose Range starts before the cutoff is.
+	// Refusing the re-plan once clamping empties the parent window is equally
+	// correct; only a dispatched task whose Range starts before the cutoff fails.
 }
-
-// ===========================================================================
-// Q3 (core/costs/window.go:79 daysWithinPeriod) — ignores sel.End
-// entirely, tiling the WHOLE ISO week containing sel.Start instead of just
-// sel itself. WindowWithin(oneDayPeriod, Day, now) must return exactly that
-// one day, not all 7 days of its enclosing week.
-// ===========================================================================
 
 func TestCostsReview6_Q3_WindowWithin_OneDayPeriod_TilesExactlyThatDay(t *testing.T) {
 	now := time.Date(2026, time.July, 15, 12, 0, 0, 0, time.UTC)
@@ -217,15 +184,6 @@ func TestCostsReview6_Q3_WindowWithin_OneDayPeriod_TilesExactlyThatDay(t *testin
 		t.Errorf("WindowWithin(%+v, Day, now)[0] = %+v, want the input period back unchanged", oneDay, got[0])
 	}
 }
-
-// ===========================================================================
-// Q4 behavior (core/app/actions_list.go:170) — Go evaluates return
-// operands left-to-right, so `return c.snapshot(), c.forceRefreshCostsLocked()`
-// runs c.snapshot() BEFORE forceRefreshCostsLocked() mutates cs.Loading —
-// Apply(ActionRefresh) on a warm costs screen returns the STALE pre-refresh
-// snapshot (Loading=false), not the post-refresh one a caller (TUI or
-// headless) needs to render the refresh as already in flight.
-// ===========================================================================
 
 func TestCostsReview6_Q4_ApplyActionRefresh_ReturnsPostRefreshSnapshot(t *testing.T) {
 	c := newCostsController(t, fixedCostsNow)

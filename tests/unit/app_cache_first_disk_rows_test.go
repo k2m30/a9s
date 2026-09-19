@@ -1,24 +1,14 @@
-// app_cache_first_disk_rows_test.go — the on-disk row cache and generic
-// field materialization (cache-first list UX, Contract B).
+// The on-disk cache (core/cache) persists, per type, the last first-page rows
+// (ID, Name, Fields map — no RawStruct) and the last enrichment findings per
+// row (cache.Row.Findings). On a cold start with a valid cache file, opening a
+// list before probes complete seeds rows+findings from disk with
+// Refreshing=true. app.MaterializeListFields runs on every fetch result
+// (core/app.applyResourcesLoaded) and, for each view-config column with a Path
+// and an empty Key, writes the fieldpath scalar into Fields under the column
+// key, so cached rows render identically without RawStruct.
 //
-// Contract B: the on-disk cache (core/cache) persists, per type, the last
-// first-page rows (ID, Name, Fields map — NO RawStruct) and the last
-// enrichment findings per row (cache.Row.Findings, a per-row slice). On a
-// cold start with a valid cache file, opening a list before probes complete
-// seeds rows+findings from disk with Refreshing=true. Fields must be
-// render-sufficient: a generic materialization step runs on every fetch
-// result (controller/runtime layer, before caching/rendering) that, for each
-// view-config column with a Path and empty Key, extracts the scalar via
-// fieldpath and writes it into Fields under the column key — so cached rows
-// render identically without RawStruct.
-//
-// The materialization step is app.MaterializeListFields(r resource.Resource,
-// columns []app.ColumnDef) resource.Resource in core/app, beside
-// extractListCells/resolveListColumnsForBuild in list_columns.go, and
-// core/app.applyResourcesLoaded is the seam that calls it. "ec2" is the
-// pinned type because its "State" column is Path-based with an empty Key
-// (Path: "State.Name", Key: "") in core/config/defaults_compute.go — exactly
-// the column shape the contract calls out.
+// ec2's "State" column is Path-based with an empty Key (Path: "State.Name",
+// Key: "") in core/config/defaults_compute.go.
 package unit_test
 
 import (
@@ -32,15 +22,9 @@ import (
 	"github.com/k2m30/a9s/v3/core/session"
 )
 
-// -----------------------------------------------------------------------
-// Generic field materialization (the render-sufficiency half of Contract B)
-// -----------------------------------------------------------------------
-
-// ec2InstanceStateFake mirrors the shape fieldpath.ExtractScalar needs for
-// the EC2 "State" list column (Path: "State.Name"). Deliberately NOT the
-// real AWS SDK ec2.Instance type — fieldpath matches by field name via
-// reflection, so a minimal shape exercises the same code path without an
-// SDK dependency in this test file.
+// ec2InstanceStateFake is the shape fieldpath.ExtractScalar needs for the EC2
+// "State" list column (Path: "State.Name"). fieldpath matches by field name
+// via reflection, so the SDK type is not needed.
 type ec2InstanceStateFake struct {
 	InstanceId string
 	State      struct {
@@ -48,22 +32,8 @@ type ec2InstanceStateFake struct {
 	}
 }
 
-// TestMaterializeListFields_EC2State_PathBasedColumn_EmptyKey pins the core
-// of Contract B's render-sufficiency requirement: for a column with a Path
-// and an empty Key (ec2's "State" column, Path="State.Name" Key=""), the
-// materialization step must extract the scalar via fieldpath and write it
-// into Fields under the column's key — using the column's resolved cell
-// value as the Fields key, mirroring how extractListCells's key-based first
-// lookup (r.Fields[col.Key]) would find it on a cache replay with no
-// RawStruct.
-//
-// Ambiguity resolution: "the column key" for a Key="" column is the
-// lowercased Title ("state"), since that is what a RawStruct-less second
-// visit needs r.Fields to contain for ExtractCellValue's Fields-map
-// lookup to succeed (the title-match loop in list_columns.go already
-// tries lowercased title against Fields keys as a fallback cascade step —
-// materialization should populate the SAME key so the primary Key-based
-// lookup succeeds directly, without relying on the fallback cascade).
+// For a Key="" column the Fields key is the lowercased Title ("state"): the
+// key a RawStruct-less cache replay looks up in r.Fields.
 func TestMaterializeListFields_EC2State_PathBasedColumn_EmptyKey(t *testing.T) {
 	raw := ec2InstanceStateFake{InstanceId: "i-0matlzed0001"}
 	raw.State.Name = "running"
@@ -86,15 +56,6 @@ func TestMaterializeListFields_EC2State_PathBasedColumn_EmptyKey(t *testing.T) {
 	}
 }
 
-// TestMaterializeListFields_CachedRowRendersIdenticallyToLive is the
-// end-to-end pin from Contract B: "cached-row rendering must produce the
-// same cells as live rendering". It seeds a live row (with RawStruct) as
-// one list screen's rows and its materialized-then-stripped-of-RawStruct
-// counterpart (simulating what survives a disk-cache round trip per the
-// "NO RawStruct" rule) as a second list screen's rows, renders both through
-// the same public Controller.ApplyResourcesLoaded → Snapshot().Body.List.Rows
-// path (list_body.go's buildListBody / extractListCells), and asserts the
-// rendered cells are byte-identical.
 func TestMaterializeListFields_CachedRowRendersIdenticallyToLive(t *testing.T) {
 	raw := ec2InstanceStateFake{InstanceId: "i-0parity000001"}
 	raw.State.Name = "stopped"
@@ -106,15 +67,10 @@ func TestMaterializeListFields_CachedRowRendersIdenticallyToLive(t *testing.T) {
 		RawStruct: raw,
 		Fields:    map[string]string{},
 	}
-	// Render the live row (RawStruct present, Fields not yet materialized).
 	_, liveCtrl := newSeededTestController(t)
 
-	// Use the SAME column set list_body.go's buildListBody resolves for "ec2"
-	// (the real 9-column catalog from core/config/defaults_compute.go),
-	// not a 2-column subset — otherwise Path-based columns outside the subset
-	// (e.g. Instance ID) are never materialized and the parity check is
-	// vacuous (both sides render "" for that cell instead of pinning a real
-	// value match).
+	// The full catalog column set for "ec2": a subset would leave Path-based
+	// columns outside it unmaterialized, and both sides would render "" for them.
 	columns := liveCtrl.ResolveColumnsForType("ec2")
 
 	liveCtrl.Apply(app.Action{Kind: app.ActionCommand, Arg: "ec2"})
@@ -124,9 +80,8 @@ func TestMaterializeListFields_CachedRowRendersIdenticallyToLive(t *testing.T) {
 		t.Fatalf("live: len(Rows) = %d, want 1", len(liveRows))
 	}
 
-	// Simulate the disk-cache round trip: materialize fields while RawStruct
-	// is still present (this MUST happen before caching per the contract),
-	// then drop RawStruct exactly as "NO RawStruct" on disk requires.
+	// A disk-cache round trip: fields are materialized while RawStruct is
+	// present, then RawStruct is dropped, as on disk.
 	cached := app.MaterializeListFields(live, columns)
 	cached.RawStruct = nil
 
@@ -150,11 +105,9 @@ func TestMaterializeListFields_CachedRowRendersIdenticallyToLive(t *testing.T) {
 	}
 }
 
-// TestMaterializeListFields_KeyBasedColumn_Untouched verifies the
-// materialization step only acts on Path-based columns with an EMPTY Key —
-// a column that already has a Key must not be overwritten (it already
-// resolves via the Fields-map lookup, so touching it risks clobbering a
-// value fieldpath cannot see, e.g. Wave-2 enrichment field overrides).
+// A column that already has a Key resolves via the Fields map; materialization
+// leaves it alone so it cannot clobber a value fieldpath cannot see, e.g. a
+// Wave-2 enrichment override.
 func TestMaterializeListFields_KeyBasedColumn_Untouched(t *testing.T) {
 	r := resource.Resource{
 		ID:     "bucket-untouched",
@@ -173,13 +126,6 @@ func TestMaterializeListFields_KeyBasedColumn_Untouched(t *testing.T) {
 	}
 }
 
-// -----------------------------------------------------------------------
-// Disk persistence of rows + findings (the on-disk half of Contract B)
-// -----------------------------------------------------------------------
-
-// TestCacheTypeFile_RowsRoundTripThroughSaveLoad pins that cache.TypeFile
-// carries a Rows field ([]cache.Row: ID/Name/Fields, NO RawStruct) that
-// survives a full Put → SaveType → LoadDir round trip via YAML.
 func TestCacheTypeFile_RowsRoundTripThroughSaveLoad(t *testing.T) {
 	tmp := t.TempDir()
 	t.Setenv("A9S_CONFIG_FOLDER", tmp)
@@ -213,9 +159,6 @@ func TestCacheTypeFile_RowsRoundTripThroughSaveLoad(t *testing.T) {
 	}
 }
 
-// TestCacheTypeFile_RowFindingsRoundTripThroughSaveLoad pins the sibling
-// requirement: the last enrichment findings persist per row (cache.Row.
-// Findings, a []domain.Finding) alongside the row's ID/Name/Fields.
 func TestCacheTypeFile_RowFindingsRoundTripThroughSaveLoad(t *testing.T) {
 	tmp := t.TempDir()
 	t.Setenv("A9S_CONFIG_FOLDER", tmp)
@@ -255,25 +198,6 @@ func TestCacheTypeFile_RowFindingsRoundTripThroughSaveLoad(t *testing.T) {
 	}
 }
 
-// -----------------------------------------------------------------------
-// Cold-start seeding from disk cache (list opens before probes complete)
-// -----------------------------------------------------------------------
-
-// TestListOpen_ColdStart_SeedsFromDiskCache_WithRefreshing pins the
-// controller-level outcome of Contract B: on a cold start (empty session,
-// RowStore never observed) with a valid disk cache file present, opening a
-// list before probes complete must seed rows+findings from disk with
-// Refreshing=true — mirroring the cache-first seeding contract's in-session outcome, but
-// sourced from disk instead of session state.
-//
-// Ambiguity resolution: "seeds from disk" is modeled at the controller
-// level as the disk cache.TypeFile.Rows having already been loaded into
-// RowStore (OriginDisk) by the startup cache-load path (the same seam
-// LoadAvailabilityCache/SaveAvailabilityCache in core/runtime/probes.go
-// already uses for counts) — this test drives that outcome directly via
-// core.Session().RowStore.Observe rather than asserting on the startup
-// loader's internals, since the loader itself is not in this task's scope
-// (probes.go is read-only reference material per the dispatch).
 func TestListOpen_ColdStart_SeedsFromDiskCache_WithRefreshing(t *testing.T) {
 	tmp := t.TempDir()
 	t.Setenv("A9S_CONFIG_FOLDER", tmp)

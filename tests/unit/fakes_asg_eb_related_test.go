@@ -1,7 +1,6 @@
 // fakes_asg_eb_related_test.go contains lightweight fake implementations of AWS
 // service client interfaces used by the asg and eb related-panel checker
-// tests (T009–T014 for asg, T020–T024 for eb). All types are in package
-// unit_test (external test package).
+// tests. All types are in package unit_test (external test package).
 package unit_test
 
 import (
@@ -20,7 +19,7 @@ import (
 )
 
 // ---------------------------------------------------------------------------
-// fakeASGChecker — implements ASGAPI for batch-2 tests
+// fakeASGChecker — implements ASGAPI
 // Controllable methods: DescribeLaunchConfigurations, DescribeNotificationConfigurations
 // Other methods return safe empty stubs.
 // ---------------------------------------------------------------------------
@@ -87,7 +86,7 @@ func newFakeASGWithNotifications(configs []asgtypes.NotificationConfiguration) *
 }
 
 // ---------------------------------------------------------------------------
-// fakeEC2ForASG — implements EC2API for batch-2 tests
+// fakeEC2ForASG — implements EC2API
 // Controllable method: DescribeSubnets, DescribeLaunchTemplateVersions
 // Other methods return safe empty stubs.
 // ---------------------------------------------------------------------------
@@ -216,7 +215,7 @@ func newFakeEC2WithLaunchTemplateVersions(versions []ec2types.LaunchTemplateVers
 }
 
 // ---------------------------------------------------------------------------
-// fakeIAMForASG — implements IAMAPI for batch-2 tests
+// fakeIAMForASG — implements IAMAPI
 // Controllable method: GetInstanceProfile
 // Other methods return safe empty stubs.
 // ---------------------------------------------------------------------------
@@ -327,7 +326,7 @@ func newFakeIAMWithInstanceProfile(roles []iamtypes.Role) *fakeIAMForASG {
 }
 
 // ---------------------------------------------------------------------------
-// fakeEBChecker — implements ElasticBeanstalkAPI for batch-2 tests
+// fakeEBChecker — implements ElasticBeanstalkAPI
 // Controllable methods: DescribeEnvironmentResources, DescribeConfigurationSettings,
 // DescribeApplicationVersions
 // ---------------------------------------------------------------------------
@@ -406,7 +405,7 @@ func newFakeEBWithAppVersions(versions []ebtypes.ApplicationVersionDescription) 
 }
 
 // ---------------------------------------------------------------------------
-// fakeELBv2ForEB — implements ELBv2API for batch-2 tests
+// fakeELBv2ForEB — implements ELBv2API
 // Controllable methods: DescribeLoadBalancers, DescribeListeners
 // ---------------------------------------------------------------------------
 

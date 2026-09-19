@@ -20,19 +20,9 @@ import (
 	"github.com/k2m30/a9s/v3/core/session"
 )
 
-// ---------------------------------------------------------------------------
-// Finding 1 — CodePipeline ARN format.
-//
 // AWS docs (CodePipeline resource ARN format): a pipeline's ARN is
-// arn:aws:codepipeline:<region>:<account>:<pipelineName> — there is NO
-// "pipeline/" segment (unlike, e.g., IAM policy ARNs). core/aws/pipeline.go
-// (fetchCodePipelinesPage, ~line 99) currently constructs
-// arn:aws:codepipeline:<region>:<account>:pipeline/<name>, which is wrong.
-// This test drives the real production fetch path
-// (FetchCodePipelinesPageWithClients, mirroring
-// TestPipeline_Related_EbRule_ResolvesViaRealFetcherOutput in
-// aws_related_checker_round2_test.go) and asserts the correct ARN shape.
-// ---------------------------------------------------------------------------
+// arn:aws:codepipeline:<region>:<account>:<pipelineName>, with no
+// "pipeline/" segment (unlike, e.g., IAM policy ARNs).
 
 type fakeCodePipelineListPipelinesRound2 struct {
 	awsclient.CodePipelineAPI
@@ -67,19 +57,10 @@ func TestPipeline_Fetch_ArnHasNoPipelineSegment(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// Finding 2 — cold-cache Lambda triggers must not report a definitive zero.
-//
-// core/aws/related_common.go (lambdaEventSourceMappingLambdaCheck,
-// ~lines 150-154): when lambda:ListEventSourceMappings returns a mapping but
-// the lambda ResourceCache entry is not loaded ("cache[\"lambda\"]" absent),
-// the checker returns RelatedCheckResult{TargetType:"lambda"} — Count:0,
-// Truncated:false — a definitive zero. But the ListEventSourceMappings API
-// call already succeeded and is authoritative (kinesis.md/msk.md: "ESM is
-// the authoritative link" / "the API result is authoritative"); a cold
-// lambda cache must not erase a real API-confirmed trigger. This test
-// covers both call sites: checkKinesisLambda and checkMSKLambda.
-// ---------------------------------------------------------------------------
+// lambda:ListEventSourceMappings is the authoritative link between a stream
+// and its triggers (docs/resources/kinesis.md, docs/resources/msk.md), so a
+// cold lambda cache must not turn an API-confirmed trigger into a definitive
+// zero.
 
 type fakeLambdaListEventSourceMappingsRound2 struct {
 	awsclient.LambdaAPI
@@ -118,8 +99,6 @@ func TestKinesis_Related_Lambda_ColdCache_NotDefinitiveZero(t *testing.T) {
 		},
 	}
 
-	// No "lambda" entry in the cache at all — the lambda list has not been
-	// loaded yet.
 	cache := resource.ResourceCache{}
 
 	checker := checkerByTarget(t, "kinesis", "lambda")
@@ -157,7 +136,6 @@ func TestMSK_Related_Lambda_ColdCache_NotDefinitiveZero(t *testing.T) {
 		RawStruct: kafkatypes.Cluster{ClusterArn: aws.String(clusterArn)},
 	}
 
-	// No "lambda" entry in the cache at all.
 	cache := resource.ResourceCache{}
 
 	checker := checkerByTarget(t, "msk", "lambda")
@@ -180,18 +158,9 @@ func TestMSK_Related_Lambda_ColdCache_NotDefinitiveZero(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// Finding 3 — GetVpcLinks pagination.
-//
-// core/aws/apigw_related.go (checkApigwELB, ~line 390) calls
-// apigatewayv2:GetVpcLinks exactly once with an empty input, ignoring
-// NextToken. GetVpcLinksOutput.NextToken (AWS SDK Go v2 apigatewayv2 API)
-// means the wanted VpcLink can be on any page — a single-page read misses
-// links that are not on page 1. This test puts the wanted VpcLink on page 2
-// and asserts checkApigwELB still finds the ELB, that the fake was called
-// with the page-1 NextToken on its second invocation, and that the checker
-// does not loop forever (the fake errors on a third call).
-// ---------------------------------------------------------------------------
+// GetVpcLinksOutput.NextToken means the wanted VpcLink can be on any page.
+// The fake errors on a third call, so a checker that loops forever fails
+// instead of hanging.
 
 type fakeAPIGWV2VpcLinksPaginated struct {
 	awsclient.APIGatewayV2API
@@ -201,19 +170,16 @@ type fakeAPIGWV2VpcLinksPaginated struct {
 	gotTokens    []string
 }
 
-// GetAuthorizers answers empty rather than leaving the call to the embedded
+// GetAuthorizers answers rather than leaving the call to the embedded
 // nil interface. EnrichAPIGatewayStage calls it for every v2 API, and a nil
 // embedded field dereferences into a SIGSEGV that takes the whole unit
-// package down before any other test reports. See apigwGetStagesFake in
-// aws_apigw_enricher_test.go for the same fix and the reason the static
-// interface assertion cannot catch it.
+// package down before any other test reports.
 func (f *fakeAPIGWV2VpcLinksPaginated) GetAuthorizers(
 	_ context.Context,
 	_ *apigatewayv2.GetAuthorizersInput,
 	_ ...func(*apigatewayv2.Options),
 ) (*apigatewayv2.GetAuthorizersOutput, error) {
-	// One authorizer, so apigw.no-authorizer stays out of tests written
-	// before it existed and about something else.
+	// One authorizer keeps the apigw.no-authorizer finding out of these results.
 	return &apigatewayv2.GetAuthorizersOutput{Items: []apigwv2types.Authorizer{{
 		AuthorizerId: aws.String("auth-default"),
 		Name:         aws.String("acme-jwt"),
@@ -267,11 +233,9 @@ func TestApigw_Related_ELB_GetVpcLinks_FollowsPagination(t *testing.T) {
 		},
 		pages: [][]apigwv2types.VpcLink{
 			{
-				// Page 1: unrelated VPC link — the wanted one is NOT here.
 				{VpcLinkId: aws.String("vpcl-unrelated"), SubnetIds: []string{"subnet-unrelated"}},
 			},
 			{
-				// Page 2: the wanted VPC link.
 				{VpcLinkId: aws.String(vpcLinkID), SubnetIds: []string{subnetID}},
 			},
 		},

@@ -15,11 +15,6 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// ---------------------------------------------------------------------------
-// CodeBuild Build Logs fetcher tests (Level 2 child of CodeBuild Builds,
-// cross-service to CloudWatch Logs)
-// ---------------------------------------------------------------------------
-
 // TestFetchCBBuildLogs_Basic verifies parsing of 2 log events with correct
 // timestamp formatting, message, and status classification.
 func TestFetchCBBuildLogs_Basic(t *testing.T) {
@@ -76,14 +71,12 @@ func TestFetchCBBuildLogs_Basic(t *testing.T) {
 	})
 
 	t.Run("first_event_Status_in_progress", func(t *testing.T) {
-		// "Running command" maps to IN_PROGRESS
 		if resources[0].Fields["status"] != "IN_PROGRESS" {
 			t.Errorf("Fields[\"status\"]: expected %q, got %q", "IN_PROGRESS", resources[0].Fields["status"])
 		}
 	})
 
 	t.Run("second_event_Status_succeeded", func(t *testing.T) {
-		// "Phase complete" and "SUCCEEDED" maps to SUCCEEDED
 		if resources[1].Fields["status"] != "SUCCEEDED" {
 			t.Errorf("Fields[\"status\"]: expected %q, got %q", "SUCCEEDED", resources[1].Fields["status"])
 		}
@@ -94,7 +87,6 @@ func TestFetchCBBuildLogs_Basic(t *testing.T) {
 		if ts == "" {
 			t.Error("Fields[timestamp] should not be empty")
 		}
-		// Should be formatted from epoch ms 1718445600000
 		if !strings.Contains(ts, "2024") {
 			t.Errorf("Fields[timestamp] should contain year, got %q", ts)
 		}
@@ -187,14 +179,11 @@ func TestFetchCBBuildLogs_NilFields(t *testing.T) {
 	mock := &mockCWLogsGetLogEventsClient{
 		output: &cloudwatchlogs.GetLogEventsOutput{
 			Events: []cwlogstypes.OutputLogEvent{
-				{
-					// All fields nil
-				},
+				{},
 			},
 		},
 	}
 
-	// Should not panic
 	result, err := awsclient.FetchCBBuildLogs(
 		context.Background(),
 		mock,
@@ -210,7 +199,6 @@ func TestFetchCBBuildLogs_NilFields(t *testing.T) {
 		t.Fatalf("expected 1 resource, got %d", len(resources))
 	}
 
-	// Message should be empty or placeholder
 	_ = resources[0].Name
 	_ = resources[0].Fields["message"]
 	_ = resources[0].Fields["timestamp"]
@@ -264,22 +252,18 @@ func TestFetchCBBuildLogs_StatusClassification(t *testing.T) {
 		message    string
 		wantStatus string
 	}{
-		// ERROR cases
 		{"FAIL_keyword", "FAIL: test_something failed", "ERROR"},
 		{"ERROR_uppercase", "ERROR: something went wrong", "ERROR"},
 		{"error_lowercase", "error: connection refused", "ERROR"},
 		{"Error_mixed_case", "Error: unexpected EOF", "ERROR"},
 		{"did_not_exit_successfully", "Command did not exit successfully", "ERROR"},
 
-		// SUCCEEDED cases
 		{"Phase_complete", "Phase complete: BUILD. Status: SUCCEEDED", "SUCCEEDED"},
 		{"SUCCEEDED_keyword", "SUCCEEDED: all tests passed", "SUCCEEDED"},
 
-		// IN_PROGRESS cases
 		{"Entering_phase", "Entering phase BUILD", "IN_PROGRESS"},
 		{"Running_command", "Running command echo hello", "IN_PROGRESS"},
 
-		// Default -- empty status
 		{"plain_message", "Just a regular log line", ""},
 	}
 
@@ -410,10 +394,6 @@ func TestFetchCBBuildLogs_RegistrationExists(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// Column definitions test
-// ---------------------------------------------------------------------------
-
 // TestCBBuildLogColumns verifies that CBBuildLogColumns returns columns with
 // the expected keys.
 func TestCBBuildLogColumns(t *testing.T) {
@@ -477,10 +457,6 @@ func TestCBBuildLogs_ParentHasChildDef(t *testing.T) {
 		t.Error("cb_builds should have child view def for cb_build_logs")
 	}
 }
-
-// ---------------------------------------------------------------------------
-// Config defaults test
-// ---------------------------------------------------------------------------
 
 // TestConfigDefaultViewDef_CBBuildLogs verifies that the cb_build_logs view
 // definition has the expected list columns and non-empty detail paths.

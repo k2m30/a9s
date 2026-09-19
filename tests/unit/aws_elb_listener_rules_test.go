@@ -170,11 +170,8 @@ func (m *markerCapturingELBv2DescribeRulesMock) DescribeRules(_ context.Context,
 // TestFetchELBListenerRules_MarkerForwarded pins that a resumable cursor
 // (the fetcher's own NextToken from a truncated first page) decodes back to
 // the AWS Marker it carries and forwards that Marker to DescribeRules.
-// continuationToken is now a compound JSON cursor produced by this fetcher's
-// own encode(), NOT the bare AWS marker string — see elbListenerRulesCursor.
-// DescribeRules DOES paginate via Marker/NextMarker like other ELBv2
-// List/Describe calls, so an arbitrary raw string is no longer accepted
-// as-is (see TestQA_ChildPagination_FetchELBListenerRules_Continuation).
+// continuationToken is a compound JSON cursor produced by this fetcher's own
+// encode(), not the bare AWS marker string — see elbListenerRulesCursor.
 func TestFetchELBListenerRules_MarkerForwarded(t *testing.T) {
 	firstPage := &mockELBv2DescribeRulesClient{output: &elbv2.DescribeRulesOutput{
 		Rules:      []elbtypes.Rule{{RuleArn: aws.String("arn:rule/page1"), Priority: aws.String("1")}},
@@ -233,12 +230,10 @@ func TestFetchELBListenerRules_TruncatedByNextMarker(t *testing.T) {
 	}
 }
 
-// TestFetchELBListenerRules_TruncatedByMaxRulesCap pins the SECOND
-// truncation cause: even when AWS reports no NextMarker (AWS itself has no
-// more pages), the client-side maxRules=200 cap can still truncate the
-// response converted to resources. Before the fix, IsTruncated was
-// hardcoded false, so a listener with more than 200 rules silently reported
-// an exact, complete rule count that was 200+ short of the truth.
+// TestFetchELBListenerRules_TruncatedByMaxRulesCap pins the second
+// truncation cause: even when AWS reports no NextMarker, the client-side
+// maxRules=200 cap can truncate the converted response, and a listener with
+// more than 200 rules must report IsTruncated rather than an exact count.
 func TestFetchELBListenerRules_TruncatedByMaxRulesCap(t *testing.T) {
 	const maxRules = 200
 	rules := make([]elbtypes.Rule, maxRules+1)

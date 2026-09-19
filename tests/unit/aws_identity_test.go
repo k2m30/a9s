@@ -12,11 +12,6 @@ import (
 	awsclient "github.com/k2m30/a9s/v3/core/aws"
 )
 
-// ---------------------------------------------------------------------------
-// TestFetchCallerIdentity_AssumedRole
-// STS returns an assumed-role ARN. IAM returns an account alias.
-// ---------------------------------------------------------------------------
-
 func TestFetchCallerIdentity_AssumedRole(t *testing.T) {
 	stsMock := &mockSTSGetCallerIdentityClient{
 		output: &sts.GetCallerIdentityOutput{
@@ -56,11 +51,6 @@ func TestFetchCallerIdentity_AssumedRole(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// TestFetchCallerIdentity_IAMUser
-// STS returns an IAM user ARN. IAM returns no aliases.
-// ---------------------------------------------------------------------------
-
 func TestFetchCallerIdentity_IAMUser(t *testing.T) {
 	stsMock := &mockSTSGetCallerIdentityClient{
 		output: &sts.GetCallerIdentityOutput{
@@ -94,11 +84,6 @@ func TestFetchCallerIdentity_IAMUser(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// TestFetchCallerIdentity_WithAlias
-// IAM returns an account alias.
-// ---------------------------------------------------------------------------
-
 func TestFetchCallerIdentity_WithAlias(t *testing.T) {
 	stsMock := &mockSTSGetCallerIdentityClient{
 		output: &sts.GetCallerIdentityOutput{
@@ -122,11 +107,6 @@ func TestFetchCallerIdentity_WithAlias(t *testing.T) {
 		t.Errorf("AccountAlias: expected %q, got %q", "acme-prod", result.AccountAlias)
 	}
 }
-
-// ---------------------------------------------------------------------------
-// TestFetchCallerIdentity_NoAlias
-// IAM returns an empty aliases slice.
-// ---------------------------------------------------------------------------
 
 func TestFetchCallerIdentity_NoAlias(t *testing.T) {
 	stsMock := &mockSTSGetCallerIdentityClient{
@@ -152,10 +132,7 @@ func TestFetchCallerIdentity_NoAlias(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// TestFetchCallerIdentity_IAMAccessDenied
-// IAM call fails but STS data is still populated. No error returned.
-// ---------------------------------------------------------------------------
+// An IAM failure still returns the STS data and no error.
 
 func TestFetchCallerIdentity_IAMAccessDenied(t *testing.T) {
 	stsMock := &mockSTSGetCallerIdentityClient{
@@ -185,11 +162,6 @@ func TestFetchCallerIdentity_IAMAccessDenied(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// TestFetchCallerIdentity_STSError
-// STS fails entirely. Function returns nil + error.
-// ---------------------------------------------------------------------------
-
 func TestFetchCallerIdentity_STSError(t *testing.T) {
 	stsMock := &mockSTSGetCallerIdentityClient{
 		err: fmt.Errorf("ExpiredToken: security token has expired"),
@@ -208,11 +180,6 @@ func TestFetchCallerIdentity_STSError(t *testing.T) {
 		t.Errorf("expected nil result when STS fails, got %+v", result)
 	}
 }
-
-// ---------------------------------------------------------------------------
-// TestFetchCallerIdentity_FederatedUser
-// STS returns a federated-user ARN.
-// ---------------------------------------------------------------------------
 
 func TestFetchCallerIdentity_FederatedUser(t *testing.T) {
 	stsMock := &mockSTSGetCallerIdentityClient{

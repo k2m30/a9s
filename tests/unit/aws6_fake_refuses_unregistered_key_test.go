@@ -1,7 +1,6 @@
 package unit_test
 
-// aws6_fake_refuses_unregistered_key_test.go — every demo fake is honest about
-// a key it does not hold.
+// Every demo fake is honest about a key it does not hold.
 //
 // A fake stands in for a whole account. A key the fixtures never registered is
 // therefore a key the account does not have, and the only truthful answer is
@@ -151,12 +150,6 @@ func fakeNotFoundPins() []fakeNotFoundPin {
 			_, err := fakes.NewCloudTrail().GetTrailStatus(ctx, &cloudtrail.GetTrailStatusInput{Name: aws.String(id)})
 			return err
 		}},
-		// cloudwatch carries no pin: the only by-name read a9s makes of it is
-		// DescribeAlarmHistory, whose API models no not-found error — an unknown
-		// alarm name matches no history and succeeds empty. The rule is per
-		// OPERATION, so a fake that refused here would model a failure AWS never
-		// sends. Pinned the other way round in
-		// aws6_fake_models_only_real_errors_test.go.
 		{"codeartifact", "ResourceNotFoundException", "", func(ctx context.Context, id string) error {
 			_, err := fakes.NewCodeArtifact().DescribeDomain(ctx, &codeartifact.DescribeDomainInput{Domain: aws.String(id)})
 			return err
@@ -324,14 +317,9 @@ func TestDemoFakeRefusesAnUnregisteredKey(t *testing.T) {
 	}
 }
 
-// TestDemoFakesStillAnswerEveryRegisteredKey is the other half: refusing an
-// unregistered key must not start refusing a registered one. Every type's real
-// fetcher is drained over the same fakes, and a type that produced rows before
-// still does.
-//
-// This is the guard against an over-eager refusal — the failure mode a
-// too-clever "unknown key" check introduces, where the demo related panels go
-// empty for keys the fixtures DO register.
+// A registered key still answers: every type's real fetcher is drained over
+// the same fakes and must still produce rows. An over-eager "unknown key" check
+// would empty the demo related panels for keys the fixtures do register.
 func TestDemoFakesStillAnswerEveryRegisteredKey(t *testing.T) {
 	byType, _ := buildVisibilityTypeCache(t)
 

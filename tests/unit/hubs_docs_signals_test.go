@@ -125,8 +125,8 @@ func TestAttentionSignals_CategoryHeadingsMatchTheCatalog(t *testing.T) {
 }
 
 // TestAttentionSignals_NoSecondSignalTable pins that no signal row survives
-// outside the generated block: neither the older findings-table block, which
-// generates the same FindingDefs a second time, nor a hand-written per-type
+// outside the generated block: neither a findings-table block, which would
+// generate the same FindingDefs a second time, nor a hand-written per-type
 // table. Both are places a batch would have to edit by hand, and both can
 // disagree with the catalog without any gate noticing.
 func TestAttentionSignals_NoSecondSignalTable(t *testing.T) {
@@ -154,10 +154,8 @@ func TestAttentionSignals_NoSecondSignalTable(t *testing.T) {
 	}
 }
 
-// TestAttentionSignals_NotYetImplementedStaysHandWritten pins the other half:
-// the Wave 3 ideas the old tables carried are not FindingDefs and cannot be
-// generated, so deleting the hand-written tables must not delete them. They
-// live in a hand-written section the generator does not touch.
+// The Wave 3 ideas are not FindingDefs and cannot be generated, so they live
+// in a hand-written section the generator does not touch.
 func TestAttentionSignals_NotYetImplementedStaysHandWritten(t *testing.T) {
 	generated, handWritten := attentionSignalsDoc(t)
 

@@ -1,9 +1,3 @@
-// aws_boundary_test.go — US3 boundary semantic tests for implemented
-// related-panel checkers. These tests verify generic contract semantics across
-// representative checkers (different parent types) rather than duplicating the
-// per-pair tests in aws_<parent>_related_test.go.
-//
-// Test tasks: T110–T114 from specs/019-related-panel-checkers/tasks.md
 package unit_test
 
 import (
@@ -24,20 +18,6 @@ import (
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
-
-// ---------------------------------------------------------------------------
-// T110 — TestChecker_AccessDenied_ReturnsError
-//
-// For 3 representative forward checkers from different parent types, inject a
-// fake client that returns AccessDeniedException and verify:
-//   - result.State == RelatedError
-//   - result.Err != nil
-//
-// Covered checkers:
-//   asg → vpc  (EC2.DescribeSubnets)
-//   ddb → kinesis (DynamoDB.DescribeKinesisStreamingDestination)
-//   kms → role  (IAM.SimulatePrincipalPolicy)
-// ---------------------------------------------------------------------------
 
 func TestChecker_AccessDenied_ReturnsError(t *testing.T) {
 	t.Run("asg_vpc", func(t *testing.T) {
@@ -62,11 +42,6 @@ func TestChecker_AccessDenied_ReturnsError(t *testing.T) {
 			t.Error("Err = nil, want non-nil (AccessDenied must propagate)")
 		}
 	})
-
-	// ddb_backup removed: per docs/resources/ddb.md §2, backup discovery is a
-	// reverse-scan of the already-loaded backup plan cache, NOT a
-	// ListRecoveryPointsByResource call. No live Backup API is invoked, so no
-	// AccessDenied path to propagate.
 
 	t.Run("ddb_kinesis", func(t *testing.T) {
 		parent := resource.Resource{
@@ -105,21 +80,8 @@ func TestChecker_AccessDenied_ReturnsError(t *testing.T) {
 	})
 }
 
-// ---------------------------------------------------------------------------
-// T111 — TestChecker_RetryOnThrottle_WrapsCall
-//
-// For 2 forward checkers (different services), inject a fake whose first call
-// returns a throttling error and subsequent calls succeed. Assert:
-//   - result.Count matches the successful response
-//   - the fake's call count is > 1 (RetryOnThrottle issued at least one retry)
-//
-// Covered checkers:
-//   asg → vpc  (EC2.DescribeSubnets)
-//
-// NOTE: DefaultRetryConfig() uses a 500ms base delay with jitter. We override
-// with a 1ms delay via SetRetryConfigForTest so the retry path still executes
-// the full backoff-and-retry flow without taking ~500ms per sub-test.
-// ---------------------------------------------------------------------------
+// DefaultRetryConfig() uses a 500ms base delay with jitter; SetRetryConfigForTest
+// drops it to 1ms so the retry path runs without taking ~500ms per sub-test.
 
 func TestChecker_RetryOnThrottle_WrapsCall(t *testing.T) {
 	restore := awsclient.SetRetryConfigForTest(&awsclient.RetryConfig{
@@ -148,7 +110,6 @@ func TestChecker_RetryOnThrottle_WrapsCall(t *testing.T) {
 		checker := boundaryCheckerByTarget(t, "asg", "vpc")
 		got := checker(context.Background(), clients, parent, nil)
 
-		// The fake's first call throttled; second call returned one VPC ID.
 		calls := fakeEC2.calls.Load()
 		if calls < 2 {
 			t.Errorf("DescribeSubnets call count = %d, want >= 2 (retry must have fired)", calls)
@@ -161,23 +122,7 @@ func TestChecker_RetryOnThrottle_WrapsCall(t *testing.T) {
 		}
 	})
 
-	// ddb_backup removed: reverse-scan checkers do not hit the live AWS API,
-	// so retry-on-throttle has no surface to wrap here.
 }
-
-// ---------------------------------------------------------------------------
-// T112 — TestChecker_Truncated_PropagatedFromCache
-//
-// For 2 reverse-scan checkers, call the checker twice:
-//   1. cache has matching resource, IsTruncated=false → Truncated must be false
-//   2. same cache entry but IsTruncated=true → Truncated must be true
-//
-// Both calls must return Count > 0 (real match in cache).
-//
-// Covered checkers:
-//   ecr → ecs  (checkECRECS — reverse-scan via cache["ecs-task"])
-//   efs → ecs-task (checkEFSECSTask — reverse-scan via cache["ecs-task"])
-// ---------------------------------------------------------------------------
 
 func TestChecker_Truncated_PropagatedFromCache(t *testing.T) {
 	t.Run("ecr_ecs", func(t *testing.T) {
@@ -214,7 +159,6 @@ func TestChecker_Truncated_PropagatedFromCache(t *testing.T) {
 
 		checker := boundaryCheckerByTarget(t, "ecr", "ecs-task")
 
-		// First call: complete cache (IsTruncated=false)
 		exact := resource.ResourceCache{
 			"ecs-task": resource.ResourceCacheEntry{
 				Resources:   []resource.Resource{taskRes},
@@ -229,7 +173,6 @@ func TestChecker_Truncated_PropagatedFromCache(t *testing.T) {
 			t.Error("exact cache: Truncated = true, want false (IsTruncated=false)")
 		}
 
-		// Second call: truncated cache (IsTruncated=true)
 		truncated := resource.ResourceCache{
 			"ecs-task": resource.ResourceCacheEntry{
 				Resources:   []resource.Resource{taskRes},
@@ -272,7 +215,6 @@ func TestChecker_Truncated_PropagatedFromCache(t *testing.T) {
 
 		checker := boundaryCheckerByTarget(t, "efs", "ecs-task")
 
-		// First call: complete cache (IsTruncated=false)
 		exact := resource.ResourceCache{
 			"ecs-task": resource.ResourceCacheEntry{
 				Resources:   []resource.Resource{taskRes},
@@ -287,7 +229,6 @@ func TestChecker_Truncated_PropagatedFromCache(t *testing.T) {
 			t.Error("exact cache: Truncated = true, want false (IsTruncated=false)")
 		}
 
-		// Second call: truncated cache (IsTruncated=true)
 		truncated := resource.ResourceCache{
 			"ecs-task": resource.ResourceCacheEntry{
 				Resources:   []resource.Resource{taskRes},
@@ -304,16 +245,7 @@ func TestChecker_Truncated_PropagatedFromCache(t *testing.T) {
 	})
 }
 
-// ---------------------------------------------------------------------------
-// T113 — TestChecker_DedupsDuplicateIDs
-//
-// For asg → vpc (checkASGVPC), construct an input where the AWS response
-// contains 5 subnets belonging to 2 unique VPC IDs (3 duplicates). Assert
-// result.Count == 2, proving relatedResult deduplicates.
-// ---------------------------------------------------------------------------
-
 func TestChecker_DedupsDuplicateIDs(t *testing.T) {
-	// Subnets: 3 in vpc-0001, 2 in vpc-0002 → after dedup: 2 unique VPCs.
 	const vpcA = "vpc-0dedup0000000001"
 	const vpcB = "vpc-0dedup0000000002"
 	subnetIDs := "subnet-aa01,subnet-aa02,subnet-aa03,subnet-bb01,subnet-bb02"
@@ -333,8 +265,7 @@ func TestChecker_DedupsDuplicateIDs(t *testing.T) {
 		Fields: map[string]string{},
 		RawStruct: asgtypes.AutoScalingGroup{
 			AutoScalingGroupName: aws.String("dedup-asg"),
-			// 5 subnets across 2 VPCs
-			VPCZoneIdentifier: aws.String(subnetIDs),
+			VPCZoneIdentifier:    aws.String(subnetIDs),
 		},
 	}
 
@@ -352,23 +283,6 @@ func TestChecker_DedupsDuplicateIDs(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// T114 — TestChecker_NilClients_ReturnsError
-//
-// For representative forward checkers that make a LIVE AWS API call, call
-// with clients == nil and a valid parent. Assert State == RelatedError and no panic.
-//
-// Covered checkers:
-//   asg → vpc  (checkASGVPC)
-//   ddb → kinesis (checkDdbKinesis)
-//
-// ddb → backup is intentionally NOT covered here — checkDdbBackup is a pure
-// cache-scan (no live API call), so its nil-client semantics fall into the
-// "nil target list → TruncatedResult" rule, not the "nil client = error = RelatedError"
-// rule. See the four-category classifier in
-// .claude/skills/a9s-add-related-view/SKILL.md.
-// ---------------------------------------------------------------------------
-
 func TestChecker_NilClients_ReturnsError(t *testing.T) {
 	t.Run("asg_vpc", func(t *testing.T) {
 		parent := resource.Resource{
@@ -380,7 +294,6 @@ func TestChecker_NilClients_ReturnsError(t *testing.T) {
 			},
 		}
 		checker := boundaryCheckerByTarget(t, "asg", "vpc")
-		// Ensure no panic occurs when clients is nil.
 		got := checker(context.Background(), nil, parent, resource.ResourceCache{})
 		if got.State() != domain.RelatedUnknown {
 			t.Errorf("State = %v, want RelatedError (nil clients must error)", got.State())
@@ -400,19 +313,9 @@ func TestChecker_NilClients_ReturnsError(t *testing.T) {
 	})
 }
 
-// ---------------------------------------------------------------------------
-// T115 — TestReverseScans_DoNotPopulateFetchFilter
-//
-// Locks the contract that reverse-scan checkers (pattern C+reverse) never set
-// FetchFilter in their result. Tests 3 representative checkers from different
-// parent types with empty-cache inputs (ensures execution reaches the cache-scan
-// path, not an early-exit due to missing client).
-//
-// Covered checkers:
-//   cb    → pipeline  (checkCbPipeline — cache-miss path, empty result)
-//   ecs-svc → eb-rule (checkECSSvcEbRule — cache-miss path, empty result)
-//   secrets → ecs-task (checkSecretsECSTask — wrong RawStruct, early exit, still no FetchFilter)
-// ---------------------------------------------------------------------------
+// Reverse-scan checkers never set FetchFilter in their result. Empty-cache
+// inputs make execution reach the cache-scan path rather than an early exit on
+// a missing client.
 
 func TestReverseScans_DoNotPopulateFetchFilter(t *testing.T) {
 	t.Run("cb_pipeline", func(t *testing.T) {
@@ -460,11 +363,9 @@ func TestReverseScans_DoNotPopulateFetchFilter(t *testing.T) {
 	})
 }
 
-// ---------------------------------------------------------------------------
 // boundaryCheckerByTarget is a test helper that retrieves the registered
 // RelatedChecker for the given parent/target pair. Fails the test if not found
 // or if the checker is nil.
-// ---------------------------------------------------------------------------
 
 func boundaryCheckerByTarget(t *testing.T, parent, target string) resource.RelatedChecker {
 	t.Helper()

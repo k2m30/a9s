@@ -1,16 +1,6 @@
-// detail_root_scroll_follow_test.go — TDD red-phase pin for the LIVE app_stack.go
-// wiring gap behind the detail-view scroll-follows-cursor bug. The controller-level
-// fix (core/app/detail_cursor.go's reconcileDetailScrollToCursor) is already
-// covered by detail_controller_scroll_follow_test.go, but that test calls
-// controller.Apply directly with Action.N pre-set — it never exercises the real
-// key-dispatch path the running binary uses. A --demo smoke proved the fix does
-// NOT work end-to-end: pressing Down on a long detail does not scroll the field
-// viewport, because internal/tui/app_stack.go's left-column ActionMoveDown/
-// ActionMoveUp/ActionMoveBottom handling (handleDetailKeyMsg) never supplies
-// Action.N (the renderer-owned viewport height), unlike the ActionPageDown/
-// ActionPageUp handling a few lines below it in the same switch. This test
-// drives the ROOT tui.Model.Update the running binary uses, so it fails for the
-// exact reason the smoke test failed.
+// detail_root_scroll_follow_test.go — Down on a long detail scrolls the
+// field viewport when driven through the ROOT tui.Model.Update the running
+// binary uses (internal/tui/app_stack.go handleDetailKeyMsg).
 package unit
 
 import (
@@ -56,17 +46,14 @@ func rootScrollProbeResource() *resource.Resource {
 	}
 }
 
-// TestRootDetail_DownKeys_ScrollFollowsCursor pins the end-to-end fix: repeatedly
-// pressing Down on a long detail screen through the ROOT model's real key
-// dispatcher must scroll the field viewport, the same way a user watching the
-// terminal would observe it.
+// TestRootDetail_DownKeys_ScrollFollowsCursor: repeatedly pressing Down on a
+// long detail screen through the ROOT model's real key dispatcher must scroll
+// the field viewport.
 //
 // tui.Model.ctrl is unexported (package tui), so DetailBody.ScrollY cannot be
-// read directly from this external test package — the scroll is asserted the
-// way a user (and the failing --demo smoke) observes it: via rendered View()
-// content. Before the fix, ScrollY never advances on this path, so a field
-// label deep in the list never becomes visible no matter how many times Down
-// is pressed.
+// read from this external test package — the scroll is asserted via rendered
+// View() content: a field label deep in the list becomes visible only once
+// the viewport has scrolled.
 func TestRootDetail_DownKeys_ScrollFollowsCursor(t *testing.T) {
 	m := newRootSizedModel()
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 200, Height: 24})
@@ -79,9 +66,8 @@ func TestRootDetail_DownKeys_ScrollFollowsCursor(t *testing.T) {
 
 	// Force a render pass so rs.viewport is populated with a real height —
 	// renderDetail (internal/tui/renderer.go) only replaces the zero-value
-	// viewport with one sized to rs.height on a View() call. Without this,
-	// even the fixed app_stack.go code would read rs.viewport.Height()==0
-	// and pass N=0, making reconcileDetailScrollToCursor a no-op regardless.
+	// viewport with one sized to rs.height on a View() call. Without it the
+	// viewport height reads 0 and reconcileDetailScrollToCursor is a no-op.
 	before := stripANSI(rootViewContent(m))
 	if !strings.Contains(before, "field-00") {
 		t.Fatalf("precondition: initial detail render should show field-00 (top of list), got:\n%s", before)

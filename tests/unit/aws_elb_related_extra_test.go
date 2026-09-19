@@ -1,12 +1,5 @@
 package unit_test
 
-// aws_elb_related_extra_test.go — additional coverage for elb_related.go.
-// Covers: checkELBSG, checkELBVPC, checkELBCFN (with fake DescribeTags),
-// checkELBACM (with fake DescribeListeners), checkELBCF (cf cache),
-// checkELBENI (eni cache), checkELBS3 (with fake DescribeLoadBalancerAttributes),
-// checkELBSubnet, checkELBWAF (with fake GetWebACLForResource).
-// elbCheckerByTarget is defined in aws_elb_related_test.go (same package).
-
 import (
 	"context"
 	"testing"
@@ -47,9 +40,7 @@ func (f *fakeELBv2Full) DescribeLoadBalancerAttributes(_ context.Context, input 
 	return &elbv2.DescribeLoadBalancerAttributesOutput{}, nil
 }
 
-// ---------------------------------------------------------------------------
-// fakeWAFv2ForResource — implements WAFv2GetWebACLForResourceAPI
-// ---------------------------------------------------------------------------
+// fakeWAFv2ForResource implements WAFv2GetWebACLForResourceAPI.
 
 type fakeWAFv2ForResource struct {
 	output *wafv2.GetWebACLForResourceOutput
@@ -75,8 +66,6 @@ func (f *fakeWAFv2ForResource) ListResourcesForWebACL(_ context.Context, _ *wafv
 func (f *fakeWAFv2ForResource) GetLoggingConfiguration(_ context.Context, _ *wafv2.GetLoggingConfigurationInput, _ ...func(*wafv2.Options)) (*wafv2.GetLoggingConfigurationOutput, error) {
 	return &wafv2.GetLoggingConfigurationOutput{}, nil
 }
-
-// --- checkELBSG (Pattern F — reads SecurityGroups) ---
 
 func TestRelated_ELB_SG_Found(t *testing.T) {
 	const elbARN = "arn:aws:elasticloadbalancing:us-east-1:123456789012:loadbalancer/app/prod-alb/abcdef1234567890"
@@ -132,8 +121,6 @@ func TestRelated_ELB_SG_WrongRawStruct(t *testing.T) {
 	}
 }
 
-// --- checkELBVPC (Pattern F — reads vpc_id from Fields) ---
-
 func TestRelated_ELB_VPC_Found(t *testing.T) {
 	source := resource.Resource{
 		ID:     "prod-alb",
@@ -163,8 +150,6 @@ func TestRelated_ELB_VPC_EmptyVPCField(t *testing.T) {
 		t.Errorf("Count = %d, want 0 (empty vpc_id)", result.Count())
 	}
 }
-
-// --- checkELBCFN (Pattern C — DescribeTags) ---
 
 func TestRelated_ELB_CFN_Found(t *testing.T) {
 	const elbARN = "arn:aws:elasticloadbalancing:us-east-1:123456789012:loadbalancer/app/prod-alb/abcdef1234567890"
@@ -227,8 +212,6 @@ func TestRelated_ELB_CFN_NoCFNTag(t *testing.T) {
 	}
 }
 
-// --- checkELBACM (Pattern C — DescribeListeners for certificate ARNs) ---
-
 func TestRelated_ELB_ACM_Found(t *testing.T) {
 	const elbARN = "arn:aws:elasticloadbalancing:us-east-1:123456789012:loadbalancer/app/prod-alb/abcdef1234567890"
 	const certARN = "arn:aws:acm:us-east-1:123456789012:certificate/abc1-2345-6789-0abc-defabcdef012"
@@ -259,7 +242,6 @@ func TestRelated_ELB_ACM_Found(t *testing.T) {
 }
 
 func TestRelated_ELB_ACM_DeduplicatesCerts(t *testing.T) {
-	// Same cert on two listeners → should appear once.
 	const elbARN = "arn:aws:elasticloadbalancing:us-east-1:123456789012:loadbalancer/app/prod-alb/abcdef1234567890"
 	const certARN = "arn:aws:acm:us-east-1:123456789012:certificate/abc1-2345-6789-0abc-defabcdef012"
 	source := resource.Resource{
@@ -325,8 +307,6 @@ func TestRelated_ELB_ACM_NilClients(t *testing.T) {
 		t.Errorf("Count = %d, want -1 (nil clients)", result.Count())
 	}
 }
-
-// --- checkELBCF (Pattern C — cf cache, DomainName match) ---
 
 func TestRelated_ELB_CF_Found(t *testing.T) {
 	const dnsName = "prod-alb-1234567890.us-east-1.elb.amazonaws.com"
@@ -396,8 +376,6 @@ func TestRelated_ELB_CF_EmptyDNSName(t *testing.T) {
 	}
 }
 
-// --- checkELBENI (Pattern C — eni cache, "ELB app/NAME/hash" description) ---
-
 func TestRelated_ELB_ENI_Found(t *testing.T) {
 	source := resource.Resource{
 		ID:   "prod-alb",
@@ -463,8 +441,6 @@ func TestRelated_ELB_ENI_EmptyName(t *testing.T) {
 	}
 }
 
-// --- checkELBS3 (Pattern C — DescribeLoadBalancerAttributes for access_logs.s3.bucket) ---
-
 func TestRelated_ELB_S3_Found(t *testing.T) {
 	const elbARN = "arn:aws:elasticloadbalancing:us-east-1:123456789012:loadbalancer/app/prod-alb/abcdef1234567890"
 	source := resource.Resource{
@@ -518,8 +494,6 @@ func TestRelated_ELB_S3_LogsNotEnabled(t *testing.T) {
 		t.Errorf("Count = %d, want 0 (access logs disabled)", result.Count())
 	}
 }
-
-// --- checkELBSubnet (Pattern F — reads AvailabilityZones[].SubnetId) ---
 
 func TestRelated_ELB_Subnet_Found(t *testing.T) {
 	const elbARN = "arn:aws:elasticloadbalancing:us-east-1:123456789012:loadbalancer/app/prod-alb/abcdef1234567890"
@@ -577,8 +551,6 @@ func TestRelated_ELB_Subnet_WrongRawStruct(t *testing.T) {
 		t.Errorf("Count = %d, want -1 (wrong RawStruct)", result.Count())
 	}
 }
-
-// --- checkELBWAF (Pattern C — GetWebACLForResource) ---
 
 func TestRelated_ELB_WAF_Found(t *testing.T) {
 	const elbARN = "arn:aws:elasticloadbalancing:us-east-1:123456789012:loadbalancer/app/prod-alb/abcdef1234567890"

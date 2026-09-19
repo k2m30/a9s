@@ -1,7 +1,6 @@
 package unit_test
 
-// aws6_rawstruct_detail_reads_as_words_test.go — the detail rows projected off
-// the SDK struct read as words too.
+// The detail rows projected off the SDK struct read as words too.
 //
 // A type's declaration names a fact, not a spelling. The fetcher writes that
 // fact under a snake_case key and the detail projector also renders it off
@@ -9,7 +8,7 @@ package unit_test
 // the same word: the CloudWatch alarm's state is Fields["state"] and
 // RawStruct's StateValue. A declaration that names only the fetcher's key
 // therefore reaches one row and not the other, and the operator reads
-// INSUFFICIENT_DATA on the screen the declaration was added for.
+// INSUFFICIENT_DATA on the alarm detail.
 //
 // A nested scalar is the same problem one level down. The projector composes a
 // path for a subfield — StreamModeDetails.StreamMode — but the item it emits
@@ -40,7 +39,7 @@ var rawStructDetailWitnesses = []struct {
 	shortName string
 	label     string // the detail row's label as the projector writes it
 	raw       any
-	constant  string // what the screen shows today
+	constant  string // the raw SDK constant
 	want      string // the words it must show
 }{
 	{
@@ -75,7 +74,6 @@ var rawStructDetailWitnesses = []struct {
 	},
 }
 
-// TestRawStructDetailRowReadsAsWords pins row 24's three named screens.
 func TestRawStructDetailRowReadsAsWords(t *testing.T) {
 	for _, w := range rawStructDetailWitnesses {
 		t.Run(w.shortName+"/"+w.label, func(t *testing.T) {
@@ -106,17 +104,16 @@ func TestRawStructDetailRowReadsAsWords(t *testing.T) {
 	}
 }
 
-// TestDottedDeclarationHumanizesTheNestedScalar pins row 23 for every dotted
-// declaration the catalog carries, so a second one added later is covered
-// without this test changing.
+// Every dotted declaration the catalog carries is checked, so a second one
+// added later is covered without this test changing.
 func TestDottedDeclarationHumanizesTheNestedScalar(t *testing.T) {
 	dotted := dottedDeclarations(t)
 	if len(dotted) == 0 {
 		t.Fatal("no type declares a dotted humanize field, so nothing exercises the nested-scalar path")
 	}
 
-	// kinesis is the witness; a dotted declaration on another type is reported
-	// so it gets a witness of its own rather than riding on this one.
+	// kinesis carries the demo case; a dotted declaration on another type is
+	// reported so it gets a demo case of its own.
 	const kinesisShortName = "kinesis"
 	for _, d := range dotted {
 		if d.shortName != kinesisShortName {

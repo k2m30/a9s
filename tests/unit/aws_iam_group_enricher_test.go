@@ -1,13 +1,5 @@
 package unit
 
-// aws_iam_group_enricher_test.go — Behavioral tests for EnrichIAMGroup.
-//
-// Contract assertions:
-//   - GetGroup.Users=[user-1] + ListAttachedGroupPolicies=[policy-1] → 0 findings.
-//   - GetGroup.Users=[] → 1 finding sev "~" (empty group).
-//   - GetGroup.Users=[user-1] + ListAttachedGroupPolicies=[] + no inline → 1 finding sev "~" (no policies).
-//   - clients.IAM == nil → 0 findings, no error.
-
 import (
 	"context"
 	"testing"
@@ -79,7 +71,6 @@ func (f *iamGroupFake) ListGroupPolicies(
 	return &iam.ListGroupPoliciesOutput{PolicyNames: names}, nil
 }
 
-// Compile-time check: iamGroupFake satisfies IAMAPI.
 var _ awsclient.IAMAPI = (*iamGroupFake)(nil)
 
 // iamGroupResources returns a slice of iam-group Resource stubs.

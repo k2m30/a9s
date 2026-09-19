@@ -26,8 +26,6 @@ func rtbCheckerByTarget(t *testing.T, target string) resource.RelatedChecker {
 	return nil
 }
 
-// --- Navigable Field Registration ---
-
 func TestNavigableFields_RTB_Registered(t *testing.T) {
 	expected := map[string]string{
 		"VpcId":                 "vpc",
@@ -45,8 +43,6 @@ func TestNavigableFields_RTB_Registered(t *testing.T) {
 		}
 	}
 }
-
-// --- checkRTBSubnet (forward: Associations SubnetId → subnet cache) ---
 
 func TestRelated_RTB_Subnet_Found(t *testing.T) {
 	source := resource.Resource{
@@ -156,8 +152,6 @@ func TestRelated_RTB_Subnet_NoAssociations(t *testing.T) {
 	}
 }
 
-// --- checkRTBNAT (forward: Routes NatGatewayId → nat cache) ---
-
 func TestRelated_RTB_NAT_Found(t *testing.T) {
 	source := resource.Resource{
 		ID: "rtb-test",
@@ -259,8 +253,6 @@ func TestRelated_RTB_NAT_CacheMissNoClients(t *testing.T) {
 	}
 }
 
-// --- checkRTBIGW (forward: Routes GatewayId with "igw-" prefix → igw cache) ---
-
 func TestRelated_RTB_IGW_Found(t *testing.T) {
 	source := resource.Resource{
 		ID: "rtb-test",
@@ -341,7 +333,7 @@ func TestRelated_RTB_IGW_CacheMissNoClients(t *testing.T) {
 }
 
 func TestRelated_RTB_IGW_LocalGateway(t *testing.T) {
-	// Routes that have GatewayId="local" should be filtered out — local is not an IGW.
+	// GatewayId "local" is the VPC's local route, not an IGW.
 	source := resource.Resource{
 		ID: "rtb-test",
 		RawStruct: ec2types.RouteTable{
@@ -367,8 +359,6 @@ func TestRelated_RTB_IGW_LocalGateway(t *testing.T) {
 		t.Errorf("unexpected error: %v", result.Err())
 	}
 }
-
-// --- CloudFormation checker (tag-based: aws:cloudformation:stack-name → cfn cache) ---
 
 func TestRelated_RTB_CFN_Found(t *testing.T) {
 	source := resource.Resource{
@@ -479,12 +469,6 @@ func TestRelated_RTB_CFN_CacheMiss(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// checkRTBVPC — Pattern F: reads vpc_id from Fields directly
-// ---------------------------------------------------------------------------
-
-// TestRelated_RTB_VPC_Present verifies that a route table with a vpc_id field
-// returns Count=1 with the VPC ID.
 func TestRelated_RTB_VPC_Present(t *testing.T) {
 	source := resource.Resource{
 		ID: "rtb-abc123",
@@ -504,7 +488,6 @@ func TestRelated_RTB_VPC_Present(t *testing.T) {
 	}
 }
 
-// TestRelated_RTB_VPC_Absent verifies that a route table with no vpc_id returns Count=0.
 func TestRelated_RTB_VPC_Absent(t *testing.T) {
 	source := resource.Resource{
 		ID:     "rtb-abc123",
@@ -519,12 +502,6 @@ func TestRelated_RTB_VPC_Absent(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// checkRTBENI — forward: Routes[].NetworkInterfaceId → eni cache
-// ---------------------------------------------------------------------------
-
-// TestRelated_RTB_ENI_Found verifies that a route with a NetworkInterfaceId matching
-// an ENI in the cache returns Count=1.
 func TestRelated_RTB_ENI_Found(t *testing.T) {
 	source := resource.Resource{
 		ID: "rtb-abc123",
@@ -552,7 +529,6 @@ func TestRelated_RTB_ENI_Found(t *testing.T) {
 	}
 }
 
-// TestRelated_RTB_ENI_NotFound verifies that no matching ENI yields Count=0.
 func TestRelated_RTB_ENI_NotFound(t *testing.T) {
 	source := resource.Resource{
 		ID: "rtb-abc123",
@@ -577,8 +553,6 @@ func TestRelated_RTB_ENI_NotFound(t *testing.T) {
 	}
 }
 
-// TestRelated_RTB_ENI_NoRoutes verifies that a route table with no routes referencing
-// ENIs returns Count=0.
 func TestRelated_RTB_ENI_NoRoutes(t *testing.T) {
 	source := resource.Resource{
 		ID: "rtb-abc123",
@@ -603,12 +577,6 @@ func TestRelated_RTB_ENI_NoRoutes(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// checkRTBTGW — forward: Routes[].TransitGatewayId → tgw cache
-// ---------------------------------------------------------------------------
-
-// TestRelated_RTB_TGW_Found verifies that a route with a TransitGatewayId matching
-// a TGW in the cache returns Count=1.
 func TestRelated_RTB_TGW_Found(t *testing.T) {
 	source := resource.Resource{
 		ID: "rtb-abc123",
@@ -636,7 +604,6 @@ func TestRelated_RTB_TGW_Found(t *testing.T) {
 	}
 }
 
-// TestRelated_RTB_TGW_NotFound verifies that no matching TGW in cache returns Count=0.
 func TestRelated_RTB_TGW_NotFound(t *testing.T) {
 	source := resource.Resource{
 		ID: "rtb-abc123",
@@ -661,8 +628,6 @@ func TestRelated_RTB_TGW_NotFound(t *testing.T) {
 	}
 }
 
-// TestRelated_RTB_TGW_NoRoutes verifies that a route table with no transit gateway
-// routes returns Count=0.
 func TestRelated_RTB_TGW_NoRoutes(t *testing.T) {
 	source := resource.Resource{
 		ID: "rtb-abc123",
@@ -687,12 +652,6 @@ func TestRelated_RTB_TGW_NoRoutes(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// checkRTBVPCE — reverse: vpce cache, VpcEndpoint.RouteTableIds contains rtbID
-// ---------------------------------------------------------------------------
-
-// TestRelated_RTB_VPCE_Found verifies that a Gateway VPC endpoint with
-// RouteTableIds containing this RTB ID is returned.
 func TestRelated_RTB_VPCE_Found(t *testing.T) {
 	source := resource.Resource{
 		ID: "rtb-abc123",
@@ -726,7 +685,6 @@ func TestRelated_RTB_VPCE_Found(t *testing.T) {
 	}
 }
 
-// TestRelated_RTB_VPCE_NotFound verifies that no VPC endpoint references this RTB → Count=0.
 func TestRelated_RTB_VPCE_NotFound(t *testing.T) {
 	source := resource.Resource{
 		ID: "rtb-abc123",
@@ -752,7 +710,6 @@ func TestRelated_RTB_VPCE_NotFound(t *testing.T) {
 	}
 }
 
-// TestRelated_RTB_VPCE_CacheMiss verifies Count=-1 when vpce cache is absent.
 func TestRelated_RTB_VPCE_CacheMiss(t *testing.T) {
 	source := resource.Resource{
 		ID: "rtb-abc123",

@@ -1,8 +1,5 @@
 package unit_test
 
-// aws_eip_related_extra_test.go — additional coverage for eip_related.go
-// Covers: checkEIPCFN, checkEIPAlarm, checkEIPASG, checkEIPECS/ECSSvc/ECSTask/Logs.
-
 import (
 	"context"
 	"testing"
@@ -15,8 +12,6 @@ import (
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
-
-// --- checkEIPCFN (Pattern F — reads aws:cloudformation:stack-name tag) ---
 
 func TestRelated_EIP_CFN_Found(t *testing.T) {
 	source := resource.Resource{
@@ -80,8 +75,6 @@ func TestRelated_EIP_CFN_WrongRawStruct(t *testing.T) {
 		t.Errorf("Count = %d, want -1 (wrong RawStruct)", result.Count())
 	}
 }
-
-// --- checkEIPAlarm (Pattern C — reverse lookup by InstanceId/NetworkInterfaceId dimension) ---
 
 func TestRelated_EIP_Alarm_MatchByInstanceId(t *testing.T) {
 	source := resource.Resource{
@@ -167,8 +160,6 @@ func TestRelated_EIP_Alarm_WrongRawStruct(t *testing.T) {
 		t.Errorf("Count = %d, want -1 (wrong RawStruct)", result.Count())
 	}
 }
-
-// --- checkEIPASG (Pattern C — looks up EC2 tag aws:autoscaling:groupName) ---
 
 func TestRelated_EIP_ASG_FoundViaInstanceTag(t *testing.T) {
 	source := resource.Resource{
@@ -293,18 +284,6 @@ func TestRelated_EIP_ASG_NilCacheNoClients(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// checkEIPECS / checkEIPECSSvc / checkEIPECSTask
-// Each returns State: RelatedUnknown for a non-empty ID (outside 1-call budget) and
-// Count:0 for an empty ID (no EIP → no association possible).
-//
-// checkEIPLogs (same shape) was removed along with its eip:logs
-// registration: EIP flow logs require per-ENI DescribeFlowLogs, explicitly
-// outside the 1-call budget, with no fixture able to change that. See
-// qa_demo_pivot_coverage_test.go's knownDisconnectedPivots terminal-state
-// comment for the burn-down precedent this deletion follows.
-// ---------------------------------------------------------------------------
-
 func TestRelated_EIP_ECS_EmptyIDReturnsZero(t *testing.T) {
 	source := resource.Resource{ID: ""}
 	checker := eipCheckerByTarget(t, "ecs")
@@ -317,11 +296,6 @@ func TestRelated_EIP_ECS_EmptyIDReturnsZero(t *testing.T) {
 	}
 }
 
-// TestRelated_EIP_ECS_NoENIReturnsZero verifies that checkEIPECS is a
-// zero-extra-call ENI-cache join (eipENIID + eipMatchingECSTask), not an
-// outside-1-call-budget "-1 unknown" stub: an EIP with no NetworkInterfaceId
-// (eniID resolves to "") returns Count=0, not -1 —
-// docs/resources/eip.md §2 `ecs`.
 func TestRelated_EIP_ECS_NoENIReturnsZero(t *testing.T) {
 	source := resource.Resource{
 		ID: "eipalloc-0a1b2c3d4e5f60001",

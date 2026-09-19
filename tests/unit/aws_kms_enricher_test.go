@@ -1,15 +1,5 @@
 package unit
 
-// aws_kms_enricher_test.go — Behavioral tests for EnrichKMSRotation.
-//
-// Contract assertions:
-//   - GetKeyRotationStatus is called once per key in the resources slice.
-//   - KeyRotationEnabled=false  → Finding keyed by resource.ID, severity "~".
-//   - KeyRotationEnabled=true   → no finding.
-//   - AccessDeniedException     → silently skipped, NOT Truncated (AWS-managed key).
-//   - clients.KMS == nil        → (EnricherResult{Findings: non-nil empty}, nil).
-//   - Other API error           → no finding for that key, Truncated=true.
-
 import (
 	"context"
 	"testing"
@@ -54,7 +44,6 @@ func (f *kmsFake) GetKeyRotationStatus(
 	return &kms.GetKeyRotationStatusOutput{KeyRotationEnabled: true}, nil
 }
 
-// Compile-time check: kmsFake satisfies KMSAPI.
 var _ awsclient.KMSAPI = (*kmsFake)(nil)
 
 // makeKMSResources builds a []resource.Resource slice from the given key IDs.
@@ -181,10 +170,8 @@ func TestEnrichKMSRotation_NilClientReturnsEmptyFindingsNoError(t *testing.T) {
 	}
 }
 
-// TestEnrichKMSRotation_MixedDisabledEnabledError verifies that:
-//   - disabled key produces a finding with severity "~"
-//   - enabled key produces no finding
-//   - an API error for one key produces no finding for that key and is skipped silently
+// TestEnrichKMSRotation_MixedDisabledEnabledError verifies a disabled key, an
+// enabled key and a key whose rotation status cannot be read in one batch.
 func TestEnrichKMSRotation_MixedDisabledEnabledError(t *testing.T) {
 	otherErr := &smithy.GenericAPIError{
 		Code:    "InternalServiceError",
@@ -207,7 +194,6 @@ func TestEnrichKMSRotation_MixedDisabledEnabledError(t *testing.T) {
 	if err == nil {
 		t.Fatal("a failed GetKeyRotationStatus returned no error")
 	}
-	// One finding for the disabled key.
 	if len(result.Findings) != 1 {
 		t.Errorf("findings = %d, want 1", len(result.Findings))
 	}
@@ -226,7 +212,7 @@ func TestEnrichKMSRotation_MixedDisabledEnabledError(t *testing.T) {
 }
 
 // The kms enricher also reads the key policy; a key with no policy attached
-// keeps these tests about rotation, which is what they were written for.
+// keeps these tests about rotation.
 func (f *kmsFake) GetKeyPolicy(
 	_ context.Context,
 	_ *kms.GetKeyPolicyInput,

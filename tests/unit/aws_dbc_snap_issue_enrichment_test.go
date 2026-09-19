@@ -1,16 +1,5 @@
 package unit
 
-// aws_dbc_snap_issue_enrichment_test.go — Cross-ref enricher tests for dbc-snap.
-//
-// dbc-snap is wired to the SnapshotCrossRef helper (snapshot_cross_ref.go)
-// with parent="dbc". These tests pin the activation: orphan and
-// past-retention signals must fire for DBClusterSnapshot inputs whose
-// parent is missing or whose retention is exceeded.
-//
-// The enricher is wired into catalog_databases.go's dbc-snap Wave2 field.
-// Tests drive it by looking it up via awsclient.Wave2EnricherFor, NOT by
-// importing the production file directly.
-
 import (
 	"context"
 	"strings"
@@ -27,8 +16,6 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// dbcSnapEnricher retrieves the registered dbc-snap IssueEnricherFunc from
-// the catalog Wave2 field via awsclient.Wave2EnricherFor.
 func dbcSnapEnricher(t *testing.T) awsclient.IssueEnricherFunc {
 	t.Helper()
 	e, ok := awsclient.Wave2EnricherFor("dbc-snap")
@@ -41,12 +28,9 @@ func dbcSnapEnricher(t *testing.T) awsclient.IssueEnricherFunc {
 	return e.Fn
 }
 
-// TestDBCSnap_Orphan_DocDB verifies the orphan signal fires for a DocDB
-// cluster snapshot whose parent is missing from the dbc cache.
 func TestDBCSnap_Orphan_DocDB(t *testing.T) {
 	enricher := dbcSnapEnricher(t)
 
-	// dbc cache has "other-cluster" but not "deleted-cluster"; not truncated.
 	otherCluster := docdbtypes.DBCluster{
 		DBClusterIdentifier:   aws.String("other-cluster"),
 		BackupRetentionPeriod: aws.Int32(7),
@@ -94,15 +78,9 @@ func TestDBCSnap_Orphan_DocDB(t *testing.T) {
 	}
 }
 
-// TestDBCSnap_Orphan_Aurora verifies the orphan signal fires for an Aurora
-// cluster snapshot (rdstypes.DBClusterSnapshot) whose parent is missing from the
-// dbc cache. Aurora cluster snapshots arrive via the RDS SDK
-// (rdstypes.DBClusterSnapshot), not the DocDB SDK. The enricher's dual-shape
-// extractor (dbcSnapParentID) handles both SDK shapes.
 func TestDBCSnap_Orphan_Aurora(t *testing.T) {
 	enricher := dbcSnapEnricher(t)
 
-	// Cache has an rdstypes.DBCluster parent but NOT the one referenced by the snap.
 	otherCluster := rdstypes.DBCluster{
 		DBClusterIdentifier:   aws.String("other-aurora"),
 		BackupRetentionPeriod: aws.Int32(14),
@@ -146,8 +124,6 @@ func TestDBCSnap_Orphan_Aurora(t *testing.T) {
 	}
 }
 
-// TestDBCSnap_PastRetention_DocDB verifies the past-retention signal fires
-// for an automated DocDB cluster snapshot older than parent's retention.
 func TestDBCSnap_PastRetention_DocDB(t *testing.T) {
 	enricher := dbcSnapEnricher(t)
 
@@ -195,8 +171,6 @@ func TestDBCSnap_PastRetention_DocDB(t *testing.T) {
 	}
 }
 
-// TestDBCSnap_PastRetention_Manual verifies the past-retention rule does
-// NOT fire for manual snapshots.
 func TestDBCSnap_PastRetention_Manual(t *testing.T) {
 	enricher := dbcSnapEnricher(t)
 
@@ -232,8 +206,6 @@ func TestDBCSnap_PastRetention_Manual(t *testing.T) {
 	}
 }
 
-// TestDBCSnap_TruncatedCache_NoFalseOrphan verifies the orphan rule skips
-// when the dbc cache is truncated and the parent is not in the visible window.
 func TestDBCSnap_TruncatedCache_NoFalseOrphan(t *testing.T) {
 	enricher := dbcSnapEnricher(t)
 
@@ -264,8 +236,6 @@ func TestDBCSnap_TruncatedCache_NoFalseOrphan(t *testing.T) {
 	}
 }
 
-// TestDBCSnap_NoCache_Skip verifies the enricher skips silently when the
-// dbc cache is not loaded (per spec §3.1 skip rule).
 func TestDBCSnap_NoCache_Skip(t *testing.T) {
 	enricher := dbcSnapEnricher(t)
 

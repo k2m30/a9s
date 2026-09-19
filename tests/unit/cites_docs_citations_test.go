@@ -5,15 +5,12 @@ package unit
 // resource docs against the shipped catalog.
 //
 // The signals page carries one generated table per category under `## Signals`
-// and nothing else per type: there are no Wave 1/2/3 cells, no Source cells and
-// no stable line numbers to point at. A citation that names one of those is a
-// pointer into a page that no longer exists, and a reader who follows it lands
-// nowhere. Two shapes, both resolved against the page itself, are the only
-// citations that can still be checked after the next regeneration: one names a
-// signal row, one names a hand-written section.
+// and has no per-type cells or stable line numbers to point at. Two citation
+// shapes survive regeneration, both resolved against the page itself: one names
+// a signal row, one names a hand-written section.
 //
-// The hand-written §4 tables are the other half: a doc that spells a list text
-// or a severity the emitter never produces reads as the contract while the code
+// A resource doc's Issue Visualization table that spells a list text or a
+// severity the emitter never produces reads as the contract while the code
 // reads as the bug.
 
 import (
@@ -76,8 +73,8 @@ func signalsCategories(t *testing.T) map[string]map[string]bool {
 	return categories
 }
 
-// Prose that names a cell of the per-type tables the generated block replaced,
-// with or without naming the file it is describing.
+// Prose that names a Wave or Source cell, a per-type table shape the signals
+// page does not carry, with or without naming the file.
 var reSignalsCellReference = regexp.MustCompile(`Wave [0-9] cell|Source cell|Source column`)
 
 var reMarkdownHeading = regexp.MustCompile(`^#{2,3} (.+)$`)
@@ -145,14 +142,8 @@ func relToRoot(t *testing.T, path string) string {
 	return rel
 }
 
-// TestCitesSignalsCitationShape walks every mention of the signals page in
-// docs/resources/*.md and in core/aws/eks.go and resolves it against the page:
-// a signal citation must name a category the generated block has a heading for
-// and a type registered under it, a section citation must name a heading the
-// page carries outside that block.
-//
-// The `generatedFrom:` list in the YAML front matter is a list of source files,
-// not a citation into a heading; it is the one exempt shape.
+// The `generatedFrom:` list in the YAML front matter lists source files, not a
+// citation into a heading, and is exempt.
 func TestCitesSignalsCitationShape(t *testing.T) {
 	categories := signalsCategories(t)
 	sections := signalsSections(t)
@@ -240,19 +231,10 @@ func TestCitesSignalsCitationShape(t *testing.T) {
 	}
 }
 
-// TestCitesCodeartifactPublicAccessDescribedByTheEngine pins that
-// docs/resources/codeartifact.md no longer describes the public-access signal
-// as a string match on the policy document. The policy engine in
-// core/iampolicy/evaluate.go evaluates the statement; a doc that promises a
-// substring search describes a check a9s does not run, and an operator reading
-// it would expect a policy written any other way to go unflagged.
-//
-// The engine file was core/aws/catalog_security.go here until the citation
-// batch: that file holds the SECURITY & IAM catalog literal and its color
-// classifiers and names codeartifact nowhere, while
-// core/aws/codeartifact_issue_enrichment.go calls iampolicy.Evaluate for the
-// verdict. Pinning the old path would have put a false citation in the doc to
-// make this test pass; do not restore it.
+// The policy engine in core/iampolicy/evaluate.go evaluates the codeartifact
+// policy statement; a doc that promises a substring search on the policy
+// document describes a check a9s does not run, and an operator reading it
+// would expect a policy written any other way to go unflagged.
 func TestCitesCodeartifactPublicAccessDescribedByTheEngine(t *testing.T) {
 	path := filepath.Join(projectRoot(t), "docs", "resources", "codeartifact.md")
 	lines := readLines(t, path)
@@ -275,7 +257,8 @@ func TestCitesCodeartifactPublicAccessDescribedByTheEngine(t *testing.T) {
 	}
 }
 
-// docSignalRow is one row of a resource doc's hand-written §4 table.
+// docSignalRow is one row of a resource doc's hand-written Issue Visualization
+// table.
 type docSignalRow struct {
 	line       int
 	condition  string
@@ -294,10 +277,9 @@ type docSignalRow struct {
 
 var reDocTableSeparator = regexp.MustCompile(`^\|[\s|:-]+\|$`)
 
-// The one shape a deferred row spells its marker in. Every doc that defers a
-// row today writes exactly this, and the gate resolves the row against
-// `docs/attention-signals.md § Not yet implemented` through it, so a second
-// wording is a row nothing can check.
+// The one shape a deferred row spells its marker in. The gate resolves the row
+// against `docs/attention-signals.md § Not yet implemented` through it, so a
+// second wording is a row nothing can check.
 var reDeferredMarker = regexp.MustCompile(`— NOT IMPLEMENTED \(backlog; no emission in code as of \d{4}-\d{2}-\d{2}\)`)
 
 const deferredMarkerShape = "— NOT IMPLEMENTED (backlog; no emission in code as of <YYYY-MM-DD>)"
@@ -380,10 +362,8 @@ func splitTableRow(line string) []string {
 	return cells
 }
 
-// catalogPhraseSeverities returns, for one shortName, every phrase the
-// generated signals table carries and the severity words it carries it under.
-// A phrase can be shared by two codes at different severities, so the value is
-// a set.
+// catalogSignalsByType parses the generated signals table into shortName -> its
+// rows. A phrase can be shared by two codes at different severities.
 func catalogSignalsByType(t *testing.T) map[string][]catalogSignal {
 	t.Helper()
 	generated, _ := attentionSignalsDoc(t)
@@ -422,7 +402,7 @@ type catalogSignal struct {
 }
 
 // severityWordForBucket maps the catalog's severity to the word the resource
-// docs' §4 tables spell in their "State bucket" column.
+// docs' Issue Visualization tables spell in their "State bucket" column.
 var severityWordForBucket = map[string]string{
 	"broken": "Broken",
 	"warn":   "Warning",
@@ -449,18 +429,20 @@ const (
 	kindQuotedColour = "quotes a phrase under the wrong colour"
 )
 
-// expectedGlyph derives the Severity cell of a §4 row from the finding alone.
-// The renderer is the only source: internal/tui/views/detail_fields.go builds
-// the detail-view Attention section, one entry per finding of either wave, and
-// gives it `!` at SevBroken and `~` otherwise. A finding that is not
-// Severity.IsIssue() — SevDim, SevOK — is skipped there, so it has no tier.
+// expectedGlyph derives the Severity cell of an Issue Visualization row from
+// the finding alone. The renderer is the only source:
+// internal/tui/views/detail_fields.go builds the detail-view Attention section,
+// one entry per finding of either wave, and gives it `!` at SevBroken and `~`
+// otherwise. A finding that is not Severity.IsIssue() — SevDim, SevOK — is
+// skipped there, so it has no tier.
 //
-// Not the list decorator. core/app/list_columns.go resolveListRowSeverity
-// reaches its glyph branch only for a row td.ResolveColor calls Healthy, and
+// The list decorator is not a source. core/app/list_columns.go
+// resolveListRowSeverity reaches its glyph branch only for a row
+// td.ResolveColor calls Healthy, and
 // tests/unit/qa_color_findings_conformance_test.go holds every registered type
 // to "colour is the worst finding across both waves" with an empty divergence
 // allowlist, so a Healthy row carries no warn or broken finding and that branch
-// cannot fire. A glyph derived from the list row is not to be restored.
+// cannot fire.
 func expectedGlyph(sig catalogSignal) string {
 	switch sig.severity {
 	case "broken":
@@ -599,15 +581,16 @@ func pageRecordsCondition(rowCondition string, pageConditions []string) bool {
 }
 
 // docCompletenessOffenders resolves one resource doc against the shipped
-// definitions: every phrase its §4 table promises is one the emitter produces,
-// at the severity and in the wave the catalog gives it; every finding the
-// catalog ships for the type has a row; §3 and §4 describe the same signals;
-// and a row the doc renders for a condition nothing emits is recorded as
-// deferred on the signals page. A doc that spells its own wording, bucket or
+// definitions: every phrase its Issue Visualization table promises is one the
+// emitter produces, at the severity and in the wave the catalog gives it; every
+// finding the catalog ships for the type has a row; the Attention / Issues
+// Algorithm section and the Issue Visualization table describe the same
+// signals; and a row the doc renders for a condition nothing emits is recorded
+// as deferred on the signals page. A doc that spells its own wording, bucket or
 // wave is a second definition of the finding, and the reader cannot tell which
 // one ships.
 //
-// The second result is false when the doc carries no §3/§4 at all, or no type
+// The second result is false when the doc carries neither section, or no type
 // the catalog knows — an implementation plan, not a resource design.
 func docCompletenessOffenders(t *testing.T, path string) ([]docOffender, bool) {
 	t.Helper()
@@ -758,11 +741,11 @@ var reNoWaveSignals = regexp.MustCompile(`(?i)no wave ([123])(?:(?: [a-z]+)* sig
 
 var reS3Suppressed = regexp.MustCompile(`S3 (is )?suppress`)
 
-// The §4.1 paragraph quotes what the operator reads off the list, so a code
-// span in it is a promise about a Status cell. Resolving those spans against
-// the type's generated table is the same rule the §4 table rows already carry
-// — a phrase spelled here and nowhere in the catalog is a second definition of
-// the finding, and the reader cannot tell which one ships.
+// The UX review paragraph quotes what the operator reads off the list, so a
+// code span in it is a promise about a Status cell. Resolving those spans
+// against the type's generated table is the same rule the Issue Visualization
+// rows carry — a phrase spelled here and nowhere in the catalog is a second
+// definition of the finding, and the reader cannot tell which one ships.
 //
 // Not every span on the line is such a promise. Four shapes name something
 // other than list text and are read past: an SDK field or shape
@@ -778,26 +761,26 @@ var (
 	reColourWord    = regexp.MustCompile(`(?i)\b(red|yellow|dim|grey|gray)\b`)
 )
 
-// colourSeverity maps the colour word a §4.1 sentence puts beside a phrase to
-// the severity the catalog registers that phrase under. Green has no entry: a
-// healthy row carries no finding, so a phrase quoted as green is a phrase the
+// colourSeverity maps the colour word a UX review sentence puts beside a phrase
+// to the severity the catalog registers that phrase under. Green has no entry:
+// a healthy row carries no finding, so a phrase quoted as green is a phrase the
 // list never shows for a reason the catalog knows.
 var colourSeverity = map[string]string{
 	"red": "broken", "yellow": "warn", "dim": "dim", "grey": "dim", "gray": "dim",
 }
 
-// listTextClaim is one code span of a §4.1 paragraph, with the colour word the
-// sentence puts in front of it. The colour is the last one between the end of
-// the previous span and the start of this one, which is where the docs put it
-// ("a red row reading `public access policy`"); a phrase with no colour word in
-// front of it is checked for existence only.
+// listTextClaim is one code span of a UX review paragraph, with the colour word
+// the sentence puts in front of it. The colour is the last one between the end
+// of the previous span and the start of this one, which is where the docs put
+// it ("a red row reading `public access policy`"); a phrase with no colour word
+// in front of it is checked for existence only.
 type listTextClaim struct {
 	text   string
 	colour string
 }
 
-// listTextClaims splits a §4.1 line into the spans that promise list text. A
-// span the type ships as a phrase is a claim whatever else it looks like:
+// listTextClaims splits a UX review line into the spans that promise list text.
+// A span the type ships as a phrase is a claim whatever else it looks like:
 // `alarm` is both a phrase of `alarm_history` and the short name of another
 // type, and reading it as the short name would drop the row's colour check.
 func listTextClaims(line string, phrases, pivots map[string]bool) []listTextClaim {
@@ -819,11 +802,11 @@ func listTextClaims(line string, phrases, pivots map[string]bool) []listTextClai
 	return claims
 }
 
-// The §4.1 paragraph answers one question — what the operator can read off the
-// list without opening detail — so naming the tier in it says the tier is on
-// the list row. It is not: it is an entry in the detail-view Attention section
+// The UX review paragraph answers one question — what the operator can read off
+// the list without opening detail — so naming the tier in it says the tier is
+// on the list row. The tier is an entry in the detail-view Attention section
 // (internal/tui/views/detail_fields.go), which is the thing opening detail
-// shows. A page that wants to say where the tier lives says it in §5.
+// shows.
 var (
 	reUXReviewLine = regexp.MustCompile(`^At 3am`)
 	reTierToken    = regexp.MustCompile("`!`|`~`|glyph")
@@ -934,10 +917,11 @@ func signalWords(signals []catalogSignal, get func(catalogSignal) string) []stri
 
 var reDocSignalBucket = regexp.MustCompile(`\*\*State bucket\*\*:\s*([A-Za-z]+)`)
 
-// docSectionBuckets counts the buckets a doc's §3 signal bullets describe, and
-// returns the line of the first one so a mismatch points somewhere. A bullet
-// carrying the deferred marker is left out on both sides of the comparison: it
-// describes a signal the doc has already told the reader does not ship.
+// docSectionBuckets counts the buckets a doc's Attention / Issues Algorithm
+// bullets describe, and returns the line of the first one so a mismatch points
+// somewhere. A bullet carrying the deferred marker describes a signal the doc
+// has already told the reader does not ship, so it is left out on both sides of
+// the comparison.
 func docSectionBuckets(t *testing.T, path string) (map[string]int, int) {
 	t.Helper()
 	lines := readLines(t, path)
@@ -983,13 +967,10 @@ func formatBucketCounts(counts map[string]int) string {
 	return "{" + strings.Join(parts, " ") + "}"
 }
 
-// TestCompleteResourceDocsListExactlyWhatShips walks every resource design doc
-// and resolves its hand-written signal sections against the shipped
-// definitions. There is no per-doc opt-in: a doc that describes signals is a
-// doc a reader trusts, and one that describes them wrong is a contract the
-// reader follows into a behaviour a9s does not have. Docs with no §3/§4 table,
-// and docs whose name is no type the catalog knows, are skipped by that
-// property — they are implementation plans, not designs.
+// A doc that describes signals is a doc a reader trusts, and one that describes
+// them wrong is a contract the reader follows into a behaviour a9s does not
+// have. Docs with no signal sections, and docs whose name is no type the
+// catalog knows, are implementation plans, not designs, and are skipped.
 func TestCompleteResourceDocsListExactlyWhatShips(t *testing.T) {
 	paths, err := filepath.Glob(filepath.Join(projectRoot(t), "docs", "resources", "*.md"))
 	if err != nil {
@@ -1044,10 +1025,8 @@ var (
 	reSmokeOpenDtl  = regexp.MustCompile(`send-keys[^\n]*'d'`)
 )
 
-// TestCitesSmokeDemoCapturesNgDetail pins that the demo smoke walks an EKS node
-// group into its detail view and asserts the health-issue cause there. The
-// health issue is a supporting row now, so the only place it can be seen is the
-// detail body — a list-only capture proves nothing about it.
+// The node group health issue is a supporting row, visible only in the detail
+// body, so a list-only capture of the demo smoke proves nothing about it.
 func TestCitesSmokeDemoCapturesNgDetail(t *testing.T) {
 	path := filepath.Join(projectRoot(t), "scripts", "smoke-demo.sh")
 	rel := relToRoot(t, path)
@@ -1165,8 +1144,6 @@ func TestCitesNotYetImplementedCitationsResolveToALine(t *testing.T) {
 			"citing a section that does not record it:\n%s", len(offenders), strings.Join(offenders, "\n"))
 	}
 }
-
-// ─── docs/related-resources.md — the related-panel contract ─────────────────
 
 // The related contract page is edited under its own rules and its sections are
 // renumbered whenever a pivot is added, so a line number in a citation is a
@@ -1310,15 +1287,15 @@ func pivotNames(t *testing.T) map[string]bool {
 	return names
 }
 
-// A §2 block heading names its pivot and nothing else. The panel renders one
-// row per registered pivot and has no row for a heading that annotates an
-// absence ("`dbc` (intentionally absent)"), so a heading carrying prose is a
-// block the reader cannot match to anything on screen.
+// A Related Resources Panel block heading names its pivot and nothing else.
+// The panel renders one row per registered pivot and has no row for a heading
+// that annotates an absence ("`dbc` (intentionally absent)"), so a heading
+// carrying prose is a block the reader cannot match to anything on screen.
 var reRelatedPivotHeading = regexp.MustCompile("^### `([a-z0-9-]+)`$")
 
-// docRelatedPivots reads the `### ` headings of a resource doc's §2 — the
-// related-panel section — which is one block per pivot the doc promises. The
-// second result is false for a doc with no §2 at all.
+// docRelatedPivots reads the `### ` headings of a resource doc's Related
+// Resources Panel section, one block per pivot the doc promises. The last
+// result is false for a doc with no such section.
 func docRelatedPivots(t *testing.T, path string) ([]string, map[string]int, []string, bool) {
 	t.Helper()
 	var order, offShape []string
@@ -1347,16 +1324,14 @@ func docRelatedPivots(t *testing.T, path string) ([]string, map[string]int, []st
 	return order, lines, offShape, sawHeading
 }
 
-// TestCitesRelatedPanelSectionMatchesRegistry resolves each resource doc's §2
-// against the pivots the catalog registers for that type. §2 is the reader's
-// answer to "what can I pivot to from here", and the panel is built from the
-// catalog's `Related` entries, so a block for a pivot nothing registers
-// promises a row the panel never renders, and a registered pivot with no block
-// is a row the reader meets with no explanation of what it is or how it was
-// found.
+// The Related Resources Panel section answers "what can I pivot to from here",
+// and the panel is built from the catalog's `Related` entries, so a block for a
+// pivot nothing registers promises a row the panel never renders, and a
+// registered pivot with no block is a row the reader meets with no explanation
+// of what it is or how it was found.
 //
 // Docs for a type the catalog registers no pivots for are implementation plans
-// rather than designs, and are skipped by that property.
+// rather than designs, and are skipped.
 func TestCitesRelatedPanelSectionMatchesRegistry(t *testing.T) {
 	paths, err := filepath.Glob(filepath.Join(projectRoot(t), "docs", "resources", "*.md"))
 	if err != nil {

@@ -65,13 +65,10 @@ func TestRelated_DbcSnap_Registered(t *testing.T) {
 	}
 }
 
-// --- Backup checker tests (Pattern C — cache scan, zero API calls) ---
-//
-// The dbc-snap → backup pivot now mirrors the dbi-snap → backup pattern:
-// resolve the snapshot's parent cluster ARN via the dbc cache, then scan the
-// loaded backup PLAN cache for plans whose Fields["resources"] cover that
-// cluster ARN. Returns plan IDs (not recovery-point ARNs) so drill-through
-// lands on the backup-plan list.
+// The dbc-snap → backup pivot resolves the snapshot's parent cluster ARN via
+// the dbc cache, then scans the backup plan cache for plans whose
+// Fields["resources"] cover that ARN. It returns plan IDs, not recovery-point
+// ARNs, so drill-through lands on the backup-plan list.
 
 const dbcSnapTestClusterID = "acme-docdb-prod"
 const dbcSnapTestClusterARN = "arn:aws:rds:us-east-1:123456789012:cluster:acme-docdb-prod"
@@ -124,8 +121,6 @@ func dbcSnapBackupCache(planResources string) resource.ResourceCache {
 	}
 }
 
-// TestRelated_DbcSnap_Backup_Match verifies a single plan whose resources
-// cover the parent cluster ARN resolves to Count=1 with that plan's ID.
 func TestRelated_DbcSnap_Backup_Match(t *testing.T) {
 	res := dbcSnapBackupSrcResource()
 	cache := dbcSnapBackupCache(dbcSnapTestClusterARN)
@@ -141,8 +136,6 @@ func TestRelated_DbcSnap_Backup_Match(t *testing.T) {
 	}
 }
 
-// TestRelated_DbcSnap_Backup_Empty verifies Count=0 when no plan covers the
-// parent cluster ARN.
 func TestRelated_DbcSnap_Backup_Empty(t *testing.T) {
 	res := dbcSnapBackupSrcResource()
 	cache := dbcSnapBackupCache("arn:aws:rds:us-east-1:123456789012:cluster:unrelated")
@@ -155,14 +148,11 @@ func TestRelated_DbcSnap_Backup_Empty(t *testing.T) {
 	}
 }
 
-// TestRelated_DbcSnap_Backup_NoParentReference verifies Count=0 when the
-// snapshot has no DBClusterIdentifier (manual/shared snapshot).
 func TestRelated_DbcSnap_Backup_NoParentReference(t *testing.T) {
 	res := resource.Resource{
 		ID: "snap-1",
 		RawStruct: docdbtypes.DBClusterSnapshot{
 			DBClusterSnapshotIdentifier: aws.String("snap-1"),
-			// DBClusterIdentifier intentionally nil
 		},
 	}
 	checker := dbcSnapCheckerByTarget(t, "backup")
@@ -173,25 +163,9 @@ func TestRelated_DbcSnap_Backup_NoParentReference(t *testing.T) {
 	}
 }
 
-// Suppress unused-import warning when backuptypes is no longer needed.
+// Keeps the backuptypes import referenced.
 var _ = backuptypes.RecoveryPointByResource{}
 
-// ---------------------------------------------------------------------------
-// Issue 3: checkDbcSnapDBC cache existence check missing
-//
-// Bug: checkDbcSnapDBC (dbc_snap_related.go:17-31) emits relatedResult("dbc", [id])
-// directly from DBClusterIdentifier with NO cache existence check. Sister
-// checkDBISnapDBI does the cache scan + TruncatedResult/UnknownRelated logic.
-// Result: orphan dbc-snap rows whose source cluster is deleted will claim Count=1.
-//
-// These tests FAIL today because checkDbcSnapDBC always returns Count=1 for any
-// non-empty DBClusterIdentifier, regardless of whether the cluster is in the cache.
-// After fix, it must scan the dbc cache and return Count=0 (or TruncatedResult /
-// UnknownRelated) when the cluster is absent.
-// ---------------------------------------------------------------------------
-
-// dbcSnapDBC_SnapshotWithDocDBRaw builds a dbc-snap source resource with a
-// docdbtypes.DBClusterSnapshot RawStruct referencing the given cluster ID.
 func dbcSnapDBC_SnapshotWithDocDBRaw(clusterID string) resource.Resource {
 	return resource.Resource{
 		ID:   "dbc-snap-" + clusterID + "-2026-01-01",
@@ -203,8 +177,6 @@ func dbcSnapDBC_SnapshotWithDocDBRaw(clusterID string) resource.Resource {
 	}
 }
 
-// dbcSnapDBC_SnapshotWithRDSRaw builds a dbc-snap source resource with an
-// rdstypes.DBClusterSnapshot RawStruct referencing the given cluster ID.
 func dbcSnapDBC_SnapshotWithRDSRaw(clusterID string) resource.Resource {
 	return resource.Resource{
 		ID:   "rds-dbc-snap-" + clusterID + "-2026-01-01",
@@ -216,12 +188,10 @@ func dbcSnapDBC_SnapshotWithRDSRaw(clusterID string) resource.Resource {
 	}
 }
 
-// dbcSnapDBC_CompleteCacheWithoutCluster builds a dbc cache that is NOT
-// truncated and does NOT contain the given cluster ID.
 func dbcSnapDBC_CompleteCacheWithoutCluster(_ string) resource.ResourceCache {
 	return resource.ResourceCache{
 		"dbc": resource.ResourceCacheEntry{
-			IsTruncated: false, // complete — parent definitively absent
+			IsTruncated: false,
 			Resources: []resource.Resource{
 				{ID: "other-cluster", Name: "other-cluster"},
 			},
@@ -229,12 +199,10 @@ func dbcSnapDBC_CompleteCacheWithoutCluster(_ string) resource.ResourceCache {
 	}
 }
 
-// dbcSnapDBC_TruncatedCacheWithoutCluster builds a dbc cache that IS truncated
-// and does NOT contain the given cluster ID in the visible window.
 func dbcSnapDBC_TruncatedCacheWithoutCluster(_ string) resource.ResourceCache {
 	return resource.ResourceCache{
 		"dbc": resource.ResourceCacheEntry{
-			IsTruncated: true, // truncated — parent may be in later page
+			IsTruncated: true,
 			Resources: []resource.Resource{
 				{ID: "other-cluster", Name: "other-cluster"},
 			},
@@ -242,7 +210,6 @@ func dbcSnapDBC_TruncatedCacheWithoutCluster(_ string) resource.ResourceCache {
 	}
 }
 
-// dbcSnapDBC_CacheWithCluster builds a dbc cache containing the given cluster ID.
 func dbcSnapDBC_CacheWithCluster(clusterID string) resource.ResourceCache {
 	return resource.ResourceCache{
 		"dbc": resource.ResourceCacheEntry{
@@ -254,12 +221,6 @@ func dbcSnapDBC_CacheWithCluster(clusterID string) resource.ResourceCache {
 	}
 }
 
-// TestRelated_DbcSnap_DBC_OrphanComplete_DocDB verifies that when the dbc cache
-// is complete (IsTruncated=false) and does NOT contain the snapshot's parent
-// cluster, the checker returns Count=0 (cluster is definitively deleted/absent).
-//
-// FAILS today: checkDbcSnapDBC returns Count=1 (relatedResult with the cluster ID)
-// regardless of cache state — it has no cache scan.
 func TestRelated_DbcSnap_DBC_OrphanComplete_DocDB(t *testing.T) {
 	const ghostCluster = "ghost-cluster"
 	res := dbcSnapDBC_SnapshotWithDocDBRaw(ghostCluster)
@@ -268,8 +229,6 @@ func TestRelated_DbcSnap_DBC_OrphanComplete_DocDB(t *testing.T) {
 	checker := dbcSnapCheckerByTarget(t, "dbc")
 	result := checker(context.Background(), nil, res, cache)
 
-	// FAILS today: checkDbcSnapDBC returns Count=1 unconditionally.
-	// PROBE-TRUNCATION-LOST BUG cousin: orphan cluster appears to exist.
 	if result.Count() != 0 {
 		t.Errorf(
 			"checkDbcSnapDBC (docdb RawStruct): ghost cluster %q with complete cache: "+
@@ -280,10 +239,6 @@ func TestRelated_DbcSnap_DBC_OrphanComplete_DocDB(t *testing.T) {
 	}
 }
 
-// TestRelated_DbcSnap_DBC_OrphanComplete_RDS verifies the same orphan scenario
-// for rdstypes.DBClusterSnapshot RawStruct (the second branch in checkDbcSnapDBC).
-//
-// FAILS today: checkDbcSnapDBC returns Count=1 regardless of cache for both branches.
 func TestRelated_DbcSnap_DBC_OrphanComplete_RDS(t *testing.T) {
 	const ghostCluster = "ghost-rds-cluster"
 	res := dbcSnapDBC_SnapshotWithRDSRaw(ghostCluster)
@@ -292,7 +247,6 @@ func TestRelated_DbcSnap_DBC_OrphanComplete_RDS(t *testing.T) {
 	checker := dbcSnapCheckerByTarget(t, "dbc")
 	result := checker(context.Background(), nil, res, cache)
 
-	// FAILS today: checkDbcSnapDBC returns Count=1 unconditionally (rds branch).
 	if result.Count() != 0 {
 		t.Errorf(
 			"checkDbcSnapDBC (rds RawStruct): ghost cluster %q with complete cache: "+
@@ -303,10 +257,8 @@ func TestRelated_DbcSnap_DBC_OrphanComplete_RDS(t *testing.T) {
 	}
 }
 
-// TestRelated_DbcSnap_DBC_OrphanTruncated_DocDB: the checker scans the list
-// rather than answering 1 from the snapshot's own cluster id. The dbc list IS
-// the target list here, so a truncated page that did not carry the parent is
-// a resolved zero carrying the truncation flag, rendered "(0+)", not Unknown.
+// The dbc list is the target list, so a truncated page that did not carry the
+// parent is a resolved zero carrying the truncation flag, rendered "(0+)".
 // Unknown is reserved for a list that was never read.
 func TestRelated_DbcSnap_DBC_OrphanTruncated_DocDB(t *testing.T) {
 	const ghostCluster = "ghost-cluster-trunc"
@@ -319,8 +271,6 @@ func TestRelated_DbcSnap_DBC_OrphanTruncated_DocDB(t *testing.T) {
 	assertDbcSnapTruncatedZero(t, "docdb RawStruct", ghostCluster, result)
 }
 
-// TestRelated_DbcSnap_DBC_OrphanTruncated_RDS is the same case for the
-// rdstypes.DBClusterSnapshot shape.
 func TestRelated_DbcSnap_DBC_OrphanTruncated_RDS(t *testing.T) {
 	const ghostCluster = "ghost-rds-cluster-trunc"
 	res := dbcSnapDBC_SnapshotWithRDSRaw(ghostCluster)
@@ -332,11 +282,6 @@ func TestRelated_DbcSnap_DBC_OrphanTruncated_RDS(t *testing.T) {
 	assertDbcSnapTruncatedZero(t, "rds RawStruct", ghostCluster, result)
 }
 
-// TestRelated_DbcSnap_DBC_PresentInCache_DocDB verifies that when the parent
-// cluster IS in the dbc cache, the checker returns Count=1 with the matching ID.
-//
-// This should PASS today (the cluster ID is returned directly). It pins the
-// correct behavior so the fix does not break the happy-path case.
 func TestRelated_DbcSnap_DBC_PresentInCache_DocDB(t *testing.T) {
 	const clusterID = "my-docdb-cluster"
 	res := dbcSnapDBC_SnapshotWithDocDBRaw(clusterID)
@@ -353,10 +298,6 @@ func TestRelated_DbcSnap_DBC_PresentInCache_DocDB(t *testing.T) {
 	}
 }
 
-// TestRelated_DbcSnap_DBC_PresentInCache_RDS verifies the same happy-path for
-// rdstypes.DBClusterSnapshot RawStruct.
-//
-// Should PASS today (cluster ID returned directly). Pins the happy-path.
 func TestRelated_DbcSnap_DBC_PresentInCache_RDS(t *testing.T) {
 	const clusterID = "my-aurora-cluster"
 	res := dbcSnapDBC_SnapshotWithRDSRaw(clusterID)
@@ -373,10 +314,9 @@ func TestRelated_DbcSnap_DBC_PresentInCache_RDS(t *testing.T) {
 	}
 }
 
-// assertDbcSnapTruncatedZero holds the row 16 reading for a ghost parent on a
-// truncated page: the list was read, so the zero is real so far, and the
-// truncation flag is what says a later page may still carry the cluster. The
-// snapshot's own cluster id must never become the count.
+// On a truncated page the list was read, so the zero is real so far, and the
+// truncation flag says a later page may still carry the cluster. The
+// snapshot's own cluster id never becomes the count.
 func assertDbcSnapTruncatedZero(t *testing.T, shape, ghostCluster string, result domain.RelatedCheckResult) {
 	t.Helper()
 	if result.State() != domain.RelatedResolved {
@@ -392,12 +332,9 @@ func assertDbcSnapTruncatedZero(t *testing.T, shape, ghostCluster string, result
 	}
 }
 
-// TestRelated_DbcSnap_DBC_ColdCacheIsUnknown pins row 16 case 1 at the dbc
-// snapshot pivot. When the dbc list was never read, the snapshot's own
-// DBClusterIdentifier is the only thing left, and it is a field of the source
-// resource rather than an answer from the target list — the same claim about
-// the past that a CloudTrail event body makes. The panel must say it does not
-// know, not offer a cluster nobody looked up.
+// When the dbc list was never read, the snapshot's own DBClusterIdentifier is
+// a field of the source resource, not an answer from the target list, so the
+// panel reports unknown.
 func TestRelated_DbcSnap_DBC_ColdCacheIsUnknown(t *testing.T) {
 	for _, tc := range []struct {
 		shape string
@@ -418,12 +355,8 @@ func TestRelated_DbcSnap_DBC_ColdCacheIsUnknown(t *testing.T) {
 	}
 }
 
-// TestRelated_DbcSnap_DBC_MatchOnTruncatedPageIsALowerBound pins the other half
-// of row 16 at this pivot. Before this batch the checker returned through a
-// helper that dropped the truncation flag on every matching path, so a parent
-// confirmed on a partial page rendered as an exact count. It is a lower bound:
-// the parent is real, and a page nobody read may carry another cluster of the
-// same name.
+// A parent confirmed on a truncated page is a lower bound: a page nobody read
+// may carry another cluster of the same name.
 func TestRelated_DbcSnap_DBC_MatchOnTruncatedPageIsALowerBound(t *testing.T) {
 	for _, tc := range []struct {
 		shape     string

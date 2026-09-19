@@ -14,8 +14,6 @@ package unit
 //	  finish); returns ctx.Err() in that case, nil otherwise.
 //	- limit <= 1 or n <= 1 degrade to a plain sequential loop.
 //	- fn is responsible for its own result collection and locking.
-//
-// Panic safety is explicitly out of contract and not tested here.
 
 import (
 	"context"
@@ -28,7 +26,7 @@ import (
 	awsclient "github.com/k2m30/a9s/v3/core/aws"
 )
 
-// TestForEachParallel_AllIndicesVisitedExactlyOnce pins case 1: every index
+// TestForEachParallel_AllIndicesVisitedExactlyOnce pins that every index
 // in [0,n) is visited exactly once, collected into a mutex-guarded set.
 func TestForEachParallel_AllIndicesVisitedExactlyOnce(t *testing.T) {
 	const n = 100
@@ -61,7 +59,7 @@ func TestForEachParallel_AllIndicesVisitedExactlyOnce(t *testing.T) {
 	}
 }
 
-// TestForEachParallel_ConcurrencyBounded pins case 2: with limit=4, the
+// TestForEachParallel_ConcurrencyBounded pins that with limit=4, the
 // max number of in-flight fn calls never exceeds 4, and — to prove actual
 // parallelization is happening rather than a hidden sequential loop — the
 // max in-flight count exceeds 1 at some point during the run.
@@ -96,7 +94,7 @@ func TestForEachParallel_ConcurrencyBounded(t *testing.T) {
 	}
 }
 
-// TestForEachParallel_ContextCancellation pins case 3: cancelling ctx after
+// TestForEachParallel_ContextCancellation pins that cancelling ctx after
 // a handful of fn calls stops new calls from starting, returns
 // context.Canceled, and the call returns promptly (no deadlock/leak).
 func TestForEachParallel_ContextCancellation(t *testing.T) {
@@ -147,7 +145,7 @@ func TestForEachParallel_ContextCancellation(t *testing.T) {
 	}
 }
 
-// TestForEachParallel_ZeroN pins case 4a: n=0 means fn is never called and
+// TestForEachParallel_ZeroN pins that n=0 means fn is never called and
 // the error is nil.
 func TestForEachParallel_ZeroN(t *testing.T) {
 	called := false
@@ -162,7 +160,7 @@ func TestForEachParallel_ZeroN(t *testing.T) {
 	}
 }
 
-// TestForEachParallel_LimitZero_SequentialInOrder pins case 4b: limit=0
+// TestForEachParallel_LimitZero_SequentialInOrder pins that limit=0
 // degrades to a plain sequential loop, visiting indices 0..n-1 in exact
 // ascending order.
 func TestForEachParallel_LimitZero_SequentialInOrder(t *testing.T) {
@@ -186,7 +184,7 @@ func TestForEachParallel_LimitZero_SequentialInOrder(t *testing.T) {
 	}
 }
 
-// TestForEachParallel_LimitOne_SequentialInOrder pins case 4b: limit=1
+// TestForEachParallel_LimitOne_SequentialInOrder pins that limit=1
 // likewise degrades to a plain sequential loop, visiting indices 0..n-1 in
 // exact ascending order.
 func TestForEachParallel_LimitOne_SequentialInOrder(t *testing.T) {
@@ -210,7 +208,7 @@ func TestForEachParallel_LimitOne_SequentialInOrder(t *testing.T) {
 	}
 }
 
-// TestForEachParallel_NOne pins case 4c: n=1 runs fn exactly once with i=0,
+// TestForEachParallel_NOne pins that n=1 runs fn exactly once with i=0,
 // regardless of limit.
 func TestForEachParallel_NOne(t *testing.T) {
 	var mu sync.Mutex
@@ -230,8 +228,8 @@ func TestForEachParallel_NOne(t *testing.T) {
 }
 
 // TestForEachParallel_RaceGuardedCollector is a race-detector-meaningful
-// test (case 6): many goroutines write through a single mutex-guarded
-// collector concurrently. Under `go test -race` (make test-race / CI) this
+// test: many goroutines write through a single mutex-guarded
+// collector concurrently. Under `go test -race` (make test-race) this
 // catches any accidental unsynchronized access introduced by the helper
 // itself (e.g. sharing loop variables across goroutines incorrectly).
 func TestForEachParallel_RaceGuardedCollector(t *testing.T) {

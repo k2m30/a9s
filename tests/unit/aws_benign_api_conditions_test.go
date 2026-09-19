@@ -1,28 +1,5 @@
 package unit
 
-// aws_benign_api_conditions_test.go — RED tests pinning the intended contract
-// for two live owner-reported error-lane floods (acme-dev logs):
-//
-//  1. sfn EXPRESS state machines: ListExecutions is not a supported operation
-//     for EXPRESS state machines (StateMachineTypeNotSupported). The fetcher
-//     already threads Fields["type"] from ListStateMachines through to the
-//     enricher's resources slice (sfn.go FetchStepFunctionsPage). Contract:
-//     EnrichStepFunctionsStatus must not call ListExecutions for a resource
-//     whose Fields["type"] == "EXPRESS" — zero error, zero finding from this
-//     enricher for that resource. A STANDARD machine is enriched normally.
-//     If a StateMachineTypeNotSupported error is still produced by the API for
-//     some resource, it must be treated as a benign skip and never surface in
-//     the composite error.
-//
-//  2. kms per-key AccessDeniedException on DescribeKey inside FetchKMSKeysPage:
-//     must NOT contribute to the composite fetch error (28/29 succeeding with
-//     only access-denied failures ⇒ nil error), and the denied key's row must
-//     still be present in Resources carrying a wave1 finding with an owner
-//     phrase distinguishing it from other KMS states. Other error kinds
-//     (throttle exhaustion, 500) must keep contributing to the composite
-//     error exactly as today (AggregateFailures path), and must NOT get a
-//     resource row assembled for that key.
-
 import (
 	"context"
 	"strings"
@@ -39,8 +16,6 @@ import (
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
-
-// --- sfn EXPRESS skip -------------------------------------------------
 
 // sfnTypeAwareFake implements SFNAPI (via embedding) and records every
 // StateMachineArn passed to ListExecutions so the test can assert EXPRESS
@@ -195,7 +170,7 @@ func TestEnrichStepFunctionsStatus_StateMachineTypeNotSupportedIsBenignSkip(t *t
 		notSupportedARNs: map[string]bool{arn: true},
 	}
 	clients := &awsclient.ServiceClients{SFN: fake}
-	// Fields["type"] deliberately omitted/empty to simulate the guard not
+	// An empty Fields["type"] simulates the guard not
 	// having type information available — the API-level error must still be
 	// treated as benign.
 	resources := []resource.Resource{
@@ -235,8 +210,6 @@ func fdump(r awsclient.IssueEnricherResult) string {
 	}
 	return sb.String()
 }
-
-// --- kms per-key AccessDenied -------------------------------------------
 
 // kmsPageFake implements KMSAPI for FetchKMSKeysPage testing. ListKeys and
 // ListAliases return fixed pages; DescribeKey is driven per-key-ID from a map
@@ -377,9 +350,8 @@ func TestFetchKMSKeysPage_AccessDeniedKeyRowCarriesOwnerFinding(t *testing.T) {
 // TestFetchKMSKeysPage_ThrottleAndServerErrorsStillContributeToCompositeError
 // pins that non-AccessDenied error kinds (throttle exhaustion, 500/internal)
 // are NOT reclassified as benign — they must keep contributing to the
-// composite AggregateFailures error exactly as before, and the failing key
-// must be excluded from Resources (current fetcher behavior: `continue`,
-// no partial row for a failed DescribeKey outside the access-denied case).
+// composite AggregateFailures error, and the failing key must be excluded
+// from Resources.
 func TestFetchKMSKeysPage_ThrottleAndServerErrorsStillContributeToCompositeError(t *testing.T) {
 	throttleErr := &smithy.GenericAPIError{Code: "ThrottlingException", Message: "Rate exceeded", Fault: smithy.FaultClient}
 	serverErr := &smithy.GenericAPIError{Code: "InternalServiceErrorException", Message: "internal error", Fault: smithy.FaultServer}

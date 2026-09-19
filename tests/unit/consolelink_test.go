@@ -1,11 +1,6 @@
-// consolelink_test.go — helper-level tests for core/consolelink, the package
-// backing the "o = open in AWS console / O = copy console URL" feature
-// (spec: console-url-spec.md). This package does not exist yet at RED time;
-// these tests define its contract: Domain, Regional, Global, GoView,
-// AccountFromARN, Valid, Resolve.
-//
-// Per-type builder coverage (all 70 top-level types) lives in
-// console_url_types_test.go. This file covers only the shared helpers.
+// Helper-level tests for core/consolelink, the package behind the "o = open in
+// AWS console / O = copy console URL" feature. Per-type builder coverage lives
+// in console_url_types_test.go.
 package unit_test
 
 import (
@@ -16,8 +11,6 @@ import (
 	"github.com/k2m30/a9s/v3/core/consolelink"
 	"github.com/k2m30/a9s/v3/core/domain"
 )
-
-// ─── Domain ─────────────────────────────────────────────────────────────────
 
 func TestConsoleLink_Domain_PartitionRouting(t *testing.T) {
 	cases := []struct {
@@ -38,8 +31,6 @@ func TestConsoleLink_Domain_PartitionRouting(t *testing.T) {
 		}
 	}
 }
-
-// ─── Regional / Global ──────────────────────────────────────────────────────
 
 func TestConsoleLink_Regional_BuildsRegionSubdomainHost(t *testing.T) {
 	cases := []struct {
@@ -81,8 +72,6 @@ func TestConsoleLink_Global_OmitsRegionSubdomain(t *testing.T) {
 	}
 }
 
-// ─── GoView ──────────────────────────────────────────────────────────────────
-
 func TestConsoleLink_GoView_QueryEscapesARN(t *testing.T) {
 	cases := []struct {
 		region, arn string
@@ -99,8 +88,6 @@ func TestConsoleLink_GoView_QueryEscapesARN(t *testing.T) {
 		}
 	}
 }
-
-// ─── AccountFromARN ──────────────────────────────────────────────────────────
 
 func TestConsoleLink_AccountFromARN(t *testing.T) {
 	cases := []struct {
@@ -119,8 +106,6 @@ func TestConsoleLink_AccountFromARN(t *testing.T) {
 		}
 	}
 }
-
-// ─── Valid ───────────────────────────────────────────────────────────────────
 
 func TestConsoleLink_Valid_AcceptsRealConsoleHosts(t *testing.T) {
 	valid := []string{
@@ -157,8 +142,6 @@ func TestConsoleLink_Valid_RejectsNonConsoleOrInsecureURLs(t *testing.T) {
 	}
 }
 
-// ─── Resolve ─────────────────────────────────────────────────────────────────
-
 func TestConsoleLink_Resolve_UsesConsoleURLWhenSet(t *testing.T) {
 	td := catalog.ResourceTypeDef{
 		ShortName: "ec2",
@@ -179,7 +162,7 @@ func TestConsoleLink_Resolve_UsesConsoleURLWhenSet(t *testing.T) {
 }
 
 func TestConsoleLink_Resolve_NilConsoleURLFallsBackToGoViewOnArnField(t *testing.T) {
-	// ct-events has no ConsoleURL builder per spec (deliberately nil).
+	// ct-events has no ConsoleURL builder.
 	td := catalog.ResourceTypeDef{ShortName: "ct-events"}
 	arn := "arn:aws:cloudtrail:us-east-1:123456789012:trail/acme-management-trail"
 	r := domain.Resource{ID: "evt-1", Fields: map[string]string{"arn": arn}}
@@ -208,9 +191,8 @@ func TestConsoleLink_Resolve_NoConsoleURLAndNoArnField_ReturnsFalse(t *testing.T
 }
 
 func TestConsoleLink_Resolve_ConsoleURLReturningEmptyFallsBackToGoView(t *testing.T) {
-	// Simulates e.g. trail/msk/sfn/ecs-svc when their required Fields key is
-	// missing at runtime: the type-specific builder itself returns "", but a
-	// bare Fields["arn"] is still present, so Resolve must not give up.
+	// A type-specific builder returns "" when its required Fields key is missing
+	// while a bare Fields["arn"] is still present; Resolve must fall back to it.
 	td := catalog.ResourceTypeDef{
 		ShortName: "trail",
 		ConsoleURL: func(r domain.Resource, region, accountID string) string {

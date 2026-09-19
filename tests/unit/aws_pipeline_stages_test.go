@@ -16,13 +16,6 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// ---------------------------------------------------------------------------
-// Pipeline Stages fetcher tests (child of CodePipelines)
-// ---------------------------------------------------------------------------
-
-// TestFetchPipelineStages_Basic verifies parsing of 2 stages with 4 total
-// actions, checking that each stage+action pair is flattened to its own
-// resource row with correct ID, Name, Status, and all Fields keys.
 func TestFetchPipelineStages_Basic(t *testing.T) {
 	lastChange1 := time.Date(2024, 6, 15, 10, 0, 0, 0, time.UTC)
 	lastChange2 := time.Date(2024, 6, 15, 10, 1, 30, 0, time.UTC)
@@ -107,7 +100,6 @@ func TestFetchPipelineStages_Basic(t *testing.T) {
 		t.Fatalf("expected 4 resources (2 stages x 2 actions each), got %d", len(resources))
 	}
 
-	// Row 0: Source / GitHub (first action in stage → stage_name populated)
 	r0 := resources[0]
 	t.Run("row0_stage_name", func(t *testing.T) {
 		if r0.Fields["stage_name"] != "Source" {
@@ -150,7 +142,6 @@ func TestFetchPipelineStages_Basic(t *testing.T) {
 		}
 	})
 
-	// Row 1: Source / S3Upload (second action → stage_name blank)
 	r1 := resources[1]
 	t.Run("row1_stage_name_blank", func(t *testing.T) {
 		if r1.Fields["stage_name"] != "" {
@@ -163,7 +154,6 @@ func TestFetchPipelineStages_Basic(t *testing.T) {
 		}
 	})
 
-	// Row 2: Deploy / CodeBuild (first action in second stage → stage_name populated)
 	r2 := resources[2]
 	t.Run("row2_stage_name", func(t *testing.T) {
 		if r2.Fields["stage_name"] != "Deploy" {
@@ -176,7 +166,6 @@ func TestFetchPipelineStages_Basic(t *testing.T) {
 		}
 	})
 
-	// Row 3: Deploy / ECS-Deploy (second action → stage_name blank)
 	r3 := resources[3]
 	t.Run("row3_stage_name_blank", func(t *testing.T) {
 		if r3.Fields["stage_name"] != "" {
@@ -204,9 +193,6 @@ func TestFetchPipelineStages_Basic(t *testing.T) {
 	})
 }
 
-// TestFetchPipelineStages_MultiAction verifies that a single stage with 3
-// actions produces 3 resource rows, and that stage_name is shown ONLY on
-// the first action row (blank for subsequent actions in the same stage).
 func TestFetchPipelineStages_MultiAction(t *testing.T) {
 	lastChange := time.Date(2024, 6, 15, 10, 0, 0, 0, time.UTC)
 
@@ -266,12 +252,10 @@ func TestFetchPipelineStages_MultiAction(t *testing.T) {
 		t.Fatalf("expected 3 resources for 3 actions, got %d", len(resources))
 	}
 
-	// First action should have stage_name populated
 	if resources[0].Fields["stage_name"] != "Build" {
 		t.Errorf("First action stage_name: expected %q, got %q", "Build", resources[0].Fields["stage_name"])
 	}
 
-	// Second and third actions should have blank stage_name
 	if resources[1].Fields["stage_name"] != "" {
 		t.Errorf("Second action stage_name should be blank, got %q", resources[1].Fields["stage_name"])
 	}
@@ -279,7 +263,6 @@ func TestFetchPipelineStages_MultiAction(t *testing.T) {
 		t.Errorf("Third action stage_name should be blank, got %q", resources[2].Fields["stage_name"])
 	}
 
-	// Verify all action names
 	if resources[0].Fields["action_name"] != "CompileCode" {
 		t.Errorf("Row 0 action_name: expected %q, got %q", "CompileCode", resources[0].Fields["action_name"])
 	}
@@ -291,8 +274,6 @@ func TestFetchPipelineStages_MultiAction(t *testing.T) {
 	}
 }
 
-// TestFetchPipelineStages_Empty verifies that a pipeline with no stages
-// returns an empty slice with no error.
 func TestFetchPipelineStages_Empty(t *testing.T) {
 	mock := &mockCodePipelineGetPipelineStateClient{
 		output: &codepipeline.GetPipelineStateOutput{
@@ -319,8 +300,6 @@ func TestFetchPipelineStages_Empty(t *testing.T) {
 	}
 }
 
-// TestFetchPipelineStages_Error verifies that GetPipelineState API errors
-// are propagated correctly.
 func TestFetchPipelineStages_Error(t *testing.T) {
 	mock := &mockCodePipelineGetPipelineStateClient{
 		err: fmt.Errorf("AWS API error: pipeline not found"),
@@ -347,8 +326,6 @@ func TestFetchPipelineStages_Error(t *testing.T) {
 	}
 }
 
-// TestFetchPipelineStages_NilExecution verifies that nil LatestExecution on
-// both stage and action level does not panic and produces empty status/time.
 func TestFetchPipelineStages_NilExecution(t *testing.T) {
 	mock := &mockCodePipelineGetPipelineStateClient{
 		output: &codepipeline.GetPipelineStateOutput{
@@ -356,11 +333,11 @@ func TestFetchPipelineStages_NilExecution(t *testing.T) {
 			StageStates: []cptypes.StageState{
 				{
 					StageName:       aws.String("Source"),
-					LatestExecution: nil, // nil stage execution
+					LatestExecution: nil,
 					ActionStates: []cptypes.ActionState{
 						{
 							ActionName:      aws.String("GitHub"),
-							LatestExecution: nil, // nil action execution
+							LatestExecution: nil,
 						},
 					},
 				},
@@ -415,8 +392,6 @@ func TestFetchPipelineStages_NilExecution(t *testing.T) {
 	})
 }
 
-// TestFetchPipelineStages_NilActionStates verifies that a stage with nil or
-// empty ActionStates produces no rows for that stage.
 func TestFetchPipelineStages_NilActionStates(t *testing.T) {
 	mock := &mockCodePipelineGetPipelineStateClient{
 		output: &codepipeline.GetPipelineStateOutput{
@@ -427,14 +402,14 @@ func TestFetchPipelineStages_NilActionStates(t *testing.T) {
 					LatestExecution: &cptypes.StageExecution{
 						Status: cptypes.StageExecutionStatusSucceeded,
 					},
-					ActionStates: nil, // nil action states
+					ActionStates: nil,
 				},
 				{
 					StageName: aws.String("AlsoEmpty"),
 					LatestExecution: &cptypes.StageExecution{
 						Status: cptypes.StageExecutionStatusSucceeded,
 					},
-					ActionStates: []cptypes.ActionState{}, // empty action states
+					ActionStates: []cptypes.ActionState{},
 				},
 			},
 		},
@@ -459,15 +434,6 @@ func TestFetchPipelineStages_NilActionStates(t *testing.T) {
 	}
 }
 
-// TestFetchPipelineStages_StatusMapping verifies that action execution
-// statuses map correctly to resource Status values:
-//
-//	Succeeded   → "running"
-//	Failed      → "failed"
-//	InProgress  → "pending"
-//	Stopped     → "terminated"
-//	Abandoned   → "terminated"
-//	""          → "terminated"
 func TestFetchPipelineStages_StatusMapping(t *testing.T) {
 	lastChange := time.Date(2024, 6, 15, 10, 0, 0, 0, time.UTC)
 
@@ -526,8 +492,6 @@ func TestFetchPipelineStages_StatusMapping(t *testing.T) {
 	}
 }
 
-// TestFetchPipelineStages_ExternalURL verifies that ExternalExecutionUrl is
-// correctly extracted from the action execution.
 func TestFetchPipelineStages_ExternalURL(t *testing.T) {
 	lastChange := time.Date(2024, 6, 15, 10, 0, 0, 0, time.UTC)
 	expectedURL := "https://console.aws.amazon.com/codebuild/home#/builds/my-project:build-001/view/new"
@@ -567,8 +531,6 @@ func TestFetchPipelineStages_ExternalURL(t *testing.T) {
 	}
 }
 
-// TestFetchPipelineStages_LastChangeTime verifies that LastStatusChange
-// is formatted as "2006-01-02 15:04" in UTC.
 func TestFetchPipelineStages_LastChangeTime(t *testing.T) {
 	ts := time.Date(2024, 12, 25, 23, 59, 59, 0, time.UTC)
 
@@ -607,9 +569,6 @@ func TestFetchPipelineStages_LastChangeTime(t *testing.T) {
 	}
 }
 
-// TestFetchPipelineStages_DetailFields verifies that detail-only fields
-// (action_token, action_error_details, revision_id, revision_summary)
-// are correctly extracted.
 func TestFetchPipelineStages_DetailFields(t *testing.T) {
 	lastChange := time.Date(2024, 6, 15, 10, 0, 0, 0, time.UTC)
 
@@ -671,8 +630,6 @@ func TestFetchPipelineStages_DetailFields(t *testing.T) {
 	})
 }
 
-// TestFetchPipelineStages_ErrorDetails verifies that ErrorDetails with Code
-// and Message are formatted as "code: message".
 func TestFetchPipelineStages_ErrorDetails(t *testing.T) {
 	lastChange := time.Date(2024, 6, 15, 10, 0, 0, 0, time.UTC)
 
@@ -717,8 +674,6 @@ func TestFetchPipelineStages_ErrorDetails(t *testing.T) {
 	}
 }
 
-// TestFetchPipelineStages_ParentContext verifies that the "pipeline_name"
-// context key from the parent is used to call GetPipelineState.
 func TestFetchPipelineStages_ParentContext(t *testing.T) {
 	mock := &mockCodePipelineGetPipelineStateClient{
 		output: &codepipeline.GetPipelineStateOutput{
@@ -740,13 +695,8 @@ func TestFetchPipelineStages_ParentContext(t *testing.T) {
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
-	// If GetPipelineState was called without error, the pipeline_name was used
 }
 
-// TestFetchPipelineStages_RawStruct verifies that RawStruct is preserved
-// for each flattened row. Since we flatten stage→action, the RawStruct
-// should be a PipelineStageRow (or equivalent) that holds both stage and
-// action information for YAML/detail view rendering.
 func TestFetchPipelineStages_RawStruct(t *testing.T) {
 	lastChange := time.Date(2024, 6, 15, 10, 0, 0, 0, time.UTC)
 
@@ -799,8 +749,6 @@ func TestFetchPipelineStages_RawStruct(t *testing.T) {
 	}
 }
 
-// TestFetchPipelineStages_RegistrationExists verifies that "pipeline_stages"
-// is registered as a child resource type.
 func TestFetchPipelineStages_RegistrationExists(t *testing.T) {
 	td := resource.GetChildType("pipeline_stages")
 	if td == nil {
@@ -814,12 +762,6 @@ func TestFetchPipelineStages_RegistrationExists(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// Column definitions test
-// ---------------------------------------------------------------------------
-
-// TestPipelineStageColumns verifies that PipelineStageColumns returns 6
-// columns with the expected keys, titles, and widths.
 func TestPipelineStageColumns(t *testing.T) {
 	cols := resource.PipelineStageColumns()
 
@@ -857,8 +799,6 @@ func TestPipelineStageColumns(t *testing.T) {
 	}
 }
 
-// TestPipelineStages_PaginatedChildFetcherRegistered verifies that the paginated
-// child fetcher is registered under the correct short name.
 func TestPipelineStages_PaginatedChildFetcherRegistered(t *testing.T) {
 	f := resource.GetPaginatedChildFetcher("pipeline_stages")
 	if f == nil {
@@ -866,8 +806,6 @@ func TestPipelineStages_PaginatedChildFetcherRegistered(t *testing.T) {
 	}
 }
 
-// TestPipelineStages_ParentHasChildDef verifies that the pipeline parent
-// resource type has a Children entry for pipeline_stages.
 func TestPipelineStages_ParentHasChildDef(t *testing.T) {
 	var pipelineType *resource.ResourceTypeDef
 	for _, rt := range resource.AllResourceTypes() {
@@ -903,12 +841,6 @@ func TestPipelineStages_ParentHasChildDef(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// Config defaults test
-// ---------------------------------------------------------------------------
-
-// TestConfigDefaultViewDef_PipelineStages verifies that the pipeline_stages
-// view definition has the expected list columns and non-empty detail paths.
 func TestConfigDefaultViewDef_PipelineStages(t *testing.T) {
 	vd := config.DefaultViewDef("pipeline_stages")
 
@@ -925,7 +857,6 @@ func TestConfigDefaultViewDef_PipelineStages(t *testing.T) {
 	})
 }
 
-// Ensure all imports are used.
 var _ = aws.String
 var _ = codepipeline.GetPipelineStateOutput{}
 var _ = config.DefaultViewDef

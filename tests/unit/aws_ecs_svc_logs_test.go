@@ -15,14 +15,6 @@ import (
 	awsclient "github.com/k2m30/a9s/v3/core/aws"
 )
 
-// ---------------------------------------------------------------------------
-// ECS Service Logs fetcher tests (child of ECS Services, cross-service)
-// API Sequence: DescribeTaskDefinition -> FilterLogEvents
-// ---------------------------------------------------------------------------
-
-// TestFetchEcsSvcLogs_Basic verifies happy path: task def has awslogs driver,
-// FilterLogEvents returns 3 events, verifying timestamp (formatEpochMillis),
-// stream_short, and message fields.
 func TestFetchEcsSvcLogs_Basic(t *testing.T) {
 	taskDefMock := &mockECSDescribeTaskDefinitionClient{
 		output: &ecs.DescribeTaskDefinitionOutput{
@@ -101,14 +93,12 @@ func TestFetchEcsSvcLogs_Basic(t *testing.T) {
 		if r.Fields["timestamp"] == "" {
 			t.Error("Fields[timestamp] should not be empty")
 		}
-		// Should be formatted, not raw epoch ms
 		if r.Fields["timestamp"] == "1711036800000" {
 			t.Errorf("timestamp should be formatted, not raw epoch ms: %q", r.Fields["timestamp"])
 		}
 	})
 
 	t.Run("event_0_Fields_timestamp_formatted", func(t *testing.T) {
-		// 1711036800000 = 2024-03-21 16:00 UTC
 		r := result.Resources[0]
 		if !strings.Contains(r.Fields["timestamp"], "2024-03-21") {
 			t.Errorf("timestamp should contain date '2024-03-21', got %q", r.Fields["timestamp"])
@@ -120,8 +110,6 @@ func TestFetchEcsSvcLogs_Basic(t *testing.T) {
 		if r.Fields["stream_short"] == "" {
 			t.Error("Fields[stream_short] should not be empty")
 		}
-		// stream_short should be a shortened version of the log stream name
-		// e.g., "web/abc123de" from "ecs/web/abc123def456"
 	})
 
 	t.Run("event_0_Fields_message", func(t *testing.T) {
@@ -148,7 +136,6 @@ func TestFetchEcsSvcLogs_Basic(t *testing.T) {
 		}
 	})
 
-	// Verify required fields on all events
 	t.Run("required_fields_present", func(t *testing.T) {
 		requiredFields := []string{"timestamp", "stream_short", "message"}
 		for i, r := range result.Resources {
@@ -161,8 +148,6 @@ func TestFetchEcsSvcLogs_Basic(t *testing.T) {
 	})
 }
 
-// TestFetchEcsSvcLogs_NonAwslogsDriver verifies that a task definition using
-// a non-awslogs log driver returns an appropriate error.
 func TestFetchEcsSvcLogs_NonAwslogsDriver(t *testing.T) {
 	taskDefMock := &mockECSDescribeTaskDefinitionClient{
 		output: &ecs.DescribeTaskDefinitionOutput{
@@ -199,8 +184,6 @@ func TestFetchEcsSvcLogs_NonAwslogsDriver(t *testing.T) {
 	}
 }
 
-// TestFetchEcsSvcLogs_NoContainers verifies that a task definition with no
-// container definitions returns an error.
 func TestFetchEcsSvcLogs_NoContainers(t *testing.T) {
 	taskDefMock := &mockECSDescribeTaskDefinitionClient{
 		output: &ecs.DescribeTaskDefinitionOutput{
@@ -226,8 +209,6 @@ func TestFetchEcsSvcLogs_NoContainers(t *testing.T) {
 	}
 }
 
-// TestFetchEcsSvcLogs_DescribeTaskDefinitionError verifies that
-// DescribeTaskDefinition API errors are propagated.
 func TestFetchEcsSvcLogs_DescribeTaskDefinitionError(t *testing.T) {
 	taskDefMock := &mockECSDescribeTaskDefinitionClient{
 		err: fmt.Errorf("AWS API error: task definition not found"),
@@ -252,8 +233,6 @@ func TestFetchEcsSvcLogs_DescribeTaskDefinitionError(t *testing.T) {
 	}
 }
 
-// TestFetchEcsSvcLogs_FilterLogEventsError verifies that FilterLogEvents
-// API errors are propagated.
 func TestFetchEcsSvcLogs_FilterLogEventsError(t *testing.T) {
 	taskDefMock := &mockECSDescribeTaskDefinitionClient{
 		output: &ecs.DescribeTaskDefinitionOutput{
@@ -295,8 +274,6 @@ func TestFetchEcsSvcLogs_FilterLogEventsError(t *testing.T) {
 	}
 }
 
-// TestFetchEcsSvcLogs_TimestampFormatting verifies that epoch ms timestamps
-// are formatted into human-readable strings.
 func TestFetchEcsSvcLogs_TimestampFormatting(t *testing.T) {
 	taskDefMock := &mockECSDescribeTaskDefinitionClient{
 		output: &ecs.DescribeTaskDefinitionOutput{
@@ -353,7 +330,6 @@ func TestFetchEcsSvcLogs_TimestampFormatting(t *testing.T) {
 	if ts == "" {
 		t.Fatal("Fields[timestamp] should not be empty")
 	}
-	// Should be formatted, not raw epoch ms
 	if ts == "1711036800000" {
 		t.Errorf("timestamp should be formatted, not raw epoch ms: %q", ts)
 	}
@@ -362,8 +338,6 @@ func TestFetchEcsSvcLogs_TimestampFormatting(t *testing.T) {
 	}
 }
 
-// TestFetchEcsSvcLogs_NewlineStripping verifies that messages with newlines
-// get cleaned.
 func TestFetchEcsSvcLogs_NewlineStripping(t *testing.T) {
 	taskDefMock := &mockECSDescribeTaskDefinitionClient{
 		output: &ecs.DescribeTaskDefinitionOutput{
@@ -422,8 +396,6 @@ func TestFetchEcsSvcLogs_NewlineStripping(t *testing.T) {
 	}
 }
 
-// TestFetchEcsSvcLogs_NilFields verifies that events with nil Timestamp,
-// Message, and LogStreamName do not cause a panic.
 func TestFetchEcsSvcLogs_NilFields(t *testing.T) {
 	taskDefMock := &mockECSDescribeTaskDefinitionClient{
 		output: &ecs.DescribeTaskDefinitionOutput{
@@ -448,15 +420,12 @@ func TestFetchEcsSvcLogs_NilFields(t *testing.T) {
 		outputs: []*cloudwatchlogs.FilterLogEventsOutput{
 			{
 				Events: []cwlogstypes.FilteredLogEvent{
-					{
-						// All fields nil
-					},
+					{},
 				},
 			},
 		},
 	}
 
-	// Should not panic
 	result, err := awsclient.FetchEcsSvcLogs(
 		context.Background(),
 		taskDefMock,
@@ -477,7 +446,6 @@ func TestFetchEcsSvcLogs_NilFields(t *testing.T) {
 	r := result.Resources[0]
 
 	t.Run("no_panic", func(t *testing.T) {
-		// If we got here, no panic occurred
 	})
 
 	t.Run("timestamp_empty", func(t *testing.T) {
@@ -499,9 +467,7 @@ func TestFetchEcsSvcLogs_NilFields(t *testing.T) {
 	})
 }
 
-// TestFetchEcsSvcLogs_StreamShortComputation verifies that stream_short is
-// correctly computed from the log stream name.
-// For example, "ecs/web/abc123def456" -> "web/abc123de" (container/short-task-id).
+// "ecs/web/abc123def456" shortens to "web/abc123de" (container/short task id).
 func TestFetchEcsSvcLogs_StreamShortComputation(t *testing.T) {
 	taskDefMock := &mockECSDescribeTaskDefinitionClient{
 		output: &ecs.DescribeTaskDefinitionOutput{
@@ -558,14 +524,11 @@ func TestFetchEcsSvcLogs_StreamShortComputation(t *testing.T) {
 	if ss == "" {
 		t.Fatal("Fields[stream_short] should not be empty")
 	}
-	// The stream_short should contain the container name and a shortened task ID
 	if !strings.Contains(ss, "web") {
 		t.Errorf("stream_short should contain container name 'web', got %q", ss)
 	}
 }
 
-// TestFetchEcsSvcLogs_RawStruct verifies that RawStruct preserves the original
-// cwlogstypes.FilteredLogEvent.
 func TestFetchEcsSvcLogs_RawStruct(t *testing.T) {
 	taskDefMock := &mockECSDescribeTaskDefinitionClient{
 		output: &ecs.DescribeTaskDefinitionOutput{
@@ -654,8 +617,6 @@ func TestFetchEcsSvcLogs_RawStruct(t *testing.T) {
 	})
 }
 
-// TestFetchEcsSvcLogs_Pagination verifies that the fetcher follows NextToken
-// across multiple pages and stops at the maxLogEvents cap.
 func TestFetchEcsSvcLogs_Pagination(t *testing.T) {
 	taskDefMock := &mockECSDescribeTaskDefinitionClient{
 		output: &ecs.DescribeTaskDefinitionOutput{
@@ -676,7 +637,6 @@ func TestFetchEcsSvcLogs_Pagination(t *testing.T) {
 		},
 	}
 
-	// Create 2 pages of 120 events each — but cap should stop at 200
 	page1Events := make([]cwlogstypes.FilteredLogEvent, 120)
 	for i := range page1Events {
 		id := fmt.Sprintf("evt-%03d", i)
@@ -719,28 +679,19 @@ func TestFetchEcsSvcLogs_Pagination(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	// Page 1 has 120 events, page 2 has 120, but cap is 200.
-	// After page 1 (120 events), fetcher continues. After page 2 (240 total),
-	// the loop breaks because NextToken is nil OR len >= maxLogEvents.
-	// Since page 2 has no NextToken, we get all 240.
-	// But if the cap is enforced mid-page, we get exactly 240 (both pages consumed).
 	if len(results.Resources) < 200 {
 		t.Errorf("expected at least 200 results (pagination should fetch 2 pages), got %d", len(results.Resources))
 	}
 
-	// Verify the mock was called twice (2 pages)
 	if cwLogsMock.callIdx != 2 {
 		t.Errorf("expected 2 FilterLogEvents calls, got %d", cwLogsMock.callIdx)
 	}
 }
 
-// TestFetchEcsSvcLogs_PageCapStopsScanAndReportsTruncated pins the 100-page
-// FilterLogEvents scan cap. This scan has no FilterPattern and no start-time
-// bound, so a page carrying zero events plus a NextToken (CloudWatch Logs'
-// normal "no writes in this time slice, keep scanning" signal) is expected,
-// not exceptional — maxLogEvents alone never fires while that happens. It
-// must stop at exactly maxLogScanPages (100) calls and report the result as
-// truncated, not present the empty result as a complete answer.
+// This scan has no FilterPattern and no start-time bound, so a page with zero
+// events plus a NextToken (CloudWatch Logs' normal "keep scanning" signal) is
+// expected and maxLogEvents never fires; the scan stops at maxLogScanPages
+// (100) calls and reports the result as truncated.
 func TestFetchEcsSvcLogs_PageCapStopsScanAndReportsTruncated(t *testing.T) {
 	taskDefMock := &mockECSDescribeTaskDefinitionClient{
 		output: &ecs.DescribeTaskDefinitionOutput{
@@ -789,8 +740,6 @@ func TestFetchEcsSvcLogs_PageCapStopsScanAndReportsTruncated(t *testing.T) {
 	}
 }
 
-// TestFetchEcsSvcLogs_ContinuationToken verifies that a non-empty
-// continuation token is forwarded to the FilterLogEvents API as NextToken.
 func TestFetchEcsSvcLogs_ContinuationToken(t *testing.T) {
 	taskDefMock := &mockECSDescribeTaskDefinitionClient{
 		output: &ecs.DescribeTaskDefinitionOutput{
@@ -852,7 +801,6 @@ func TestFetchEcsSvcLogs_ContinuationToken(t *testing.T) {
 	}
 }
 
-// tokenCapturingEcsSvcLogsMock wraps the CWLogs FilterLogEvents mock to capture NextToken.
 type tokenCapturingEcsSvcLogsMock struct {
 	inner             *mockCWLogsFilterLogEventsClient
 	capturedNextToken *string

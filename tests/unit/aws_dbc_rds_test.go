@@ -1,25 +1,8 @@
 package unit
 
-// aws_dbc_rds_test.go — Regression pins for Issue 4 (P2):
-// RDS DescribeDBClusters returns Neptune / DocDB rows unfiltered.
-//
-// Bug location: core/aws/dbc_rds.go:121-186 (FetchRDSDBClustersPage).
-// The loop iterates output.DBClusters and emits ALL clusters as dbc resources.
-// Per AWS SDK docstring (rds@v1.116.3/api_op_DescribeDBClusters.go:19-28),
-// this API may return Neptune and DocDB rows alongside Aurora/Multi-AZ rows.
-//
-// Impact:
-//   - Neptune rows surface as unsupported "dbc" entries (Engine="neptune")
-//   - DocDB rows appear duplicated (already fetched from the DocDB SDK side)
-//
-// Fix contract: FetchRDSDBClustersPage must filter to Aurora / Multi-AZ engines.
-// Specifically: keep engines that start with "aurora" (aurora-mysql, aurora-postgresql)
-// or are "mysql"/"postgres" (Multi-AZ DB clusters per AWS SDK docstring); skip
-// "neptune", "docdb", and any other non-Aurora engine.
-//
-// Test strategy: each test builds a fake RDS API returning a mix of engines,
-// then calls FetchRDSDBClustersPage directly and asserts on the returned resources.
-// Tests FAIL today because the function emits all clusters.
+// DescribeDBClusters also returns Neptune and DocumentDB clusters (see the
+// rds DescribeDBClusters API docstring); dbc lists Aurora engines and the
+// Multi-AZ "mysql"/"postgres" cluster engines.
 
 import (
 	"context"
@@ -32,7 +15,6 @@ import (
 	awsclient "github.com/k2m30/a9s/v3/core/aws"
 )
 
-// mockRDSClusterPageClient implements RDSDescribeDBClustersAPI for a fixed page.
 type mockRDSClusterPageClient struct {
 	clusters []rdstypes.DBCluster
 	marker   *string
@@ -53,7 +35,6 @@ func (m *mockRDSClusterPageClient) DescribeDBClusters(
 	}, nil
 }
 
-// buildRDSCluster is a minimal builder so test cases stay concise.
 func buildRDSCluster(id, engine string) rdstypes.DBCluster {
 	return rdstypes.DBCluster{
 		DBClusterIdentifier: aws.String(id),
@@ -64,16 +45,11 @@ func buildRDSCluster(id, engine string) rdstypes.DBCluster {
 	}
 }
 
-// TestFetchRDSDBClustersPage_FiltersNeptune verifies that Neptune clusters are
-// NOT emitted by FetchRDSDBClustersPage.
-//
-// FAILS today: FetchRDSDBClustersPage emits all clusters regardless of engine,
-// so a "neptune" cluster appears in the result — Count=2 instead of Count=1.
 func TestFetchRDSDBClustersPage_FiltersNeptune(t *testing.T) {
 	mock := &mockRDSClusterPageClient{
 		clusters: []rdstypes.DBCluster{
 			buildRDSCluster("aurora-prod", "aurora-postgresql"),
-			buildRDSCluster("neptune-prod", "neptune"), // must be filtered out
+			buildRDSCluster("neptune-prod", "neptune"),
 		},
 	}
 
@@ -82,7 +58,6 @@ func TestFetchRDSDBClustersPage_FiltersNeptune(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	// FAILS today: len(result.Resources) == 2 (neptune cluster included).
 	if len(result.Resources) != 1 {
 		t.Fatalf(
 			"FetchRDSDBClustersPage: expected 1 resource (aurora-postgresql), got %d — "+
@@ -95,16 +70,12 @@ func TestFetchRDSDBClustersPage_FiltersNeptune(t *testing.T) {
 	}
 }
 
-// TestFetchRDSDBClustersPage_SkipsDocDB verifies that DocDB clusters returned by
-// the RDS API are NOT emitted — they are fetched separately via the DocDB SDK.
-//
-// FAILS today: FetchRDSDBClustersPage emits all clusters — DocDB rows appear
-// duplicated (once from DocDB SDK, once from RDS SDK).
+// DocumentDB clusters are listed by the DocDB SDK fetcher.
 func TestFetchRDSDBClustersPage_SkipsDocDB(t *testing.T) {
 	mock := &mockRDSClusterPageClient{
 		clusters: []rdstypes.DBCluster{
 			buildRDSCluster("aurora-prod", "aurora-mysql"),
-			buildRDSCluster("docdb-prod", "docdb"), // must be filtered out (fetched via DocDB SDK)
+			buildRDSCluster("docdb-prod", "docdb"),
 		},
 	}
 
@@ -113,7 +84,6 @@ func TestFetchRDSDBClustersPage_SkipsDocDB(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	// FAILS today: len(result.Resources) == 2 (docdb cluster duplicated).
 	if len(result.Resources) != 1 {
 		t.Fatalf(
 			"FetchRDSDBClustersPage: expected 1 resource (aurora-mysql), got %d — "+
@@ -126,12 +96,6 @@ func TestFetchRDSDBClustersPage_SkipsDocDB(t *testing.T) {
 	}
 }
 
-// TestFetchRDSDBClustersPage_KeepsAuroraVariants verifies that all legitimate
-// Aurora and Multi-AZ DB cluster engine variants are emitted.
-//
-// These should PASS today (the function currently emits everything). This test
-// pins the allowed-engine allowlist so the filter does not accidentally drop
-// legitimate clusters.
 func TestFetchRDSDBClustersPage_KeepsAuroraVariants(t *testing.T) {
 	allowedEngines := []struct {
 		id     string
@@ -163,7 +127,6 @@ func TestFetchRDSDBClustersPage_KeepsAuroraVariants(t *testing.T) {
 		)
 	}
 
-	// Verify each expected cluster is present.
 	got := make(map[string]bool, len(result.Resources))
 	for _, r := range result.Resources {
 		got[r.ID] = true
@@ -175,17 +138,13 @@ func TestFetchRDSDBClustersPage_KeepsAuroraVariants(t *testing.T) {
 	}
 }
 
-// TestFetchRDSDBClustersPage_MixedEngines verifies the complete filtering
-// scenario: aurora kept, neptune and docdb filtered.
-//
-// FAILS today: all 4 clusters emitted; only 2 should be.
 func TestFetchRDSDBClustersPage_MixedEngines(t *testing.T) {
 	mock := &mockRDSClusterPageClient{
 		clusters: []rdstypes.DBCluster{
 			buildRDSCluster("aurora-pg-prod", "aurora-postgresql"),
-			buildRDSCluster("neptune-graph", "neptune"), // must be filtered
+			buildRDSCluster("neptune-graph", "neptune"),
 			buildRDSCluster("aurora-mysql-staging", "aurora-mysql"),
-			buildRDSCluster("docdb-app", "docdb"), // must be filtered
+			buildRDSCluster("docdb-app", "docdb"),
 		},
 	}
 
@@ -194,7 +153,6 @@ func TestFetchRDSDBClustersPage_MixedEngines(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	// FAILS today: len(result.Resources) == 4.
 	if len(result.Resources) != 2 {
 		t.Fatalf(
 			"FetchRDSDBClustersPage: expected 2 resources (aurora variants), got %d — "+

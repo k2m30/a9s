@@ -66,8 +66,6 @@ func (b *lockScopeBarrier) assertMet(t *testing.T, call string) {
 	}
 }
 
-// --- sns ---
-
 type lockScopeSNSFake struct {
 	awsclient.SNSAPI
 	barrier *lockScopeBarrier
@@ -114,8 +112,6 @@ func TestEnrichSNSSubscriptions_TopicPostureReadsOverlap(t *testing.T) {
 		}
 	}
 }
-
-// --- r53 ---
 
 type lockScopeR53Fake struct {
 	awsclient.Route53API
@@ -169,8 +165,6 @@ func TestEnrichRoute53Zone_QueryLoggingReadsOverlap(t *testing.T) {
 		}
 	}
 }
-
-// --- apigw ---
 
 type lockScopeAPIGWFake struct {
 	awsclient.APIGatewayV2API

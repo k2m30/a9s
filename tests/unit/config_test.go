@@ -10,15 +10,10 @@ import (
 	"github.com/k2m30/a9s/v3/core/config"
 )
 
-// testdataDir returns the absolute path to a directory inside tests/testdata/.
 func testdataDir(parts ...string) string {
 	// tests/unit/ -> tests/testdata/
 	return filepath.Join(append([]string{"..", "testdata"}, parts...)...)
 }
-
-// ---------------------------------------------------------------------------
-// T015: Test YAML parsing — load views/valid/ directory
-// ---------------------------------------------------------------------------
 
 func TestConfigYAMLParsing(t *testing.T) {
 	dirs := []string{testdataDir("views", "valid")}
@@ -30,7 +25,6 @@ func TestConfigYAMLParsing(t *testing.T) {
 		t.Fatal("expected non-nil config")
 	}
 
-	// --- EC2 ---
 	ec2, ok := cfg.Views["ec2"]
 	if !ok {
 		t.Fatal("missing ec2 view definition")
@@ -39,7 +33,6 @@ func TestConfigYAMLParsing(t *testing.T) {
 		t.Fatalf("ec2: expected 3 list columns, got %d", len(ec2.List))
 	}
 
-	// Verify order and values
 	wantEC2Cols := []struct {
 		title string
 		path  string
@@ -68,7 +61,6 @@ func TestConfigYAMLParsing(t *testing.T) {
 		}
 	}
 
-	// --- S3 ---
 	s3, ok := cfg.Views["s3"]
 	if !ok {
 		t.Fatal("missing s3 view definition")
@@ -81,15 +73,10 @@ func TestConfigYAMLParsing(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// T016: Test lookup chain — priority of config file locations
-// ---------------------------------------------------------------------------
-
 func TestConfigLookupChain(t *testing.T) {
 	// LoadFromDirs processes directories in order; later dirs overlay earlier.
 	// Each dir contains per-resource .yaml files (no "views:" wrapper).
 
-	// Subtest 1: Dir2 (later) overlays Dir1
 	t.Run("cwd_wins", func(t *testing.T) {
 		dir1 := filepath.Join(t.TempDir(), "views")
 		dir2 := filepath.Join(t.TempDir(), "views")
@@ -98,7 +85,6 @@ func TestConfigLookupChain(t *testing.T) {
 		os.WriteFile(filepath.Join(dir1, "ec2.yaml"), []byte("list:\n  FromDir1:\n    path: dir1\n    width: 1\n"), 0644)
 		os.WriteFile(filepath.Join(dir2, "ec2.yaml"), []byte("list:\n  FromDir2:\n    path: dir2\n    width: 2\n"), 0644)
 
-		// Dir2 (later) overlays Dir1
 		cfg, err := config.LoadFromDirs([]string{dir1, dir2})
 		if err != nil {
 			t.Fatalf("LoadFromDirs failed: %v", err)
@@ -112,7 +98,6 @@ func TestConfigLookupChain(t *testing.T) {
 		}
 	})
 
-	// Subtest 2: ConfigDir is used when later dir doesn't exist
 	t.Run("configdir_when_no_cwd", func(t *testing.T) {
 		dir1 := filepath.Join(t.TempDir(), "views")
 		os.MkdirAll(dir1, 0755)
@@ -132,12 +117,7 @@ func TestConfigLookupChain(t *testing.T) {
 	})
 }
 
-// ---------------------------------------------------------------------------
-// T017: Test fallback — no config file returns built-in defaults
-// ---------------------------------------------------------------------------
-
 func TestConfigFallbackDefaults(t *testing.T) {
-	// No directories with .yaml files exist
 	dirs := []string{filepath.Join(t.TempDir(), "nonexistent")}
 	cfg, err := config.LoadFromDirs(dirs)
 	if err != nil {
@@ -147,24 +127,18 @@ func TestConfigFallbackDefaults(t *testing.T) {
 		t.Fatal("expected nil config when no file found")
 	}
 
-	// GetViewDef with nil cfg should return defaults
 	ec2 := config.GetViewDef(nil, "ec2")
 	expected := config.DefaultViewDef("ec2")
 	if len(ec2.List) != len(expected.List) {
 		t.Fatalf("expected %d default ec2 columns, got %d", len(expected.List), len(ec2.List))
 	}
 
-	// Verify the column titles match the built-in defaults
 	for i, want := range expected.List {
 		if ec2.List[i].Title != want.Title {
 			t.Errorf("ec2 default column %d: got title %q, want %q", i, ec2.List[i].Title, want.Title)
 		}
 	}
 }
-
-// ---------------------------------------------------------------------------
-// T018: Test partial config — s3 from config, ec2 falls back to defaults
-// ---------------------------------------------------------------------------
 
 func TestConfigPartialOverride(t *testing.T) {
 	dirs := []string{testdataDir("views", "partial")}
@@ -176,7 +150,6 @@ func TestConfigPartialOverride(t *testing.T) {
 		t.Fatal("expected non-nil config")
 	}
 
-	// S3 should use config values
 	s3 := config.GetViewDef(cfg, "s3")
 	if len(s3.List) != 2 {
 		t.Fatalf("s3: expected 2 columns from config, got %d", len(s3.List))
@@ -188,17 +161,12 @@ func TestConfigPartialOverride(t *testing.T) {
 		t.Errorf("s3 col 1: got {%q, %d}, want {\"Created\", 20}", s3.List[1].Title, s3.List[1].Width)
 	}
 
-	// EC2 not in partial config — should fall back to defaults
 	ec2 := config.GetViewDef(cfg, "ec2")
 	expectedEC2 := config.DefaultViewDef("ec2")
 	if len(ec2.List) != len(expectedEC2.List) {
 		t.Fatalf("ec2: expected %d default columns, got %d", len(expectedEC2.List), len(ec2.List))
 	}
 }
-
-// ---------------------------------------------------------------------------
-// T041: Test config loading recognizes s3_objects — default and YAML
-// ---------------------------------------------------------------------------
 
 func TestConfigDefaultViewDef_S3Objects(t *testing.T) {
 	vd := config.DefaultViewDef("s3_objects")
@@ -244,7 +212,6 @@ func TestConfigYAMLParsing_S3Objects(t *testing.T) {
 		t.Fatalf("s3_objects: expected 4 list columns, got %d", len(s3obj.List))
 	}
 
-	// The YAML file uses custom widths different from defaults
 	wantCols := []struct {
 		title string
 		path  string
@@ -265,12 +232,7 @@ func TestConfigYAMLParsing_S3Objects(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// T042: Test s3_objects config columns via GetViewDef (with and without config)
-// ---------------------------------------------------------------------------
-
 func TestGetViewDef_S3Objects_NilConfig(t *testing.T) {
-	// With nil config, should fall back to defaults
 	vd := config.GetViewDef(nil, "s3_objects")
 	if len(vd.List) != 4 {
 		t.Fatalf("expected 4 default s3_objects columns with nil config, got %d", len(vd.List))
@@ -291,14 +253,12 @@ func TestGetViewDef_S3Objects_FromConfig(t *testing.T) {
 	if len(vd.List) != 4 {
 		t.Fatalf("expected 4 s3_objects columns from config, got %d", len(vd.List))
 	}
-	// Config has width 60 for Key, defaults have 50
 	if vd.List[0].Width != 60 {
 		t.Errorf("expected Key width 60 from config override, got %d", vd.List[0].Width)
 	}
 }
 
 func TestGetViewDef_S3Objects_PartialConfig_FallsBackToDefaults(t *testing.T) {
-	// Config has s3 but not s3_objects — should fall back to defaults
 	dirs := []string{testdataDir("views", "partial")}
 	cfg, err := config.LoadFromDirs(dirs)
 	if err != nil {
@@ -309,15 +269,10 @@ func TestGetViewDef_S3Objects_PartialConfig_FallsBackToDefaults(t *testing.T) {
 	if len(vd.List) != 4 {
 		t.Fatalf("expected 4 default s3_objects columns (not in partial config), got %d", len(vd.List))
 	}
-	// Should be default widths
 	if vd.List[0].Width != 36 {
 		t.Errorf("expected default Key width 36, got %d", vd.List[0].Width)
 	}
 }
-
-// ---------------------------------------------------------------------------
-// Test: generated .a9s/views/ round-trips through parser and matches defaults
-// ---------------------------------------------------------------------------
 
 func TestViewsDir_RoundTrip_MatchesDefaults(t *testing.T) {
 	viewsDir := filepath.Join("..", "..", ".a9s", "views")
@@ -331,7 +286,6 @@ func TestViewsDir_RoundTrip_MatchesDefaults(t *testing.T) {
 
 	defaults := config.DefaultConfig()
 
-	// Every default view must be present in the parsed YAML
 	for name, defView := range defaults.Views {
 		yamlView, ok := cfg.Views[name]
 		if !ok {
@@ -339,14 +293,12 @@ func TestViewsDir_RoundTrip_MatchesDefaults(t *testing.T) {
 			continue
 		}
 
-		// Check list column count matches
 		if len(yamlView.List) != len(defView.List) {
 			t.Errorf("%s: list column count mismatch: yaml=%d, default=%d",
 				name, len(yamlView.List), len(defView.List))
 			continue
 		}
 
-		// Check each list column
 		for i, defCol := range defView.List {
 			yamlCol := yamlView.List[i]
 			if yamlCol.Title != defCol.Title {
@@ -363,14 +315,12 @@ func TestViewsDir_RoundTrip_MatchesDefaults(t *testing.T) {
 			}
 		}
 
-		// Check detail path count matches
 		if len(yamlView.Detail) != len(defView.Detail) {
 			t.Errorf("%s: detail path count mismatch: yaml=%d, default=%d",
 				name, len(yamlView.Detail), len(defView.Detail))
 			continue
 		}
 
-		// Check each detail path
 		for i, defPath := range defView.Detail {
 			if yamlView.Detail[i].String() != defPath.String() {
 				t.Errorf("%s.Detail[%d]: yaml=%q, default=%q", name, i, yamlView.Detail[i].String(), defPath.String())
@@ -378,17 +328,12 @@ func TestViewsDir_RoundTrip_MatchesDefaults(t *testing.T) {
 		}
 	}
 
-	// Also check no extra views in YAML that aren't in defaults
 	for name := range cfg.Views {
 		if _, ok := defaults.Views[name]; !ok {
 			t.Errorf("views dir has extra resource %q not in defaults.go", name)
 		}
 	}
 }
-
-// ---------------------------------------------------------------------------
-// T019: Test invalid YAML — returns error, GetViewDef still returns defaults
-// ---------------------------------------------------------------------------
 
 func TestConfigInvalidYAML(t *testing.T) {
 	dirs := []string{testdataDir("views", "invalid")}
@@ -400,17 +345,12 @@ func TestConfigInvalidYAML(t *testing.T) {
 		t.Fatal("expected nil config on parse error")
 	}
 
-	// Even after error, GetViewDef with nil config should give defaults
 	ec2 := config.GetViewDef(nil, "ec2")
 	expected := config.DefaultViewDef("ec2")
 	if len(ec2.List) != len(expected.List) {
 		t.Fatalf("expected %d default ec2 columns after error, got %d", len(expected.List), len(ec2.List))
 	}
 }
-
-// ---------------------------------------------------------------------------
-// Test: YAML key field parses into ListColumn.Key
-// ---------------------------------------------------------------------------
 
 func TestConfigYAMLParsing_KeyField(t *testing.T) {
 	yamlData := `list:
@@ -436,7 +376,6 @@ detail:
 		t.Fatalf("expected 3 columns, got %d", len(sqs.List))
 	}
 
-	// First column: has path, no key
 	if sqs.List[0].Path != "QueueUrl" {
 		t.Errorf("col 0 path: got %q, want %q", sqs.List[0].Path, "QueueUrl")
 	}
@@ -444,7 +383,6 @@ detail:
 		t.Errorf("col 0 key: got %q, want empty", sqs.List[0].Key)
 	}
 
-	// Second column: has key, no path
 	if sqs.List[1].Key != "approx_messages" {
 		t.Errorf("col 1 key: got %q, want %q", sqs.List[1].Key, "approx_messages")
 	}
@@ -452,18 +390,11 @@ detail:
 		t.Errorf("col 1 path: got %q, want empty", sqs.List[1].Path)
 	}
 
-	// Third column: has key, no path
 	if sqs.List[2].Key != "approx_not_visible" {
 		t.Errorf("col 2 key: got %q, want %q", sqs.List[2].Key, "approx_not_visible")
 	}
 }
 
-// ---------------------------------------------------------------------------
-// Config directory management tests (ConfigDir, EnsureConfigDir, ConfigFilePath)
-// ---------------------------------------------------------------------------
-
-// TestConfigDir_DefaultsToHomeDir verifies that ConfigDir returns ~/.a9s/
-// when no A9S_CONFIG_FOLDER env var is set.
 func TestConfigDir_DefaultsToHomeDir(t *testing.T) {
 	t.Setenv("A9S_CONFIG_FOLDER", "")
 
@@ -489,8 +420,6 @@ func TestConfigDir_DefaultsToHomeDir(t *testing.T) {
 	}
 }
 
-// TestConfigDir_RespectsEnvVar verifies that ConfigDir returns the exact path
-// from A9S_CONFIG_FOLDER when set.
 func TestConfigDir_RespectsEnvVar(t *testing.T) {
 	t.Setenv("A9S_CONFIG_FOLDER", "/tmp/custom-a9s")
 
@@ -501,8 +430,6 @@ func TestConfigDir_RespectsEnvVar(t *testing.T) {
 	}
 }
 
-// TestConfigDir_EnvVarOverridesHome verifies that when A9S_CONFIG_FOLDER is
-// set, ConfigDir does NOT return a path under ~/.a9s/.
 func TestConfigDir_EnvVarOverridesHome(t *testing.T) {
 	t.Setenv("A9S_CONFIG_FOLDER", "/tmp/override")
 
@@ -516,8 +443,6 @@ func TestConfigDir_EnvVarOverridesHome(t *testing.T) {
 	}
 }
 
-// TestEnsureConfigDir_CreatesDirectory verifies that EnsureConfigDir creates
-// the directory with 0700 permissions when it does not exist.
 func TestEnsureConfigDir_CreatesDirectory(t *testing.T) {
 	base := t.TempDir()
 	target := filepath.Join(base, "new-config")
@@ -547,8 +472,6 @@ func TestEnsureConfigDir_CreatesDirectory(t *testing.T) {
 	}
 }
 
-// TestEnsureConfigDir_ExistingDirectory verifies that EnsureConfigDir succeeds
-// without error when the directory already exists.
 func TestEnsureConfigDir_ExistingDirectory(t *testing.T) {
 	existing := t.TempDir()
 	t.Setenv("A9S_CONFIG_FOLDER", existing)
@@ -562,8 +485,6 @@ func TestEnsureConfigDir_ExistingDirectory(t *testing.T) {
 	}
 }
 
-// TestEnsureConfigDir_NoFilesCreated verifies that EnsureConfigDir creates
-// only the directory itself, without populating it with any files.
 func TestEnsureConfigDir_NoFilesCreated(t *testing.T) {
 	base := t.TempDir()
 	target := filepath.Join(base, "empty-config")
@@ -587,8 +508,6 @@ func TestEnsureConfigDir_NoFilesCreated(t *testing.T) {
 	}
 }
 
-// TestConfigFilePath verifies that ConfigFilePath joins the config directory
-// with the given filename correctly.
 func TestConfigFilePath(t *testing.T) {
 	base := filepath.Join(os.TempDir(), "a9s-test")
 	t.Setenv("A9S_CONFIG_FOLDER", base)
@@ -606,16 +525,12 @@ func TestConfigFilePath(t *testing.T) {
 	}
 }
 
-// TestLookupPaths_EnvVarDoesNotFallThrough verifies that when
-// A9S_CONFIG_FOLDER is set to a directory that has no views/, Load()
-// does NOT fall through to ~/.a9s/views/. It should return (nil, nil).
 func TestLookupPaths_EnvVarDoesNotFallThrough(t *testing.T) {
-	// Point A9S_CONFIG_FOLDER to an empty temp dir (no views/ dir)
 	emptyDir := t.TempDir()
 	t.Setenv("A9S_CONFIG_FOLDER", emptyDir)
 
-	// Also override HOME to a temp dir that DOES have ~/.a9s/views/,
-	// to prove Load() doesn't fall through to the home dir.
+	// HOME points at a directory that does have ~/.a9s/views/, which Load() must
+	// not read.
 	fakeHome := t.TempDir()
 	t.Setenv("HOME", fakeHome)
 
@@ -629,15 +544,11 @@ func TestLookupPaths_EnvVarDoesNotFallThrough(t *testing.T) {
 		t.Fatalf("failed to write ec2.yaml: %v", err)
 	}
 
-	// Make sure the CWD .a9s/ path also doesn't exist
-	// (we're in the test binary's working dir, which shouldn't have .a9s/)
-
 	cfg, err := config.Load()
 	if err != nil {
 		t.Fatalf("Load() error: %v", err)
 	}
 	if cfg != nil {
-		// If cfg is non-nil, it means Load() fell through to the home dir
 		ec2, ok := cfg.Views["ec2"]
 		if ok && len(ec2.List) > 0 && ec2.List[0].Title == "ShouldNotLoad" {
 			t.Fatalf("Load() fell through to ~/.a9s/views/ despite A9S_CONFIG_FOLDER being set (to empty dir)")
@@ -645,5 +556,3 @@ func TestLookupPaths_EnvVarDoesNotFallThrough(t *testing.T) {
 		t.Fatalf("Load() returned non-nil config; expected (nil, nil) when env var dir has no file")
 	}
 }
-
-// New ParseSingle and LoadFromDirs tests are in config_split_test.go.

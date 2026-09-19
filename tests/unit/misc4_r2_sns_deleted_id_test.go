@@ -1,7 +1,5 @@
 package unit
 
-// misc4_r2_sns_deleted_id_test.go — misc4 row 2.
-//
 // AWS reports a deleted subscription by putting the word "Deleted" where the
 // SubscriptionArn goes, so every deleted subscription under one topic arrives
 // carrying the same string. Taking that string as the row ID makes them one
@@ -88,10 +86,9 @@ func TestSNSSubByTopicDeletedSecondPageSurvivesTheAppend(t *testing.T) {
 	}
 }
 
-// TestSNSSubByTopicUnknownRowsHaveDistinctIDs pins the sibling the deleted
-// case's probe turned up: a subscription that comes back with no
-// SubscriptionArn at all takes the empty string as its ID, so two of them
-// under one topic collide exactly as two deleted ones did.
+// TestSNSSubByTopicUnknownRowsHaveDistinctIDs pins that a subscription with no
+// SubscriptionArn at all, whose ID would otherwise be the empty string, does
+// not collide with another such subscription under one topic.
 func TestSNSSubByTopicUnknownRowsHaveDistinctIDs(t *testing.T) {
 	mock := &mockSNSListSubscriptionsByTopicClient{
 		outputs: []*sns.ListSubscriptionsByTopicOutput{{

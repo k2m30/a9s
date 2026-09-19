@@ -35,12 +35,6 @@ func dbcCheckerByTarget(t *testing.T, target string) resource.RelatedChecker {
 	return nil
 }
 
-// ────────────────────────────────────────────────────────────────────────────
-// Registration completeness
-// ────────────────────────────────────────────────────────────────────────────
-
-// TestRelated_DBC_Registered verifies that all nine expected related defs are
-// registered for "dbc" with correct DisplayNames and non-nil Checkers.
 func TestRelated_DBC_Registered(t *testing.T) {
 	defs := resource.GetRelated("dbc")
 	if len(defs) == 0 {
@@ -86,12 +80,6 @@ func TestRelated_DBC_Registered(t *testing.T) {
 	}
 }
 
-// ────────────────────────────────────────────────────────────────────────────
-// checkDbcSG — Pattern F (no cache)
-// ────────────────────────────────────────────────────────────────────────────
-
-// TestRelated_DBC_SG_Found verifies that VpcSecurityGroups on the DBCluster
-// RawStruct are returned as ResourceIDs.
 func TestRelated_DBC_SG_Found(t *testing.T) {
 	src := resource.Resource{
 		ID: "acme-docdb-prod",
@@ -122,8 +110,6 @@ func TestRelated_DBC_SG_Found(t *testing.T) {
 	}
 }
 
-// TestRelated_DBC_SG_Empty verifies that a cluster with no security groups
-// returns Count=0.
 func TestRelated_DBC_SG_Empty(t *testing.T) {
 	src := resource.Resource{
 		ID: "acme-docdb-prod",
@@ -141,8 +127,6 @@ func TestRelated_DBC_SG_Empty(t *testing.T) {
 	}
 }
 
-// TestRelated_DBC_SG_WrongRawStruct verifies that a non-DBCluster RawStruct
-// returns Count=-1 (assertStruct fails).
 func TestRelated_DBC_SG_WrongRawStruct(t *testing.T) {
 	src := resource.Resource{
 		ID:        "acme-docdb-prod",
@@ -157,12 +141,6 @@ func TestRelated_DBC_SG_WrongRawStruct(t *testing.T) {
 	}
 }
 
-// ────────────────────────────────────────────────────────────────────────────
-// checkDbcAlarm — Pattern D (dimension-based cache lookup)
-// ────────────────────────────────────────────────────────────────────────────
-
-// TestRelated_DBC_Alarm_Found verifies that a CloudWatch alarm with dimension
-// "DBClusterIdentifier" matching the cluster ID is returned.
 func TestRelated_DBC_Alarm_Found(t *testing.T) {
 	const clusterID = "acme-docdb-prod"
 	alarmRes := resource.Resource{
@@ -195,8 +173,6 @@ func TestRelated_DBC_Alarm_Found(t *testing.T) {
 	}
 }
 
-// TestRelated_DBC_Alarm_NotFound verifies that alarms with non-matching
-// dimensions produce Count=0.
 func TestRelated_DBC_Alarm_NotFound(t *testing.T) {
 	alarmRes := resource.Resource{
 		ID: "alarm-other-cluster-cpu",
@@ -225,15 +201,8 @@ func TestRelated_DBC_Alarm_NotFound(t *testing.T) {
 	}
 }
 
-// TestRelated_DBC_Alarm_NilCache_ReturnsUnknown pins the canonical nil-cache
-// contract from docs/related-resources-engine.md §7: a nil alarm cache is
-// not a proven zero and must resolve to UnknownRelated("alarm") — the same
-// contract checkSQSAlarm already honors.
-//
-// checkDbcAlarm (core/aws/dbc_related.go:140-142) currently diverges: it
-// returns relatedResultTrunc("alarm", nil, true) instead — a false
-// proven-zero-with-truncation. This test is expected to FAIL until that
-// divergence is fixed (by hand or by the alarmIDsByDimension extraction).
+// A nil alarm cache is not a proven zero; it resolves to
+// UnknownRelated("alarm") (docs/related-resources-engine.md).
 func TestRelated_DBC_Alarm_NilCache_ReturnsUnknown(t *testing.T) {
 	src := resource.Resource{
 		ID: "acme-docdb-prod",
@@ -250,8 +219,6 @@ func TestRelated_DBC_Alarm_NilCache_ReturnsUnknown(t *testing.T) {
 	}
 }
 
-// TestRelated_DBC_Alarm_EmptyID verifies that a cluster with an empty ID
-// short-circuits and returns Count=0.
 func TestRelated_DBC_Alarm_EmptyID(t *testing.T) {
 	src := resource.Resource{
 		ID:        "",
@@ -266,12 +233,6 @@ func TestRelated_DBC_Alarm_EmptyID(t *testing.T) {
 	}
 }
 
-// ────────────────────────────────────────────────────────────────────────────
-// checkDbcLogs — Pattern N (naming convention)
-// ────────────────────────────────────────────────────────────────────────────
-
-// TestRelated_DBC_Logs_Found verifies that log groups matching the
-// /aws/docdb/{clusterID}/ naming convention are returned.
 func TestRelated_DBC_Logs_Found(t *testing.T) {
 	const clusterID = "acme-docdb-prod"
 	auditLog := resource.Resource{ID: "/aws/docdb/" + clusterID + "/audit"}
@@ -306,8 +267,6 @@ func TestRelated_DBC_Logs_Found(t *testing.T) {
 	}
 }
 
-// TestRelated_DBC_Logs_NoMatch verifies Count=0 when no log group has the
-// cluster's prefix.
 func TestRelated_DBC_Logs_NoMatch(t *testing.T) {
 	otherLog := resource.Resource{ID: "/aws/docdb/other-cluster/audit"}
 	cache := resource.ResourceCache{
@@ -328,12 +287,6 @@ func TestRelated_DBC_Logs_NoMatch(t *testing.T) {
 	}
 }
 
-// ────────────────────────────────────────────────────────────────────────────
-// checkDbcDBI — reverse lookup (dbi cache by DBClusterIdentifier)
-// ────────────────────────────────────────────────────────────────────────────
-
-// TestRelated_DBC_DBI_Found verifies that RDS instances with a matching
-// DBClusterIdentifier are returned.
 func TestRelated_DBC_DBI_Found(t *testing.T) {
 	const clusterID = "acme-docdb-prod"
 	dbiRes := resource.Resource{
@@ -371,7 +324,6 @@ func TestRelated_DBC_DBI_Found(t *testing.T) {
 	}
 }
 
-// TestRelated_DBC_DBI_EmptyID verifies that a cluster with empty ID returns Count=0.
 func TestRelated_DBC_DBI_EmptyID(t *testing.T) {
 	src := resource.Resource{
 		ID:        "",
@@ -386,12 +338,6 @@ func TestRelated_DBC_DBI_EmptyID(t *testing.T) {
 	}
 }
 
-// ────────────────────────────────────────────────────────────────────────────
-// checkDbcDbcSnap — reverse lookup (dbc-snap cache by DBClusterIdentifier)
-// ────────────────────────────────────────────────────────────────────────────
-
-// TestRelated_DBC_DbcSnap_Found verifies that snapshots with matching
-// DBClusterIdentifier are returned.
 func TestRelated_DBC_DbcSnap_Found(t *testing.T) {
 	const clusterID = "acme-docdb-prod"
 	snapRes := resource.Resource{
@@ -429,7 +375,6 @@ func TestRelated_DBC_DbcSnap_Found(t *testing.T) {
 	}
 }
 
-// TestRelated_DBC_DbcSnap_Empty verifies Count=0 when no snapshots match.
 func TestRelated_DBC_DbcSnap_Empty(t *testing.T) {
 	otherSnap := resource.Resource{
 		ID: "dbc-snap-other-cluster",
@@ -456,12 +401,6 @@ func TestRelated_DBC_DbcSnap_Empty(t *testing.T) {
 	}
 }
 
-// ────────────────────────────────────────────────────────────────────────────
-// checkDbcSecrets — ARN match against Secrets Manager cache
-// ────────────────────────────────────────────────────────────────────────────
-
-// TestRelated_DBC_Secrets_Found verifies that a secret whose ARN matches the
-// cluster's MasterUserSecret.SecretArn is returned.
 func TestRelated_DBC_Secrets_Found(t *testing.T) {
 	const secretARN = "arn:aws:secretsmanager:us-east-1:123456789012:secret:prod/docdb/acme-docdb-prod-XyZaBc"
 	secretRes := resource.Resource{
@@ -499,8 +438,6 @@ func TestRelated_DBC_Secrets_Found(t *testing.T) {
 	}
 }
 
-// TestRelated_DBC_Secrets_NoMasterUserSecret verifies Count=0 when the cluster
-// has no MasterUserSecret (nil pointer guard).
 func TestRelated_DBC_Secrets_NoMasterUserSecret(t *testing.T) {
 	src := resource.Resource{
 		ID: "acme-docdb-prod",
@@ -518,11 +455,9 @@ func TestRelated_DBC_Secrets_NoMasterUserSecret(t *testing.T) {
 	}
 }
 
-// TestRelated_DBC_Secrets_WrongRawStruct verifies Count=0 when RawStruct is
-// not a DBCluster shape. dbcClusterMasterSecretARN returns "" for any
-// unrecognised parent, so there is no MasterUserSecret link to find.
-// Returning -1 would drop the honest lower bound — see
-// TestAllReverseScanCheckers_TruncatedEmptyCacheReturnsTruncated.
+// dbcClusterMasterSecretARN returns "" for any unrecognised parent, so there
+// is no MasterUserSecret link to find. Returning -1 would drop the honest
+// lower bound — see TestAllReverseScanCheckers_TruncatedEmptyCacheReturnsTruncated.
 func TestRelated_DBC_Secrets_WrongRawStruct(t *testing.T) {
 	src := resource.Resource{
 		ID:        "acme-docdb-prod",
@@ -537,12 +472,6 @@ func TestRelated_DBC_Secrets_WrongRawStruct(t *testing.T) {
 	}
 }
 
-// ────────────────────────────────────────────────────────────────────────────
-// checkDbcKMS — Pattern F (no cache, KmsKeyId ARN suffix)
-// ────────────────────────────────────────────────────────────────────────────
-
-// TestRelated_DBC_KMS_Found verifies that the KMS key ID is extracted from the
-// cluster's KmsKeyId ARN (last segment after "/").
 func TestRelated_DBC_KMS_Found(t *testing.T) {
 	const keyARN = "arn:aws:kms:us-east-1:123456789012:key/a1b2c3d4-5678-90ab-cdef-111111111111"
 	const keyID = "a1b2c3d4-5678-90ab-cdef-111111111111"
@@ -566,7 +495,6 @@ func TestRelated_DBC_KMS_Found(t *testing.T) {
 	}
 }
 
-// TestRelated_DBC_KMS_NoKey verifies Count=0 when the cluster has no KmsKeyId.
 func TestRelated_DBC_KMS_NoKey(t *testing.T) {
 	src := resource.Resource{
 		ID: "acme-docdb-unencrypted",
@@ -584,7 +512,6 @@ func TestRelated_DBC_KMS_NoKey(t *testing.T) {
 	}
 }
 
-// TestRelated_DBC_KMS_WrongRawStruct verifies Count=0 for non-DBCluster RawStruct.
 func TestRelated_DBC_KMS_WrongRawStruct(t *testing.T) {
 	src := resource.Resource{
 		ID:        "acme-docdb-prod",
@@ -599,13 +526,6 @@ func TestRelated_DBC_KMS_WrongRawStruct(t *testing.T) {
 	}
 }
 
-// ────────────────────────────────────────────────────────────────────────────
-// checkDbcSubnet — Pattern C (live API, DescribeDBSubnetGroups)
-// ────────────────────────────────────────────────────────────────────────────
-
-// TestRelated_DBC_Subnet_NilDocDB verifies Count=-1 when DocDB client is nil.
-// (aws_related_checkers_branch_coverage_test.go covers TestRelated_DBC_Subnet_NilClientsW5, this
-// test covers the ServiceClients != nil but DocDB == nil path.)
 func TestRelated_DBC_Subnet_NilDocDB(t *testing.T) {
 	src := resource.Resource{
 		ID: "acme-docdb-prod",
@@ -625,11 +545,6 @@ func TestRelated_DBC_Subnet_NilDocDB(t *testing.T) {
 	}
 }
 
-// ────────────────────────────────────────────────────────────────────────────
-// checkDbcVPC — Pattern C (live API, DescribeDBSubnetGroups)
-// ────────────────────────────────────────────────────────────────────────────
-
-// TestRelated_DBC_VPC_NilDocDB verifies Count=-1 when DocDB client is nil.
 func TestRelated_DBC_VPC_NilDocDB(t *testing.T) {
 	src := resource.Resource{
 		ID: "acme-docdb-prod",
@@ -649,8 +564,6 @@ func TestRelated_DBC_VPC_NilDocDB(t *testing.T) {
 	}
 }
 
-// TestRelated_DBC_VPC_NoSubnetGroup verifies Count=-1 when the cluster has no
-// DBSubnetGroup — dbcSubnetGroup returns nil, so both subnet and vpc return -1.
 func TestRelated_DBC_VPC_NoSubnetGroup(t *testing.T) {
 	src := resource.Resource{
 		ID: "acme-docdb-prod",
@@ -669,8 +582,6 @@ func TestRelated_DBC_VPC_NoSubnetGroup(t *testing.T) {
 	}
 }
 
-// TestRelated_DBC_VPC_WrongRawStruct verifies Count=-1 when RawStruct is not
-// a DBCluster (assertStruct fails → dbcSubnetGroup returns nil).
 func TestRelated_DBC_VPC_WrongRawStruct(t *testing.T) {
 	src := resource.Resource{
 		ID:        "acme-docdb-prod",

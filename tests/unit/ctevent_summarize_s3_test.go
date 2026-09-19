@@ -166,7 +166,7 @@ func TestCTDetailSummarizeS3_UnknownEvent(t *testing.T) {
 
 // TestCTDetailSummarizeS3_SeverityNeverSet verifies that no row emitted by SummarizeS3
 // has its Severity field populated. Severity is only set on the ACTION Event row
-// by sections.go (FR-002 single-cell exception).
+// by sections.go.
 func TestCTDetailSummarizeS3_SeverityNeverSet(t *testing.T) {
 	cases := []struct {
 		eventName string

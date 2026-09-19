@@ -15,10 +15,6 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// ---------------------------------------------------------------------------
-// ASG - Test FetchAutoScalingGroups response parsing
-// ---------------------------------------------------------------------------
-
 func TestFetchAutoScalingGroups_ParsesMultipleGroups(t *testing.T) {
 	createdTime := time.Date(2025, 3, 1, 9, 0, 0, 0, time.UTC)
 
@@ -79,7 +75,6 @@ func TestFetchAutoScalingGroups_ParsesMultipleGroups(t *testing.T) {
 		t.Fatalf("expected 2 resources, got %d", len(resources))
 	}
 
-	// Verify required fields exist
 	requiredFields := []string{"asg_name", "min_size", "max_size", "desired", "instances", "status"}
 	for i, r := range resources {
 		for _, key := range requiredFields {
@@ -89,7 +84,6 @@ func TestFetchAutoScalingGroups_ParsesMultipleGroups(t *testing.T) {
 		}
 	}
 
-	// Verify first ASG
 	r0 := resources[0]
 	if r0.ID != "prod-web-asg" {
 		t.Errorf("resource[0].ID: expected %q, got %q", "prod-web-asg", r0.ID)
@@ -116,12 +110,11 @@ func TestFetchAutoScalingGroups_ParsesMultipleGroups(t *testing.T) {
 		t.Errorf("resource[0].Fields[\"status\"]: expected empty, got %q", r0.Fields["status"])
 	}
 
-	// Verify second ASG
 	r1 := resources[1]
 	if r1.ID != "staging-api-asg" {
 		t.Errorf("resource[1].ID: expected %q, got %q", "staging-api-asg", r1.ID)
 	}
-	// Post-fold contract: fetcher stops writing Status; emits wave1 Finding instead.
+	// The unhealthy state surfaces as a wave-1 Finding.
 	if len(r1.Findings) != 1 {
 		t.Fatalf("resource[1].Findings: expected 1 for deleting ASG, got %d", len(r1.Findings))
 	}
@@ -179,10 +172,6 @@ func TestFetchAutoScalingGroups_EmptyResponse(t *testing.T) {
 		t.Errorf("expected 0 resources, got %d", len(resources))
 	}
 }
-
-// ---------------------------------------------------------------------------
-// Attention-signal field population tests (Wave 1 ASG fields)
-// ---------------------------------------------------------------------------
 
 func TestFetchAutoScalingGroupsPage_PopulatesInstancesUnhealthyCount(t *testing.T) {
 	mock := &mockASGDescribeAutoScalingGroupsClient{
@@ -366,10 +355,6 @@ func TestFetchAutoScalingGroupsPage_RegistersAttentionFields(t *testing.T) {
 		}
 	}
 }
-
-// ---------------------------------------------------------------------------
-// Color function tests for ASG attention rules
-// ---------------------------------------------------------------------------
 
 func TestColorASG_BrokenWhenInServiceBelowMinSize(t *testing.T) {
 	td := resource.FindResourceType("asg")

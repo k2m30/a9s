@@ -1,34 +1,6 @@
-// costs_quality_test.go — Cost Explorer: rendered surfaces against
-// specs/021-cost-explorer/wireframe.md (items 1, 2, 5) plus web/TUI drill
-// parity (items 3, 4).
-//
-// package unit (not unit_test): item 3's TUI-vs-Snapshot convergence check
-// needs the TUI key-routing/render helpers (rootApplyMsg/rootViewContent/
-// newRootSizedModel, tui_root_test.go) which only live in package unit —
-// every other item reuses only EXPORTED app/costs/runtime surface via local
-// round8-prefixed helpers.
-//
-// Item 1 (P2) — DeltaTag gains a 4-tier color scale. wireframe.md only says
-// "growth red shades, drop green shades, |Δ| < threshold neutral" — no
-// exact percentages, so the thresholds are:
-//
-//	|Δ| <  5%        -> "neutral"
-//	5% <= |Δ| < 25%  -> "growth-soft"  / "drop-soft"
-//	|Δ| >= 25%       -> "growth-strong" / "drop-strong"
-//
-// DeltaTag stays a single string (5 values total) rather than splitting
-// into a second Intensity field — mirrors CostCell's own existing contract
-// ("one pre-resolved string drives color, same as ListRow.Color").
-//
-// Item 5 (P2) — Cost Explorer rejects year zoom beyond its history horizon
-// with ValidationException ("You haven't enabled historical data beyond 14
-// months."). costsHistoryHorizonMonths (core/app/costs_state.go) is
-// unexported and unreachable from tests/unit — mirrored here as a literal
-// (13) with a comment tying it back explicitly.
-//
-// Item 4 (P2) — CostsBody's Currency field is pinned via reflection rather
-// than a direct field reference, so a missing field fails this one test
-// instead of the whole tests/unit package's compilation.
+// Cost Explorer rejects a Range.Start beyond its history horizon with
+// ValidationException ("You haven't enabled historical data beyond 14
+// months.").
 package unit
 
 import (
@@ -44,16 +16,9 @@ import (
 	"github.com/k2m30/a9s/v3/core/runtime/messages"
 )
 
-// ---------------------------------------------------------------------------
-// Local helpers (package unit cannot reach costs_state_test.go's/
-// costs_interaction_test.go's package-unit_test equivalents)
-// ---------------------------------------------------------------------------
+// package unit cannot reach the package unit_test costs helpers.
 
 var round8Now = time.Date(2026, time.July, 15, 12, 0, 0, 0, time.UTC)
-
-// newCostsScreenController (costs_round3_test.go, same package) is the
-// shared builder — closure-wave harness dedup collapsed this file's own
-// former round8NewCostsController into it.
 
 func round8TopDrill(t *testing.T, c *app.Controller) costs.DrillLevel {
 	t.Helper()
@@ -88,11 +53,6 @@ func round8MonthRecord(now time.Time, rowKey string, amount float64) costs.Recor
 		Metrics: map[costs.Metric]costs.Amount{costs.MetricInvoice: {Value: amount, Unit: "USD"}},
 	}
 }
-
-// ===========================================================================
-// Item 1 — DeltaTag gains a neutral band and two intensity tiers per
-// direction. See file header for the pinned, flagged threshold contract.
-// ===========================================================================
 
 func TestCostsQuality_Item1_DeltaTag_FourTierColorScale(t *testing.T) {
 	tests := []struct {
@@ -139,26 +99,13 @@ func TestCostsQuality_Item1_DeltaTag_FourTierColorScale(t *testing.T) {
 	}
 }
 
-// ===========================================================================
-// Item 2 — humanized anomaly footer: service, impact amount, and usage
-// type, no raw "DIMENSION=value" dumps. Confirmed via direct trace:
-// core/aws/costs.go's mapAnomaly builds RootCause as literally
-// fmt.Sprintf("%s=%s", dim, value) joined by ", " — this test originally
-// fed exactly that shape as the seeded AnomalyMark.RootCause.
-//
-// Reconciled (closure wave): AnomalyMark.RootCause/.Score/.ID die with the
-// fields — this test's Dimension-only fixture (SERVICE + USAGE_TYPE, no
-// RootCause/ID at all) becomes the ONLY representation an anomaly carries,
-// so costsFooterNote must derive the humanized footer straight from
-// Dimension, not from any pre-baked raw-dump string. Impact IS already
-// correctly populated end-to-end (fetcher and demo fixture both set it) —
-// costsFooterNote simply never reads it.
-// ===========================================================================
+// The anomaly footer names service, impact amount and usage type, derived from
+// AnomalyMark.Dimension, never a raw "DIMENSION=value" dump.
 
 func TestCostsQuality_Item2_AnomalyFooter_Humanized_NoRawDimensionDump(t *testing.T) {
 	c := newCostsScreenController(t, round8Now)
 	root := round8TopDrill(t, c)
-	curPeriod := root.Window[len(root.Window)-1] // cursor already opens here (FR-002)
+	curPeriod := root.Window[len(root.Window)-1] // the cursor opens here
 
 	c.Handle(messages.CostsLoaded{
 		Query: costs.Query{Granularity: costs.GranularityMonth.APIGranularity(), GroupBy: []costs.Dimension{costs.DimensionService}},
@@ -195,16 +142,9 @@ func TestCostsQuality_Item2_AnomalyFooter_Humanized_NoRawDimensionDump(t *testin
 	}
 }
 
-// ===========================================================================
-// Item 3 — the web costs view's title must carry the same state line the
-// TUI computes, from ONE shared source exposed via
-// Controller.Snapshot().FrameTitle: core/app/snapshot.go feeds vs.FrameTitle
-// for the costs screen kind from the same builder both renderers consume,
-// as every OTHER screen kind (menu/list/selector/detail) does — never a bare
-// "costs" string with internal/tui/app_view.go's frameTitle() computing a
-// RICH state line via a package-private costsFrameTitle() that bypasses
-// vs.FrameTitle.
-// ===========================================================================
+// The web costs view's title carries the state line the TUI computes, from one
+// source: Controller.Snapshot().FrameTitle, fed by core/app/snapshot.go from
+// the builder both renderers consume, as for every other screen kind.
 
 func TestCostsQuality_Item3a_Snapshot_FrameTitle_IsStateLine_NotBareScreenID(t *testing.T) {
 	c := newCostsScreenController(t, round8Now)
@@ -240,10 +180,6 @@ func TestCostsQuality_Item3a_TUI_RenderedFrame_ContainsSharedSnapshotFrameTitle(
 	}
 }
 
-// ===========================================================================
-// app.js's keyMap carries j/k/h/l as aliases for the movement actions.
-// ===========================================================================
-
 func TestCostsQuality_Item3c_WebAppJS_KeyMap_HasVimMovementAliases(t *testing.T) {
 	raw, err := readQualityFile(t, "../../core/web/static/app.js")
 	if err != nil {
@@ -261,18 +197,10 @@ func TestCostsQuality_Item3c_WebAppJS_KeyMap_HasVimMovementAliases(t *testing.T)
 	}
 }
 
-// ===========================================================================
-// Item 4 — currency in the footer. Grid.Currency (core/costs/grid.go)
-// is already correctly resolved by BuildGrid (single-currency -> that
-// currency; mixed currencies -> "" per its own unitSet logic) but is
-// silently dropped: CostsBody has no Currency field, and neither
-// renderCostsFooter (TUI) nor costs.html (web) reference one.
-// ===========================================================================
+// Grid.Currency (core/costs/grid.go) is the single currency, or "" for mixed
+// currencies, and reaches the footer of both renderers through CostsBody.
 
 func TestCostsQuality_Item4_CostsBody_GainsCurrencyField(t *testing.T) {
-	// Compile-safe existence check (see file header) — a direct
-	// vs.Body.Costs.Currency reference would be a package-wide compile
-	// error today.
 	typ := reflect.TypeOf(app.CostsBody{})
 	field, ok := typ.FieldByName("Currency")
 	if !ok {
@@ -303,9 +231,6 @@ func TestCostsQuality_Item4_WebCostsTemplate_ReferencesCurrency(t *testing.T) {
 	}
 }
 
-// TestCostsQuality_Item4_GridCurrency_AlreadyResolvedCorrectly is a control
-// confirming the DATA half of item 4 is already sound — only the threading
-// to CostsBody/the two renderers is missing.
 func TestCostsQuality_Item4_GridCurrency_AlreadyResolvedCorrectly(t *testing.T) {
 	window := []costs.Period{{Start: "2026-07-01", End: "2026-08-01"}}
 	single := costs.BuildGrid(
@@ -328,9 +253,6 @@ func TestCostsQuality_Item4_GridCurrency_AlreadyResolvedCorrectly(t *testing.T) 
 	}
 }
 
-// readQualityFile is a t.Helper os.ReadFile wrapper — separated out only so
-// every static-file check above reads identically; not a meaningful
-// abstraction on its own.
 func readQualityFile(t *testing.T, path string) (string, error) {
 	t.Helper()
 	raw, err := os.ReadFile(path)
@@ -340,18 +262,11 @@ func readQualityFile(t *testing.T, path string) (string, error) {
 	return string(raw), nil
 }
 
-// ===========================================================================
-// Item 5 — history-horizon Range.Start clamp: zoom-out to YEAR must never
-// build a window/query whose Range.Start precedes the same
-// costsHistoryHorizonMonths CE entitlement horizon scroll-to-load already
-// respects at month granularity. Live-verified: a real CE call with an
-// unclamped Range.Start throws ValidationException "You haven't enabled
-// historical data beyond 14 months."
-//
-// costsHistoryHorizonMonths (core/app/costs_state.go, = 13) is
-// unexported and unreachable from tests/unit — mirrored here as a literal,
-// tied back explicitly rather than re-derived.
-// ===========================================================================
+// Zoom-out to YEAR must never build a window or query whose Range.Start
+// precedes the costsHistoryHorizonMonths horizon: Cost Explorer answers an
+// unclamped Range.Start with ValidationException "You haven't enabled
+// historical data beyond 14 months." costsHistoryHorizonMonths is unexported,
+// so the test mirrors it as a literal.
 
 func TestCostsQuality_Item5_YearZoom_RangeStart_ClampedToHistoryHorizon(t *testing.T) {
 	const historyHorizonMonths = 13 // mirrors core/app/costs_state.go's costsHistoryHorizonMonths
@@ -391,10 +306,8 @@ func TestCostsQuality_Item5_YearZoom_RangeStart_ClampedToHistoryHorizon(t *testi
 	}
 }
 
-// TestCostsQuality_Item5_YearView_RendersCoveredSpan_NotError confirms the
-// year view, once its window/query is clamped, renders whatever span IS
-// covered rather than failing — the live symptom's actual user-facing
-// outcome (a full-screen error) is what the clamp exists to prevent.
+// Once clamped, the year view renders the covered span instead of a
+// full-screen error.
 func TestCostsQuality_Item5_YearView_RendersCoveredSpan_NotError(t *testing.T) {
 	c := newCostsScreenController(t, round8Now)
 	_, tasks := c.Apply(app.Action{Kind: app.ActionCostZoomOut}) // month -> year

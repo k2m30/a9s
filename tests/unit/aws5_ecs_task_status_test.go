@@ -1,13 +1,7 @@
 package unit
 
-// aws5_ecs_task_status_test.go — the ECS task's lifecycle state is one field.
-//
-// The fetcher wrote one variable under "status" and "last_status", and the
-// readers had already drifted apart: the column and LifecycleKey read "status"
-// while the colour classifier read "last_status". The project settled which
-// name survives when the backup type went through this same collapse
-// (tests/unit/aws_backup_test.go:273, "column keyed 'last_status' is banned
-// per spec §4 — replace with 'status'").
+// The ECS task's lifecycle state is one field, "status": the column,
+// LifecycleKey and the colour classifier all read it.
 
 import (
 	"context"
@@ -21,8 +15,8 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// TestECSTask_StateIsOneField pins the collapse at the fetcher and follows it
-// through every reader the catalog registers.
+// The fetcher writes the state once, and every reader the catalog registers
+// reads that key.
 func TestECSTask_StateIsOneField(t *testing.T) {
 	listClusters := &mockECSListClustersClient{
 		output: &ecs.ListClustersOutput{
@@ -67,9 +61,8 @@ func TestECSTask_StateIsOneField(t *testing.T) {
 	}
 }
 
-// TestECSTask_ColourReadsTheSurvivingKey pins the reader that had drifted. It
-// coloured from "last_status", so a row rebuilt from the cache under the key
-// the column persists would have coloured healthy whatever its state.
+// A row rebuilt from the cache carries only the key the column persists, so
+// the colour classifier reads "status" too.
 func TestECSTask_ColourReadsTheSurvivingKey(t *testing.T) {
 	td := aws5TypeDef(t, "ecs-task")
 	if td.Color == nil {

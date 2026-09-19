@@ -13,12 +13,6 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// ---------------------------------------------------------------------------
-// Log Streams fetcher tests (child of Log Groups)
-// ---------------------------------------------------------------------------
-
-// TestFetchLogStreams_Basic verifies parsing of 3 log streams with varied data,
-// checking ID, Name, Status, all Fields, and RawStruct.
 func TestFetchLogStreams_Basic(t *testing.T) {
 	mock := &mockCWLogsDescribeLogStreamsClient{
 		outputs: []*cloudwatchlogs.DescribeLogStreamsOutput{
@@ -103,7 +97,6 @@ func TestFetchLogStreams_Basic(t *testing.T) {
 		}
 	})
 
-	// Verify all streams have required fields
 	t.Run("required_fields_present", func(t *testing.T) {
 		requiredFields := []string{"stream_name", "last_event", "first_event"}
 		for i, r := range resources {
@@ -116,8 +109,6 @@ func TestFetchLogStreams_Basic(t *testing.T) {
 	})
 }
 
-// TestFetchLogStreams_Empty verifies that an empty response returns an empty
-// slice with no error.
 func TestFetchLogStreams_Empty(t *testing.T) {
 	mock := &mockCWLogsDescribeLogStreamsClient{
 		outputs: []*cloudwatchlogs.DescribeLogStreamsOutput{
@@ -138,7 +129,6 @@ func TestFetchLogStreams_Empty(t *testing.T) {
 	}
 }
 
-// TestFetchLogStreams_APIError verifies that API errors are propagated correctly.
 func TestFetchLogStreams_APIError(t *testing.T) {
 	mock := &mockCWLogsDescribeLogStreamsClient{
 		err: fmt.Errorf("AWS API error: throttling exception"),
@@ -161,7 +151,6 @@ func TestFetchLogStreams_APIError(t *testing.T) {
 // with the continuation token verifies the token is forwarded and the final
 // page sets IsTruncated=false.
 func TestFetchLogStreams_Pagination(t *testing.T) {
-	// Page 1: 2 streams with NextToken indicating more pages exist.
 	page1Mock := &mockCWLogsDescribeLogStreamsClient{
 		outputs: []*cloudwatchlogs.DescribeLogStreamsOutput{
 			{
@@ -184,7 +173,6 @@ func TestFetchLogStreams_Pagination(t *testing.T) {
 		},
 	}
 
-	// First call: no continuation token — fetches page 1.
 	result1, err := awsclient.FetchLogStreams(context.Background(), page1Mock, "/aws/lambda/paginated", "")
 	if err != nil {
 		t.Fatalf("page 1: expected no error, got %v", err)
@@ -229,7 +217,6 @@ func TestFetchLogStreams_Pagination(t *testing.T) {
 		}
 	})
 
-	// Page 2: 1 stream with no NextToken — last page.
 	page2Mock := &mockCWLogsDescribeLogStreamsClient{
 		outputs: []*cloudwatchlogs.DescribeLogStreamsOutput{
 			{
@@ -245,7 +232,6 @@ func TestFetchLogStreams_Pagination(t *testing.T) {
 		},
 	}
 
-	// Second call: pass continuation token from page 1 to fetch page 2.
 	result2, err := awsclient.FetchLogStreams(context.Background(), page2Mock, "/aws/lambda/paginated", result1.Pagination.NextToken)
 	if err != nil {
 		t.Fatalf("page 2: expected no error, got %v", err)
@@ -330,7 +316,6 @@ func TestFetchLogStreams_NilFields(t *testing.T) {
 				LogStreams: []cwlogstypes.LogStream{
 					{
 						LogStreamName: aws.String("nil-fields-stream"),
-						// All other fields are nil
 					},
 				},
 			},
@@ -370,8 +355,6 @@ func TestFetchLogStreams_NilFields(t *testing.T) {
 
 }
 
-// TestFetchLogStreams_RawStruct verifies that RawStruct is the original
-// cwlogstypes.LogStream, preserving all SDK fields.
 func TestFetchLogStreams_RawStruct(t *testing.T) {
 	mock := &mockCWLogsDescribeLogStreamsClient{
 		outputs: []*cloudwatchlogs.DescribeLogStreamsOutput{
@@ -425,8 +408,6 @@ func TestFetchLogStreams_RawStruct(t *testing.T) {
 
 }
 
-// TestLogStreamColumns verifies that LogStreamColumns returns the expected
-// 3 columns with the correct keys: stream_name, last_event, first_event.
 func TestLogStreamColumns(t *testing.T) {
 	cols := resource.LogStreamColumns()
 
@@ -467,8 +448,6 @@ func TestLogStreamColumns(t *testing.T) {
 // reasonable number of results instead of loading all streams from a log
 // group with thousands of entries.
 func TestFetchLogStreams_MaxResults(t *testing.T) {
-	// Build a mock that returns 20 pages of 50 streams each (1000 total).
-	// The fetcher should stop well before exhausting all pages.
 	var outputs []*cloudwatchlogs.DescribeLogStreamsOutput
 	for page := range 20 {
 		var streams []cwlogstypes.LogStream
@@ -495,12 +474,10 @@ func TestFetchLogStreams_MaxResults(t *testing.T) {
 
 	resources := result.Resources
 
-	// Should cap at a reasonable limit (e.g., 500) instead of loading all 1000
 	if len(resources) > 500 {
 		t.Errorf("expected <= 500 resources (capped), got %d — fetcher should limit pagination", len(resources))
 	}
 
-	// Should still return a meaningful number of results
 	if len(resources) < 50 {
 		t.Errorf("expected at least 50 resources, got %d", len(resources))
 	}

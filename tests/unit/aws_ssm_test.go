@@ -14,10 +14,6 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// ---------------------------------------------------------------------------
-// SSM - Test FetchSSMParameters response parsing
-// ---------------------------------------------------------------------------
-
 func TestFetchSSMParameters_ParsesMultipleParameters(t *testing.T) {
 	lastModified := time.Date(2025, 6, 15, 10, 0, 0, 0, time.UTC)
 
@@ -59,7 +55,6 @@ func TestFetchSSMParameters_ParsesMultipleParameters(t *testing.T) {
 		t.Fatalf("expected 2 resources, got %d", len(resources))
 	}
 
-	// Verify required fields exist
 	requiredFields := []string{"name", "type", "version", "last_modified", "description"}
 	for i, r := range resources {
 		for _, key := range requiredFields {
@@ -69,7 +64,6 @@ func TestFetchSSMParameters_ParsesMultipleParameters(t *testing.T) {
 		}
 	}
 
-	// Verify first parameter
 	r0 := resources[0]
 	if r0.ID != "/prod/database/password" {
 		t.Errorf("resource[0].ID: expected %q, got %q", "/prod/database/password", r0.ID)
@@ -93,7 +87,6 @@ func TestFetchSSMParameters_ParsesMultipleParameters(t *testing.T) {
 		t.Error("resource[0].Fields[\"last_modified\"] should not be empty")
 	}
 
-	// Verify second parameter
 	r1 := resources[1]
 	if r1.ID != "/staging/api-key" {
 		t.Errorf("resource[1].ID: expected %q, got %q", "/staging/api-key", r1.ID)

@@ -65,8 +65,7 @@ func TestRelated_Eb_TG_TimeoutOnListeners_NamesTheCall(t *testing.T) {
 	}
 }
 
-// TestFailedCall_DeniedAction_NamesTheOperationOnce pins the other half of row
-// 3: a denial's cause already names the action, so the operation is not
+// A denial's cause already names the action, so the operation is not
 // prepended a second time.
 func TestFailedCall_DeniedAction_NamesTheOperationOnce(t *testing.T) {
 	denied := &smithy.OperationError{

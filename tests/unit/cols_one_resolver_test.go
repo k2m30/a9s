@@ -1,22 +1,17 @@
-// cols_one_resolver_test.go — a resource type has exactly one answer to
-// "what are my list columns", and exactly one column that names its rows.
+// A resource type has exactly one answer to "what are my list columns", and
+// exactly one column that names its rows.
 //
-// Two resolvers currently answer the first question — (*app.Controller).
-// ResolveColumnsForType and resource.ResolveListColumnCascade — and they
-// disagree about Path and whether a child short name resolves at
-// all. Whichever one a caller happens to reach decides what the user sees,
-// so the two must be indistinguishable field by field, for every registered
-// type, with and without a view config loaded from disk.
+// (*app.Controller).ResolveColumnsForType and resource.ResolveListColumnCascade
+// both answer the first question. Whichever one a caller reaches decides what
+// the user sees, so the two must be indistinguishable field by field, for every
+// registered type, with and without a view config loaded from disk.
 //
-// The identity column is elected twice for the same reason: once over the
-// set that is rendered, and again inside the cell extractor over the type's
-// built-in set, which is not the same set once a view file is loaded. When
-// those two elections disagree, a row with nothing but an ID and a name —
-// a warm-cache replay, a degraded fetch, a related-panel stub — shows its
-// name under a column the marker glyph is not on, or under no column at
-// all. The election belongs on the resolved set, and every consumer of it
-// (the cell extractor, the marker column, the sort comparator) must read
-// that one election.
+// The identity-column election belongs on the resolved set, and every consumer
+// of it (the cell extractor, the marker column, the sort comparator) must read
+// that one election. The type's built-in set is not the rendered set once a
+// view file is loaded, so a second election over it puts a bare ID-and-name
+// row's name — a warm-cache replay, a degraded fetch, a related-panel stub —
+// under a column the marker glyph is not on, or under no column at all.
 package unit_test
 
 import (
@@ -34,8 +29,7 @@ import (
 )
 
 // colsTypeDefFor resolves the typeDef the cascade must be handed for a short
-// name: the catalog parent, else the registered child. The controller's own
-// lookup consults only the parent half, which is the point of the gate.
+// name: the catalog parent, else the registered child.
 func colsTypeDefFor(shortName string) *resource.ResourceTypeDef {
 	if td := resource.FindResourceType(shortName); td != nil {
 		return td
@@ -123,11 +117,8 @@ func colsLoadedViewConfig(t *testing.T) *config.ViewsConfig {
 	return vc
 }
 
-// TestCols_ControllerAnswerEqualsCascadeAnswer walks every registered type,
-// parent and child, and asserts the controller's column set is the cascade's
-// column set — with no view config and with the shipped view files loaded.
-// Both must also be non-empty: a type that resolves no columns renders a list
-// with no cells, which is a worse failure than disagreeing about one of them.
+// A type that resolves no columns renders a list with no cells, a worse
+// failure than disagreeing about one of them.
 func TestCols_ControllerAnswerEqualsCascadeAnswer(t *testing.T) {
 	loaded := colsLoadedViewConfig(t)
 
@@ -212,18 +203,6 @@ func colsDegradedRows(shortName string) []resource.Resource {
 	}
 }
 
-// TestCols_IdentityColumnIsTheColumnThatShowsTheRowName drives the app's own
-// render path: a list opened on the controller with the shipped view files
-// loaded, rows delivered through the real ResourcesLoaded event, cells read
-// off the ListBody the renderers consume. The column the body marks as the
-// identity column (IdentityCol) must be the column whose cell carries the row's
-// name, and no other column may carry it.
-//
-// ct-events and eb are the types where this fails today: their view file
-// elects a different column than their built-in set does, and the extractor
-// re-elects from the built-in set, so the name lands under a column the
-// marker is not on — or, when no built-in title matches a view-file title,
-// under no column at all and the first cell of every row goes blank.
 func TestCols_IdentityColumnIsTheColumnThatShowsTheRowName(t *testing.T) {
 	vc := colsLoadedViewConfig(t)
 
@@ -276,18 +255,6 @@ func TestCols_IdentityColumnIsTheColumnThatShowsTheRowName(t *testing.T) {
 	}
 }
 
-// TestCols_SortingByTheIdentityColumnOrdersDegradedRowsByName pins the third
-// consumer of the election. The sort comparator builds its own ColumnDef from
-// the view definition rather than from the resolved set, so on a row with no
-// struct and no Fields it asks the extractor for a value the extractor will
-// only produce for the identity column — and the comparator's hand-built
-// column is not that column. Every row then compares equal and the list keeps
-// its arrival order, so sorting by the one column that has anything to say
-// about these rows does nothing at all.
-//
-// ct-events is driven here because its view file's identity column ("V") and
-// its built-in one ("Time") are the pair that diverge; the rows are delivered
-// in descending name order so a working sort has to move them.
 func TestCols_SortingByTheIdentityColumnOrdersDegradedRowsByName(t *testing.T) {
 	const shortName = "ct-events"
 	vc := colsLoadedViewConfig(t)
@@ -327,13 +294,8 @@ func TestCols_SortingByTheIdentityColumnOrdersDegradedRowsByName(t *testing.T) {
 	}
 }
 
-// TestCols_SaveColumnsAreAProjectionOfTheResolvedSet pins the third lane. The
-// cache-save resolver must not resolve anything: it must project the set the
-// render path shows, so a save can never persist a column the list does not
-// render, or miss one it does. Walked for every type with and without the
-// shipped view files, because the two lanes previously duplicated the typeDef
-// lookup and would diverge on whichever branch that lookup answered
-// differently.
+// The cache-save resolver projects the set the render path shows, so a save
+// can never persist a column the list does not render, or miss one it does.
 func TestCols_SaveColumnsAreAProjectionOfTheResolvedSet(t *testing.T) {
 	loaded := colsLoadedViewConfig(t)
 
@@ -367,17 +329,10 @@ func TestCols_SaveColumnsAreAProjectionOfTheResolvedSet(t *testing.T) {
 	}
 }
 
-// TestCols_SortOverridesSurviveOntoTheResolvedColumn pins the field that
-// exists for one purpose: to let a column sort by something other than the text
-// it shows. A size rendered "1.2 GB" and a timestamp rendered "Mar 28 14:30"
-// sort wrongly as text, so the built-in view declares the raw Fields key to
-// compare instead. The sort_path companion this test also covered was removed
-// with the sort task: it read the AWS struct, which a warm-cache row does not
-// have, so it ordered the cached frame differently from the live one. Do not
-// restore that assertion. Those declarations have to reach the
-// column the comparator reads, on the branch a real user's session takes —
-// which is the one with the shipped view files loaded, not the built-in
-// defaults.
+// A size rendered "1.2 GB" and a timestamp rendered "Mar 28 14:30" sort wrongly
+// as text, so the built-in view declares the raw Fields key to compare instead.
+// Those declarations must reach the column the comparator reads with the
+// shipped view files loaded, the branch a real session takes.
 func TestCols_SortOverridesSurviveOntoTheResolvedColumn(t *testing.T) {
 	loaded := colsLoadedViewConfig(t)
 	ctrl := newTestController(t)
@@ -412,11 +367,9 @@ func TestCols_SortOverridesSurviveOntoTheResolvedColumn(t *testing.T) {
 	}
 }
 
-// TestCols_SortingCloudTrailByTimeIsChronological is the user-visible half of
-// the rule above. A CloudTrail event's time cell reads "Mar 28 14:30:15", so
-// sorting those cells as text puts April before March and every August before
-// every February. The built-in view declares the RFC3339 field to compare
-// instead; sorting the list ascending has to produce that order.
+// A CloudTrail event's time cell reads "Mar 28 14:30:15", so sorting those
+// cells as text puts April before March. The built-in view declares the
+// RFC3339 field to compare instead.
 func TestCols_SortingCloudTrailByTimeIsChronological(t *testing.T) {
 	const shortName = "ct-events"
 	var td resource.ResourceTypeDef

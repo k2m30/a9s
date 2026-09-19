@@ -13,10 +13,6 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// ---------------------------------------------------------------------------
-// Internet Gateway fetcher tests
-// ---------------------------------------------------------------------------
-
 func TestFetchInternetGateways_ParsesMultipleIGWs(t *testing.T) {
 	mock := &mockEC2DescribeInternetGatewaysClient{
 		output: &ec2.DescribeInternetGatewaysOutput{
@@ -61,7 +57,6 @@ func TestFetchInternetGateways_ParsesMultipleIGWs(t *testing.T) {
 		t.Fatalf("expected 2 resources, got %d", len(resources))
 	}
 
-	// Verify first IGW
 	r0 := resources[0]
 	if r0.ID != "igw-0001" {
 		t.Errorf("resource[0].ID: expected %q, got %q", "igw-0001", r0.ID)
@@ -73,7 +68,6 @@ func TestFetchInternetGateways_ParsesMultipleIGWs(t *testing.T) {
 		t.Errorf("resource[0].Findings: expected none for attached IGW, got %d", len(r0.Findings))
 	}
 
-	// Verify Fields on all resources
 	requiredFields := []string{"igw_id", "name", "vpc_id", "state"}
 	for i, r := range resources {
 		for _, key := range requiredFields {
@@ -83,7 +77,6 @@ func TestFetchInternetGateways_ParsesMultipleIGWs(t *testing.T) {
 		}
 	}
 
-	// Verify specific field values on first IGW
 	if r0.Fields["igw_id"] != "igw-0001" {
 		t.Errorf("resource[0].Fields[\"igw_id\"]: expected %q, got %q", "igw-0001", r0.Fields["igw_id"])
 	}
@@ -97,7 +90,6 @@ func TestFetchInternetGateways_ParsesMultipleIGWs(t *testing.T) {
 		t.Errorf("resource[0].Fields[\"state\"]: expected %q, got %q", "attached", r0.Fields["state"])
 	}
 
-	// Verify second IGW (no Name tag)
 	r1 := resources[1]
 	if r1.ID != "igw-0002" {
 		t.Errorf("resource[1].ID: expected %q, got %q", "igw-0002", r1.ID)

@@ -15,8 +15,6 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// mockIAMListEntitiesAPI is a minimal implementation of IAMListEntitiesForPolicyAPI
-// used by policy related-checker tests.
 type mockIAMListEntitiesAPI struct {
 	out *iam.ListEntitiesForPolicyOutput
 	err error
@@ -36,16 +34,12 @@ func policyResource(arn string) resource.Resource {
 	}
 }
 
-// --- Navigable Fields ---
-
 func TestNavigableFields_Policy_None(t *testing.T) {
 	fields := resource.GetNavigableFields("policy")
 	if len(fields) != 0 {
 		t.Errorf("expected no navigable fields for policy, got %d: %v", len(fields), fields)
 	}
 }
-
-// --- checkPolicyRole ---
 
 func TestRelated_Policy_Role_ReturnsRoleNames(t *testing.T) {
 	restore := internalaws.SetIAMListEntitiesAPIForTest(&mockIAMListEntitiesAPI{
@@ -135,8 +129,6 @@ func TestRelated_Policy_Role_NilClientsReturnsNegOne(t *testing.T) {
 	}
 }
 
-// --- checkPolicyUser ---
-
 func TestRelated_Policy_User_ReturnsUserNames(t *testing.T) {
 	restore := internalaws.SetIAMListEntitiesAPIForTest(&mockIAMListEntitiesAPI{
 		out: &iam.ListEntitiesForPolicyOutput{
@@ -192,8 +184,6 @@ func TestRelated_Policy_User_NilClientsReturnsNegOne(t *testing.T) {
 		t.Errorf("TargetType = %q, want %q", result.TargetType(), "iam-user")
 	}
 }
-
-// --- checkPolicyGroup ---
 
 func TestRelated_Policy_Group_ReturnsGroupNames(t *testing.T) {
 	restore := internalaws.SetIAMListEntitiesAPIForTest(&mockIAMListEntitiesAPI{
@@ -251,17 +241,12 @@ func TestRelated_Policy_Group_NilClientsReturnsNegOne(t *testing.T) {
 	}
 }
 
-// --- ARN fallback ---
-
-// TestRelated_Policy_Role_ARNFallbackFromID verifies that when Fields["arn"] is empty
-// the checker returns Count 0 (no ARN resolvable), not -1 (error).
 func TestRelated_Policy_Role_ARNFallbackFromID(t *testing.T) {
 	restore := internalaws.SetIAMListEntitiesAPIForTest(&mockIAMListEntitiesAPI{
 		out: &iam.ListEntitiesForPolicyOutput{},
 	})
 	defer restore()
 
-	// Resource with no "arn" in Fields and no RawStruct — policyARNFromResource returns "".
 	res := resource.Resource{
 		ID:     "no-arn-policy",
 		Name:   "no-arn-policy",
@@ -278,10 +263,6 @@ func TestRelated_Policy_Role_ARNFallbackFromID(t *testing.T) {
 	}
 }
 
-// --- TTL cache ---
-
-// TestRelated_Policy_TTLCache verifies that two checkers called with the same ARN
-// within policyEntitiesTTL share a cached result (the mock is only called once).
 func TestRelated_Policy_TTLCache(t *testing.T) {
 	// Use a unique ARN to guarantee no stale entry from other tests.
 	arn := "arn:aws:iam::111122223333:policy/ttl-cache-test-" + time.Now().Format("20060102150405.999999999")
@@ -311,7 +292,6 @@ func TestRelated_Policy_TTLCache(t *testing.T) {
 	}
 }
 
-// mockIAMListEntitiesAPICounter is a mock that increments a counter on each call.
 type mockIAMListEntitiesAPICounter struct {
 	out     *iam.ListEntitiesForPolicyOutput
 	counter *int

@@ -14,10 +14,6 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// ---------------------------------------------------------------------------
-// NAT Gateway fetcher tests
-// ---------------------------------------------------------------------------
-
 func TestFetchNatGateways_ParsesMultipleNatGateways(t *testing.T) {
 	createTime := time.Date(2024, 1, 15, 10, 0, 0, 0, time.UTC)
 
@@ -63,7 +59,6 @@ func TestFetchNatGateways_ParsesMultipleNatGateways(t *testing.T) {
 		t.Fatalf("expected 2 resources, got %d", len(resources))
 	}
 
-	// Verify first NAT gateway
 	r0 := resources[0]
 	if r0.ID != "nat-0001" {
 		t.Errorf("resource[0].ID: expected %q, got %q", "nat-0001", r0.ID)
@@ -75,7 +70,6 @@ func TestFetchNatGateways_ParsesMultipleNatGateways(t *testing.T) {
 		t.Errorf("resource[0].Findings: expected none for available NAT, got %d", len(r0.Findings))
 	}
 
-	// Verify Fields on all resources
 	requiredFields := []string{"nat_gateway_id", "name", "vpc_id", "subnet_id", "state", "public_ip"}
 	for i, r := range resources {
 		for _, key := range requiredFields {
@@ -85,7 +79,6 @@ func TestFetchNatGateways_ParsesMultipleNatGateways(t *testing.T) {
 		}
 	}
 
-	// Verify specific field values on first NAT gateway
 	if r0.Fields["nat_gateway_id"] != "nat-0001" {
 		t.Errorf("resource[0].Fields[\"nat_gateway_id\"]: expected %q, got %q", "nat-0001", r0.Fields["nat_gateway_id"])
 	}
@@ -105,7 +98,6 @@ func TestFetchNatGateways_ParsesMultipleNatGateways(t *testing.T) {
 		t.Errorf("resource[0].Fields[\"public_ip\"]: expected %q, got %q", "1.2.3.4", r0.Fields["public_ip"])
 	}
 
-	// Verify second NAT gateway (no Name tag, pending state, no public IP)
 	r1 := resources[1]
 	if r1.ID != "nat-0002" {
 		t.Errorf("resource[1].ID: expected %q, got %q", "nat-0002", r1.ID)

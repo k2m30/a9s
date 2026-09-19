@@ -1,10 +1,5 @@
 package unit
 
-// apptest_interleaving_test.go — drives core/app/apptest's deterministic
-// interleaving harness against the REAL detail-view production path
-// (Controller.Apply/ExecuteOne), rather than exercising the harness types in
-// isolation.
-//
 // Fixture choice: "sfn" (not "ec2", the usual detail_workload_test.go
 // fixture) — it registers both a detail enricher (enrichSfn) and related
 // defs (checkSFNRole/checkSFNKMS/checkSFNLambda) that all call the SAME
@@ -59,17 +54,8 @@ const sfnInterleavingType = "sfn"
 // real RawStruct (sfntypes.StateMachineListItem with StateMachineArn set) so
 // enrichSfn's own id/fetch actually run instead of short-circuiting.
 //
-// RawStruct must NOT be left nil here: core/aws/detail_enrich_engine.go's
-// RawStruct==nil branch returns awsclient.ErrDetailEnrichSkipped (see its
-// own doc comment), which core/runtime.HandleEnrichDetailResult
-// distinguishes from a completed enrichment, so a permanently-nil RawStruct
-// would make the latch permanently unclearable for the wrong reason and
-// never exercise the "genuinely completed" path
-// TestApptestExplorer_DetailViewActionSpace_AllInvariantsHold and
-// TestApptestScheduler_StickyRefreshSupersededByPanelToggle_
-// LatchOnlyClearsOnGenuineFreshFold promise. Both tests additionally assert
-// on the fake SFN client's own call counter, not just LatchCleared, so a nil
-// on this field fails loudly.
+// RawStruct must be set: with it nil, enrichment returns
+// awsclient.ErrDetailEnrichSkipped, which never clears the latch.
 func sfnFixtureResource(id string) resource.Resource {
 	arn := "arn:aws:states:us-east-1:123456789012:stateMachine:" + id
 	return resource.Resource{
@@ -93,10 +79,6 @@ func completeTaskForOp(sched *apptest.Scheduler, kind runtime.TaskKind, op domai
 	}
 	return errors.New("apptest_interleaving_test: no pending task of the requested kind/op")
 }
-
-// ---------------------------------------------------------------------------
-// Scope (a) — permanent exploration test
-// ---------------------------------------------------------------------------
 
 func sfnInterleavingActions() []apptest.Action {
 	const id = "sfn-explorer-0000001"
@@ -134,14 +116,6 @@ func sfnInterleavingActions() []apptest.Action {
 	}
 }
 
-// TestApptestExplorer_DetailViewActionSpace_AllInvariantsHold is the
-// regression harness for the "action B lands while action A is in flight"
-// defect class: every legal interleaving of
-// open→refresh→toggle-related→open-yaml against the completion order of the
-// enrich/related tasks those actions spawn must satisfy all five apptest
-// invariants. sfnFixtureResource carries a real RawStruct and Check asserts
-// on lastFake.describeCalls, so LatchCleared is checked against a genuine
-// enrich fold, not a no-op that clears the latch for free.
 func TestApptestExplorer_DetailViewActionSpace_AllInvariantsHold(t *testing.T) {
 	const id = "sfn-explorer-0000001"
 
@@ -182,15 +156,9 @@ func TestApptestExplorer_DetailViewActionSpace_AllInvariantsHold(t *testing.T) {
 			// refresh's own enrich is still pending would be a false
 			// positive on a merely-not-yet-folded (not stuck) latch.
 			if len(pending) == 0 {
-				// Proves LatchCleared's pass means what it claims: that a
-				// GENUINE enrich fold happened, not that sfnFixtureResource's
-				// RawStruct silently regressed back to nil (which would make
-				// every enrich a no-op ErrDetailEnrichSkipped skip — never
-				// clearing the latch, so this check would fail loudly instead
-				// of LatchCleared quietly passing for the wrong reason).
-				// "open" is every replay's mandatory first action, so by
-				// quiescence its enrich has always at least attempted the
-				// real DescribeStateMachine call.
+				// Without a real RawStruct every enrich is an ErrDetailEnrichSkipped no-op
+				// that never clears the latch. "open" is every replay's first action, so by
+				// quiescence its enrich has attempted DescribeStateMachine.
 				if lastFake.describeCalls.Load() == 0 {
 					return fmt.Errorf("apptest: quiescent but the coalescing SFN fake's DescribeStateMachine never fired — sfnFixtureResource's RawStruct must carry a real StateMachineArn so enrichSfn genuinely completes")
 				}
@@ -212,15 +180,6 @@ func TestApptestExplorer_DetailViewActionSpace_AllInvariantsHold(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// Scope (c) — the harness's own failure output must be usable
-// ---------------------------------------------------------------------------
-
-// TestApptestExplorer_FailureReplay_IsHumanReadable drives a deliberately-
-// violating Check (always errors) through a tiny two-action Explorer and
-// asserts Explore's returned Failure carries a Replay string a human could
-// actually follow and reproduce, plus an Error() that surfaces the
-// underlying cause.
 func TestApptestExplorer_FailureReplay_IsHumanReadable(t *testing.T) {
 	wantErr := "deliberate violation for harness usability check"
 	explorer := &apptest.Explorer{
@@ -252,29 +211,10 @@ func TestApptestExplorer_FailureReplay_IsHumanReadable(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// Scope (b) — named regression pins for known historical interleaving bugs
-// ---------------------------------------------------------------------------
-
-// TestApptestScheduler_StickyRefreshSupersededByPanelToggle_LatchOnlyClearsOnGenuineFreshFold
-// pins the historical "sticky refresh" defect via its PANEL-TOGGLE vehicle
-// specifically (detail_workload_test.go's existing TestStickyRefresh_* suite
-// only exercises the related-row-retry vehicle): Ctrl+R arms
-// session.PendingDetailRefresh; before its own enrichment folds, toggling the
-// related panel off then back on begins a fresh, non-refresh, non-forced
-// successor operation for the SAME resource (core/app/detail_cursor.go's
-// ActionToggleRelated case) — that successor must still inherit
-// SkipCache=true, and the latch must clear only once a genuinely fresh
-// enrichment fold lands, never silently downgrading back to cached data.
-//
-// Same historical caveat as the Explorer test above: before sfnFixtureResource
-// carried a real RawStruct, this test's own LatchCleared assertion at the
-// bottom could never have failed no matter what production code did — every
-// enrich in this test was a nil-RawStruct no-op, so the "genuinely fresh
-// fold" this test's name promises never actually happened. It is a real
-// fresh-fold check now; see the fake.describeCalls assertion immediately
-// above LatchCleared, added specifically so a future regression back to a
-// nil RawStruct here fails loudly instead of quietly reintroducing the gap.
+// Ctrl+R arms session.PendingDetailRefresh; toggling the related panel off and
+// on before the refresh's enrichment folds begins a non-refresh successor
+// operation for the same resource. That successor inherits SkipCache=true, and
+// the latch clears only once a fresh enrichment fold lands.
 func TestApptestScheduler_StickyRefreshSupersededByPanelToggle_LatchOnlyClearsOnGenuineFreshFold(t *testing.T) {
 	const id = "sfn-sticky-0000001"
 	ctx := context.Background()
@@ -283,7 +223,6 @@ func TestApptestScheduler_StickyRefreshSupersededByPanelToggle_LatchOnlyClearsOn
 	core.Session().Clients = &awsclient.ServiceClients{SFN: fake}
 	sched := apptest.NewScheduler(ctx, c)
 
-	// open(sfn/sticky-1) → op1, drained to quiescence.
 	c.Apply(app.Action{Kind: app.ActionCommand, Arg: sfnInterleavingType})
 	c.ApplyResourcesLoaded(sfnInterleavingType, []resource.Resource{sfnFixtureResource(id)}, nil, false)
 	_, openTasks := c.Apply(app.Action{Kind: app.ActionSelect})
@@ -292,7 +231,6 @@ func TestApptestScheduler_StickyRefreshSupersededByPanelToggle_LatchOnlyClearsOn
 		t.Fatalf("draining the initial detail open: %v", err)
 	}
 
-	// refresh → op2, arms PendingDetailRefresh unconditionally at Apply time.
 	_, refreshTasks := c.Apply(app.Action{Kind: app.ActionRefresh})
 	sched.Submit(refreshTasks...)
 	refreshOp := runtime.TaskOpID(findTaskKind(refreshTasks, runtime.KindEnrichDetail).Payload)
@@ -300,13 +238,10 @@ func TestApptestScheduler_StickyRefreshSupersededByPanelToggle_LatchOnlyClearsOn
 		t.Fatal("precondition failed: refresh's enrich task TaskOpID is 0")
 	}
 
-	// Complete ONLY op2's related-check, deliberately leaving its enrich
-	// pending — the refresh's own enrichment has NOT yet folded.
 	if err := completeTaskForOp(sched, runtime.KindRelatedCheck, refreshOp); err != nil {
 		t.Fatalf("completing refresh's related-check: %v", err)
 	}
 
-	// toggle-related OFF then ON — the panel-toggle successor vehicle.
 	_, offTasks := c.Apply(app.Action{Kind: app.ActionToggleRelated})
 	if len(offTasks) != 0 {
 		t.Fatalf("toggle OFF returned %v tasks, want none", taskKindsOf(offTasks))
@@ -322,13 +257,8 @@ func TestApptestScheduler_StickyRefreshSupersededByPanelToggle_LatchOnlyClearsOn
 		t.Fatalf("draining the toggle-ON workload (plus the leftover stale op2 enrich): %v", err)
 	}
 
-	// Proves the LatchCleared pass below means what it claims: a GENUINE
-	// enrichment fold reached the real DescribeStateMachine call, not that
-	// sfnFixtureResource's RawStruct regressed back to nil — which would
-	// make every enrich a no-op ErrDetailEnrichSkipped skip that can never
-	// clear the latch (this test's name would then be pinning "always stuck",
-	// not "clears on genuine fresh fold"). At least op1, the leftover stale
-	// op2, and the toggle-ON successor each attempt one real call.
+	// Without a real RawStruct every enrich is an ErrDetailEnrichSkipped no-op, so
+	// a zero call count means LatchCleared below checks nothing.
 	if got := fake.describeCalls.Load(); got == 0 {
 		t.Fatal("fake.describeCalls == 0 — DescribeStateMachine never fired; sfnFixtureResource's RawStruct must carry a real StateMachineArn so enrichSfn genuinely completes instead of skipping")
 	}
@@ -338,14 +268,9 @@ func TestApptestScheduler_StickyRefreshSupersededByPanelToggle_LatchOnlyClearsOn
 	}
 }
 
-// TestApptestScheduler_PartialRelatedCache_StillDispatchesCheck_NoRowStrandedInLoading
-// pins the "partial related cache" rule (core/app/navigate.go's
-// relatedCacheCoverage doc comment): a related cache covering only SOME of
-// "sfn"'s registered defs — as if a prior operation completed some checks
-// but never finished the rest before this operation began — must still
-// dispatch KindRelatedCheck, or the still-uncached defs' rows are stranded
-// in Loading forever (BeginDetailOperation has already invalidated whatever
-// was running for them under any prior operation).
+// A related cache covering only some of sfn's defs must still dispatch
+// KindRelatedCheck: BeginDetailOperation has invalidated whatever ran for the
+// uncached defs, so their rows would stay Loading.
 func TestApptestScheduler_PartialRelatedCache_StillDispatchesCheck_NoRowStrandedInLoading(t *testing.T) {
 	const id = "sfn-partial-0000001"
 	ctx := context.Background()
@@ -370,8 +295,6 @@ func TestApptestScheduler_PartialRelatedCache_StillDispatchesCheck_NoRowStranded
 		t.Fatalf("a PARTIAL related cache (1/%d defs) suppressed KindRelatedCheck; want still dispatched so the uncached defs are not stranded in Loading. tasks: %v", len(defs), taskKindsOf(tasks))
 	}
 
-	// Mid-flight: the related-check is still pending — no row may show
-	// Loading without it.
 	if err := apptest.NoOrphanLoadingRelated(c.Snapshot(), sched.Pending()); err != nil {
 		t.Error(err)
 	}
@@ -380,20 +303,11 @@ func TestApptestScheduler_PartialRelatedCache_StillDispatchesCheck_NoRowStranded
 		t.Fatalf("draining the related-check fan-out: %v", err)
 	}
 
-	// Quiescent: nothing pending, so nothing may still show Loading.
 	if err := apptest.NoOrphanLoadingRelated(c.Snapshot(), sched.Pending()); err != nil {
 		t.Error(err)
 	}
 }
 
-// TestApptestScheduler_StaleEnrichResult_LandingAfterNewer_IsRejectedNotAccepted
-// pins the ordering-inversion defect class the whole harness exists for: a
-// fresh refresh operation (op2) begins before the original open's (op1)
-// enrichment ever folds; op2's enrich result is completed FIRST (as a truly
-// concurrent system would deliver it), op1's stale enrich arrives SECOND —
-// op1's late fold must be rejected (superseded), never regressing the
-// visible detail back to older enrichment, and MonotonicDetailFold must hold
-// across the whole accepted-fold history.
 func TestApptestScheduler_StaleEnrichResult_LandingAfterNewer_IsRejectedNotAccepted(t *testing.T) {
 	const id = "sfn-stale-0000001"
 	ctx := context.Background()
@@ -404,14 +318,13 @@ func TestApptestScheduler_StaleEnrichResult_LandingAfterNewer_IsRejectedNotAccep
 
 	c.Apply(app.Action{Kind: app.ActionCommand, Arg: sfnInterleavingType})
 	c.ApplyResourcesLoaded(sfnInterleavingType, []resource.Resource{sfnFixtureResource(id)}, nil, false)
-	_, openTasks := c.Apply(app.Action{Kind: app.ActionSelect}) // op1
+	_, openTasks := c.Apply(app.Action{Kind: app.ActionSelect})
 	sched.Submit(openTasks...)
 	op1 := runtime.TaskOpID(findTaskKind(openTasks, runtime.KindEnrichDetail).Payload)
 	if op1 == 0 {
 		t.Fatal("precondition failed: op1's enrich task TaskOpID is 0")
 	}
 
-	// A fresh refresh — op2 — begins before op1's enrichment ever folds.
 	_, refreshTasks := c.Apply(app.Action{Kind: app.ActionRefresh})
 	sched.Submit(refreshTasks...)
 	op2 := runtime.TaskOpID(findTaskKind(refreshTasks, runtime.KindEnrichDetail).Payload)
@@ -419,11 +332,9 @@ func TestApptestScheduler_StaleEnrichResult_LandingAfterNewer_IsRejectedNotAccep
 		t.Fatalf("precondition failed: op2 = %d, want a fresh non-zero op distinct from op1 = %d", op2, op1)
 	}
 
-	// The NEWER operation's result arrives first.
 	if err := completeTaskForOp(sched, runtime.KindEnrichDetail, op2); err != nil {
 		t.Fatalf("completing op2's enrich: %v", err)
 	}
-	// The STALE (older) operation's result arrives late.
 	if err := completeTaskForOp(sched, runtime.KindEnrichDetail, op1); err != nil {
 		t.Fatalf("completing op1's stale enrich: %v", err)
 	}
@@ -450,15 +361,6 @@ func TestApptestScheduler_StaleEnrichResult_LandingAfterNewer_IsRejectedNotAccep
 	}
 }
 
-// TestApptestScheduler_ByIDPlaceholder_UnrelatedResourcesLoaded_NeverTouchesOutstandingOwnFetch
-// pins the by-ID auto-open placeholder regression
-// (app_autoopen_single_detail_fallback_test.go's
-// TestApply_AutoOpenSingleDetail_UnrelatedResourcesLoaded_NoStubNoDetailOpen
-// covers the same contract via a hand-built Handle call; this pins it via a
-// REAL Scheduler-executed task instead): an "ami" by-ID placeholder pending
-// its own fetch must not react at all to an unrelated type's
-// ResourcesLoaded — delivered here as a genuinely executed KindFetchResources
-// task for "ec2" (demo fixtures), not a synthetic event literal.
 func TestApptestScheduler_ByIDPlaceholder_UnrelatedResourcesLoaded_NeverTouchesOutstandingOwnFetch(t *testing.T) {
 	const targetID = "ami-0scheduler0000001"
 	ctx := context.Background()
@@ -475,9 +377,8 @@ func TestApptestScheduler_ByIDPlaceholder_UnrelatedResourcesLoaded_NeverTouchesO
 	c.Apply(app.Action{Kind: app.ActionCommand, Arg: "ami"})
 	c.SetListAutoOpenSingle(true)
 	c.PatchListRelatedIDSet([]string{targetID})
-	// The "ami" placeholder's own fetch is deliberately never resolved in
-	// this test — exactly the outstanding window autoOpenSingleDetail's
-	// unrelated-type guard exists for.
+	// The "ami" placeholder's own fetch stays unresolved: that outstanding window
+	// is what autoOpenSingleDetail's unrelated-type guard covers.
 
 	sched.Submit(runtime.TaskRequest{Key: runtime.TaskKey{Kind: runtime.KindFetchResources, Scope: "ec2"}})
 	if err := sched.Complete(0); err != nil {
@@ -492,10 +393,8 @@ func TestApptestScheduler_ByIDPlaceholder_UnrelatedResourcesLoaded_NeverTouchesO
 		t.Errorf("Body.List.Rows = %+v, want still empty — an unrelated type's fetch must never resolve a different type's placeholder", snap.Body.List.Rows)
 	}
 
-	// A real ec2 ResourcesLoaded cascades into its own follow-up (its
-	// TaskKindProbeEnrich issue-enrichment probe) — draining that unrelated
-	// cascade to genuine quiescence must still leave the "ami" placeholder
-	// exactly as untouched as the single-task snapshot above.
+	// A real ec2 ResourcesLoaded cascades into its TaskKindProbeEnrich probe;
+	// draining that to quiescence must leave the placeholder untouched too.
 	if err := sched.DrainRemaining(); err != nil {
 		t.Fatalf("draining the unrelated ec2 cascade: %v", err)
 	}

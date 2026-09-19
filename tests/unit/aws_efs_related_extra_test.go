@@ -1,9 +1,5 @@
 package unit_test
 
-// aws_efs_related_extra_test.go — additional coverage for efs_related_extra.go.
-// Covers: checkEFSAlarm, checkEFSEC2, checkEFSENI, checkEFSVPC.
-// efsCheckerByTarget is defined in aws_efs_related_test.go (same package).
-
 import (
 	"context"
 	"testing"
@@ -16,8 +12,6 @@ import (
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
-
-// --- checkEFSAlarm (Pattern D — FileSystemId dimension) ---
 
 func TestRelated_EFS_Alarm_Found(t *testing.T) {
 	const fsID = "fs-0a1b2c3d4e5f60001"
@@ -93,14 +87,6 @@ func TestRelated_EFS_Alarm_CacheMissNilClients(t *testing.T) {
 	}
 }
 
-// EFS→EC2 pivot was removed (2026-04-24): AWS exposes no API edge linking
-// an EC2 instance to the EFS filesystems it mounts — mount-target ENIs are
-// RequesterManaged with no Attachment.InstanceId, and mounting itself happens
-// at the guest OS layer via DNS. A registered pivot that always returns zero
-// is a U9 violation; see core/aws/efs_related.go.
-
-// --- checkEFSENI (scans eni cache for ENIs with fsID in description) ---
-
 func TestRelated_EFS_ENI_Found(t *testing.T) {
 	const fsID = "fs-0a1b2c3d4e5f60001"
 	source := resource.Resource{ID: fsID}
@@ -166,8 +152,6 @@ func TestRelated_EFS_ENI_EmptyID(t *testing.T) {
 		t.Errorf("Count = %d, want 0 (empty ID)", result.Count())
 	}
 }
-
-// --- checkEFSVPC (ENI → VpcId) ---
 
 func TestRelated_EFS_VPC_Found(t *testing.T) {
 	const fsID = "fs-0a1b2c3d4e5f60001"

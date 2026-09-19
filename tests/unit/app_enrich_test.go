@@ -62,12 +62,6 @@ func newEnrichApp(t testing.TB) tui.Model {
 	return m
 }
 
-// ---------------------------------------------------------------------------
-// TestDetailView_EnrichResult_UpdatesRawStruct
-// Verifies that after EnrichDetailResultMsg, the enriched resource (with
-// Document) is available in the YAML view content rendered from RawStruct.
-// ---------------------------------------------------------------------------
-
 func TestDetailView_EnrichResult_UpdatesRawStruct(t *testing.T) {
 	// Test via YAML model directly — YAML view renders from RawStruct
 	// and will include Document if present.
@@ -100,13 +94,8 @@ func TestDetailView_EnrichResult_UpdatesRawStruct(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// TestDetailView_EnrichResult_YAMLViewShowsDocument
-// Verifies that after enrichment the YAML view contains Document content.
-// Uses YAMLModel directly since pressing 'y' returns a cmd that must be
-// driven separately to create the YAML view with the enriched resource.
-// ---------------------------------------------------------------------------
-
+// Pressing 'y' returns a cmd that must be driven separately, so the YAML model
+// is built directly.
 func TestDetailView_EnrichResult_YAMLViewShowsDocument(t *testing.T) {
 	k := keys.Default()
 
@@ -129,11 +118,6 @@ func TestDetailView_EnrichResult_YAMLViewShowsDocument(t *testing.T) {
 		t.Error("expected YAML view to contain Statement")
 	}
 }
-
-// ---------------------------------------------------------------------------
-// TestDetailView_EnrichResult_JSONViewShowsDocument
-// Verifies that the JSON view renders Document from an enriched resource.
-// ---------------------------------------------------------------------------
 
 func TestDetailView_EnrichResult_JSONViewShowsDocument(t *testing.T) {
 	k := keys.Default()
@@ -158,12 +142,6 @@ func TestDetailView_EnrichResult_JSONViewShowsDocument(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// TestDetailView_EnrichResult_IgnoresMismatchedResourceID
-// Verifies that an EnrichDetailResultMsg with a wrong resource ID is ignored
-// by the app — the detail view stays at its original resource.
-// ---------------------------------------------------------------------------
-
 func TestDetailView_EnrichResult_IgnoresMismatchedResourceID(t *testing.T) {
 	m := newEnrichApp(t)
 
@@ -175,10 +153,8 @@ func TestDetailView_EnrichResult_IgnoresMismatchedResourceID(t *testing.T) {
 		Resource:     &res,
 	})
 
-	// Capture view before mismatch enrichment
 	beforeContent := stripANSI(rootViewContent(m))
 
-	// Send enrichment result with WRONG resource ID — should be silently ignored
 	wrongRes := withDocument(res, map[string]any{"Version": "2012-10-17"})
 	m, _ = rootApplyMsg(m, messages.EnrichDetailResult{
 		ResourceType: "role_policies",
@@ -188,22 +164,14 @@ func TestDetailView_EnrichResult_IgnoresMismatchedResourceID(t *testing.T) {
 
 	afterContent := stripANSI(rootViewContent(m))
 
-	// The view should be unchanged — mismatched ID was discarded
 	if beforeContent != afterContent {
 		t.Error("detail view should be unchanged when EnrichDetailResultMsg has mismatched resource ID")
 	}
 }
 
-// ---------------------------------------------------------------------------
-// TestApp_NavigateToRolePoliciesDetail_DispatchesEnrichment
-// Verifies that navigating to role_policies detail returns a non-nil cmd,
-// indicating the enrichment dispatch was triggered.
-// ---------------------------------------------------------------------------
-
 func TestApp_NavigateToRolePoliciesDetail_DispatchesEnrichment(t *testing.T) {
 	m := newEnrichApp(t)
 
-	// Verify role_policies has a detail enricher registered
 	if !resource.HasDetailEnricher("role_policies") {
 		t.Fatal("expected role_policies detail enricher to be registered")
 	}
@@ -220,11 +188,6 @@ func TestApp_NavigateToRolePoliciesDetail_DispatchesEnrichment(t *testing.T) {
 		t.Fatal("expected a non-nil command after navigating to role_policies detail (enrichment dispatch)")
 	}
 }
-
-// ---------------------------------------------------------------------------
-// TestDetailView_EnrichResult_InlinePolicy_YAMLShowsDocument
-// Verifies inline policy documents appear in YAML view after enrichment.
-// ---------------------------------------------------------------------------
 
 func TestDetailView_EnrichResult_InlinePolicy_YAMLShowsDocument(t *testing.T) {
 	k := keys.Default()
@@ -249,12 +212,6 @@ func TestDetailView_EnrichResult_InlinePolicy_YAMLShowsDocument(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// TestDetailView_EnrichResult_AcceptsMatchingID
-// Verifies that EnrichDetailResultMsg with matching resource ID is accepted,
-// i.e., the update call succeeds without panic.
-// ---------------------------------------------------------------------------
-
 func TestDetailView_EnrichResult_AcceptsMatchingID(t *testing.T) {
 	m := newEnrichApp(t)
 
@@ -267,19 +224,16 @@ func TestDetailView_EnrichResult_AcceptsMatchingID(t *testing.T) {
 	})
 
 	enrichedRes := withDocument(res, map[string]any{"Version": "2012-10-17"})
-	// Should not panic, update should be accepted
 	m, _ = rootApplyMsg(m, messages.EnrichDetailResult{
 		ResourceType: "role_policies",
 		ResourceID:   res.ID, // matching ID
 		EnrichedRes:  enrichedRes,
 	})
 
-	// App should still render a view without error
 	content := stripANSI(rootViewContent(m))
 	if content == "" {
 		t.Error("view should not be empty after enrichment with matching ID")
 	}
-	// Detail view should still show the policy fields
 	if !strings.Contains(content, "my-policy") {
 		t.Errorf("detail view should still show policy name after enrichment, got:\n%s", content)
 	}
@@ -301,7 +255,6 @@ func TestEnrichResult_WrongResourceType_IsIgnored(t *testing.T) {
 		Resource:     &res,
 	})
 
-	// Send enrichment result with WRONG resource type but matching ID
 	enrichedRes := withDocument(res, map[string]any{"Version": "2012-10-17"})
 	m, _ = rootApplyMsg(m, messages.EnrichDetailResult{
 		ResourceType: "wrong-type",
@@ -331,15 +284,8 @@ func TestEnrichResult_ErrorShowsFlashMessage(t *testing.T) {
 		Resource:     &res,
 	})
 
-	// Send enrichment result with an error. HandleEnrichDetailResult applies
-	// the failure as a FlashIntent (core/runtime/handlers_resources.go).
-	// internal/tui/app.go's messages.EnrichDetailResult case (handleEnrichDetailResult)
-	// calls m.ctrl.Handle directly and forwards only the returned TaskRequests,
-	// never the ViewState or its Flash — unlike Model.applyIntents
-	// (app_dispatch.go), which re-emits a FlashIntent as a messages.Flash cmd.
-	// The FlashIntent therefore never reaches m.flash (or a returned cmd), so
-	// this test verifies the rendered view and stays RED until that TUI-side
-	// gap is closed.
+	// HandleEnrichDetailResult applies the failure as a FlashIntent
+	// (core/runtime/handlers_resources.go).
 	m, _ = rootApplyMsg(m, messages.EnrichDetailResult{
 		ResourceType: "role_policies",
 		ResourceID:   res.ID,
@@ -353,8 +299,7 @@ func TestEnrichResult_ErrorShowsFlashMessage(t *testing.T) {
 	}
 }
 
-// TestEnrichResult_ErrorFlash_AdvancesGenSoStalePendingTickCannotClearIt pins
-// the flash lifecycle: dispatchDetailOpResultIntents
+// dispatchDetailOpResultIntents
 // (internal/tui/runtime_adapter_resources.go) bumps m.flash.gen for an
 // enrichment-error FlashIntent and routes through Core.HandleFlash +
 // dispatchHandlerResult, the same path messages.Flash takes. A tick already
@@ -364,9 +309,7 @@ func TestEnrichResult_ErrorShowsFlashMessage(t *testing.T) {
 func TestEnrichResult_ErrorFlash_AdvancesGenSoStalePendingTickCannotClearIt(t *testing.T) {
 	m := newEnrichApp(t)
 
-	// Establish a baseline flash (simulating the EARLIER flash whose
-	// auto-clear tick — stamped with genBefore — is the "stale pending
-	// tick" this fix must survive).
+	// A baseline flash whose auto-clear tick is stamped with genBefore.
 	m, _ = rootApplyMsg(m, messages.Flash{Text: "earlier notice"})
 	genBefore := m.FlashGen()
 	if genBefore == 0 {
@@ -391,19 +334,13 @@ func TestEnrichResult_ErrorFlash_AdvancesGenSoStalePendingTickCannotClearIt(t *t
 		t.Fatalf("flash.gen after the enrichment error = %d, want strictly greater than the pre-error baseline %d — a direct m.flash mutation (the regression) never bumps gen", genAfter, genBefore)
 	}
 
-	// The returned cmd must carry the new flash's own auto-clear tick — do
-	// NOT execute it (it is a tea.Tick auto-clear timer; running it would
-	// deliver ClearFlash and erase the flash before assertions below run —
-	// see qa_error_log_test.go's TestErrorHistoryAccumulation_NonErrorFlashesNotAdded
-	// for the same established idiom).
+	// The returned cmd carries the new flash's auto-clear tick; running it would
+	// deliver ClearFlash and erase the flash before the assertions below.
 	if cmd == nil {
 		t.Fatal("dispatchDetailOpResultIntents returned a nil cmd for an error FlashIntent — want the auto-clear tick to still be scheduled")
 	}
 
-	// Simulate the STALE tick from the EARLIER flash arriving now (stamped
-	// with genBefore, not the new error flash's genAfter). Before the fix,
-	// genAfter == genBefore, so this would have incorrectly cleared the
-	// brand-new error.
+	// The stale tick from the earlier flash, stamped with genBefore, arrives now.
 	m, _ = rootApplyMsg(m, messages.ClearFlash{Gen: genBefore})
 
 	view := stripANSI(rootViewContent(m))
@@ -411,10 +348,9 @@ func TestEnrichResult_ErrorFlash_AdvancesGenSoStalePendingTickCannotClearIt(t *t
 		t.Errorf("a stale ClearFlash stamped with the PRE-error gen (%d) cleared the new error flash (now at gen %d) — the gen bump must make them distinct. View:\n%s", genBefore, genAfter, view)
 	}
 
-	// Error-history entry recorded: pressing "!" must open the error log
-	// viewer, not flash "No errors this session" (the observable proxy
-	// qa_error_log_test.go's TestErrorHistoryAccumulation_ErrorFlashesAddToHistory
-	// uses — Model has no direct error-history accessor from this package).
+	// Model exposes no error-history accessor to this package: the error log
+	// viewer opening on "!", not a "No errors this session" flash, shows the
+	// entry was recorded.
 	m, bangCmd := rootApplyMsg(m, tea.KeyPressMsg{Code: '!'})
 	if bangCmd != nil {
 		if msg := bangCmd(); msg != nil {
@@ -476,14 +412,12 @@ func TestYAMLView_DirectFromList_EnrichmentUpdatesContent(t *testing.T) {
 
 	res := rolePolicyRes("arn:aws:iam::123456789012:policy/yaml-direct", "yaml-direct", "Managed")
 
-	// Open YAML view directly (as if pressing y from resource list)
 	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetYAML,
 		ResourceType: "role_policies",
 		Resource:     &res,
 	})
 
-	// Simulate enrichment result arriving
 	enrichedRes := withDocument(res, map[string]any{
 		"Version": "2012-10-17",
 		"Statement": []any{
@@ -516,14 +450,12 @@ func TestJSONView_DirectFromList_EnrichmentUpdatesContent(t *testing.T) {
 
 	res := rolePolicyRes("arn:aws:iam::123456789012:policy/json-direct", "json-direct", "Managed")
 
-	// Open JSON view directly
 	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetJSON,
 		ResourceType: "role_policies",
 		Resource:     &res,
 	})
 
-	// Simulate enrichment result
 	enrichedRes := withDocument(res, map[string]any{
 		"Version": "2012-10-17",
 		"Statement": []any{
@@ -562,7 +494,6 @@ func TestYAMLView_WrongResourceType_EnrichmentIgnored(t *testing.T) {
 		Resource:     &res,
 	})
 
-	// Send enrichment with wrong resource type
 	enrichedRes := withDocument(res, map[string]any{"Version": "2012-10-17"})
 	m, _ = rootApplyMsg(m, messages.EnrichDetailResult{
 		ResourceType: "wrong-type",
@@ -598,7 +529,6 @@ func TestPolicyDocCache_DifferentInstances_DoNotShareCache(t *testing.T) {
 
 	cache1.Set(awsclient.InlineKey("my-role", "trust-policy"), map[string]any{"from": "account-1"})
 
-	// cache2 should have nothing — different instance, different session
 	got := cache2.Get(awsclient.InlineKey("my-role", "trust-policy"))
 	if got != nil {
 		t.Fatal("different PolicyDocumentCache instances must not share data")
@@ -632,21 +562,14 @@ func TestPolicyDocCache_ZeroValueSafe(t *testing.T) {
 		t.Fatal("expected nil from zero-value cache")
 	}
 
-	// Set should not panic on zero-value cache
 	cache.Set("key", "value")
 	if cache.Get("key") != "value" {
 		t.Fatal("expected value after Set on zero-value cache")
 	}
 }
 
-// TestPolicyDocCache_SetIfNewer_StaleOpRefused_NewerOpReplaces mirrors
-// TestDetailDocCache_SetIfNewer_StaleOpRefused_NewerOpReplaces
-// (detail_doc_cache_test.go) for PolicyDocumentCache: the two caches are
-// independently implemented (no shared underlying type), so a stale-op
-// write-refusal bug in one is not automatically caught by testing the
-// other. Assumed API surface: SetIfNewer(key string, doc any, opID
-// domain.Gen) bool, additive alongside the existing plain Set every
-// pre-existing TestPolicyDocCache_* test above still uses unmodified.
+// PolicyDocumentCache and DetailDocCache are implemented independently, so the
+// stale-op write refusal is pinned on each.
 func TestPolicyDocCache_SetIfNewer_StaleOpRefused_NewerOpReplaces(t *testing.T) {
 	var cache awsclient.PolicyDocumentCache
 	key := awsclient.ManagedKey("arn:aws:iam::123456789012:policy/test")
@@ -673,9 +596,8 @@ func TestPolicyDocCache_SetIfNewer_StaleOpRefused_NewerOpReplaces(t *testing.T) 
 	}
 }
 
-// TestPolicyDocCache_SetIfNewer_OpZero_WritesEmptyKey_DoesNotBlockLaterOp
-// mirrors the DetailDocCache opID-0 axis: op 0 writes a never-written key
-// successfully but never raises the bar, so a later op 3 write still lands.
+// Op 0 writes a never-written key but never raises the bar, so a later op 3
+// write still lands.
 func TestPolicyDocCache_SetIfNewer_OpZero_WritesEmptyKey_DoesNotBlockLaterOp(t *testing.T) {
 	var cache awsclient.PolicyDocumentCache
 	key := awsclient.InlineKey("my-role", "trust-policy")
@@ -695,13 +617,10 @@ func TestPolicyDocCache_SetIfNewer_OpZero_WritesEmptyKey_DoesNotBlockLaterOp(t *
 	}
 }
 
-// TestPolicyDocCache_SetIfNewer_NoEviction_UnrelatedKeysNeverInterfere pins
-// the PolicyDocumentCache half of #261's version-keyed eviction contract
-// (item e): PolicyDocumentCache's keys are stable (never version-stamped),
-// so its own SetIfNewer always passes resource="" to opAwareDocStore — no
-// eviction bookkeeping applies at all. Two keys that would collide under
-// DetailDocCache's ":"-stripping scheme (both share the "managed" prefix)
-// must NOT evict each other here.
+// PolicyDocumentCache keys are never version-stamped, so its SetIfNewer passes
+// resource="" to opAwareDocStore and no eviction applies: two keys sharing the
+// "managed" prefix, which would collide under DetailDocCache's ":"-stripping
+// scheme, never evict each other.
 func TestPolicyDocCache_SetIfNewer_NoEviction_UnrelatedKeysNeverInterfere(t *testing.T) {
 	var cache awsclient.PolicyDocumentCache
 	keyA := awsclient.ManagedKey("arn:aws:iam::123456789012:policy/policy-a")
@@ -738,21 +657,12 @@ func TestRefresh_OnDetailView_DispatchesEnrichment(t *testing.T) {
 		Resource:     &res,
 	})
 
-	// Press Ctrl+R to refresh
 	_, cmd := rootApplyMsg(m, tea.KeyPressMsg{Code: 'r', Mod: tea.ModCtrl})
 
-	// Should return a batched command (related checks + enrichment)
 	if cmd == nil {
 		t.Fatal("expected a command on refresh")
 	}
 }
-
-// ---------------------------------------------------------------------------
-// TestDetailOperationTasks_NoEnricher_ReturnsNilEnrichTask
-// Verifies that Core.DetailOperationTasks gates the enrich task on
-// resource.GetDetailEnricher — "ec2" has no detail enricher, so the
-// operation it builds must carry no enrich task at all.
-// ---------------------------------------------------------------------------
 
 func TestDetailOperationTasks_NoEnricher_ReturnsNilEnrichTask(t *testing.T) {
 	app := newBlessedModel(t, "demo", "us-east-1",
@@ -763,7 +673,7 @@ func TestDetailOperationTasks_NoEnricher_ReturnsNilEnrichTask(t *testing.T) {
 		tui.WithRegionForTest(demo.DemoRegion))
 	m, _ := rootApplyMsg(app, tea.WindowSizeMsg{Width: 120, Height: 40})
 
-	// Confirm ec2 has no detail enricher (guard against future registration).
+	// The test needs a type with no detail enricher.
 	if resource.HasDetailEnricher("ec2") {
 		t.Skip("ec2 now has a detail enricher — update this test to use a type without one")
 	}
@@ -783,14 +693,6 @@ func TestDetailOperationTasks_NoEnricher_ReturnsNilEnrichTask(t *testing.T) {
 		t.Error("BeginDetailOperation should return no KindEnrichDetail task when no enricher is registered for the type")
 	}
 }
-
-// ---------------------------------------------------------------------------
-// TestDetailOperationTasks_WithEnricher_ExecutesToEnrichDetailResult
-// Verifies that Core.BeginDetailOperation builds a non-nil enrich task when
-// an enricher is registered, and that executing it (Core.ExecuteTaskAt)
-// produces an EnrichDetailResult carrying the correct ResourceType and
-// ResourceID.
-// ---------------------------------------------------------------------------
 
 func TestDetailOperationTasks_WithEnricher_ExecutesToEnrichDetailResult(t *testing.T) {
 	if !resource.HasDetailEnricher("role_policies") {

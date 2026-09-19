@@ -1,16 +1,5 @@
 package unit
 
-// aws_waf_enricher_test.go — Behavioral tests for EnrichWAFLogging.
-//
-// Contract assertions:
-//   - GetLoggingConfiguration is called once per WAF WebACL resource (keyed by ARN).
-//   - ListResourcesForWebACL is called once per WebACL to check associations.
-//   - Logging enabled AND resources associated → 0 findings.
-//   - WAFNonexistentItemException from GetLoggingConfiguration → 1 finding sev "~" "no logging" for that WebACL.
-//   - ListResourcesForWebACL returns empty list → 1 finding sev "~" "not associated" for that WebACL.
-//   - clients.WAFv2 == nil → (EnricherResult{Findings: non-nil empty}, nil).
-//   - API error (generic) → 0 findings, Truncated=true, no error returned.
-
 import (
 	"context"
 	"errors"
@@ -27,19 +16,11 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// wafLoggingFake implements WAFv2API for enrichment testing.
-// It embeds the interface and overrides only GetLoggingConfiguration and
-// ListResourcesForWebACL so the fake only needs to serve the two methods
-// used by EnrichWAFLogging.  Result maps are keyed by WebACL ARN.
 type wafLoggingFake struct {
 	awsclient.WAFv2API
-	// loggingResults maps ARN → GetLoggingConfigurationOutput.
-	loggingResults map[string]*wafv2.GetLoggingConfigurationOutput
-	// loggingErrByARN maps ARN → error; overrides loggingResults when set.
-	loggingErrByARN map[string]error
-	// resourcesResults maps ARN → ListResourcesForWebACLOutput.
-	resourcesResults map[string]*wafv2.ListResourcesForWebACLOutput
-	// resourcesErrByARN maps ARN → error; overrides resourcesResults when set.
+	loggingResults    map[string]*wafv2.GetLoggingConfigurationOutput
+	loggingErrByARN   map[string]error
+	resourcesResults  map[string]*wafv2.ListResourcesForWebACLOutput
 	resourcesErrByARN map[string]error
 }
 
@@ -85,11 +66,9 @@ func (f *wafLoggingFake) ListResourcesForWebACL(
 	return out, nil
 }
 
-// Compile-time check: wafLoggingFake satisfies WAFv2API.
 var _ awsclient.WAFv2API = (*wafLoggingFake)(nil)
 
-// wafWebACLResources returns a slice of WAF Resource stubs with the given ARNs.
-// The ID field is set to the ARN to match how the enricher keys resources.
+// The enricher keys WebACLs by ARN, so ID is the ARN.
 func wafWebACLResources(arns ...string) []resource.Resource {
 	res := make([]resource.Resource, 0, len(arns))
 	for i, arn := range arns {
@@ -109,7 +88,6 @@ func wafWebACLResources(arns ...string) []resource.Resource {
 	return res
 }
 
-// wafLoggingOutput returns a GetLoggingConfigurationOutput indicating logging is configured.
 func wafLoggingOutput(arn string) *wafv2.GetLoggingConfigurationOutput {
 	return &wafv2.GetLoggingConfigurationOutput{
 		LoggingConfiguration: &wafv2types.LoggingConfiguration{
@@ -119,7 +97,6 @@ func wafLoggingOutput(arn string) *wafv2.GetLoggingConfigurationOutput {
 	}
 }
 
-// wafResourcesOutput returns a ListResourcesForWebACLOutput with the given resource ARNs.
 func wafResourcesOutput(resourceARNs ...string) *wafv2.ListResourcesForWebACLOutput {
 	return &wafv2.ListResourcesForWebACLOutput{
 		ResourceArns: resourceARNs,
@@ -131,8 +108,6 @@ const (
 	wafACLARN2 = "arn:aws:wafv2:us-east-1:123456789012:regional/webacl/my-acl-2/bbbbcccc-1111-2222-3333-444444444444"
 )
 
-// TestEnrichWAFLogging_LoggedAndAssociatedProducesNoFindings verifies that when both
-// WebACLs have logging configured and are associated with resources, no findings are produced.
 func TestEnrichWAFLogging_LoggedAndAssociatedProducesNoFindings(t *testing.T) {
 	fake := &wafLoggingFake{
 		loggingResults: map[string]*wafv2.GetLoggingConfigurationOutput{
@@ -159,9 +134,6 @@ func TestEnrichWAFLogging_LoggedAndAssociatedProducesNoFindings(t *testing.T) {
 	}
 }
 
-// TestEnrichWAFLogging_NoLoggingProducesFindingSevTilde verifies that when acl-1
-// returns WAFNonexistentItemException (logging not configured), a finding with
-// severity "~" containing "no logging" is produced for acl-1 only.
 func TestEnrichWAFLogging_NoLoggingProducesFindingSevTilde(t *testing.T) {
 	notExistErr := &wafv2types.WAFNonexistentItemException{
 		Message: stringPtr("logging configuration not found"),
@@ -201,9 +173,6 @@ func TestEnrichWAFLogging_NoLoggingProducesFindingSevTilde(t *testing.T) {
 	}
 }
 
-// TestEnrichWAFLogging_OrphanACLProducesFindingSevTilde verifies that when acl-1
-// has no associated resources (ListResourcesForWebACL returns empty), a finding with
-// severity "~" containing "not associated" is produced for acl-1 only.
 func TestEnrichWAFLogging_OrphanACLProducesFindingSevTilde(t *testing.T) {
 	fake := &wafLoggingFake{
 		loggingResults: map[string]*wafv2.GetLoggingConfigurationOutput{
@@ -211,7 +180,7 @@ func TestEnrichWAFLogging_OrphanACLProducesFindingSevTilde(t *testing.T) {
 			wafACLARN2: wafLoggingOutput(wafACLARN2),
 		},
 		resourcesResults: map[string]*wafv2.ListResourcesForWebACLOutput{
-			wafACLARN1: wafResourcesOutput(), // empty — orphan
+			wafACLARN1: wafResourcesOutput(),
 			wafACLARN2: wafResourcesOutput("arn:aws:elasticloadbalancing:us-east-1:123456789012:loadbalancer/app/lb-2/aabbccdd"),
 		},
 	}
@@ -246,8 +215,6 @@ func TestEnrichWAFLogging_OrphanACLProducesFindingSevTilde(t *testing.T) {
 	}
 }
 
-// TestEnrichWAFLogging_NilClientReturnsEmptyFindingsNoError verifies that when
-// clients.WAFv2 is nil the enricher returns a non-nil empty Findings map and no error.
 func TestEnrichWAFLogging_NilClientReturnsEmptyFindingsNoError(t *testing.T) {
 	clients := &awsclient.ServiceClients{WAFv2: nil}
 
@@ -263,12 +230,8 @@ func TestEnrichWAFLogging_NilClientReturnsEmptyFindingsNoError(t *testing.T) {
 	}
 }
 
-// TestEnrichWAFLogging_APIErrorMarksRowTruncatedIDNotBadge verifies that when the
-// API call returns a generic error, the enricher marks each failing ACL's row
-// via TruncatedIDs, produces 0 findings, and returns a composite error
-// containing the enricher prefix and the failing WebACL ARN. waf only ever
-// emits "~" (informational) findings, so the aggregate Truncated flag must
-// stay false — a coverage gap never lower-bounds the issue badge.
+// waf only emits "~" findings, so a coverage gap never lower-bounds the
+// issue badge: Truncated stays false.
 func TestEnrichWAFLogging_APIErrorMarksRowTruncatedIDNotBadge(t *testing.T) {
 	apiErr := errors.New("wafv2: GetLoggingConfiguration throttled")
 	fake := &wafLoggingFake{
@@ -310,5 +273,4 @@ func TestEnrichWAFLogging_APIErrorMarksRowTruncatedIDNotBadge(t *testing.T) {
 	}
 }
 
-// stringPtr is a local helper — avoids importing aws just for a test helper.
 func stringPtr(s string) *string { return &s }

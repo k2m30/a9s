@@ -1,7 +1,6 @@
 package unit
 
-// aws6_view_migration_keeps_removals_test.go — a migration inserts what its
-// version introduced, and nothing else.
+// A migration inserts what its version introduced, and nothing else.
 //
 // A view file is the operator's. Deleting a column from it is a decision, and
 // the only record of that decision is the column's absence. A migration that
@@ -51,10 +50,9 @@ func lambdaDefaultsWithout(t *testing.T, title string) ([]config.ListColumn, []c
 	return kept, def.Detail
 }
 
-// TestMigrationKeepsARemovedColumnOnTheWholesalePath pins the wholesale path:
-// every column that REMAINS matches what a build generated, so the file reads as
-// untouched and is replaced with the current defaults, restoring the one the
-// operator deleted.
+// Every column that remains matches what a build generated, so the file reads
+// as untouched and takes the wholesale replacement; the column the operator
+// deleted stays deleted.
 func TestMigrationKeepsARemovedColumnOnTheWholesalePath(t *testing.T) {
 	cols, detail := lambdaDefaultsWithout(t, "Runtime")
 	dir := tui5SeedOlderView(t, lambdaViewName, cols, detail)
@@ -72,10 +70,9 @@ func TestMigrationKeepsARemovedColumnOnTheWholesalePath(t *testing.T) {
 	}
 }
 
-// TestMigrationKeepsARemovedColumnOnTheInsertionPath pins the other path. A
-// second customization — a width the operator changed — stops the wholesale
-// replacement, and the per-column insertion loop restores the deleted column
-// anyway.
+// A second customization — a width the operator changed — stops the wholesale
+// replacement, so the per-column insertion runs; it too leaves the deleted
+// column out.
 func TestMigrationKeepsARemovedColumnOnTheInsertionPath(t *testing.T) {
 	cols, detail := lambdaDefaultsWithout(t, "Runtime")
 	if len(cols) == 0 {
@@ -105,14 +102,9 @@ func TestMigrationKeepsARemovedColumnOnTheInsertionPath(t *testing.T) {
 	}
 }
 
-// TestMigrationKeepsARemovedColumnOnASecondStart pins persistence. A migration
-// that restores the column once is an annoyance; one that restores it on every
-// start is a file the operator cannot edit.
-//
-// Two runs, no edit between them: the first must keep the deletion and the
-// second must leave the settled file alone. Deleting the column again between
-// the runs would have made the pin passable only against the defect, since a
-// correct first pass leaves nothing to delete.
+// A migration that restored the column on every start would leave a file the
+// operator cannot edit. Two runs with no edit between them: the first keeps
+// the deletion and the second leaves the settled file alone.
 func TestMigrationKeepsARemovedColumnOnASecondStart(t *testing.T) {
 	cols, detail := lambdaDefaultsWithout(t, "Runtime")
 	dir := tui5SeedOlderView(t, lambdaViewName, cols, detail)
@@ -158,14 +150,13 @@ func TestMigrationStillInsertsAColumnItsVersionIntroduced(t *testing.T) {
 // gate on core/config/ensure_views.go's per-version additions table.
 //
 // That table has to be extended by hand whenever a column joins the built-in
-// views, and nothing today notices when it is forgotten. The cost is silent and
-// lands on existing installations only: a column with no entry is one the
-// migration cannot tell from a column the operator deleted, so it reaches new
-// installations and never reaches anyone who has run a9s before.
+// views. A column with no entry is one the migration cannot tell from a column
+// the operator deleted, so it reaches new installations and never reaches
+// anyone who has run a9s before.
 //
 // The check restates the invariant as a migration. Seed each view as the oldest
 // migratable build wrote it, run the real EnsureViewsDir, and the file must come
-// out carrying exactly today's built-in columns. A column added to the defaults
+// out carrying exactly the current built-in columns. A column added to the defaults
 // without a table entry is not inserted, so it is missing here and named.
 func TestDefaultColumnsAreTheBaselinePlusTheRecordedAdditions(t *testing.T) {
 	for name, def := range config.DefaultConfig().Views {
@@ -235,8 +226,8 @@ func seedViewAtOldestMigratableStamp(t *testing.T, name string, titles []string,
 	for _, title := range titles {
 		c, ok := byTitle[title]
 		if !ok {
-			// A baseline title the defaults no longer declare: keep it, with
-			// only the title the old build wrote, so the check below reports it.
+			// A baseline title absent from the current defaults: keep it, with only the
+			// title the old build wrote, so the check below reports it.
 			c = config.ListColumn{Title: title, Width: 12}
 		}
 		cols = append(cols, c)

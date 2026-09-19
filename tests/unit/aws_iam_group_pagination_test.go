@@ -7,13 +7,6 @@ package unit
 // After pagination, counts are exact (not truncated) unless the walk is
 // capped at PerParentPageCap = 10 pages, in which case the value carries
 // a "+" suffix to signal truncated.
-//
-// Contract assertions:
-//   - GetGroup returns 2 pages (100+50 users) → Fields["member_count"] == "150"
-//   - ListAttachedGroupPolicies returns 2 pages (60+30) → no "no policies" finding
-//   - ListGroupPolicies returns 2 pages (20+15) → correct aggregation
-//   - GetGroup always truncated (huge group) → capped at PerParentPageCap pages, "1000+"
-//   - GetGroup returns 0 users across all pages → "0", finding "group has no members"
 
 import (
 	"context"
@@ -29,15 +22,9 @@ import (
 	awsclient "github.com/k2m30/a9s/v3/core/aws"
 )
 
-// ---------------------------------------------------------------------------
-// Pagination-aware fakes
-// ---------------------------------------------------------------------------
-
 // iamGroupPaginatedFake handles GetGroup with Marker/IsTruncated pagination.
 // Each call to GetGroup advances an internal call counter per group name,
 // returning the corresponding page from the pages map.
-//
-// Keyed by group name → ordered list of pages. Each call reads the next page.
 type iamGroupPaginatedFake struct {
 	awsclient.IAMAPI
 
@@ -140,7 +127,6 @@ func (f *iamGroupPaginatedFake) ListGroupPolicies(
 	return pages[idx], nil
 }
 
-// Compile-time check: iamGroupPaginatedFake satisfies IAMAPI.
 var _ awsclient.IAMAPI = (*iamGroupPaginatedFake)(nil)
 
 // getGroupCallsFor returns the recorded GetGroup call count for groupName,
@@ -168,10 +154,6 @@ func (f *iamGroupPaginatedFake) inlinePoliciesCallsFor(groupName string) int {
 	defer f.mu.Unlock()
 	return f.inlinePoliciesCalls[groupName]
 }
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
 
 // makeUsers builds a slice of n minimal iamtypes.User stubs.
 func makeUsers(n int) []iamtypes.User {
@@ -203,10 +185,6 @@ func makeInlinePolicyNames(n int) []string {
 	return names
 }
 
-// ---------------------------------------------------------------------------
-// Test: GetGroup pagination — 2 pages (100 + 50 users)
-// ---------------------------------------------------------------------------
-
 // TestEnrichIAMGroup_PaginatesGetGroupMembers verifies that the enricher
 // follows Marker/IsTruncated across two GetGroup pages and writes the total
 // count (150) to Fields["member_count"].
@@ -215,7 +193,6 @@ func TestEnrichIAMGroup_PaginatesGetGroupMembers(t *testing.T) {
 
 	fake := newIAMGroupPaginatedFake()
 
-	// Page 1: 100 users, IsTruncated=true, Marker="m1"
 	fake.getGroupPages[groupName] = []*iam.GetGroupOutput{
 		{
 			Group:       &iamtypes.Group{GroupName: aws.String(groupName)},
@@ -223,18 +200,15 @@ func TestEnrichIAMGroup_PaginatesGetGroupMembers(t *testing.T) {
 			IsTruncated: true,
 			Marker:      aws.String("m1"),
 		},
-		// Page 2: 50 users, IsTruncated=false
 		{
 			Group:       &iamtypes.Group{GroupName: aws.String(groupName)},
 			Users:       makeUsers(50),
 			IsTruncated: false,
 		},
 	}
-	// ListAttachedGroupPolicies: 1 page, 1 policy (so no "no policies" finding)
 	fake.attachedPoliciesPages[groupName] = []*iam.ListAttachedGroupPoliciesOutput{
 		{AttachedPolicies: makeAttachedPolicies(1), IsTruncated: false},
 	}
-	// ListGroupPolicies: 1 page, empty
 	fake.inlinePoliciesPages[groupName] = []*iam.ListGroupPoliciesOutput{
 		{PolicyNames: []string{}, IsTruncated: false},
 	}
@@ -247,7 +221,6 @@ func TestEnrichIAMGroup_PaginatesGetGroupMembers(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	// Verify member_count reflects both pages
 	updates, ok := result.FieldUpdates[groupName]
 	if !ok {
 		t.Fatalf("FieldUpdates missing entry for %q", groupName)
@@ -257,21 +230,15 @@ func TestEnrichIAMGroup_PaginatesGetGroupMembers(t *testing.T) {
 		t.Errorf("member_count = %q, want %q", updates["member_count"], wantCount)
 	}
 
-	// GetGroup must have been called twice (once per page)
 	calls := fake.getGroupCallsFor(groupName)
 	if calls != 2 {
 		t.Errorf("GetGroup called %d times, want 2", calls)
 	}
 
-	// No findings expected (group has members and policies)
 	if len(result.Findings) != 0 {
 		t.Errorf("expected 0 findings, got %d: %v", len(result.Findings), result.Findings)
 	}
 }
-
-// ---------------------------------------------------------------------------
-// Test: ListAttachedGroupPolicies pagination — 2 pages (60 + 30 policies)
-// ---------------------------------------------------------------------------
 
 // TestEnrichIAMGroup_PaginatesAttachedPolicies verifies that the enricher
 // aggregates attached policies across two pages and suppresses the
@@ -289,7 +256,6 @@ func TestEnrichIAMGroup_PaginatesAttachedPolicies(t *testing.T) {
 			IsTruncated: false,
 		},
 	}
-	// ListAttachedGroupPolicies: 2 pages, 60+30 policies
 	fake.attachedPoliciesPages[groupName] = []*iam.ListAttachedGroupPoliciesOutput{
 		{
 			AttachedPolicies: makeAttachedPolicies(60),
@@ -301,7 +267,6 @@ func TestEnrichIAMGroup_PaginatesAttachedPolicies(t *testing.T) {
 			IsTruncated:      false,
 		},
 	}
-	// ListGroupPolicies: 1 page, empty
 	fake.inlinePoliciesPages[groupName] = []*iam.ListGroupPoliciesOutput{
 		{PolicyNames: []string{}, IsTruncated: false},
 	}
@@ -314,7 +279,6 @@ func TestEnrichIAMGroup_PaginatesAttachedPolicies(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	// Because total attached policies (90) > 0, no "no policies" finding
 	if fs, ok := result.Findings[groupName]; ok {
 		f := fs[0]
 		if strings.Contains(f.Phrase, "no policies") {
@@ -322,16 +286,11 @@ func TestEnrichIAMGroup_PaginatesAttachedPolicies(t *testing.T) {
 		}
 	}
 
-	// ListAttachedGroupPolicies must have been called twice
 	calls := fake.attachedPoliciesCallsFor(groupName)
 	if calls != 2 {
 		t.Errorf("ListAttachedGroupPolicies called %d times, want 2", calls)
 	}
 }
-
-// ---------------------------------------------------------------------------
-// Test: ListGroupPolicies pagination — 2 pages (20 + 15 policy names)
-// ---------------------------------------------------------------------------
 
 // TestEnrichIAMGroup_PaginatesInlinePolicies verifies that the enricher
 // aggregates inline policy names across two pages and suppresses the
@@ -341,7 +300,6 @@ func TestEnrichIAMGroup_PaginatesInlinePolicies(t *testing.T) {
 
 	fake := newIAMGroupPaginatedFake()
 
-	// GetGroup: 1 page, 1 member
 	fake.getGroupPages[groupName] = []*iam.GetGroupOutput{
 		{
 			Group:       &iamtypes.Group{GroupName: aws.String(groupName)},
@@ -349,11 +307,9 @@ func TestEnrichIAMGroup_PaginatesInlinePolicies(t *testing.T) {
 			IsTruncated: false,
 		},
 	}
-	// ListAttachedGroupPolicies: 1 page, empty
 	fake.attachedPoliciesPages[groupName] = []*iam.ListAttachedGroupPoliciesOutput{
 		{AttachedPolicies: []iamtypes.AttachedPolicy{}, IsTruncated: false},
 	}
-	// ListGroupPolicies: 2 pages, 20+15 policy names
 	fake.inlinePoliciesPages[groupName] = []*iam.ListGroupPoliciesOutput{
 		{
 			PolicyNames: makeInlinePolicyNames(20),
@@ -374,7 +330,6 @@ func TestEnrichIAMGroup_PaginatesInlinePolicies(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	// Because total inline policies (35) > 0, no "no policies" finding
 	if fs, ok := result.Findings[groupName]; ok {
 		f := fs[0]
 		if strings.Contains(f.Phrase, "no policies") {
@@ -382,16 +337,11 @@ func TestEnrichIAMGroup_PaginatesInlinePolicies(t *testing.T) {
 		}
 	}
 
-	// ListGroupPolicies must have been called twice
 	calls := fake.inlinePoliciesCallsFor(groupName)
 	if calls != 2 {
 		t.Errorf("ListGroupPolicies called %d times, want 2", calls)
 	}
 }
-
-// ---------------------------------------------------------------------------
-// Test: GetGroup pagination capped at PerParentPageCap → "1000+"
-// ---------------------------------------------------------------------------
 
 // TestEnrichIAMGroup_CappedAtPerParentPageCap verifies that when GetGroup
 // always returns IsTruncated=true (simulating a huge group), the enricher
@@ -401,8 +351,6 @@ func TestEnrichIAMGroup_CappedAtPerParentPageCap(t *testing.T) {
 
 	fake := newIAMGroupPaginatedFake()
 
-	// Build PerParentPageCap+2 pages, all with IsTruncated=true, 100 users each.
-	// The enricher should stop at exactly PerParentPageCap pages.
 	pages := make([]*iam.GetGroupOutput, awsclient.PerParentPageCap+2)
 	for i := range pages {
 		pages[i] = &iam.GetGroupOutput{
@@ -414,11 +362,9 @@ func TestEnrichIAMGroup_CappedAtPerParentPageCap(t *testing.T) {
 	}
 	fake.getGroupPages[groupName] = pages
 
-	// ListAttachedGroupPolicies: single page, 1 policy
 	fake.attachedPoliciesPages[groupName] = []*iam.ListAttachedGroupPoliciesOutput{
 		{AttachedPolicies: makeAttachedPolicies(1), IsTruncated: false},
 	}
-	// ListGroupPolicies: single page, empty
 	fake.inlinePoliciesPages[groupName] = []*iam.ListGroupPoliciesOutput{
 		{PolicyNames: []string{}, IsTruncated: false},
 	}
@@ -431,13 +377,11 @@ func TestEnrichIAMGroup_CappedAtPerParentPageCap(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	// GetGroup must be called exactly PerParentPageCap times
 	calls := fake.getGroupCallsFor(groupName)
 	if calls != awsclient.PerParentPageCap {
 		t.Errorf("GetGroup called %d times, want exactly %d (PerParentPageCap)", calls, awsclient.PerParentPageCap)
 	}
 
-	// member_count must carry "+" suffix to indicate truncated
 	updates, ok := result.FieldUpdates[groupName]
 	if !ok {
 		t.Fatalf("FieldUpdates missing entry for %q", groupName)
@@ -446,16 +390,11 @@ func TestEnrichIAMGroup_CappedAtPerParentPageCap(t *testing.T) {
 	if !strings.HasSuffix(mc, "+") {
 		t.Errorf("member_count = %q, want suffix \"+\" (truncated)", mc)
 	}
-	// The numeric part must be PerParentPageCap * 100 = 1000
 	wantPrefix := fmt.Sprintf("%d+", awsclient.PerParentPageCap*100)
 	if mc != wantPrefix {
 		t.Errorf("member_count = %q, want %q", mc, wantPrefix)
 	}
 }
-
-// ---------------------------------------------------------------------------
-// Test: zero members across all pages → "0", finding emitted
-// ---------------------------------------------------------------------------
 
 // TestEnrichIAMGroup_ZeroMembersAcrossPages verifies that when all pages
 // return 0 users, member_count is "0" and the "group has no members" finding
@@ -465,7 +404,6 @@ func TestEnrichIAMGroup_ZeroMembersAcrossPages(t *testing.T) {
 
 	fake := newIAMGroupPaginatedFake()
 
-	// GetGroup: 1 page, 0 users, not truncated
 	fake.getGroupPages[groupName] = []*iam.GetGroupOutput{
 		{
 			Group:       &iamtypes.Group{GroupName: aws.String(groupName)},
@@ -473,11 +411,9 @@ func TestEnrichIAMGroup_ZeroMembersAcrossPages(t *testing.T) {
 			IsTruncated: false,
 		},
 	}
-	// ListAttachedGroupPolicies: 1 policy (so no "no policies" finding)
 	fake.attachedPoliciesPages[groupName] = []*iam.ListAttachedGroupPoliciesOutput{
 		{AttachedPolicies: makeAttachedPolicies(1), IsTruncated: false},
 	}
-	// ListGroupPolicies: empty
 	fake.inlinePoliciesPages[groupName] = []*iam.ListGroupPoliciesOutput{
 		{PolicyNames: []string{}, IsTruncated: false},
 	}
@@ -490,7 +426,6 @@ func TestEnrichIAMGroup_ZeroMembersAcrossPages(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	// member_count must be "0"
 	updates, ok := result.FieldUpdates[groupName]
 	if !ok {
 		t.Fatalf("FieldUpdates missing entry for %q", groupName)
@@ -499,7 +434,6 @@ func TestEnrichIAMGroup_ZeroMembersAcrossPages(t *testing.T) {
 		t.Errorf("member_count = %q, want \"0\"", updates["member_count"])
 	}
 
-	// Finding "group has no members (orphan)" must be emitted
 	fs, ok := result.Findings[groupName]
 	if !ok {
 		t.Fatalf("expected finding for %q (no members), but none was produced", groupName)

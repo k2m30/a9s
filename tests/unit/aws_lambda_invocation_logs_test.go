@@ -14,12 +14,6 @@ import (
 	awsclient "github.com/k2m30/a9s/v3/core/aws"
 )
 
-// ---------------------------------------------------------------------------
-// Lambda Invocation Logs fetcher tests (level-2 child of Lambda Invocations)
-// ---------------------------------------------------------------------------
-
-// TestFetchLambdaInvocationLogs_Basic verifies filtering log events by
-// RequestId, checking ID, Name, Status, all Fields, and RawStruct.
 func TestFetchLambdaInvocationLogs_Basic(t *testing.T) {
 	mock := &mockCWLogsFilterLogEventsClient{
 		outputs: []*cloudwatchlogs.FilterLogEventsOutput{
@@ -112,7 +106,6 @@ func TestFetchLambdaInvocationLogs_Basic(t *testing.T) {
 		}
 	})
 
-	// Verify required fields on all log lines
 	t.Run("required_fields_present", func(t *testing.T) {
 		requiredFields := []string{"timestamp", "message"}
 		for i, r := range resources {
@@ -187,8 +180,6 @@ func TestFetchLambdaInvocationLogs_StatusClassification(t *testing.T) {
 	}
 }
 
-// TestFetchLambdaInvocationLogs_Empty verifies that an empty response
-// returns an empty slice with no error.
 func TestFetchLambdaInvocationLogs_Empty(t *testing.T) {
 	mock := &mockCWLogsFilterLogEventsClient{
 		outputs: []*cloudwatchlogs.FilterLogEventsOutput{
@@ -213,8 +204,6 @@ func TestFetchLambdaInvocationLogs_Empty(t *testing.T) {
 	}
 }
 
-// TestFetchLambdaInvocationLogs_APIError verifies that API errors are
-// propagated correctly.
 func TestFetchLambdaInvocationLogs_APIError(t *testing.T) {
 	mock := &mockCWLogsFilterLogEventsClient{
 		err: fmt.Errorf("AWS API error: resource not found"),
@@ -274,8 +263,6 @@ func TestFetchLambdaInvocationLogs_MessageNewlineStripping(t *testing.T) {
 	}
 }
 
-// TestFetchLambdaInvocationLogs_NilFields verifies that events with nil
-// Message and nil Timestamp do not panic.
 func TestFetchLambdaInvocationLogs_NilFields(t *testing.T) {
 	mock := &mockCWLogsFilterLogEventsClient{
 		outputs: []*cloudwatchlogs.FilterLogEventsOutput{
@@ -308,7 +295,6 @@ func TestFetchLambdaInvocationLogs_NilFields(t *testing.T) {
 	r := resources[0]
 
 	t.Run("no_panic", func(t *testing.T) {
-		// If we got here, no panic occurred
 	})
 
 	t.Run("message_empty", func(t *testing.T) {
@@ -324,8 +310,6 @@ func TestFetchLambdaInvocationLogs_NilFields(t *testing.T) {
 	})
 }
 
-// TestFetchLambdaInvocationLogs_RawStruct verifies that RawStruct is the
-// original cwlogstypes.FilteredLogEvent, preserving all SDK fields.
 func TestFetchLambdaInvocationLogs_RawStruct(t *testing.T) {
 	mock := &mockCWLogsFilterLogEventsClient{
 		outputs: []*cloudwatchlogs.FilterLogEventsOutput{
@@ -419,14 +403,12 @@ func TestFetchLambdaInvocationLogs_ParentContextKeys(t *testing.T) {
 		t.Fatalf("expected no error, got %v", err)
 	}
 
-	// Verify the log group and request ID filter are passed correctly
 	if mock.lastInput == nil {
 		t.Fatal("expected FilterLogEvents to be called")
 	}
 	if mock.lastInput.LogGroupName == nil || *mock.lastInput.LogGroupName != logGroup {
 		t.Errorf("expected log group %q, got %q", logGroup, *mock.lastInput.LogGroupName)
 	}
-	// The filter pattern should contain the request ID
 	if mock.lastInput.FilterPattern == nil || !strings.Contains(*mock.lastInput.FilterPattern, requestID) {
 		filterPattern := ""
 		if mock.lastInput.FilterPattern != nil {
@@ -473,7 +455,6 @@ func TestFetchLambdaInvocationLogs_TimestampFormatting(t *testing.T) {
 	if ts == "" {
 		t.Fatal("Fields[timestamp] should not be empty")
 	}
-	// Should be formatted, not raw epoch ms
 	if ts == "1711065600000" {
 		t.Errorf("timestamp should be formatted, not raw epoch ms: %q", ts)
 	}
@@ -546,12 +527,10 @@ func TestFetchLambdaInvocationLogs_EmptyFirstPage(t *testing.T) {
 	mock := &mockCWLogsFilterLogEventsClient{
 		outputs: []*cloudwatchlogs.FilterLogEventsOutput{
 			{
-				// Page 1: empty events, but NextToken signals more data
 				Events:    []cwlogstypes.FilteredLogEvent{},
 				NextToken: aws.String("page2-token"),
 			},
 			{
-				// Page 2: the actual log lines
 				Events: []cwlogstypes.FilteredLogEvent{
 					{
 						Timestamp: aws.Int64(1711065600000),
@@ -664,11 +643,9 @@ func TestFetchLambdaInvocationLogs_PageCapStopsScanAndReportsTruncated(t *testin
 	}
 }
 
-// ---------------------------------------------------------------------------
-// Clean-Name tests (bug fix): Name must be a clean, human-readable summary —
-// never a raw-JSON prefix or a byte-sliced multibyte string. Fields["message"]
-// must always retain the full RAW message unchanged.
-// ---------------------------------------------------------------------------
+// Name is a clean, human-readable summary — never a raw-JSON prefix or a
+// byte-sliced multibyte string. Fields["message"] always retains the full RAW
+// message unchanged.
 
 // TestFetchLambdaInvocationLogs_Name_JSONMessage_ExtractsInnerMessageField
 // verifies that when the raw log message is a JSON object with a string
@@ -752,10 +729,9 @@ func TestFetchLambdaInvocationLogs_Name_PlainTextMessage_UsesMessageVerbatim(t *
 // verifies that a multi-line message produces a Name containing only the
 // first non-empty line, with no embedded newline.
 func TestFetchLambdaInvocationLogs_Name_MultiLineMessage_UsesFirstNonEmptyLineOnly(t *testing.T) {
-	// No trailing newline: FetchLambdaInvocationLogs already TrimRight's
-	// "\n\r" from the raw message (pre-existing, unrelated behavior) before
-	// storing Fields["message"], so this fixture isolates the Name-cleanup
-	// bug fix from that trim.
+	// No trailing newline: FetchLambdaInvocationLogs TrimRight's "\n\r" from the
+	// raw message before storing Fields["message"], so this fixture keeps the
+	// Name cleanup separate from that trim.
 	raw := "\n\nERROR something broke\nstack trace line 1\nstack trace line 2"
 	mock := &mockCWLogsFilterLogEventsClient{
 		outputs: []*cloudwatchlogs.FilterLogEventsOutput{

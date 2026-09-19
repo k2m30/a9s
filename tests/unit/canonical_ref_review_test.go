@@ -1,9 +1,7 @@
 package unit_test
 
-// canonical_ref_review_test.go — reference readings that must go through the
-// target's resolver rather than a hand-rolled parse or a name read as an ID:
-// each test drives the registered checker, the fetcher or the rendered detail with
-// the shape AWS returns and asserts the row ID the target list keys on.
+// A reference is read through its target's resolver, never by a hand-rolled
+// parse or a name read as an ID; the row ID is what the target list keys on.
 
 import (
 	"context"
@@ -54,8 +52,6 @@ func refRelatedDef(t *testing.T, source, target string) resource.RelatedDef {
 	t.Fatalf("no %s related def for target %q", source, target)
 	return resource.RelatedDef{}
 }
-
-// ── every checker reads its references through the target's resolver ───────
 
 // TestTGWRole_ServiceLinkedRoleCountedByName: role rows are keyed by role
 // name, so the transit gateway's service-linked role is counted by name, not
@@ -211,8 +207,6 @@ func TestASGELB_ClassicNamesAreNotLoadBalancerRows(t *testing.T) {
 	}
 }
 
-// ── alarm dimensions that hold a name ──────────────────────────────────────
-
 func refNamedRow(t *testing.T, b refBench, typ string) resource.Resource {
 	t.Helper()
 	for _, r := range b.byType[typ] {
@@ -264,8 +258,6 @@ func TestAlarmNamedDimensions_ResolveToTheRowID(t *testing.T) {
 	}
 }
 
-// ── an ECS task's host is an EC2 instance ID ───────────────────────────────
-
 // TestEcsTaskEC2_HostIsAnInstanceID: a task on the EC2 launch type runs on a
 // container instance whose Ec2InstanceId is the ec2 row; the container
 // instance's own UUID is no instance ID and no ec2 row can carry it.
@@ -293,8 +285,6 @@ func TestEcsTaskEC2_HostIsAnInstanceID(t *testing.T) {
 		t.Error("ecs-task d4e5f6a1b2c3d4e5f6010203 (EC2 launch type) counts no single host instance")
 	}
 }
-
-// ── CloudTrail principals from another account ─────────────────────────────
 
 type refCloudTrailFake struct {
 	awsclient.CloudTrailAPI
@@ -395,8 +385,6 @@ func TestCtEventsPrincipals_AnotherAccountIsNotTheLocalNamesake(t *testing.T) {
 		}
 	}
 }
-
-// ── a KMS lookup that partly fails keeps what it resolved ──────────────────
 
 // refKMSLookupFake answers DescribeKey for the listed key IDs and aliases,
 // NotFound for a retired alias, and a service failure for a flaky one.
@@ -548,8 +536,6 @@ func TestKMSPivots_PartialLookupFailureKeepsWhatResolved(t *testing.T) {
 	}
 }
 
-// ── a KMS alias field opens the key the related row counts ─────────────────
-
 // TestSSMKeyId_AWSManagedAliasNavigableWithoutTheKeyList: the operator opens
 // the parameter before ever loading the kms list. Once the KMS row's result
 // lazy-adds the AWS-managed key, KeyId opens that key — the badge and the
@@ -578,8 +564,6 @@ func TestSSMKeyId_AWSManagedAliasNavigableWithoutTheKeyList(t *testing.T) {
 	}
 }
 
-// ── KMS → secrets reads the viewed key's own aliases ───────────────────────
-
 // TestKMSSecrets_ViewedKeyAliasesMatchWithoutTheKeyList: a secret names its
 // key by alias ARN, and the viewed key (opened from a pivot, the kms list not
 // loaded) carries that alias. The secret counts; an alias ref nothing can
@@ -605,8 +589,6 @@ func TestKMSSecrets_ViewedKeyAliasesMatchWithoutTheKeyList(t *testing.T) {
 		t.Errorf("kms %s → Secrets = %v truncated=%v, want %v truncated=true", key.ID, ids, got.Truncated(), want)
 	}
 }
-
-// ── the demo bench shows each reference shape ──────────────────────────────
 
 func refRawJSON(r resource.Resource) string {
 	raw, err := json.Marshal(r.RawStruct)
@@ -699,8 +681,6 @@ func TestDemoKMS_NoCustomerKeyInTheReservedAliasNamespace(t *testing.T) {
 	}
 }
 
-// ── the CloudTrail JSON fallback keeps the principal's account ─────────────
-
 // TestCtEventsPrincipals_JSONFallbackKeepsTheAccount: an event whose only
 // role evidence is userIdentity.sessionContext.sessionIssuer (LookupEvents
 // reports the session name as Username, and there is no roleArn or role
@@ -756,10 +736,8 @@ func TestCtEventsPrincipals_JSONFallbackKeepsTheAccount(t *testing.T) {
 	}
 }
 
-// TestDemoCtEvents_ForeignPrincipalReadsNoLocalRole is the demo witness: the
-// Karpenter event was made by a role in account 111111111111, so its IAM
-// Roles row reads (0). The local role list is the caller's account only, so
-// no role row carries another account's ARN.
+// The Karpenter demo event was made by a role in account 111111111111, so its
+// IAM Roles row reads (0): the local role list is the caller's account only.
 func TestDemoCtEvents_ForeignPrincipalReadsNoLocalRole(t *testing.T) {
 	b := newRefBench(t)
 	for _, r := range b.byType["role"] {
@@ -776,8 +754,6 @@ func TestDemoCtEvents_ForeignPrincipalReadsNoLocalRole(t *testing.T) {
 			got.ResourceIDs(), got.EffectiveState())
 	}
 }
-
-// ── Route 53 → API Gateway reads the host through the apigw resolver ───────
 
 type refR53Fake struct {
 	awsclient.Route53API

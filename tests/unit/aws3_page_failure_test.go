@@ -2,10 +2,10 @@
 
 package unit
 
-// aws3_page_failure_test.go — the paged-walk half: a walk stopped by a failed
-// page names the page as a page. Every other id in a composite error is
-// something the operator can go and look at, and "page 2" posing as one
-// sends them looking for a resource that does not exist.
+// A walk stopped by a failed page names the page as a page. Every other id in
+// a composite error is something the operator can go and look at, and
+// "page 2" posing as one sends them looking for a resource that does not
+// exist.
 
 import (
 	"context"

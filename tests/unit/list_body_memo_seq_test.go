@@ -1,24 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
 
-// list_body_memo_seq_test.go — mutate-after-render sequence pins for
-// core/app's list body build (buildListBody, applyListFilters,
-// listSortResources, extractListCells: core/app/list_body.go:325-450,
-// core/app/list_filter.go). An upcoming refactor memoizes the filtered+
-// sorted rows and extracted cells, keyed on (RowStore generation, filter
-// text, attention-only flag, sort column, sort direction), invalidating on
-// any of those changing.
-//
-// Every test below renders through the real Controller.Snapshot() surface at
-// least twice, with exactly one input mutated between renders, and asserts
-// the SECOND render reflects the change. A memo key that omits or
-// mis-tracks that one input shows up as a stale second render here — the
-// class of bug a mutate-then-render-once test cannot catch. list_test.go's
-// TestListFilter_*/TestListSort_*/TestListAttention_* and this file's own
-// TestWave3AttentionFilter_* siblings all either render only once after
-// every mutation has already landed, or (the two TestWave3AttentionFilter_*
-// cases) render twice but only ever vary the attention-filter row-inclusion
-// dimension — never sort, never a second distinct filter value, never a
-// row's own Decorator/Severity on an already-included row.
+// Each test renders through Controller.Snapshot() at least twice with exactly
+// one list-body input changed between renders, and asserts the second render
+// reflects the change. A memo key that mis-tracks that input shows up as a
+// stale second render, which a mutate-then-render-once test cannot catch.
 package unit_test
 
 import (
@@ -32,26 +17,17 @@ import (
 	"github.com/k2m30/a9s/v3/core/session"
 )
 
-// ===========================================================================
-// (a) filter text set / changed / cleared
-// ===========================================================================
-
-// TestListBodyMemoSeq_FilterSetChangedCleared_RowsAndCountUpdate renders
-// through three DIFFERENT filter states in sequence (none → "web-server" →
-// "db-server" → "") and asserts both Rows and the frame-title count line
-// after each transition. The middle-to-middle step (one non-empty filter to
-// a DIFFERENT non-empty filter) is the case no existing test exercises: a
-// memo key that tracks only "filter active" as a bool rather than the
-// filter's own text would incorrectly reuse the first filter's cached rows.
+// Moving from one non-empty filter to a different one must not reuse the
+// first filter's rows: the memo keys on the filter text, not on whether a
+// filter is active.
 func TestListBodyMemoSeq_FilterSetChangedCleared_RowsAndCountUpdate(t *testing.T) {
 	c := openListController(t, "ec2")
 	resources := wave3FilterEC2Resources()
 	c.ApplyResourcesLoaded("ec2", resources, nil, false)
 
-	// cache-node carries a Wave-1 SevWarn Finding, so the frame title always
-	// shows the unconditional " !1" issue-count suffix (docs/attention-
-	// signals.md §Visualization Surfaces) whenever cache-node is among the
-	// visible rows.
+	// cache-node carries a Wave-1 SevWarn Finding, so the frame title shows the
+	// unconditional " !1" issue-count suffix (docs/attention-signals.md) whenever
+	// cache-node is among the visible rows.
 	render1 := *c.Snapshot().Body.List
 	if len(render1.Rows) != 3 {
 		t.Fatalf("render1 (no filter): Rows count: got %d want 3", len(render1.Rows))
@@ -88,17 +64,8 @@ func TestListBodyMemoSeq_FilterSetChangedCleared_RowsAndCountUpdate(t *testing.T
 	}
 }
 
-// ===========================================================================
-// (b) sort column / direction toggled
-// ===========================================================================
-
-// TestListBodyMemoSeq_SortToggle_RowOrderUpdatesAcrossRenders renders after
-// every sort mutation (asc → desc on the same column → asc on a DIFFERENT
-// column), unlike TestListSort_RowsOrderedDescByName and
-// TestListSort_DifferentColResetsToAsc (core/app/list_test.go), which apply
-// every Action first and render exactly once at the end. A memo keyed on
-// Col but not Dir, or vice-versa, would return the previous render's row
-// order here.
+// A memo keyed on the sort column but not its direction, or vice-versa,
+// would return the previous render's row order.
 func TestListBodyMemoSeq_SortToggle_RowOrderUpdatesAcrossRenders(t *testing.T) {
 	c := openListController(t, "ec2")
 	resources := wave3FilterEC2Resources()
@@ -157,18 +124,8 @@ func idsEqual(a, b []string) bool {
 	return true
 }
 
-// ===========================================================================
-// (c) attention-only toggle, both directions
-// ===========================================================================
-
-// TestListBodyMemoSeq_AttentionToggle_BothDirectionsAcrossRenders renders
-// after enabling AND after disabling the attention filter.
-// TestListAttention_ToggleOffRestoresAll (core/app/list_test.go) applies
-// both toggle actions back-to-back and renders only once at the end, so it
-// never observes the ON render — a memo that fails to invalidate on the
-// OFF transition specifically (e.g. treats "AttentionOnly flipped" as a
-// one-shot cache-bust already consumed by the ON render) would leak the
-// filtered row set into this render.
+// A memo that fails to invalidate on the attention filter's OFF transition
+// would leak the filtered row set into the next render.
 func TestListBodyMemoSeq_AttentionToggle_BothDirectionsAcrossRenders(t *testing.T) {
 	c := openListController(t, "ec2")
 	resources := wave3FilterEC2Resources() // cache-node carries a SevWarn Finding
@@ -198,18 +155,8 @@ func TestListBodyMemoSeq_AttentionToggle_BothDirectionsAcrossRenders(t *testing.
 	}
 }
 
-// ===========================================================================
-// (d) RowStore generation advance via ResourcesLoaded, including load-more
-// ===========================================================================
-
-// TestListBodyMemoSeq_LoadMoreAppend_NewRowsAppearOnNextRender renders once
-// after the initial page lands, appends a second page through the same
-// ApplyResourcesLoaded/ObserveRows seam a real load-more (m key) drives
-// (core/app/list_body.go:145-150 routes both the initial and the appended
-// call through Core.ObserveRows, bumping ls.RowsGen), then renders again and
-// asserts the appended rows are visible. No existing test renders BEFORE an
-// append lands to prove the append is what changed the second render's
-// content, rather than the append call itself doing so out of band.
+// The initial page and a load-more append both go through Core.ObserveRows,
+// which bumps ls.RowsGen; the appended rows appear on the next render.
 func TestListBodyMemoSeq_LoadMoreAppend_NewRowsAppearOnNextRender(t *testing.T) {
 	c := openListController(t, "ec2")
 	page1 := []resource.Resource{
@@ -245,27 +192,9 @@ func TestListBodyMemoSeq_LoadMoreAppend_NewRowsAppearOnNextRender(t *testing.T) 
 	}
 }
 
-// ===========================================================================
-// (e) wave-2 finding lands on an already-rendered list
-// ===========================================================================
-
-// TestListBodyMemoSeq_EnrichmentLandsAfterFirstRender_DecoratorFlipsOnNextRender
-// renders a healthy row, applies a Wave-2 finding via ApplyEnrichmentState
-// (the same seam production code's Wave-2 sweep uses), then renders again.
-// TestEnrichment_BrokenRowHasDecoratorError (deleted with the glyph branch) and
-// TestListStatusColumn_EnrichmentMapOnlyFinding_OverridesRawState
-// (this file) both apply the finding BEFORE ever rendering, so neither
-// proves a SECOND render — as opposed to the first-ever render of that
-// screen — picks up the change.
-//
-// This sequence is the sharpest edge for an incoming memo key:
-// applyEnrichmentState (core/app/list_filter.go:296-348) writes only
-// c.enrichmentStore/enrichmentDetails/enrichmentTruncated — it never
-// advances ls.RowsGen or any other generation counter. A memo key built
-// only from (RowsGen, filter, attention, sort) would therefore hit on
-// render2 and return render1's pre-enrichment Decorator/Severity/status
-// cell; the key must also incorporate the enrichment store's own state (or
-// enrichment must be given its own generation bump) to invalidate here.
+// applyEnrichmentState writes only the enrichment store and advances no
+// generation counter, so the memo key must also track enrichment state for a
+// second render to pick up a Wave-2 finding.
 func TestListBodyMemoSeq_EnrichmentLandsAfterFirstRender_DecoratorFlipsOnNextRender(t *testing.T) {
 	c := openListController(t, "ec2")
 	resources := []resource.Resource{
@@ -280,9 +209,8 @@ func TestListBodyMemoSeq_EnrichmentLandsAfterFirstRender_DecoratorFlipsOnNextRen
 	}
 	// The probe is the rendered Status cell, not the row decorator: a list
 	// row's colour is the worst finding over both waves, so buildListBody
-	// produces no glyph. The S4 status-cell override reads the enrichment
-	// store directly, so it is the surface this memo-invalidation pin can
-	// observe.
+	// produces no glyph. The status-cell override reads the enrichment store
+	// directly.
 	if got := render1.Rows[0].Cells[render1.StatusCol]; got == "system check failed" {
 		t.Fatalf("render1 (before enrichment): Status cell already carries the Wave-2 phrase")
 	}
@@ -300,40 +228,15 @@ func TestListBodyMemoSeq_EnrichmentLandsAfterFirstRender_DecoratorFlipsOnNextRen
 	}
 }
 
-// ===========================================================================
-// (f) background RowStore write while ls.Rows is nil — the listScreenResources
+// openListController never calls ApplyResourcesLoaded, so ls.Rows stays nil
+// and listScreenResources falls back to the session RowStore. An
+// AvailabilityChecked event writes the RowStore through Core.ObserveRows
+// without touching the screen's ListState, so only the memo key's
+// AnyOriginResourceCacheGen term can invalidate the memo.
 //
-//	fallback branch (list_state.go:152-157)
-//
-// ===========================================================================
-//
-// openListController pushes a resource-list screen via ActionCommand but
-// never calls ApplyResourcesLoaded, so the pushed ListState's Rows field
-// stays nil (core/app/navigate.go's NavigateKindPushResourceList only seeds
-// ls.Rows when HandleNavigate attaches a CachedEntry, which a fresh
-// session.New() session with an empty RowStore and no on-disk availability
-// cache never does). With ls.Rows nil, listScreenResources falls through to
-// c.cachedResources(typeName), which reads the session-owned RowStore
-// directly (core.AnyOriginResourceCache) rather than the screen's own state.
-//
-// A live availability sweep result for that type lands as a
-// messages.AvailabilityChecked event, routed by Controller.Handle straight
-// to Core.HandleEvent → handleAvailabilityChecked, which writes the RowStore
-// via Core.ObserveRows(canonType, freshResources, ..., session.OriginProbe,
-// false) — unlike messages.ResourcesLoaded, Controller.Handle does NOT
-// special-case AvailabilityChecked through applyResourcesLoaded, so nothing
-// touches the pushed screen's ListState fields directly (ls.rowsVersion,
-// ls.Filter, ls.AttentionOnly, ls.SortCol/SortDir all stay untouched).
-//
-// rebuildListBodyMemo's key also watches Core.AnyOriginResourceCacheGen(typeName)
-// (list_body.go's fallbackRowsGen) specifically to invalidate on exactly this
-// RowStore-fallback write — both sequences below pin that behavior: render
-// once (populating/validating listBodyMemo), deliver an AvailabilityChecked
-// purely through Controller.Handle, then render again and assert the
-// RowStore's new rows are visible. Gen: domain.Gen(1) is session.New()'s
-// AvailabilityGen seed (session.go:395) — openListController never bumps
-// it, so the same literal satisfies messages.IsStale's exact-match guard on
-// both deliveries in a test.
+// Gen: domain.Gen(1) is session.New()'s AvailabilityGen seed and
+// openListController never bumps it, so the same literal passes
+// messages.IsStale on both deliveries in a test.
 func TestListBodyMemoSeq_BackgroundAvailabilityReplace_FallbackRowsStaleAcrossRenders(t *testing.T) {
 	c := openListController(t, "ec2")
 
@@ -407,13 +310,7 @@ func TestListBodyMemoSeq_BackgroundAvailabilityFirstWrite_EmptyFallbackStaysStal
 	}
 }
 
-// ===========================================================================
-// Benchmark: baseline evidence for the memoization refactor
-// ===========================================================================
-
-// newBenchListController mirrors newTestController (app_controller_test.go)
-// but takes a *testing.B, since the buildListBody memoization refactor's
-// baseline must be measured, not test-asserted.
+// newBenchListController mirrors newTestController but takes a *testing.B.
 func newBenchListController(b *testing.B) *app.Controller {
 	b.Helper()
 	b.Setenv("A9S_CONFIG_FOLDER", b.TempDir())
@@ -471,12 +368,9 @@ func hexPad(n int) string {
 	return s
 }
 
-// BenchmarkListSnapshot_LargeList is the before/after baseline for the
-// buildListBody memoization refactor: a realistic 3000-row EC2 list, with
+// BenchmarkListSnapshot_LargeList measures a 3000-row EC2 list with
 // Snapshot() called every frame and the cursor moved on roughly one frame in
-// ten — the common steady-state render (repeated filter/sort/cell-extract
-// with no other input changing), which is exactly what the refactor's cache
-// is meant to skip.
+// ten: the steady-state render where no memo input changes.
 func BenchmarkListSnapshot_LargeList(b *testing.B) {
 	c := newBenchListController(b)
 	c.ApplyResourcesLoaded("ec2", memoBenchEC2Rows(3000), nil, false)

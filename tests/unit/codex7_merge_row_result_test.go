@@ -31,10 +31,10 @@ func (f *dupIDSNSFake) GetTopicAttributes(_ context.Context, in *sns.GetTopicAtt
 
 // One resource listed twice states its condition once, and its supporting
 // rows accumulate — setWave2Finding's rule for a repeated code. The parallel
-// enricher now evaluates each listing into a result of its own, so that rule
-// has to survive the merge of two results: without it the detail view prints
-// the same sentence twice and the stacked list phrase counts one topic's
-// missing key as two.
+// enricher evaluates each listing into a result of its own, so the rule must
+// hold across the merge of two results, or the detail view prints the same
+// sentence twice and the stacked list phrase counts one topic's missing key as
+// two.
 func TestEnricherMerge_DuplicateResourceIDRaisesTheFindingOnce(t *testing.T) {
 	const topic = "arn:aws:sns:us-east-1:123456789012:orders-events"
 

@@ -1,15 +1,5 @@
 package unit
 
-// aws_cf_enricher_test.go — Behavioral tests for EnrichCloudFrontDistribution.
-//
-// Contract assertions:
-//   - GetDistributionConfig is called once per CF resource (keyed by distribution ID).
-//   - DefaultCacheBehavior.ViewerProtocolPolicy=redirect-to-https AND all origins https-only → 0 findings.
-//   - DefaultCacheBehavior.ViewerProtocolPolicy=allow-all → 1 finding sev "~" "no HTTPS redirect" for that distro.
-//   - An origin with CustomOriginConfig.OriginProtocolPolicy=http-only → 1 finding sev "~" "origin without TLS" for that distro.
-//   - clients.CloudFront == nil → (EnricherResult{Findings: non-nil empty}, nil).
-//   - API error for a resource → 0 findings for that resource, Truncated=true, no error returned.
-
 import (
 	"context"
 	"errors"
@@ -60,7 +50,6 @@ func (f *cfGetDistributionConfigFake) GetDistributionConfig(
 	return &cloudfront.GetDistributionConfigOutput{DistributionConfig: cfg}, nil
 }
 
-// Compile-time check: cfGetDistributionConfigFake satisfies CloudFrontAPI.
 var _ awsclient.CloudFrontAPI = (*cfGetDistributionConfigFake)(nil)
 
 // cfDistroResources returns a slice of CF Resource stubs with the given distribution IDs.
@@ -110,12 +99,11 @@ func cfDistroConfigRedirectHTTPS(id string) *cftypes.DistributionConfig {
 	})
 }
 
-// cfHealthyForW6ARows fills the settings batch w6a added rows for — access
+// cfHealthyForW6ARows fills the settings the other cf checks read — access
 // logging, a default root object, a geo restriction, a custom certificate at
-// TLS 1.2, and an origin access control on every S3 origin. These tests are
-// about cf.insecure-protocol; without this their minimal configs also trip
-// six unrelated rows, and the assertions below count findings rather than
-// look one up by code.
+// TLS 1.2, and an origin access control on every S3 origin — so these
+// cf.insecure-protocol tests, which count findings rather than look one up by
+// code, see only the finding they test.
 func cfHealthyForW6ARows(cfg *cftypes.DistributionConfig) *cftypes.DistributionConfig {
 	cfg.DefaultRootObject = aws.String("index.html")
 	cfg.Logging = &cftypes.LoggingConfig{

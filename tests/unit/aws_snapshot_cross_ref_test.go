@@ -1,19 +1,8 @@
 package unit
 
-// aws_snapshot_cross_ref_test.go — Behavioral tests for EnrichSnapshotCrossRef.
-//
-// The enricher never writes FieldUpdates["status"]. The merged §4 status
-// phrase (wave-1 + wave-2, "phrase (+N)" form) is computed at render time by
-// phraseFromFindings(r.Findings) in extractCellValue, since wave-1 findings
-// reach r.Findings via the fetcher and wave-2 findings via applyEnrichment.
-//
-// All FieldUpdates assertions in this file pin "no FieldUpdates entry written
-// by the enricher".
-//
-// Test strategy:
-//   - All stubs (testSnap, testParent) are defined inline — no AWS SDK imports.
-//   - cfg is built via makeCrossRefCfg helper — one canonical config per run.
-//   - Each subtest is independent; no shared state between runs.
+// Status reaches the list column from Findings: phraseFromFindings(r.Findings)
+// in extractCellValue merges wave-1 findings (from the fetcher) and wave-2
+// findings (from applyEnrichment) at render time.
 
 import (
 	"context"
@@ -29,10 +18,6 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// ---------------------------------------------------------------------------
-// Inline stubs — no AWS SDK dependency
-// ---------------------------------------------------------------------------
-
 type testSnap struct {
 	ID        string
 	ParentID  string
@@ -45,7 +30,6 @@ type testParent struct {
 	BackupRetentionPeriod int32
 }
 
-// makeCrossRefCfg builds a SnapshotCrossRefConfig backed by testSnap / testParent.
 func makeCrossRefCfg(retentionEnabled bool) awsclient.SnapshotCrossRefConfig {
 	return awsclient.SnapshotCrossRefConfig{
 		ParentShortName: "test-parent",
@@ -77,8 +61,8 @@ func makeCrossRefCfg(retentionEnabled bool) awsclient.SnapshotCrossRefConfig {
 			}
 			return p.BackupRetentionPeriod, p.BackupRetentionPeriod > 0
 		},
-		// Real declared codes rather than the zero value: the wording now
-		// comes from the catalog, so a config with no codes emits nothing.
+		// The wording comes from the catalog by code, so a config with no codes
+		// emits nothing.
 		OrphanCode:        "dbi-snap.orphan",
 		PastRetentionCode: "dbi-snap.past-retention",
 		ParentRowLabel:    "Source Parent",
@@ -86,7 +70,6 @@ func makeCrossRefCfg(retentionEnabled bool) awsclient.SnapshotCrossRefConfig {
 	}
 }
 
-// snapRes builds a minimal resource.Resource for enricher input.
 func snapRes(snap testSnap) resource.Resource {
 	return resource.Resource{
 		ID:        snap.ID,
@@ -94,9 +77,6 @@ func snapRes(snap testSnap) resource.Resource {
 	}
 }
 
-// snapResWithStatus builds a resource.Resource with a pre-existing Wave-1
-// finding (simulates a fetcher that emitted findings before Wave 2).
-// Empty status / nil issues produces a resource with no Findings.
 func snapResWithStatus(snap testSnap, status string, issues []string) resource.Resource {
 	r := resource.Resource{
 		ID:        snap.ID,
@@ -117,7 +97,6 @@ func snapResWithStatus(snap testSnap, status string, issues []string) resource.R
 	return r
 }
 
-// parentCache builds a ResourceCache with "test-parent" entries.
 func parentCache(truncated bool, parents ...testParent) resource.ResourceCache {
 	entries := make([]resource.Resource, 0, len(parents))
 	for _, p := range parents {
@@ -134,19 +113,13 @@ func parentCache(truncated bool, parents ...testParent) resource.ResourceCache {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// Tests
-// ---------------------------------------------------------------------------
-
-// TestSnapshotCrossRef_EmptyParentCache verifies that when the "test-parent"
-// key is absent from the cache the enricher returns zero findings and no error.
 func TestSnapshotCrossRef_EmptyParentCache(t *testing.T) {
 	cfg := makeCrossRefCfg(true)
 	fn := awsclient.EnrichSnapshotCrossRef(cfg)
 
 	snap := testSnap{ID: "snap-1", ParentID: "p1", Type: "automated", CreatedAt: time.Now().Add(-24 * time.Hour)}
 	resources := []resource.Resource{snapRes(snap)}
-	cache := resource.ResourceCache{} // no "test-parent" key at all
+	cache := resource.ResourceCache{}
 
 	result, err := fn(context.Background(), nil, resources, cache)
 	if err != nil {
@@ -160,9 +133,6 @@ func TestSnapshotCrossRef_EmptyParentCache(t *testing.T) {
 	}
 }
 
-// TestSnapshotCrossRef_ParentFound_NoFinding verifies that when the snapshot's
-// parent IS present in the cache and the snapshot is within retention, no
-// finding is emitted.
 func TestSnapshotCrossRef_ParentFound_NoFinding(t *testing.T) {
 	cfg := makeCrossRefCfg(true)
 	fn := awsclient.EnrichSnapshotCrossRef(cfg)
@@ -184,14 +154,12 @@ func TestSnapshotCrossRef_ParentFound_NoFinding(t *testing.T) {
 	}
 }
 
-// TestSnapshotCrossRef_TruncatedCache_NoFalseOrphan verifies that when the
-// cache IsTruncated=true and the parent is NOT found, no orphan finding is
-// emitted (avoids false positives when the parent might exist in a later page).
+// A truncated cache may hold the parent on a later page, so a missing parent
+// is no orphan.
 func TestSnapshotCrossRef_TruncatedCache_NoFalseOrphan(t *testing.T) {
 	cfg := makeCrossRefCfg(true)
 	fn := awsclient.EnrichSnapshotCrossRef(cfg)
 
-	// cache has a different parent, IsTruncated=true
 	existingParent := testParent{ID: "p2", BackupRetentionPeriod: 7}
 	snap := testSnap{ID: "snap-1", ParentID: "p1", Type: "automated", CreatedAt: time.Now().Add(-30 * 24 * time.Hour)}
 	resources := []resource.Resource{snapRes(snap)}
@@ -209,16 +177,10 @@ func TestSnapshotCrossRef_TruncatedCache_NoFalseOrphan(t *testing.T) {
 	}
 }
 
-// TestSnapshotCrossRef_OrphanFinding verifies that when the parent is NOT in
-// the cache and the cache is NOT truncated, a full orphan Finding is emitted.
-// FieldUpdates["status"] is never written — the merged phrase is
-// computed at render time by phraseFromFindings(r.Findings). Findings still
-// carries the orphan signal for S5 Attention rendering.
 func TestSnapshotCrossRef_OrphanFinding(t *testing.T) {
 	cfg := makeCrossRefCfg(true)
 	fn := awsclient.EnrichSnapshotCrossRef(cfg)
 
-	// cache has "p2" but snap references "p1"
 	otherParent := testParent{ID: "p2", BackupRetentionPeriod: 7}
 	snap := testSnap{ID: "snap-1", ParentID: "p1", Type: "automated", CreatedAt: time.Now().Add(-5 * 24 * time.Hour)}
 	resources := []resource.Resource{snapRes(snap)}
@@ -244,7 +206,6 @@ func TestSnapshotCrossRef_OrphanFinding(t *testing.T) {
 		t.Errorf("expected Phrase=%q, got %q", want, finding.Phrase)
 	}
 
-	// Must contain a row with Label="Source Parent" and Value containing "p1" and the hint.
 	found = false
 	for _, row := range result.AttentionDetails["snap-1"][finding.Code].Rows {
 		if row.Label == "Source Parent" {
@@ -261,17 +222,11 @@ func TestSnapshotCrossRef_OrphanFinding(t *testing.T) {
 		t.Errorf("expected a row with Label=%q, rows were: %+v", "Source Parent", result.AttentionDetails["snap-1"][finding.Code].Rows)
 	}
 
-	// FieldUpdates must be nil or empty — the enricher never overlays the
-	// status field. The merged display phrase is computed by
-	// phraseFromFindings(r.Findings) in extractCellValue at render time.
 	if updates, hasUpdates := result.FieldUpdates["snap-1"]; hasUpdates && len(updates) != 0 {
 		t.Errorf("AS-140: expected no FieldUpdates entry for snap-1 (status overlay removed); got %v", updates)
 	}
 }
 
-// TestSnapshotCrossRef_PastRetention_Automated verifies that an automated
-// snapshot whose age exceeds the parent's BackupRetentionPeriod gets a
-// past-retention finding.
 func TestSnapshotCrossRef_PastRetention_Automated(t *testing.T) {
 	cfg := makeCrossRefCfg(true)
 	fn := awsclient.EnrichSnapshotCrossRef(cfg)
@@ -307,7 +262,6 @@ func TestSnapshotCrossRef_PastRetention_Automated(t *testing.T) {
 		t.Errorf("expected Phrase=%q, got %q", expectedPhrase, finding.Phrase)
 	}
 
-	// Rows must contain Source Parent, Retention, Created entries.
 	hasParentRow := false
 	hasRetentionRow := false
 	hasCreatedRow := false
@@ -341,17 +295,12 @@ func TestSnapshotCrossRef_PastRetention_Automated(t *testing.T) {
 		t.Errorf("missing Created row; rows: %+v", result.AttentionDetails["snap-1"][finding.Code].Rows)
 	}
 
-	// FieldUpdates must be nil or empty for snap-1 — the enricher never
-	// overlays the status field; the past-retention phrase reaches the
-	// list column via Findings → phraseFromFindings at render time.
 	if updates, hasUpdates := result.FieldUpdates["snap-1"]; hasUpdates && len(updates) != 0 {
 		t.Errorf("AS-140: expected no FieldUpdates entry for snap-1 (status overlay removed); got %v", updates)
 	}
 }
 
-// TestSnapshotCrossRef_PastRetention_Manual verifies that a manual snapshot
-// past retention does NOT trigger the past-retention finding (rule applies to
-// "automated" only).
+// The past-retention rule applies to automated snapshots only.
 func TestSnapshotCrossRef_PastRetention_Manual(t *testing.T) {
 	cfg := makeCrossRefCfg(true)
 	fn := awsclient.EnrichSnapshotCrossRef(cfg)
@@ -373,8 +322,6 @@ func TestSnapshotCrossRef_PastRetention_Manual(t *testing.T) {
 	}
 }
 
-// TestSnapshotCrossRef_ZeroRetentionParent verifies that when the parent has
-// BackupRetentionPeriod=0 the past-retention rule does not fire.
 func TestSnapshotCrossRef_ZeroRetentionParent(t *testing.T) {
 	cfg := makeCrossRefCfg(true)
 	fn := awsclient.EnrichSnapshotCrossRef(cfg)
@@ -393,15 +340,11 @@ func TestSnapshotCrossRef_ZeroRetentionParent(t *testing.T) {
 	}
 }
 
-// TestSnapshotCrossRef_RetentionDisabled verifies that when RetentionEnabled=false
-// the past-retention rule never fires even when age > retention, and the orphan
-// rule is unaffected.
 func TestSnapshotCrossRef_RetentionDisabled(t *testing.T) {
 	t.Run("no_past_retention_when_disabled", func(t *testing.T) {
-		cfg := makeCrossRefCfg(false) // RetentionEnabled=false
+		cfg := makeCrossRefCfg(false)
 		fn := awsclient.EnrichSnapshotCrossRef(cfg)
 
-		// Same setup that would normally produce a past-retention finding.
 		parent := testParent{ID: "p1", BackupRetentionPeriod: 7}
 		snap := testSnap{ID: "snap-1", ParentID: "p1", Type: "automated", CreatedAt: time.Now().Add(-30 * 24 * time.Hour)}
 		resources := []resource.Resource{snapRes(snap)}
@@ -417,10 +360,9 @@ func TestSnapshotCrossRef_RetentionDisabled(t *testing.T) {
 	})
 
 	t.Run("orphan_still_fires_when_retention_disabled", func(t *testing.T) {
-		cfg := makeCrossRefCfg(false) // RetentionEnabled=false
+		cfg := makeCrossRefCfg(false)
 		fn := awsclient.EnrichSnapshotCrossRef(cfg)
 
-		// cache has "p2", snap references "p1" — should still orphan.
 		otherParent := testParent{ID: "p2", BackupRetentionPeriod: 7}
 		snap := testSnap{ID: "snap-2", ParentID: "p1", Type: "automated", CreatedAt: time.Now().Add(-30 * 24 * time.Hour)}
 		resources := []resource.Resource{snapRes(snap)}
@@ -436,19 +378,13 @@ func TestSnapshotCrossRef_RetentionDisabled(t *testing.T) {
 	})
 }
 
-// TestSnapshotCrossRef_OrphanFinding_NoFieldUpdates_WithWave1 verifies that
-// even when the resource already carries Wave-1 phrases (Status + Issues set
-// by the legacy fetcher form), the enricher MUST NOT write FieldUpdates.
-// The merged "wave-1 (+1)" display is built at render time by
-// phraseFromFindings(r.Findings) — wave-1 findings reach r.Findings via the
-// fetcher, wave-2 via applyEnrichment.
 func TestSnapshotCrossRef_OrphanFinding_NoFieldUpdates_WithWave1(t *testing.T) {
 	t.Run("legacy_form_single_wave1_phrase_plus_orphan", func(t *testing.T) {
 		cfg := makeCrossRefCfg(true)
 		fn := awsclient.EnrichSnapshotCrossRef(cfg)
 
 		otherParent := testParent{ID: "p2", BackupRetentionPeriod: 7}
-		snap := testSnap{ID: "snap-1", ParentID: "p1"} // orphan — p1 not in cache
+		snap := testSnap{ID: "snap-1", ParentID: "p1"}
 		res := snapResWithStatus(snap, "unencrypted", []string{"unencrypted"})
 		cache := parentCache(false, otherParent)
 
@@ -457,12 +393,10 @@ func TestSnapshotCrossRef_OrphanFinding_NoFieldUpdates_WithWave1(t *testing.T) {
 			t.Fatalf("unexpected error: %v", err)
 		}
 
-		// The orphan Finding must still be present.
 		if _, ok := result.Findings["snap-1"]; !ok {
 			t.Errorf("expected orphan Finding for snap-1 — wave-1 stacking must NOT suppress the wave-2 Finding")
 		}
 
-		// FieldUpdates must be empty/nil.
 		if updates, hasUpdates := result.FieldUpdates["snap-1"]; hasUpdates && len(updates) != 0 {
 			t.Errorf("AS-140: expected empty FieldUpdates for snap-1; got %v", updates)
 		}
@@ -473,7 +407,7 @@ func TestSnapshotCrossRef_OrphanFinding_NoFieldUpdates_WithWave1(t *testing.T) {
 		fn := awsclient.EnrichSnapshotCrossRef(cfg)
 
 		otherParent := testParent{ID: "p2", BackupRetentionPeriod: 7}
-		snap := testSnap{ID: "snap-1", ParentID: "p1"} // orphan
+		snap := testSnap{ID: "snap-1", ParentID: "p1"}
 		res := snapResWithStatus(snap, "unencrypted (+1)", []string{"unencrypted", "publicly accessible"})
 		cache := parentCache(false, otherParent)
 
@@ -491,15 +425,13 @@ func TestSnapshotCrossRef_OrphanFinding_NoFieldUpdates_WithWave1(t *testing.T) {
 	})
 }
 
-// TestSnapshotCrossRef_Idempotent verifies that running the enricher twice on
-// the same inputs produces identical output (no suffix accumulation on re-runs).
 func TestSnapshotCrossRef_Idempotent(t *testing.T) {
 	t.Run("orphan_idempotent", func(t *testing.T) {
 		cfg := makeCrossRefCfg(true)
 		fn := awsclient.EnrichSnapshotCrossRef(cfg)
 
 		otherParent := testParent{ID: "p2", BackupRetentionPeriod: 7}
-		snap := testSnap{ID: "snap-1", ParentID: "p1"} // orphan
+		snap := testSnap{ID: "snap-1", ParentID: "p1"}
 		res := snapRes(snap)
 		cache := parentCache(false, otherParent)
 
@@ -537,21 +469,13 @@ func TestSnapshotCrossRef_Idempotent(t *testing.T) {
 	})
 }
 
-// TestSnapshotCrossRef_PostPR03eShape_NoFieldUpdates covers the
-// fetcher shape (Findings populated, Status / Issues empty,
-// Fields["status"] carrying the §4 phrase). The Wave-2 orphan signal must
-// still produce a Finding for the resource, but FieldUpdates is not
-// written — the (+N) suffix is computed at render time by
-// phraseFromFindings(r.Findings).
 func TestSnapshotCrossRef_PostPR03eShape_NoFieldUpdates(t *testing.T) {
 	cfg := makeCrossRefCfg(true)
 	fn := awsclient.EnrichSnapshotCrossRef(cfg)
 
 	otherParent := testParent{ID: "p2", BackupRetentionPeriod: 7}
-	snap := testSnap{ID: "snap-1", ParentID: "p1"} // orphan — p1 not in cache
+	snap := testSnap{ID: "snap-1", ParentID: "p1"}
 
-	// Post-PR-03e shape: Findings populated by the fetcher, Fields["status"]
-	// carrying the merged §4 phrase. Status / Issues are intentionally empty.
 	res := resource.Resource{
 		ID: snap.ID,
 		Findings: []domain.Finding{
@@ -567,25 +491,15 @@ func TestSnapshotCrossRef_PostPR03eShape_NoFieldUpdates(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	// The orphan Wave-2 Finding must still be emitted so the S5 Attention
-	// section renders, and so applyEnrichment can stack it onto r.Findings.
 	if _, ok := result.Findings["snap-1"]; !ok {
 		t.Errorf("expected orphan Finding for snap-1 even on post-PR-03e wave-1 shape")
 	}
 
-	// FieldUpdates must be nil/empty. The merged "unencrypted (+1)"
-	// phrase is computed at render time by
-	// phraseFromFindings(r.Findings) in extractCellValue.
 	if updates, hasUpdates := result.FieldUpdates["snap-1"]; hasUpdates && len(updates) != 0 {
 		t.Errorf("AS-140: expected empty FieldUpdates for snap-1 (status overlay removed); got %v", updates)
 	}
 }
 
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-// crossRefContains is a simple substring helper local to this test file.
 func crossRefContains(s, sub string) bool {
 	if len(sub) == 0 {
 		return true
@@ -601,8 +515,6 @@ func crossRefContains(s, sub string) bool {
 	return false
 }
 
-// assertResultsIdentical checks that two IssueEnricherResults are identical for
-// a specific resource ID (Findings + FieldUpdates).
 func assertResultsIdentical(t *testing.T, id string, r1, r2 awsclient.IssueEnricherResult) {
 	t.Helper()
 

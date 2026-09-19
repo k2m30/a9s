@@ -13,13 +13,6 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// ---------------------------------------------------------------------------
-// Route 53 DNS Records fetcher tests
-// ---------------------------------------------------------------------------
-
-// TestFetchR53Records_Basic verifies parsing of A (multi-value), CNAME, and MX
-// records with correct ID, Name, Status, Fields (name, type, ttl, values), and
-// RawStruct.
 func TestFetchR53Records_Basic(t *testing.T) {
 	mock := &mockRoute53RecordSetsClient{
 		outputs: []*route53.ListResourceRecordSetsOutput{
@@ -66,7 +59,6 @@ func TestFetchR53Records_Basic(t *testing.T) {
 		t.Fatalf("expected 3 resources, got %d", len(resources))
 	}
 
-	// Verify A record
 	t.Run("A_record_ID", func(t *testing.T) {
 		if resources[0].ID != "example.com.|A" {
 			t.Errorf("ID: expected %q, got %q", "example.com.|A", resources[0].ID)
@@ -115,7 +107,6 @@ func TestFetchR53Records_Basic(t *testing.T) {
 		}
 	})
 
-	// Verify CNAME record
 	t.Run("CNAME_record", func(t *testing.T) {
 		r := resources[1]
 		if r.ID != "www.example.com.|CNAME" {
@@ -135,7 +126,6 @@ func TestFetchR53Records_Basic(t *testing.T) {
 		}
 	})
 
-	// Verify MX record
 	t.Run("MX_record", func(t *testing.T) {
 		r := resources[2]
 		if r.ID != "example.com.|MX" {
@@ -152,7 +142,6 @@ func TestFetchR53Records_Basic(t *testing.T) {
 		}
 	})
 
-	// Verify all records have required fields
 	t.Run("required_fields_present", func(t *testing.T) {
 		requiredFields := []string{"name", "type", "ttl", "values"}
 		for i, r := range resources {
@@ -165,8 +154,6 @@ func TestFetchR53Records_Basic(t *testing.T) {
 	})
 }
 
-// TestFetchR53Records_AliasRecord verifies that alias records (AliasTarget
-// instead of ResourceRecords) produce the correct values and empty TTL.
 func TestFetchR53Records_AliasRecord(t *testing.T) {
 	mock := &mockRoute53RecordSetsClient{
 		outputs: []*route53.ListResourceRecordSetsOutput{
@@ -250,15 +237,7 @@ func TestFetchR53Records_AliasRecord(t *testing.T) {
 	})
 }
 
-// TestFetchR53Records_Pagination verifies that paginated responses (IsTruncated
-// + NextRecordName/NextRecordType) are followed and all records collected.
-// TestFetchR53Records_Pagination verifies the single-page pagination contract:
-// one API call is made per invocation, resources from that page are returned,
-// and IsTruncated/NextToken (compound JSON cursor) reflect whether more pages
-// exist. A second call with the continuation token verifies the token is
-// forwarded and the final page sets IsTruncated=false.
 func TestFetchR53Records_Pagination(t *testing.T) {
-	// Page 1: 2 records with IsTruncated=true and NextRecordName indicating more pages.
 	page1Mock := &mockRoute53RecordSetsClient{
 		outputs: []*route53.ListResourceRecordSetsOutput{
 			{
@@ -287,7 +266,6 @@ func TestFetchR53Records_Pagination(t *testing.T) {
 		},
 	}
 
-	// First call: no continuation token — fetches page 1.
 	result1, err := awsclient.FetchR53Records(context.Background(), page1Mock, "/hostedzone/ZPAGE", "")
 	if err != nil {
 		t.Fatalf("page 1: expected no error, got %v", err)
@@ -332,7 +310,6 @@ func TestFetchR53Records_Pagination(t *testing.T) {
 		}
 	})
 
-	// Page 2: 1 record with IsTruncated=false — last page.
 	page2Mock := &mockRoute53RecordSetsClient{
 		outputs: []*route53.ListResourceRecordSetsOutput{
 			{
@@ -351,7 +328,6 @@ func TestFetchR53Records_Pagination(t *testing.T) {
 		},
 	}
 
-	// Second call: pass continuation token from page 1 to fetch page 2.
 	result2, err := awsclient.FetchR53Records(context.Background(), page2Mock, "/hostedzone/ZPAGE", result1.Pagination.NextToken)
 	if err != nil {
 		t.Fatalf("page 2: expected no error, got %v", err)
@@ -388,9 +364,6 @@ func TestFetchR53Records_Pagination(t *testing.T) {
 	})
 }
 
-// TestFetchR53Records_SetIdentifier verifies that records with a SetIdentifier
-// (weighted/latency/failover routing) include the identifier in the ID, while
-// records without a SetIdentifier do not.
 func TestFetchR53Records_SetIdentifier(t *testing.T) {
 	mock := &mockRoute53RecordSetsClient{
 		outputs: []*route53.ListResourceRecordSetsOutput{
@@ -460,7 +433,6 @@ func TestFetchR53Records_SetIdentifier(t *testing.T) {
 	})
 }
 
-// TestFetchR53Records_Error verifies that API errors are propagated correctly.
 func TestFetchR53Records_Error(t *testing.T) {
 	mock := &mockRoute53RecordSetsClient{
 		err: fmt.Errorf("AWS API error: throttling exception"),
@@ -475,8 +447,6 @@ func TestFetchR53Records_Error(t *testing.T) {
 	}
 }
 
-// TestFetchR53Records_Empty verifies that an empty record set returns an empty
-// non-nil slice with no error.
 func TestFetchR53Records_Empty(t *testing.T) {
 	mock := &mockRoute53RecordSetsClient{
 		outputs: []*route53.ListResourceRecordSetsOutput{
@@ -496,8 +466,6 @@ func TestFetchR53Records_Empty(t *testing.T) {
 	}
 }
 
-// TestR53RecordColumns verifies that R53RecordColumns returns the expected
-// 4 columns with the correct keys: name, type, ttl, values.
 func TestR53RecordColumns(t *testing.T) {
 	cols := resource.R53RecordColumns()
 

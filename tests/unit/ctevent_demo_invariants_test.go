@@ -1,24 +1,5 @@
 package unit_test
 
-// ctevent_demo_invariants_test.go — table-driven invariant tests over all 12
-// demo ct-events fixtures (Cases A–L).
-//
-// Three top-level tests:
-//
-//	TestCtEventsDemoLeftColumnNavigable — L1/L2/L3/L4: every navigable row from
-//	  BuildSections must have a non-empty TargetType, resolve to a known resource
-//	  type, and its NavID/Value must exist in demo fixtures.
-//	  Bug D: Root principal must NOT be navigable (TargetType must be "").
-//
-//	TestCtEventsDemoRegistryNavigableFields — R1/R2: every registered NavigableField
-//	  for ct-events must resolve to a known resource type; Root/AWSService events
-//	  must have empty user/role_name post-cleanup.
-//
-//	TestCtEventsDemoRightColumnCheckers — G1/G2/G3: demo checker results are
-//	  consistent: IDs with Count>0 must be in demo fixtures; Count=-1+FetchFilter
-//	  must route to NavigationKindFilteredList or NavigationKindEnterChildView; Root events must
-//	  return Count=0 for the role checker.
-
 import (
 	"context"
 	"fmt"
@@ -35,10 +16,6 @@ import (
 	"github.com/k2m30/a9s/v3/core/runtime"
 	"github.com/k2m30/a9s/v3/core/semantics/ctevent"
 )
-
-// ---------------------------------------------------------------------------
-// Shared helpers
-// ---------------------------------------------------------------------------
 
 // loadAllCTFixtures returns all demo ct-events fixtures via the real fetcher
 // backed by the typed CloudTrail fake.
@@ -78,8 +55,7 @@ func parseCTEventForFixture(t *testing.T, res resource.Resource) *ctevent.Event 
 }
 
 // buildFakeResourceCache builds a ResourceCache for all ct-events related types
-// using demo.NewServiceClients() and real fetcher functions. No demo.GetResources
-// calls — every entry is populated via the typed fakes.
+// using demo.NewServiceClients() and real fetcher functions.
 func buildFakeResourceCache(t *testing.T) resource.ResourceCache {
 	t.Helper()
 	clients := demo.NewServiceClients()
@@ -194,17 +170,13 @@ func isRootFixture(res resource.Resource) bool {
 	return strings.Contains(*evt.CloudTrailEvent, `"type":"Root"`)
 }
 
-// ---------------------------------------------------------------------------
-// TestCtEventsDemoLeftColumnNavigable
-// ---------------------------------------------------------------------------
-
 // TestCtEventsDemoLeftColumnNavigable iterates all 12 demo fixtures × every
 // navigable row produced by ctevent.BuildSections and asserts:
 //
 //	L1: IsNavigable rows must have a non-empty TargetType.
 //	L2: TargetType must resolve via resource.ResolveNavigationTarget.
 //	L3: NavID (if set) or Value must exist in the demo fixture set for TargetType.
-//	L4 (Bug D): Root-identity events must not have a navigable ACTOR.Principal row.
+//	L4: Root-identity events must not have a navigable ACTOR.Principal row.
 func TestCtEventsDemoLeftColumnNavigable(t *testing.T) {
 	ensureNoColor(t)
 
@@ -237,7 +209,7 @@ func TestCtEventsDemoLeftColumnNavigable(t *testing.T) {
 						continue
 					}
 
-					// L4 (Bug D): Root-identity events must not have a navigable Principal.
+					// L4: Root-identity events must not have a navigable Principal.
 					if isRoot && section.Name == ctevent.SectionActor && row.Key == "Principal" {
 						t.Errorf("L4 (Bug D) FAIL: Root event has navigable Principal row — %s", rowLabel)
 					}
@@ -285,20 +257,15 @@ func TestCtEventsDemoLeftColumnNavigable(t *testing.T) {
 						continue
 					}
 
-					// demofixtures.CtEventDeletedBucket names a bucket the account no
-					// longer holds — the row-6 witness, and a DeleteBucket event
-					// in any real account looks exactly like it. Its left-column
-					// TARGET value is therefore not navigable BY DESIGN. The
-					// left column offering it anyway is the same guessing defect
-					// row 6 fixed in the related panel, on another surface; it is
-					// reported, not fixed here.
+					// demofixtures.CtEventDeletedBucket names a bucket the account does
+					// not hold, as a real DeleteBucket event does. The left column offers its
+					// TARGET value as navigable anyway, so it is skipped here.
 					if res.ID == demofixtures.CtEventDeletedBucket {
 						continue
 					}
 
-					// demofixtures.CtEventDeletedRole names a role the account no
-					// longer holds — the row-12 witness. Same known surface as the
-					// deleted bucket above: the left column offers the value anyway.
+					// demofixtures.CtEventDeletedRole names a role the account does not
+					// hold; the left column offers the value anyway.
 					if res.ID == demofixtures.CtEventDeletedRole {
 						continue
 					}
@@ -324,10 +291,6 @@ func TestCtEventsDemoLeftColumnNavigable(t *testing.T) {
 		})
 	}
 }
-
-// ---------------------------------------------------------------------------
-// TestCtEventsDemoRegistryNavigableFields
-// ---------------------------------------------------------------------------
 
 // TestCtEventsDemoRegistryNavigableFields iterates all 12 demo fixtures × the
 // 2 NavigableField registrations for ct-events ("user"→iam-user, "role_name"→role)
@@ -412,17 +375,13 @@ func isAWSServiceFixture(res resource.Resource) bool {
 	return strings.Contains(*evt.CloudTrailEvent, `"type":"AWSService"`)
 }
 
-// ---------------------------------------------------------------------------
-// TestCtEventsDemoRightColumnCheckers
-// ---------------------------------------------------------------------------
-
 // TestCtEventsDemoRightColumnCheckers iterates all 12 demo fixtures × the demo
 // checker results (17 groups: 13 typed + 4 self-pivots) and asserts:
 //
 //	G1: Count>0 IDs must each exist in the fake resource cache for TargetType.
-//	G2 (Bug C): Count=-1 + non-empty FetchFilter must route via ResolveRelatedNavigate
+//	G2: State RelatedDeferred with a non-empty FetchFilter must route via ResolveRelatedNavigate
 //	    to NavigationKindFilteredList or NavigationKindEnterChildView.
-//	G3 (Bug A): Root-identity events must return Count=0 for the role checker.
+//	G3: Root-identity events must return Count=0 for the role checker.
 func TestCtEventsDemoRightColumnCheckers(t *testing.T) {
 	ensureNoColor(t)
 
@@ -434,7 +393,6 @@ func TestCtEventsDemoRightColumnCheckers(t *testing.T) {
 			results := ctEventsRealCheckerResults(res, cache)
 			isRoot := isRootFixture(res)
 
-			// Build a map for ResolveRelatedNavigate.
 			resolveCache := make(map[string][]resource.Resource, len(cache))
 			for k, v := range cache {
 				resolveCache[k] = v.Resources
@@ -444,7 +402,7 @@ func TestCtEventsDemoRightColumnCheckers(t *testing.T) {
 				rowLabel := fmt.Sprintf("event=%s targetType=%s count=%d fetchFilter=%v ids=%v",
 					res.ID, result.TargetType(), result.Count(), result.FetchFilter(), result.ResourceIDs())
 
-				// G3 (Bug A): Root events must have Count=0 for the role checker.
+				// G3: Root events must have Count=0 for the role checker.
 				if isRoot && result.TargetType() == "role" && result.Count() != 0 {
 					t.Errorf("G3 (Bug A) FAIL: Root event has Count=%d for role checker, want 0 — %s",
 						result.Count(), rowLabel)
@@ -477,7 +435,7 @@ func TestCtEventsDemoRightColumnCheckers(t *testing.T) {
 					}
 				}
 
-				// G2 (Bug C): State: RelatedDeferred (+ non-empty FetchFilter) must
+				// G2: State: RelatedDeferred (+ non-empty FetchFilter) must
 				// route to NavigationKindFilteredList or NavigationKindEnterChildView.
 				if result.State() == domain.RelatedDeferred {
 					navMsg := runtime.RelatedNavigateEvent{
@@ -498,10 +456,6 @@ func TestCtEventsDemoRightColumnCheckers(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// TestCtEventsDemoRightColumnCheckers_RealCheckers
-// ---------------------------------------------------------------------------
-
 // TestCtEventsDemoRightColumnCheckers_RealCheckers runs the REAL production
 // checkers (not the demo overrides) against the demo resource cache to catch
 // mapping bugs that the demo checker might mask.
@@ -516,7 +470,6 @@ func TestCtEventsDemoRightColumnCheckers_RealCheckers(t *testing.T) {
 		t.Fatal("resource.GetRelated(\"ct-events\") returned no defs")
 	}
 
-	// Find the role checker.
 	var roleChecker resource.RelatedChecker
 	for _, def := range defs {
 		if def.TargetType == "role" {
@@ -537,9 +490,8 @@ func TestCtEventsDemoRightColumnCheckers_RealCheckers(t *testing.T) {
 			continue
 		}
 		t.Run("Root/"+res.ID, func(t *testing.T) {
-			// Real checker with nil clients (demo path: ctEventsRelatedResources
-			// returns nil, false when clients is not *ServiceClients, so Count=-1
-			// without error — that's OK, we just need Count != positive integer).
+			// Real checker with nil clients: the result may stay unresolved;
+			// only a positive Count is wrong.
 			result := roleChecker(ctx, nil, res, cache)
 			if result.Count() > 0 {
 				t.Errorf("G3 (Bug A) FAIL: Real role checker returned Count=%d (IDs=%v) for Root event %q, want 0 — "+

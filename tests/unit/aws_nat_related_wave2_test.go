@@ -1,5 +1,3 @@
-// aws_nat_related_wave2_test.go — coverage wave 2 for nat_related.go checkers.
-// Covers: checkNATEIP (0%), checkNATENI (0%), checkNATAlarm (0%).
 package unit_test
 
 import (
@@ -13,10 +11,6 @@ import (
 	_ "github.com/k2m30/a9s/v3/core/aws"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
-
-// ---------------------------------------------------------------------------
-// helpers
-// ---------------------------------------------------------------------------
 
 func natGatewaySource(natID, vpcID, allocID, eniID string) resource.Resource {
 	return resource.Resource{
@@ -40,10 +34,6 @@ func natGatewaySource(natID, vpcID, allocID, eniID string) resource.Resource {
 		},
 	}
 }
-
-// ---------------------------------------------------------------------------
-// checkNATEIP — Pattern C: NatGatewayAddresses.AllocationId vs eip cache
-// ---------------------------------------------------------------------------
 
 func TestRelated_NAT_EIP_MatchByAllocationID(t *testing.T) {
 	const natID = "nat-0aaa111111111111a"
@@ -102,9 +92,8 @@ func TestRelated_NAT_EIP_NoMatchWhenAllocIDNotInCache(t *testing.T) {
 	}
 }
 
-// Event-derived: the NAT's NatGatewayAddresses[].AllocationId IS the eip id
-// (real eip resources are keyed by AllocationId — see eip.go), so the checker
-// returns it straight from the NAT body with no eip-cache walk.
+// An eip resource is keyed by its AllocationId, so the NAT's
+// NatGatewayAddresses[].AllocationId is the eip id itself.
 func TestRelated_NAT_EIP_MatchByRawStructAllocationID(t *testing.T) {
 	const natID = "nat-0aaa111111111111a"
 	const allocID = "eipalloc-0aaa111111111111a"
@@ -121,10 +110,6 @@ func TestRelated_NAT_EIP_MatchByRawStructAllocationID(t *testing.T) {
 		t.Errorf("ResourceIDs = %v, want [%s] (AllocationId is the eip id, resolved by identity)", result.ResourceIDs(), allocID)
 	}
 }
-
-// ---------------------------------------------------------------------------
-// checkNATENI — Pattern C: NatGatewayAddresses.NetworkInterfaceId vs eni cache
-// ---------------------------------------------------------------------------
 
 func TestRelated_NAT_ENI_MatchByNetworkInterfaceID(t *testing.T) {
 	const natID = "nat-0aaa111111111111a"
@@ -182,7 +167,6 @@ func TestRelated_NAT_ENI_NoMatchWhenENINotInCache(t *testing.T) {
 	}
 }
 
-// Edge: NAT Gateway with no addresses → Count=0 (not -1).
 func TestRelated_NAT_ENI_NoAddressesReturnsZero(t *testing.T) {
 	src := resource.Resource{
 		ID:   "nat-0aaa111111111111a",
@@ -202,10 +186,6 @@ func TestRelated_NAT_ENI_NoAddressesReturnsZero(t *testing.T) {
 		t.Errorf("Count = %d, want 0 (no addresses)", result.Count())
 	}
 }
-
-// ---------------------------------------------------------------------------
-// checkNATAlarm — Pattern D: alarm dimension "NatGatewayId"
-// ---------------------------------------------------------------------------
 
 func TestRelated_NAT_Alarm_MatchByNatGatewayIDDimension(t *testing.T) {
 	const natID = "nat-0aaa111111111111a"
@@ -274,7 +254,6 @@ func TestRelated_NAT_Alarm_NoMatchWhenDimensionValueDiffers(t *testing.T) {
 	}
 }
 
-// Edge: alarm has wrong dimension name (not NatGatewayId) — not matched.
 func TestRelated_NAT_Alarm_NoMatchWhenDimensionNameDiffers(t *testing.T) {
 	const natID = "nat-0aaa111111111111a"
 
@@ -285,7 +264,6 @@ func TestRelated_NAT_Alarm_NoMatchWhenDimensionNameDiffers(t *testing.T) {
 			AlarmName: aws.String("ec2-alarm-with-same-value"),
 			Dimensions: []cwtypes.Dimension{
 				{
-					// Wrong dimension name
 					Name:  aws.String("InstanceId"),
 					Value: aws.String(natID),
 				},

@@ -1,13 +1,3 @@
-// costs_nav_test.go — Cost Explorer Phase 2: navigation wiring
-// (specs/021-cost-explorer/data-model.md §"Controller & runtime additions",
-// last paragraph: executeCommand "costs"/"ce", the synthetic main-menu
-// entry, and NavigateKindPushCosts).
-//
-// Colon-command driving follows tui_root_test.go's TestRootExecuteCommand_*
-// convention (":" enters command mode, characters are typed, Enter submits)
-// combined with qa_cli_command_flag_test.go's extractMsg/findNavigateMsg
-// batch-walking helpers — both already live in this package (unit) and are
-// reused here rather than re-implemented.
 package unit
 
 import (
@@ -50,10 +40,6 @@ func typeColonCommand(m tui.Model, cmd string) (tui.Model, tea.Cmd) {
 	return rootApplyMsg(m, rootSpecialKey(tea.KeyEnter))
 }
 
-// ---------------------------------------------------------------------------
-// executeCommand "costs" / "ce"
-// ---------------------------------------------------------------------------
-
 func TestQA_Costs_ColonCommand_Costs_EmitsNavigateTargetCosts(t *testing.T) {
 	m := newRootSizedModel()
 
@@ -90,11 +76,8 @@ func TestQA_Costs_ColonCommand_CEAlias_EmitsNavigateTargetCosts(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// NavigateKindPushCosts pushes ScreenCosts (+ seeds CostsState via
-// EnsureCostsState) — observed through the rendered view, since the runtime
+// NavigateKindPushCosts is observed through the rendered view: the runtime
 // adapter's push logic is unexported.
-// ---------------------------------------------------------------------------
 
 func TestQA_Costs_Navigate_PushesCostsScreen(t *testing.T) {
 	m := newRootSizedModel()
@@ -106,10 +89,6 @@ func TestQA_Costs_Navigate_PushesCostsScreen(t *testing.T) {
 		t.Errorf("after navigating to TargetCosts, rendered view should show the costs screen, got:\n%s", plain)
 	}
 }
-
-// ---------------------------------------------------------------------------
-// Main-menu synthetic "costs" entry
-// ---------------------------------------------------------------------------
 
 func TestQA_Costs_MainMenu_SyntheticEntryPresent(t *testing.T) {
 	c := newCostsNavController(t)
@@ -141,10 +120,6 @@ func TestQA_Costs_SyntheticEntry_AbsentFromAllResourceTypes(t *testing.T) {
 		}
 	}
 }
-
-// ---------------------------------------------------------------------------
-// Main-menu Enter on the synthetic "costs" entry
-// ---------------------------------------------------------------------------
 
 func TestQA_Costs_MainMenu_Enter_EmitsNavigateTargetCosts(t *testing.T) {
 	t.Setenv("A9S_CONFIG_FOLDER", t.TempDir())

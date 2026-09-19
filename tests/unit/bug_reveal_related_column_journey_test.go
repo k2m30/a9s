@@ -11,9 +11,6 @@ import (
 	"github.com/k2m30/a9s/v3/internal/tui"
 )
 
-// Reveals regression from real user journey:
-// main menu -> filter "ec2" -> Enter list -> Enter detail.
-// At wide width, EC2 detail MUST show RELATED column.
 func TestBugReveal_MainMenuToEC2Detail_MustShowRelatedColumn(t *testing.T) {
 	for _, profile := range []string{"demo", "test-profile"} {
 		t.Run("profile="+profile, func(t *testing.T) {

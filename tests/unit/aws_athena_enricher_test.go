@@ -1,15 +1,5 @@
 package unit
 
-// aws_athena_enricher_test.go — Behavioral tests for EnrichAthenaWorkGroup.
-//
-// Contract assertions:
-//   - GetWorkGroup is called once per Athena workgroup resource.
-//   - Both WGs have EnforceWorkGroupConfiguration=true and non-nil EncryptionConfiguration → 0 findings.
-//   - WG-1 has EnforceWorkGroupConfiguration=false → 1 finding sev "~" containing "Enforce".
-//   - WG-1 has EncryptionConfiguration=nil → 1 finding sev "~" containing "encryption".
-//   - clients.Athena == nil → (EnricherResult{Findings: non-nil empty}, nil).
-//   - Generic API error for a resource → 0 findings for that resource, Truncated=true, no error.
-
 import (
 	"context"
 	"errors"
@@ -57,7 +47,6 @@ func (f *athenaGetWorkGroupFake) GetWorkGroup(
 	return &athenasvc.GetWorkGroupOutput{WorkGroup: wg}, nil
 }
 
-// Compile-time check: athenaGetWorkGroupFake satisfies AthenaAPI.
 var _ awsclient.AthenaAPI = (*athenaGetWorkGroupFake)(nil)
 
 // athenaWorkGroupResources returns a slice of Athena Resource stubs with the given
@@ -160,10 +149,6 @@ func TestEnrichAthenaWorkGroup_NotEnforcedProducesFindingSevTilde(t *testing.T) 
 	}
 	// The phrase names the setting in the operator's words, not the SDK's
 	// (EnforceWorkGroupConfiguration) — the style gate forbids the latter.
-	// d4 row 22 replaced the old phrase, "Workgroup settings enforced", which
-	// was the supporting row's own label: it restated the row beneath it and
-	// left the operator to work out which way "enforced" pointed. Do not
-	// restore it, and do not expect a row here — the phrase says it all.
 	if f.Phrase != "settings can be overridden per query" {
 		t.Errorf("phrase = %q, want %q", f.Phrase, "settings can be overridden per query")
 	}
@@ -182,7 +167,7 @@ func TestEnrichAthenaWorkGroup_NotEnforcedProducesFindingSevTilde(t *testing.T) 
 func TestEnrichAthenaWorkGroup_NoEncryptionProducesFindingSevTilde(t *testing.T) {
 	fake := &athenaGetWorkGroupFake{
 		results: map[string]*athenatypes.WorkGroup{
-			athenaWG1: athenaWorkGroup(athenaWG1, true, nil), // no encryption
+			athenaWG1: athenaWorkGroup(athenaWG1, true, nil),
 			athenaWG2: athenaWorkGroup(athenaWG2, true, sseS3Encryption()),
 		},
 	}
@@ -201,11 +186,7 @@ func TestEnrichAthenaWorkGroup_NoEncryptionProducesFindingSevTilde(t *testing.T)
 	if f.Severity != domain.SevWarn {
 		t.Errorf("severity = %v, want %v", f.Severity, "~")
 	}
-	// d4 row 22 split the one governance finding into two codes, so this is
-	// its own phrase rather than a merged summary. It says "unencrypted"
-	// where the old substring check looked for "encryption"; do not narrow it
-	// back to a substring, which passed on the merged phrase naming the other
-	// half.
+	// Each governance finding has its own code and phrase; the exact match keeps a phrase naming the other half from passing.
 	if f.Phrase != "query results stored unencrypted" {
 		t.Errorf("phrase = %q, want %q", f.Phrase, "query results stored unencrypted")
 	}

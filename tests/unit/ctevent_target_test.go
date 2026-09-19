@@ -2,8 +2,7 @@ package unit
 
 // Tests for ctevent.ExtractTarget — the TARGET section extraction function.
 //
-// Contract (per specs/013-ct-event-detail-v2/contracts/ctdetail-api.md and
-// docs/historical/design/ct-event-detail-v2.md §2.3):
+// Contract:
 //
 //  1. Prefer resources[] envelope → one Row per entry
 //  2. Fall back to per-event-name lookup table (requestParameters heuristics)
@@ -11,8 +10,6 @@ package unit
 //
 // Fields lifted into TARGET rows are removed from cleanedParams.
 // The function is pure — input params map is never mutated.
-//
-// All tests FAIL against the stub (returns nil, params).
 
 import (
 	"maps"
@@ -21,10 +18,6 @@ import (
 
 	"github.com/k2m30/a9s/v3/core/semantics/ctevent"
 )
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
 
 // copyParams deep-copies a flat map[string]any for mutation-guard assertions.
 // Only copies top-level keys; sufficient for purity tests where nested maps
@@ -65,10 +58,6 @@ func findRowValue(rows []ctevent.Row, key string) string {
 	}
 	return ""
 }
-
-// ---------------------------------------------------------------------------
-// §1: resources[] envelope — prefer over everything else
-// ---------------------------------------------------------------------------
 
 func TestCTDetailExtractTarget_ResourcesEnvelope_SingleBucketARN(t *testing.T) {
 	// arn:aws:s3:::prod-logs → stripped to "prod-logs", Key = "Bucket"
@@ -119,7 +108,6 @@ func TestCTDetailExtractTarget_ResourcesEnvelope_MultipleInstances_TwoRows(t *te
 	if rows[1].Value != "instance/i-bbb" {
 		t.Errorf("rows[1].Value = %q; want %q", rows[1].Value, "instance/i-bbb")
 	}
-	// both must be labeled "Instance"
 	for i, r := range rows {
 		if r.Key != "Instance" {
 			t.Errorf("rows[%d].Key = %q; want %q", i, r.Key, "Instance")
@@ -191,10 +179,6 @@ func TestCTDetailExtractTarget_ResourcesEnvelope_SecretARN(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// §3: ARN-strip via FormatCTTarget (shared helper contract)
-// ---------------------------------------------------------------------------
-
 func TestCTDetailExtractTarget_ARNStrip_S3BucketARN(t *testing.T) {
 	// arn:aws:s3:::prod-logs → "prod-logs" (empty account segment)
 	resources := []ctevent.ResourceRef{
@@ -204,7 +188,6 @@ func TestCTDetailExtractTarget_ARNStrip_S3BucketARN(t *testing.T) {
 	if len(rows) == 0 {
 		t.Fatal("expected at least 1 row, got 0")
 	}
-	// Value must be the stripped resource portion
 	found := false
 	for _, r := range rows {
 		if r.Value == "prod-logs" {
@@ -259,25 +242,9 @@ func TestCTDetailExtractTarget_ARNStrip_IAMUserARN(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// §8: Cross-account ARN — account ID is RETAINED inline
-// ---------------------------------------------------------------------------
-
 func TestCTDetailExtractTarget_CrossAccountARN_RetainsAccountPrefix(t *testing.T) {
-	// Resource ARN account (888888888888) differs from recipientAccountId (777777777777).
-	// The Row value MUST contain "888888888888:" prefix.
-	// ExtractTarget receives the recipientAccountId as part of the event context.
-	// Since ExtractTarget doesn't take recipientAccountId directly, the implementation
-	// must receive it via the resources[] AccountID field or infer it.
-	// We test this by passing an ARN with a different account than the resource's AccountID.
-	//
-	// The contract: when resource.AccountID != local account (caller must supply it somehow),
-	// FormatCTTarget retains the account segment.
-	//
-	// Implementation note: if ExtractTarget doesn't receive a local account parameter,
-	// the cross-account detection relies on the ARN account being non-empty and
-	// resources[].AccountID being checked against the event's recipientAccountId.
-	// We assert the output contains "888888888888" to verify cross-account retention.
+	// Resource ARN account (888888888888) differs from recipientAccountId
+	// (777777777777), so the Row value retains the account segment.
 	resources := []ctevent.ResourceRef{
 		{
 			ARN:       "arn:aws:iam::888888888888:role/CrossAccountRole",
@@ -285,33 +252,23 @@ func TestCTDetailExtractTarget_CrossAccountARN_RetainsAccountPrefix(t *testing.T
 			Type:      "AWS::IAM::Role",
 		},
 	}
-	// The event's recipient account is 777777777777 — passed as recipientAccountID.
-	// The implementation detects the mismatch: ARN account (888888888888) != recipientAccountID (777777777777).
-	// We verify the Value contains the cross-account indicator.
 	rows, _ := ctevent.ExtractTarget("AssumeRole", "sts.amazonaws.com", "777777777777", resources, nil)
 	if len(rows) == 0 {
 		t.Fatal("expected at least 1 row, got 0")
 	}
-	// The value must contain "888888888888" because it's a cross-account reference.
-	// Exact format: "888888888888:role/CrossAccountRole" (account + ":" + resource).
-	// Note: this test documents the expected behavior — the stub returns nil so it fails now.
+	// Cross-account format: "888888888888:role/CrossAccountRole" (account + ":" + resource).
 	val := rows[0].Value
 	if val == "role/CrossAccountRole" {
 		t.Errorf("rows[0].Value = %q; cross-account ARN must retain account prefix (e.g. %q)",
 			val, "888888888888:role/CrossAccountRole")
 	}
-	// Also verify it's not empty or "(none)"
 	if val == "" || val == "(none)" {
 		t.Errorf("rows[0].Value = %q; expected cross-account value containing \"888888888888\"", val)
 	}
 }
 
-// ---------------------------------------------------------------------------
-// §2: Per-event-name fallback table
-// ---------------------------------------------------------------------------
-
-// TestCTDetailExtractTarget_FallbackTable is a table-driven test covering all
-// per-event-name cases per docs/historical/design/ct-event-detail-v2.md §2.3 / #246 §4.
+// TestCTDetailExtractTarget_FallbackTable covers the per-event-name fallback
+// cases.
 func TestCTDetailExtractTarget_FallbackTable(t *testing.T) {
 	type tc struct {
 		name        string
@@ -452,10 +409,6 @@ func TestCTDetailExtractTarget_FallbackTable(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// §2: S3 object events — PutObject, GetObject, DeleteObject
-// ---------------------------------------------------------------------------
-
 func TestCTDetailExtractTarget_PutObject_BucketAndObjectRows(t *testing.T) {
 	// PutObject with bucketName + key → two Rows: Bucket and Object
 	params := map[string]any{
@@ -514,10 +467,6 @@ func TestCTDetailExtractTarget_DeleteObject_BucketAndObjectRows(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// §4: TARGET-vs-REQUEST de-dup — lifted fields must be removed from cleanedParams
-// ---------------------------------------------------------------------------
-
 func TestCTDetailExtractTarget_Dedup_PutObject_RemovesBucketAndKey(t *testing.T) {
 	// PutObject: bucketName + key are lifted → removed from cleanedParams.
 	// versionId is NOT lifted → remains in cleanedParams.
@@ -557,7 +506,6 @@ func TestCTDetailExtractTarget_Dedup_TerminateInstances_RemovesInstanceIds(t *te
 	if cleaned == nil {
 		t.Fatal("cleanedParams is nil; want non-nil map")
 	}
-	// The instance IDs must not appear in the cleaned params.
 	// Implementation may remove "instancesSet" entirely or leave an empty structure.
 	if items, ok := cleaned["instancesSet"]; ok {
 		// If instancesSet is still present, verify no instance IDs remain inside it.
@@ -585,10 +533,6 @@ func TestCTDetailExtractTarget_Dedup_NoExtractableParams_CleanedUnchanged(t *tes
 		t.Errorf("cleanedParams missing \"filterSet\"; non-TARGET fields must be preserved unchanged")
 	}
 }
-
-// ---------------------------------------------------------------------------
-// §5: Purity — input params map must NOT be mutated
-// ---------------------------------------------------------------------------
 
 func TestCTDetailExtractTarget_Purity_PutObject_DoesNotMutateInput(t *testing.T) {
 	params := map[string]any{
@@ -626,10 +570,6 @@ func TestCTDetailExtractTarget_Purity_NilParams_ReturnsNonNilCleaned(t *testing.
 		t.Error("cleanedParams is nil when params is nil; contract requires non-nil return")
 	}
 }
-
-// ---------------------------------------------------------------------------
-// §6: Resource type label derivation
-// ---------------------------------------------------------------------------
 
 func TestCTDetailExtractTarget_LabelDerivation_Table(t *testing.T) {
 	type tc struct {
@@ -720,10 +660,6 @@ func TestCTDetailExtractTarget_LabelDerivation_AmbiguousCatchAll_LabelResource(t
 	}
 }
 
-// ---------------------------------------------------------------------------
-// §2: Extraction precedence — resources[] wins over fallback table
-// ---------------------------------------------------------------------------
-
 func TestCTDetailExtractTarget_Precedence_ResourcesWinOverFallback(t *testing.T) {
 	// When resources[] is populated, use it — ignore requestParameters even if
 	// the per-event-name table would also produce a result.
@@ -744,10 +680,6 @@ func TestCTDetailExtractTarget_Precedence_ResourcesWinOverFallback(t *testing.T)
 			rows[0].Value, "role/EnvelopeRole")
 	}
 }
-
-// ---------------------------------------------------------------------------
-// §2: Catch-all — scan for *Id / *Name / *Arn (fallback of fallback)
-// ---------------------------------------------------------------------------
 
 func TestCTDetailExtractTarget_CatchAll_IdSuffix(t *testing.T) {
 	params := map[string]any{"thingyId": "t-1"}
@@ -777,15 +709,10 @@ func TestCTDetailExtractTarget_CatchAll_ArnSuffix(t *testing.T) {
 	if len(rows) == 0 {
 		t.Fatal("expected at least 1 row from catch-all, got 0")
 	}
-	// ARN should be stripped
 	if rows[0].Value == "" {
 		t.Errorf("rows[0].Value is empty; expected stripped ARN value")
 	}
 }
-
-// ---------------------------------------------------------------------------
-// §5: Nil-safety and empty resource list
-// ---------------------------------------------------------------------------
 
 func TestCTDetailExtractTarget_EmptyResources_FallsBackToParams(t *testing.T) {
 	// Empty resources[] slice — must fall through to params heuristics.
@@ -812,10 +739,6 @@ func TestCTDetailExtractTarget_NilParams_NilResources_ListBuckets(t *testing.T) 
 		t.Error("cleanedParams must be non-nil even when input params is nil")
 	}
 }
-
-// ---------------------------------------------------------------------------
-// §7: Navigability — TARGET rows must carry IsNavigable + TargetType
-// ---------------------------------------------------------------------------
 
 func TestCTDetailExtractTarget_Navigability_S3PutObject_BucketAndObject(t *testing.T) {
 	// PutObject via fallback table: Bucket → s3, Object → s3

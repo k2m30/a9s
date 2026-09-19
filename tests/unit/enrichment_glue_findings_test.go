@@ -1,16 +1,6 @@
 package unit
 
 // enrichment_glue_findings_test.go — Behavioral tests for EnrichGlueJobStatus.
-//
-// Contract assertions (enricher-contract.md):
-//   - Returns EnricherResult.Findings keyed by job name (r.Name).
-//   - Severity "!" for all findings.
-//   - Summary "latest run failed" / "latest run error" / "latest run timeout"
-//     (humanized phrase via domain.HumanizeStatusPhrase, not the raw AWS enum).
-//   - IssueCount = len(Findings).
-//   - Truncated = true when len(resources) > EnrichmentCap.
-//   - Jobs with SUCCEEDED/RUNNING latest run must NOT appear in Findings.
-//   - Empty resources → non-nil empty Findings map.
 
 import (
 	"context"
@@ -74,7 +64,7 @@ func TestEnrichGlueJobStatus_FailedFindingKeyedByJobName(t *testing.T) {
 }
 
 // TestEnrichGlueJobStatus_SummaryContainsFAILED verifies the summary for FAILED
-// state is humanized to "failed" and never leaks the raw AWS enum (11933a6f).
+// state is humanized to "failed" and never leaks the raw AWS enum.
 func TestEnrichGlueJobStatus_SummaryContainsFAILED(t *testing.T) {
 	fake := &glueJobFake{
 		jobRuns: map[string]gluetypes.JobRunState{
@@ -99,7 +89,7 @@ func TestEnrichGlueJobStatus_SummaryContainsFAILED(t *testing.T) {
 }
 
 // TestEnrichGlueJobStatus_SummaryContainsERROR verifies the summary for ERROR
-// state is humanized to "error" and never leaks the raw AWS enum (11933a6f).
+// state is humanized to "error" and never leaks the raw AWS enum.
 func TestEnrichGlueJobStatus_SummaryContainsERROR(t *testing.T) {
 	fake := &glueJobFake{
 		jobRuns: map[string]gluetypes.JobRunState{
@@ -124,8 +114,8 @@ func TestEnrichGlueJobStatus_SummaryContainsERROR(t *testing.T) {
 }
 
 // TestEnrichGlueJobStatus_SummaryContainsTIMEOUT verifies the summary for
-// TIMEOUT state is humanized to "timeout" and never leaks the raw AWS enum
-// (11933a6f). Unlike sfn's "TIMED_OUT" (has an underscore, humanizes to
+// TIMEOUT state is humanized to "timeout" and never leaks the raw AWS enum.
+// Unlike sfn's "TIMED_OUT" (has an underscore, humanizes to
 // "timed out"), glue's "TIMEOUT" is a single all-upper word with no
 // underscore — HumanizeStatusPhrase's camelCase branch lowercases it in
 // place with no inserted space.

@@ -2,23 +2,10 @@ package unit
 
 // enrichment_tg_findings_test.go — Behavioral tests for EnrichTargetGroupHealth.
 //
-// Contract assertions (docs/attention-signals.md `tg` Wave 2 row):
-//   - Returns EnricherResult.Findings keyed by r.ID (target group name set by tg fetcher).
-//   - DescribeTargetHealth is called with r.Fields["target_group_arn"] (full ARN required by AWS).
-//   - Only literal TargetHealth.State == "unhealthy" counts toward the unhealthy
-//     numerator — "initial", "draining", "unused", "unavailable", and
-//     "unhealthy.draining" targets are NOT unhealthy and must not trigger a
-//     finding by themselves.
-//   - Severity is graduated: any target State=="unhealthy" (numerator > 0) →
-//     "~" (SevWarn); EVERY target reporting State=="unhealthy" (numerator ==
-//     denominator, i.e. no healthy/initial/draining/unused/unavailable target
-//     present) → "!" (SevBroken). A single non-"unhealthy" target in the mix
-//     blocks the "!" escalation even if every other target is unhealthy.
-//   - Summary format: "unhealthy targets: X/Y".
-//   - IssueCount = len(Findings) (one entry per TG with any unhealthy targets).
-//   - Truncated = true when len(resources) > EnrichmentCap.
-//   - TG with zero literally-unhealthy targets must NOT appear in Findings.
-//   - Empty resources slice → non-nil empty Findings map.
+// Only literal TargetHealth.State == "unhealthy" counts as unhealthy;
+// "initial", "draining", "unused", "unavailable" and "unhealthy.draining" do
+// not. Any unhealthy target is "~" (SevWarn); every target unhealthy is "!"
+// (SevBroken) (docs/attention-signals.md, `tg`).
 
 import (
 	"context"
@@ -124,16 +111,15 @@ func TestEnrichTargetGroupHealth_SummaryUnhealthyXofY(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	f := result.Findings[tgName][0]
-	// Summary must be "unhealthy targets: 2/3"
 	if !strings.HasPrefix(f.Phrase, "unhealthy targets:") {
 		t.Errorf("summary %q must start with %q", f.Phrase, "unhealthy targets:")
 	}
 	if !strings.Contains(f.Phrase, "2/3") {
 		t.Errorf("summary %q must contain %q (2 of 3 unhealthy)", f.Phrase, "2/3")
 	}
-	// 2 of 3 unhealthy is NOT "every target unhealthy" — must be Warning, not
-	// Broken (docs/attention-signals.md `tg` Wave 2: "any target unhealthy ->
-	// Warning; all unhealthy -> Broken"). Current code always stamps "!".
+	// 2 of 3 unhealthy is not "every target unhealthy", so Warning, not
+	// Broken (docs/attention-signals.md `tg`: "any target unhealthy ->
+	// Warning; all unhealthy -> Broken").
 	if f.Severity != domain.SevWarn {
 		t.Errorf("severity = %v, want %v (2/3 unhealthy is partial, not all)", f.Severity, domain.SevWarn)
 	}
@@ -144,9 +130,6 @@ func TestEnrichTargetGroupHealth_SummaryUnhealthyXofY(t *testing.T) {
 // literal State=="unhealthy" is. A TG with zero literally-unhealthy targets
 // must not appear in Findings at all, even though every target here is
 // non-"healthy".
-//
-// Current code treats State != Healthy as unhealthy, so this TG would
-// (wrongly) get a finding today.
 func TestEnrichTargetGroupHealth_NonUnhealthyStatesExcluded(t *testing.T) {
 	tgName := "mixed-nonunhealthy-tg"
 	tgARN := "arn:aws:elasticloadbalancing:us-east-1:123456789012:targetgroup/mixed-nonunhealthy-tg/333"

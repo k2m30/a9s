@@ -44,10 +44,6 @@ func ebRuleRes(ruleName string, roleARN string) resource.Resource {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// Registered checkers
-// ---------------------------------------------------------------------------
-
 func TestRelated_EbRule_Registered(t *testing.T) {
 	defs := resource.GetRelated("eb-rule")
 	if len(defs) == 0 {
@@ -82,10 +78,6 @@ func TestRelated_EbRule_Registered(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// NavigableFields
-// ---------------------------------------------------------------------------
-
 func TestNavigableFields_EbRule_RoleArn(t *testing.T) {
 	fields := resource.GetNavigableFields("eb-rule")
 	found := false
@@ -99,10 +91,6 @@ func TestNavigableFields_EbRule_RoleArn(t *testing.T) {
 		t.Error("eb-rule NavigableField RoleArn→role not registered")
 	}
 }
-
-// ---------------------------------------------------------------------------
-// checkEbRuleRole — Pattern F (RawStruct eventbridgetypes.Rule.RoleArn)
-// ---------------------------------------------------------------------------
 
 func TestRelated_EbRule_Role_Match(t *testing.T) {
 	res := ebRuleRes("my-rule", "arn:aws:iam::123456789012:role/EventBridgeDeployRole")
@@ -140,10 +128,6 @@ func TestRelated_EbRule_Role_WrongRawStruct(t *testing.T) {
 		t.Errorf("Count = %d, want -1 (wrong RawStruct type)", result.Count())
 	}
 }
-
-// ---------------------------------------------------------------------------
-// checkEbRuleKinesis — ebRuleTargetsByService, service="kinesis"
-// ---------------------------------------------------------------------------
 
 func TestRelated_EbRule_Kinesis_Match(t *testing.T) {
 	res := resource.Resource{ID: "my-rule", Fields: map[string]string{}}
@@ -202,10 +186,6 @@ func TestRelated_EbRule_Kinesis_EmptyID(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// checkEbRuleLambda — service="lambda", strips :version suffix
-// ---------------------------------------------------------------------------
-
 func TestRelated_EbRule_Lambda_Match(t *testing.T) {
 	res := resource.Resource{ID: "my-rule", Fields: map[string]string{}}
 	clients := &awsclient.ServiceClients{
@@ -221,7 +201,6 @@ func TestRelated_EbRule_Lambda_Match(t *testing.T) {
 	if result.Count() != 1 {
 		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	// :version should be stripped
 	if len(result.ResourceIDs()) == 0 || result.ResourceIDs()[0] != "process-events" {
 		t.Errorf("ResourceIDs = %v, want [process-events]", result.ResourceIDs())
 	}
@@ -247,10 +226,6 @@ func TestRelated_EbRule_Lambda_NoVersion(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// checkEbRuleLogs — service="logs", trims :* suffix
-// ---------------------------------------------------------------------------
-
 func TestRelated_EbRule_Logs_Match(t *testing.T) {
 	res := resource.Resource{ID: "my-rule", Fields: map[string]string{}}
 	clients := &awsclient.ServiceClients{
@@ -266,15 +241,10 @@ func TestRelated_EbRule_Logs_Match(t *testing.T) {
 	if result.Count() != 1 {
 		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	// :* suffix should be stripped
 	if len(result.ResourceIDs()) == 0 || result.ResourceIDs()[0] != "/aws/my-app" {
 		t.Errorf("ResourceIDs = %v, want [/aws/my-app]", result.ResourceIDs())
 	}
 }
-
-// ---------------------------------------------------------------------------
-// checkEbRuleSFN — service="states", extracts :stateMachine: suffix
-// ---------------------------------------------------------------------------
 
 func TestRelated_EbRule_SFN_Match(t *testing.T) {
 	res := resource.Resource{ID: "my-rule", Fields: map[string]string{}}
@@ -295,10 +265,6 @@ func TestRelated_EbRule_SFN_Match(t *testing.T) {
 		t.Errorf("ResourceIDs = %v, want [my-state-machine]", result.ResourceIDs())
 	}
 }
-
-// ---------------------------------------------------------------------------
-// checkEbRuleSNS — service="sns", last ":" segment
-// ---------------------------------------------------------------------------
 
 func TestRelated_EbRule_SNS_Match(t *testing.T) {
 	res := resource.Resource{ID: "my-rule", Fields: map[string]string{}}
@@ -321,10 +287,6 @@ func TestRelated_EbRule_SNS_Match(t *testing.T) {
 		t.Errorf("ResourceIDs = %v, want [%s]", result.ResourceIDs(), topicARN)
 	}
 }
-
-// ---------------------------------------------------------------------------
-// checkEbRuleSQS — service="sqs", last ":" segment
-// ---------------------------------------------------------------------------
 
 func TestRelated_EbRule_SQS_Match(t *testing.T) {
 	res := resource.Resource{ID: "my-rule", Fields: map[string]string{}}

@@ -25,16 +25,12 @@ func iamGroupCheckerByTarget(t *testing.T, target string) resource.RelatedChecke
 	return nil
 }
 
-// --- Navigable Fields ---
-
 func TestNavigableFields_IAMGroup_None(t *testing.T) {
 	fields := resource.GetNavigableFields("iam-group")
 	if len(fields) != 0 {
 		t.Errorf("expected no navigable fields for iam-group, got %d: %v", len(fields), fields)
 	}
 }
-
-// --- iam-group→iam-user (IAM API: GetGroup) ---
 
 func TestRelated_IAMGroup_User_NonNil(t *testing.T) {
 	checker := iamGroupCheckerByTarget(t, "iam-user")
@@ -67,8 +63,6 @@ func TestRelated_IAMGroup_User_EmptyID(t *testing.T) {
 		t.Errorf("Count = %d, want -1 (nil clients)", result.Count())
 	}
 }
-
-// --- iam-group→policy (IAM API: ListAttachedGroupPolicies) ---
 
 func TestRelated_IAMGroup_Policy_NonNil(t *testing.T) {
 	checker := iamGroupCheckerByTarget(t, "policy")

@@ -1,13 +1,5 @@
 package unit
 
-// T011 — Cold-cache S3: list buckets then drill into S3 objects child view via
-// the real EnterChildViewMsg message flow. Tests that:
-//   1. S3 buckets list populates from the fake/transport (no nil-client panic).
-//   2. EnterChildViewMsg{ChildType:"s3_objects"} dispatched to the model produces
-//      a LoadResourcesMsg / fetch cmd for "s3_objects".
-//   3. The child-view fetch produces a ResourcesLoadedMsg for "s3_objects".
-//   4. An unknown bucket returns an error, not an empty list (contract rule 4).
-
 import (
 	"strings"
 	"testing"
@@ -50,10 +42,8 @@ func TestDemoColdCacheS3_ListPopulates(t *testing.T) {
 		t.Fatal("expected at least one S3 bucket in fixture data, got zero")
 	}
 
-	// Deliver resources to the model.
 	*m, _ = rootApplyMsg(*m, result)
 
-	// Verify the rendered list contains at least one bucket name.
 	plain := stripANSI(rootViewContent(*m))
 	hasName := false
 	for _, r := range result.Resources {
@@ -82,7 +72,6 @@ func TestDemoColdCacheS3_ObjectsChildView(t *testing.T) {
 	clients := demo.NewServiceClients()
 	*m, _ = rootApplyMsg(*m, messages.ClientsReady{Clients: clients, Gen: 1})
 
-	// Load the S3 bucket list first.
 	var navCmd tea.Cmd
 	*m, navCmd = rootApplyMsg(*m, messages.Navigate{
 		Target:       messages.TargetResourceList,
@@ -110,7 +99,6 @@ func TestDemoColdCacheS3_ObjectsChildView(t *testing.T) {
 	firstBucket := loaded.Resources[0]
 	bucketName := firstBucket.ID
 
-	// Dispatch EnterChildViewMsg as ResourceList emits when Enter is pressed.
 	var childCmd tea.Cmd
 	*m, childCmd = rootApplyMsg(*m, messages.EnterChildView{
 		ChildType:     "s3_objects",
@@ -123,7 +111,6 @@ func TestDemoColdCacheS3_ObjectsChildView(t *testing.T) {
 			"is s3_objects registered as a child type?")
 	}
 
-	// Execute the child fetcher command. Expect a ResourcesLoadedMsg for "s3_objects".
 	childRaw := extractMsg(t, childCmd, func(msg tea.Msg) bool {
 		if r, ok := msg.(messages.ResourcesLoaded); ok {
 			return r.ResourceType == "s3_objects"
@@ -140,7 +127,6 @@ func TestDemoColdCacheS3_ObjectsChildView(t *testing.T) {
 		t.Errorf("ResourcesLoadedMsg.ResourceType = %q; want %q", childLoaded.ResourceType, "s3_objects")
 	}
 
-	// Deliver objects to the model and verify the view renders.
 	*m, _ = rootApplyMsg(*m, childLoaded)
 
 	plain := stripANSI(rootViewContent(*m))
@@ -149,9 +135,9 @@ func TestDemoColdCacheS3_ObjectsChildView(t *testing.T) {
 	}
 }
 
-// TestDemoColdCacheS3_UnknownBucketReturnsError verifies contract rule 4:
-// fetching s3_objects for a bucket that does not exist in the fixture must
-// produce an error, not an empty list.
+// TestDemoColdCacheS3_UnknownBucketReturnsError: fetching s3_objects for a
+// bucket that does not exist in the fixture must produce an error, not an
+// empty list.
 func TestDemoColdCacheS3_UnknownBucketReturnsError(t *testing.T) {
 	t.Parallel()
 	m := newDemoColdCacheApp(t)
@@ -179,7 +165,6 @@ func TestDemoColdCacheS3_UnknownBucketReturnsError(t *testing.T) {
 	loaded := raw.(messages.ResourcesLoaded)
 	*m, _ = rootApplyMsg(*m, loaded)
 
-	// Drill into a bucket that does not exist in the fixture.
 	var childCmd tea.Cmd
 	*m, childCmd = rootApplyMsg(*m, messages.EnterChildView{
 		ChildType:     "s3_objects",
@@ -193,7 +178,6 @@ func TestDemoColdCacheS3_UnknownBucketReturnsError(t *testing.T) {
 
 	childMsg := childCmd()
 
-	// Walk BatchMsg one level to find the real message.
 	if batch, ok := childMsg.(tea.BatchMsg); ok {
 		for _, sub := range batch {
 			if sub == nil {
@@ -210,7 +194,6 @@ func TestDemoColdCacheS3_UnknownBucketReturnsError(t *testing.T) {
 			t.Error("APIErrorMsg.Err must not be nil for unknown bucket")
 		}
 	case messages.ResourcesLoaded:
-		// An empty list for an unknown parent is a contract violation (rule 4).
 		if len(v.Resources) == 0 {
 			t.Errorf("contract violation: fetching s3_objects for unknown bucket returned " +
 				"empty ResourcesLoadedMsg instead of an error — " +

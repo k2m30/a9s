@@ -23,14 +23,11 @@ import (
 	"github.com/k2m30/a9s/v3/internal/tui/views"
 )
 
-// unlabelledRowValue is the closing line of a capped supporting list — the
-// one Attention row shipped today that has no label. No colon in it, so a
-// colon on its line can only have come from an empty label.
+// unlabelledRowValue is the closing line of a capped supporting list, an
+// Attention row with no label. No colon in it, so a colon on its line can
+// only have come from an empty label.
 const unlabelledRowValue = "and 3 more"
 
-// TestDetailAttention_UnlabelledSupportingRowIsAWholeLine drives a finding
-// whose supporting rows are one labelled fact and one bare line, and reads
-// both the body and the painted screen back.
 func TestDetailAttention_UnlabelledSupportingRowIsAWholeLine(t *testing.T) {
 	const code domain.FindingCode = "sg.public-ingress"
 	res := resource.Resource{

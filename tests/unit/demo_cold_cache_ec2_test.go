@@ -19,7 +19,6 @@ func TestDemoColdCacheEC2_ListPopulates(t *testing.T) {
 	t.Parallel()
 	m := newDemoColdCacheApp(t)
 
-	// Size the model so View() renders.
 	*m, _ = rootApplyMsg(*m, tea.WindowSizeMsg{Width: 120, Height: 40})
 
 	// Wire the pre-supplied fake clients by injecting a ClientsReadyMsg so that
@@ -53,10 +52,8 @@ func TestDemoColdCacheEC2_ListPopulates(t *testing.T) {
 		t.Fatal("expected at least one EC2 instance in fixture data, got zero")
 	}
 
-	// Deliver the resources to the model.
 	*m, _ = rootApplyMsg(*m, result)
 
-	// Verify the rendered list contains at least one instance ID or name.
 	plain := stripANSI(rootViewContent(*m))
 	hasInstance := false
 	for _, r := range result.Resources {
@@ -74,9 +71,6 @@ func TestDemoColdCacheEC2_ListPopulates(t *testing.T) {
 // an EC2 instance triggers the related-resource check path (VPC, SG, Subnet) via
 // the real DetailOperation-driven task dispatch (Core.BeginDetailOperation +
 // Core.DetailOperationTasks), not a demo shortcut. The related panels should
-// populate with fixture data.
-//
-// Expected to FAIL initially because EC2Fake methods panic (T013 not yet done).
 func TestDemoColdCacheEC2_DetailRelatedPanels(t *testing.T) {
 	m := newDemoColdCacheApp(t)
 
@@ -85,7 +79,6 @@ func TestDemoColdCacheEC2_DetailRelatedPanels(t *testing.T) {
 	clients := demo.NewServiceClients()
 	*m, _ = rootApplyMsg(*m, messages.ClientsReady{Clients: clients, Gen: 1})
 
-	// Navigate to EC2 list and extract the ResourcesLoadedMsg from the batch.
 	var navCmd tea.Cmd
 	*m, navCmd = rootApplyMsg(*m, messages.Navigate{
 		Target:       messages.TargetResourceList,
@@ -105,7 +98,6 @@ func TestDemoColdCacheEC2_DetailRelatedPanels(t *testing.T) {
 		t.Fatal("fixture data has zero EC2 instances; cannot open detail")
 	}
 
-	// Deliver resources to the model.
 	*m, _ = rootApplyMsg(*m, loaded)
 
 	// Open detail for the first EC2 instance. handleNavigate dispatches a
@@ -123,15 +115,13 @@ func TestDemoColdCacheEC2_DetailRelatedPanels(t *testing.T) {
 			"are VPC/SG/Subnet RelatedDefs registered for ec2?")
 	}
 
-	// Detail-open for an enrichable type (ec2 now has a detail enricher)
-	// dispatches enrich + related-check tasks directly off relatedCmd as a
-	// (possibly nested) tea.Batch; each per-def related-check leaf carries a
-	// RelatedCheckResult directly — RunRelatedDef already recovers
-	// per-checker panics into a RelatedCheckResult with LazyAddError, so a
-	// non-EC2-backed checker (e.g. ELBv2 target groups during the EC2-only
-	// pilot) with a nil client surfaces as a negative Count (UnknownRelated)
-	// rather than a raw panic. Look specifically for an EC2-backed result
-	// (vpc/sg/subnet/eni etc, Count>=0).
+	// Detail-open for an enrichable type dispatches enrich + related-check
+	// tasks directly off relatedCmd as a (possibly nested) tea.Batch; each
+	// per-def related-check leaf carries a RelatedCheckResult. RunRelatedDef
+	// recovers per-checker panics into a RelatedCheckResult with LazyAddError,
+	// so a checker with a nil client surfaces as a negative Count
+	// (UnknownRelated) rather than a raw panic. Only an EC2-backed result
+	// (vpc/sg/subnet/eni, Count>=0) counts here.
 	leaves := extractLeafMsgs(relatedCmd)
 	var checkResult messages.RelatedCheckResult
 	var found bool
@@ -158,13 +148,11 @@ func TestDemoColdCacheEC2_DetailRelatedPanels(t *testing.T) {
 			checkResult.DefDisplayName, checkResult.Result.Count())
 	}
 
-	// Verify the detail view rendered with the instance ID visible.
 	plain := stripANSI(rootViewContent(*m))
 	if !strings.Contains(plain, firstInstance.ID) {
 		t.Errorf("detail view does not contain instance ID %q; view:\n%s", firstInstance.ID, plain)
 	}
 
-	// Verify at least one related panel label is visible.
 	relatedPanelKeys := []string{"VPC", "Security Group", "Subnet"}
 	foundAny := false
 	for _, panel := range relatedPanelKeys {

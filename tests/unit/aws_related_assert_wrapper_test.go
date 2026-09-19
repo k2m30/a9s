@@ -1,21 +1,9 @@
 package unit
 
-// aws_related_assert_wrapper_test.go — assertStruct[T]
-// (core/aws/related_common.go) resolves T when RawStruct holds a detail
-// enricher's wrapper instead of the raw SDK struct, so Ctrl+R after
-// enrichment does not degrade related panels (every checker's assertStruct[T]
-// call would otherwise silently return the zero value, ok=false).
-//
-// findEmbeddedStruct (core/aws/related_common.go) makes assertStruct search
-// v's exported anonymous embedded struct fields (pointer-deref'd) for a T when
-// the direct/pointer assertions miss.
-//
-// The test drives a real related-checker path (checkEC2SG, registered as the
-// "sg" RelatedDef for "ec2" — Pattern F, no clients/cache needed) rather than
-// the engine-level GetDetailEnricher fallback, since this checker's plumbing
-// is lightweight enough to call directly. Mirrors the checker-lookup helper
-// ec2CheckerByTarget and the fixture/assertion style of
-// TestEC2RelatedCheckers_NoUnknownCounts (aws_ec2_related_test.go).
+// After a Ctrl+R re-enrichment on a detail view, RawStruct holds the detail
+// enricher's wrapper embedding the SDK struct. assertStruct[T] finds T through
+// that embedding; otherwise every checker would read the zero value and the
+// related panel would degrade.
 
 import (
 	"context"
@@ -28,12 +16,6 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// TestRelatedChecker_AssertStructOnWrapper_EC2SG verifies that checkEC2SG
-// (assertStruct[ec2types.Instance] internally) produces the identical
-// count/witness (ResourceIDs) whether res.RawStruct holds the raw
-// ec2types.Instance or the on-demand detail enricher's InstanceEnriched
-// wrapper embedding it — the shape RawStruct actually holds after a Ctrl+R
-// re-enrichment on a detail view.
 func TestRelatedChecker_AssertStructOnWrapper_EC2SG(t *testing.T) {
 	checker := ec2CheckerByTarget(t, "sg")
 

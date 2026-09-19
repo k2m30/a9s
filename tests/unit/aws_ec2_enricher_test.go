@@ -1,27 +1,5 @@
 package unit
 
-// aws_ec2_enricher_test.go — Behavioral tests for EnrichEC2InstanceStatus.
-//
-// Contract assertions:
-//   - DescribeInstanceStatus is called once (all instances, no resource iteration).
-//   - InstanceStatus.Status="impaired" → 1 finding keyed by InstanceId, severity "!".
-//   - SystemStatus.Status="impaired" → 1 finding keyed by InstanceId, severity "!".
-//   - ScheduledEvent within next 5 days → 1 finding keyed by InstanceId, severity "~".
-//   - All status checks ok, no events → 0 findings.
-//   - clients.EC2 == nil → (EnricherResult{Findings: non-nil empty}, nil).
-//   - API error → (EnricherResult{}, error propagated).
-//
-// docs/attention-signals.md `ec2` Wave 2 mandates FOUR distinct, severity-
-// stamped FindingCodes rather than one code reused across conditions:
-//   - "ec2.instance-status-impaired" (SevBroken) — impaired status check.
-//   - "ec2.instance-status.initializing" (SevWarn) — initializing status check.
-//   - "ec2.instance-status.insufficient-data" (SevWarn) — insufficient-data status check.
-//   - "ec2.scheduled-event" (SevWarn) — scheduled retirement/reboot within 7d.
-//
-// Current code stamps every condition under the single
-// "ec2.instance-status-impaired" code (core/aws/ec2_issue_enrichment.go:20-25),
-// so all four conditions share one phrase and one severity.
-
 import (
 	"context"
 	"errors"
@@ -45,8 +23,6 @@ const (
 	ec2CodeScheduledEvent             = domain.FindingCode("ec2.scheduled-event")
 )
 
-// ec2InstanceStatusFake implements EC2API for enrichment testing.
-// It embeds the interface and overrides only DescribeInstanceStatus.
 type ec2InstanceStatusFake struct {
 	awsclient.EC2API
 	statuses []ec2types.InstanceStatus
@@ -64,18 +40,13 @@ func (f *ec2InstanceStatusFake) DescribeInstanceStatus(
 	return &ec2.DescribeInstanceStatusOutput{InstanceStatuses: f.statuses}, nil
 }
 
-// Compile-time check: ec2InstanceStatusFake satisfies EC2API.
 var _ awsclient.EC2API = (*ec2InstanceStatusFake)(nil)
 
-// daysFromNow returns a *time.Time n days in the future.
 func daysFromNow(n int) *time.Time {
 	t := time.Now().Add(time.Duration(n) * 24 * time.Hour)
 	return &t
 }
 
-// TestEnrichEC2InstanceStatus_InstanceStatusImpairedProducesFindingSevBang verifies
-// that an instance with InstanceStatus.Status="impaired" produces a finding with
-// severity "!" keyed by the instance ID.
 func TestEnrichEC2InstanceStatus_InstanceStatusImpairedProducesFindingSevBang(t *testing.T) {
 	fake := &ec2InstanceStatusFake{
 		statuses: []ec2types.InstanceStatus{
@@ -107,9 +78,6 @@ func TestEnrichEC2InstanceStatus_InstanceStatusImpairedProducesFindingSevBang(t 
 	}
 }
 
-// TestEnrichEC2InstanceStatus_SystemStatusImpairedProducesFindingSevBang verifies
-// that an instance with SystemStatus.Status="impaired" produces a finding with
-// severity "!" keyed by the instance ID.
 func TestEnrichEC2InstanceStatus_SystemStatusImpairedProducesFindingSevBang(t *testing.T) {
 	fake := &ec2InstanceStatusFake{
 		statuses: []ec2types.InstanceStatus{
@@ -141,9 +109,6 @@ func TestEnrichEC2InstanceStatus_SystemStatusImpairedProducesFindingSevBang(t *t
 	}
 }
 
-// TestEnrichEC2InstanceStatus_ScheduledEventSoonProducesFindingSevTilde verifies
-// that a running instance with ok status checks but a scheduled event within the
-// next 5 days produces a finding with severity "~".
 func TestEnrichEC2InstanceStatus_ScheduledEventSoonProducesFindingSevTilde(t *testing.T) {
 	fake := &ec2InstanceStatusFake{
 		statuses: []ec2types.InstanceStatus{
@@ -182,8 +147,6 @@ func TestEnrichEC2InstanceStatus_ScheduledEventSoonProducesFindingSevTilde(t *te
 	}
 }
 
-// TestEnrichEC2InstanceStatus_HealthyInstanceProducesNoFinding verifies that a
-// running instance with all status checks ok and no events produces zero findings.
 func TestEnrichEC2InstanceStatus_HealthyInstanceProducesNoFinding(t *testing.T) {
 	fake := &ec2InstanceStatusFake{
 		statuses: []ec2types.InstanceStatus{
@@ -210,9 +173,6 @@ func TestEnrichEC2InstanceStatus_HealthyInstanceProducesNoFinding(t *testing.T) 
 	}
 }
 
-// TestEnrichEC2InstanceStatus_NilClientReturnsEmptyFindingsNoError verifies that
-// when clients.EC2 is nil, the enricher returns a non-nil empty Findings map and
-// no error.
 func TestEnrichEC2InstanceStatus_NilClientReturnsEmptyFindingsNoError(t *testing.T) {
 	clients := &awsclient.ServiceClients{EC2: nil}
 
@@ -228,20 +188,8 @@ func TestEnrichEC2InstanceStatus_NilClientReturnsEmptyFindingsNoError(t *testing
 	}
 }
 
-// TestEnrichEC2InstanceStatus_SystemStatusInitializingIsWarningNotImpaired pins
-// Finding B (core/aws/ec2_issue_enrichment.go ~line 134): AWS
-// "initializing" status must NOT be stamped with the "impaired" wording.
-//
-// docs/resources/ec2.md §4 row (line 226):
-//
-//	| `SystemStatus.Status == initializing` | 2 | Warning | `~` | S3, S4, S5 |
-//	`initializing: checks in progress` | `Instance status checks have not yet
-//	passed since start.` |
-//
-// Current code (ec2_issue_enrichment.go lines 87-97) stamps Tier:"!" and
-// severity="!" for ANY non-"ok" status, including "initializing" — which is
-// wrong per the doc row above (Warning/"~", not Broken/"!", and the summary
-// text must not claim "impaired").
+// AWS "initializing" means the status checks have not yet passed since start:
+// a warning, not an impairment (docs/resources/ec2.md).
 func TestEnrichEC2InstanceStatus_SystemStatusInitializingIsWarningNotImpaired(t *testing.T) {
 	fake := &ec2InstanceStatusFake{
 		statuses: []ec2types.InstanceStatus{
@@ -280,17 +228,8 @@ func TestEnrichEC2InstanceStatus_SystemStatusInitializingIsWarningNotImpaired(t 
 	}
 }
 
-// TestEnrichEC2InstanceStatus_InstanceStatusInsufficientDataIsWarningNotImpaired
-// pins Finding B for the "insufficient-data" status value.
-//
-// docs/resources/ec2.md §4 row (line 227):
-//
-//	| `SystemStatus.Status == insufficient-data` | 2 | Warning | `~` | S3, S4,
-//	S5 | `status unknown: checks not reporting` | `AWS cannot determine status
-//	— insufficient data from the hypervisor.` |
-//
-// Current code stamps Tier:"!" / severity="!" for this status too, which is
-// wrong per the doc row above.
+// AWS "insufficient-data" means it cannot determine the status: a warning,
+// not an impairment (docs/resources/ec2.md).
 func TestEnrichEC2InstanceStatus_InstanceStatusInsufficientDataIsWarningNotImpaired(t *testing.T) {
 	fake := &ec2InstanceStatusFake{
 		statuses: []ec2types.InstanceStatus{
@@ -329,8 +268,6 @@ func TestEnrichEC2InstanceStatus_InstanceStatusInsufficientDataIsWarningNotImpai
 	}
 }
 
-// TestEnrichEC2InstanceStatus_APIErrorIsPropagated verifies that an API error from
-// DescribeInstanceStatus is propagated as the enricher's return error.
 func TestEnrichEC2InstanceStatus_APIErrorIsPropagated(t *testing.T) {
 	apiErr := errors.New("ec2: describe instance status failed")
 	fake := &ec2InstanceStatusFake{err: apiErr}
@@ -345,9 +282,6 @@ func TestEnrichEC2InstanceStatus_APIErrorIsPropagated(t *testing.T) {
 	}
 }
 
-// TestEnrichEC2InstanceStatus_ImpairedUsesImpairedCode pins that an impaired
-// status check keeps the "ec2.instance-status-impaired" code (SevBroken) —
-// this is the one condition that keeps its historical code.
 func TestEnrichEC2InstanceStatus_ImpairedUsesImpairedCode(t *testing.T) {
 	fake := &ec2InstanceStatusFake{
 		statuses: []ec2types.InstanceStatus{
@@ -377,11 +311,6 @@ func TestEnrichEC2InstanceStatus_ImpairedUsesImpairedCode(t *testing.T) {
 	}
 }
 
-// TestEnrichEC2InstanceStatus_InitializingUsesDistinctCode pins that
-// "initializing" gets its OWN FindingCode ("ec2.instance-status.initializing"),
-// distinct from the impaired code. Today both are stamped
-// "ec2.instance-status-impaired", so an initializing instance borrows the
-// impaired phrase and severity.
 func TestEnrichEC2InstanceStatus_InitializingUsesDistinctCode(t *testing.T) {
 	fake := &ec2InstanceStatusFake{
 		statuses: []ec2types.InstanceStatus{
@@ -411,10 +340,6 @@ func TestEnrichEC2InstanceStatus_InitializingUsesDistinctCode(t *testing.T) {
 	}
 }
 
-// TestEnrichEC2InstanceStatus_InsufficientDataUsesDistinctCode pins that
-// "insufficient-data" gets its OWN FindingCode
-// ("ec2.instance-status.insufficient-data"), distinct from both the impaired
-// and initializing codes.
 func TestEnrichEC2InstanceStatus_InsufficientDataUsesDistinctCode(t *testing.T) {
 	fake := &ec2InstanceStatusFake{
 		statuses: []ec2types.InstanceStatus{
@@ -444,12 +369,6 @@ func TestEnrichEC2InstanceStatus_InsufficientDataUsesDistinctCode(t *testing.T) 
 	}
 }
 
-// TestEnrichEC2InstanceStatus_ScheduledEventUsesDistinctCode pins that a
-// scheduled retirement/reboot event on an otherwise-ok instance gets its OWN
-// FindingCode ("ec2.scheduled-event"), distinct from the impaired code. Today
-// the scheduled-event row is folded into whatever "ec2.instance-status-impaired"
-// finding exists for the resource (or creates one under that same code if no
-// status-check finding exists).
 func TestEnrichEC2InstanceStatus_ScheduledEventUsesDistinctCode(t *testing.T) {
 	fake := &ec2InstanceStatusFake{
 		statuses: []ec2types.InstanceStatus{
@@ -486,12 +405,8 @@ func TestEnrichEC2InstanceStatus_ScheduledEventUsesDistinctCode(t *testing.T) {
 	}
 }
 
-// TestEnrichEC2InstanceStatus_ImpairedAndScheduledEventProduceTwoFindings pins
-// that an instance with BOTH an impaired status check AND a scheduled event
-// produces TWO separate findings — one per FindingCode — rather than one
-// finding whose Rows merge both conditions under a single code. Findings is
-// map[string][]domain.Finding (multi-finding-per-resource, see commit history
-// around the "AllFindings" -> "Findings" rename), so this is a supported shape.
+// Findings is map[string][]domain.Finding, so one resource carries one finding
+// per FindingCode.
 func TestEnrichEC2InstanceStatus_ImpairedAndScheduledEventProduceTwoFindings(t *testing.T) {
 	fake := &ec2InstanceStatusFake{
 		statuses: []ec2types.InstanceStatus{

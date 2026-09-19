@@ -1,27 +1,3 @@
-// aws_ses_issue_enrichment_test.go — Behavioral tests for EnrichSESAccount (Wave 2).
-//
-// Contract assertions (current implementation):
-//   - SHUTDOWN → finding per identity row, severity="!", Summary="sending paused by AWS (shutdown)",
-//     IssueCount=1 (counted once, not N times for N identities).
-//   - PROBATION → finding per identity row, severity="!", Summary="account under review (probation)",
-//     IssueCount=1.
-//   - quota SentLast24Hours > 0.8*Max24HourSend (strict >) → severity="~",
-//     Summary="quota 80%+ used", IssueCount=0.
-//   - quota == 80% exactly (8000/10000) → NO finding (strict >, not >=).
-//   - Healthy (no status issues, below quota) → 0 findings, IssueCount=0.
-//   - nil resources slice → no findings (nothing to replicate onto).
-//   - Two resources passed → two entries in Findings map (one per row).
-//   - PROBATION beats quota: PROBATION takes precedence, quota not checked.
-//   - the enricher does NOT write FieldUpdates["status"]; the Wave-2
-//     phrase reaches the list view via r.Findings[0].Phrase (phraseFromFindings)
-//     and row color via colorSES reading r.Findings.
-//   - nil clients.SESv2 → empty Findings map (non-nil), 0 IssueCount, no error.
-//   - API error → error propagated.
-//   - U11 invariant: Summary must NOT contain any row's Value string.
-//   - TruncatedIDs is non-nil on all return paths.
-//   - FieldUpdates is non-nil on all return paths (symmetry; never written).
-//   - Fixture-based: NewSESFixtures().GetAccountDefault (HEALTHY, ~2.4% usage)
-//     → 0 findings, 0 IssueCount.
 package unit
 
 import (
@@ -40,8 +16,6 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// sesEnrichmentFake implements awsclient.SESv2API for issue-enrichment tests.
-// Overrides GetAccount; all other methods return safe stubs via embedded interface.
 type sesEnrichmentFake struct {
 	awsclient.SESv2API
 	enforcementStatus *string
@@ -63,10 +37,8 @@ func (f *sesEnrichmentFake) GetAccount(
 	}, nil
 }
 
-// Compile-time check: sesEnrichmentFake satisfies SESv2API.
 var _ awsclient.SESv2API = (*sesEnrichmentFake)(nil)
 
-// sesResourceRow returns a test identity resource for enrichment input.
 func sesResourceRow(id, _ string) resource.Resource {
 	return resource.Resource{
 		ID:     id,
@@ -75,12 +47,6 @@ func sesResourceRow(id, _ string) resource.Resource {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// SHUTDOWN — severity "!", IssueCount = 1
-// ---------------------------------------------------------------------------
-
-// TestEnrichSESAccount_ShutdownFindingPerRow verifies that SHUTDOWN produces
-// one finding entry per identity row, keyed by identity ID.
 func TestEnrichSESAccount_ShutdownFindingPerRow(t *testing.T) {
 	fake := &sesEnrichmentFake{enforcementStatus: aws.String("SHUTDOWN")}
 	clients := &awsclient.ServiceClients{SESv2: fake}
@@ -112,8 +78,6 @@ func TestEnrichSESAccount_ShutdownFindingPerRow(t *testing.T) {
 	}
 }
 
-// TestEnrichSESAccount_ShutdownNilResources verifies that when resources is nil,
-// no findings are produced (nothing to replicate onto).
 func TestEnrichSESAccount_ShutdownNilResources(t *testing.T) {
 	fake := &sesEnrichmentFake{enforcementStatus: aws.String("SHUTDOWN")}
 	clients := &awsclient.ServiceClients{SESv2: fake}
@@ -128,9 +92,6 @@ func TestEnrichSESAccount_ShutdownNilResources(t *testing.T) {
 	}
 }
 
-// TestEnrichSESAccount_ShutdownFindingRowActionable verifies the SHUTDOWN
-// finding carries an actionable Row (not a duplicate of the Summary enum).
-// U11 contract requires Row.Value NOT appear as substring of Summary.
 func TestEnrichSESAccount_ShutdownFindingRowActionable(t *testing.T) {
 	fake := &sesEnrichmentFake{enforcementStatus: aws.String("SHUTDOWN")}
 	clients := &awsclient.ServiceClients{SESv2: fake}
@@ -162,12 +123,6 @@ func TestEnrichSESAccount_ShutdownFindingRowActionable(t *testing.T) {
 	_ = f
 }
 
-// ---------------------------------------------------------------------------
-// PROBATION — severity "!", IssueCount = 1
-// ---------------------------------------------------------------------------
-
-// TestEnrichSESAccount_ProbationFindingPerRow verifies that PROBATION produces
-// one finding entry per identity row with severity "!".
 func TestEnrichSESAccount_ProbationFindingPerRow(t *testing.T) {
 	fake := &sesEnrichmentFake{enforcementStatus: aws.String("PROBATION")}
 	clients := &awsclient.ServiceClients{SESv2: fake}
@@ -195,9 +150,6 @@ func TestEnrichSESAccount_ProbationFindingPerRow(t *testing.T) {
 	}
 }
 
-// TestEnrichSESAccount_ProbationFindingRowActionable verifies the PROBATION
-// finding carries an actionable Row. U11 contract forbids Row.Value duplicating
-// the Summary enum.
 func TestEnrichSESAccount_ProbationFindingRowActionable(t *testing.T) {
 	fake := &sesEnrichmentFake{enforcementStatus: aws.String("PROBATION")}
 	clients := &awsclient.ServiceClients{SESv2: fake}
@@ -228,12 +180,6 @@ func TestEnrichSESAccount_ProbationFindingRowActionable(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// Quota > 80% — severity "~", IssueCount = 0
-// ---------------------------------------------------------------------------
-
-// TestEnrichSESAccount_QuotaOver80PercentProducesTildeFindings verifies that
-// SentLast24Hours > 80% of Max24HourSend (strict) produces severity "~" findings.
 func TestEnrichSESAccount_QuotaOver80PercentProducesTildeFindings(t *testing.T) {
 	fake := &sesEnrichmentFake{
 		enforcementStatus: aws.String("HEALTHY"),
@@ -262,9 +208,7 @@ func TestEnrichSESAccount_QuotaOver80PercentProducesTildeFindings(t *testing.T) 
 	}
 }
 
-// TestEnrichSESAccount_QuotaExactly80PercentNoFinding verifies that
-// SentLast24Hours == 80% of Max24HourSend does NOT produce a finding.
-// The threshold is strict >, not >=.
+// The quota threshold is strict >, not >=.
 func TestEnrichSESAccount_QuotaExactly80PercentNoFinding(t *testing.T) {
 	fake := &sesEnrichmentFake{
 		sendQuota: &sesv2types.SendQuota{
@@ -284,12 +228,6 @@ func TestEnrichSESAccount_QuotaExactly80PercentNoFinding(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// PROBATION beats quota (precedence)
-// ---------------------------------------------------------------------------
-
-// TestEnrichSESAccount_ProbationBeatsQuota verifies that PROBATION takes the
-// finding slot — the quota check is NOT reached when enforcement status matches.
 func TestEnrichSESAccount_ProbationBeatsQuota(t *testing.T) {
 	fake := &sesEnrichmentFake{
 		enforcementStatus: aws.String("PROBATION"),
@@ -315,16 +253,9 @@ func TestEnrichSESAccount_ProbationBeatsQuota(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// FieldUpdates — never written, always non-nil
-// ---------------------------------------------------------------------------
-
-// TestEnrichSESAccount_FieldUpdatesNeverWritten pins that the SES enricher
-// must not write to FieldUpdates on any path. The Wave-2 phrase reaches the
-// list view via r.Findings[0].Phrase (phraseFromFindings at render time) and
-// the row color via colorSES reading r.Findings.
-//
-// Covers all three §4 paths plus the Wave-1-preceded row — none may write a status entry.
+// The Wave-2 phrase reaches the list view through r.Findings
+// (phraseFromFindings) and the row color through colorSES, so the enricher
+// writes no FieldUpdates on any path.
 func TestEnrichSESAccount_FieldUpdatesNeverWritten(t *testing.T) {
 	cases := []struct {
 		name string
@@ -372,8 +303,6 @@ func TestEnrichSESAccount_FieldUpdatesNeverWritten(t *testing.T) {
 	}
 }
 
-// TestEnrichSESAccount_FieldUpdatesNonNilOnHealthyAccount verifies that
-// FieldUpdates is non-nil even when no findings are produced.
 func TestEnrichSESAccount_FieldUpdatesNonNilOnHealthyAccount(t *testing.T) {
 	fake := &sesEnrichmentFake{enforcementStatus: aws.String("HEALTHY")}
 	clients := &awsclient.ServiceClients{SESv2: fake}
@@ -387,12 +316,6 @@ func TestEnrichSESAccount_FieldUpdatesNonNilOnHealthyAccount(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// Healthy account — 0 findings
-// ---------------------------------------------------------------------------
-
-// TestEnrichSESAccount_HealthyNoQuotaProducesNoFindings verifies that a HEALTHY
-// account with quota well below 80% produces 0 findings and IssueCount=0.
 func TestEnrichSESAccount_HealthyNoQuotaProducesNoFindings(t *testing.T) {
 	fake := &sesEnrichmentFake{
 		enforcementStatus: aws.String("HEALTHY"),
@@ -413,12 +336,6 @@ func TestEnrichSESAccount_HealthyNoQuotaProducesNoFindings(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// nil client path
-// ---------------------------------------------------------------------------
-
-// TestEnrichSESAccount_NilSESv2ReturnsEmptyFindingsNoError verifies that a nil
-// SESv2 client returns non-nil empty Findings, non-nil FieldUpdates, and no error.
 func TestEnrichSESAccount_NilSESv2ReturnsEmptyFindingsNoError(t *testing.T) {
 	clients := &awsclient.ServiceClients{SESv2: nil}
 
@@ -437,12 +354,6 @@ func TestEnrichSESAccount_NilSESv2ReturnsEmptyFindingsNoError(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// API error propagation
-// ---------------------------------------------------------------------------
-
-// TestEnrichSESAccount_APIErrorPropagated verifies that a GetAccount API error
-// is propagated as the enricher's return error.
 func TestEnrichSESAccount_APIErrorPropagated(t *testing.T) {
 	sentinel := errors.New("ses: get account failed")
 	fake := &sesEnrichmentFake{err: sentinel}
@@ -457,12 +368,6 @@ func TestEnrichSESAccount_APIErrorPropagated(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// U11 invariant: Summary must NOT contain row Value
-// ---------------------------------------------------------------------------
-
-// TestEnrichSESAccount_ShutdownSummaryDoesNotContainRowValue verifies U11:
-// Summary must not embed content already present in Rows.
 func TestEnrichSESAccount_ShutdownSummaryDoesNotContainRowValue(t *testing.T) {
 	fake := &sesEnrichmentFake{enforcementStatus: aws.String("SHUTDOWN")}
 	clients := &awsclient.ServiceClients{SESv2: fake}
@@ -480,7 +385,6 @@ func TestEnrichSESAccount_ShutdownSummaryDoesNotContainRowValue(t *testing.T) {
 	}
 }
 
-// TestEnrichSESAccount_ProbationSummaryDoesNotContainRowValue verifies U11 for PROBATION.
 func TestEnrichSESAccount_ProbationSummaryDoesNotContainRowValue(t *testing.T) {
 	fake := &sesEnrichmentFake{enforcementStatus: aws.String("PROBATION")}
 	clients := &awsclient.ServiceClients{SESv2: fake}
@@ -498,8 +402,6 @@ func TestEnrichSESAccount_ProbationSummaryDoesNotContainRowValue(t *testing.T) {
 	}
 }
 
-// TestEnrichSESAccount_QuotaSummaryDoesNotContainSentOrMaxValues verifies U11
-// for the quota finding (Row Values are numeric strings, not in Summary).
 func TestEnrichSESAccount_QuotaSummaryDoesNotContainSentOrMaxValues(t *testing.T) {
 	fake := &sesEnrichmentFake{
 		sendQuota: &sesv2types.SendQuota{
@@ -526,12 +428,6 @@ func TestEnrichSESAccount_QuotaSummaryDoesNotContainSentOrMaxValues(t *testing.T
 	}
 }
 
-// ---------------------------------------------------------------------------
-// TruncatedIDs — non-nil on all paths
-// ---------------------------------------------------------------------------
-
-// TestEnrichSESAccount_TruncatedIDsNonNilOnAllPaths verifies TruncatedIDs is
-// non-nil for SHUTDOWN, HEALTHY, and nil-client paths.
 func TestEnrichSESAccount_TruncatedIDsNonNilOnAllPaths(t *testing.T) {
 	paths := []struct {
 		name    string
@@ -555,12 +451,6 @@ func TestEnrichSESAccount_TruncatedIDsNonNilOnAllPaths(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// Fixture-based: healthy demo account produces no findings
-// ---------------------------------------------------------------------------
-
-// TestEnrichSESAccount_FixtureHealthyAccountProducesNoFindings verifies that the
-// canonical demo fixture account (HEALTHY, ~2.4% quota usage) produces 0 findings.
 func TestEnrichSESAccount_FixtureHealthyAccountProducesNoFindings(t *testing.T) {
 	f := fixtures.NewSESFixtures()
 	defaultAccount := f.GetAccountDefault
@@ -570,7 +460,6 @@ func TestEnrichSESAccount_FixtureHealthyAccountProducesNoFindings(t *testing.T) 
 		sendQuota:         defaultAccount.SendQuota,
 	}
 	clients := &awsclient.ServiceClients{SESv2: fake}
-	// Pass a row representing the graph-root identity.
 	rows := []resource.Resource{sesResourceRow(fixtures.SESGraphRootIdentity, "")}
 
 	result, err := awsclient.EnrichSESAccount(context.Background(), clients, rows, nil)
@@ -582,19 +471,9 @@ func TestEnrichSESAccount_FixtureHealthyAccountProducesNoFindings(t *testing.T) 
 	}
 }
 
-// ---------------------------------------------------------------------------
-// colorSES must source Wave-2 SES findings from r.Findings
-// ---------------------------------------------------------------------------
-
-// TestSES_ColorReadsWave2FindingsForAccountFindings pins the rendering
-// invariant: the SES Color resolver returns the Wave-2 finding's severity color
-// when the account-level finding lives in r.Findings (Source="wave2").
-// FieldUpdates["status"] is never written; the Wave-2 phrase reaches color
-// classification via r.Findings, not via Fields["status"].
-//
-// Without this path, pure-Wave-2 rows would silently render ColorHealthy
-// even though phraseFromFindings still surfaces "sending paused by AWS
-// (shutdown)" in the Status column.
+// Without reading r.Findings, a pure Wave-2 row would render ColorHealthy
+// while phraseFromFindings still shows "sending paused by AWS (shutdown)" in
+// the Status column.
 func TestSES_ColorReadsWave2FindingsForAccountFindings(t *testing.T) {
 	td := resource.FindResourceType("ses")
 	if td == nil {
@@ -643,9 +522,8 @@ func TestSES_ColorReadsWave2FindingsForAccountFindings(t *testing.T) {
 			wantColor: resource.ColorBroken,
 		},
 		{
-			// The quota row reaches S2 along with the rest: docs/resources/ses.md
-			// §4 lists S1 through S5 for it, so a Warn finding never sits on a
-			// green row.
+			// docs/resources/ses.md colors the quota finding like the rest, so a
+			// Warn finding never sits on a green row.
 			name: "quota 80%+ Wave-2 finding (SevWarn) → ColorWarning",
 			r: resource.Resource{
 				ID: "acme-corp.com",
@@ -712,12 +590,9 @@ func TestSES_ColorReadsWave2FindingsForAccountFindings(t *testing.T) {
 	}
 }
 
-// GetEmailIdentity is the stub half of a partial test double: this fake embeds
-// SESv2API as a nil interface and implements only the calls the enricher
-// under test made when it was written. The enricher now also calls
-// GetEmailIdentity, and the promoted nil method panics rather than returning
-// anything. An empty output keeps this fake's own scenario unchanged —
-// no DKIM posture is asserted here.
+// sesEnrichmentFake embeds SESv2API as a nil interface, whose promoted
+// methods panic. GetEmailIdentity answers an empty output so no DKIM posture
+// enters these scenarios.
 func (f *sesEnrichmentFake) GetEmailIdentity(_ context.Context, _ *sesv2.GetEmailIdentityInput, _ ...func(*sesv2.Options)) (*sesv2.GetEmailIdentityOutput, error) {
 	return &sesv2.GetEmailIdentityOutput{}, nil
 }

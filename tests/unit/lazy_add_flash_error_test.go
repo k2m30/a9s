@@ -1,15 +1,9 @@
 package unit
 
-// lazy_add_flash_error_test.go — pins the FlashIntent wiring in
-// Core.HandleRelatedCheckResult (core/runtime/handlers_resources.go) that
-// converts a non-nil LazyAddError into a visible operator notification.
-//
-// internal/tui/app.go's messages.RelatedCheckResult case calls m.ctrl.Handle
-// directly and forwards only the returned TaskRequests, never the ViewState
-// or its Flash — unlike Model.applyIntents (app_dispatch.go), which re-emits
-// a FlashIntent as a messages.Flash cmd. The FlashIntent this handler emits
-// therefore never reaches m.flash (or a returned cmd), so this test verifies
-// the rendered view and stays RED until that TUI-side gap is closed.
+// Core.HandleRelatedCheckResult (core/runtime/handlers_resources.go) turns a
+// non-nil LazyAddError into a FlashIntent. The TUI's RelatedCheckResult case
+// forwards only the returned TaskRequests, so the flash is asserted on the
+// rendered view rather than on m.flash or a returned cmd.
 
 import (
 	"context"
@@ -23,15 +17,8 @@ import (
 	"github.com/k2m30/a9s/v3/core/runtime/messages"
 )
 
-// ---------------------------------------------------------------------------
-// Test 1 — total FetchByIDs failure emits FlashMsg with "related-fetch" prefix
-// ---------------------------------------------------------------------------
-
-// TestLazyAddError_EmitsFlashMsg verifies that when FetchByIDs returns a
-// non-nil error (and no partial results), the app handler emits a FlashMsg
-// with IsError=true and text containing "related-fetch" + the error string.
-//
-// Regression pin for the `if msg.LazyAddError != nil` branch added in app.go.
+// A FetchByIDs error with no partial results surfaces as an error flash
+// carrying "related-fetch" and the error text.
 func TestLazyAddError_EmitsFlashMsg(t *testing.T) {
 	const (
 		srcType    = "test-flash-error-source"
@@ -63,9 +50,6 @@ func TestLazyAddError_EmitsFlashMsg(t *testing.T) {
 
 	srcRes := resource.Resource{ID: "src-flash-001"}
 
-	// Step 1: open detail for srcRes — begins a DetailOperation and
-	// dispatches the related-check task directly — then collect the
-	// resulting RelatedCheckResult.
 	m, startCmd := rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetDetail,
 		ResourceType: srcType,
@@ -80,10 +64,6 @@ func TestLazyAddError_EmitsFlashMsg(t *testing.T) {
 		t.Fatal("expected LazyAddError to be set when FetchByIDs returns an error")
 	}
 
-	// Step 2: apply the RelatedCheckResultMsg to the model. HandleRelatedCheckResult
-	// applies the LazyAddError as a FlashIntent (core/runtime/handlers_resources.go),
-	// mutating Controller/Model flash state directly rather than returning a
-	// messages.Flash cmd, so the error surfaces in the rendered header.
 	m, _ = rootApplyMsg(m, resultMsg)
 
 	view := stripANSI(rootViewContent(m))
@@ -94,17 +74,8 @@ func TestLazyAddError_EmitsFlashMsg(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// Test 2 — partial success + error emits FlashMsg AND caches the partial result
-// ---------------------------------------------------------------------------
-
-// TestLazyAddError_PartialSuccess_StillEmitsFlashMsg verifies that when
-// FetchByIDs returns (partialResults, error), the app handler:
-//   - merges the partial results into lazyResourceCache, AND
-//   - still emits a FlashMsg for the operator.
-//
-// Regression pin for the partial-success path where both the merge loop at
-// app.go:594-610 and the flash branch at app.go:615-624 must both execute.
+// FetchByIDs returning (partialResults, error) both merges the partial
+// results and surfaces the error flash.
 func TestLazyAddError_PartialSuccess_StillEmitsFlashMsg(t *testing.T) {
 	const (
 		srcType    = "test-flash-partial-source"
@@ -123,7 +94,6 @@ func TestLazyAddError_PartialSuccess_StillEmitsFlashMsg(t *testing.T) {
 	})
 
 	resource.SetFetchByIDsForTest(targetType, func(_ context.Context, _ any, _ []string) ([]resource.Resource, error) {
-		// Partial success: 1 resolved, 1 missing.
 		partial := []resource.Resource{{ID: "id-ok", Name: "ok-resource"}}
 		return partial, errors.New("id-bad: denied")
 	})
@@ -138,7 +108,6 @@ func TestLazyAddError_PartialSuccess_StillEmitsFlashMsg(t *testing.T) {
 
 	srcRes := resource.Resource{ID: "src-partial-001"}
 
-	// Step 1: open detail for srcRes and collect the resulting RelatedCheckResult.
 	m, startCmd := rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetDetail,
 		ResourceType: srcType,
@@ -153,17 +122,11 @@ func TestLazyAddError_PartialSuccess_StillEmitsFlashMsg(t *testing.T) {
 		t.Fatal("expected LazyAddError to be set for partial FetchByIDs failure")
 	}
 
-	// The partial result must be present on the message itself (app.go merge loop
-	// reads from msg.LazyAddedResources).
 	lazySlice := resultMsg.LazyAddedResources[targetType]
 	if len(lazySlice) != 1 || lazySlice[0].ID != "id-ok" {
 		t.Errorf("LazyAddedResources[%s] = %v, want 1 resource with ID=id-ok", targetType, lazySlice)
 	}
 
-	// Step 2: apply the result to the model. HandleRelatedCheckResult applies
-	// the LazyAddError as a FlashIntent (core/runtime/handlers_resources.go),
-	// mutating Controller/Model flash state directly rather than returning a
-	// messages.Flash cmd, so the error surfaces in the rendered header.
 	m, _ = rootApplyMsg(m, resultMsg)
 
 	view := stripANSI(rootViewContent(m))

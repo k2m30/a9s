@@ -13,8 +13,6 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// sgCheckerByTarget retrieves the RelatedChecker for the given targetType
-// and fails the test if the checker is nil or not found.
 func sgCheckerByTarget(t *testing.T, target string) resource.RelatedChecker {
 	t.Helper()
 	for _, def := range resource.GetRelated("sg") {
@@ -29,10 +27,6 @@ func sgCheckerByTarget(t *testing.T, target string) resource.RelatedChecker {
 	return nil
 }
 
-// ─── Navigable Field Registration ────────────────────────────────────────────
-
-// TestNavigableFields_SG_Registered verifies that VpcId -> vpc is registered
-// as a navigable field for the sg resource type.
 func TestNavigableFields_SG_Registered(t *testing.T) {
 	nav := resource.IsFieldNavigableForTest("sg", "VpcId")
 	if nav == nil {
@@ -43,10 +37,6 @@ func TestNavigableFields_SG_Registered(t *testing.T) {
 	}
 }
 
-// ─── VPC checker (Pattern F — forward field from res.Fields["vpc_id"]) ───────
-
-// TestRelated_SG_VPC_Found verifies that a security group with a vpc_id field
-// returns Count:1 and the VPC ID in ResourceIDs.
 func TestRelated_SG_VPC_Found(t *testing.T) {
 	source := resource.Resource{
 		ID: "sg-test",
@@ -67,8 +57,6 @@ func TestRelated_SG_VPC_Found(t *testing.T) {
 	}
 }
 
-// TestRelated_SG_VPC_EmptyVpcID verifies that a security group with an empty
-// vpc_id field returns Count:0.
 func TestRelated_SG_VPC_EmptyVpcID(t *testing.T) {
 	source := resource.Resource{
 		ID:     "sg-no-vpc",
@@ -84,10 +72,6 @@ func TestRelated_SG_VPC_EmptyVpcID(t *testing.T) {
 	}
 }
 
-// ─── EC2 checker (Pattern C — cache: match RawStruct SecurityGroups[].GroupId) ─
-
-// TestRelated_SG_EC2_Found verifies that an EC2 instance whose SecurityGroups
-// slice contains the source SG ID is counted.
 func TestRelated_SG_EC2_Found(t *testing.T) {
 	source := resource.Resource{ID: "sg-test"}
 	cache := resource.ResourceCache{
@@ -115,8 +99,6 @@ func TestRelated_SG_EC2_Found(t *testing.T) {
 	}
 }
 
-// TestRelated_SG_EC2_NotFound verifies that an EC2 instance with a different
-// SG ID yields Count:0.
 func TestRelated_SG_EC2_NotFound(t *testing.T) {
 	source := resource.Resource{ID: "sg-test"}
 	cache := resource.ResourceCache{
@@ -141,8 +123,6 @@ func TestRelated_SG_EC2_NotFound(t *testing.T) {
 	}
 }
 
-// TestRelated_SG_EC2_CacheMissNoClients verifies that an empty cache with nil
-// clients returns State: RelatedUnknown (resource.UnknownRelated).
 func TestRelated_SG_EC2_CacheMissNoClients(t *testing.T) {
 	source := resource.Resource{ID: "sg-test"}
 	cache := resource.ResourceCache{}
@@ -155,8 +135,6 @@ func TestRelated_SG_EC2_CacheMissNoClients(t *testing.T) {
 	}
 }
 
-// TestRelated_SG_EC2_EmptySourceID verifies that a source with an empty ID
-// returns Count:0.
 func TestRelated_SG_EC2_EmptySourceID(t *testing.T) {
 	source := resource.Resource{ID: ""}
 	cache := resource.ResourceCache{
@@ -181,10 +159,6 @@ func TestRelated_SG_EC2_EmptySourceID(t *testing.T) {
 	}
 }
 
-// ─── ENI checker (Pattern C — cache: match RawStruct Groups[].GroupId) ───────
-
-// TestRelated_SG_ENI_Found verifies that an ENI whose Groups slice contains the
-// source SG ID is counted.
 func TestRelated_SG_ENI_Found(t *testing.T) {
 	source := resource.Resource{ID: "sg-test"}
 	cache := resource.ResourceCache{
@@ -212,8 +186,6 @@ func TestRelated_SG_ENI_Found(t *testing.T) {
 	}
 }
 
-// TestRelated_SG_ENI_NotFound verifies that an ENI with a different SG ID
-// yields Count:0.
 func TestRelated_SG_ENI_NotFound(t *testing.T) {
 	source := resource.Resource{ID: "sg-test"}
 	cache := resource.ResourceCache{
@@ -238,8 +210,6 @@ func TestRelated_SG_ENI_NotFound(t *testing.T) {
 	}
 }
 
-// TestRelated_SG_ENI_CacheMissNoClients verifies that an empty cache with nil
-// clients returns State: RelatedUnknown (resource.UnknownRelated).
 func TestRelated_SG_ENI_CacheMissNoClients(t *testing.T) {
 	source := resource.Resource{ID: "sg-test"}
 	cache := resource.ResourceCache{}
@@ -252,10 +222,6 @@ func TestRelated_SG_ENI_CacheMissNoClients(t *testing.T) {
 	}
 }
 
-// ─── ELB checker (Pattern C — cache: match RawStruct SecurityGroups[] string slice) ─
-
-// TestRelated_SG_ELB_Found verifies that a load balancer whose SecurityGroups
-// slice contains the source SG ID is counted.
 func TestRelated_SG_ELB_Found(t *testing.T) {
 	source := resource.Resource{ID: "sg-test"}
 	cache := resource.ResourceCache{
@@ -281,8 +247,6 @@ func TestRelated_SG_ELB_Found(t *testing.T) {
 	}
 }
 
-// TestRelated_SG_ELB_NotFound verifies that an ELB with a different SG ID
-// yields Count:0.
 func TestRelated_SG_ELB_NotFound(t *testing.T) {
 	source := resource.Resource{ID: "sg-test"}
 	cache := resource.ResourceCache{
@@ -305,8 +269,6 @@ func TestRelated_SG_ELB_NotFound(t *testing.T) {
 	}
 }
 
-// TestRelated_SG_ELB_CacheMissNoClients verifies that an empty cache with nil
-// clients returns State: RelatedUnknown (resource.UnknownRelated).
 func TestRelated_SG_ELB_CacheMissNoClients(t *testing.T) {
 	source := resource.Resource{ID: "sg-test"}
 	cache := resource.ResourceCache{}
@@ -319,10 +281,6 @@ func TestRelated_SG_ELB_CacheMissNoClients(t *testing.T) {
 	}
 }
 
-// ─── CFN checker (Pattern F — tag: "aws:cloudformation:stack-name") ─────────
-
-// TestRelated_SG_CFN_Found verifies that a security group with the
-// aws:cloudformation:stack-name tag returns Count:1 and the stack name as ID.
 func TestRelated_SG_CFN_Found(t *testing.T) {
 	source := resource.Resource{
 		ID: "sg-tagged",
@@ -346,8 +304,6 @@ func TestRelated_SG_CFN_Found(t *testing.T) {
 	}
 }
 
-// TestRelated_SG_CFN_NoTag verifies that a security group with no CFN tag
-// returns Count:0.
 func TestRelated_SG_CFN_NoTag(t *testing.T) {
 	source := resource.Resource{
 		ID: "sg-untagged",
@@ -366,10 +322,6 @@ func TestRelated_SG_CFN_NoTag(t *testing.T) {
 	}
 }
 
-// ─── SG → SG (Referencing SGs) ───────────────────────────────────────────────
-
-// TestRelated_SG_SG_Found verifies that an SG in the cache whose IpPermissions
-// contains a UserIdGroupPair referencing the source SG is counted.
 func TestRelated_SG_SG_Found(t *testing.T) {
 	source := resource.Resource{ID: "sg-source"}
 	cache := resource.ResourceCache{
@@ -401,9 +353,6 @@ func TestRelated_SG_SG_Found(t *testing.T) {
 	}
 }
 
-// TestRelated_SG_SG_FoundInEgress verifies that an SG in the cache whose
-// IpPermissionsEgress contains a UserIdGroupPair referencing the source SG is
-// counted.
 func TestRelated_SG_SG_FoundInEgress(t *testing.T) {
 	source := resource.Resource{ID: "sg-source"}
 	cache := resource.ResourceCache{
@@ -433,8 +382,6 @@ func TestRelated_SG_SG_FoundInEgress(t *testing.T) {
 	}
 }
 
-// TestRelated_SG_SG_SkipsSelf verifies that an SG whose GroupId equals the
-// source SG's ID (self-referencing rule) is excluded from results.
 func TestRelated_SG_SG_SkipsSelf(t *testing.T) {
 	source := resource.Resource{ID: "sg-source"}
 	cache := resource.ResourceCache{
@@ -463,8 +410,6 @@ func TestRelated_SG_SG_SkipsSelf(t *testing.T) {
 	}
 }
 
-// TestRelated_SG_SG_NotFound verifies that SGs in the cache which do not
-// reference the source SG return Count:0.
 func TestRelated_SG_SG_NotFound(t *testing.T) {
 	source := resource.Resource{ID: "sg-source"}
 	cache := resource.ResourceCache{
@@ -493,8 +438,6 @@ func TestRelated_SG_SG_NotFound(t *testing.T) {
 	}
 }
 
-// TestRelated_SG_SG_CacheMissNoClients verifies that an empty cache with nil
-// clients returns State: RelatedUnknown (resource.UnknownRelated; cache miss).
 func TestRelated_SG_SG_CacheMissNoClients(t *testing.T) {
 	source := resource.Resource{ID: "sg-source"}
 	cache := resource.ResourceCache{}
@@ -507,8 +450,6 @@ func TestRelated_SG_SG_CacheMissNoClients(t *testing.T) {
 	}
 }
 
-// TestRelated_SG_SG_EmptySourceID verifies that a source with an empty ID
-// returns Count:0.
 func TestRelated_SG_SG_EmptySourceID(t *testing.T) {
 	source := resource.Resource{ID: ""}
 	cache := resource.ResourceCache{

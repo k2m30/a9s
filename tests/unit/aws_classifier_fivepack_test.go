@@ -1,28 +1,3 @@
-// aws_classifier_fivepack_test.go — five fetcher/classifier pairs, each
-// mirrored by the demo-state-coverage ratchet (qa_demo_state_coverage_test.go):
-//
-//  1. colorKMS reads the field FetchKMSKeysPage writes, so Broken/Dim/Warning
-//     are reachable through the real fetcher + real classifier pair. Per
-//     docs/resources/kms.md §3.2 the buckets are: PendingDeletion/
-//     PendingImport -> Broken, Disabled -> Warning, Unavailable -> Broken.
-//  2. Per docs/resources/iam-user.md §3.2 a console user without MFA
-//     classifies Broken via the wave2 finding path; colorIAMUser carries no
-//     dead Fields["has_console_password"]=="true" branch (FetchIAMUsersPage
-//     never sets it and EnrichIAMUserMFA only updates "mfa" and "risk").
-//  3. colorLambda must not force Warning on a Fields["dlq_target_arn"]==""
-//     check ahead of the Inactive->Dim and Healthy-fallthrough branches:
-//     FetchLambdaFunctionsPage never writes "dlq_target_arn", so that check
-//     would force every non-Failed, non-deprecated-runtime function into
-//     Warning regardless of its real state or DLQ config.
-//  4. colorRedis has no "deleted" branch: computeRedisFindings has no
-//     "deleted" case (docs/resources/redis.md §3.1/§3.2/§5 document no
-//     deleted/dim state for redis — ElastiCache simply stops returning a
-//     torn-down replication group). The pin is a source-scan.
-//  5. There is no third, distinct "rds" pending-maintenance enricher:
-//     docs/resources/dbi.md §4 ("Pending maintenance overdue",
-//     dbi.pending-maintenance, Warning on Healthy row) is served by
-//     EnrichDBIMaintenance and docs/resources/dbc.md §3.2/§4 ("maintenance
-//     overdue", Broken/!) by EnrichDBCMaintenance.
 package unit_test
 
 import (
@@ -50,14 +25,10 @@ import (
 	a9sruntime "github.com/k2m30/a9s/v3/core/runtime"
 )
 
-// ---------------------------------------------------------------------------
-// Bug 1 — colorKMS reads a field FetchKMSKeysPage never writes.
-// ---------------------------------------------------------------------------
-
 // fakeKMSFivepack drives FetchKMSKeysPage through the exact production code
 // path (ListKeys -> ListAliases -> per-key DescribeKey), returning
 // customer-managed keys in the three non-Enabled states documented in
-// docs/resources/kms.md §3.2.
+// docs/resources/kms.md.
 type fakeKMSFivepack struct {
 	keys    []kmstypes.KeyListEntry
 	byID    map[string]*kmstypes.KeyMetadata
@@ -123,11 +94,8 @@ func newFakeKMSFivepack() *fakeKMSFivepack {
 // TestColorKMS_RealFetcherReachesDocumentedBuckets drives the real
 // FetchKMSKeysPage against Disabled/PendingDeletion/Unavailable customer
 // keys and asserts the real td.ResolveColor("kms") lands each in the bucket
-// docs/resources/kms.md §3.2 documents: Disabled->Warning,
-// PendingDeletion->Broken, Unavailable->Broken. Fails today because
-// FetchKMSKeysPage writes Fields["status"] but colorKMS reads
-// Fields["key_state"], which is never set — every key falls through to the
-// default ColorHealthy branch regardless of its real AWS KeyState.
+// docs/resources/kms.md documents: Disabled->Warning,
+// PendingDeletion->Broken, Unavailable->Broken.
 func TestColorKMS_RealFetcherReachesDocumentedBuckets(t *testing.T) {
 	td := resource.FindResourceType("kms")
 	if td == nil {
@@ -175,24 +143,14 @@ func TestColorKMS_RealFetcherReachesDocumentedBuckets(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// Bug 2 — colorIAMUser requires a field the fetcher/enricher pair never sets.
-// ---------------------------------------------------------------------------
-
 // TestColorIAMUser_ConsoleUserWithoutMFAClassifiesBroken drives the real
 // FetchIAMUsersPage against the demo IAM fixtures (alice.johnson: a console
 // user with PasswordLastUsed set and zero registered MFA devices — see
 // core/demo/fixtures/iam.go) and the real Wave-2 EnrichIAMUserMFA
 // enricher, then asserts the real td.ResolveColor("iam-user") lands
-// alice.johnson in the Broken bucket per docs/resources/iam-user.md §3.2
+// alice.johnson in the Broken bucket per docs/resources/iam-user.md
 // ("GetLoginProfile(UserName) returns a profile AND ListMFADevices(UserName)
-// returns MFADevices==[] -> State bucket: Broken"). Fails today because
-// FetchIAMUsersPage hardcodes Fields["has_console_password"]="false" and
-// EnrichIAMUserMFA never writes that field back (it only writes "mfa" and
-// "risk" via FieldUpdates) — colorIAMUser's Warning branch requires
-// Fields["has_console_password"]=="true", which alice.johnson never carries,
-// so she is permanently misclassified Healthy despite the Broken-severity
-// wave2 finding actually being emitted.
+// returns MFADevices==[] -> State bucket: Broken").
 func TestColorIAMUser_ConsoleUserWithoutMFAClassifiesBroken(t *testing.T) {
 	td := resource.FindResourceType("iam-user")
 	if td == nil {
@@ -258,10 +216,6 @@ func TestColorIAMUser_ConsoleUserWithoutMFAClassifiesBroken(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// Bug 3 — colorLambda's dlq_target_arn check runs before Inactive/Healthy.
-// ---------------------------------------------------------------------------
-
 type fakeLambdaFivepack struct {
 	functions []lambdatypes.FunctionConfiguration
 }
@@ -273,13 +227,9 @@ func (f *fakeLambdaFivepack) ListFunctions(_ context.Context, _ *lambda.ListFunc
 // TestColorLambda_RealFetcherReachesDimAndHealthy drives the real
 // FetchLambdaFunctionsPage against an Active function that has a
 // DeadLetterConfig set (should classify Healthy) and an Inactive function
-// (should classify Dim per docs/resources/lambda.md §3.1
+// (should classify Dim per docs/resources/lambda.md
 // "State in Inactive -> Dim"), and asserts the real td.ResolveColor("lambda")
-// reaches both buckets. Fails today because FetchLambdaFunctionsPage never
-// writes a "dlq_target_arn" field at all, so colorLambda's
-// `Fields["dlq_target_arn"] == ""` check is always true and forces every
-// non-Failed, non-deprecated-runtime function into Warning before the
-// Inactive->Dim check or the Healthy fallthrough are ever reached.
+// reaches both buckets.
 func TestColorLambda_RealFetcherReachesDimAndHealthy(t *testing.T) {
 	td := resource.FindResourceType("lambda")
 	if td == nil {
@@ -348,21 +298,13 @@ func TestColorLambda_RealFetcherReachesDimAndHealthy(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// Bug 4 — colorRedis has a dead "deleted" branch documented nowhere.
-// ---------------------------------------------------------------------------
-
 // TestColorRedis_NoUnreachableDeletedBranch is a source-scan pin: it parses
 // core/aws/catalog_databases.go's colorRedis function body and asserts
 // it never compares a phrase/status string against the literal "deleted".
-// docs/resources/redis.md §3.1, §3.2, and §5 document no deleted/dim state
-// for redis anywhere — real ElastiCache simply stops returning a torn-down
+// Redis has no deleted/dim state: ElastiCache stops returning a torn-down
 // replication group from DescribeReplicationGroups rather than reporting a
-// "deleted" status, and computeRedisFindings' switch has no case that can
-// ever produce the phrase "deleted" (only the in-progress "deleting" form).
-// The fix removes the dead branch; it does not fabricate fixture data, so
-// this pin cannot be satisfied by adding a fixture — it can only be
-// satisfied by deleting the phrase=="deleted" comparison from colorRedis.
+// "deleted" status, and computeRedisFindings produces only the in-progress
+// "deleting" form.
 func TestColorRedis_NoUnreachableDeletedBranch(t *testing.T) {
 	_, thisFile, _, ok := runtime.Caller(0)
 	if !ok {
@@ -417,10 +359,6 @@ func TestColorRedis_NoUnreachableDeletedBranch(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// Bug 5 — EnrichRDSDocDBMaintenance is dead: wired to no catalog Wave2 field.
-// ---------------------------------------------------------------------------
-
 // TestNoOrphanedIssueEnrichmentFunctions walks every core/aws/
 // *_issue_enrichment.go Enrich* top-level function declaration and asserts
 // each one is reachable from at least one registered
@@ -433,19 +371,6 @@ func TestColorRedis_NoUnreachableDeletedBranch(t *testing.T) {
 // TestNoSingleCallListAPIEnrichers (enrichment_pagination_audit_test.go):
 // a new orphaned enricher — implemented but never wired to any type,
 // directly or via a combiner — fails this test.
-//
-// docs/resources/dbi.md §4 documents "Pending maintenance overdue"
-// (dbi.pending-maintenance, Warning-on-Healthy, "~") and
-// docs/resources/dbc.md §3.2/§4 documents "Cluster has a pending
-// maintenance action ... -> Warning" / "maintenance overdue" (dbc side).
-// Both signals are already served by the registered EnrichDBIMaintenance
-// (catalog_databases.go dbi Wave2) and EnrichDBCMaintenance (catalog_
-// databases.go dbc Wave2) respectively — no golden doc documents a third,
-// distinct "rds" pending-maintenance signal. EnrichRDSDocDBMaintenance
-// (rds_issue_enrichment.go) duplicates the dbi half of that coverage under
-// a resource name ("rds") no catalog entry uses, is not called by any
-// registered combiner, and is referenced by nothing but its own test
-// suite — it fails this pin today as an orphan.
 func TestNoOrphanedIssueEnrichmentFunctions(t *testing.T) {
 	_, thisFile, _, ok := runtime.Caller(0)
 	if !ok {

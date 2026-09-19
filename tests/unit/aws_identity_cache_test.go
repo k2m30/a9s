@@ -1,19 +1,7 @@
-// aws_identity_cache_test.go contains indirect coverage tests for
-// core/aws/identity_cache.go.
-//
-// COVERAGE LIMITS:
-//   - accountIDFromClients: unexported; ServiceClients.STS is *sts.Client
-//     (concrete, not an interface). There is no mock injection point from an
-//     external test package. Covered indirectly through checkers that call it
-//     (e.g. checkEBSBackup) — nil-STS path is exercised below.
-//   - regionFromEnv: unexported. Covered indirectly by exercising a checker
-//     that calls it. The AWS_REGION / AWS_DEFAULT_REGION env-var branches are
-//     tested by inspecting the behaviour of checkEBSBackup when the env is
-//     unset vs. set (observable via State: RelatedUnknown when region is the bottleneck).
-//
-// Direct white-box tests for these functions require a test file inside the
-// core/aws package itself (core/aws/identity_cache_test.go), which is
-// outside the QA agent's write scope.
+// aws_identity_cache_test.go exercises core/aws/identity_cache.go through
+// checkEBSBackup: accountIDFromClients and regionFromEnv are unexported, and
+// ServiceClients.STS is a concrete *sts.Client with no mock injection point
+// from an external test package.
 package unit_test
 
 import (
@@ -28,25 +16,7 @@ import (
 	_ "github.com/k2m30/a9s/v3/core/aws"
 )
 
-// Note: ebsCheckerByTarget is declared in aws_ebs_related_test.go (same package).
-
-// ---------------------------------------------------------------------------
-// regionFromEnv — indirect coverage via checkEBSBackup
-//
-// checkEBSBackup calls:
-//   region  := regionFromEnv()
-//   account := accountIDFromClients(ctx, c)
-//   if region == "" || account == "" { return UnknownRelated(targetType) }
-//
-// When AWS_REGION is unset AND AWS_DEFAULT_REGION is unset, regionFromEnv()
-// returns "" → the checker returns State: RelatedUnknown regardless of the STS client.
-// ---------------------------------------------------------------------------
-
-// TestIdentityCache_RegionFromEnv_EmptyWhenEnvUnset verifies that a checker
-// that needs the region returns State: RelatedUnknown when neither AWS_REGION nor
-// AWS_DEFAULT_REGION is set.  This exercises the regionFromEnv() "" branch.
 func TestIdentityCache_RegionFromEnv_EmptyWhenEnvUnset(t *testing.T) {
-	// Ensure both region env vars are absent for this test.
 	orig1, has1 := os.LookupEnv("AWS_REGION")
 	orig2, has2 := os.LookupEnv("AWS_DEFAULT_REGION")
 	if err := os.Unsetenv("AWS_REGION"); err != nil {
@@ -64,8 +34,7 @@ func TestIdentityCache_RegionFromEnv_EmptyWhenEnvUnset(t *testing.T) {
 		}
 	})
 
-	// Provide a non-nil Backup client so the nil-client early-exit is NOT hit,
-	// but leave STS nil — the checker reaches regionFromEnv(), which returns "".
+	// A non-nil Backup client passes the nil-client early exit; STS stays nil.
 	clients := &awsclient.ServiceClients{
 		Backup: newFakeBackupWithRecoveryPoints(nil),
 	}
@@ -91,10 +60,6 @@ func TestIdentityCache_RegionFromEnv_EmptyWhenEnvUnset(t *testing.T) {
 	}
 }
 
-// TestIdentityCache_RegionFromEnv_FallbackToAWSDefaultRegion verifies that
-// when AWS_REGION is unset but AWS_DEFAULT_REGION is set, the checker still
-// returns State: RelatedUnknown because the STS client (accountIDFromClients) is nil —
-// but it exercises the AWS_DEFAULT_REGION branch of regionFromEnv().
 func TestIdentityCache_RegionFromEnv_FallbackToAWSDefaultRegion(t *testing.T) {
 	orig1, has1 := os.LookupEnv("AWS_REGION")
 	orig2, has2 := os.LookupEnv("AWS_DEFAULT_REGION")
@@ -117,10 +82,6 @@ func TestIdentityCache_RegionFromEnv_FallbackToAWSDefaultRegion(t *testing.T) {
 		}
 	})
 
-	// region is now non-empty (eu-west-1) but STS is nil → accountIDFromClients
-	// returns "" → checker still returns State: RelatedUnknown. The test verifies
-	// the code path executes without panic, which covers the regionFromEnv
-	// fallback branch.
 	clients := &awsclient.ServiceClients{
 		Backup: newFakeBackupWithRecoveryPoints(nil),
 	}

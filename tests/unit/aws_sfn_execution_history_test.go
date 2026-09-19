@@ -16,13 +16,6 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// ---------------------------------------------------------------------------
-// SFN Execution History fetcher tests (Level 2 child of SFN Executions)
-// ---------------------------------------------------------------------------
-
-// TestFetchSFNExecutionHistory_Basic verifies parsing of 3 events
-// (ExecutionStarted, TaskScheduled, TaskSucceeded) with all key fields:
-// Resource.ID, Name, Status, Fields keys, and RawStruct.
 func TestFetchSFNExecutionHistory_Basic(t *testing.T) {
 	ts1 := time.Date(2024, 6, 15, 10, 0, 0, 0, time.UTC)
 	ts2 := time.Date(2024, 6, 15, 10, 0, 1, 0, time.UTC)
@@ -90,28 +83,24 @@ func TestFetchSFNExecutionHistory_Basic(t *testing.T) {
 	})
 
 	t.Run("first_event_Name_humanized", func(t *testing.T) {
-		// ExecutionStarted -> "Execution Started"
 		if resources[0].Name == "" {
 			t.Error("Name should not be empty")
 		}
 	})
 
 	t.Run("first_event_Status_active", func(t *testing.T) {
-		// ExecutionStarted maps to "active"
 		if resources[0].Fields["status"] != "active" {
 			t.Errorf("Fields[\"status\"]: expected %q, got %q", "active", resources[0].Fields["status"])
 		}
 	})
 
 	t.Run("second_event_Status_pending", func(t *testing.T) {
-		// TaskScheduled maps to "pending"
 		if resources[1].Fields["status"] != "pending" {
 			t.Errorf("Fields[\"status\"]: expected %q, got %q", "pending", resources[1].Fields["status"])
 		}
 	})
 
 	t.Run("third_event_Status_succeeded", func(t *testing.T) {
-		// TaskSucceeded maps to "succeeded"
 		if resources[2].Fields["status"] != "succeeded" {
 			t.Errorf("Fields[\"status\"]: expected %q, got %q", "succeeded", resources[2].Fields["status"])
 		}
@@ -151,7 +140,6 @@ func TestFetchSFNExecutionHistory_Basic(t *testing.T) {
 	})
 
 	t.Run("Fields_event_detail", func(t *testing.T) {
-		// ExecutionStarted with Input should have detail
 		if resources[0].Fields["event_detail"] == "" || resources[0].Fields["event_detail"] == "\u2014" {
 			t.Error("Fields[event_detail] should contain input for ExecutionStarted")
 		}
@@ -183,8 +171,6 @@ func TestFetchSFNExecutionHistory_Basic(t *testing.T) {
 	})
 }
 
-// TestFetchSFNExecutionHistory_Empty verifies that an execution with no history
-// events returns an empty slice with no error.
 func TestFetchSFNExecutionHistory_Empty(t *testing.T) {
 	mock := &mockSFNGetExecutionHistoryClient{
 		output: &sfn.GetExecutionHistoryOutput{
@@ -212,7 +198,6 @@ func TestFetchSFNExecutionHistory_Empty(t *testing.T) {
 	}
 }
 
-// TestFetchSFNExecutionHistory_APIError verifies that API errors are propagated.
 func TestFetchSFNExecutionHistory_APIError(t *testing.T) {
 	mock := &mockSFNGetExecutionHistoryClient{
 		err: fmt.Errorf("AWS API error: access denied"),
@@ -241,13 +226,6 @@ func TestFetchSFNExecutionHistory_APIError(t *testing.T) {
 	}
 }
 
-// TestFetchSFNExecutionHistory_Pagination verifies that paginated responses
-// via NextToken are followed and all events collected across multiple pages.
-// TestFetchSFNExecutionHistory_Pagination verifies the single-page pagination
-// contract: one API call is made per invocation, resources from that page are
-// returned, and IsTruncated/NextToken reflect whether more pages exist. A second
-// call with the continuation token verifies the token is forwarded and the final
-// page sets IsTruncated=false.
 func TestFetchSFNExecutionHistory_Pagination(t *testing.T) {
 	ts := time.Date(2024, 6, 15, 10, 0, 0, 0, time.UTC)
 
@@ -255,7 +233,6 @@ func TestFetchSFNExecutionHistory_Pagination(t *testing.T) {
 		"execution_arn": "arn:aws:states:us-east-1:123456789012:execution:sm:exec-paginated",
 	}
 
-	// Page 1: 2 events with NextToken indicating more pages exist.
 	page1Mock := &mockSFNGetExecutionHistoryClient{
 		outputs: []*sfn.GetExecutionHistoryOutput{
 			{
@@ -280,7 +257,6 @@ func TestFetchSFNExecutionHistory_Pagination(t *testing.T) {
 		},
 	}
 
-	// First call: no continuation token — fetches page 1.
 	result1, err := awsclient.FetchSFNExecutionHistory(context.Background(), page1Mock, parentCtx, "")
 	if err != nil {
 		t.Fatalf("page 1: expected no error, got %v", err)
@@ -316,11 +292,9 @@ func TestFetchSFNExecutionHistory_Pagination(t *testing.T) {
 		}
 	})
 
-	// Page 2: 1 event with no NextToken — last page.
 	page2Mock := &mockSFNGetExecutionHistoryClient{
 		outputs: []*sfn.GetExecutionHistoryOutput{
 			{
-				// No NextToken — last page
 				Events: []sfntypes.HistoryEvent{
 					{
 						Id:              3,
@@ -333,7 +307,6 @@ func TestFetchSFNExecutionHistory_Pagination(t *testing.T) {
 		},
 	}
 
-	// Second call: pass continuation token from page 1 to fetch page 2.
 	result2, err := awsclient.FetchSFNExecutionHistory(context.Background(), page2Mock, parentCtx, result1.Pagination.NextToken)
 	if err != nil {
 		t.Fatalf("page 2: expected no error, got %v", err)
@@ -361,14 +334,9 @@ func TestFetchSFNExecutionHistory_Pagination(t *testing.T) {
 	})
 }
 
-// TestFetchSFNExecutionHistory_MaxCap verifies that a single API page of 50
-// events is returned as-is with correct IsTruncated=true metadata when the API
-// indicates more pages exist. The per-page cap no longer applies — each call
-// returns one page and the caller drives pagination via continuation tokens.
 func TestFetchSFNExecutionHistory_MaxCap(t *testing.T) {
 	ts := time.Date(2024, 6, 15, 10, 0, 0, 0, time.UTC)
 
-	// Build one page of 50 events with a NextToken indicating more pages exist.
 	events := make([]sfntypes.HistoryEvent, 50)
 	for i := range events {
 		events[i] = sfntypes.HistoryEvent{
@@ -437,11 +405,6 @@ func TestFetchSFNExecutionHistory_MaxCap(t *testing.T) {
 	})
 }
 
-// ---------------------------------------------------------------------------
-// Computed field tests: HumanizeEventType
-// ---------------------------------------------------------------------------
-
-// TestHumanizeEventType verifies CamelCase-to-spaced conversion.
 func TestHumanizeEventType(t *testing.T) {
 	tests := []struct {
 		name  string
@@ -467,40 +430,30 @@ func TestHumanizeEventType(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// Computed field tests: ClassifyEventStatus
-// ---------------------------------------------------------------------------
-
-// TestClassifyEventStatus verifies the mapping of event types to synthetic
-// status strings used for row coloring.
 func TestClassifyEventStatus(t *testing.T) {
 	tests := []struct {
 		name      string
 		eventType string
 		want      string
 	}{
-		// Active — ExecutionStarted must be checked BEFORE generic *Started
+		// ExecutionStarted is matched before the generic *Started suffix.
 		{"ExecutionStarted_active", "ExecutionStarted", "active"},
 
-		// Succeeded
 		{"TaskSucceeded", "TaskSucceeded", "succeeded"},
 		{"LambdaFunctionSucceeded", "LambdaFunctionSucceeded", "succeeded"},
 		{"StateExited", "ChoiceStateExited", "succeeded"},
 		{"ExecutionSucceeded", "ExecutionSucceeded", "succeeded"},
 
-		// Failed
 		{"TaskFailed", "TaskFailed", "failed"},
 		{"LambdaFunctionTimedOut", "LambdaFunctionTimedOut", "failed"},
 		{"ExecutionAborted", "ExecutionAborted", "failed"},
 		{"ExecutionTimedOut", "ExecutionTimedOut", "failed"},
 
-		// Pending
 		{"TaskScheduled", "TaskScheduled", "pending"},
 		{"TaskStarted", "TaskStarted", "pending"},
 		{"StateEntered", "TaskStateEntered", "pending"},
 		{"MapRunStarted", "MapRunStarted", "pending"},
 
-		// Unknown -> active
 		{"unknown_event", "SomethingUnknown", "active"},
 	}
 
@@ -515,12 +468,6 @@ func TestClassifyEventStatus(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// Computed field tests: ExtractEventDetail
-// ---------------------------------------------------------------------------
-
-// TestExtractEventDetail_Failed verifies that TaskFailedEventDetails
-// containing Error and Cause are included in the extracted detail string.
 func TestExtractEventDetail_Failed(t *testing.T) {
 	event := sfntypes.HistoryEvent{
 		Id:   1,
@@ -542,8 +489,6 @@ func TestExtractEventDetail_Failed(t *testing.T) {
 	}
 }
 
-// TestExtractEventDetail_StateEntered verifies that StateEnteredEventDetails
-// with Input are included in the extracted detail string.
 func TestExtractEventDetail_StateEntered(t *testing.T) {
 	event := sfntypes.HistoryEvent{
 		Id:   1,
@@ -560,13 +505,10 @@ func TestExtractEventDetail_StateEntered(t *testing.T) {
 	}
 }
 
-// TestExtractEventDetail_Empty verifies that an event with no detail fields
-// returns the em-dash placeholder.
 func TestExtractEventDetail_Empty(t *testing.T) {
 	event := sfntypes.HistoryEvent{
 		Id:   1,
 		Type: sfntypes.HistoryEventTypeTaskStarted,
-		// No detail fields populated
 	}
 
 	detail := awsclient.ExtractEventDetail(event)
@@ -575,8 +517,6 @@ func TestExtractEventDetail_Empty(t *testing.T) {
 	}
 }
 
-// TestExtractEventDetail_NewlineStripped verifies that newlines in event
-// detail strings are removed (design spec requirement).
 func TestExtractEventDetail_NewlineStripped(t *testing.T) {
 	event := sfntypes.HistoryEvent{
 		Id:   1,
@@ -595,12 +535,6 @@ func TestExtractEventDetail_NewlineStripped(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// State name tracking tests
-// ---------------------------------------------------------------------------
-
-// TestConvertHistoryEvent_StateName_FromStateEntered verifies that a
-// StateEntered event extracts the state name from StateEnteredEventDetails.Name.
 func TestConvertHistoryEvent_StateName_FromStateEntered(t *testing.T) {
 	ts := time.Date(2024, 6, 15, 10, 0, 0, 0, time.UTC)
 	event := sfntypes.HistoryEvent{
@@ -623,8 +557,6 @@ func TestConvertHistoryEvent_StateName_FromStateEntered(t *testing.T) {
 	}
 }
 
-// TestConvertHistoryEvent_StateName_Inherited verifies that a Task event
-// after a StateEntered event inherits the state name via the lastStateName pointer.
 func TestConvertHistoryEvent_StateName_Inherited(t *testing.T) {
 	ts := time.Date(2024, 6, 15, 10, 0, 1, 0, time.UTC)
 	event := sfntypes.HistoryEvent{
@@ -646,8 +578,6 @@ func TestConvertHistoryEvent_StateName_Inherited(t *testing.T) {
 	}
 }
 
-// TestConvertHistoryEvent_StateName_ExecutionLevel verifies that an
-// ExecutionStarted event (no state context) has state_name set to em-dash.
 func TestConvertHistoryEvent_StateName_ExecutionLevel(t *testing.T) {
 	ts := time.Date(2024, 6, 15, 10, 0, 0, 0, time.UTC)
 	event := sfntypes.HistoryEvent{
@@ -667,12 +597,6 @@ func TestConvertHistoryEvent_StateName_ExecutionLevel(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// Registration tests
-// ---------------------------------------------------------------------------
-
-// TestSFNExecutionHistoryColumns verifies that SFNExecutionHistoryColumns
-// returns the expected 4 columns with correct keys, titles, and widths.
 func TestSFNExecutionHistoryColumns(t *testing.T) {
 	cols := resource.SFNExecutionHistoryColumns()
 
@@ -712,8 +636,6 @@ func TestSFNExecutionHistoryColumns(t *testing.T) {
 
 }
 
-// TestSFNExecutionHistory_ChildTypeRegistered verifies that the child type
-// is registered under the correct short name.
 func TestSFNExecutionHistory_ChildTypeRegistered(t *testing.T) {
 	td := resource.GetChildType("sfn_execution_history")
 	if td == nil {
@@ -728,8 +650,6 @@ func TestSFNExecutionHistory_ChildTypeRegistered(t *testing.T) {
 	}
 }
 
-// TestSFNExecutionHistory_PaginatedChildFetcherRegistered verifies that the paginated
-// child fetcher is registered under the correct short name.
 func TestSFNExecutionHistory_PaginatedChildFetcherRegistered(t *testing.T) {
 	f := resource.GetPaginatedChildFetcher("sfn_execution_history")
 	if f == nil {
@@ -737,9 +657,6 @@ func TestSFNExecutionHistory_PaginatedChildFetcherRegistered(t *testing.T) {
 	}
 }
 
-// TestSFNExecutionHistory_ParentHasChildDef verifies that the parent
-// sfn_executions child type has a child view definition for
-// sfn_execution_history with key "enter".
 func TestSFNExecutionHistory_ParentHasChildDef(t *testing.T) {
 	td := resource.GetChildType("sfn_executions")
 	if td == nil {
@@ -773,8 +690,6 @@ func TestSFNExecutionHistory_ParentHasChildDef(t *testing.T) {
 	}
 }
 
-// TestSFNExecutions_CopyField verifies that the sfn_executions child type
-// has CopyField set to "execution_arn".
 func TestSFNExecutions_CopyField(t *testing.T) {
 	td := resource.GetChildType("sfn_executions")
 	if td == nil {
@@ -785,8 +700,6 @@ func TestSFNExecutions_CopyField(t *testing.T) {
 	}
 }
 
-// TestSFNExecutionHistory_CopyField verifies that the sfn_execution_history
-// child type has CopyField set to "event_detail".
 func TestSFNExecutionHistory_CopyField(t *testing.T) {
 	td := resource.GetChildType("sfn_execution_history")
 	if td == nil {
@@ -797,13 +710,6 @@ func TestSFNExecutionHistory_CopyField(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// Config defaults test
-// ---------------------------------------------------------------------------
-
-// TestConfigDefaultViewDef_SFNExecutionHistory verifies that the
-// sfn_execution_history view definition has the expected list columns
-// and non-empty detail paths.
 func TestConfigDefaultViewDef_SFNExecutionHistory(t *testing.T) {
 	vd := config.DefaultViewDef("sfn_execution_history")
 
@@ -817,7 +723,6 @@ func TestConfigDefaultViewDef_SFNExecutionHistory(t *testing.T) {
 		if len(vd.Detail) == 0 {
 			t.Error("expected non-empty Detail paths for sfn_execution_history")
 		}
-		// Check for key detail fields
 		detailStr := strings.Join(config.DetailStringsForTest(vd.Detail), ",")
 		for _, expected := range []string{"Timestamp", "Type", "Id"} {
 			if !strings.Contains(detailStr, expected) {

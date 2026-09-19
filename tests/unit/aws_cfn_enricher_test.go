@@ -1,14 +1,5 @@
 package unit
 
-// aws_cfn_enricher_test.go — Behavioral tests for EnrichCFNDrift.
-//
-// Contract assertions:
-//   - DescribeStacks is called once per CFN resource (keyed by stack name).
-//   - A stack with DriftInformation.StackDriftStatus=DRIFTED → 1 finding sev "~" for that stack.
-//   - A stack with DriftInformation.StackDriftStatus=IN_SYNC → 0 findings.
-//   - clients.CloudFormation == nil → (EnricherResult{Findings: non-nil empty}, nil).
-//   - API error for a resource → Truncated=true, no finding for that stack, no error returned.
-
 import (
 	"context"
 	"errors"
@@ -66,7 +57,6 @@ func (f *cfnDescribeStacksDriftFake) DescribeStacks(
 	return &cloudformation.DescribeStacksOutput{Stacks: stacks}, nil
 }
 
-// Compile-time check: cfnDescribeStacksDriftFake satisfies CFNAPI.
 var _ awsclient.CFNAPI = (*cfnDescribeStacksDriftFake)(nil)
 
 // cfnDriftStackResource builds a CFN Resource stub matching what

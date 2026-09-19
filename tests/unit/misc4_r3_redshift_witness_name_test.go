@@ -1,19 +1,12 @@
 package unit
 
-// misc4_r3_redshift_witness_name_test.go — misc4 row 3.
+// A demo row named for a condition is read as evidence of it.
 //
-// A demo row named for a condition is read as a witness for it. This one was
-// named "redshift-expired-window" while carrying no finding at all, so the
-// demo list showed a row promising a signal beside a blank Status cell.
-//
-// The AWS field settles it: hasActiveDeferredMaintenanceWindow
-// (core/aws/redshift.go) reports a deferral only while `now` falls inside
-// [DeferMaintenanceStartTime, DeferMaintenanceEndTime]. A window whose
-// DeferMaintenanceEndTime has passed is a deferral that has lapsed — the
-// cluster's maintenance is no longer being held off, which is the normal
-// state and not a posture item. There is no wave-1 check to add. The row is
-// the negative control for redshift.maintenance-deferred, and its name now
-// says so.
+// hasActiveDeferredMaintenanceWindow (core/aws/redshift.go) reports a
+// deferral only while `now` falls inside [DeferMaintenanceStartTime,
+// DeferMaintenanceEndTime]. A window whose DeferMaintenanceEndTime has passed
+// is a lapsed deferral: the normal state, not a posture item. The row is the
+// negative control for redshift.maintenance-deferred.
 
 import (
 	"strings"
@@ -22,9 +15,8 @@ import (
 	"github.com/k2m30/a9s/v3/core/demo/fixtures"
 )
 
-// TestRedshiftLapsedDeferralWitnessIsNamedForWhatItShows pins the rename and
-// the behaviour it describes: the row carries no finding, and its ID does not
-// promise one.
+// TestRedshiftLapsedDeferralWitnessIsNamedForWhatItShows pins that the row
+// carries no finding and its ID does not promise one.
 func TestRedshiftLapsedDeferralWitnessIsNamedForWhatItShows(t *testing.T) {
 	id := fixtures.RedshiftDeferralLapsedID
 	if strings.Contains(id, "expired-window") {

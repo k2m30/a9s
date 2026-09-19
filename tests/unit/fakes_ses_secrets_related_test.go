@@ -54,7 +54,6 @@ func (f *fakeSESv2Checker) GetEmailIdentity(_ context.Context, input *sesv2.GetE
 	return &sesv2.GetEmailIdentityOutput{}, nil
 }
 
-// Compile-time check: fakeSESv2Checker satisfies SESv2API.
 var _ awsclient.SESv2API = (*fakeSESv2Checker)(nil)
 
 // newFakeSESv2WithEventDestinations returns a fakeSESv2Checker whose
@@ -110,7 +109,6 @@ func (f *fakeSecretsManagerChecker) GetResourcePolicy(_ context.Context, _ *secr
 	return &secretsmanager.GetResourcePolicyOutput{}, nil
 }
 
-// Compile-time check: fakeSecretsManagerChecker satisfies SecretsManagerAPI.
 var _ awsclient.SecretsManagerAPI = (*fakeSecretsManagerChecker)(nil)
 
 // newFakeSecretsManagerWithResourcePolicy returns a fakeSecretsManagerChecker
@@ -161,7 +159,6 @@ func (f *fakeLambdaForSecrets) ListTags(_ context.Context, _ *lambdapkg.ListTags
 	return &lambdapkg.ListTagsOutput{}, nil
 }
 
-// Compile-time check: fakeLambdaForSecrets satisfies LambdaAPI.
 var _ awsclient.LambdaAPI = (*fakeLambdaForSecrets)(nil)
 
 // newFakeLambdaWithFunctionConfig returns a fakeLambdaForSecrets whose GetFunction

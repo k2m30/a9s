@@ -1,17 +1,5 @@
 package unit_test
 
-// aws_related_branch_gaps_test.go closes branch-coverage gaps on checkers
-// that already execute in the suite but have <70% branch coverage:
-//   - checkASGSG            core/aws/asg_related_extra.go:81  (50.0%)
-//   - checkCbSecrets        core/aws/cb_related.go:309        (68.4%)
-//   - checkDbcSnapVPC       core/aws/dbc_snap_related.go:83   (66.7%)
-//   - checkEIPECSTask       core/aws/eip_related.go:233       (63.6%)
-//   - checkEIPECSSvc        core/aws/eip_related.go:254       (64.7%)
-//   - checkEIPECS           core/aws/eip_related.go:283       (64.7%)
-//   - checkVPCELogs         core/aws/vpce_related.go:149      (66.7%)
-//
-// Pins existing behavior (these are GREEN on write, not RED regressions).
-
 import (
 	"context"
 	"errors"
@@ -30,16 +18,6 @@ import (
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
-
-// ---------------------------------------------------------------------------
-// checkASGSG (core/aws/asg_related_extra.go:81) — 50.0% branch coverage.
-// No prior test in the suite invokes asgCheckerByTarget(t, "sg") at all.
-// Branches: wrong RawStruct(-1); nil/non-*ServiceClients clients(-1);
-// LaunchConfigurationName set -> DescribeLaunchConfigurations path (success,
-// error, empty-result); LaunchTemplate direct path; MixedInstancesPolicy
-// fallback path; neither LC nor LT -> Count 0; LT DescribeLaunchTemplateVersions
-// error; NetworkInterfaces[].Groups flattened alongside SecurityGroupIds.
-// ---------------------------------------------------------------------------
 
 func TestRelated_ASGSG_WrongRawStruct(t *testing.T) {
 	res := resource.Resource{ID: "my-asg", RawStruct: "not-an-asg"}
@@ -262,14 +240,6 @@ func TestRelated_ASGSG_LaunchTemplateVersionsError(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// checkCbSecrets (core/aws/cb_related.go:309) — 68.4% branch coverage.
-// Existing tests only cover a plain (non-ARN) secret name and the "no
-// SECRETS_MANAGER vars" case. Uncovered: wrong RawStruct(-1); nil
-// Environment(0); ARN-form values with ":secret:" segment (with and without
-// trailing ":json-key" suffix); nil env.Value skip.
-// ---------------------------------------------------------------------------
-
 func TestRelated_CbSecrets_WrongRawStruct(t *testing.T) {
 	res := resource.Resource{ID: "my-project", RawStruct: "not-a-project"}
 	checker := cbCheckerByTarget(t, "secrets")
@@ -365,14 +335,6 @@ func TestRelated_CbSecrets_NilValueSkipped(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// checkDbcSnapVPC (core/aws/dbc_snap_related.go:83) — 66.7% branch coverage.
-// Existing tests (qa_related_field_extraction_test.go) cover only the
-// docdbtypes.DBClusterSnapshot branch (with and without VpcId) and the
-// no-RawStruct fallthrough. The rdstypes.DBClusterSnapshot branch (with and
-// without VpcId) is never exercised.
-// ---------------------------------------------------------------------------
-
 func TestRelated_DbcSnapVPC_RDSType_ReturnsVpcID(t *testing.T) {
 	res := resource.Resource{
 		ID:        "rds:cluster-snapshot:aurora-snap",
@@ -401,15 +363,6 @@ func TestRelated_DbcSnapVPC_RDSType_NilVpcID_ReturnsZero(t *testing.T) {
 		t.Errorf("Count = %d, want 0 (nil VpcId, rds type)", result.Count())
 	}
 }
-
-// ---------------------------------------------------------------------------
-// checkEIPECSTask / checkEIPECSSvc / checkEIPECS (core/aws/eip_related.go)
-// Existing tests cover only the empty-EIP-ID (Count 0) and no-ENI (Count 0)
-// early returns. Uncovered: eipMatchingECSTask error propagation (-1, Err
-// set); truncated-cache no-match (TruncatedResult); a genuine match resolving
-// the task/service-name/cluster; ECSSvc/ECS Group-prefix and ClusterArn
-// guard branches.
-// ---------------------------------------------------------------------------
 
 func eipSrcWithENI(eniID string) resource.Resource {
 	return resource.Resource{
@@ -599,14 +552,6 @@ func TestRelated_EIPECS_MatchedTaskNilClusterArn_ReturnsZero(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// checkVPCELogs (core/aws/vpce_related.go:149) — 66.7% branch coverage.
-// Existing tests cover nil-clients(-1) and empty-ID(0). Uncovered: the
-// success path (LogGroupName direct hit; LogDestination ARN parsing via
-// ":log-group:" segment with and without a trailing colon; dedup by name)
-// and the DescribeFlowLogs error path.
-// ---------------------------------------------------------------------------
-
 func TestRelated_VPCELogs_DescribeError(t *testing.T) {
 	wantErr := errors.New("boom: describe flow logs failed")
 	fakeEC2 := &fakeEC2VPCELogsError{err: wantErr}
@@ -724,9 +669,6 @@ func TestRelated_VPCELogs_NoFlowLogsReturnsZero(t *testing.T) {
 	}
 }
 
-// fakeEC2VPCELogsFlowLogs is a minimal EC2API fake exercising only
-// DescribeFlowLogs for checkVPCELogs branch coverage; all other methods
-// return safe empty stubs since checkVPCELogs never calls them.
 type fakeEC2VPCELogsFlowLogs struct {
 	flowLogs []ec2types.FlowLog
 }
@@ -801,8 +743,6 @@ func (f *fakeEC2VPCELogsFlowLogs) DescribeVpcPeeringConnections(_ context.Contex
 	return &ec2.DescribeVpcPeeringConnectionsOutput{}, nil
 }
 
-// fakeEC2VPCELogsError is a minimal EC2API fake whose DescribeFlowLogs always
-// fails, for exercising checkVPCELogs's error-propagation branch.
 type fakeEC2VPCELogsError struct {
 	fakeEC2VPCELogsFlowLogs
 	err error

@@ -1,29 +1,8 @@
 package unit
 
-// aws_ec2_detail_enrich_test.go — coverage for enrichEc2
-// (core/aws/ec2_detail_enrichment.go), the on-demand detail enricher
-// registered for the "ec2" resource type (#261).
-//
-// Covers:
-//   - wrong clients type / nil DetailEnrichmentCtx / nil Clients → error
-//     (ec2 has no DetailDocs dependency — uncached, per the contract)
-//   - wrong RawStruct type → error
-//   - missing InstanceId → error
-//   - success: valid base64 user-data decoded to plaintext
-//   - invalid base64 falls back to the raw attribute value
-//   - valid gzip (base64+gzip magic) user-data decompressed to plaintext
-//   - corrupt gzip (bad header after the magic) falls back to the raw base64
-//     string (un-gunzipped bytes fail the utf8.Valid gate)
-//   - binary non-UTF-8, non-gzip user-data falls back to the raw base64 string
-//   - oversized gzip user-data is truncated at the 1 MiB decompression cap
-//   - nil/empty UserData attribute → ""
-//   - InstanceEnriched re-enrichment path accepted as RawStruct
-//   - API error propagated
-//
-// The EC2 fake must implement all 21 methods of the EC2API aggregate (the
-// static type of ServiceClients.EC2) plus EC2DescribeInstanceAttributeAPI,
-// which the enricher type-asserts separately — mirrors enrichPolicyIAM's
-// full-interface stub in aws_iam_policies_enrich_test.go.
+// The EC2 fake implements the whole EC2API aggregate (the static type of
+// ServiceClients.EC2) plus EC2DescribeInstanceAttributeAPI, which enrichEc2
+// type-asserts separately.
 
 import (
 	"bytes"
@@ -41,10 +20,6 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// ---------------------------------------------------------------------------
-// enrichEc2Fake — full EC2API + EC2DescribeInstanceAttributeAPI fake
-// ---------------------------------------------------------------------------
-
 type enrichEc2Fake struct {
 	describeAttrFn    func(*ec2.DescribeInstanceAttributeInput) (*ec2.DescribeInstanceAttributeOutput, error)
 	describeAttrCalls int
@@ -57,8 +32,6 @@ func (f *enrichEc2Fake) DescribeInstanceAttribute(_ context.Context, in *ec2.Des
 	}
 	return &ec2.DescribeInstanceAttributeOutput{}, nil
 }
-
-// --- Stubs for the rest of EC2API (unused by enrichEc2) ---
 
 func (f *enrichEc2Fake) DescribeInstances(_ context.Context, _ *ec2.DescribeInstancesInput, _ ...func(*ec2.Options)) (*ec2.DescribeInstancesOutput, error) {
 	return &ec2.DescribeInstancesOutput{}, nil
@@ -133,10 +106,6 @@ func (f *enrichEc2Fake) DescribeVpcPeeringConnections(_ context.Context, _ *ec2.
 var _ awsclient.EC2API = (*enrichEc2Fake)(nil)
 var _ awsclient.EC2DescribeInstanceAttributeAPI = (*enrichEc2Fake)(nil)
 
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
 func ec2Enricher(t *testing.T) resource.DetailEnricher {
 	t.Helper()
 	e := resource.GetDetailEnricher("ec2")
@@ -171,10 +140,6 @@ func makeEc2Res(instanceID string) resource.Resource {
 
 const ec2TestUserDataPlain = "#!/bin/bash\nyum update -y\necho \"export APP_ENV=production\" >> /etc/environment\n"
 
-// ---------------------------------------------------------------------------
-// Tests: invalid context
-// ---------------------------------------------------------------------------
-
 func TestEnrichEc2_WrongClientsType_ReturnsError(t *testing.T) {
 	enricher := ec2Enricher(t)
 	res := makeEc2Res(ec2TestInstanceID)
@@ -206,10 +171,6 @@ func TestEnrichEc2_NilClients_ReturnsError(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// Tests: bad RawStruct / missing InstanceId
-// ---------------------------------------------------------------------------
-
 func TestEnrichEc2_WrongRawStructType_ReturnsError(t *testing.T) {
 	enricher := ec2Enricher(t)
 	res := resource.Resource{ID: ec2TestInstanceID, RawStruct: "not-an-instance"}
@@ -229,10 +190,6 @@ func TestEnrichEc2_NoInstanceId_ReturnsError(t *testing.T) {
 		t.Fatal("expected error for instance with no InstanceId, got nil")
 	}
 }
-
-// ---------------------------------------------------------------------------
-// Tests: success — valid base64, invalid base64, empty/nil
-// ---------------------------------------------------------------------------
 
 func TestEnrichEc2_ValidBase64_Decoded(t *testing.T) {
 	encoded := base64.StdEncoding.EncodeToString([]byte(ec2TestUserDataPlain))
@@ -388,19 +345,13 @@ func TestEnrichEc2_BinaryNonUTF8NonGzip_FallsBackToRawBase64(t *testing.T) {
 	}
 }
 
-// TestEnrichEc2_OversizedGzipUserData_FallsBackToRawBase64 pins gunzipUserData's
-// explicit-error-above-the-cap contract (#261 boundary-sealing wave, item f):
-// an oversized decompressed payload must never be presented as complete,
-// truncated content. gunzipUserData itself is unexported (core/aws), so the
-// only externally observable proof that it returned an error rather than a
-// truncated []byte is that decodeUserData's caller-side fallback chain takes
-// over exactly like any other unrecoverable gunzip failure (see
-// TestEnrichEc2_CorruptGzipUserData_FallsBackToRawBase64) — the still-gzipped
-// bytes fail the utf8.Valid gate, so enrichEc2 falls back to the original
-// base64 string instead of a silently truncated 1 MiB prefix.
+// gunzipUserData returns an error above the cap rather than a truncated
+// payload. It is unexported, so the evidence is decodeUserData's fallback: the
+// still-gzipped bytes fail the utf8.Valid gate and enrichEc2 returns the
+// original base64 string.
 func TestEnrichEc2_OversizedGzipUserData_FallsBackToRawBase64(t *testing.T) {
 	const oneMiB = 1 << 20
-	large := strings.Repeat("A", oneMiB*2) // 2 MiB decompressed, well past the 1 MiB cap
+	large := strings.Repeat("A", oneMiB*2)
 	encoded := gzipThenBase64(t, []byte(large))
 
 	fake := &enrichEc2Fake{
@@ -424,10 +375,6 @@ func TestEnrichEc2_OversizedGzipUserData_FallsBackToRawBase64(t *testing.T) {
 	}
 }
 
-// TestEnrichEc2_AtCapGzipUserData_DecodesIntact pins the cap's other edge:
-// a payload that decompresses to EXACTLY maxUserDataDecompressedSize (1 MiB)
-// is at-or-below the cap and must still decode in full, not trip the
-// oversized fallback above.
 func TestEnrichEc2_AtCapGzipUserData_DecodesIntact(t *testing.T) {
 	const oneMiB = 1 << 20
 	atCap := strings.Repeat("B", oneMiB)
@@ -496,10 +443,6 @@ func TestEnrichEc2_EmptyUserDataValue_EmptyString(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// Tests: re-enrichment path
-// ---------------------------------------------------------------------------
-
 func TestEnrichEc2_InstanceEnrichedRawStruct_Accepted(t *testing.T) {
 	encoded := base64.StdEncoding.EncodeToString([]byte(ec2TestUserDataPlain))
 	fake := &enrichEc2Fake{
@@ -531,10 +474,6 @@ func TestEnrichEc2_InstanceEnrichedRawStruct_Accepted(t *testing.T) {
 		t.Errorf("enriched.UserData = %q, want refreshed %q", enriched.UserData, ec2TestUserDataPlain)
 	}
 }
-
-// ---------------------------------------------------------------------------
-// Tests: API error propagation
-// ---------------------------------------------------------------------------
 
 func TestEnrichEc2_APIError_Propagated(t *testing.T) {
 	fake := &enrichEc2Fake{

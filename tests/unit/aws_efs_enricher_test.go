@@ -1,15 +1,5 @@
 package unit
 
-// aws_efs_enricher_test.go — Behavioral tests for EnrichEFSMountTargets.
-//
-// Contract assertions:
-//   - DescribeMountTargets is called once per EFS resource (keyed by file system ID).
-//   - All mount targets LifeCycleState=available → 0 findings.
-//   - Any mount target LifeCycleState != available (e.g. "creating") → 1 finding for
-//     that file system, severity "!".
-//   - clients.EFS == nil → (EnricherResult{Findings: non-nil empty}, nil).
-//   - API error for a resource → 0 findings for that resource, Truncated=true, no error returned.
-
 import (
 	"context"
 	"errors"
@@ -22,12 +12,6 @@ import (
 	"github.com/k2m30/a9s/v3/core/domain"
 )
 
-// Shared helpers (efsMountTargetFake, efsResources, availableMT,
-// unavailableMT) live in helpers_efs_test.go.
-
-// TestEnrichEFSMountTargets_AllAvailableProducesNoFindings verifies that when all
-// mount targets for both EFS resources are in the "available" state, no findings
-// are produced and IssueCount is 0.
 func TestEnrichEFSMountTargets_AllAvailableProducesNoFindings(t *testing.T) {
 	fake := &efsMountTargetFake{
 		results: map[string][]efstypes.MountTargetDescription{
@@ -50,9 +34,6 @@ func TestEnrichEFSMountTargets_AllAvailableProducesNoFindings(t *testing.T) {
 	}
 }
 
-// TestEnrichEFSMountTargets_OneUnavailableMTProducesFindingSevBang verifies that
-// when EFS-1 has a mount target in "creating" state, a finding with severity "!"
-// is produced for EFS-1, and EFS-2 (all available) produces no finding.
 func TestEnrichEFSMountTargets_OneUnavailableMTProducesFindingSevBang(t *testing.T) {
 	fake := &efsMountTargetFake{
 		results: map[string][]efstypes.MountTargetDescription{
@@ -83,8 +64,6 @@ func TestEnrichEFSMountTargets_OneUnavailableMTProducesFindingSevBang(t *testing
 	}
 }
 
-// TestEnrichEFSMountTargets_NilClientReturnsEmptyFindingsNoError verifies that when
-// clients.EFS is nil the enricher returns a non-nil empty Findings map and no error.
 func TestEnrichEFSMountTargets_NilClientReturnsEmptyFindingsNoError(t *testing.T) {
 	clients := &awsclient.ServiceClients{EFS: nil}
 
@@ -100,10 +79,6 @@ func TestEnrichEFSMountTargets_NilClientReturnsEmptyFindingsNoError(t *testing.T
 	}
 }
 
-// TestEnrichEFSMountTargets_APIErrorSetsTruncatedAndSurfacesError verifies that
-// when the API call for EFS-1 returns an error, the enricher sets Truncated=true,
-// produces 0 findings for that file system, and returns a composite error containing
-// the enricher prefix and the failing file system ID.
 func TestEnrichEFSMountTargets_APIErrorSetsTruncatedAndSurfacesError(t *testing.T) {
 	apiErr := errors.New("efs: DescribeMountTargets throttled")
 	fake := &efsMountTargetFake{

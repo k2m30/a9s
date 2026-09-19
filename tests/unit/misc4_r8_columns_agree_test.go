@@ -2,21 +2,9 @@
 
 package unit_test
 
-// misc4_r8_columns_agree_test.go — misc4 row 8.
-//
-// A list column is declared in two places, and ResolveListColumnCascade has
-// two arms that read them differently. When the built-in view defaults hold
-// more columns than the catalog literal and the first title matches, the
-// default column set is used WHOLE — the catalog's Key is dropped and the
-// default's Path decides the cell. Otherwise the catalog column keeps its Key
-// and only borrows the default's Path, SortKey and Humanize.
-//
-// So a title the two spell against different facts is a cell whose value
-// depends on which arm a type lands in. That is how sns and sns-sub shipped:
-// the catalog read Fields["display_name"] and Fields["confirmed"] while the
-// defaults read RawStruct.TopicArn and RawStruct.SubscriptionArn, and the
-// Topic Name and Confirmed cells said something else entirely for every
-// operator on the other arm.
+// A list column is declared in two places: the catalog literal and the
+// built-in view defaults. A title the two spell against different facts is a
+// cell whose value depends on which arm of ResolveListColumnCascade built it.
 //
 // The catalog is the source for a column's identity — which columns a type
 // has, what each reads, and the order they are built in. The defaults exist

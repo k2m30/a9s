@@ -1,9 +1,8 @@
 package unit
 
-// d3_exposure_test.go — rows 9, 10, 11, 15 and 16: listeners read one page
-// deep, a phrase that names only the first offending port, a policy verdict
-// reached by substring, an action wilddcard scoped to one service, and user
-// data that does not decode.
+// d3_exposure_test.go — listeners read to the last page, a phrase that names
+// every offending port, a policy verdict reached by parsing, an action
+// wildcard scoped to one service, and user data that does not decode.
 
 import (
 	"context"
@@ -33,7 +32,7 @@ const (
 	d3LBArn = "arn:aws:elasticloadbalancing:us-east-1:123456789012:loadbalancer/app/acme-web/abc123"
 )
 
-// --- rows 9 and 10: the listener pass ---------------------------------------
+// --- the listener pass ---------------------------------------
 
 // d3ELBFake serves listeners across two pages and attributes that raise
 // nothing, so the listener findings are the only ones under test.
@@ -99,7 +98,7 @@ func d3EnrichELB(t *testing.T, fake *d3ELBFake) awsclient.IssueEnricherResult {
 	return res
 }
 
-// TestD3ListenerOnSecondPageIsSeen pins row 9: a balancer's listeners are read
+// TestD3ListenerOnSecondPageIsSeen pins that a balancer's listeners are read
 // to the end. Stopping after one page hides a cleartext listener behind
 // whichever listeners happened to be returned first.
 func TestD3ListenerOnSecondPageIsSeen(t *testing.T) {
@@ -119,7 +118,7 @@ func TestD3ListenerOnSecondPageIsSeen(t *testing.T) {
 	// One listener, so the phrase is singular.
 }
 
-// TestD3EveryCleartextPortIsNamed pins row 10: three listeners in the clear
+// TestD3EveryCleartextPortIsNamed pins that three listeners in the clear
 // are three ports to close, and a phrase naming only the first sends the
 // operator back to the console to find the rest.
 func TestD3EveryCleartextPortIsNamed(t *testing.T) {
@@ -194,7 +193,7 @@ func TestD3RedirectingListenerIsNotInTheClear(t *testing.T) {
 	w4AssertNoCode(t, res.Findings["acme-web"], d3CodeELBPlainHTTP)
 }
 
-// --- row 11: the codeartifact policy verdict --------------------------------
+// --- the codeartifact policy verdict --------------------------------
 
 type d3CodeArtifactFake struct {
 	awsclient.CodeArtifactAPI
@@ -283,7 +282,7 @@ func d3EnrichCodeArtifact(t *testing.T, policy string) awsclient.IssueEnricherRe
 	return res
 }
 
-// TestD3CodeArtifactOpenPolicyFoundWhateverTheSpacing pins half of row 11: the
+// TestD3CodeArtifactOpenPolicyFoundWhateverTheSpacing pins that the
 // verdict comes from parsing the document, so a policy AWS pretty-printed
 // reads the same as one written without spaces.
 func TestD3CodeArtifactOpenPolicyFoundWhateverTheSpacing(t *testing.T) {
@@ -311,7 +310,7 @@ func TestD3CodeArtifactConditionedPolicyIsNotPublic(t *testing.T) {
 	}
 }
 
-// --- row 15: an action wildcard inside one service --------------------------
+// --- an action wildcard inside one service --------------------------
 
 type d3VPCEFake struct {
 	policy string
@@ -348,7 +347,7 @@ func d3FetchVPCE(t *testing.T, policy string) resource.Resource {
 	return out.Resources[0]
 }
 
-// TestD3VPCEServiceWideActionWildcardIsOpen pins row 15's ruling: an endpoint
+// TestD3VPCEServiceWideActionWildcardIsOpen pins that an endpoint
 // that grants every action of its own service to every principal is as open
 // as one granting "*". The endpoint only ever fronts that service, so the
 // narrower wildcard withholds nothing.
@@ -365,7 +364,7 @@ func TestD3VPCESingleActionIsNotOpen(t *testing.T) {
 	w4AssertNoCode(t, r.Findings, d3CodeVPCEPolicyOpen)
 }
 
-// --- row 16: user data that does not decode ---------------------------------
+// --- user data that does not decode ---------------------------------
 
 // d3LTResource builds a launch template whose default version carries the
 // given user data verbatim, the way the fetcher hands it to the enricher.
@@ -388,7 +387,7 @@ func d3LTResource(userData string) resource.Resource {
 	}
 }
 
-// TestD3UndecodableUserDataIsScannedRaw pins row 16's ruling: a credential
+// TestD3UndecodableUserDataIsScannedRaw pins that a credential
 // pasted into user data is a credential whether or not the text was ever
 // base64. The fixture is a shell script with characters base64 has no
 // alphabet for, so any decode of it must fail and the raw text is what there
@@ -449,7 +448,7 @@ func TestD3PortListIsStableWhateverTheAPIOrder(t *testing.T) {
 	}
 }
 
-// TestD3CleartextPortsMergeAcrossPages attacks rows 9 and 10 together: paging
+// TestD3CleartextPortsMergeAcrossPages pins that paging
 // and merging have to compose, or a balancer with one offending listener per
 // page reports only the page the loop happened to finish on.
 func TestD3CleartextPortsMergeAcrossPages(t *testing.T) {

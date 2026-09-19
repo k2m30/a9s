@@ -1,7 +1,6 @@
 package unit_test
 
-// aws6_drill_context_entry_points_test.go — the screen owns its context, and
-// every way into a child view carries it.
+// The screen owns its context, and every way into a child view carries it.
 //
 // A child list screen knows which parent it was opened for; that is what its
 // ParentContext is. A grandchild's declaration reads from it by name
@@ -9,11 +8,9 @@ package unit_test
 // resolver nothing and the drill opens onto an empty list with no AWS call and
 // no error — the operator sees an empty folder that is not empty.
 //
-// The fix is that the screen always has one, not that the resolver guesses.
-// Falling back to the selected row's field would put the same fact in two
-// places: the row's "bucket" is the bucket the row was LISTED from, and after a
-// cross-bucket navigation those two need not agree. The pin below locks the
-// resolver against that fallback deliberately.
+// The resolver never falls back to the selected row's field: the row's
+// "bucket" is the bucket the row was LISTED from, and after a cross-bucket
+// navigation those two need not agree.
 
 import (
 	"context"
@@ -86,9 +83,8 @@ func TestNoRelatedPivotTargetsAChildView(t *testing.T) {
 	}
 }
 
-// TestEveryParentSourcedGrandchildDrillReadsItsParent is the sweep row 21 asks
-// for, over every child view whose declaration reads from a grandparent rather
-// than over the S3 one alone.
+// TestEveryParentSourcedGrandchildDrillReadsItsParent sweeps every child view
+// whose declaration reads from a grandparent.
 func TestEveryParentSourcedGrandchildDrillReadsItsParent(t *testing.T) {
 	clients := demo.NewServiceClients()
 	byType, _ := buildVisibilityTypeCache(t)
@@ -118,11 +114,10 @@ func TestEveryParentSourcedGrandchildDrillReadsItsParent(t *testing.T) {
 	}
 }
 
-// TestResolverDoesNotFallBackToTheRowsField locks the decision the fix must NOT
-// take. The reviewer proposed reading the selected row's own field when the
-// parent context is missing; that makes the row a second source for a fact the
-// screen owns, and the two disagree the moment a row is reached from somewhere
-// other than the bucket it names.
+// Reading the selected row's own field when the parent context is missing
+// would make the row a second source for a fact the screen owns, and the two
+// disagree the moment a row is reached from somewhere other than the bucket it
+// names.
 func TestResolverDoesNotFallBackToTheRowsField(t *testing.T) {
 	child := s3ObjectsSelfChild(t)
 

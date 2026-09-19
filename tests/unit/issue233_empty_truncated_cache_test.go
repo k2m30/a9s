@@ -8,12 +8,6 @@ package unit
 // reconstructs it and every subsequent related check reports the honest
 // lower bound {Count:0, Truncated:true} (relatedResultTrunc), never a
 // definitive Count=0. See related.go and ValidateRelatedResult.
-//
-// Tests:
-//   TestContract_EmptyTruncatedPage_PreservesIsTruncated — the core case
-//   TestContract_NonEmptyTruncatedPage_PreservesIsTruncated — control
-//   TestContract_EmptyCompletePage_IsTruncatedFalse — negative control
-//   TestContract_EmptyTruncatedPage_CheckerBehavior_Direct — isolates the checker from the write-back
 
 import (
 	"context"
@@ -37,8 +31,6 @@ import (
 func setupLiveModeEC2Detail(t *testing.T) (tui.Model, []resource.Resource) {
 	t.Helper()
 
-	// Non-demo model: no WithIsDemo option.
-	// This makes the related-check dispatch use the real checker path (not demo fixtures).
 	m := newBlessedModel(t, "test-profile", "us-east-1")
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 36})
 
@@ -69,20 +61,17 @@ func setupLiveModeEC2Detail(t *testing.T) (tui.Model, []resource.Resource) {
 }
 
 // execRelatedCheckAndCollectTGResult presses Ctrl+R on the (already-open) ec2
-// detail screen — the real re-dispatch entry point now that the fan-out has
-// no standalone trigger message — and collects the "tg" RelatedCheckResult
-// from the resulting (possibly nested) tea.Batch. Returns (result, found).
+// detail screen and collects the "tg" RelatedCheckResult from the resulting
+// (possibly nested) tea.Batch. Returns (result, found).
 //
 // handleActionRefresh (core/app/actions_list.go) invalidates RelatedCache and
-// begins a fresh DetailOperation unconditionally on Ctrl+R, so the resulting
-// related-check fan-out always calls the real checker against the CURRENT
-// buildResourceCacheSnapshot() state (set by the write-back this test
-// exercises) rather than replaying a cached result.
+// begins a fresh DetailOperation unconditionally on Ctrl+R, so the checker
+// runs against the current buildResourceCacheSnapshot() state rather than
+// replaying a cached result. The "tg" leaf shows what IsTruncated the
+// write-back persisted:
 //
-// Executing the "tg" leaf reveals what IsTruncated the write-back persisted:
-//
-//	IsTruncated=true (correct)  → checker returns {Count:0, Truncated:true} (honest lower bound)
-//	IsTruncated=false (bug)     → checker returns {Count:0, Truncated:false} (wrong definitive zero)
+//	IsTruncated=true  → {Count:0, Truncated:true} (honest lower bound)
+//	IsTruncated=false → {Count:0, Truncated:false} (wrong definitive zero)
 func execRelatedCheckAndCollectTGResult(t *testing.T, m tui.Model) (result resource.RelatedCheckResult, found bool) {
 	t.Helper()
 
@@ -114,9 +103,8 @@ func TestContract_EmptyTruncatedPage_PreservesIsTruncated(t *testing.T) {
 	m, ec2Res := setupLiveModeEC2Detail(t)
 	firstInstance := ec2Res[0]
 
-	// Step 1: Write-back. Feed RelatedCheckResultMsg with empty-but-truncated CachedPages.
-	// This simulates what app_related.go:67-79 produces on a cold-miss first page
-	// where the paginated fetcher returned an empty page with more pages behind it.
+	// A cold-miss first page whose paginated fetcher returned an empty page with
+	// more pages behind it.
 	m, _ = rootApplyMsg(m, messages.RelatedCheckResult{
 		ResourceType:     "ec2",
 		SourceResourceID: firstInstance.ID,
@@ -129,18 +117,13 @@ func TestContract_EmptyTruncatedPage_PreservesIsTruncated(t *testing.T) {
 		},
 	})
 
-	// Step 2: Trigger a fresh related check to observe what the write-back persisted.
-	// Ctrl+R's checker fan-out calls buildResourceCacheSnapshot() which reads
+	// Ctrl+R's checker fan-out calls buildResourceCacheSnapshot(), which reads
 	// m.ResourceCache["tg"].pagination to reconstruct IsTruncated.
-	// If the write-back preserved it: IsTruncated=true → {Count:0, Truncated:true} (correct)
-	// If the write-back dropped it:   IsTruncated=false → {Count:0, Truncated:false} (bug)
 	got, found := execRelatedCheckAndCollectTGResult(t, m)
 	if !found {
 		t.Fatal("TG-related checker did not produce a RelatedCheckResultMsg — cannot verify write-back contract")
 	}
 
-	// EXPECTED after fix: {Count:0, Truncated:true} (IsTruncated=true preserved from write-back)
-	// ACTUAL with bug:    {Count:0, Truncated:false} (IsTruncated dropped; treated as complete)
 	if got.Count() != 0 {
 		t.Errorf("BUG #233: empty-but-truncated write-back: want Count=0, got Count=%d", got.Count())
 	}
@@ -153,21 +136,14 @@ func TestContract_EmptyTruncatedPage_PreservesIsTruncated(t *testing.T) {
 	}
 }
 
-// TestContract_NonEmptyTruncatedPage_PreservesIsTruncated is a control test.
-//
-// Contract: When CachedPages has 1+ Resources AND IsTruncated=true, the write-back
-// correctly persists IsTruncated (app.go:383 guard passes because len > 0).
-// The TG checker must return {Count:0, Truncated:true} (relatedResultTrunc)
-// when no match is found in the partial list. See related.go:34-38.
-//
-// This test PASSES with current code — the bug only affects the empty-page case.
+// TestContract_NonEmptyTruncatedPage_PreservesIsTruncated is a control: with
+// 1+ Resources and IsTruncated=true, the TG checker returns {Count:0,
+// Truncated:true} (relatedResultTrunc) when no match is found in the partial
+// list.
 func TestContract_NonEmptyTruncatedPage_PreservesIsTruncated(t *testing.T) {
 	m, ec2Res := setupLiveModeEC2Detail(t)
 	firstInstance := ec2Res[0]
 
-	// Write-back: 1 resource + IsTruncated=true.
-	// The TG has no relationship to firstInstance. Without truncation → Count=0.
-	// With IsTruncated=true → {Count:0, Truncated:true} (honest lower bound).
 	m, _ = rootApplyMsg(m, messages.RelatedCheckResult{
 		ResourceType:     "ec2",
 		SourceResourceID: firstInstance.ID,
@@ -192,17 +168,13 @@ func TestContract_NonEmptyTruncatedPage_PreservesIsTruncated(t *testing.T) {
 	}
 }
 
-// TestContract_EmptyCompletePage_IsTruncatedFalse is a negative control test.
-//
-// Contract: When CachedPages has 0 Resources AND IsTruncated=false (complete list),
-// the checker must return Count=0 (definitive: no related resources exist).
-//
-// This test PASSES with current code.
+// TestContract_EmptyCompletePage_IsTruncatedFalse is a negative control: with
+// 0 Resources and IsTruncated=false (a complete list) the checker returns the
+// definitive Count=0.
 func TestContract_EmptyCompletePage_IsTruncatedFalse(t *testing.T) {
 	m, ec2Res := setupLiveModeEC2Detail(t)
 	firstInstance := ec2Res[0]
 
-	// Write-back: empty + complete. Definitive zero — no TGs exist anywhere.
 	m, _ = rootApplyMsg(m, messages.RelatedCheckResult{
 		ResourceType:     "ec2",
 		SourceResourceID: firstInstance.ID,
@@ -227,17 +199,11 @@ func TestContract_EmptyCompletePage_IsTruncatedFalse(t *testing.T) {
 	}
 }
 
-// TestContract_EmptyTruncatedPage_CheckerBehavior_Direct directly validates
-// the TG checker's IsTruncated handling in isolation. This test confirms that
-// the checker itself correctly returns {Count:0, Truncated:true}
-// (relatedResultTrunc) on an empty-but-truncated entry, and a definitive
-// {Count:0, Truncated:false} on an empty-but-complete entry.
-// See related.go:34-38 and TruncatedResult (related.go:101-114).
-//
-// When this test passes but TestContract_EmptyTruncatedPage_PreservesIsTruncated fails,
-// the bug is definitively in the write-back (app.go:383), not in the checker.
-//
-// This test PASSES with current code.
+// TestContract_EmptyTruncatedPage_CheckerBehavior_Direct validates the TG
+// checker's IsTruncated handling in isolation from the write-back:
+// {Count:0, Truncated:true} (relatedResultTrunc) on an empty-but-truncated
+// entry, and a definitive {Count:0, Truncated:false} on an empty-but-complete
+// entry.
 func TestContract_EmptyTruncatedPage_CheckerBehavior_Direct(t *testing.T) {
 	ec2Client := fakes.NewEC2()
 	ec2Res, err := collectAllPages(func(token string) (resource.FetchResult, error) {

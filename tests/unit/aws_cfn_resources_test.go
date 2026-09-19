@@ -16,10 +16,6 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// ---------------------------------------------------------------------------
-// CFN Stack Resources fetcher tests (child of CloudFormation Stacks)
-// ---------------------------------------------------------------------------
-
 // TestFetchCfnResources_Basic verifies parsing of 3 stack resources with known
 // types, statuses, and drift info, checking ID, Name, Status, all Fields, and
 // RawStruct.
@@ -178,7 +174,6 @@ func TestFetchCfnResources_Basic(t *testing.T) {
 		}
 	})
 
-	// Verify required fields on all resources
 	t.Run("required_fields_present", func(t *testing.T) {
 		requiredFields := []string{"logical_resource_id", "physical_resource_id", "resource_type", "resource_status", "drift_status", "last_updated"}
 		for i, r := range resources {
@@ -248,7 +243,6 @@ func TestFetchCfnResources_NilDriftInformation(t *testing.T) {
 					ResourceType:         aws.String("AWS::EC2::Instance"),
 					ResourceStatus:       cfntypes.ResourceStatusCreateComplete,
 					LastUpdatedTimestamp: &lastUpdated,
-					// DriftInformation is nil
 				},
 			},
 		},
@@ -288,14 +282,12 @@ func TestFetchCfnResources_NilOptionalFields(t *testing.T) {
 					ResourceType:         aws.String("AWS::EC2::Instance"),
 					ResourceStatus:       cfntypes.ResourceStatusCreateInProgress,
 					LastUpdatedTimestamp: &lastUpdated,
-					// PhysicalResourceId is nil (resource not yet created)
-					// ResourceStatusReason is nil
+					// PhysicalResourceId is nil until the resource is created.
 				},
 			},
 		},
 	}
 
-	// Should not panic
 	result, err := awsclient.FetchCfnResources(
 		context.Background(),
 		mock,
@@ -565,7 +557,6 @@ func TestFetchCfnResources_Pagination(t *testing.T) {
 				},
 			},
 			{
-				// No NextToken — last page
 				StackResourceSummaries: []cfntypes.StackResourceSummary{
 					{
 						LogicalResourceId:    aws.String("Queue1"),
@@ -586,7 +577,6 @@ func TestFetchCfnResources_Pagination(t *testing.T) {
 		},
 	}
 
-	// Page 1: first call with empty token
 	result, err := awsclient.FetchCfnResources(
 		context.Background(),
 		mock,
@@ -624,7 +614,6 @@ func TestFetchCfnResources_Pagination(t *testing.T) {
 		}
 	})
 
-	// Page 2: second call with continuation token
 	result2, err := awsclient.FetchCfnResources(
 		context.Background(),
 		mock,
@@ -696,7 +685,6 @@ func TestFetchCfnResources_Pagination(t *testing.T) {
 			"AWS::SQS::Queue",
 			"AWS::SNS::Topic",
 		}
-		// end expectedTypes
 		allResources := make([]resource.Resource, 0, len(result.Resources)+len(result2.Resources))
 		allResources = append(allResources, result.Resources...)
 		allResources = append(allResources, result2.Resources...)

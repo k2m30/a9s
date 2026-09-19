@@ -13,14 +13,10 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// aws_ng_ebs_cache_join_test.go pins the target behavior for a rewrite of
-// checkNGEBS (core/aws/ng_related.go:241) from a two-AWS-call checker
-// (autoscaling:DescribeAutoScalingGroups + ec2:DescribeInstances) to a
-// zero-call cache join mirroring checkNGEC2: scan the "ec2" cache entry,
-// match instances by tag "eks:nodegroup-name" (guarded by "eks:cluster-name"
-// when present), then collect BlockDeviceMappings[].Ebs.VolumeId.
-//
-// These pins are RED against the current two-AWS-call implementation.
+// checkNGEBS is a zero-call cache join: it scans the "ec2" cache entry,
+// matches instances by tag "eks:nodegroup-name" (guarded by
+// "eks:cluster-name" when present), then collects
+// BlockDeviceMappings[].Ebs.VolumeId.
 
 func TestRelated_NG_EBS_CacheJoin_MatchByNodegroupTag(t *testing.T) {
 	const ngName = "general-pool"
@@ -58,7 +54,6 @@ func TestRelated_NG_EBS_CacheJoin_MatchByNodegroupTag(t *testing.T) {
 			},
 			BlockDeviceMappings: []ec2types.InstanceBlockDeviceMapping{
 				{
-					// Shared volume ID with matchedInst1 to prove dedup.
 					DeviceName: aws.String("/dev/xvda"),
 					Ebs:        &ec2types.EbsInstanceBlockDevice{VolumeId: aws.String("vol-0abc000000000shared")},
 				},
@@ -102,7 +97,7 @@ func TestRelated_NG_EBS_CacheJoin_MatchByNodegroupTag(t *testing.T) {
 	}
 
 	checker := ngCheckerByTarget(t, "ebs")
-	// New contract needs NO AWS clients — pass nil.
+	// The cache join makes no AWS calls, so clients are nil.
 	result := checker(context.Background(), nil, source, cache)
 
 	if result.Err() != nil {
@@ -137,13 +132,9 @@ func TestRelated_NG_EBS_CacheJoin_MatchByNodegroupTag(t *testing.T) {
 	}
 }
 
-// TestRelated_NG_EBS_CacheJoin_CrossClusterNodegroupNameCollision pins the
-// "eks:cluster-name" guard: an instance tagged with the SAME nodegroup name
-// as the source ("general-pool") but a DIFFERENT cluster ("other-cluster")
-// must be excluded from the volume join, even though the source nodegroup
-// belongs to "prod-cluster". Without the cluster-name guard, two clusters
-// that happen to name a nodegroup identically would leak each other's EBS
-// volumes into the RELATED panel.
+// EKS scopes a nodegroup name to its cluster, so two clusters may share one;
+// the "eks:cluster-name" tag keeps one cluster's EBS volumes out of the
+// other's RELATED panel.
 func TestRelated_NG_EBS_CacheJoin_CrossClusterNodegroupNameCollision(t *testing.T) {
 	const ngName = "general-pool"
 	const sourceCluster = "prod-cluster"
@@ -289,7 +280,6 @@ func TestRelated_NG_EBS_CacheJoin_NoEC2CacheEntry(t *testing.T) {
 			NodegroupName: aws.String(ngName),
 		},
 	}
-	// No "ec2" key present in the cache map at all.
 	cache := resource.ResourceCache{}
 
 	checker := ngCheckerByTarget(t, "ebs")
@@ -328,12 +318,6 @@ func TestRelated_NG_EBS_CacheJoin_MatchedInstanceNoBlockDeviceMappings(t *testin
 		},
 		RawStruct: ekstypes.Nodegroup{
 			NodegroupName: aws.String(ngName),
-			// Non-empty Resources.AutoScalingGroups so the OLD two-call
-			// implementation proceeds past its early Count:0 guard and
-			// instead falls through to its nil-clients State: RelatedUnknown
-			// branch — making this a true RED pin against current HEAD rather than
-			// an accidental match on the old short-circuit path. The new
-			// cache-join contract must ignore this field entirely.
 			Resources: &ekstypes.NodegroupResources{
 				AutoScalingGroups: []ekstypes.AutoScalingGroup{
 					{Name: aws.String("eks-general-pool-asg")},

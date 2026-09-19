@@ -1,16 +1,9 @@
 package unit
 
-// aws_apigw_v2_pagination_test.go — EnrichAPIGatewayStage pagination.
-//
 // GetStages V2 returns up to 100 stages per page and a NextToken when more
 // exist. After full pagination, counts are exact. If pagination exceeds
 // PerParentPageCap = 10 pages per API, the count is capped and marked "1000+".
 // Per-stage throttle and access-log checks must be applied to stages on ALL pages.
-//
-// Contract assertions:
-//   - 2 pages (100 + 20 stages) → Fields["stages_count"] == "120"; GetStages called twice
-//   - NextToken always non-nil (huge API) → capped at PerParentPageCap; "1000+"
-//   - All pages return 0 stages → stages_count == "0", no per-stage findings
 
 import (
 	"context"
@@ -28,10 +21,6 @@ import (
 
 	awsclient "github.com/k2m30/a9s/v3/core/aws"
 )
-
-// ---------------------------------------------------------------------------
-// Pagination-aware fake for APIGatewayV2 GetStages
-// ---------------------------------------------------------------------------
 
 // apigwPaginatedFake implements APIGatewayV2API and serves paginated
 // GetStages responses. Pages are keyed by API ID.
@@ -51,19 +40,16 @@ type apigwPaginatedFake struct {
 	failAt map[string]int
 }
 
-// GetAuthorizers answers empty rather than leaving the call to the embedded
+// GetAuthorizers answers rather than leaving the call to the embedded
 // nil interface. EnrichAPIGatewayStage calls it for every v2 API, and a nil
 // embedded field dereferences into a SIGSEGV that takes the whole unit
-// package down before any other test reports. See apigwGetStagesFake in
-// aws_apigw_enricher_test.go for the same fix and the reason the static
-// interface assertion cannot catch it.
+// package down before any other test reports.
 func (f *apigwPaginatedFake) GetAuthorizers(
 	_ context.Context,
 	_ *apigatewayv2.GetAuthorizersInput,
 	_ ...func(*apigatewayv2.Options),
 ) (*apigatewayv2.GetAuthorizersOutput, error) {
-	// One authorizer, so apigw.no-authorizer stays out of tests written
-	// before it existed and about something else.
+	// One authorizer keeps the apigw.no-authorizer finding out of these results.
 	return &apigatewayv2.GetAuthorizersOutput{Items: []apigwtypes.Authorizer{{
 		AuthorizerId: aws.String("auth-default"),
 		Name:         aws.String("acme-jwt"),
@@ -112,12 +98,7 @@ func (f *apigwPaginatedFake) callsFor(apiID string) int {
 	return f.callCounts[apiID]
 }
 
-// Compile-time check: apigwPaginatedFake satisfies APIGatewayV2API.
 var _ awsclient.APIGatewayV2API = (*apigwPaginatedFake)(nil)
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
 
 // makeStagesGood builds n stages that are properly configured (throttling
 // enabled, access logs enabled) — will not generate any finding.
@@ -139,10 +120,6 @@ func makeStagesGood(n int) []apigwtypes.Stage {
 	return stages
 }
 
-// ---------------------------------------------------------------------------
-// Test: GetStages pagination — 2 pages (100 + 20 stages)
-// ---------------------------------------------------------------------------
-
 // TestEnrichAPIGatewayStage_PaginatesStages verifies that the enricher
 // follows NextToken across two pages and writes the total count (120) to
 // Fields["stages_count"].
@@ -151,8 +128,6 @@ func TestEnrichAPIGatewayStage_PaginatesStages(t *testing.T) {
 
 	fake := newAPiGWPaginatedFake()
 
-	// Page 1: 100 good stages, NextToken="s1"
-	// Page 2: 20 good stages, NextToken nil (last page)
 	fake.pages[apiID] = []*apigatewayv2.GetStagesOutput{
 		{
 			Items:     makeStagesGood(100),
@@ -172,7 +147,6 @@ func TestEnrichAPIGatewayStage_PaginatesStages(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	// stages_count must reflect both pages
 	updates, ok := result.FieldUpdates[apiID]
 	if !ok {
 		t.Fatalf("FieldUpdates missing entry for %q", apiID)
@@ -182,21 +156,15 @@ func TestEnrichAPIGatewayStage_PaginatesStages(t *testing.T) {
 		t.Errorf("stages_count = %q, want %q", updates["stages_count"], wantCount)
 	}
 
-	// GetStages must have been called twice
 	calls := fake.callsFor(apiID)
 	if calls != 2 {
 		t.Errorf("GetStages called %d times, want 2", calls)
 	}
 
-	// No findings — all stages are properly configured
 	if len(result.Findings) != 0 {
 		t.Errorf("expected 0 findings, got %d: %v", len(result.Findings), result.Findings)
 	}
 }
-
-// ---------------------------------------------------------------------------
-// Test: GetStages capped at PerParentPageCap → "1000+"
-// ---------------------------------------------------------------------------
 
 // TestEnrichAPIGatewayStage_CappedAtPerParentPageCap verifies that when
 // NextToken is always non-nil (simulating an API with enormous stage count),
@@ -207,7 +175,6 @@ func TestEnrichAPIGatewayStage_CappedAtPerParentPageCap(t *testing.T) {
 
 	fake := newAPiGWPaginatedFake()
 
-	// Build PerParentPageCap+2 pages, all with NextToken set, 100 stages/page.
 	pages := make([]*apigatewayv2.GetStagesOutput, awsclient.PerParentPageCap+2)
 	for i := range pages {
 		pages[i] = &apigatewayv2.GetStagesOutput{
@@ -225,13 +192,11 @@ func TestEnrichAPIGatewayStage_CappedAtPerParentPageCap(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	// GetStages must be called exactly PerParentPageCap times
 	calls := fake.callsFor(apiID)
 	if calls != awsclient.PerParentPageCap {
 		t.Errorf("GetStages called %d times, want exactly %d (PerParentPageCap)", calls, awsclient.PerParentPageCap)
 	}
 
-	// stages_count must carry "+" suffix
 	updates, ok := result.FieldUpdates[apiID]
 	if !ok {
 		t.Fatalf("FieldUpdates missing entry for %q", apiID)
@@ -246,10 +211,6 @@ func TestEnrichAPIGatewayStage_CappedAtPerParentPageCap(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// Test: zero stages across all pages → "0", no per-stage findings
-// ---------------------------------------------------------------------------
-
 // TestEnrichAPIGatewayStage_ZeroStagesAcrossPages verifies that when all
 // pages return 0 stages, stages_count is "0" and no per-stage findings
 // are emitted.
@@ -258,7 +219,6 @@ func TestEnrichAPIGatewayStage_ZeroStagesAcrossPages(t *testing.T) {
 
 	fake := newAPiGWPaginatedFake()
 
-	// Single page, 0 stages, no NextToken
 	fake.pages[apiID] = []*apigatewayv2.GetStagesOutput{
 		{
 			Items:     []apigwtypes.Stage{},
@@ -274,7 +234,6 @@ func TestEnrichAPIGatewayStage_ZeroStagesAcrossPages(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	// stages_count must be "0"
 	updates, ok := result.FieldUpdates[apiID]
 	if !ok {
 		t.Fatalf("FieldUpdates missing entry for %q", apiID)

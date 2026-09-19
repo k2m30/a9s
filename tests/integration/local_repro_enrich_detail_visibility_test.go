@@ -8,11 +8,8 @@ import (
 	"testing"
 )
 
-// TestEnrichDetailBackgroundCheckVisible verifies that when an RDS instance has
-// pending maintenance actions, opening its detail view shows the "⚠ Background Check"
-// section. Bug B2: arnSuffix fallback keys findings by cluster ARN suffix rather than
-// probed instance ID, so detail lookup (findings[resource.ID]) always misses → section
-// never appears.
+// An RDS instance with pending maintenance actions shows the
+// "⚠ Background Check" section in its detail view.
 //
 // Requires a live AWS profile with at least one RDS instance that has pending
 // maintenance actions:

@@ -12,11 +12,6 @@ import (
 	"github.com/k2m30/a9s/v3/internal/tui"
 )
 
-// TestBugReveal_EC2Detail_RelatedVisibleAcrossWidths verifies the RELATED
-// panel remains visible on the EC2 detail view across a spectrum of terminal
-// widths: 60 (minimum supported boundary), 76, 95, 120, and 160. Width 40 is
-// below the app's 60-column floor and shows "Terminal too narrow" instead of
-// the detail view, so it is excluded.
 func TestBugReveal_EC2Detail_RelatedVisibleAcrossWidths(t *testing.T) {
 	ec2 := mustDemoEC2(t)
 	for _, w := range []int{60, 76, 95, 120, 160} {

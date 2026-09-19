@@ -1,21 +1,7 @@
 package unit_test
 
-// ec2_stories_nav_chains_test.go — EC2 navigation chain stories.
-//
-// Covers stories:
-//   EC2-027, EC2-028             Section 4  — count=1 right-col Enter opens detail
-//   EC2-030, EC2-031, EC2-032    Section 5  — filtered list drill-down + Esc chain
-//   EC2-034                      Section 5  — EBS snapshot multi-hop (P2)
-//   EC2-035..EC2-041             Section 6  — full navigation chains
-//   EC2-042, EC2-046             Section 7  — edge cases: missing resource, depth indicator
-//   EC2-058, EC2-059             Section 7  — CloudTrail pre-filter, session cache (P2)
-//
-// Package: unit_test (no build tags — runs under go test ./tests/unit/ without flags)
-//
-// Most tests FAIL AT RUNTIME until handleRelatedNavigate in app_handlers.go is fixed
-// to push TargetDetail when TargetID is set (count=1 path) and to filter by exact
-// RelatedIDs when multiple IDs are provided. Tests marked [PASSES NOW] are regression
-// guards that document current behaviour.
+// ec2_stories_nav_chains_test.go — EC2 navigation chains: related pivots,
+// filtered-list drill-downs, Esc unwinds, and deep stacks.
 
 import (
 	"strings"
@@ -30,10 +16,6 @@ import (
 	"github.com/k2m30/a9s/v3/internal/tui"
 	"github.com/k2m30/a9s/v3/tests/unit/tuitest"
 )
-
-// ---------------------------------------------------------------------------
-// Local helpers
-// ---------------------------------------------------------------------------
 
 // chainApplyMsg forwards a message through tui.Model.Update and type-asserts
 // the result back to tui.Model.
@@ -114,10 +96,6 @@ func chainEsc(m tui.Model) tui.Model {
 	return m
 }
 
-// ---------------------------------------------------------------------------
-// Section 4 — Right Column Enter (count=1): EC2-027, EC2-028
-// ---------------------------------------------------------------------------
-
 // TestEC2_027_ASG_Count1_OpensDetail verifies that a RelatedNavigateMsg with
 // TargetType "asg" and a single TargetID opens the asg's DETAIL view: a
 // related pivot that narrows to exactly ONE resource always opens that
@@ -169,8 +147,6 @@ func TestEC2_027_ASG_Count1_OpensDetail(t *testing.T) {
 
 // TestEC2_028_EIP_Count1_OpensDetail verifies that a RelatedNavigateMsg with
 // TargetType "eip" and a single TargetID pushes an EIP detail view.
-//
-// FAILS AT RUNTIME until handleRelatedNavigate pushes TargetDetail for count=1.
 func TestEC2_028_EIP_Count1_OpensDetail(t *testing.T) {
 	m := newChainDemoModel(t)
 	m = chainNavigateToEC2Detail(t, m)
@@ -203,15 +179,8 @@ func TestEC2_028_EIP_Count1_OpensDetail(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// Section 5 — Filtered list drill-down: EC2-030, EC2-031, EC2-032, EC2-034
-// ---------------------------------------------------------------------------
-
 // TestEC2_030_EnterOnAlarmInFilteredList verifies the three-step sequence:
 // EC2 detail → filtered alarm list → alarm detail.
-//
-// FAILS AT RUNTIME until handleRelatedNavigate filters by exact RelatedIDs and
-// NavigateMsg(TargetDetail) pushes detail over a list view.
 func TestEC2_030_EnterOnAlarmInFilteredList(t *testing.T) {
 	m := newChainDemoModel(t)
 	m = chainNavigateToEC2Detail(t, m)
@@ -228,7 +197,6 @@ func TestEC2_030_EnterOnAlarmInFilteredList(t *testing.T) {
 		RelatedIDs: []string{"web-prod-cpu-high", "web-prod-status-check"},
 	})
 
-	// Now open alarm detail via NavigateMsg
 	m, _ = chainApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetDetail,
 		ResourceType: "alarm",
@@ -245,8 +213,6 @@ func TestEC2_030_EnterOnAlarmInFilteredList(t *testing.T) {
 
 // TestEC2_031_EscFromAlarmDetail_ReturnsToFilteredList verifies that pressing Esc
 // from the alarm detail returns to the filtered alarm list.
-//
-// FAILS AT RUNTIME until the navigation chain is correctly managed by the stack.
 func TestEC2_031_EscFromAlarmDetail_ReturnsToFilteredList(t *testing.T) {
 	m := newChainDemoModel(t)
 	m = chainNavigateToEC2Detail(t, m)
@@ -257,20 +223,17 @@ func TestEC2_031_EscFromAlarmDetail_ReturnsToFilteredList(t *testing.T) {
 	}
 	m = chainPreloadResources(m, "alarm", alarms)
 
-	// Push filtered alarm list
 	m, _ = chainApplyMsg(m, messages.RelatedNavigate{
 		TargetType: "alarm",
 		RelatedIDs: []string{"web-prod-cpu-high", "web-prod-status-check"},
 	})
 
-	// Push alarm detail
 	m, _ = chainApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetDetail,
 		ResourceType: "alarm",
 		Resource:     &alarms[0],
 	})
 
-	// Esc from alarm detail
 	m = chainEsc(m)
 
 	view := chainStrip(chainViewContent(m))
@@ -292,8 +255,6 @@ func TestEC2_031_EscFromAlarmDetail_ReturnsToFilteredList(t *testing.T) {
 
 // TestEC2_032_EscFromFilteredList_ReturnsToEC2Detail verifies that pressing Esc
 // from the filtered alarm list returns to the EC2 detail view.
-//
-// FAILS AT RUNTIME until the navigation stack correctly pops back to EC2 detail.
 func TestEC2_032_EscFromFilteredList_ReturnsToEC2Detail(t *testing.T) {
 	m := newChainDemoModel(t)
 	m = chainNavigateToEC2Detail(t, m)
@@ -304,13 +265,11 @@ func TestEC2_032_EscFromFilteredList_ReturnsToEC2Detail(t *testing.T) {
 	}
 	m = chainPreloadResources(m, "alarm", alarms)
 
-	// Push filtered alarm list
 	m, _ = chainApplyMsg(m, messages.RelatedNavigate{
 		TargetType: "alarm",
 		RelatedIDs: []string{"web-prod-cpu-high", "web-prod-status-check"},
 	})
 
-	// Push alarm detail
 	m, _ = chainApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetDetail,
 		ResourceType: "alarm",
@@ -333,8 +292,6 @@ func TestEC2_032_EscFromFilteredList_ReturnsToEC2Detail(t *testing.T) {
 
 // TestEC2_034_EBSSnapshots_MultiHop verifies that a RelatedNavigateMsg for EBS
 // snapshots with two RelatedIDs shows exactly those two snapshots in a filtered list.
-//
-// FAILS AT RUNTIME until handleRelatedNavigate filters by exact RelatedIDs.
 func TestEC2_034_EBSSnapshots_MultiHop(t *testing.T) {
 	m := newChainDemoModel(t)
 	m = chainNavigateToEC2Detail(t, m)
@@ -364,14 +321,8 @@ func TestEC2_034_EBSSnapshots_MultiHop(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// Section 6 — Full navigation chains: EC2-035 through EC2-041
-// ---------------------------------------------------------------------------
-
 // TestEC2_035_ChainA_EC2ToVPCAndBack verifies the forward and return chain:
 // EC2 detail → VPC detail (via RelatedNavigateMsg) → Esc → EC2 detail.
-//
-// FAILS AT RUNTIME until handleRelatedNavigate pushes TargetDetail for count=1.
 func TestEC2_035_ChainA_EC2ToVPCAndBack(t *testing.T) {
 	m := newChainDemoModel(t)
 	m = chainNavigateToEC2Detail(t, m)
@@ -388,7 +339,6 @@ func TestEC2_035_ChainA_EC2ToVPCAndBack(t *testing.T) {
 	}
 	m = chainPreloadResources(m, "vpc", []resource.Resource{vpcRes})
 
-	// Navigate to VPC detail
 	m, _ = chainApplyMsg(m, messages.RelatedNavigate{
 		TargetType: "vpc",
 		TargetID:   "vpc-0abc123def456789a",
@@ -411,8 +361,6 @@ func TestEC2_035_ChainA_EC2ToVPCAndBack(t *testing.T) {
 }
 
 // TestEC2_036_ChainB_EC2ToSubnetAndBack verifies EC2 detail → Subnet detail → Esc.
-//
-// FAILS AT RUNTIME until handleRelatedNavigate pushes TargetDetail for count=1.
 func TestEC2_036_ChainB_EC2ToSubnetAndBack(t *testing.T) {
 	m := newChainDemoModel(t)
 	m = chainNavigateToEC2Detail(t, m)
@@ -429,7 +377,6 @@ func TestEC2_036_ChainB_EC2ToSubnetAndBack(t *testing.T) {
 	}
 	m = chainPreloadResources(m, "subnet", []resource.Resource{subnetRes})
 
-	// Navigate to Subnet detail
 	m, _ = chainApplyMsg(m, messages.RelatedNavigate{
 		TargetType: "subnet",
 		TargetID:   "subnet-0aaa111111111111a",
@@ -452,8 +399,6 @@ func TestEC2_036_ChainB_EC2ToSubnetAndBack(t *testing.T) {
 }
 
 // TestEC2_037_ChainC_EC2ToSGAndBack verifies EC2 detail → SG detail → Esc.
-//
-// FAILS AT RUNTIME until handleRelatedNavigate pushes TargetDetail for count=1.
 func TestEC2_037_ChainC_EC2ToSGAndBack(t *testing.T) {
 	m := newChainDemoModel(t)
 	m = chainNavigateToEC2Detail(t, m)
@@ -470,7 +415,6 @@ func TestEC2_037_ChainC_EC2ToSGAndBack(t *testing.T) {
 	}
 	m = chainPreloadResources(m, "sg", []resource.Resource{sgRes})
 
-	// Navigate to SG detail
 	m, _ = chainApplyMsg(m, messages.RelatedNavigate{
 		TargetType: "sg",
 		TargetID:   "sg-0aaa111111111111a",
@@ -546,9 +490,6 @@ func TestEC2_038_ChainD_EC2TabToTGAndBack(t *testing.T) {
 
 // TestEC2_039_ChainE_EC2ToAlarmListToDetailAndBackx2 verifies the five-step chain:
 // EC2 detail → filtered alarm list (2 alarms) → alarm detail → Esc → alarm list → Esc → EC2 detail.
-//
-// FAILS AT RUNTIME until handleRelatedNavigate filters by RelatedIDs and the stack
-// manages multiple hops correctly.
 func TestEC2_039_ChainE_EC2ToAlarmListToDetailAndBackx2(t *testing.T) {
 	m := newChainDemoModel(t)
 	m = chainNavigateToEC2Detail(t, m)
@@ -574,7 +515,6 @@ func TestEC2_039_ChainE_EC2ToAlarmListToDetailAndBackx2(t *testing.T) {
 		t.Errorf("EC2-039 step1: filtered alarm list must NOT contain unrelated alarm %q; got:\n%s", "other-server-alarm", viewList1)
 	}
 
-	// Step 2: Push alarm detail
 	m, _ = chainApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetDetail,
 		ResourceType: "alarm",
@@ -611,8 +551,6 @@ func TestEC2_039_ChainE_EC2ToAlarmListToDetailAndBackx2(t *testing.T) {
 // Navigation sequence (depths assuming menu=1, ec2-list=2, ec2-detail=3):
 //
 //	EC2 detail (3) → VPC detail (4) → Subnet list (5) → Subnet detail (6) → unwind.
-//
-// FAILS AT RUNTIME until handleRelatedNavigate correctly manages deep stacks.
 func TestEC2_040_ChainF_Depth6_EC2ToVPCToSubnetAndBack(t *testing.T) {
 	m := newChainDemoModel(t)
 	// stack: menu (1)
@@ -700,8 +638,6 @@ func TestEC2_040_ChainF_Depth6_EC2ToVPCToSubnetAndBack(t *testing.T) {
 
 // TestEC2_041_ChainG_MixedLeftAndRight verifies a mixed left+right column navigation:
 // EC2 detail → SG detail (left-col Enter) → EC2 filtered list (right-col Enter) → Esc → SG detail → Esc → EC2 detail.
-//
-// FAILS AT RUNTIME until handleRelatedNavigate correctly handles the full chain.
 func TestEC2_041_ChainG_MixedLeftAndRight(t *testing.T) {
 	m := newChainDemoModel(t)
 	m = chainNavigateToEC2Detail(t, m)
@@ -759,10 +695,6 @@ func TestEC2_041_ChainG_MixedLeftAndRight(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// Section 7 — Edge cases: EC2-042, EC2-046, EC2-058, EC2-059
-// ---------------------------------------------------------------------------
-
 // TestEC2_042_NavToMissingResource_FlashMessage verifies that navigating to a
 // resource ID that does not exist in the demo cache either:
 //
@@ -771,9 +703,6 @@ func TestEC2_041_ChainG_MixedLeftAndRight(t *testing.T) {
 //
 // Both outcomes are acceptable — the critical invariant is that the user is NOT
 // silently moved to an empty or broken view.
-//
-// FAILS AT RUNTIME until handleRelatedNavigate emits a FlashMsg on cache miss
-// (currently it creates a new empty list and fetches — no flash, no stay).
 func TestEC2_042_NavToMissingResource_FlashMessage(t *testing.T) {
 	m := newChainDemoModel(t)
 	m = chainNavigateToEC2Detail(t, m)
@@ -801,8 +730,7 @@ func TestEC2_042_NavToMissingResource_FlashMessage(t *testing.T) {
 	}
 }
 
-// TestEC2_046_DepthIndicator covers story EC2-046: the header shows [N] when
-// depth > 4.
+// TestEC2_046_DepthIndicator: the header shows [N] when depth > 4.
 func TestEC2_046_DepthIndicator(t *testing.T) {
 	m := newChainDemoModel(t)
 	// Stack depth starts at 1 (main menu).
@@ -846,7 +774,7 @@ func TestEC2_046_DepthIndicator(t *testing.T) {
 
 	view6 := chainStrip(chainViewContent(m))
 
-	// Expected: header shows "[6]" instead of version. Not yet implemented.
+	// The header shows "[6]" instead of the version.
 	if !strings.Contains(view6, "[6]") {
 		t.Errorf("EC2-046: at stack depth 6, header must contain %q depth indicator; got header area:\n%s",
 			"[6]", view6)
@@ -862,14 +790,14 @@ func TestEC2_046_DepthIndicator(t *testing.T) {
 	// Esc back to depth 4 — version should reappear (depth <= 4)
 	m = chainEsc(m)
 	view4 := chainStrip(chainViewContent(m))
-	// At depth 4, version should appear (no depth indicator needed per spec)
+	// At depth 4 the version appears, with no depth indicator.
 	if strings.Contains(view4, "[4]") {
 		t.Errorf("EC2-046: at stack depth 4, header must NOT contain [4] depth indicator; got:\n%s", view4)
 	}
 }
 
-// TestEC2_058_CloudTrailPreFiltered covers story EC2-058: navigating to
-// CloudTrail Events from an EC2 detail right column pre-filters the search.
+// TestEC2_058_CloudTrailPreFiltered: navigating to CloudTrail Events from an
+// EC2 detail right column pre-filters the search.
 func TestEC2_058_CloudTrailPreFiltered(t *testing.T) {
 	m := newChainDemoModel(t)
 	m = chainNavigateToEC2Detail(t, m)
@@ -906,24 +834,18 @@ func TestEC2_058_CloudTrailPreFiltered(t *testing.T) {
 // The test verifies the cache contract indirectly: we deliver RelatedCheckResultMsg
 // results, navigate away, and verify the model's ResourcesLoadedMsg handling doesn't
 // wipe the cache.
-//
-// Priority: P2 — PASSES if the cache is not invalidated on navigation. FAILS if the
-// implementation re-fetches on every entry.
 func TestEC2_059_SessionCachePreventsRecheck(t *testing.T) {
 	m := newChainDemoModel(t)
 	m = chainNavigateToEC2Detail(t, m)
 
-	// Deliver related check results for this EC2 instance
 	checkResult := messages.RelatedCheckResult{
 		ResourceType: "ec2",
 		Result:       resource.KnownRelated("tg", []string{"tg-web-prod"}, false),
 	}
 	m, _ = chainApplyMsg(m, checkResult)
 
-	// Navigate away from EC2 detail (Esc to go back)
 	m = chainEsc(m)
 
-	// Navigate back to the same EC2 detail
 	ec2Res := ec2TestResource()
 	m, _ = chainApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetDetail,

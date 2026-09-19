@@ -1,19 +1,13 @@
-// costs_fixture_anchor_test.go — the demo costs dataset has exactly one
-// clock, and every test that reads that dataset must read the same one.
+// The demo costs dataset has exactly one clock, and every test that reads it
+// must read the same one.
 //
-// core/demo/fixtures/costs.go anchors its 13-month synthetic window to a
-// month resolved from the wall clock, so a test that hard-codes a month
-// label ("Jan'26"), a window bound, or the planted anomaly's coordinate is
-// a SECOND source of truth for "which months exist". The two agree only in
-// the month the literal was written in and silently disagree every month
-// after — the drift that took three costs tests red without a single line
-// of production code changing.
+// core/demo/fixtures/costs.go anchors its 13-month synthetic window to a month
+// resolved from the wall clock, so a test that hard-codes a month label
+// ("Jan'26"), a window bound, or the planted anomaly's coordinate is a second
+// source of truth for "which months exist" and disagrees with the fixture
+// every month after the literal was written.
 //
-// The helpers below are the only sanctioned way for a test to name a month
-// of that dataset: they derive it from the fixture's own exported anchor.
-// The table test at the bottom pins the property that makes the derivation
-// safe — the generator's whole month window, and the planted anomaly inside
-// it, move together with the anchor, at any anchor.
+// The helpers below derive a month from the fixture's own exported anchor.
 
 package unit
 
@@ -56,14 +50,10 @@ func costsFixtureNowInMonth(t *testing.T, month string) time.Time {
 	return costsFixtureMonthTime(t, month).AddDate(0, 0, 14)
 }
 
-// TestCostsFixtureAnchorNow_WindowAlwaysCoversTheGrowthStory pins the one
-// property every converted costs test leans on: a MONTH window built from
-// the fixture's anchor instant always ends at the anchor month AND contains
-// the planted growth/anomaly month. That is what makes "find the column
-// labelled after CostsGrowthMonth" a safe assertion instead of a literal.
-// Checked across a year rollover and a short month, because the helper
-// picks a day inside the anchor month and a day arithmetic that slipped
-// into a neighbouring month would silently shift the whole window by one.
+// A MONTH window built from the fixture's anchor instant always ends at the
+// anchor month and contains the planted growth/anomaly month. Checked across a
+// year rollover and a short month, because a day arithmetic that slipped into
+// a neighbouring month would shift the whole window by one.
 func TestCostsFixtureAnchorNow_WindowAlwaysCoversTheGrowthStory(t *testing.T) {
 	anchors := []time.Time{
 		time.Date(2026, time.January, 15, 12, 0, 0, 0, time.UTC),
@@ -116,16 +106,11 @@ func costsFixtureMonthLabel(t *testing.T, month string) string {
 	}, costs.GranularityMonth)
 }
 
-// TestCostsFixtures_AnchorDrivesTheWholeDataset pins that the synthetic
-// costs dataset is a pure function of its anchor: the 13-month window ends
-// at the anchor month, the planted growth story sits at a FIXED OFFSET
-// inside that window (index 6), and the single planted anomaly names that
-// same month and the same service/usage type the growth ramp was built
-// from. Run at a pinned anchor and at anchor+13 months — the second anchor
-// shares no month with the first, so any month that stayed put between the
-// two runs (a constant baked into the generator instead of derived from the
-// anchor) shows up as a mismatch here rather than as a costs test that
-// mysteriously goes red next quarter.
+// The synthetic costs dataset is a pure function of its anchor: the 13-month
+// window ends at the anchor month, the planted growth story sits at index 6
+// inside it, and the single planted anomaly names that month and the growth
+// ramp's service/usage type. The second anchor shares no month with the
+// first, so a month constant baked into the generator shows up as a mismatch.
 //
 // The window length (13) and the growth offset (6) are spelled out rather
 // than read from fixtures.CostsWindowMonths / CostsGrowthMonthIndex on

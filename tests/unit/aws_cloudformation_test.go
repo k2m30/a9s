@@ -14,10 +14,6 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// ---------------------------------------------------------------------------
-// T070 - Test CloudFormation DescribeStacks response parsing
-// ---------------------------------------------------------------------------
-
 func TestFetchCloudFormationStacks_ParsesMultipleStacks(t *testing.T) {
 	creationTime := time.Date(2025, 1, 15, 10, 0, 0, 0, time.UTC)
 	lastUpdated := time.Date(2025, 3, 10, 14, 30, 0, 0, time.UTC)
@@ -64,7 +60,6 @@ func TestFetchCloudFormationStacks_ParsesMultipleStacks(t *testing.T) {
 		t.Fatalf("expected 2 resources, got %d", len(resources))
 	}
 
-	// Verify required fields exist
 	requiredFields := []string{"stack_name", "status", "creation_time", "last_updated", "description"}
 	for i, r := range resources {
 		for _, key := range requiredFields {
@@ -74,7 +69,6 @@ func TestFetchCloudFormationStacks_ParsesMultipleStacks(t *testing.T) {
 		}
 	}
 
-	// Verify first stack
 	r0 := resources[0]
 	if r0.ID != "prod-infra-stack" {
 		t.Errorf("resource[0].ID: expected %q, got %q", "prod-infra-stack", r0.ID)
@@ -101,7 +95,6 @@ func TestFetchCloudFormationStacks_ParsesMultipleStacks(t *testing.T) {
 		t.Error("resource[0].Fields[\"last_updated\"] should not be empty")
 	}
 
-	// Verify second stack
 	r1 := resources[1]
 	if r1.ID != "staging-app-stack" {
 		t.Errorf("resource[1].ID: expected %q, got %q", "staging-app-stack", r1.ID)

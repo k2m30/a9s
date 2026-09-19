@@ -1,15 +1,5 @@
 package unit
 
-// aws_dbc_test.go — fetcher tests for the dbc (DocumentDB cluster) resource type.
-// // Tests exercise FetchDocDBClusters and FetchDocDBClustersPage, verifying:
-// - All required Fields are populated with correct values.
-// - CIS flags (cis_flags) are computed correctly from StorageEncrypted,
-// BackupRetentionPeriod, and DeletionProtection.
-// - has_writer / writer_count are set correctly for various member configs.
-// - Pagination: Marker is threaded correctly; IsTruncated is set when present.
-// - Error propagation returns a wrapped error.
-// - Empty API response returns empty Resources slice (not nil).
-
 import (
 	"context"
 	"fmt"
@@ -26,16 +16,11 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// singlePageDocDB returns a fake that returns one page with the given clusters.
 func singlePageDocDB(clusters []docdbtypes.DBCluster) *fakeDocDBDescribeDBClusters {
 	return &fakeDocDBDescribeDBClusters{
 		Output: &docdb.DescribeDBClustersOutput{DBClusters: clusters},
 	}
 }
-
-// ---------------------------------------------------------------------------
-// T-DBC-01: field mapping
-// ---------------------------------------------------------------------------
 
 func TestFetchDocDBClusters_FieldMapping(t *testing.T) {
 	mock := singlePageDocDB([]docdbtypes.DBCluster{
@@ -68,14 +53,12 @@ func TestFetchDocDBClusters_FieldMapping(t *testing.T) {
 
 	r := resources[0]
 
-	// ID and Name are the cluster identifier.
 	if r.ID != "prod-docdb-01" {
 		t.Errorf("ID = %q, want %q", r.ID, "prod-docdb-01")
 	}
 	if r.Name != "prod-docdb-01" {
 		t.Errorf("Name = %q, want %q", r.Name, "prod-docdb-01")
 	}
-	// Status is always "" (phrases moved to Findings + Fields["status"]).
 	if len(r.Findings) != 0 {
 		phrases := make([]string, len(r.Findings))
 		for i, f := range r.Findings {
@@ -84,7 +67,6 @@ func TestFetchDocDBClusters_FieldMapping(t *testing.T) {
 		t.Errorf("Findings = %v, want empty slice for healthy cluster", phrases)
 	}
 
-	// Required field keys. cis_flags is intentionally absent (jargon column removed).
 	requiredFields := []string{
 		"cluster_id", "engine_version", "status", "instances",
 		"endpoint", "arn", "has_writer", "writer_count",
@@ -99,11 +81,10 @@ func TestFetchDocDBClusters_FieldMapping(t *testing.T) {
 		t.Errorf("Fields unexpectedly contains cis_flags — jargon column must not ship")
 	}
 
-	// Specific field values.
 	wantFields := map[string]string{
 		"cluster_id":              "prod-docdb-01",
 		"engine_version":          "5.0.0",
-		"status":                  "", // Healthy → blank phrase (§4)
+		"status":                  "",
 		"instances":               "2",
 		"endpoint":                "prod-docdb-01.cluster-xyz.us-east-1.docdb.amazonaws.com",
 		"arn":                     "arn:aws:rds:us-east-1:123456789012:cluster:prod-docdb-01",
@@ -119,16 +100,6 @@ func TestFetchDocDBClusters_FieldMapping(t *testing.T) {
 		}
 	}
 }
-
-// CIS flags column removed per universal-rule U10 (no jargon columns). The
-// underlying signals (unencrypted, no backup, no deletion protection) are now
-// tested via the §4 Status phrase tests (warn-dbc-unenc, warn-dbc-no-bkp,
-// warn-dbc-no-prot, warn-dbc-multi) — see aws_dbc_test.go below and
-// docs/resources/dbc.md §4.
-
-// ---------------------------------------------------------------------------
-// T-DBC-03: has_writer / writer_count
-// ---------------------------------------------------------------------------
 
 func TestFetchDocDBClusters_WriterCount(t *testing.T) {
 	cases := []struct {
@@ -212,17 +183,9 @@ func TestFetchDocDBClusters_WriterCount(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// T-DBC-04: nil field guards
-// ---------------------------------------------------------------------------
-
-// TestFetchDocDBClusters_NilFields verifies that nil pointer fields in the
-// DBCluster struct (identifier, engine_version, status, endpoint) are handled
-// gracefully — each falls back to an empty string.
 func TestFetchDocDBClusters_NilFields(t *testing.T) {
 	mock := singlePageDocDB([]docdbtypes.DBCluster{
 		{
-			// All optional fields are nil.
 			DBClusterIdentifier:   nil,
 			EngineVersion:         nil,
 			Status:                nil,
@@ -252,23 +215,16 @@ func TestFetchDocDBClusters_NilFields(t *testing.T) {
 	if r.Fields["endpoint"] != "" {
 		t.Errorf("endpoint = %q, want empty string for nil pointer", r.Fields["endpoint"])
 	}
-	// nil DeletionProtection → defaults to "true" (safe default).
 	if r.Fields["deletion_protection"] != "true" {
 		t.Errorf("deletion_protection = %q, want %q for nil pointer", r.Fields["deletion_protection"], "true")
 	}
-	// nil StorageEncrypted → defaults to "true" (safe default).
 	if r.Fields["storage_encrypted"] != "true" {
 		t.Errorf("storage_encrypted = %q, want %q for nil pointer", r.Fields["storage_encrypted"], "true")
 	}
-	// nil BackupRetentionPeriod → defaults to "0".
 	if r.Fields["backup_retention_period"] != "0" {
 		t.Errorf("backup_retention_period = %q, want %q for nil pointer", r.Fields["backup_retention_period"], "0")
 	}
 }
-
-// ---------------------------------------------------------------------------
-// T-DBC-05: empty response
-// ---------------------------------------------------------------------------
 
 func TestFetchDocDBClusters_Empty(t *testing.T) {
 	mock := singlePageDocDB(nil)
@@ -279,15 +235,10 @@ func TestFetchDocDBClusters_Empty(t *testing.T) {
 	if err != nil {
 		t.Fatalf("FetchDocDBClusters error: %v", err)
 	}
-	// Empty response: resources is nil or empty — either is fine.
 	if len(resources) != 0 {
 		t.Errorf("expected 0 resources, got %d", len(resources))
 	}
 }
-
-// ---------------------------------------------------------------------------
-// T-DBC-06: error propagation
-// ---------------------------------------------------------------------------
 
 func TestFetchDocDBClusters_APIError(t *testing.T) {
 	mock := &fakeDocDBDescribeDBClusters{Err: fmt.Errorf("throttled")}
@@ -301,10 +252,6 @@ func TestFetchDocDBClusters_APIError(t *testing.T) {
 		t.Errorf("expected 0 resources on error, got %d", len(resources))
 	}
 }
-
-// ---------------------------------------------------------------------------
-// T-DBC-07: pagination — Marker is threaded; IsTruncated set when Marker present.
-// ---------------------------------------------------------------------------
 
 func TestFetchDocDBClustersPage_Pagination(t *testing.T) {
 	marker := "next-page-token"
@@ -375,11 +322,6 @@ func TestFetchDocDBClusters_MultiPageAccumulates(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// RDS cluster tests — computeRDSDBClusterStatusAndIssues via FetchRDSDBClustersPage
-// ---------------------------------------------------------------------------
-
-// mockRDSClustersClient satisfies RDSDescribeDBClustersAPI for a single page.
 type mockRDSClustersClient struct {
 	out *rds.DescribeDBClustersOutput
 	err error
@@ -391,8 +333,6 @@ func (m *mockRDSClustersClient) DescribeDBClusters(
 	return m.out, m.err
 }
 
-// rdsClusterPage is a test helper that calls FetchRDSDBClustersPage with a
-// single-cluster page and returns the first resource + error.
 func rdsClusterPage(t *testing.T, cluster rdstypes.DBCluster) (resource.FetchResult, error) {
 	t.Helper()
 	mock := &mockRDSClustersClient{
@@ -403,13 +343,6 @@ func rdsClusterPage(t *testing.T, cluster rdstypes.DBCluster) (resource.FetchRes
 	return awsclient.FetchRDSDBClustersPage(context.Background(), mock, "")
 }
 
-// ---------------------------------------------------------------------------
-// T-DBC-08: dual-SDK pagination — DocDB token sequence transitions to RDS.
-// Issue 5 regression pin.
-// ---------------------------------------------------------------------------
-
-// fullDocDBMock implements awsclient.DocDBAPI. Only DescribeDBClusters is
-// exercised by the dbc fetcher; all other methods return empty no-ops.
 type fullDocDBMock struct {
 	dbClustersPages []docdb.DescribeDBClustersOutput
 	dbClustersCall  int
@@ -452,8 +385,6 @@ func (m *fullDocDBMock) DescribePendingMaintenanceActions(
 	return &docdb.DescribePendingMaintenanceActionsOutput{}, nil
 }
 
-// fullRDSMock implements awsclient.RDSAPI. Only DescribeDBClusters is
-// exercised by the dbc fetcher; all other methods return empty no-ops.
 type fullRDSMock struct {
 	dbClustersPages []rds.DescribeDBClustersOutput
 	dbClustersCall  int
@@ -520,7 +451,6 @@ func (m *fullRDSMock) DescribePendingMaintenanceActions(
 	return &rds.DescribePendingMaintenanceActionsOutput{}, nil
 }
 
-// buildDocDBCluster is a minimal DocDB cluster builder for pagination tests.
 func buildDocDBCluster(id string) docdbtypes.DBCluster {
 	return docdbtypes.DBCluster{
 		DBClusterIdentifier: aws.String(id),
@@ -530,30 +460,16 @@ func buildDocDBCluster(id string) docdbtypes.DBCluster {
 	}
 }
 
-// TestDbc_Pagination_MultiPage_Success drives the registered "dbc" paginated
-// fetcher through the full DocDB→RDS token-prefix transition and verifies:
-// // - tick 1 (token=""): fetches DocDB page 1 (has more); no RDS call yet.
-// Result: DocDB page 1 rows, NextToken="docdb:d1", IsTruncated=true.
-// // - tick 2 (token="docdb:d1"): fetches DocDB page 2 (last DocDB page),
-// then immediately fetches RDS page 1 (has more). Result: DocDB page 2
-// rows + RDS page 1 rows concatenated, NextToken="rds:r1", IsTruncated=true.
-// // - tick 3 (token="rds:r1"): fetches RDS page 2 (last page, no Marker).
-// Result: RDS page 2 rows only, NextToken="", IsTruncated=false.
-// // This is a regression pin for Issue 5: verifies that the token-prefix logic
-// in dbc.go correctly sequences DocDB and RDS pages and that the combined
-// result assembles correctly without losing rows.
 func TestDbc_Pagination_MultiPage_Success(t *testing.T) {
 	docdbMock := &fullDocDBMock{
 		dbClustersPages: []docdb.DescribeDBClustersOutput{
 			{
-				// Page 1: one cluster, has more.
 				DBClusters: []docdbtypes.DBCluster{
 					buildDocDBCluster("docdb-p1"),
 				},
 				Marker: aws.String("d1"),
 			},
 			{
-				// Page 2: one cluster, no more.
 				DBClusters: []docdbtypes.DBCluster{
 					buildDocDBCluster("docdb-p2"),
 				},
@@ -563,7 +479,6 @@ func TestDbc_Pagination_MultiPage_Success(t *testing.T) {
 	rdsMock := &fullRDSMock{
 		dbClustersPages: []rds.DescribeDBClustersOutput{
 			{
-				// RDS page 1: one aurora cluster, has more.
 				DBClusters: []rdstypes.DBCluster{
 					{
 						DBClusterIdentifier: aws.String("rds-p1"),
@@ -574,7 +489,6 @@ func TestDbc_Pagination_MultiPage_Success(t *testing.T) {
 				Marker: aws.String("r1"),
 			},
 			{
-				// RDS page 2: one aurora cluster, no more.
 				DBClusters: []rdstypes.DBCluster{
 					{
 						DBClusterIdentifier: aws.String("rds-p2"),
@@ -596,7 +510,6 @@ func TestDbc_Pagination_MultiPage_Success(t *testing.T) {
 		t.Fatal("no paginated fetcher registered for dbc — init() not invoked")
 	}
 
-	// --- tick 1: token="" ---
 	result1, err := fetcher(context.Background(), clients, "")
 	if err != nil {
 		t.Fatalf("tick 1 error: %v", err)
@@ -616,7 +529,6 @@ func TestDbc_Pagination_MultiPage_Success(t *testing.T) {
 		t.Errorf("tick 1: Resources[0].ID = %q, want %q", result1.Resources[0].ID, "docdb-p1")
 	}
 
-	// --- tick 2: token="docdb:d1" ---
 	result2, err := fetcher(context.Background(), clients, "docdb:d1")
 	if err != nil {
 		t.Fatalf("tick 2 error: %v", err)
@@ -630,7 +542,6 @@ func TestDbc_Pagination_MultiPage_Success(t *testing.T) {
 	if result2.Pagination.NextToken != "rds:r1" {
 		t.Errorf("tick 2: NextToken = %q, want %q", result2.Pagination.NextToken, "rds:r1")
 	}
-	// DocDB page 2 row + RDS page 1 row.
 	if len(result2.Resources) != 2 {
 		t.Errorf("tick 2: len(Resources) = %d, want 2 (docdb-p2 + rds-p1)", len(result2.Resources))
 	} else {
@@ -646,7 +557,6 @@ func TestDbc_Pagination_MultiPage_Success(t *testing.T) {
 		}
 	}
 
-	// --- tick 3: token="rds:r1" ---
 	result3, err := fetcher(context.Background(), clients, "rds:r1")
 	if err != nil {
 		t.Fatalf("tick 3 error: %v", err)
@@ -667,25 +577,16 @@ func TestDbc_Pagination_MultiPage_Success(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// dual-SDK dedup-by-ID — DocDB-side wins.
-// ---------------------------------------------------------------------------
-
-// TestDBCFetcher_DedupesAcrossDualAPIByID pins the dedup rule:
-// when DocDB and RDS DescribeDBClusters both return the same cluster ID on
-// the same fetch tick (verified live: the DocDB endpoint returns
-// aurora-postgresql clusters too), the dbc fetcher must dedup by Resource.ID
-// with first-occurrence wins. DocDB-side rows are appended first, so the
-// docdb-side row must be preserved (engine-correct RawStruct used by detail
-// enrichment and dbc-snap related-panel pivots).
+// The DocDB DescribeDBClusters endpoint also returns aurora-postgresql
+// clusters, so both APIs can return the same cluster ID. The fetcher keeps the
+// first occurrence and appends DocDB rows first, so the engine-correct DocDB
+// RawStruct survives.
 func TestDBCFetcher_DedupesAcrossDualAPIByID(t *testing.T) {
 	fetcher := resource.GetPaginatedFetcher("dbc")
 	if fetcher == nil {
 		t.Fatal("no paginated fetcher registered for dbc — init() not invoked")
 	}
 
-	// Sub-test 1: same cluster identifier returned by both DocDB and RDS on the
-	// same tick. Expect 1 row, with docdb-side RawStruct preserved.
 	t.Run("overlap_keeps_docdb_side", func(t *testing.T) {
 		const sharedID = "shared-cluster-01"
 		docdbMock := &fullDocDBMock{
@@ -734,7 +635,6 @@ func TestDBCFetcher_DedupesAcrossDualAPIByID(t *testing.T) {
 		}
 	})
 
-	// Sub-test 2: distinct identifiers on each side — both rows preserved.
 	t.Run("no_overlap_keeps_both", func(t *testing.T) {
 		docdbMock := &fullDocDBMock{
 			dbClustersPages: []docdb.DescribeDBClustersOutput{
@@ -784,8 +684,6 @@ func TestDBCFetcher_DedupesAcrossDualAPIByID(t *testing.T) {
 		}
 	})
 
-	// Sub-test 3: shared identifier + RDS-only unique on the same tick —
-	// deduped pair plus the unique RDS row both survive.
 	t.Run("overlap_plus_rds_only_keeps_two", func(t *testing.T) {
 		const sharedID = "shared-cluster-02"
 		docdbMock := &fullDocDBMock{
@@ -853,9 +751,6 @@ func TestDBCFetcher_DedupesAcrossDualAPIByID(t *testing.T) {
 	})
 }
 
-// TestComputeRDSDBClusterStatusAndFindings validates computeRDSDBClusterStatusAndIssues
-// (unexported) via FetchRDSDBClustersPage — 11 cases mirroring the docdb table.
-// assertions migrated from Status/Issues to Fields["status"]/Findings.
 func TestComputeRDSDBClusterStatusAndFindings(t *testing.T) {
 	boolPtr := func(b bool) *bool { return &b }
 	int32Ptr := func(i int32) *int32 { return &i }
@@ -864,8 +759,8 @@ func TestComputeRDSDBClusterStatusAndFindings(t *testing.T) {
 	cases := []struct {
 		name         string
 		cluster      rdstypes.DBCluster
-		wantPhrase   string   // expected Fields["status"] display phrase
-		wantFindings []string // expected Findings phrases in order
+		wantPhrase   string
+		wantFindings []string
 	}{
 		{
 			name: "healthy_available_writer",
@@ -1009,11 +904,9 @@ func TestComputeRDSDBClusterStatusAndFindings(t *testing.T) {
 				t.Fatalf("expected 1 resource, got %d", len(result.Resources))
 			}
 			r := result.Resources[0]
-			// Status must always be "".
 			if r.Fields["status"] != tc.wantPhrase {
 				t.Errorf("Fields[status] = %q, want %q", r.Fields["status"], tc.wantPhrase)
 			}
-			// Compare finding phrases.
 			gotPhrases := make([]string, len(r.Findings))
 			for i, f := range r.Findings {
 				gotPhrases[i] = f.Phrase

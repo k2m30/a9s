@@ -6,12 +6,6 @@ package unit
 // per page). After full pagination, counts are exact. If pagination exceeds
 // PerParentPageCap = 10 pages per rule, the count is capped and marked "1000+".
 // DLQ checks must be applied to targets on ALL pages, not just the first.
-//
-// Contract assertions:
-//   - 2 pages (100 + 50 targets) → Fields["target_count"] == "150"; called twice
-//   - NextToken always non-nil (huge rule) → capped at PerParentPageCap; "1000+"
-//   - DLQ check applied to targets on page 2 even when page 1 has DLQ configured
-//   - ENABLED rule, all pages return 0 targets → "enabled rule has no targets" finding
 
 import (
 	"context"
@@ -28,10 +22,6 @@ import (
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
-
-// ---------------------------------------------------------------------------
-// Pagination-aware fake for EventBridge ListTargetsByRule
-// ---------------------------------------------------------------------------
 
 // ebPaginatedFake implements EventBridgeAPI and serves paginated
 // ListTargetsByRule responses. Pages are keyed by rule name.
@@ -89,12 +79,7 @@ func (f *ebPaginatedFake) callsFor(rule string) int {
 	return f.callCounts[rule]
 }
 
-// Compile-time check: ebPaginatedFake satisfies EventBridgeAPI.
 var _ awsclient.EventBridgeAPI = (*ebPaginatedFake)(nil)
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
 
 // makeEBTargetsWithDLQ builds n targets, each with a DeadLetterConfig.
 func makeEBTargetsWithDLQ(n int) []ebtypes.Target {
@@ -146,10 +131,6 @@ func ebRuleResources(rules ...struct {
 	return res
 }
 
-// ---------------------------------------------------------------------------
-// Test: ListTargetsByRule pagination — 2 pages (100 + 50 targets)
-// ---------------------------------------------------------------------------
-
 // TestEnrichEventBridgeRule_PaginatesTargets verifies that the enricher
 // follows NextToken across two pages and writes the total count (150) to
 // Fields["target_count"].
@@ -158,8 +139,6 @@ func TestEnrichEventBridgeRule_PaginatesTargets(t *testing.T) {
 
 	fake := newEBPaginatedFake()
 
-	// Page 1: 100 targets with DLQ, NextToken="t1"
-	// Page 2: 50 targets with DLQ, NextToken nil (last page)
 	fake.pages[ruleName] = []*eventbridge.ListTargetsByRuleOutput{
 		{
 			Targets:   makeEBTargetsWithDLQ(100),
@@ -184,7 +163,6 @@ func TestEnrichEventBridgeRule_PaginatesTargets(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	// target_count must reflect both pages
 	updates, ok := result.FieldUpdates[ruleName]
 	if !ok {
 		t.Fatalf("FieldUpdates missing entry for %q", ruleName)
@@ -194,21 +172,15 @@ func TestEnrichEventBridgeRule_PaginatesTargets(t *testing.T) {
 		t.Errorf("target_count = %q, want %q", updates["target_count"], wantCount)
 	}
 
-	// ListTargetsByRule must have been called twice
 	calls := fake.callsFor(ruleName)
 	if calls != 2 {
 		t.Errorf("ListTargetsByRule called %d times, want 2", calls)
 	}
 
-	// No findings — all targets have DLQ, rule is ENABLED with targets
 	if len(result.Findings) != 0 {
 		t.Errorf("expected 0 findings, got %d: %v", len(result.Findings), result.Findings)
 	}
 }
-
-// ---------------------------------------------------------------------------
-// Test: ListTargetsByRule capped at PerParentPageCap → "1000+"
-// ---------------------------------------------------------------------------
 
 // TestEnrichEventBridgeRule_CappedAtPerParentPageCap verifies that when
 // NextToken is always non-nil (simulating a huge rule), the enricher stops
@@ -218,7 +190,6 @@ func TestEnrichEventBridgeRule_CappedAtPerParentPageCap(t *testing.T) {
 
 	fake := newEBPaginatedFake()
 
-	// Build PerParentPageCap+2 pages, all with NextToken set, 100 targets/page.
 	pages := make([]*eventbridge.ListTargetsByRuleOutput, awsclient.PerParentPageCap+2)
 	for i := range pages {
 		pages[i] = &eventbridge.ListTargetsByRuleOutput{
@@ -241,13 +212,11 @@ func TestEnrichEventBridgeRule_CappedAtPerParentPageCap(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	// ListTargetsByRule must be called exactly PerParentPageCap times
 	calls := fake.callsFor(ruleName)
 	if calls != awsclient.PerParentPageCap {
 		t.Errorf("ListTargetsByRule called %d times, want exactly %d (PerParentPageCap)", calls, awsclient.PerParentPageCap)
 	}
 
-	// target_count must carry "+" suffix
 	updates, ok := result.FieldUpdates[ruleName]
 	if !ok {
 		t.Fatalf("FieldUpdates missing entry for %q", ruleName)
@@ -262,10 +231,6 @@ func TestEnrichEventBridgeRule_CappedAtPerParentPageCap(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// Test: DLQ check applied to targets on all pages
-// ---------------------------------------------------------------------------
-
 // TestEnrichEventBridgeRule_DLQCheckAcrossAllPages verifies that targets
 // without DeadLetterConfig on page 2 produce a finding even when page 1
 // targets all have DLQ configured.
@@ -274,8 +239,6 @@ func TestEnrichEventBridgeRule_DLQCheckAcrossAllPages(t *testing.T) {
 
 	fake := newEBPaginatedFake()
 
-	// Page 1: all targets have DLQ
-	// Page 2: all targets lack DLQ → should trigger findings
 	fake.pages[ruleName] = []*eventbridge.ListTargetsByRuleOutput{
 		{
 			Targets:   makeEBTargetsWithDLQ(2),
@@ -300,14 +263,12 @@ func TestEnrichEventBridgeRule_DLQCheckAcrossAllPages(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	// Findings must exist for the targets-without-DLQ from page 2
 	fs, ok := result.Findings[ruleName]
 	if !ok {
 		t.Fatalf("expected finding for %q (targets on page 2 lack DLQ), none produced", ruleName)
 	}
 	f := fs[0]
 
-	// Verify at least one row references the no-DLQ issue
 	foundNoDLQ := false
 	for _, row := range result.AttentionDetails[ruleName][f.Code].Rows {
 		if strings.Contains(row.Value, "no dead-letter config") {
@@ -320,10 +281,6 @@ func TestEnrichEventBridgeRule_DLQCheckAcrossAllPages(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// Test: ENABLED rule with zero targets across all pages → finding
-// ---------------------------------------------------------------------------
-
 // TestEnrichEventBridgeRule_EnabledWithZeroTargetsAcrossPages verifies that
 // when all pages return 0 targets and the rule is ENABLED, the
 // "enabled rule has no targets" finding is emitted and target_count is "0".
@@ -332,7 +289,6 @@ func TestEnrichEventBridgeRule_EnabledWithZeroTargetsAcrossPages(t *testing.T) {
 
 	fake := newEBPaginatedFake()
 
-	// Single page, 0 targets, no NextToken
 	fake.pages[ruleName] = []*eventbridge.ListTargetsByRuleOutput{
 		{
 			Targets:   []ebtypes.Target{},
@@ -353,7 +309,6 @@ func TestEnrichEventBridgeRule_EnabledWithZeroTargetsAcrossPages(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	// target_count must be "0"
 	updates, ok := result.FieldUpdates[ruleName]
 	if !ok {
 		t.Fatalf("FieldUpdates missing entry for %q", ruleName)
@@ -362,7 +317,6 @@ func TestEnrichEventBridgeRule_EnabledWithZeroTargetsAcrossPages(t *testing.T) {
 		t.Errorf("target_count = %q, want \"0\"", updates["target_count"])
 	}
 
-	// Finding "enabled rule has no targets" must be emitted with severity "!"
 	fs, ok := result.Findings[ruleName]
 	if !ok {
 		t.Fatalf("expected finding for %q (enabled rule with no targets), none produced", ruleName)

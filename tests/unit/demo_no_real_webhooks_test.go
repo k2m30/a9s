@@ -23,7 +23,7 @@ var webhookPatterns = []webhookPattern{
 		re: regexp.MustCompile(`https://hooks\.slack\.com/services/([A-Z0-9]+)/([A-Z0-9]+)/([A-Za-z0-9]+)`),
 		// Allowed placeholder: workspace is T followed by all zeros, channel is B followed by all zeros,
 		// token is all X (case-insensitive match on token per observed fixture value).
-		// Reference fixture: T00000000/B00000000/XXXXXXXX (fixtures_messaging.go lines 266, 272)
+		// Reference fixture: T00000000/B00000000/XXXXXXXX (fixtures_messaging.go).
 		isPlaceholder: func(groups []string) bool {
 			workspace := groups[1]
 			channel := groups[2]
@@ -119,7 +119,6 @@ func TestDemo_NoRealWebhookURLs(t *testing.T) {
 				}
 
 				if !wp.isPlaceholder(groups) {
-					// Compute a human-readable line number for the match offset.
 					matchStart := loc[0]
 					lineNum := 1 + strings.Count(string(contents[:matchStart]), "\n")
 					t.Errorf("%s: real %s webhook URL found at line %d: %s",

@@ -1,19 +1,7 @@
 package unit_test
 
-// aws_transfer_related_test.go — related-resource checker tests for transfer
-// (docs/resources/transfer.md §2, docs/resources/transfer-impl-plan.md §1
-// "related_targets"). Checkers live in core/aws/transfer_related.go.
-//
-// All 8 real pivots (acm, eip, lambda, logs, role, subnet, vpc, vpce) are
-// field-driven (read a field on the DescribedServer, no API call) — these
-// are exercised against the REAL FetchTransferServersPage output for the
-// relevant demo fixtures, avoiding any guess at internal Fields/RawStruct
-// shape (mirrors TestRelated_MWAA_GraphRootCounts). ct-events is the
-// universal ctEventsCheckerFor("transfer") pivot. sg/apigw/s3/efs are
-// explicitly excluded per docs/resources/transfer.md §2.
-//
-// checkerByTarget is shared package-scope test tooling, defined in
-// aws_iam_policies_related_test.go.
+// The field-driven pivots run against the real FetchTransferServersPage output
+// for the demo fixtures, so no test guesses the internal Fields/RawStruct shape.
 
 import (
 	"context"
@@ -27,16 +15,13 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// transferResourceByID fetches the real demo page via FetchTransferServersPage
-// and returns the Resource with the given id, failing the test if absent.
 func transferResourceByID(t *testing.T, id string) resource.Resource {
 	t.Helper()
 	clients := &awsclient.ServiceClients{Transfer: fakes.NewTransfer()}
 	result, err := awsclient.FetchTransferServersPage(context.Background(), clients, "")
 	if err == nil || !strings.Contains(err.Error(), fixtures.WarnTransferDetailsDeniedID) {
-		// The demo set includes the details-denied witness, so the fetch
-		// must legitimately return rows + a composite error naming that
-		// witness (E5 partial success) — any other outcome is unexpected.
+		// The demo set includes a server whose DescribeServer is denied, so the
+		// fetch returns rows plus a composite error naming it.
 		t.Fatalf("expected the details-denied composite error naming %q, got %v", fixtures.WarnTransferDetailsDeniedID, err)
 	}
 	for _, r := range result.Resources {
@@ -47,10 +32,6 @@ func transferResourceByID(t *testing.T, id string) resource.Resource {
 	t.Fatalf("resource %q not found in fetch result", id)
 	return resource.Resource{}
 }
-
-// ---------------------------------------------------------------------------
-// Registration
-// ---------------------------------------------------------------------------
 
 func TestRelated_Transfer_Registered(t *testing.T) {
 	defs := resource.GetRelated("transfer")
@@ -104,12 +85,6 @@ func TestRelated_Transfer_ExcludedTargetsNotRegistered(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// Field-driven checkers — graph root (prod-as2-gateway) counts per
-// transfer-impl-plan.md §1 "related_targets": role 1, vpc 1, subnet 3,
-// vpce 1, logs 2, acm 1, eip 3.
-// ---------------------------------------------------------------------------
-
 func TestRelated_Transfer_GraphRootCounts(t *testing.T) {
 	res := transferResourceByID(t, fixtures.ProdAS2GatewayID)
 	for _, tc := range []struct {
@@ -135,10 +110,7 @@ func TestRelated_Transfer_GraphRootCounts(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// lambda — custom-authorizer pivot, only present on the AWS_LAMBDA IdP
-// fixture (sftp-lambda-auth), not on the graph root.
-// ---------------------------------------------------------------------------
+// The lambda pivot is the custom authorizer of an AWS_LAMBDA identity provider.
 
 func TestRelated_Transfer_LambdaOnAuthFixture(t *testing.T) {
 	res := transferResourceByID(t, fixtures.SftpLambdaAuthID)
@@ -149,12 +121,8 @@ func TestRelated_Transfer_LambdaOnAuthFixture(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// Conditional pivots absent cleanly — a PUBLIC endpoint (no EndpointDetails,
-// no Certificate, no Lambda IdP) must resolve those pivots to 0, not error
-// or panic. role stays 1 (LoggingRole is present regardless of endpoint
-// type) as a positive control that the checkers are actually running.
-// ---------------------------------------------------------------------------
+// A PUBLIC endpoint carries no EndpointDetails, Certificate or Lambda identity
+// provider; LoggingRole is present on every endpoint type.
 
 func TestRelated_Transfer_PublicEndpointConditionalPivotsAbsent(t *testing.T) {
 	res := transferResourceByID(t, fixtures.SftpUsersProdID)
@@ -184,17 +152,8 @@ func TestRelated_Transfer_PublicEndpointConditionalPivotsAbsent(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// eip — internet-facing endpoint static addresses. Only the AS2 gateway
-// carries AddressAllocationIds; every other endpoint shape (PUBLIC, or VPC
-// without static addresses) must resolve to a clean 0, and a degraded
-// ListedServer row (no DescribeServer access) must resolve to
-// RelatedUnknown, not panic.
-//
-// SftpUsersProdID (PUBLIC endpoint) is covered by the {"eip", 0} case in
-// TestRelated_Transfer_PublicEndpointConditionalPivotsAbsent — only the VPC
-// endpoint shape (SftpLambdaAuthID) is unique here.
-// ---------------------------------------------------------------------------
+// AddressAllocationIds are the endpoint's static addresses; a ListedServer row
+// without DescribeServer access resolves eip to unknown.
 
 func TestRelated_Transfer_EIP_ZeroOnFixturesWithoutAddressAllocation(t *testing.T) {
 	res := transferResourceByID(t, fixtures.SftpLambdaAuthID)
@@ -218,11 +177,6 @@ func TestRelated_Transfer_EIP_DegradedRowUnknown(t *testing.T) {
 		t.Errorf("State = %v, want RelatedUnknown (degraded ListedServer row carries no EndpointDetails field)", result.State())
 	}
 }
-
-// ---------------------------------------------------------------------------
-// ct-events — universal ctEventsCheckerFor("transfer") pivot: deferred,
-// server-side FetchFilter, drillable.
-// ---------------------------------------------------------------------------
 
 func TestRelated_Transfer_CtEvents_Drillable(t *testing.T) {
 	res := transferResourceByID(t, fixtures.ProdAS2GatewayID)

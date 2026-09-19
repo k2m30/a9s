@@ -12,14 +12,6 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// TestRelated_Codeartifact_CB_ReturnsUnknown was deleted: codeartifact→cb is in
-// the Explicitly excluded list (unanimous sometimes — no first-class AWS field).
-// See docs/related-resources.md "Explicitly excluded" section.
-
-// TestRelated_Codeartifact_Registered was deleted: the only registered pair
-// for codeartifact (cb) has been dropped. The remaining codeartifact→kms
-// registration is tested via the golden contract tests.
-
 // codeartifactCheckerByTarget returns the RelatedChecker for the given target
 // type registered under "codeartifact". Fails immediately if not found or nil.
 func codeartifactCheckerByTarget(t *testing.T, target string) resource.RelatedChecker {

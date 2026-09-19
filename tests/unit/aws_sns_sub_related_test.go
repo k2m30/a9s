@@ -22,8 +22,6 @@ func snsSubCheckerByTarget(t *testing.T, target string) resource.RelatedChecker 
 	return nil
 }
 
-// --- SNS Topic Checker Tests ---
-
 func TestRelated_SNSSub_Topic_Match(t *testing.T) {
 	topicARN := "arn:aws:sns:us-east-1:123456789012:my-topic"
 	res := resource.Resource{
@@ -73,8 +71,6 @@ func TestRelated_SNSSub_Topic_NoMatch(t *testing.T) {
 		t.Errorf("Count = %d, want 0", result.Count())
 	}
 }
-
-// --- Lambda Checker Tests ---
 
 func TestRelated_SNSSub_Lambda_Match(t *testing.T) {
 	lambdaARN := "arn:aws:lambda:us-east-1:123456789012:function:my-function"
@@ -127,11 +123,9 @@ func TestRelated_SNSSub_Lambda_WrongProtocol(t *testing.T) {
 	}
 }
 
-// --- SQS Checker Tests ---
-
 func TestRelated_SNSSub_SQS_Match(t *testing.T) {
-	// The SQS checker extracts the queue name from the endpoint ARN (last ":" segment).
-	// The cache entry must match by ID or Name against that extracted queue name.
+	// The SQS checker matches the last ":" segment of the endpoint ARN
+	// against the row ID or Name.
 	queueName := "my-queue"
 	sqsARN := "arn:aws:sqs:us-east-1:123456789012:" + queueName
 	res := resource.Resource{
@@ -142,7 +136,6 @@ func TestRelated_SNSSub_SQS_Match(t *testing.T) {
 			"endpoint":  sqsARN,
 		},
 	}
-	// The checker parses queueName from the endpoint ARN and matches sqsRes.ID == queueName.
 	cache := resource.ResourceCache{
 		"sqs": resource.ResourceCacheEntry{Resources: []resource.Resource{
 			{ID: queueName},
@@ -182,8 +175,6 @@ func TestRelated_SNSSub_SQS_WrongProtocol(t *testing.T) {
 		t.Errorf("Count = %d, want 0 (wrong protocol)", result.Count())
 	}
 }
-
-// --- Nil Clients / Empty Cache Tests ---
 
 // snsSubResForTarget returns a resource whose protocol field is appropriate for
 // exercising the cache-miss path of the given target checker.
@@ -234,8 +225,6 @@ func TestRelated_SNSSub_EmptyCache(t *testing.T) {
 		}
 	}
 }
-
-// --- Navigable Field Registration ---
 
 func TestNavigableFields_SNSSub(t *testing.T) {
 	expected := map[string]string{

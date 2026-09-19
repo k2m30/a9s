@@ -9,23 +9,6 @@ import (
 	"github.com/k2m30/a9s/v3/core/costs"
 )
 
-// costs.Store is not given exact method signatures in data-model.md (only
-// the on-disk YAML shape and the closed/open/merge/anomaly-TTL policy
-// prose). The surface exercised below mirrors the existing
-// core/cache.Store convention (LoadDir/Put/SaveType) adapted to the
-// single-file-per-profile layout in data-model.md:
-//
-//	costs.CachePath(profile string) string
-//	costs.LoadStore(profile string) *costs.Store
-//	(*costs.Store).Recovered() bool
-//	(*costs.Store).Lookup(q costs.Query, window []costs.Period, now time.Time) (records []costs.Record, missing []costs.Period)
-//	(*costs.Store).Merge(q costs.Query, recs []costs.Record, now time.Time)
-//	(*costs.Store).Attrs() map[string]string
-//	(*costs.Store).MergeAttrs(attrs map[string]string)
-//	(*costs.Store).Anomalies(now time.Time) (marks []costs.AnomalyMark, ok bool)
-//	(*costs.Store).PutAnomalies(marks []costs.AnomalyMark, now time.Time, covered costs.Period)
-//	(*costs.Store).Save() error
-
 func ec2MonthlyQuery() costs.Query {
 	return costs.Query{
 		Granularity: "MONTHLY",
@@ -97,27 +80,9 @@ func TestStore_SaveLoadRoundTrip_PreservesRecordsAttrsAnomalies(t *testing.T) {
 	}
 }
 
-// TestStore_Lookup_ImmutabilityKeysOnFetchedAfterClosure supersedes the
-// original TestStore_Lookup_ClosedPeriodReturnedRegardlessOfFetchedAtAge,
-// which pinned the OLD rule (a period is immutable once it is closed
-// RELATIVE TO THE LOOKUP CALL's own now, regardless of when the cached
-// bucket was actually fetched). Round 8 finding 1 identified that rule as
-// a bug: a bucket cached WHILE its period was still open (a normal,
-// necessarily-partial open-period fetch) would wrongly become immutable
-// the instant a LATER Lookup call's own clock rolled past the period's
-// end — even though that bucket was never re-fetched after the period
-// actually closed.
-//
-// The new single predicate: immutability keys on fetched-AFTER-closure
-// (bucket.FetchedAt on or after the period's own End), not on
-// "period.Closed(relative to THIS lookup's now)".
-//
-// Reconciled (self-review C5): immutability now additionally requires a
-// 72h settlement lag past End (CE revises data 24-72h post-close). This
-// test's "post-closure fetch" subtest fetches 4 days (96h) after End,
-// already past that lag, so its "immutable" assertion stays valid
-// unchanged — see costs_selfreview_test.go's C5a/C5b tests for the
-// narrower boundary (a fetch within the 72h lag) this test does not probe.
+// Immutability keys on the bucket being fetched at least 72h past its
+// period's End (CE revises data 24-72h post-close), not on the period
+// being closed relative to the lookup's now.
 func TestStore_Lookup_ImmutabilityKeysOnFetchedAfterClosure(t *testing.T) {
 	period := costs.Period{Start: "2025-01-01", End: "2025-02-01"}
 	q := ec2MonthlyQuery()

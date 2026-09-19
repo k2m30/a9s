@@ -1,21 +1,5 @@
 package unit
 
-// aws_sfn_detail_enrich_test.go — coverage for enrichSfn (core/aws/sfn_detail_enrichment.go),
-// the on-demand detail enricher registered for the "sfn" resource type (#261).
-//
-// Covers:
-//   - wrong clients type / nil DetailEnrichmentCtx / nil Clients → error
-//   - nil DetailDocs no longer errors (uncached, mirrors enrichLambda's contract)
-//   - wrong RawStruct type → error
-//   - nil/empty state-machine ARN → error
-//   - DescribeStateMachine result parsed correctly, ASL definition parsed to structured data
-//   - unparsable definition falls back to the raw string
-//   - two consecutive enrichments of the same ARN both call the API (uncached:
-//     UpdateStateMachine keeps the ARN, so a session cache would go stale
-//     without ever missing — see enrichSfn's doc comment)
-//   - StateMachineEnriched re-enrichment path accepted as RawStruct
-//   - API error propagated
-
 import (
 	"context"
 	"encoding/json"
@@ -29,10 +13,6 @@ import (
 	awsclient "github.com/k2m30/a9s/v3/core/aws"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
-
-// ---------------------------------------------------------------------------
-// enrichSfnFake — narrow SFNAPI fake with a DescribeStateMachine call counter
-// ---------------------------------------------------------------------------
 
 type enrichSfnFake struct {
 	describeFn    func(*sfn.DescribeStateMachineInput) (*sfn.DescribeStateMachineOutput, error)
@@ -64,10 +44,6 @@ func (f *enrichSfnFake) ListTagsForResource(_ context.Context, _ *sfn.ListTagsFo
 }
 
 var _ awsclient.SFNAPI = (*enrichSfnFake)(nil)
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
 
 func sfnEnricher(t *testing.T) resource.DetailEnricher {
 	t.Helper()
@@ -102,10 +78,6 @@ func makeSfnRes(arn string) resource.Resource {
 	return resource.Resource{ID: arn, RawStruct: makeSfnItem(arn)}
 }
 
-// ---------------------------------------------------------------------------
-// Tests: invalid context
-// ---------------------------------------------------------------------------
-
 func TestEnrichSfn_WrongClientsType_ReturnsError(t *testing.T) {
 	enricher := sfnEnricher(t)
 	res := makeSfnRes(sfnTestArn)
@@ -138,9 +110,7 @@ func TestEnrichSfn_NilClients_ReturnsError(t *testing.T) {
 }
 
 func TestEnrichSfn_NilDetailDocs_NoLongerErrors(t *testing.T) {
-	// sfn is uncached (see enrichSfn's doc comment): DetailDocs is
-	// consequently not a required dependency, mirroring enrichLambda's
-	// uncached contract (aws_lambda_detail_enrich_test.go).
+	// sfn is uncached, so DetailDocs is not a required dependency.
 	enricher := sfnEnricher(t)
 	res := makeSfnRes(sfnTestArn)
 	ctx := &awsclient.DetailEnrichmentCtx{
@@ -152,10 +122,6 @@ func TestEnrichSfn_NilDetailDocs_NoLongerErrors(t *testing.T) {
 		t.Fatalf("unexpected error with nil DetailDocs (sfn is uncached): %v", err)
 	}
 }
-
-// ---------------------------------------------------------------------------
-// Tests: bad RawStruct / missing ARN
-// ---------------------------------------------------------------------------
 
 func TestEnrichSfn_WrongRawStructType_ReturnsError(t *testing.T) {
 	enricher := sfnEnricher(t)
@@ -193,9 +159,8 @@ func TestEnrichSfn_EmptyARN_ReturnsError(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// Tests: every enrichment calls the API (uncached)
-// ---------------------------------------------------------------------------
+// UpdateStateMachine keeps the ARN, so a session cache would go stale
+// without ever missing: every enrichment calls the API.
 
 func TestEnrichSfn_ConsecutiveCalls_BothHitAPIWithFreshPayload(t *testing.T) {
 	fake := &enrichSfnFake{
@@ -267,20 +232,9 @@ func TestEnrichSfn_UnparsableDefinition_KeptAsRawString(t *testing.T) {
 	}
 }
 
-// TestEnrichSfn_BigIntInDefinition_RoundTripsLosslessly pins F2: parseJSONOrRaw
-// (core/aws/detail_enrich_engine.go) must decode with json.Decoder.UseNumber
-// so an ASL definition's integer fields above 2^53 survive as json.Number,
-// not a plain json.Unmarshal-into-any float64 that silently rounds
-// 9007199254740993 to 9007199254740992 — the same corruption
-// core/fieldpath's tryParseJSON was fixed for (extract.go's doc comment).
-// TestEnrichSfn_BigIntInDefinition_RoundTripsLosslessly pins F2's tiered
-// normalization (jsonyaml.NormalizeJSONNumbers, called by parseJSONOrRaw):
-// a json.Number that fits int64 promotes to a bare int64 — 9007199254740993
-// fits (int64 max is ~9.22e18), so it must come back as int64(9007199254740993),
-// not the json.Number wrapper (which normalizeJSONNumbers only keeps for a
-// value past uint64 range — see the sibling test below) and never the
-// float64 a plain json.Unmarshal-into-any would silently round to
-// (9007199254740992).
+// parseJSONOrRaw decodes with json.Decoder.UseNumber and normalizes: an
+// integer that fits int64 comes back as int64, so 9007199254740993 (above
+// 2^53) is not rounded to the float64 9007199254740992.
 func TestEnrichSfn_BigIntInDefinition_RoundTripsLosslessly(t *testing.T) {
 	const bigInt = "9007199254740993"
 	rawDef := `{"Comment":"order processing","Timeout":` + bigInt + `}`
@@ -311,12 +265,8 @@ func TestEnrichSfn_BigIntInDefinition_RoundTripsLosslessly(t *testing.T) {
 	}
 }
 
-// TestEnrichSfn_IntBeyondUint64InDefinition_StaysJSONNumber verifies the
-// other tier: a value past uint64's range (2^64) fits none of
-// int64/uint64/exact-round-trip-float64, so normalization must leave it as
-// json.Number with its full digits intact rather than losing precision to
-// float64 (whose shortest %g form for 2^64 is "1.8446744073709552e+19",
-// not the original digit string).
+// A value past uint64's range fits no integer type or exact float64, so it
+// stays json.Number with its full digits.
 func TestEnrichSfn_IntBeyondUint64InDefinition_StaysJSONNumber(t *testing.T) {
 	const beyondUint64 = "18446744073709551616" // 2^64, one past uint64 max
 	rawDef := `{"Comment":"order processing","Timeout":` + beyondUint64 + `}`
@@ -347,10 +297,6 @@ func TestEnrichSfn_IntBeyondUint64InDefinition_StaysJSONNumber(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// Tests: re-enrichment path
-// ---------------------------------------------------------------------------
-
 func TestEnrichSfn_StateMachineEnrichedRawStruct_Accepted(t *testing.T) {
 	fake := &enrichSfnFake{
 		describeFn: func(_ *sfn.DescribeStateMachineInput) (*sfn.DescribeStateMachineOutput, error) {
@@ -379,10 +325,6 @@ func TestEnrichSfn_StateMachineEnrichedRawStruct_Accepted(t *testing.T) {
 		t.Errorf("enriched.StateMachineArn = %v, want %q", enriched.StateMachineArn, sfnTestArn)
 	}
 }
-
-// ---------------------------------------------------------------------------
-// Tests: API error propagation
-// ---------------------------------------------------------------------------
 
 func TestEnrichSfn_APIError_Propagated(t *testing.T) {
 	fake := &enrichSfnFake{

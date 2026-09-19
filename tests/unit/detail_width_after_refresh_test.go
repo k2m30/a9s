@@ -1,29 +1,10 @@
 package unit
 
-// detail_width_after_refresh_test.go — Tests revealing that Ctrl+R and
-// ResetRightColumn use the constant m.rightColWidth (32) instead of calling
-// m.currentRightColWidth() when sizing the right column.
-//
-// Bug location:
-//   - internal/tui/views/detail.go:189 (Ctrl+R handler):
-//       m.rightCol.SetSize(m.rightColWidth, m.height)  ← should use currentRightColWidth()
-//   - internal/tui/views/detail.go:639 (ResetRightColumn):
-//       m.rightCol.SetSize(m.rightColWidth, m.height)  ← should use currentRightColWidth()
-//
-// On an 80-col terminal currentRightColWidth() = max(24, 80/3)=26, capped by
-// max(16, 80-40)=40 → 26. When SetSize uses m.rightColWidth=32 instead, the
-// right column's internal viewport is 32 wide. After results are re-fed, its
-// View() produces 32-wide lines. The detail View() computes leftW as
-// 80 - currentRightColWidth() - 1 = 53. Total rendered width = 53 + 1 + 32 = 86,
-// exceeding the 80-col terminal.
-//
-// Test sequence to reveal the bug:
-//  1. Set up at width=80 with loaded results (right col visible).
-//  2. Press Ctrl+R (or call ResetRightColumn) — right col is rebuilt with wrong width.
-//  3. Re-feed RelatedCheckResultMsg — right col renders at the wrong (32) width.
-//  4. Measure rendered output — expect ≤ 80 cols, but get > 80 with the bug.
-//
-// Both tests FAIL with current code and PASS after the fix.
+// detail_width_after_refresh_test.go — after Ctrl+R the right column is
+// sized with the current right-column width, so the rendered view never
+// exceeds the terminal. At 80 columns the right column is max(24, 80/3)=26
+// wide and the left pane 80-26-1=53; a right column sized to the 32-column
+// default renders 53+1+32=86 columns.
 
 import (
 	"context"
@@ -119,23 +100,9 @@ func maxLineWidth(view string) int {
 	return maxW
 }
 
-// TestDetail_CtrlR_UsesCurrentRightColWidth_NarrowTerminal verifies that after
-// pressing Ctrl+R on an 80-col terminal and re-feeding results, the rendered
-// view does not exceed the terminal width.
-//
-// The Ctrl+R handler (detail.go:189) calls:
-//
-//	m.rightCol.SetSize(m.rightColWidth, m.height)   ← BUG: uses 32
-//
-// With the fix it calls:
-//
-//	m.rightCol.SetSize(m.currentRightColWidth(), m.height)  ← correct: 26 at 80 cols
-//
-// When the right column is set to 32 wide and results are re-fed, its View()
-// produces 32-wide content. The detail View() pads the left pane to
-// width - currentRightColWidth() - 1 = 53. Total = 53 + 1 + 32 = 86 > 80.
-//
-// This test FAILS with current code.
+// TestDetail_CtrlR_UsesCurrentRightColWidth_NarrowTerminal: after Ctrl+R on
+// an 80-col terminal and re-fed results, the rendered view does not exceed
+// the terminal width.
 func TestDetail_CtrlR_UsesCurrentRightColWidth_NarrowTerminal(t *testing.T) {
 	m, firstInstance := setupEC2DetailWithResultsNarrow(t)
 
@@ -146,7 +113,6 @@ func TestDetail_CtrlR_UsesCurrentRightColWidth_NarrowTerminal(t *testing.T) {
 			"related counts are visible at width=%d.\nView:\n%s", narrowTerminalWidth, viewBefore)
 	}
 
-	// Press Ctrl+R — rebuilds right column with the buggy SetSize(m.rightColWidth=32).
 	m, refreshCmd := rootApplyMsg(m, ctrlR())
 
 	// Drain the RelatedCheckStartedMsg cmd into the model so checkers are dispatched.
@@ -156,16 +122,11 @@ func TestDetail_CtrlR_UsesCurrentRightColWidth_NarrowTerminal(t *testing.T) {
 		}
 	}
 
-	// Re-feed results — now the right column is filled again.
-	// With the bug the right col's internal viewport is 32 wide → overflow.
-	// With the fix it is 26 wide → no overflow.
 	m = feedEC2Results(t, m, firstInstance.ID)
 
 	viewAfter := rootViewContent(m) // keep ANSI so lipgloss.Width is accurate
 	maxW := maxLineWidth(viewAfter)
 
-	// BUG: m.rightColWidth (32) was used instead of currentRightColWidth() (26).
-	// After re-feeding results the right col renders at 32, total line = 86 > 80.
 	if maxW > narrowTerminalWidth {
 		t.Fatalf("BUG: after Ctrl+R + re-fed results on a %d-col terminal the rendered "+
 			"view is %d cols wide — the Ctrl+R handler (detail.go:189) must call "+
@@ -176,31 +137,18 @@ func TestDetail_CtrlR_UsesCurrentRightColWidth_NarrowTerminal(t *testing.T) {
 	}
 }
 
-// TestDetail_ResetRightColumn_UsesCurrentRightColWidth_NarrowTerminal verifies
-// that ResetRightColumn (detail.go:639) uses currentRightColWidth() when sizing
-// the rebuilt right column.
-//
-// ResetRightColumn is called from app_handlers.go:handleRefresh when Ctrl+R is
-// pressed at the root level. After reset, results arrive via RelatedCheckResultMsg.
-// With the bug the right col is sized to 32; after results are fed the rendered
-// view exceeds 80 cols.
-//
-// The test drives this via the root model handleRefresh path: Ctrl+R on the root
-// model calls d.ResetRightColumn() then emits RelatedCheckStartedMsg.
-//
-// This test FAILS with current code.
+// TestDetail_ResetRightColumn_UsesCurrentRightColWidth_NarrowTerminal: Ctrl+R
+// at the root level resets the right column; once results arrive via
+// RelatedCheckResultMsg the rebuilt column must fit the 80-col terminal.
 func TestDetail_ResetRightColumn_UsesCurrentRightColWidth_NarrowTerminal(t *testing.T) {
 	m, firstInstance := setupEC2DetailWithResultsNarrow(t)
 
-	// Confirm right column is visible.
 	viewBefore := stripANSI(rootViewContent(m))
 	if !strings.Contains(viewBefore, "(7)") {
 		t.Fatalf("precondition failed: expected '(7)' in view before reset; "+
 			"view:\n%s", viewBefore)
 	}
 
-	// Ctrl+R at root level → handleRefresh → d.ResetRightColumn() → RelatedCheckStartedMsg.
-	// app_handlers.go:512: d.ResetRightColumn() calls detail.go:639 SetSize(m.rightColWidth).
 	m, refreshCmd := rootApplyMsg(m, ctrlR())
 
 	// Drain RelatedCheckStartedMsg → handleRelatedCheckStarted dispatches checkers.
@@ -210,16 +158,11 @@ func TestDetail_ResetRightColumn_UsesCurrentRightColWidth_NarrowTerminal(t *test
 		}
 	}
 
-	// Re-feed results to fill the reset right column.
-	// With the bug: ResetRightColumn used m.rightColWidth=32, right col renders at 32.
-	// With the fix: ResetRightColumn uses currentRightColWidth()=26, right col renders at 26.
 	m = feedEC2Results(t, m, firstInstance.ID)
 
 	viewAfter := rootViewContent(m) // keep ANSI for accurate lipgloss.Width
 	maxW := maxLineWidth(viewAfter)
 
-	// BUG: ResetRightColumn (detail.go:639) uses m.rightColWidth (32) directly.
-	// After re-feeding results the rendered line width is 53 + 1 + 32 = 86 > 80.
 	if maxW > narrowTerminalWidth {
 		t.Fatalf("BUG: after ResetRightColumn + re-fed results on a %d-col terminal "+
 			"the rendered view is %d cols wide — ResetRightColumn (detail.go:639) must "+

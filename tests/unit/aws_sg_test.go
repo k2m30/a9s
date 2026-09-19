@@ -14,10 +14,6 @@ import (
 	"github.com/k2m30/a9s/v3/tests/testdata"
 )
 
-// ---------------------------------------------------------------------------
-// T-SG-001 - Test Security Groups response parsing
-// ---------------------------------------------------------------------------
-
 func TestFetchSecurityGroups_ParsesMultipleGroups(t *testing.T) {
 	mock := &mockEC2DescribeSecurityGroupsClient{
 		output: &ec2.DescribeSecurityGroupsOutput{
@@ -80,7 +76,6 @@ func TestFetchSecurityGroups_ParsesMultipleGroups(t *testing.T) {
 		t.Fatalf("expected 2 resources, got %d", len(resources))
 	}
 
-	// Verify first security group
 	r0 := resources[0]
 	if r0.ID != "sg-0001" {
 		t.Errorf("resource[0].ID: expected %q, got %q", "sg-0001", r0.ID)
@@ -89,7 +84,6 @@ func TestFetchSecurityGroups_ParsesMultipleGroups(t *testing.T) {
 		t.Errorf("resource[0].Name: expected %q, got %q", "web-sg", r0.Name)
 	}
 
-	// Verify second security group
 	r1 := resources[1]
 	if r1.ID != "sg-0002" {
 		t.Errorf("resource[1].ID: expected %q, got %q", "sg-0002", r1.ID)
@@ -98,7 +92,6 @@ func TestFetchSecurityGroups_ParsesMultipleGroups(t *testing.T) {
 		t.Errorf("resource[1].Name: expected %q, got %q", "db-sg", r1.Name)
 	}
 
-	// Verify Fields contain the expected keys
 	requiredFields := []string{"group_id", "group_name", "vpc_id", "description"}
 	for i, r := range resources {
 		for _, key := range requiredFields {
@@ -108,7 +101,6 @@ func TestFetchSecurityGroups_ParsesMultipleGroups(t *testing.T) {
 		}
 	}
 
-	// Verify specific field values on the first SG
 	if r0.Fields["group_id"] != "sg-0001" {
 		t.Errorf("resource[0].Fields[\"group_id\"]: expected %q, got %q", "sg-0001", r0.Fields["group_id"])
 	}
@@ -122,7 +114,6 @@ func TestFetchSecurityGroups_ParsesMultipleGroups(t *testing.T) {
 		t.Errorf("resource[0].Fields[\"description\"]: expected %q, got %q", "Web server security group", r0.Fields["description"])
 	}
 
-	// Second SG field values
 	if r1.Fields["group_id"] != "sg-0002" {
 		t.Errorf("resource[1].Fields[\"group_id\"]: expected %q, got %q", "sg-0002", r1.Fields["group_id"])
 	}
@@ -130,10 +121,6 @@ func TestFetchSecurityGroups_ParsesMultipleGroups(t *testing.T) {
 		t.Errorf("resource[1].Fields[\"vpc_id\"]: expected %q, got %q", "vpc-bbb", r1.Fields["vpc_id"])
 	}
 }
-
-// ---------------------------------------------------------------------------
-// T-SG-003 - Test API error handling
-// ---------------------------------------------------------------------------
 
 func TestFetchSecurityGroups_ErrorResponse(t *testing.T) {
 	mock := &mockEC2DescribeSecurityGroupsClient{
@@ -152,10 +139,6 @@ func TestFetchSecurityGroups_ErrorResponse(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// T-SG-004 - Test empty response
-// ---------------------------------------------------------------------------
-
 func TestFetchSecurityGroups_EmptyResponse(t *testing.T) {
 	mock := &mockEC2DescribeSecurityGroupsClient{
 		output: &ec2.DescribeSecurityGroupsOutput{
@@ -173,10 +156,6 @@ func TestFetchSecurityGroups_EmptyResponse(t *testing.T) {
 		t.Errorf("expected 0 resources, got %d", len(resources))
 	}
 }
-
-// ---------------------------------------------------------------------------
-// T-SG-005 - Test RawStruct populated for fieldpath
-// ---------------------------------------------------------------------------
 
 func TestFetchSecurityGroups_RawStructPopulated(t *testing.T) {
 	mock := &mockEC2DescribeSecurityGroupsClient{
@@ -204,12 +183,10 @@ func TestFetchSecurityGroups_RawStructPopulated(t *testing.T) {
 
 	r := resources[0]
 
-	// RawStruct must be set
 	if r.RawStruct == nil {
 		t.Fatal("RawStruct must not be nil")
 	}
 
-	// RawStruct should be an ec2types.SecurityGroup
 	sg, ok := r.RawStruct.(ec2types.SecurityGroup)
 	if !ok {
 		t.Fatalf("RawStruct should be ec2types.SecurityGroup, got %T", r.RawStruct)
@@ -220,18 +197,11 @@ func TestFetchSecurityGroups_RawStructPopulated(t *testing.T) {
 
 }
 
-// T-SG-006 was testing DetailData singular rule count — removed with DetailData
-
-// ---------------------------------------------------------------------------
-// T-SG-007 - Test nil string fields handled gracefully
-// ---------------------------------------------------------------------------
-
 func TestFetchSecurityGroups_NilFieldsHandled(t *testing.T) {
 	mock := &mockEC2DescribeSecurityGroupsClient{
 		output: &ec2.DescribeSecurityGroupsOutput{
 			SecurityGroups: []ec2types.SecurityGroup{
 				{
-					// All string pointer fields are nil
 					GroupId:     nil,
 					GroupName:   nil,
 					VpcId:       nil,
@@ -273,10 +243,6 @@ func TestFetchSecurityGroups_NilFieldsHandled(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// T-SG-REAL - Test SG fetcher with all 21 sanitized security groups
-// ---------------------------------------------------------------------------
-
 func TestFetchSecurityGroups_RealAWSData(t *testing.T) {
 	mock := &mockEC2DescribeSecurityGroupsClient{
 		output: &ec2.DescribeSecurityGroupsOutput{
@@ -291,18 +257,15 @@ func TestFetchSecurityGroups_RealAWSData(t *testing.T) {
 		t.Fatalf("expected no error, got %v", err)
 	}
 
-	// Real data has exactly 21 security groups
 	if len(resources) != 21 {
 		t.Fatalf("expected 21 resources from real data, got %d", len(resources))
 	}
 
-	// Build a lookup by group ID for targeted assertions
 	byID := make(map[string]int)
 	for i, r := range resources {
 		byID[r.ID] = i
 	}
 
-	// Verify all 21 group IDs are present
 	expectedIDs := []string{
 		"sg-0aa0000000000001a", // migration-sg (docdb-sg)
 		"sg-0aa0000000000002b", // node-to-node-traffic
@@ -332,7 +295,7 @@ func TestFetchSecurityGroups_RealAWSData(t *testing.T) {
 		}
 	}
 
-	// --- Verify SG with most inbound rules: test-cluster-1-node (11 inbound, 1 outbound) ---
+	// test-cluster-1-node: the SG with the most inbound rules.
 	idx := byID["sg-0aa0000000000005e"]
 	r := resources[idx]
 	if r.Name != "test-cluster-1-node" {
@@ -348,24 +311,21 @@ func TestFetchSecurityGroups_RealAWSData(t *testing.T) {
 	if r.Fields["description"] != "EKS node shared security group" {
 		t.Errorf("eks node SG Fields[description]: expected %q, got %q", "EKS node shared security group", r.Fields["description"])
 	}
-	// Verify tags on eks node SG (has 4 tags including kubernetes.io/cluster and karpenter.sh/discovery)
 
-	// --- Verify SG with 0 inbound and 0 outbound rules: default dev-vpc SG ---
+	// default dev-vpc SG: no rules.
 	idx = byID["sg-0aa0000000000014e"]
 	rEmpty := resources[idx]
 	if rEmpty.Name != "default" {
 		t.Errorf("default dev-vpc SG Name: expected %q, got %q", "default", rEmpty.Name)
 	}
 
-	// --- Verify SG with no tags: msk-sg ---
+	// msk-sg: no tags.
 	idx = byID["sg-0aa0000000000003c"]
 	rMsk := resources[idx]
 	if rMsk.Name != "msk-sg" {
 		t.Errorf("msk SG Name: expected %q, got %q", "msk-sg", rMsk.Name)
 	}
 
-	// --- Verify SG spanning two VPCs ---
-	// Count how many SGs belong to each VPC
 	vpcCounts := make(map[string]int)
 	for _, r := range resources {
 		vpcCounts[r.Fields["vpc_id"]]++
@@ -377,7 +337,6 @@ func TestFetchSecurityGroups_RealAWSData(t *testing.T) {
 		t.Errorf("expected 2 SGs in default VPC, got %d", vpcCounts["vpc-0ddd3333eee4444ff"])
 	}
 
-	// --- Verify all SGs have RawStruct of type ec2types.SecurityGroup ---
 	for i, r := range resources {
 		if r.RawStruct == nil {
 			t.Errorf("resource[%d].RawStruct must not be nil", i)
@@ -388,13 +347,12 @@ func TestFetchSecurityGroups_RealAWSData(t *testing.T) {
 			t.Errorf("resource[%d].RawStruct should be ec2types.SecurityGroup, got %T", i, r.RawStruct)
 			continue
 		}
-		// Verify GroupId in RawStruct matches resource ID
 		if sg.GroupId == nil || *sg.GroupId != r.ID {
 			t.Errorf("resource[%d].RawStruct.GroupId (%v) does not match ID (%q)", i, sg.GroupId, r.ID)
 		}
 	}
 
-	// --- Verify SG with IPv6 egress rules (ci-runner-ubuntu) ---
+	// ci-runner-ubuntu: IPv6 egress rules.
 	idx = byID["sg-0aa0000000000006f"]
 	rCiUbuntu := resources[idx]
 	sgRaw, ok := rCiUbuntu.RawStruct.(ec2types.SecurityGroup)
@@ -408,7 +366,6 @@ func TestFetchSecurityGroups_RealAWSData(t *testing.T) {
 		t.Errorf("ci-runner-ubuntu egress rule expected 1 IPv6 range, got %d", len(sgRaw.IpPermissionsEgress[0].Ipv6Ranges))
 	}
 
-	// --- Verify all required fields exist on every resource ---
 	requiredFields := []string{"group_id", "group_name", "vpc_id", "description"}
 	for i, r := range resources {
 		for _, key := range requiredFields {

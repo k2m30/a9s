@@ -1,23 +1,5 @@
 package unit_test
 
-// aws_s3_related_test.go — Related-target discovery tests for s3 (spec §2).
-//
-// Covered assertions:
-//   - All 15 in-scope pivots are registered in GetRelated("s3"):
-//     athena, backup, cf, cfn, eb-rule, glue, kms, lambda, logs, r53, role,
-//     sns, sqs, trail, ct-events.
-//   - iam-user and waf are NOT registered (§5 Out of Scope enforcement).
-//   - One "found" + one "no-match" case per pivot (where deterministically
-//     testable via cache or forward-field lookup).
-//   - ct-events: present in registry AND returns Count=-1 with non-nil FetchFilter
-//     (the universal auto-registered checker behaviour).
-//   - Healthy-bucket resource (with notification ARNs pre-populated) returns
-//     Count≥1 for the forward-lookup pivots (lambda, sns, sqs).
-//   - Reverse-scan pivots (trail, cf, cfn, kms, logs) return Count≥1 when the
-//     cache / fake client contains the expected entry.
-//   - Cache-scan pivots (athena, backup, eb-rule, glue, r53, role) return
-//     Count≥0 (accepting zero when the cache lacks the required field).
-
 import (
 	"context"
 	"testing"
@@ -35,12 +17,6 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// ---------------------------------------------------------------------------
-// helpers
-// ---------------------------------------------------------------------------
-
-// s3CheckerByTarget retrieves the RelatedChecker for the given targetType from
-// the s3 related definitions. Fails the test if not found or nil.
 func s3CheckerByTarget(t *testing.T, target string) resource.RelatedChecker {
 	t.Helper()
 	for _, def := range resource.GetRelated("s3") {
@@ -55,19 +31,13 @@ func s3CheckerByTarget(t *testing.T, target string) resource.RelatedChecker {
 	return nil
 }
 
-// s3BackupSession is a session that recorded the region its buckets were read
-// in. The backup pivot builds a bucket ARN, and the partition in it comes from
-// that region; a session with none declines instead of guessing commercial
-// (aws5 row 2), so these walks name one. The old nil argument leant on the
-// ambient config's us-east-1, which is the guess the row removed — do not
-// restore it.
+// The backup pivot builds a bucket ARN whose partition comes from the
+// session's region; a session that recorded none declines rather than
+// guessing commercial.
 func s3BackupSession() *awsclient.ServiceClients {
 	return &awsclient.ServiceClients{Region: "us-east-1"}
 }
 
-// healthyBucketResource returns a resource.Resource pre-populated with all
-// fields that the healthy-bucket fixture would have after a full fetch with
-// notifications enabled. Used by forward-lookup pivot tests.
 func healthyBucketResource() resource.Resource {
 	return resource.Resource{
 		ID:   fixtures.HealthyBucketName,
@@ -81,7 +51,6 @@ func healthyBucketResource() resource.Resource {
 	}
 }
 
-// emptyBucketResource returns a resource.Resource with no notification fields.
 func emptyBucketResource(name string) resource.Resource {
 	return resource.Resource{
 		ID:     name,
@@ -107,18 +76,10 @@ func s3CheckerByDisplayName(t *testing.T, display string) resource.RelatedChecke
 	return nil
 }
 
-// s3FakeClients builds a ServiceClients with the demo S3 fake (for API-call
-// based checkers: kms, logs, cfn).
 func s3FakeClients() *awsclient.ServiceClients {
 	return &awsclient.ServiceClients{S3: fakes.NewS3()}
 }
 
-// ---------------------------------------------------------------------------
-// §5 Out-of-Scope enforcement — iam-user and waf must NOT be present.
-// ---------------------------------------------------------------------------
-
-// TestS3_Related_OOS_IAMUser_NotRegistered asserts that iam-user is NOT in
-// the s3 related registry (spec §5 Out of Scope).
 func TestS3_Related_OOS_IAMUser_NotRegistered(t *testing.T) {
 	for _, def := range resource.GetRelated("s3") {
 		if def.TargetType == "iam-user" {
@@ -127,8 +88,7 @@ func TestS3_Related_OOS_IAMUser_NotRegistered(t *testing.T) {
 	}
 }
 
-// TestS3_Related_OOS_WAF_NotRegistered asserts that waf is NOT in the s3
-// related registry (spec §5 Out of Scope — WAF attaches via CloudFront only).
+// WAF attaches to a bucket only through CloudFront.
 func TestS3_Related_OOS_WAF_NotRegistered(t *testing.T) {
 	for _, def := range resource.GetRelated("s3") {
 		if def.TargetType == "waf" {
@@ -137,12 +97,6 @@ func TestS3_Related_OOS_WAF_NotRegistered(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// All 15 in-scope pivots are present in GetRelated("s3").
-// ---------------------------------------------------------------------------
-
-// TestS3_Related_AllInScopePivots_Registered verifies that every in-scope pivot
-// from spec §2 is present in the s3 related registry.
 func TestS3_Related_AllInScopePivots_Registered(t *testing.T) {
 	inScope := []string{
 		"athena", "backup", "cf", "cfn", "eb-rule", "glue",
@@ -166,30 +120,17 @@ func TestS3_Related_AllInScopePivots_Registered(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// ct-events — universal auto-registered pivot (always Count=-1 with FetchFilter).
-// ---------------------------------------------------------------------------
-
-// TestS3_Related_CTEvents_Present verifies ct-events is registered and returns
-// a non-nil FetchFilter (the universal auto-registered behaviour).
 func TestS3_Related_CTEvents_Present(t *testing.T) {
 	checker := s3CheckerByTarget(t, "ct-events")
 	result := checker(context.Background(), nil, healthyBucketResource(), nil)
 	if result.TargetType() != "ct-events" {
 		t.Errorf("TargetType = %q, want %q", result.TargetType(), "ct-events")
 	}
-	// ct-events always uses FetchFilter, not a static cache lookup.
 	if result.FetchFilter() == nil {
 		t.Error("ct-events checker must return non-nil FetchFilter for navigation")
 	}
 }
 
-// ---------------------------------------------------------------------------
-// lambda — forward-lookup from Fields["notification_lambda"].
-// ---------------------------------------------------------------------------
-
-// TestS3_Related_Lambda_Found verifies that a bucket with notification_lambda
-// set returns Count=1 when the named function exists in the lambda cache.
 func TestS3_Related_Lambda_Found(t *testing.T) {
 	cache := resource.ResourceCache{
 		"lambda": resource.ResourceCacheEntry{
@@ -207,8 +148,6 @@ func TestS3_Related_Lambda_Found(t *testing.T) {
 	}
 }
 
-// TestS3_Related_Lambda_NoMatch verifies that a bucket with no notification_lambda
-// field returns Count=0.
 func TestS3_Related_Lambda_NoMatch(t *testing.T) {
 	checker := s3CheckerByTarget(t, "lambda")
 	result := checker(context.Background(), nil, emptyBucketResource("bare-bucket"), nil)
@@ -218,12 +157,6 @@ func TestS3_Related_Lambda_NoMatch(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// sns — forward-lookup from Fields["notification_sns"].
-// ---------------------------------------------------------------------------
-
-// TestS3_Related_SNS_Found verifies that a bucket with notification_sns returns
-// Count=1 when the topic exists in the sns cache.
 func TestS3_Related_SNS_Found(t *testing.T) {
 	cache := resource.ResourceCache{
 		"sns": resource.ResourceCacheEntry{
@@ -241,8 +174,6 @@ func TestS3_Related_SNS_Found(t *testing.T) {
 	}
 }
 
-// TestS3_Related_SNS_NoMatch verifies that a bucket with no notification_sns
-// field returns Count=0.
 func TestS3_Related_SNS_NoMatch(t *testing.T) {
 	checker := s3CheckerByTarget(t, "sns")
 	result := checker(context.Background(), nil, emptyBucketResource("bare-bucket"), nil)
@@ -252,12 +183,6 @@ func TestS3_Related_SNS_NoMatch(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// sqs — forward-lookup from Fields["notification_sqs"].
-// ---------------------------------------------------------------------------
-
-// TestS3_Related_SQS_Found verifies that a bucket with notification_sqs returns
-// Count=1 when the queue exists in the sqs cache.
 func TestS3_Related_SQS_Found(t *testing.T) {
 	cache := resource.ResourceCache{
 		"sqs": resource.ResourceCacheEntry{
@@ -275,8 +200,6 @@ func TestS3_Related_SQS_Found(t *testing.T) {
 	}
 }
 
-// TestS3_Related_SQS_NoMatch verifies that a bucket with no notification_sqs
-// field returns Count=0.
 func TestS3_Related_SQS_NoMatch(t *testing.T) {
 	checker := s3CheckerByTarget(t, "sqs")
 	result := checker(context.Background(), nil, emptyBucketResource("bare-bucket"), nil)
@@ -286,12 +209,6 @@ func TestS3_Related_SQS_NoMatch(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// kms — API-call: GetBucketEncryption on the S3 fake.
-// ---------------------------------------------------------------------------
-
-// TestS3_Related_KMS_Found verifies that the healthy bucket's KMS encryption
-// config resolves to Count=1 when the key exists in the kms cache.
 func TestS3_Related_KMS_Found(t *testing.T) {
 	cache := resource.ResourceCache{
 		"kms": resource.ResourceCacheEntry{
@@ -313,9 +230,6 @@ func TestS3_Related_KMS_Found(t *testing.T) {
 	}
 }
 
-// TestS3_Related_KMS_NoMatch verifies that a bucket with no KMS encryption
-// returns Count=0. Uses an ad-hoc bucket name that isn't present in any
-// demo config map, so the fake returns the not-found Smithy error.
 func TestS3_Related_KMS_NoMatch(t *testing.T) {
 	checker := s3CheckerByTarget(t, "kms")
 	src := emptyBucketResource("test-only-no-kms-" + t.Name())
@@ -326,14 +240,6 @@ func TestS3_Related_KMS_NoMatch(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// logs — API-call: GetBucketLogging on the S3 fake.
-// ---------------------------------------------------------------------------
-
-// TestS3_Related_AccessLogBucket_Found verifies that the healthy bucket's
-// S3 access-log destination bucket name appears as the related resource ID
-// (Count=1). The pivot targets `s3` — the destination is another bucket,
-// not a CloudWatch log group.
 func TestS3_Related_AccessLogBucket_Found(t *testing.T) {
 	checker := s3CheckerByDisplayName(t, "Access Log Bucket")
 	result := checker(context.Background(), s3FakeClients(), healthyBucketResource(), nil)
@@ -347,9 +253,6 @@ func TestS3_Related_AccessLogBucket_Found(t *testing.T) {
 	}
 }
 
-// TestS3_Related_AccessLogBucket_NoMatch verifies that a bucket with no
-// logging config returns Count=0. Uses an ad-hoc bucket name that isn't
-// present in any demo config map, so the fake returns an empty output.
 func TestS3_Related_AccessLogBucket_NoMatch(t *testing.T) {
 	checker := s3CheckerByDisplayName(t, "Access Log Bucket")
 	src := emptyBucketResource("test-only-no-logging-" + t.Name())
@@ -360,12 +263,6 @@ func TestS3_Related_AccessLogBucket_NoMatch(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// cfn — API-call: GetBucketTagging + cfn cache scan.
-// ---------------------------------------------------------------------------
-
-// TestS3_Related_CFN_Found verifies that the healthy bucket's CFN stack-name
-// tag resolves to Count=1 when the stack exists in the cfn cache.
 func TestS3_Related_CFN_Found(t *testing.T) {
 	cache := resource.ResourceCache{
 		"cfn": resource.ResourceCacheEntry{
@@ -394,11 +291,8 @@ func TestS3_Related_CFN_Found(t *testing.T) {
 	}
 }
 
-// TestS3_Related_CFN_NoMatch verifies that a bucket with no CFN stack tag
-// returns Count=0.
 func TestS3_Related_CFN_NoMatch(t *testing.T) {
 	checker := s3CheckerByTarget(t, "cfn")
-	// a9s-demo-nopab has no TaggingConfigs entry → NoSuchTagSet → Count=0.
 	src := emptyBucketResource("a9s-demo-nopab")
 	result := checker(context.Background(), s3FakeClients(), src, resource.ResourceCache{
 		"cfn": resource.ResourceCacheEntry{
@@ -413,12 +307,6 @@ func TestS3_Related_CFN_NoMatch(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// trail — reverse scan: RawStruct.S3BucketName must match the bucket name.
-// ---------------------------------------------------------------------------
-
-// TestS3_Related_Trail_Found verifies that a trail whose S3BucketName equals
-// the healthy bucket name produces Count=1.
 func TestS3_Related_Trail_Found(t *testing.T) {
 	cache := resource.ResourceCache{
 		"trail": resource.ResourceCacheEntry{
@@ -443,8 +331,6 @@ func TestS3_Related_Trail_Found(t *testing.T) {
 	}
 }
 
-// TestS3_Related_Trail_NoMatch verifies that a trail with a different
-// S3BucketName returns Count=0.
 func TestS3_Related_Trail_NoMatch(t *testing.T) {
 	cache := resource.ResourceCache{
 		"trail": resource.ResourceCacheEntry{
@@ -469,13 +355,6 @@ func TestS3_Related_Trail_NoMatch(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// cf — reverse scan: DistributionSummary.Origins.Items must contain
-//      a DomainName with "BUCKETNAME.s3".
-// ---------------------------------------------------------------------------
-
-// TestS3_Related_CF_Found verifies that a CloudFront distribution with an S3
-// origin referencing the healthy bucket produces Count=1.
 func TestS3_Related_CF_Found(t *testing.T) {
 	cache := resource.ResourceCache{
 		"cf": resource.ResourceCacheEntry{
@@ -508,8 +387,6 @@ func TestS3_Related_CF_Found(t *testing.T) {
 	}
 }
 
-// TestS3_Related_CF_NoMatch verifies that a distribution with a different
-// origin domain returns Count=0.
 func TestS3_Related_CF_NoMatch(t *testing.T) {
 	cache := resource.ResourceCache{
 		"cf": resource.ResourceCacheEntry{
@@ -541,14 +418,6 @@ func TestS3_Related_CF_NoMatch(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// Deferred cache-scan pivots — accept Count≥0 (no sibling fixtures yet).
-// These tests confirm the checkers function without panic and return a valid
-// result code when the cache is populated with a non-matching entry.
-// ---------------------------------------------------------------------------
-
-// TestS3_Related_Athena_NoMatch verifies the athena checker returns Count=0
-// when no Athena workgroup references the bucket's S3 URI.
 func TestS3_Related_Athena_NoMatch(t *testing.T) {
 	cache := resource.ResourceCache{
 		"athena": resource.ResourceCacheEntry{
@@ -568,8 +437,6 @@ func TestS3_Related_Athena_NoMatch(t *testing.T) {
 	}
 }
 
-// TestS3_Related_Athena_Found verifies the athena checker returns Count≥1 when
-// a workgroup's result_output_location references the bucket.
 func TestS3_Related_Athena_Found(t *testing.T) {
 	cache := resource.ResourceCache{
 		"athena": resource.ResourceCacheEntry{
@@ -590,8 +457,6 @@ func TestS3_Related_Athena_Found(t *testing.T) {
 	}
 }
 
-// TestS3_Related_Backup_NoMatch verifies the backup checker returns Count=0
-// when no backup entry references this bucket's ARN.
 func TestS3_Related_Backup_NoMatch(t *testing.T) {
 	cache := resource.ResourceCache{
 		"backup": resource.ResourceCacheEntry{
@@ -611,8 +476,6 @@ func TestS3_Related_Backup_NoMatch(t *testing.T) {
 	}
 }
 
-// TestS3_Related_Backup_Found verifies the backup checker returns Count≥1
-// when a backup entry's resource_arn matches the bucket ARN.
 func TestS3_Related_Backup_Found(t *testing.T) {
 	bucketARN := fixtures.HealthyBucketARN
 	cache := resource.ResourceCache{
@@ -633,10 +496,6 @@ func TestS3_Related_Backup_Found(t *testing.T) {
 	}
 }
 
-// TestS3_Related_EBRule_NoMatch verifies the eb-rule checker returns Count=0
-// when no rule's EventPattern sources from aws.s3 with a matching bucket name.
-// Spec §2 (eb-rule): "rules with EventPattern.source=['aws.s3'] AND
-// EventPattern.detail.bucket.name matching this bucket".
 func TestS3_Related_EBRule_NoMatch(t *testing.T) {
 	cache := resource.ResourceCache{
 		"eb-rule": resource.ResourceCacheEntry{
@@ -644,7 +503,6 @@ func TestS3_Related_EBRule_NoMatch(t *testing.T) {
 				{
 					ID:   "other-rule",
 					Name: "other-rule",
-					// Pattern filters on aws.ec2, not aws.s3 — must not match.
 					Fields: map[string]string{
 						"event_pattern": `{"source":["aws.ec2"],"detail-type":["EC2 Instance State-change Notification"]}`,
 					},
@@ -652,7 +510,6 @@ func TestS3_Related_EBRule_NoMatch(t *testing.T) {
 				{
 					ID:   "s3-other-bucket-rule",
 					Name: "s3-other-bucket-rule",
-					// Right source but different bucket — must not match.
 					Fields: map[string]string{
 						"event_pattern": `{"source":["aws.s3"],"detail":{"bucket":{"name":["some-other-bucket"]}}}`,
 					},
@@ -667,9 +524,6 @@ func TestS3_Related_EBRule_NoMatch(t *testing.T) {
 	}
 }
 
-// TestS3_Related_EBRule_Found verifies the eb-rule checker returns Count≥1
-// when a rule's EventPattern sources from aws.s3 AND references the healthy
-// bucket by name.
 func TestS3_Related_EBRule_Found(t *testing.T) {
 	cache := resource.ResourceCache{
 		"eb-rule": resource.ResourceCacheEntry{
@@ -692,8 +546,6 @@ func TestS3_Related_EBRule_Found(t *testing.T) {
 	}
 }
 
-// TestS3_Related_Glue_NoMatch verifies the glue checker returns Count=0 when
-// no Glue job's ScriptLocation references this bucket.
 func TestS3_Related_Glue_NoMatch(t *testing.T) {
 	cache := resource.ResourceCache{
 		"glue": resource.ResourceCacheEntry{
@@ -716,8 +568,6 @@ func TestS3_Related_Glue_NoMatch(t *testing.T) {
 	}
 }
 
-// TestS3_Related_Glue_Found verifies the glue checker returns Count≥1 when a
-// job's ScriptLocation references the healthy bucket.
 func TestS3_Related_Glue_Found(t *testing.T) {
 	cache := resource.ResourceCache{
 		"glue": resource.ResourceCacheEntry{
@@ -740,8 +590,6 @@ func TestS3_Related_Glue_Found(t *testing.T) {
 	}
 }
 
-// TestS3_Related_R53_NoMatch verifies the r53 checker returns Count=0 when no
-// hosted zone's alias_targets references this bucket's S3 website endpoint.
 func TestS3_Related_R53_NoMatch(t *testing.T) {
 	cache := resource.ResourceCache{
 		"r53": resource.ResourceCacheEntry{
@@ -750,7 +598,6 @@ func TestS3_Related_R53_NoMatch(t *testing.T) {
 					ID:   "Z1D633PJN98FT9",
 					Name: "Z1D633PJN98FT9",
 					Fields: map[string]string{
-						// S3-website alias exists, but for a different bucket FQDN.
 						"s3website_alias_names": "other-bucket",
 						"alias_targets":         "s3-website-us-east-1.amazonaws.com.",
 					},
@@ -765,12 +612,10 @@ func TestS3_Related_R53_NoMatch(t *testing.T) {
 	}
 }
 
-// TestS3_Related_R53_Found verifies the r53 checker returns Count≥1 when a
-// hosted zone has an S3-website alias record whose NAME (FQDN) equals the
-// bucket name. Spec §2: bucket-name == FQDN is the only join key —
-// AliasTarget.DNSName is the regional endpoint and never carries the
-// bucket name in real AWS. The r53 fetcher pre-filters record sets for
-// S3-website aliases and emits the FQDNs into s3website_alias_names.
+// The bucket name equals the record FQDN, the only join key:
+// AliasTarget.DNSName is the regional endpoint and never carries the bucket
+// name. The r53 fetcher emits S3-website alias FQDNs into
+// s3website_alias_names.
 func TestS3_Related_R53_Found(t *testing.T) {
 	cache := resource.ResourceCache{
 		"r53": resource.ResourceCacheEntry{
@@ -794,10 +639,8 @@ func TestS3_Related_R53_Found(t *testing.T) {
 	}
 }
 
-// TestS3_Related_Role_NoBucketPolicy_Count0 verifies the spec-correct
-// direction: without a bucket policy, the role pivot returns 0 regardless
-// of what the role's own policies say. An ad-hoc bucket name (not in any
-// fixture) → s3:GetBucketPolicy returns NoSuchBucketPolicy → honest 0.
+// The role pivot reads the bucket policy: without one it is 0 whatever the
+// role's own policies say.
 func TestS3_Related_Role_NoBucketPolicy_Count0(t *testing.T) {
 	cache := resource.ResourceCache{
 		"role": resource.ResourceCacheEntry{
@@ -814,10 +657,6 @@ func TestS3_Related_Role_NoBucketPolicy_Count0(t *testing.T) {
 	}
 }
 
-// TestS3_Related_Role_BucketPolicyPrincipalResolves verifies the canonical
-// join: the healthy bucket's policy names a9s-demo-s3-access-role as a
-// Principal.AWS, and that role exists in the `role` cache — the pivot
-// resolves Count≥1.
 func TestS3_Related_Role_BucketPolicyPrincipalResolves(t *testing.T) {
 	cache := resource.ResourceCache{
 		"role": resource.ResourceCacheEntry{
@@ -833,11 +672,6 @@ func TestS3_Related_Role_BucketPolicyPrincipalResolves(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// backup — wildcard + NotResources exclusion regression (#296)
-// ---------------------------------------------------------------------------
-
-// s3ContainsID is a local helper: reports whether id appears in ids.
 func s3ContainsID(ids []string, id string) bool {
 	for _, v := range ids {
 		if v == id {
@@ -847,13 +681,6 @@ func s3ContainsID(ids []string, id string) bool {
 	return false
 }
 
-// TestCheckS3Backup_WildcardMatchingAndExclusion pins wildcard Resources and
-// NotResources exclusion behaviour for the S3 backup checker.
-//
-// Three plans:
-//   - plan-prefix:                arn:aws:s3:::prod-*   (no exclusions)
-//   - plan-catchall-except-quarantine: arn:aws:s3:::*  NOT arn:aws:s3:::quarantine-*
-//   - plan-specific:              arn:aws:s3:::specific-bucket (no exclusions)
 func TestCheckS3Backup_WildcardMatchingAndExclusion(t *testing.T) {
 	plans := []resource.Resource{
 		{ID: "plan-prefix", Fields: map[string]string{

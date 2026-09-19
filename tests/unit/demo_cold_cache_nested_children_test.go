@@ -1,20 +1,7 @@
 package unit
 
-// T012a — Nested child-view chains: verifies that each two-level child chain
-// compiles correctly, dispatches EnterChildViewMsg at each level, and that an
-// unknown parent identifier surfaces an SDK error rather than a silent empty
-// list (contract rule 4).
-//
-// Chains under test:
-//   logs → log_streams → log_events
-//   lambda → lambda_invocations → lambda_invocation_logs
-//   sfn → sfn_executions → sfn_execution_history
-//   cb → cb_builds → cb_build_logs
-//   elb → elb_listeners → elb_listener_rules
-//
-// Expected to FAIL for chains whose intermediate fakes are not yet wired
-// (coders own T013–T028 implementation tasks). The tests correctly fail before
-// those tasks are done; they pass once the fake and fixture data land.
+// An unknown parent identifier on a child view surfaces an SDK error rather
+// than a silent empty list.
 
 import (
 	"testing"
@@ -98,7 +85,6 @@ func enterChildAndFetch(t *testing.T, m *tui.Model, childType string, parentCtx 
 
 // enterChildExpectError dispatches EnterChildViewMsg with a known-unknown parent
 // identifier and asserts that the result is an error, not a silent empty list.
-// This validates contract rule 4.
 func enterChildExpectError(t *testing.T, m *tui.Model, childType string, parentCtx map[string]string, displayName string) {
 	t.Helper()
 	var fetchCmd tea.Cmd
@@ -111,7 +97,6 @@ func enterChildExpectError(t *testing.T, m *tui.Model, childType string, parentC
 		t.Fatalf("expected fetch cmd after EnterChildViewMsg{%s/unknown}, got nil", childType)
 	}
 	msg := fetchCmd()
-	// Unwrap one BatchMsg level.
 	if batch, ok := msg.(tea.BatchMsg); ok {
 		for _, sub := range batch {
 			if sub == nil {
@@ -126,7 +111,6 @@ func enterChildExpectError(t *testing.T, m *tui.Model, childType string, parentC
 		if v.Err == nil {
 			t.Errorf("contract rule 4: APIErrorMsg.Err must not be nil for unknown parent %q", childType)
 		}
-		// Correct: unknown parent surfaced as an error.
 	case messages.ResourcesLoaded:
 		if len(v.Resources) == 0 {
 			t.Errorf("contract rule 4 violation: %q fetch for unknown parent returned "+
@@ -146,23 +130,17 @@ func enterChildExpectError(t *testing.T, m *tui.Model, childType string, parentC
 	}
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Chain 1: logs → log_streams → log_events
-// ─────────────────────────────────────────────────────────────────────────────
-
 // TestDemoColdCacheNestedChildren_LogsChain verifies the three-level chain
 // logs → log_streams → log_events from a cold cache.
 func TestDemoColdCacheNestedChildren_LogsChain(t *testing.T) {
 	t.Parallel()
 	m := setupDemoApp(t)
 
-	// Level 0: load log groups.
 	groups := loadResourceList(t, m, "logs")
 	if len(groups) == 0 {
 		t.Fatal("no log groups in fixture data; cannot test logs→log_streams→log_events chain")
 	}
 
-	// Level 1: drill into log_streams for the first log group.
 	firstGroup := groups[0]
 	logGroupName := firstGroup.Name
 	if logGroupName == "" {
@@ -176,7 +154,6 @@ func TestDemoColdCacheNestedChildren_LogsChain(t *testing.T) {
 		t.Fatal("no log streams in fixture data for first log group; cannot test log_streams→log_events")
 	}
 
-	// Level 2: drill into log_events for the first log stream.
 	firstStream := streams.Resources[0]
 	streamName := firstStream.Name
 	if streamName == "" {
@@ -192,23 +169,18 @@ func TestDemoColdCacheNestedChildren_LogsChain(t *testing.T) {
 	_ = events // may be empty if no events in fixture; length check not required for log_events
 }
 
-// TestDemoColdCacheNestedChildren_LogsChain_UnknownParent verifies contract
-// rule 4 for the log_streams child: an unknown log group name must surface an
-// error (ResourceNotFoundException), not an empty list.
+// TestDemoColdCacheNestedChildren_LogsChain_UnknownParent: an unknown log
+// group name on the log_streams child must surface an error
+// (ResourceNotFoundException), not an empty list.
 func TestDemoColdCacheNestedChildren_LogsChain_UnknownParent(t *testing.T) {
 	t.Parallel()
 	m := setupDemoApp(t)
 
-	// Ensure clients are wired but no real list navigation needed.
 	enterChildExpectError(t, m, "log_streams",
 		map[string]string{"log_group_name": "/nonexistent/log/group/xyz-00000"},
 		"/nonexistent/log/group/xyz-00000",
 	)
 }
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Chain 2: lambda → lambda_invocations → lambda_invocation_logs
-// ─────────────────────────────────────────────────────────────────────────────
 
 // TestDemoColdCacheNestedChildren_LambdaChain verifies the three-level chain
 // lambda → lambda_invocations → lambda_invocation_logs from a cold cache.
@@ -216,13 +188,11 @@ func TestDemoColdCacheNestedChildren_LambdaChain(t *testing.T) {
 	t.Parallel()
 	m := setupDemoApp(t)
 
-	// Level 0: load lambda functions.
 	functions := loadResourceList(t, m, "lambda")
 	if len(functions) == 0 {
 		t.Fatal("no lambda functions in fixture data; cannot test lambda→invocations→logs chain")
 	}
 
-	// Level 1: drill into lambda_invocations for the first function.
 	firstFn := functions[0]
 	fnName := firstFn.Name
 	if fnName == "" {
@@ -246,7 +216,6 @@ func TestDemoColdCacheNestedChildren_LambdaChain(t *testing.T) {
 		return
 	}
 
-	// Level 2: drill into lambda_invocation_logs for the first invocation.
 	firstInvoc := invocations.Resources[0]
 	requestID := firstInvoc.Fields["request_id"]
 	if requestID == "" {
@@ -261,9 +230,9 @@ func TestDemoColdCacheNestedChildren_LambdaChain(t *testing.T) {
 	)
 }
 
-// TestDemoColdCacheNestedChildren_LambdaChain_UnknownParent verifies contract
-// rule 4 for lambda_invocations: an unknown function name must produce an SDK
-// error (or empty with error — not silent empty).
+// TestDemoColdCacheNestedChildren_LambdaChain_UnknownParent: an unknown
+// function name on lambda_invocations must produce an SDK error, not a silent
+// empty list.
 func TestDemoColdCacheNestedChildren_LambdaChain_UnknownParent(t *testing.T) {
 	t.Parallel()
 	m := setupDemoApp(t)
@@ -277,23 +246,17 @@ func TestDemoColdCacheNestedChildren_LambdaChain_UnknownParent(t *testing.T) {
 	)
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Chain 3: sfn → sfn_executions → sfn_execution_history
-// ─────────────────────────────────────────────────────────────────────────────
-
 // TestDemoColdCacheNestedChildren_SFNChain verifies the three-level chain
 // sfn → sfn_executions → sfn_execution_history from a cold cache.
 func TestDemoColdCacheNestedChildren_SFNChain(t *testing.T) {
 	t.Parallel()
 	m := setupDemoApp(t)
 
-	// Level 0: load state machines.
 	machines := loadResourceList(t, m, "sfn")
 	if len(machines) == 0 {
 		t.Fatal("no state machines in fixture data; cannot test sfn→executions→history chain")
 	}
 
-	// Level 1: drill into sfn_executions for the first state machine.
 	// The DrillCondition in types_messaging.go excludes EXPRESS machines.
 	var smArn, smName string
 	for _, sm := range machines {
@@ -318,7 +281,6 @@ func TestDemoColdCacheNestedChildren_SFNChain(t *testing.T) {
 		t.Fatal("no sfn executions in fixture data; cannot test sfn_executions→sfn_execution_history chain")
 	}
 
-	// Level 2: drill into sfn_execution_history for the first execution.
 	firstExec := executions.Resources[0]
 	execArn := firstExec.Fields["execution_arn"]
 	execName := firstExec.Name
@@ -334,8 +296,8 @@ func TestDemoColdCacheNestedChildren_SFNChain(t *testing.T) {
 	)
 }
 
-// TestDemoColdCacheNestedChildren_SFNChain_UnknownParent verifies contract
-// rule 4 for sfn_executions: an unknown state machine ARN must surface an error.
+// TestDemoColdCacheNestedChildren_SFNChain_UnknownParent: an unknown state
+// machine ARN on sfn_executions must surface an error.
 func TestDemoColdCacheNestedChildren_SFNChain_UnknownParent(t *testing.T) {
 	t.Parallel()
 	m := setupDemoApp(t)
@@ -349,23 +311,17 @@ func TestDemoColdCacheNestedChildren_SFNChain_UnknownParent(t *testing.T) {
 	)
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Chain 4: cb → cb_builds → cb_build_logs
-// ─────────────────────────────────────────────────────────────────────────────
-
 // TestDemoColdCacheNestedChildren_CBChain verifies the three-level chain
 // cb → cb_builds → cb_build_logs from a cold cache.
 func TestDemoColdCacheNestedChildren_CBChain(t *testing.T) {
 	t.Parallel()
 	m := setupDemoApp(t)
 
-	// Level 0: load CodeBuild projects.
 	projects := loadResourceList(t, m, "cb")
 	if len(projects) == 0 {
 		t.Fatal("no CodeBuild projects in fixture data; cannot test cb→builds→logs chain")
 	}
 
-	// Level 1: drill into cb_builds for the first project.
 	firstProject := projects[0]
 	projectName := firstProject.ID
 	builds := enterChildAndFetch(t, m, "cb_builds",
@@ -376,7 +332,6 @@ func TestDemoColdCacheNestedChildren_CBChain(t *testing.T) {
 		t.Fatal("no CodeBuild builds in fixture data; cannot test cb_builds→cb_build_logs chain")
 	}
 
-	// Level 2: drill into cb_build_logs for the first build that has a log group.
 	// DrillCondition: log_group_name must not be empty.
 	var logGroupName, logStreamName, buildNumber string
 	for _, b := range builds.Resources {
@@ -401,8 +356,8 @@ func TestDemoColdCacheNestedChildren_CBChain(t *testing.T) {
 	)
 }
 
-// TestDemoColdCacheNestedChildren_CBChain_UnknownParent verifies contract
-// rule 4 for cb_builds: an unknown project name must surface an error.
+// TestDemoColdCacheNestedChildren_CBChain_UnknownParent: an unknown project
+// name on cb_builds must surface an error.
 func TestDemoColdCacheNestedChildren_CBChain_UnknownParent(t *testing.T) {
 	t.Parallel()
 	m := setupDemoApp(t)
@@ -413,23 +368,17 @@ func TestDemoColdCacheNestedChildren_CBChain_UnknownParent(t *testing.T) {
 	)
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Chain 5: elb → elb_listeners → elb_listener_rules
-// ─────────────────────────────────────────────────────────────────────────────
-
 // TestDemoColdCacheNestedChildren_ELBChain verifies the three-level chain
 // elb → elb_listeners → elb_listener_rules from a cold cache.
 func TestDemoColdCacheNestedChildren_ELBChain(t *testing.T) {
 	t.Parallel()
 	m := setupDemoApp(t)
 
-	// Level 0: load load balancers.
 	lbs := loadResourceList(t, m, "elb")
 	if len(lbs) == 0 {
 		t.Fatal("no load balancers in fixture data; cannot test elb→listeners→rules chain")
 	}
 
-	// Level 1: drill into elb_listeners for the first LB.
 	firstLB := lbs[0]
 	lbArn := firstLB.Fields["load_balancer_arn"]
 	if lbArn == "" {
@@ -447,7 +396,6 @@ func TestDemoColdCacheNestedChildren_ELBChain(t *testing.T) {
 		t.Fatal("no ELB listeners in fixture data; cannot test elb_listeners→elb_listener_rules chain")
 	}
 
-	// Level 2: drill into elb_listener_rules for the first listener.
 	firstListener := listeners.Resources[0]
 	listenerArn := firstListener.ID
 	listenerDisplay := firstListener.Fields["listener_display"]
@@ -460,8 +408,8 @@ func TestDemoColdCacheNestedChildren_ELBChain(t *testing.T) {
 	)
 }
 
-// TestDemoColdCacheNestedChildren_ELBChain_UnknownParent verifies contract
-// rule 4 for elb_listeners: an unknown LB ARN must surface an error.
+// TestDemoColdCacheNestedChildren_ELBChain_UnknownParent: an unknown LB ARN
+// on elb_listeners must surface an error.
 func TestDemoColdCacheNestedChildren_ELBChain_UnknownParent(t *testing.T) {
 	t.Parallel()
 	m := setupDemoApp(t)

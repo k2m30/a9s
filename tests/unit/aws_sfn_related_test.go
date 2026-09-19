@@ -13,8 +13,6 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// sfnCheckerByTarget returns the RelatedChecker for the given target type registered
-// under "sfn". It fails the test immediately if the checker is nil or not found.
 func sfnCheckerByTarget(t *testing.T, target string) resource.RelatedChecker {
 	t.Helper()
 	for _, def := range resource.GetRelated("sfn") {
@@ -28,8 +26,6 @@ func sfnCheckerByTarget(t *testing.T, target string) resource.RelatedChecker {
 	t.Fatalf("sfn related checker for %s not found", target)
 	return nil
 }
-
-// --- checkSFNLogs tests (Pattern N — naming convention) ---
 
 func TestRelated_SFN_Logs_Found(t *testing.T) {
 	logRes := resource.Resource{
@@ -102,8 +98,6 @@ func TestRelated_SFN_Logs_CacheMissNoClients(t *testing.T) {
 		t.Errorf("Count = %d, want -1 (unknown — empty cache, no clients)", result.Count())
 	}
 }
-
-// --- checkSFNAlarm tests (Pattern D — dimension-based) ---
 
 func sfnSrcResource() resource.Resource {
 	return resource.Resource{
@@ -234,10 +228,8 @@ func TestRelated_SFN_Alarm_CacheMissNoClients(t *testing.T) {
 	}
 }
 
-// --- sfn→role: undeterminable — StateMachineListItem has no RoleArn field ---
+// StateMachineListItem carries no RoleArn; sfn→role needs DescribeStateMachine.
 
-// TestRelated_SFN_Role_EmptyARN verifies that with no ARN on the source resource,
-// sfn→role short-circuits to Count=0 (no lookup attempted).
 func TestRelated_SFN_Role_EmptyARN(t *testing.T) {
 	source := resource.Resource{
 		ID:   "order-fulfillment-workflow",
@@ -253,8 +245,6 @@ func TestRelated_SFN_Role_EmptyARN(t *testing.T) {
 	}
 }
 
-// TestRelated_SFN_Role_NilClients verifies that with nil clients (cannot call
-// DescribeStateMachine), sfn→role reports Count=-1 (unknown).
 func TestRelated_SFN_Role_NilClients(t *testing.T) {
 	source := resource.Resource{
 		ID:   "order-fulfillment-workflow",
@@ -270,16 +260,6 @@ func TestRelated_SFN_Role_NilClients(t *testing.T) {
 	}
 }
 
-// TestRelated_SFN_CFN_ReturnsUnknown was deleted: sfn→cfn is in the Explicitly
-// excluded list (unanimous sometimes — tag-heuristic only).
-// See docs/related-resources.md "Explicitly excluded" section.
-
-// ---------------------------------------------------------------------------
-// checkSFNEbRule — Pattern C: ListRuleNamesByTarget on state machine ARN
-// ---------------------------------------------------------------------------
-
-// TestRelated_SFN_EbRule_Match verifies that when the fake EventBridge returns
-// 3 rule names, Count=3 and all 3 names are in ResourceIDs.
 func TestRelated_SFN_EbRule_Match(t *testing.T) {
 	src := resource.Resource{
 		ID:   "order-fulfillment-workflow",
@@ -304,8 +284,6 @@ func TestRelated_SFN_EbRule_Match(t *testing.T) {
 	}
 }
 
-// TestRelated_SFN_EbRule_Empty verifies that a state machine with no ARN
-// field returns Count=0.
 func TestRelated_SFN_EbRule_Empty(t *testing.T) {
 	src := resource.Resource{
 		ID:     "order-fulfillment-workflow",
@@ -320,8 +298,6 @@ func TestRelated_SFN_EbRule_Empty(t *testing.T) {
 	}
 }
 
-// TestRelated_SFN_EbRule_WrongRawStruct verifies that nil clients with a valid
-// ARN field returns Count=-1 (no EventBridge client available).
 func TestRelated_SFN_EbRule_WrongRawStruct(t *testing.T) {
 	src := resource.Resource{
 		ID:   "order-fulfillment-workflow",

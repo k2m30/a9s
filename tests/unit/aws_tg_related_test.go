@@ -15,8 +15,6 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// tgCheckerByTarget retrieves the RelatedChecker for the given targetType
-// and fails the test if the checker is nil or not found.
 func tgCheckerByTarget(t *testing.T, target string) resource.RelatedChecker {
 	t.Helper()
 	for _, def := range resource.GetRelated("tg") {
@@ -37,7 +35,6 @@ const (
 	tgOtherTGARN = "arn:aws:elasticloadbalancing:us-east-1:123456789012:targetgroup/other-tg/xyz789"
 )
 
-// tgSrcResource returns a canonical test resource for the TG.
 func tgSrcResource() resource.Resource {
 	tgARN := tgTestARN
 	return resource.Resource{
@@ -57,17 +54,12 @@ func tgSrcResource() resource.Resource {
 	}
 }
 
-// --- ELB checker tests (Pattern F — reads LoadBalancerArns from TG RawStruct) ---
-
 func TestRelated_TG_ELB_Match(t *testing.T) {
 	res := tgSrcResource()
 	tgARN := tgTestELBARN
 
-	// checkTGELB reads LoadBalancerArns from the TG's own RawStruct, but that
-	// only proves ARN membership — the elb cache must supply the canonical
-	// elb Resource.ID (LoadBalancerName, e.g. "my-alb"; see core/aws/elb.go:35/72),
-	// a genuinely different string from the ARN and not derivable from it.
-	// Seeded here exactly like the sibling TestRelated_TG_ECSSvc_Match below.
+	// LoadBalancerArns proves membership only; the elb row ID is the
+	// LoadBalancerName, which the ARN does not yield, so the elb cache supplies it.
 	cache := resource.ResourceCache{
 		"elb": resource.ResourceCacheEntry{Resources: []resource.Resource{
 			{
@@ -83,8 +75,6 @@ func TestRelated_TG_ELB_Match(t *testing.T) {
 	if result.Count() != 1 {
 		t.Errorf("Count = %d, want 1", result.Count())
 	}
-	// Guards against a wrong seed key silently producing a false pass: this
-	// fails if the resolved row isn't actually the canonical "my-alb" ID.
 	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != "my-alb" {
 		t.Errorf("ResourceIDs = %v, want [my-alb]", result.ResourceIDs())
 	}
@@ -111,8 +101,6 @@ func TestRelated_TG_ELB_Empty(t *testing.T) {
 		t.Errorf("Count = %d, want 0", result.Count())
 	}
 }
-
-// --- ECS service checker tests (Pattern C — reverse cache lookup) ---
 
 func TestRelated_TG_ECSSvc_Match(t *testing.T) {
 	res := tgSrcResource()
@@ -162,8 +150,6 @@ func TestRelated_TG_ECSSvc_NoMatch(t *testing.T) {
 	}
 }
 
-// --- ASG checker tests (Pattern C — reverse cache lookup) ---
-
 func TestRelated_TG_ASG_Match(t *testing.T) {
 	res := tgSrcResource()
 	cache := resource.ResourceCache{
@@ -206,10 +192,6 @@ func TestRelated_TG_ASG_NoMatch(t *testing.T) {
 	}
 }
 
-// --- Nil clients / empty cache tests ---
-
-// TestRelated_TG_NilClients verifies that cache-dependent checkers return -1
-// when both clients are nil and the cache has no entry.
 func TestRelated_TG_NilClients(t *testing.T) {
 	res := tgSrcResource()
 	emptyCache := resource.ResourceCache{}
@@ -222,8 +204,6 @@ func TestRelated_TG_NilClients(t *testing.T) {
 		}
 	}
 }
-
-// --- Alarm checker tests (Pattern C — reverse cache lookup via TargetGroup dimension) ---
 
 func TestRelated_TG_Alarm_Match(t *testing.T) {
 	res := tgSrcResource()
@@ -268,12 +248,6 @@ func TestRelated_TG_Alarm_NoMatch(t *testing.T) {
 	}
 }
 
-// TestRelated_TG_Alarm_NilCache verifies that checkTGAlarm returns
-// RelatedUnknown when the "alarm" cache has not been loaded (cache miss, no
-// clients) — the same canonical nil-cache contract as checkSQSAlarm. Unlike
-// checkDbiAlarm/checkDdbAlarm, checkTGAlarm is NOT one of the divergent
-// clones, so this pins currently-passing behavior that must survive the
-// alarmIDsByDimension extraction.
 func TestRelated_TG_Alarm_NilCache(t *testing.T) {
 	res := tgSrcResource()
 
@@ -285,10 +259,6 @@ func TestRelated_TG_Alarm_NilCache(t *testing.T) {
 	}
 }
 
-// TestRelated_TG_Alarm_WrongDimensionName_NotCounted verifies that an alarm
-// whose dimensions carry a different name entirely (not "TargetGroup") is
-// not counted, distinct from the existing wrong-value coverage in
-// TestRelated_TG_Alarm_NoMatch.
 func TestRelated_TG_Alarm_WrongDimensionName_NotCounted(t *testing.T) {
 	res := tgSrcResource()
 	tgARNSuffix := "targetgroup/my-tg/abc123"
@@ -311,8 +281,6 @@ func TestRelated_TG_Alarm_WrongDimensionName_NotCounted(t *testing.T) {
 	}
 }
 
-// TestRelated_TG_Alarm_Error verifies that a fetch error for the "alarm"
-// target propagates as RelatedError, never a silently resolved count.
 func TestRelated_TG_Alarm_Error(t *testing.T) {
 	res := tgSrcResource()
 	wantErr := errors.New("boom: DescribeAlarms throttled")
@@ -340,9 +308,7 @@ func TestRelated_TG_Alarm_Error(t *testing.T) {
 	}
 }
 
-// TestRelated_TG_Alarm_Truncated_PropagatesTrue verifies that a truncated
-// "alarm" cache page with a real match still sets Truncated=true — the
-// match must render "(1+)", not a definitive "(1)".
+// A truncated page with a match renders "(1+)", not "(1)".
 func TestRelated_TG_Alarm_Truncated_PropagatesTrue(t *testing.T) {
 	res := tgSrcResource()
 	tgARNSuffix := "targetgroup/my-tg/abc123"
@@ -371,8 +337,6 @@ func TestRelated_TG_Alarm_Truncated_PropagatesTrue(t *testing.T) {
 	}
 }
 
-// --- NavigableFields test ---
-
 func TestNavigableFields_TG(t *testing.T) {
 	fields := resource.GetNavigableFields("tg")
 	found := false
@@ -386,5 +350,3 @@ func TestNavigableFields_TG(t *testing.T) {
 		t.Error("tg NavigableField VpcId→vpc not registered")
 	}
 }
-
-// --- Demo checker test ---

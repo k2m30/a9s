@@ -1,16 +1,10 @@
-// list_request_generation_test.go — the per-list fetch request sequence and
-// the re-entry re-verification.
-//
-//  1. A list fetch carries the dispatch-order sequence its screen was at when
-//     it was dispatched, and the apply point accepts only the latest one; a
-//     content heuristic (a smaller, still-truncated, strict-ID-subset
-//     replace) is not a stale-result guard, since an on-entry verification
-//     overlapping a later Ctrl+R can land AFTER the refresh.
-//  2. Re-entering a list that the row store still holds in full re-verifies
-//     it on both adapters: HandleNavigate returns the task, so the TUI does
-//     not render retained rows with no refreshing marker and no AWS call.
-//  3. A verify-refetch that comes back shallower than the type's known
-//     population does not regress the rendered total.
+// A list fetch carries the sequence its screen was at when dispatched, and
+// the apply point accepts only the latest: an on-entry verification that
+// overlaps a later Ctrl+R can land after the refresh, and its content need
+// not look stale. Re-entering a list the row store still holds in full
+// re-verifies it on both adapters, because HandleNavigate returns the task.
+// A verify-refetch shallower than the type's known population does not
+// regress the rendered total.
 package unit
 
 import (
@@ -29,9 +23,8 @@ import (
 const listGenType = "ec2"
 
 // listGenScreen is the list screen instance these sequences are drawn for.
-// The ordering guard keys by the issuing screen (runtime8 row 4), so a test
-// that hands out two sequences has to hand them out to one screen for them to
-// order against each other.
+// The ordering guard keys by the issuing screen, so two sequences order
+// against each other only when drawn for one screen.
 const listGenScreen domain.Gen = 1
 
 // listGenRows builds n synthetic ec2 rows whose IDs carry prefix, so two
@@ -47,10 +40,9 @@ func listGenRows(n int, prefix string) []resource.Resource {
 
 // listGenFetchSeq returns the list-fetch sequence stamped on the first
 // KindFetchResources task in tasks — what the executor echoes onto the
-// messages.ResourcesLoaded that fetch eventually produces.
-// Returns the screen the fetch was issued by alongside its sequence: the
-// ordering guard is keyed by the screen (runtime8 row 4), so a result replayed
-// with a sequence and no screen is compared against a counter nobody drew from.
+// messages.ResourcesLoaded that fetch eventually produces — and the screen
+// that issued it: a result replayed with a sequence and no screen is compared
+// against a counter nobody drew from.
 func listGenFetchSeq(t *testing.T, tasks []runtime.TaskRequest, what string) (domain.Gen, domain.Gen) {
 	t.Helper()
 	for _, task := range tasks {
@@ -65,9 +57,8 @@ func listGenFetchSeq(t *testing.T, tasks []runtime.TaskRequest, what string) (do
 	return 0, 0
 }
 
-// seedListGenDiskFile writes the on-disk type file the reviewer described: a
-// type whose population is known to be count while only rowCount rows fitted
-// in the file.
+// seedListGenDiskFile writes an on-disk type file whose known population is
+// count while only rowCount rows fitted in the file.
 func seedListGenDiskFile(t *testing.T, count, rowCount int) {
 	t.Helper()
 	stored := listGenRows(rowCount, "i-disk")
@@ -87,18 +78,10 @@ func seedListGenDiskFile(t *testing.T, count, rowCount int) {
 	}
 }
 
-// ───────────────────────────────────────────────────────────────────────────
-// 1. The overlapped on-entry verification loses to the later Ctrl+R
-// ───────────────────────────────────────────────────────────────────────────
-
-// TestListFetch_StaleEntryVerificationLosesToLaterRefresh drives the race
-// end to end through the real Controller: opening a list
-// dispatches its on-entry verification, the operator hits Ctrl+R before that
-// result arrives, and the refresh completes FIRST. The verification's own
-// result then lands last, carrying a full same-sized page of different rows —
-// exactly the shape the content heuristic cannot recognise as stale.
-//
-// The newer screen must survive.
+// Opening a list dispatches its on-entry verification; Ctrl+R is pressed
+// before that result arrives and the refresh completes first. The
+// verification's result then lands last with a full same-sized page of
+// different rows, and the newer screen survives.
 func TestListFetch_StaleEntryVerificationLosesToLaterRefresh(t *testing.T) {
 	ctrl, _ := newDetailParityHeadlessController(t)
 
@@ -112,7 +95,6 @@ func TestListFetch_StaleEntryVerificationLosesToLaterRefresh(t *testing.T) {
 		t.Fatalf("refresh reused the entry verification's sequence %d — a later dispatch must outrank an earlier one", entrySeq)
 	}
 
-	// The refresh wins the race and lands first.
 	handlePage(ctrl, messages.ResourcesLoaded{
 		ResourceType: listGenType,
 		Resources:    listGenRows(3, "i-refresh"),
@@ -122,7 +104,6 @@ func TestListFetch_StaleEntryVerificationLosesToLaterRefresh(t *testing.T) {
 		ScreenID:     refreshScreen,
 	})
 
-	// The superseded on-entry verification arrives afterwards.
 	handlePage(ctrl, messages.ResourcesLoaded{
 		ResourceType: listGenType,
 		Resources:    listGenRows(3, "i-entry"),
@@ -165,10 +146,6 @@ func TestListFetch_LatestResultStillApplies(t *testing.T) {
 		t.Fatalf("list holds %d rows, want the 2 the latest fetch returned", got)
 	}
 }
-
-// ───────────────────────────────────────────────────────────────────────────
-// 2. A re-entered list is re-verified on both adapters
-// ───────────────────────────────────────────────────────────────────────────
 
 // TestListReEntry_RuntimeReturnsVerificationTask pins the decision where it
 // belongs: HandleNavigate itself returns the fetch task for the row-store hit,
@@ -230,10 +207,6 @@ func TestListReEntry_HeadlessMarksRefreshing(t *testing.T) {
 		t.Fatalf("headless re-entry did not mark the list refreshing")
 	}
 }
-
-// ───────────────────────────────────────────────────────────────────────────
-// 3. A shallower verify-refetch does not regress the rendered total
-// ───────────────────────────────────────────────────────────────────────────
 
 // TestListTotal_ShallowVerifyKeepsKnownPopulation seeds an on-disk file for
 // a type whose population is 55 while only 50 rows were stored, opens the

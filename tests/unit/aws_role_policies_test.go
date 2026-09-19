@@ -15,10 +15,6 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// ---------------------------------------------------------------------------
-// Local mock: IAMListAttachedRolePoliciesAPI
-// ---------------------------------------------------------------------------
-
 type mockIAMListAttachedRolePoliciesClient struct {
 	outputs []*iam.ListAttachedRolePoliciesOutput
 	err     error
@@ -40,10 +36,6 @@ func (m *mockIAMListAttachedRolePoliciesClient) ListAttachedRolePolicies(
 	m.callIdx++
 	return out, nil
 }
-
-// ---------------------------------------------------------------------------
-// Local mock: IAMListRolePoliciesAPI
-// ---------------------------------------------------------------------------
 
 type mockIAMListRolePoliciesClient struct {
 	outputs []*iam.ListRolePoliciesOutput
@@ -67,12 +59,6 @@ func (m *mockIAMListRolePoliciesClient) ListRolePolicies(
 	return out, nil
 }
 
-// ---------------------------------------------------------------------------
-// Tests
-// ---------------------------------------------------------------------------
-
-// TestFetchRolePolicies_Basic verifies merging 3 managed + 2 inline policies
-// with correct order (managed first), correct ID/Name/Status/Fields.
 func TestFetchRolePolicies_Basic(t *testing.T) {
 	attachedMock := &mockIAMListAttachedRolePoliciesClient{
 		outputs: []*iam.ListAttachedRolePoliciesOutput{
@@ -119,12 +105,10 @@ func TestFetchRolePolicies_Basic(t *testing.T) {
 	}
 	resources := result.Resources
 
-	// 3 managed + 2 inline = 5 total
 	if len(resources) != 5 {
 		t.Fatalf("expected 5 resources, got %d", len(resources))
 	}
 
-	// Managed policies come first
 	r0 := resources[0]
 	t.Run("managed_policy_name", func(t *testing.T) {
 		if r0.Fields["policy_name"] != "ReadOnlyAccess" {
@@ -152,7 +136,6 @@ func TestFetchRolePolicies_Basic(t *testing.T) {
 		}
 	})
 
-	// Inline policies come after managed
 	r3 := resources[3]
 	t.Run("inline_policy_name", func(t *testing.T) {
 		if r3.Fields["policy_name"] != "trust-policy" {
@@ -187,8 +170,6 @@ func TestFetchRolePolicies_Basic(t *testing.T) {
 	})
 }
 
-// TestFetchRolePolicies_ManagedOnly verifies behavior when a role has only
-// managed policies and no inline policies.
 func TestFetchRolePolicies_ManagedOnly(t *testing.T) {
 	attachedMock := &mockIAMListAttachedRolePoliciesClient{
 		outputs: []*iam.ListAttachedRolePoliciesOutput{
@@ -220,8 +201,6 @@ func TestFetchRolePolicies_ManagedOnly(t *testing.T) {
 	}
 }
 
-// TestFetchRolePolicies_InlineOnly verifies behavior when a role has only
-// inline policies and no managed policies.
 func TestFetchRolePolicies_InlineOnly(t *testing.T) {
 	attachedMock := &mockIAMListAttachedRolePoliciesClient{
 		outputs: []*iam.ListAttachedRolePoliciesOutput{
@@ -248,8 +227,6 @@ func TestFetchRolePolicies_InlineOnly(t *testing.T) {
 	}
 }
 
-// TestFetchRolePolicies_Empty verifies that a role with no policies at all
-// returns an empty slice and no error.
 func TestFetchRolePolicies_Empty(t *testing.T) {
 	attachedMock := &mockIAMListAttachedRolePoliciesClient{
 		outputs: []*iam.ListAttachedRolePoliciesOutput{
@@ -272,8 +249,6 @@ func TestFetchRolePolicies_Empty(t *testing.T) {
 	}
 }
 
-// TestFetchRolePolicies_AttachedAPIError verifies that errors from the
-// ListAttachedRolePolicies API are propagated.
 func TestFetchRolePolicies_AttachedAPIError(t *testing.T) {
 	attachedMock := &mockIAMListAttachedRolePoliciesClient{
 		err: fmt.Errorf("access denied for attached policies"),
@@ -294,8 +269,6 @@ func TestFetchRolePolicies_AttachedAPIError(t *testing.T) {
 	}
 }
 
-// TestFetchRolePolicies_InlineAPIError verifies that errors from the
-// ListRolePolicies API are propagated.
 func TestFetchRolePolicies_InlineAPIError(t *testing.T) {
 	attachedMock := &mockIAMListAttachedRolePoliciesClient{
 		outputs: []*iam.ListAttachedRolePoliciesOutput{
@@ -316,8 +289,6 @@ func TestFetchRolePolicies_InlineAPIError(t *testing.T) {
 	}
 }
 
-// TestFetchRolePolicies_NilFields verifies that nil PolicyName/PolicyArn
-// on an AttachedPolicy does not cause a panic.
 func TestFetchRolePolicies_NilFields(t *testing.T) {
 	attachedMock := &mockIAMListAttachedRolePoliciesClient{
 		outputs: []*iam.ListAttachedRolePoliciesOutput{
@@ -345,9 +316,6 @@ func TestFetchRolePolicies_NilFields(t *testing.T) {
 	}
 }
 
-// TestFetchRolePolicies_AdminHighlight verifies that AdministratorAccess
-// emits the administrator wave1 Finding, phrased "administrator access", so
-// the row resolves as ColorBroken (red).
 func TestFetchRolePolicies_AdminHighlight(t *testing.T) {
 	attachedMock := &mockIAMListAttachedRolePoliciesClient{
 		outputs: []*iam.ListAttachedRolePoliciesOutput{
@@ -389,10 +357,6 @@ func TestFetchRolePolicies_AdminHighlight(t *testing.T) {
 	}
 }
 
-// TestFetchRolePolicies_PowerUserHighlight verifies that PowerUserAccess
-// emits the broad-power wave1 Finding, phrased "broad power access" — not
-// the administrator phrase — at the same severity, so the row resolves as
-// ColorBroken (red).
 func TestFetchRolePolicies_PowerUserHighlight(t *testing.T) {
 	attachedMock := &mockIAMListAttachedRolePoliciesClient{
 		outputs: []*iam.ListAttachedRolePoliciesOutput{
@@ -437,8 +401,6 @@ func TestFetchRolePolicies_PowerUserHighlight(t *testing.T) {
 	}
 }
 
-// TestFetchRolePolicies_InlineDim verifies that inline policies emit an
-// inline wave1 Finding so the row resolves as ColorDim (grey).
 func TestFetchRolePolicies_InlineDim(t *testing.T) {
 	attachedMock := &mockIAMListAttachedRolePoliciesClient{
 		outputs: []*iam.ListAttachedRolePoliciesOutput{
@@ -469,7 +431,6 @@ func TestFetchRolePolicies_InlineDim(t *testing.T) {
 	}
 }
 
-// TestFetchRolePolicies_RawStruct verifies that RawStruct is a RolePolicyRow.
 func TestFetchRolePolicies_RawStruct(t *testing.T) {
 	attachedMock := &mockIAMListAttachedRolePoliciesClient{
 		outputs: []*iam.ListAttachedRolePoliciesOutput{
@@ -519,12 +480,7 @@ func TestFetchRolePolicies_RawStruct(t *testing.T) {
 	}
 }
 
-// TestFetchRolePolicies_Pagination verifies that the fetcher reports
-// IsTruncated=true when either API response is truncated. The fetcher makes
-// exactly one call to each API per invocation (single-page pagination contract).
 func TestFetchRolePolicies_Pagination(t *testing.T) {
-	// Both APIs report IsTruncated=true on the first page.
-	// The fetcher should return 1 managed + 1 inline = 2 resources with IsTruncated=true.
 	attachedMock := &mockIAMListAttachedRolePoliciesClient{
 		outputs: []*iam.ListAttachedRolePoliciesOutput{
 			{
@@ -553,19 +509,16 @@ func TestFetchRolePolicies_Pagination(t *testing.T) {
 	}
 	resources := result.Resources
 
-	// One API call each → 1 managed + 1 inline = 2 resources
 	if len(resources) != 2 {
 		t.Fatalf("expected 2 resources (1 managed + 1 inline), got %d", len(resources))
 	}
 
-	// Verify managed comes first
 	if resources[0].Fields["policy_type"] != "Managed" {
 		t.Errorf("resources[0] should be Managed, got %q", resources[0].Fields["policy_type"])
 	}
 	if resources[0].Fields["policy_name"] != "Policy1" {
 		t.Errorf("resources[0] policy_name: expected %q, got %q", "Policy1", resources[0].Fields["policy_name"])
 	}
-	// Verify inline comes second
 	if resources[1].Fields["policy_type"] != "Inline" {
 		t.Errorf("resources[1] should be Inline, got %q", resources[1].Fields["policy_type"])
 	}
@@ -573,7 +526,6 @@ func TestFetchRolePolicies_Pagination(t *testing.T) {
 		t.Errorf("resources[1] policy_name: expected %q, got %q", "InlineA", resources[1].Fields["policy_name"])
 	}
 
-	// IsTruncated should be true because both APIs reported truncation
 	if result.Pagination == nil {
 		t.Fatal("Pagination is nil")
 	}
@@ -582,7 +534,6 @@ func TestFetchRolePolicies_Pagination(t *testing.T) {
 	}
 }
 
-// TestRolePolicyColumns verifies the column count, keys, titles, and widths.
 func TestRolePolicyColumns(t *testing.T) {
 	cols := resource.RolePolicyColumns()
 
@@ -617,8 +568,6 @@ func TestRolePolicyColumns(t *testing.T) {
 	}
 }
 
-// TestRolePolicies_PaginatedChildFetcherRegistered verifies that the paginated
-// child fetcher is registered under the correct short name.
 func TestRolePolicies_PaginatedChildFetcherRegistered(t *testing.T) {
 	f := resource.GetPaginatedChildFetcher("role_policies")
 	if f == nil {
@@ -626,8 +575,6 @@ func TestRolePolicies_PaginatedChildFetcherRegistered(t *testing.T) {
 	}
 }
 
-// TestRolePolicies_ParentHasChildDef verifies that the role parent resource
-// type has a Children entry for role_policies.
 func TestRolePolicies_ParentHasChildDef(t *testing.T) {
 	var roleType *resource.ResourceTypeDef
 	for _, rt := range resource.AllResourceTypes() {

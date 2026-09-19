@@ -52,8 +52,6 @@ func ecrCheckerByTarget(t *testing.T, target string) resource.RelatedChecker {
 	return nil
 }
 
-// --- Navigable Field Registration ---
-
 func TestNavigableFields_ECR_Registered(t *testing.T) {
 	fields := resource.GetNavigableFields("ecr")
 	if len(fields) == 0 {
@@ -74,8 +72,6 @@ func TestNavigableFields_ECR_Registered(t *testing.T) {
 		}
 	}
 }
-
-// --- Lambda checker (Pattern C — cache-based, heuristic PackageType=Image) ---
 
 func TestRelated_ECR_Lambda_Found(t *testing.T) {
 	repoURI := "123456789012.dkr.ecr.us-east-1.amazonaws.com/acme/api-service"
@@ -177,8 +173,6 @@ func TestRelated_ECR_Lambda_EmptyURI(t *testing.T) {
 	}
 }
 
-// --- CodeBuild checker (Pattern C — cache-based, image URI contains repo URI) ---
-
 func TestRelated_ECR_CB_Found(t *testing.T) {
 	repoURI := "123456789012.dkr.ecr.us-east-1.amazonaws.com/acme/api-service"
 	cbRes := resource.Resource{
@@ -276,13 +270,8 @@ func TestRelated_ECR_CB_EmptyURI(t *testing.T) {
 	}
 }
 
-// --- CloudFormation checker (Pattern C — cache-based, CFN tag on repo) ---
-
-// TestRelated_ECR_CFN_Found verifies that checkECRCFN resolves the
-// aws:cloudformation:stack-name tag via a live ecr:ListTagsForResource call
-// (RepositoryArn-keyed), not from a pre-populated Fields["cfn_stack_name"] —
-// docs/resources/ecr.md §2 `cfn` ("Call ecr:ListTagsForResource for this repo
-// and read the aws:cloudformation:stack-name tag").
+// checkECRCFN reads the aws:cloudformation:stack-name tag through
+// ecr:ListTagsForResource on the RepositoryArn.
 func TestRelated_ECR_CFN_Found(t *testing.T) {
 	const repoArn = "arn:aws:ecr:us-east-1:123456789012:repository/acme/api-service"
 	cfnRes := resource.Resource{
@@ -356,10 +345,7 @@ func TestRelated_ECR_CFN_NotFound(t *testing.T) {
 	}
 }
 
-// TestRelated_ECR_CFN_CacheMissNoClients verifies that when the repository
-// carries a resolvable CFN tag (via a live ListTagsForResource call) but the
-// cfn cache is empty and the CFN page-fetch fails, the result is Count=-1
-// (unknown), not a false Count=0 — docs/resources/ecr.md §2 `cfn`.
+// A failed cfn page fetch over an empty cache is unknown, not zero.
 func TestRelated_ECR_CFN_CacheMissNoClients(t *testing.T) {
 	const repoArn = "arn:aws:ecr:us-east-1:123456789012:repository/acme/api-service"
 	source := resource.Resource{
@@ -396,7 +382,6 @@ func TestRelated_ECR_CFN_NoCFNTag(t *testing.T) {
 	cache := resource.ResourceCache{
 		"cfn": resource.ResourceCacheEntry{Resources: []resource.Resource{cfnRes}},
 	}
-	// No cfn_stack_name in Fields — repo was not created by CFN.
 	source := resource.Resource{
 		ID: "acme/api-service",
 		Fields: map[string]string{
@@ -415,10 +400,6 @@ func TestRelated_ECR_CFN_NoCFNTag(t *testing.T) {
 	}
 }
 
-// --- ecr→eb-rule: reverse-scan via cache["eb-rule"] + EventPattern matching ---
-
-// ecrEbRuleResource builds an EventBridge Rule cache resource with an event pattern
-// that references the given ECR repository name via detail.repository-name.
 func ecrEbRuleResource(ruleName, repoName string) resource.Resource {
 	pattern := `{"source":["aws.ecr"],"detail":{"repository-name":["` + repoName + `"]}}`
 	return resource.Resource{
@@ -431,8 +412,6 @@ func ecrEbRuleResource(ruleName, repoName string) resource.Resource {
 	}
 }
 
-// TestRelated_ECR_EbRule_Match verifies that a rule whose EventPattern references
-// the ECR repository name returns Count=1.
 func TestRelated_ECR_EbRule_Match(t *testing.T) {
 	const repoName = "acme/api-service"
 	const ruleName = "ecr-push-rule"
@@ -467,8 +446,6 @@ func TestRelated_ECR_EbRule_Match(t *testing.T) {
 	}
 }
 
-// TestRelated_ECR_EbRule_Empty verifies that a rule whose pattern has a different
-// repository name returns Count=0.
 func TestRelated_ECR_EbRule_Empty(t *testing.T) {
 	cache := resource.ResourceCache{
 		"eb-rule": resource.ResourceCacheEntry{
@@ -494,8 +471,6 @@ func TestRelated_ECR_EbRule_Empty(t *testing.T) {
 	}
 }
 
-// TestRelated_ECR_EbRule_WrongRawStruct verifies that a wrong parent RawStruct
-// type returns Count=-1.
 func TestRelated_ECR_EbRule_WrongRawStruct(t *testing.T) {
 	source := resource.Resource{
 		ID:        "acme/api-service",
@@ -510,10 +485,6 @@ func TestRelated_ECR_EbRule_WrongRawStruct(t *testing.T) {
 	}
 }
 
-// --- ecr→pipeline: reverse-scan via cache["pipeline"] + GetPipeline per pipeline ---
-
-// TestRelated_ECR_Pipeline_Match verifies that a pipeline with an ECR source
-// action for the matching repository returns Count=1.
 func TestRelated_ECR_Pipeline_Match(t *testing.T) {
 	const repoName = "acme/api-service"
 	const pipelineName = "deploy-pipeline"
@@ -553,8 +524,6 @@ func TestRelated_ECR_Pipeline_Match(t *testing.T) {
 	}
 }
 
-// TestRelated_ECR_Pipeline_Empty verifies that a pipeline with no ECR source
-// action for the matching repository returns Count=0.
 func TestRelated_ECR_Pipeline_Empty(t *testing.T) {
 	const repoName = "acme/api-service"
 	const pipelineName = "unrelated-pipeline"
@@ -588,20 +557,16 @@ func TestRelated_ECR_Pipeline_Empty(t *testing.T) {
 	}
 }
 
-// TestRelated_ECR_Pipeline_PartialFailure_RendersInflatedTruncated verifies
-// that when some (not all) GetPipeline calls in the reverse-scan loop fail,
-// the survivors found so far are not rendered as an exact count. "2 matches,
-// 2 failures" must render "(2+)", never a confident "(2)".
+// Survivors of a partly failed reverse scan are a lower bound: 2 matches with
+// 2 failures render "(2+)".
 func TestRelated_ECR_Pipeline_PartialFailure_RendersInflatedTruncated(t *testing.T) {
 	const repoName = "acme/api-service"
 
 	fakeCp := newFakeCodePipelineWithDeclarations(map[string]*cptypes.PipelineDeclaration{
 		"matching-pipeline-1": pipelineDeclarationWithECRSourceAction("matching-pipeline-1", repoName),
 		"matching-pipeline-2": pipelineDeclarationWithECRSourceAction("matching-pipeline-2", repoName),
-		// "failing-pipeline-1"/"-2" deliberately absent: GetPipeline for a
-		// name missing from declarationsByName returns an empty output (no
-		// Pipeline field), which pipelineGetDeclaration now reports as an
-		// error instead of a silent nil.
+		// The failing-pipeline names have no declaration, so GetPipeline returns no
+		// Pipeline and pipelineGetDeclaration reports an error.
 	})
 	clients := &awsclient.ServiceClients{CodePipeline: fakeCp}
 
@@ -636,9 +601,6 @@ func TestRelated_ECR_Pipeline_PartialFailure_RendersInflatedTruncated(t *testing
 	}
 }
 
-// TestRelated_ECR_Pipeline_AllFail_UnknownRelated verifies that when every
-// GetPipeline call in the reverse-scan loop fails, the result is
-// UnknownRelated — not a confident, silent "(0)".
 func TestRelated_ECR_Pipeline_AllFail_UnknownRelated(t *testing.T) {
 	const repoName = "acme/api-service"
 
@@ -672,11 +634,8 @@ func TestRelated_ECR_Pipeline_AllFail_UnknownRelated(t *testing.T) {
 	}
 }
 
-// TestRelated_ECR_Pipeline_NilCodePipelineClient_NotConfidentZeroWithoutASingleCall
-// is the worst case in this set: with pipelines to check but no CodePipeline
-// client at all, the checker must never produce a definitive "nothing uses
-// this repository" — a confident exact 0 — without having made a single
-// successful GetPipeline call.
+// Without a CodePipeline client no GetPipeline call succeeds, so the checker
+// cannot claim a confident 0.
 func TestRelated_ECR_Pipeline_NilCodePipelineClient_NotConfidentZeroWithoutASingleCall(t *testing.T) {
 	const repoName = "acme/api-service"
 
@@ -708,8 +667,6 @@ func TestRelated_ECR_Pipeline_NilCodePipelineClient_NotConfidentZeroWithoutASing
 	}
 }
 
-// TestRelated_ECR_Pipeline_WrongRawStruct verifies that a wrong parent RawStruct
-// type returns Count=-1.
 func TestRelated_ECR_Pipeline_WrongRawStruct(t *testing.T) {
 	source := resource.Resource{
 		ID:        "acme/api-service",
@@ -724,10 +681,6 @@ func TestRelated_ECR_Pipeline_WrongRawStruct(t *testing.T) {
 	}
 }
 
-// --- ecr→role: forward via GetRepositoryPolicy + Principal.AWS parsing ---
-
-// ecrPolicyWithRoles builds an IAM policy JSON with Statement.Principal.AWS
-// containing the given role ARNs.
 func ecrPolicyWithRoles(roleARNs ...string) string {
 	arns := ""
 	for i, arn := range roleARNs {
@@ -739,10 +692,8 @@ func ecrPolicyWithRoles(roleARNs ...string) string {
 	return `{"Statement":[{"Effect":"Allow","Principal":{"AWS":[` + arns + `]},"Action":["ecr:GetDownloadUrlForLayer"]}]}`
 }
 
-// TestRelated_ECR_Role_Match verifies that two role ARNs in the repository
-// policy return Count=2 with bare RoleNames (via arnRoleName), so the role
-// cache's FetchByIDs (keyed on RoleName) resolves them — docs/resources/ecr.md
-// §2 `role`.
+// Role IDs are bare RoleNames (via arnRoleName) because the role cache's
+// FetchByIDs keys on RoleName.
 func TestRelated_ECR_Role_Match(t *testing.T) {
 	const repoName = "acme/api-service"
 	const role1 = "arn:aws:iam::123456789012:role/deploy-role"
@@ -785,8 +736,6 @@ func TestRelated_ECR_Role_Match(t *testing.T) {
 	}
 }
 
-// TestRelated_ECR_Role_Empty verifies that a repository with no policy
-// (RepositoryPolicyNotFoundException) returns Count=0.
 func TestRelated_ECR_Role_Empty(t *testing.T) {
 	fakeECR := newFakeECRWithNoPolicyError()
 	clients := &awsclient.ServiceClients{ECR: fakeECR}
@@ -810,15 +759,9 @@ func TestRelated_ECR_Role_Empty(t *testing.T) {
 	}
 }
 
-// TestRelated_ECR_Role_UnrelatedErrorContainingExceptionNameIsNotSwallowed
-// pins the negative half of the RepositoryPolicyNotFoundException
-// classification: an unrelated, untyped error whose MESSAGE merely contains
-// the substring "RepositoryPolicyNotFoundException" must surface as
-// RelatedError (Err() != nil), not be misclassified into "no policy" and
-// rendered as a confident Count=0. checkECRRole classifies via
-// ClassifyAWSError's errors.As(smithy.APIError) check — see
-// TestRelated_ECR_Role_Empty above for the positive control using a genuine
-// typed ecrtypes.RepositoryPolicyNotFoundException.
+// An untyped error whose message merely contains
+// "RepositoryPolicyNotFoundException" is a RelatedError, not "no policy":
+// checkECRRole classifies via ClassifyAWSError's errors.As(smithy.APIError).
 func TestRelated_ECR_Role_UnrelatedErrorContainingExceptionNameIsNotSwallowed(t *testing.T) {
 	fakeECR := &fakeECRForRole{
 		getPolicyErr: errors.New("throttled while calling ecr:GetRepositoryPolicy (an unrelated log line happens to mention RepositoryPolicyNotFoundException)"),
@@ -847,8 +790,6 @@ func TestRelated_ECR_Role_UnrelatedErrorContainingExceptionNameIsNotSwallowed(t 
 	}
 }
 
-// TestRelated_ECR_Role_WrongRawStruct verifies that a wrong parent RawStruct
-// type returns Count=-1.
 func TestRelated_ECR_Role_WrongRawStruct(t *testing.T) {
 	source := resource.Resource{
 		ID:        "acme/api-service",
@@ -863,7 +804,6 @@ func TestRelated_ECR_Role_WrongRawStruct(t *testing.T) {
 	}
 }
 
-// TestRelated_ECR_Role_NoClient verifies that missing clients returns Count=-1.
 func TestRelated_ECR_Role_NoClient(t *testing.T) {
 	source := resource.Resource{
 		ID:   "acme/api-service",
@@ -884,15 +824,8 @@ func TestRelated_ECR_Role_NoClient(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// ecr → ecs-task (checkECRECSTask — Pattern C+reverse: cache["ecs-task"] scan)
-// ---------------------------------------------------------------------------
-
-// ecrECSTaskResource creates a task resource whose Fields["container_images"]
-// (a comma-joined list of this task's Containers[].Image values, populated
-// directly from DescribeTasks) contains the image URI, matching the pattern
-// checkECRECSTask uses (".dkr.ecr." + "/repoName") —
-// docs/resources/ecr.md §2 `ecs-task`.
+// Fields["container_images"] is the comma-joined Containers[].Image list from
+// DescribeTasks; checkECRECSTask matches ".dkr.ecr." plus "/repoName".
 func ecrECSTaskResource(taskFamily, imageURI string) resource.Resource {
 	return resource.Resource{
 		ID:   taskFamily + ":1",
@@ -903,8 +836,6 @@ func ecrECSTaskResource(taskFamily, imageURI string) resource.Resource {
 	}
 }
 
-// TestRelated_ECR_ECSTask_Match verifies that a task definition whose Fields
-// contain the repository image URI is returned as a match.
 func TestRelated_ECR_ECSTask_Match(t *testing.T) {
 	const repoName = "acme/api-service"
 	const account = "123456789012"
@@ -947,8 +878,6 @@ func TestRelated_ECR_ECSTask_Match(t *testing.T) {
 	}
 }
 
-// TestRelated_ECR_ECSTask_Match_Truncated verifies that a match in a truncated
-// cache propagates Truncated=true.
 func TestRelated_ECR_ECSTask_Match_Truncated(t *testing.T) {
 	const repoName = "acme/worker"
 	const account = "123456789012"
@@ -980,7 +909,6 @@ func TestRelated_ECR_ECSTask_Match_Truncated(t *testing.T) {
 	}
 }
 
-// TestRelated_ECR_ECSTask_Empty verifies that no task matches return Count=0.
 func TestRelated_ECR_ECSTask_Empty(t *testing.T) {
 	const repoName = "acme/no-match"
 	const account = "123456789012"
@@ -1012,12 +940,6 @@ func TestRelated_ECR_ECSTask_Empty(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// ecr → kms: Pattern F — reads EncryptionConfiguration.KmsKey, no API call
-// ---------------------------------------------------------------------------
-
-// TestRelated_ECR_KMS_Match verifies that a repository with a KMS key ARN returns
-// the key ID (last segment after "/") as a single ResourceID.
 func TestRelated_ECR_KMS_Match(t *testing.T) {
 	const keyARN = "arn:aws:kms:us-east-1:123456789012:key/mrk-abc1234567890def"
 	const keyID = "mrk-abc1234567890def"
@@ -1051,8 +973,6 @@ func TestRelated_ECR_KMS_Match(t *testing.T) {
 	}
 }
 
-// TestRelated_ECR_KMS_NoEncryptionConfig verifies that a repository with no
-// EncryptionConfiguration returns Count:0.
 func TestRelated_ECR_KMS_NoEncryptionConfig(t *testing.T) {
 	source := resource.Resource{
 		ID:   "acme/api-service",
@@ -1071,8 +991,6 @@ func TestRelated_ECR_KMS_NoEncryptionConfig(t *testing.T) {
 	}
 }
 
-// TestRelated_ECR_KMS_WrongRawStruct verifies that a wrong RawStruct type
-// returns Count:0 (assertStruct fails, no key extracted).
 func TestRelated_ECR_KMS_WrongRawStruct(t *testing.T) {
 	source := resource.Resource{
 		ID:        "acme/api-service",
@@ -1087,8 +1005,6 @@ func TestRelated_ECR_KMS_WrongRawStruct(t *testing.T) {
 	}
 }
 
-// TestRelated_ECR_ECSTask_WrongRawStruct verifies that wrong parent RawStruct
-// does not prevent the checker from working — checkECRECSTask uses res.ID not RawStruct.
 func TestRelated_ECR_ECSTask_WrongRawStruct(t *testing.T) {
 	const repoName = "acme/api-service"
 	const account = "123456789012"
@@ -1100,7 +1016,7 @@ func TestRelated_ECR_ECSTask_WrongRawStruct(t *testing.T) {
 			Resources: []resource.Resource{ecrECSTaskResource("api-task", imageURI)},
 		},
 	}
-	// Wrong RawStruct type — checker uses res.ID not RawStruct for matching.
+	// checkECRECSTask matches on res.ID, not RawStruct.
 	source := resource.Resource{
 		ID:        repoName,
 		Name:      repoName,
@@ -1110,7 +1026,6 @@ func TestRelated_ECR_ECSTask_WrongRawStruct(t *testing.T) {
 	checker := ecrCheckerByTarget(t, "ecs-task")
 	result := checker(context.Background(), nil, source, cache)
 
-	// checkECRECSTask uses res.ID directly (no assertStruct), so it still matches.
 	if result.Count() != 1 {
 		t.Errorf("Count = %d, want 1 (checker uses res.ID, not RawStruct)", result.Count())
 	}

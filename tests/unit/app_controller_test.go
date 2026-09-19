@@ -1,26 +1,3 @@
-// app_controller_test.go — contract tests for core/app.Controller (PR-A).
-//
-// Behavioral contracts covered:
-//
-//  1. ViewState JSON round-trip: all documented fields survive Marshal/Unmarshal.
-//  2. Empty-stack safety: Snapshot() on a fresh controller never panics and
-//     returns BodyKindUnknown.
-//  3. Stack mechanics: PushScreen grows the stack, PopScreen shrinks it,
-//     ReplaceScreen swaps the top without changing depth.
-//  4. DrainSync terminates: empty queue returns immediately; non-empty queue
-//     is drained to empty (execution deferred to PR-B).
-//  5. Apply contract: returns ViewState == Snapshot() post-apply and a
-//     (possibly empty) []runtime.TaskRequest without panicking, for all
-//     documented verbs.
-//  6. Handle lane: feeding a result event returns a ViewState and a (possibly
-//     empty) []runtime.TaskRequest without panicking.
-//
-// Stack-mechanics tests (group 3) use the public ApplyIntents seam:
-//
-//	func (c *Controller) ApplyIntents(intents []runtime.UIIntent) app.ViewState
-//
-// This is the public surface for injecting PushScreen / PopScreen /
-// ReplaceScreen intents from the external test package.
 package unit_test
 
 import (
@@ -79,14 +56,6 @@ func newTestControllerForProfile(t *testing.T, profile, region string) *app.Cont
 	return c
 }
 
-// =============================================================================
-// 1. ViewState JSON round-trip
-// =============================================================================
-
-// TestViewState_JSONRoundTrip_ListBodyAllFieldsSurvive marshals a
-// fully-populated ViewState with a List body to JSON and unmarshals it back,
-// asserting that every documented field survives without loss.
-// This pins the "fully serializable, renderer-agnostic" contract from the plan.
 func TestViewState_JSONRoundTrip_ListBodyAllFieldsSurvive(t *testing.T) {
 	original := app.ViewState{
 		Header: app.Header{
@@ -140,7 +109,6 @@ func TestViewState_JSONRoundTrip_ListBodyAllFieldsSurvive(t *testing.T) {
 		t.Fatalf("json.Unmarshal failed: %v", err)
 	}
 
-	// Header fields
 	if got.Header.Version != original.Header.Version {
 		t.Errorf("Header.Version: got %q want %q", got.Header.Version, original.Header.Version)
 	}
@@ -166,7 +134,6 @@ func TestViewState_JSONRoundTrip_ListBodyAllFieldsSurvive(t *testing.T) {
 		t.Errorf("Header.ErrorHintVisible: got %v want %v", got.Header.ErrorHintVisible, original.Header.ErrorHintVisible)
 	}
 
-	// Top-level fields
 	if got.FrameTitle != original.FrameTitle {
 		t.Errorf("FrameTitle: got %q want %q", got.FrameTitle, original.FrameTitle)
 	}
@@ -185,7 +152,6 @@ func TestViewState_JSONRoundTrip_ListBodyAllFieldsSurvive(t *testing.T) {
 		}
 	}
 
-	// Body discriminator
 	if got.Body.Kind != app.BodyKindList {
 		t.Errorf("Body.Kind: got %q want %q", got.Body.Kind, app.BodyKindList)
 	}
@@ -259,9 +225,6 @@ func TestViewState_JSONRoundTrip_ListBodyAllFieldsSurvive(t *testing.T) {
 	}
 }
 
-// TestViewState_JSONRoundTrip_AllBodyKindsPreserved verifies that every
-// BodyKind constant marshals to its documented string value and round-trips
-// without change.
 func TestViewState_JSONRoundTrip_AllBodyKindsPreserved(t *testing.T) {
 	cases := []struct {
 		kind     app.BodyKind
@@ -297,9 +260,6 @@ func TestViewState_JSONRoundTrip_AllBodyKindsPreserved(t *testing.T) {
 	}
 }
 
-// TestViewState_JSONRoundTrip_FlashIsErrorFalseOmitted verifies that a Flash
-// with IsError=false and empty Text is omitted from JSON (omitempty on the
-// struct), keeping snapshots concise for web tests.
 func TestViewState_JSONRoundTrip_FlashIsErrorFalseOmitted(t *testing.T) {
 	vs := app.ViewState{
 		Header: app.Header{Profile: "demo", Region: "us-east-1"},
@@ -328,17 +288,12 @@ func TestViewState_JSONRoundTrip_FlashIsErrorFalseOmitted(t *testing.T) {
 			}
 		}
 	}
-	// round-trip must still decode cleanly
 	var back app.ViewState
 	if err := json.Unmarshal(data, &back); err != nil {
 		t.Errorf("json.Unmarshal of zero-flash snapshot failed: %v", err)
 	}
 }
 
-// TestViewState_JSONRoundTrip_HelpBodyAllFieldsSurvive verifies that a
-// fully-populated HelpBody (key-hint sections) round-trips through JSON without
-// field loss. HelpBody groups KeyHints into named sections so the renderer can
-// draw a structured help overlay.
 func TestViewState_JSONRoundTrip_HelpBodyAllFieldsSurvive(t *testing.T) {
 	original := app.ViewState{
 		Header: app.Header{Profile: "demo", Region: "us-east-1"},
@@ -408,10 +363,6 @@ func TestViewState_JSONRoundTrip_HelpBodyAllFieldsSurvive(t *testing.T) {
 	}
 }
 
-// TestViewState_JSONRoundTrip_IdentityBodyAllFieldsSurvive verifies that a
-// fully-populated IdentityBody round-trips through JSON without field loss.
-// Covers the assumed-role path (IsAssumedRole=true, RoleName, SessionName set;
-// UserName empty). Uses clearly-fake values — no real AWS account IDs or ARNs.
 func TestViewState_JSONRoundTrip_IdentityBodyAllFieldsSurvive(t *testing.T) {
 	original := app.ViewState{
 		Header: app.Header{Profile: "demo", Region: "us-east-1"},
@@ -479,15 +430,7 @@ func TestViewState_JSONRoundTrip_IdentityBodyAllFieldsSurvive(t *testing.T) {
 	}
 }
 
-// =============================================================================
-// 2. Empty-stack safety
-// =============================================================================
-
-// TestController_Snapshot_FreshControllerNoPanic verifies that Snapshot() on a
-// freshly-constructed controller never panics and returns BodyKindMenu.
-//
-// PR-C contract: New(core) starts with ScreenMenu as the root screen, so a
-// fresh controller's Snapshot() returns BodyKindMenu, not BodyKindUnknown.
+// New(core) starts with ScreenMenu as the root screen.
 func TestController_Snapshot_FreshControllerNoPanic(t *testing.T) {
 	c := newTestController(t)
 
@@ -506,14 +449,10 @@ func TestController_Snapshot_FreshControllerNoPanic(t *testing.T) {
 	}
 }
 
-// TestController_Snapshot_EmptyStackAfterPopNoPanic verifies that Snapshot()
-// after repeated PopScreen calls never panics and always returns BodyKindMenu.
-// The root screen (menu) is preserved — PopScreen at depth 1 is a no-op, so
-// the stack never empties and BodyKindUnknown is never returned.
+// PopScreen at depth 1 is a no-op: the root menu is never popped.
 func TestController_Snapshot_EmptyStackAfterPopNoPanic(t *testing.T) {
 	c := newTestController(t)
 
-	// Attempt to pop the root menu — must be a no-op (root is preserved).
 	var vs app.ViewState
 	func() {
 		defer func() {
@@ -525,14 +464,11 @@ func TestController_Snapshot_EmptyStackAfterPopNoPanic(t *testing.T) {
 		vs = c.Snapshot()
 	}()
 
-	// Root preservation: stack never drops below depth 1.
 	if vs.Body.Kind != app.BodyKindMenu {
 		t.Errorf("after PopScreen on root: Body.Kind = %q, want %q (root preserved)", vs.Body.Kind, app.BodyKindMenu)
 	}
 }
 
-// TestController_Snapshot_EmptyStackCarriesProfileAndRegion verifies that the
-// Header fields from runtime.Core are present even with an empty stack.
 func TestController_Snapshot_EmptyStackCarriesProfileAndRegion(t *testing.T) {
 	c := newTestController(t)
 	vs := c.Snapshot()
@@ -545,20 +481,6 @@ func TestController_Snapshot_EmptyStackCarriesProfileAndRegion(t *testing.T) {
 	}
 }
 
-// =============================================================================
-// 3. Stack mechanics via ApplyIntents
-//
-// ApplyIntents is the public method on Controller that applies a slice of
-// UIIntents to the screen stack and returns the resulting ViewState.
-// It is the authoritative seam for stack-mechanics tests in the external
-// test package.
-// =============================================================================
-
-// TestController_Stack_PushGrowsStackAndSetsBodyKind verifies that a
-// PushScreen intent causes Snapshot() to reflect the new top screen.
-//
-// PR-C: a fresh controller starts on ScreenMenu (BodyKindMenu). After pushing
-// ScreenProfileSelector, the top becomes BodyKindSelector.
 func TestController_Stack_PushGrowsStackAndSetsBodyKind(t *testing.T) {
 	c := newTestController(t)
 
@@ -584,8 +506,6 @@ func TestController_Stack_PushGrowsStackAndSetsBodyKind(t *testing.T) {
 	}
 }
 
-// TestController_Stack_PushChildListBodyKindList verifies that
-// ScreenChildList maps to BodyKindList (not BodyKindUnknown or another kind).
 func TestController_Stack_PushChildListBodyKindList(t *testing.T) {
 	c := newTestController(t)
 
@@ -602,8 +522,6 @@ func TestController_Stack_PushChildListBodyKindList(t *testing.T) {
 	}
 }
 
-// TestController_Stack_PushRevealBodyKindDetail verifies that
-// ScreenReveal maps to BodyKindDetail.
 func TestController_Stack_PushRevealBodyKindDetail(t *testing.T) {
 	c := newTestController(t)
 
@@ -620,16 +538,9 @@ func TestController_Stack_PushRevealBodyKindDetail(t *testing.T) {
 	}
 }
 
-// TestController_Stack_PopShrinksStack verifies that PopScreen reduces depth
-// and Snapshot returns to the previous state.
-//
-// PR-C: a fresh controller starts on ScreenMenu. After pushing
-// ScreenProfileSelector and then popping, the stack returns to the menu root
-// (BodyKindMenu), not BodyKindUnknown.
 func TestController_Stack_PopShrinksStack(t *testing.T) {
 	c := newTestController(t)
 
-	// Push a selector on top of the menu root.
 	c.ApplyIntents([]runtime.UIIntent{
 		runtime.PushScreen{
 			ID:      runtime.ScreenProfileSelector,
@@ -640,7 +551,6 @@ func TestController_Stack_PopShrinksStack(t *testing.T) {
 		t.Fatalf("precondition: expected BodyKindSelector after push, got %q", c.Snapshot().Body.Kind)
 	}
 
-	// Pop the selector — reveals the menu root underneath.
 	c.ApplyIntents([]runtime.UIIntent{runtime.PopScreen{}})
 
 	vs := c.Snapshot()
@@ -649,14 +559,9 @@ func TestController_Stack_PopShrinksStack(t *testing.T) {
 	}
 }
 
-// TestController_Stack_PopOnEmptyStackNoPanic verifies that PopScreen when only
-// the root menu remains is a no-op: it does not panic and the stack stays at
-// depth 1 with BodyKindMenu. The root screen is never popped.
 func TestController_Stack_PopOnEmptyStackNoPanic(t *testing.T) {
 	c := newTestController(t)
 
-	// Fresh controller starts at depth 1 (root menu).
-	// PopScreen at the root must be a no-op.
 	func() {
 		defer func() {
 			if r := recover(); r != nil {
@@ -671,7 +576,6 @@ func TestController_Stack_PopOnEmptyStackNoPanic(t *testing.T) {
 		t.Errorf("after PopScreen on root-only stack: expected BodyKindMenu (root preserved), got %q", vs.Body.Kind)
 	}
 
-	// A second pop must also be safe.
 	func() {
 		defer func() {
 			if r := recover(); r != nil {
@@ -687,18 +591,9 @@ func TestController_Stack_PopOnEmptyStackNoPanic(t *testing.T) {
 	}
 }
 
-// TestController_Stack_ReplaceSwapsTopWithoutChangingDepth verifies that
-// ReplaceScreen changes the top screen's identity but leaves the stack depth
-// unchanged. Depth is inferred by popping once and confirming the stack reverts
-// to the prior top (the menu root), not to BodyKindUnknown.
-//
-// PR-C: stack starts at depth-1 (menu root). Push adds ChildList → depth-2.
-// Replace swaps the ChildList entry with ProfileSelector (still depth-2).
-// Pop reveals the menu root → BodyKindMenu.
 func TestController_Stack_ReplaceSwapsTopWithoutChangingDepth(t *testing.T) {
 	c := newTestController(t)
 
-	// Push a ChildList on top of the menu root → depth-2.
 	c.ApplyIntents([]runtime.UIIntent{
 		runtime.PushScreen{
 			ID:      runtime.ScreenChildList,
@@ -709,7 +604,6 @@ func TestController_Stack_ReplaceSwapsTopWithoutChangingDepth(t *testing.T) {
 		t.Fatalf("precondition: expected BodyKindList after push, got %q", c.Snapshot().Body.Kind)
 	}
 
-	// Replace the ChildList with ProfileSelector (still depth-2).
 	c.ApplyIntents([]runtime.UIIntent{
 		runtime.ReplaceScreen{
 			ID:      runtime.ScreenProfileSelector,
@@ -722,7 +616,6 @@ func TestController_Stack_ReplaceSwapsTopWithoutChangingDepth(t *testing.T) {
 		t.Errorf("after ReplaceScreen: expected BodyKindSelector, got %q", afterReplace.Body.Kind)
 	}
 
-	// Pop once: depth-2 → depth-1, revealing the menu root.
 	c.ApplyIntents([]runtime.UIIntent{runtime.PopScreen{}})
 	afterPop := c.Snapshot()
 	if afterPop.Body.Kind != app.BodyKindMenu {
@@ -730,25 +623,13 @@ func TestController_Stack_ReplaceSwapsTopWithoutChangingDepth(t *testing.T) {
 	}
 }
 
-// TestController_Stack_ReplaceOnRootSwapsScreen verifies that ReplaceScreen on
-// the root (depth 1) swaps the top screen in-place. The stack stays at depth 1
-// and Snapshot reflects the replacement screen.
-//
-// Depth-1 verification: push one more screen on top of the replacement (→ depth
-// 2), then pop once (→ depth 1) to confirm the replacement is the only entry
-// below. This proves ReplaceScreen did not grow the stack past depth 1.
-//
-// The old "drain root to empty then replace" path is gone because PopScreen at
-// depth 1 is a no-op — the root is never popped.
 func TestController_Stack_ReplaceOnRootSwapsScreen(t *testing.T) {
 	c := newTestController(t)
 
-	// Precondition: root menu at depth 1.
 	if c.Snapshot().Body.Kind != app.BodyKindMenu {
 		t.Fatalf("precondition: expected BodyKindMenu (root), got %q", c.Snapshot().Body.Kind)
 	}
 
-	// ReplaceScreen swaps the root in-place (depth stays 1).
 	c.ApplyIntents([]runtime.UIIntent{
 		runtime.ReplaceScreen{
 			ID:      runtime.ScreenReveal,
@@ -761,9 +642,6 @@ func TestController_Stack_ReplaceOnRootSwapsScreen(t *testing.T) {
 		t.Errorf("ReplaceScreen on root: expected BodyKindDetail (Reveal), got %q", afterReplace.Body.Kind)
 	}
 
-	// Push one more screen → depth 2, then pop → depth 1 reveals the
-	// replacement (BodyKindDetail), not the original menu (BodyKindMenu).
-	// This confirms stack is depth-1 after the replace, not depth-2.
 	c.ApplyIntents([]runtime.UIIntent{
 		runtime.PushScreen{ID: runtime.ScreenHelp, Context: runtime.ScreenContext{}},
 	})
@@ -774,18 +652,6 @@ func TestController_Stack_ReplaceOnRootSwapsScreen(t *testing.T) {
 	}
 }
 
-// TestController_Stack_MultiPushPreservesDepth verifies that pushing N screens
-// on top of the root results in the topmost screen reflected by Snapshot and
-// that N sequential pops unwind the pushed screens, finally revealing the menu
-// root. An additional pop at the root is a no-op — the stack never empties.
-//
-// Stack depth at each step (root counts as depth 1):
-//   - Fresh:  depth 1 (BodyKindMenu)
-//   - +3 push: depth 4 (BodyKindDetail — Reveal on top)
-//   - Pop 1:  depth 3 (BodyKindSelector)
-//   - Pop 2:  depth 2 (BodyKindList)
-//   - Pop 3:  depth 1 (BodyKindMenu — root)
-//   - Pop 4:  depth 1 (BodyKindMenu — root preserved, no-op)
 func TestController_Stack_MultiPushPreservesDepth(t *testing.T) {
 	c := newTestController(t)
 
@@ -796,40 +662,32 @@ func TestController_Stack_MultiPushPreservesDepth(t *testing.T) {
 	}
 	c.ApplyIntents(pushes)
 
-	// Top is Reveal → BodyKindDetail.
 	vs := c.Snapshot()
 	if vs.Body.Kind != app.BodyKindDetail {
 		t.Errorf("after 3 pushes: top should be Reveal (BodyKindDetail), got %q", vs.Body.Kind)
 	}
 
-	// Pop 1: top becomes ProfileSelector → BodyKindSelector.
 	c.ApplyIntents([]runtime.UIIntent{runtime.PopScreen{}})
 	if c.Snapshot().Body.Kind != app.BodyKindSelector {
 		t.Errorf("after pop 1: expected BodyKindSelector, got %q", c.Snapshot().Body.Kind)
 	}
 
-	// Pop 2: top becomes ChildList → BodyKindList.
 	c.ApplyIntents([]runtime.UIIntent{runtime.PopScreen{}})
 	if c.Snapshot().Body.Kind != app.BodyKindList {
 		t.Errorf("after pop 2: expected BodyKindList, got %q", c.Snapshot().Body.Kind)
 	}
 
-	// Pop 3: top returns to menu root → BodyKindMenu.
 	c.ApplyIntents([]runtime.UIIntent{runtime.PopScreen{}})
 	if c.Snapshot().Body.Kind != app.BodyKindMenu {
 		t.Errorf("after pop 3: expected BodyKindMenu (menu root), got %q", c.Snapshot().Body.Kind)
 	}
 
-	// Pop 4: root guard fires — stack stays at depth 1, BodyKindMenu (not Unknown).
 	c.ApplyIntents([]runtime.UIIntent{runtime.PopScreen{}})
 	if c.Snapshot().Body.Kind != app.BodyKindMenu {
 		t.Errorf("after pop 4: expected BodyKindMenu (root preserved, no-op pop), got %q", c.Snapshot().Body.Kind)
 	}
 }
 
-// TestController_Stack_ApplyIntentsReturnedViewStateMatchesSnapshot verifies
-// that the ViewState returned by ApplyIntents equals the Snapshot taken
-// immediately afterward — they must be consistent.
 func TestController_Stack_ApplyIntentsReturnedViewStateMatchesSnapshot(t *testing.T) {
 	c := newTestController(t)
 
@@ -844,14 +702,7 @@ func TestController_Stack_ApplyIntentsReturnedViewStateMatchesSnapshot(t *testin
 	assertViewStateEqualsSnapshot(t, "ApplyIntents return vs Snapshot", returned, snap)
 }
 
-// =============================================================================
-// 4. DrainSync terminates
-// =============================================================================
-
-// TestDrainSync_EmptyPendingReturnsImmediately verifies that DrainSync with
-// nil pending tasks returns without blocking or panicking. The call runs in a
-// goroutine so the test harness can time it out; in practice it must complete
-// before the goroutine switch even happens.
+// DrainSync runs in a goroutine so the test's -timeout catches a hang.
 func TestDrainSync_EmptyPendingReturnsImmediately(t *testing.T) {
 	c := newTestController(t)
 
@@ -861,26 +712,15 @@ func TestDrainSync_EmptyPendingReturnsImmediately(t *testing.T) {
 		done <- struct{}{}
 	}()
 
-	// DrainSync on nil pending must return promptly. The test harness
-	// -timeout flag catches an infinite loop; this channel receive catches
-	// panics (goroutine exits without sending) via the test framework.
 	<-done
 }
 
-// TestDrainSync_AfterSeededPendingApplyIsShapeCorrect verifies the new seeded-
-// pending model: seed DrainSync from a lane return value, then assert that a
-// subsequent Apply returns a shape-correct (non-panicking) result. PR-A leaves
-// task execution stubbed so deeper side-effect assertions are deferred.
 func TestDrainSync_AfterSeededPendingApplyIsShapeCorrect(t *testing.T) {
 	c := newTestController(t)
 
-	// Obtain a pending task list from the lane return value — the authoritative
-	// source under the new contract. In PR-A Apply returns nil tasks for the
-	// skeleton; DrainSync must still not panic when handed nil.
 	_, tasks := c.Apply(app.Action{Kind: app.ActionMoveDown})
 	app.DrainSync(c, tasks)
 
-	// After DrainSync the controller must still serve shape-correct results.
 	vs, subsequent := c.Apply(app.Action{Kind: app.ActionMoveDown})
 	if vs.Body.Kind == "" {
 		t.Error("Apply after DrainSync returned ViewState with empty BodyKind")
@@ -891,8 +731,6 @@ func TestDrainSync_AfterSeededPendingApplyIsShapeCorrect(t *testing.T) {
 	}
 }
 
-// TestDrainSync_NoPanicOnRepeatedCalls verifies that calling DrainSync
-// multiple times in succession never panics (idempotent on nil pending).
 func TestDrainSync_NoPanicOnRepeatedCalls(t *testing.T) {
 	c := newTestController(t)
 
@@ -908,12 +746,6 @@ func TestDrainSync_NoPanicOnRepeatedCalls(t *testing.T) {
 	}()
 }
 
-// =============================================================================
-// 5. Apply contract (user-intent lane)
-// =============================================================================
-
-// TestController_Apply_MoveDownNoPanic verifies that Apply(MoveDown) does not
-// panic and returns a ViewState equal to the subsequent Snapshot().
 func TestController_Apply_MoveDownNoPanic(t *testing.T) {
 	c := newTestController(t)
 
@@ -937,8 +769,6 @@ func TestController_Apply_MoveDownNoPanic(t *testing.T) {
 	assertViewStateEqualsSnapshot(t, "Apply(MoveDown)", vs, snap)
 }
 
-// TestController_Apply_BackNoPanic verifies that Apply(Back) does not panic
-// and returns a ViewState equal to Snapshot() post-apply.
 func TestController_Apply_BackNoPanic(t *testing.T) {
 	c := newTestController(t)
 
@@ -956,10 +786,6 @@ func TestController_Apply_BackNoPanic(t *testing.T) {
 	assertViewStateEqualsSnapshot(t, "Apply(Back)", vs, snap)
 }
 
-// TestController_Apply_AllSkeletonActionsNoPanic verifies that no documented
-// ActionKind panics when applied to a fresh controller (menu root at bottom of
-// stack). PR-C wires these verbs; this guards against any panic introduced
-// while wiring menu actions.
 func TestController_Apply_AllSkeletonActionsNoPanic(t *testing.T) {
 	verbs := []app.Action{
 		{Kind: app.ActionMoveUp},
@@ -1012,9 +838,6 @@ func TestController_Apply_AllSkeletonActionsNoPanic(t *testing.T) {
 	}
 }
 
-// TestController_Apply_ReturnedViewStateEqualsSnapshotWithNonEmptyStack
-// verifies the core contract "Apply returns ViewState == Snapshot() post-apply"
-// when the stack is non-empty (so FrameTitle is meaningful).
 func TestController_Apply_ReturnedViewStateEqualsSnapshotWithNonEmptyStack(t *testing.T) {
 	c := newTestController(t)
 
@@ -1031,17 +854,9 @@ func TestController_Apply_ReturnedViewStateEqualsSnapshotWithNonEmptyStack(t *te
 	assertViewStateEqualsSnapshot(t, "Apply(MoveDown) with non-empty stack", vs, snap)
 }
 
-// =============================================================================
-// 6. Handle lane (task-result lane)
-// =============================================================================
-
-// TestController_Handle_IdentityErrorNoPanic verifies that Handle fed a
-// messages.IdentityError does not panic and returns a ViewState consistent
-// with Snapshot(). IdentityError is the cheapest constructable GenStamped
-// event — its Err field is a string (not error), and Gen=0 is accepted
-// (AcceptZeroGen=true), so the staleness guard does not short-circuit it.
-// In PR-A the handler body is a no-op; this guards against any panic
-// introduced while wiring the handler in future PRs.
+// IdentityError is the cheapest constructable GenStamped event: its Err field
+// is a string, and Gen=0 is accepted (AcceptZeroGen=true), so the staleness
+// guard does not short-circuit it.
 func TestController_Handle_IdentityErrorNoPanic(t *testing.T) {
 	c := newTestController(t)
 
@@ -1066,11 +881,8 @@ func TestController_Handle_IdentityErrorNoPanic(t *testing.T) {
 	assertViewStateEqualsSnapshot(t, "Handle(IdentityError)", vs, snap)
 }
 
-// TestController_Handle_AvailabilityCheckedNoPanic verifies that Handle fed a
-// messages.AvailabilityChecked does not panic. AvailabilityChecked has
-// AcceptZeroGen=false, so Gen=0 is always treated as stale and HandleEvent
-// short-circuits to nil, nil — which is the correct safe fallback and is
-// still a legitimate exercise of the dispatch path.
+// AvailabilityChecked has AcceptZeroGen=false, so Gen=0 is treated as stale and
+// HandleEvent short-circuits to nil, nil.
 func TestController_Handle_AvailabilityCheckedNoPanic(t *testing.T) {
 	c := newTestController(t)
 
@@ -1088,10 +900,8 @@ func TestController_Handle_AvailabilityCheckedNoPanic(t *testing.T) {
 	assertViewStateEqualsSnapshot(t, "Handle(AvailabilityChecked)", vs, snap)
 }
 
-// TestController_Handle_ReturnedViewStateEqualsSnapshot verifies the core
-// Handle contract: the returned ViewState equals Snapshot() taken immediately
-// after the call. Uses messages.IdentityError (GenStamped, AcceptZeroGen=true)
-// so the event reaches the dispatch switch rather than being dropped.
+// messages.IdentityError (GenStamped, AcceptZeroGen=true) reaches the dispatch
+// switch rather than being dropped.
 func TestController_Handle_ReturnedViewStateEqualsSnapshot(t *testing.T) {
 	c := newTestController(t)
 
@@ -1101,14 +911,10 @@ func TestController_Handle_ReturnedViewStateEqualsSnapshot(t *testing.T) {
 	assertViewStateEqualsSnapshot(t, "Handle return vs Snapshot", vs, snap)
 }
 
-// TestController_Handle_IdentityLoadedNoPanic verifies that Handle tolerates
-// messages.IdentityLoaded without panicking. A non-nil Identity must populate
-// Snapshot().Body.Identity.ARN once ScreenIdentity is on the stack.
-// Gen=0 is accepted (AcceptZeroGen=true).
+// IdentityLoaded accepts Gen=0 (AcceptZeroGen=true).
 func TestController_Handle_IdentityLoadedNoPanic(t *testing.T) {
 	c := newTestController(t)
 
-	// nil Identity must not panic.
 	func() {
 		defer func() {
 			if r := recover(); r != nil {
@@ -1145,14 +951,10 @@ func TestController_Handle_IdentityLoadedNoPanic(t *testing.T) {
 	}
 }
 
-// TestController_Snapshot_ConsoleURL_ValidListSelectionCarriesOnlyValidURL
-// pins the guard added to (*Controller).consoleURL (core/app/snapshot.go):
-// it must reject and return ("", false) whenever consolelink.Resolve
-// produces a URL that fails consolelink.Valid — the same check
-// openBrowserCmd runs before ever exec'ing a URL. For a normal, well-formed
-// ec2 list selection the guard must be a no-op: Snapshot().ConsoleURL is
-// non-empty, passes consolelink.Valid, and matches the exact regional deep
-// link ec2's ConsoleURL builder produces (core/aws/catalog_compute.go).
+// (*Controller).consoleURL (core/app/snapshot.go) returns ("", false) whenever
+// consolelink.Resolve produces a URL that fails consolelink.Valid, the same
+// check openBrowserCmd runs before exec'ing a URL. A well-formed ec2 selection
+// passes through to ec2's regional deep link (core/aws/catalog_compute.go).
 func TestController_Snapshot_ConsoleURL_ValidListSelectionCarriesOnlyValidURL(t *testing.T) {
 	c := newTestController(t)
 
@@ -1174,13 +976,6 @@ func TestController_Snapshot_ConsoleURL_ValidListSelectionCarriesOnlyValidURL(t 
 	}
 }
 
-// =============================================================================
-// helpers
-// =============================================================================
-
-// assertViewStateEqualsSnapshot compares the fields that Snapshot() guarantees
-// to populate in PR-A (Header.Profile, Header.Region, Body.Kind, FrameTitle).
-// Full body equality is deferred to PR-C when body fields are populated.
 func assertViewStateEqualsSnapshot(t *testing.T, label string, vs, snap app.ViewState) {
 	t.Helper()
 	if vs.Body.Kind != snap.Body.Kind {

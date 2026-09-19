@@ -13,13 +13,6 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// ---------------------------------------------------------------------------
-// ELB Listeners fetcher tests (child of Load Balancers)
-// ---------------------------------------------------------------------------
-
-// TestFetchELBListeners_Basic verifies parsing of 1 HTTPS listener with
-// certificate, forward action to target group. Checks ID (ListenerArn),
-// Name (port string), Status (""), all 6 Fields, and RawStruct.
 func TestFetchELBListeners_Basic(t *testing.T) {
 	mock := &mockELBv2DescribeListenersClient{
 		output: &elbv2.DescribeListenersOutput{
@@ -110,7 +103,6 @@ func TestFetchELBListeners_Basic(t *testing.T) {
 	})
 
 	t.Run("Fields_certificate_short", func(t *testing.T) {
-		// Should extract the certificate ID from the ARN
 		if r.Fields["certificate_short"] == "" {
 			t.Error("Fields[certificate_short] should not be empty")
 		}
@@ -142,8 +134,6 @@ func TestFetchELBListeners_Basic(t *testing.T) {
 	})
 }
 
-// TestFetchELBListeners_Empty verifies that an LB with no listeners
-// returns an empty slice with no error.
 func TestFetchELBListeners_Empty(t *testing.T) {
 	mock := &mockELBv2DescribeListenersClient{
 		output: &elbv2.DescribeListenersOutput{
@@ -170,7 +160,6 @@ func TestFetchELBListeners_Empty(t *testing.T) {
 	}
 }
 
-// TestFetchELBListeners_APIError verifies that API errors are propagated.
 func TestFetchELBListeners_APIError(t *testing.T) {
 	mock := &mockELBv2DescribeListenersClient{
 		err: fmt.Errorf("AWS API error: access denied"),
@@ -195,19 +184,12 @@ func TestFetchELBListeners_APIError(t *testing.T) {
 	}
 }
 
-// TestFetchELBListeners_NilFields verifies that nil Port, nil SslPolicy,
-// nil Certificates, and empty DefaultActions do not cause a panic.
 func TestFetchELBListeners_NilFields(t *testing.T) {
 	mock := &mockELBv2DescribeListenersClient{
 		output: &elbv2.DescribeListenersOutput{
 			Listeners: []elbtypes.Listener{
 				{
 					ListenerArn: aws.String("arn:aws:elasticloadbalancing:us-east-1:123456789012:listener/app/nil-alb/abc123/def456"),
-					// Port is nil
-					// Protocol is zero value
-					// SslPolicy is nil
-					// Certificates is nil
-					// DefaultActions is empty
 				},
 			},
 		},
@@ -218,7 +200,6 @@ func TestFetchELBListeners_NilFields(t *testing.T) {
 		"lb_name":           "nil-alb",
 	}
 
-	// Should not panic
 	result, err := awsclient.FetchELBListeners(
 		context.Background(),
 		mock,
@@ -236,7 +217,6 @@ func TestFetchELBListeners_NilFields(t *testing.T) {
 
 	t.Run("nil_Port_handled", func(t *testing.T) {
 		r := resources[0]
-		// Port should default to some empty/zero representation
 		if r.Fields["port"] == "" {
 			t.Logf("Fields[port] is empty (expected for nil Port)")
 		}
@@ -264,13 +244,10 @@ func TestFetchELBListeners_NilFields(t *testing.T) {
 	})
 }
 
-// TestFetchELBListeners_ComputedFields tests all 3 action types:
-// forward, redirect, and fixed-response.
 func TestFetchELBListeners_ComputedFields(t *testing.T) {
 	mock := &mockELBv2DescribeListenersClient{
 		output: &elbv2.DescribeListenersOutput{
 			Listeners: []elbtypes.Listener{
-				// Forward action — extracts TG name from ARN
 				{
 					ListenerArn: aws.String("arn:aws:elasticloadbalancing:us-east-1:123456789012:listener/app/api-prod-alb/abc123/fwd001"),
 					Port:        aws.Int32(443),
@@ -284,7 +261,6 @@ func TestFetchELBListeners_ComputedFields(t *testing.T) {
 						TargetGroupArn: aws.String("arn:aws:elasticloadbalancing:us-east-1:123456789012:targetgroup/api-prod-tg/abc123"),
 					}},
 				},
-				// Redirect action — shows redirect URL
 				{
 					ListenerArn: aws.String("arn:aws:elasticloadbalancing:us-east-1:123456789012:listener/app/api-prod-alb/abc123/rdr001"),
 					Port:        aws.Int32(80),
@@ -298,7 +274,6 @@ func TestFetchELBListeners_ComputedFields(t *testing.T) {
 						},
 					}},
 				},
-				// Fixed-response action — shows status code
 				{
 					ListenerArn: aws.String("arn:aws:elasticloadbalancing:us-east-1:123456789012:listener/app/api-prod-alb/abc123/fix001"),
 					Port:        aws.Int32(8080),
@@ -353,8 +328,6 @@ func TestFetchELBListeners_ComputedFields(t *testing.T) {
 		if target == "" {
 			t.Error("Fields[default_action_target] should not be empty for redirect")
 		}
-		// Should contain HTTPS and 443 or some representation of the redirect URL
-		// The exact format depends on implementation, but it must show the redirect destination
 	})
 
 	t.Run("fixed_response_action_target_shows_status_code", func(t *testing.T) {
@@ -366,12 +339,9 @@ func TestFetchELBListeners_ComputedFields(t *testing.T) {
 		if target == "" {
 			t.Error("Fields[default_action_target] should not be empty for fixed-response")
 		}
-		// Should contain status code "200"
 	})
 }
 
-// TestFetchELBListeners_CertificateShort verifies that the certificate ARN
-// is shortened to just the certificate ID.
 func TestFetchELBListeners_CertificateShort(t *testing.T) {
 	mock := &mockELBv2DescribeListenersClient{
 		output: &elbv2.DescribeListenersOutput{
@@ -419,8 +389,6 @@ func TestFetchELBListeners_CertificateShort(t *testing.T) {
 	}
 }
 
-// TestFetchELBListeners_RawStruct verifies that RawStruct preserves the
-// original elbtypes.Listener, including all sub-fields.
 func TestFetchELBListeners_RawStruct(t *testing.T) {
 	mock := &mockELBv2DescribeListenersClient{
 		output: &elbv2.DescribeListenersOutput{
@@ -533,7 +501,6 @@ func TestFetchELBListeners_Pagination(t *testing.T) {
 		"lb_name":           "pag-alb",
 	}
 
-	// Page 1: 2 listeners with NextMarker indicating more pages exist.
 	page1Mock := &mockELBv2DescribeListenersClient{
 		outputs: []*elbv2.DescribeListenersOutput{
 			{
@@ -570,7 +537,6 @@ func TestFetchELBListeners_Pagination(t *testing.T) {
 		},
 	}
 
-	// First call: no continuation token — fetches page 1.
 	result1, err := awsclient.FetchELBListeners(
 		context.Background(),
 		page1Mock,
@@ -637,11 +603,9 @@ func TestFetchELBListeners_Pagination(t *testing.T) {
 		}
 	})
 
-	// Page 2: 1 listener with no NextMarker — last page.
 	page2Mock := &mockELBv2DescribeListenersClient{
 		outputs: []*elbv2.DescribeListenersOutput{
 			{
-				// No NextMarker — last page
 				Listeners: []elbtypes.Listener{
 					{
 						ListenerArn: aws.String("arn:aws:elasticloadbalancing:us-east-1:123456789012:listener/app/pag-alb/abc123/page2-001"),
@@ -659,7 +623,6 @@ func TestFetchELBListeners_Pagination(t *testing.T) {
 		},
 	}
 
-	// Second call: pass continuation token from page 1 to fetch page 2.
 	result2, err := awsclient.FetchELBListeners(
 		context.Background(),
 		page2Mock,
@@ -711,11 +674,10 @@ func TestFetchELBListeners_Pagination(t *testing.T) {
 }
 
 // TestFetchELBListeners_MaxCap verifies that a single API page of 50 listeners
-// is returned as-is with correct IsTruncated=true metadata when the API
-// indicates more pages exist. The 200-item cap no longer applies — each call
-// returns one page and the caller drives pagination via continuation tokens.
+// is returned as-is with IsTruncated=true when the API indicates more pages
+// exist; each call returns one page and the caller drives pagination via
+// continuation tokens.
 func TestFetchELBListeners_MaxCap(t *testing.T) {
-	// Build one page of 50 listeners with a NextMarker indicating more pages exist.
 	var listeners []elbtypes.Listener
 	for i := range 50 {
 		portNum := int32(1000 + i)
@@ -817,8 +779,6 @@ func TestFetchELBListeners_MaxCap(t *testing.T) {
 	})
 }
 
-// TestELBListenerColumns verifies that ELBListenerColumns returns the expected
-// columns with correct keys, titles, and positive widths.
 func TestELBListenerColumns(t *testing.T) {
 	cols := resource.ELBListenerColumns()
 
@@ -865,8 +825,6 @@ func TestELBListenerColumns(t *testing.T) {
 	})
 }
 
-// TestELBListeners_ChildTypeRegistered verifies that the child type is
-// registered under the correct short name.
 func TestELBListeners_ChildTypeRegistered(t *testing.T) {
 	td := resource.GetChildType("elb_listeners")
 	if td == nil {
@@ -880,8 +838,6 @@ func TestELBListeners_ChildTypeRegistered(t *testing.T) {
 	}
 }
 
-// TestELBListeners_PaginatedChildFetcherRegistered verifies that the paginated
-// child fetcher is registered under the correct short name.
 func TestELBListeners_PaginatedChildFetcherRegistered(t *testing.T) {
 	f := resource.GetPaginatedChildFetcher("elb_listeners")
 	if f == nil {
@@ -889,9 +845,6 @@ func TestELBListeners_PaginatedChildFetcherRegistered(t *testing.T) {
 	}
 }
 
-// TestELBListeners_ParentHasChildDef verifies that the parent elb resource
-// type has a child view definition for elb_listeners with key "enter"
-// and ContextKeys includes "load_balancer_arn".
 func TestELBListeners_ParentHasChildDef(t *testing.T) {
 	rt := resource.FindResourceType("elb")
 	if rt == nil {
@@ -918,8 +871,6 @@ func TestELBListeners_ParentHasChildDef(t *testing.T) {
 	}
 }
 
-// TestFetchLoadBalancers_HasLoadBalancerArn verifies that the parent LB
-// fetcher now populates load_balancer_arn in Fields.
 func TestFetchLoadBalancers_HasLoadBalancerArn(t *testing.T) {
 	mock := &mockELBv2DescribeLoadBalancersClient{
 		output: &elbv2.DescribeLoadBalancersOutput{

@@ -1,12 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
 
-// mainmenu_cause_style_test.go — the reason a menu count is missing is not an
-// alias.
-//
 // A refused probe replaces the type's alias with the word for why (denied,
-// throttled, timeout). It was painted in the dim style the alias uses, so the
-// one cell on the screen carrying a failure read as the quietest thing on the
-// row.
+// throttled, timeout). The cause is painted in the warn style, not the alias's
+// dim one, so the one cell on the row carrying a failure does not read as the
+// quietest thing on it.
 package unit
 
 import (

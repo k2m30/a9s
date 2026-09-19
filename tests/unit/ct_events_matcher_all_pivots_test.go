@@ -1,15 +1,9 @@
 package unit_test
 
-// ct_events_matcher_all_pivots_test.go — row 6: an id in an event body is a
-// claim about the past.
-//
-// Eleven typed pivots route through ctEventsMatchTarget. The event names the
-// resource it acted on, which is why trusting those ids looked safe: they are
-// well-formed, and the call really did happen. What they do not establish is
-// that the resource is still there — a DeleteBucket event names a bucket
-// precisely because it no longer exists. Only the target list can turn a claim
-// into a count, so every pivot is pinned through the shared helper rather than
-// one of them standing in for the rest.
+// An id in an event body is a claim about the past: a DeleteBucket event
+// names a bucket precisely because it is gone. Only the target list can
+// turn a claim into a count. Eleven typed pivots route through
+// ctEventsMatchTarget, so every pivot is pinned through the shared helper.
 
 import (
 	"context"
@@ -70,8 +64,8 @@ func ctPivotEvent() resource.Resource {
 	}
 }
 
-// TestCtEventsPivots_ColdCacheIsUnknown pins the case the live account was in:
-// nothing cached and nothing to call, so no pivot may report a count.
+// TestCtEventsPivots_ColdCacheIsUnknown: nothing cached and nothing to call,
+// so no pivot may report a count.
 func TestCtEventsPivots_ColdCacheIsUnknown(t *testing.T) {
 	event := ctPivotEvent()
 	for _, p := range ctPivots() {
@@ -143,9 +137,9 @@ func TestCtEventsPivots_TruncatedConfirmingNothingIsALowerBound(t *testing.T) {
 	}
 }
 
-// TestCtEventsPivots_ProvenListResolvesZero is the counterpart that stops the
-// fix from being "always Unknown": a complete list that does not name the
-// resource proves it is gone, which is what a DeleteBucket event should show.
+// TestCtEventsPivots_ProvenListResolvesZero: a complete list that does not
+// name the resource proves it is gone, which is what a DeleteBucket event
+// should show.
 func TestCtEventsPivots_ProvenListResolvesZero(t *testing.T) {
 	event := ctPivotEvent()
 	for _, p := range ctPivots() {
@@ -166,12 +160,11 @@ func TestCtEventsPivots_ProvenListResolvesZero(t *testing.T) {
 	}
 }
 
-// TestCtEventsPivots_DemoBenchDeletedBucketWitness is the bench witness for
-// row 6. CtEventDeletedBucket is a DeleteBucket call naming acme-retired-archive,
-// which no demo S3 fixture carries — exactly what a real DeleteBucket leaves
-// behind. Its S3 panel must read a resolved zero rather than offering the
-// deleted bucket as a row. The sibling CreateBucket event names a bucket that
-// does exist, so a fix that merely zeroed the pivot fails here.
+// CtEventDeletedBucket is a DeleteBucket call naming acme-retired-archive,
+// which no demo S3 fixture carries, as a real DeleteBucket leaves behind.
+// Its S3 panel reads a resolved zero rather than offering the deleted
+// bucket as a row. The sibling CreateBucket event names a bucket that does
+// exist, so a pivot that always reports zero fails here.
 func TestCtEventsPivots_DemoBenchDeletedBucketWitness(t *testing.T) {
 	byType, _ := buildVisibilityTypeCache(t)
 	events := byType["ct-events"]

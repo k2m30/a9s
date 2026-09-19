@@ -1,14 +1,3 @@
-// costs_selfreview_test.go — Cost Explorer pins C2-C12 (C1, resource-drill
-// refusal, is pinned in costs_round8_test.go).
-//
-// package unit_test (not unit): every finding here is reachable via the
-// headless app.Controller / pure core/costs / core/aws surface — no TUI
-// helper is needed (C2 explicitly requires NO TUI adapter involvement) — so
-// this file reuses costs_state_test.go's
-// newCostsController/topDrill/fixedCostsNow/monthRecord and
-// costs_interaction_test.go's findFetchCostsTask/baseServiceQuery/
-// fullMetricRecord directly (same package), same convention as
-// costs_round8_test.go.
 package unit_test
 
 import (
@@ -35,21 +24,9 @@ import (
 	unit "github.com/k2m30/a9s/v3/tests/unit"
 )
 
-// ===========================================================================
-// C2 — web/headless resource jump. applyCostsSelect's RESOURCE_ID branch
-// (core/app/costs_state.go, screen.OpenResource) routes through the shared
-// pushByIDPlaceholderList constructor (list_state.go), mirroring
-// navigate.go's applyRelatedNavResult TargetID branch: the placeholder list
-// always has ls.EscPops = true, so handleResourcesLoadedEvent's
-// isTopLevelCanonicalList gate (which requires
-// msg.Provenance.CanonicalList() only for EscPops-false, ParentContext-nil
-// screens) skips it, the executor's Provenance: FetchProvenanceByID delivery
-// is applied, ls.Loading clears, and autoOpenSingleDetail (handle.go, fires
-// only when the TOP screen is ScreenResourceList or ScreenChildList) reaches
-// the target row. This test must not be made green by stamping its
-// ResourcesLoaded literal Provenance: FetchProvenanceCanonicalList — a real
-// KindFetchByIDDetail result is never canonical.
-// ===========================================================================
+// A KindFetchByIDDetail result carries FetchProvenanceByID, never
+// FetchProvenanceCanonicalList. The placeholder list has ls.EscPops = true,
+// so handleResourcesLoadedEvent's isTopLevelCanonicalList gate skips it.
 
 func TestCostsSelfReview_C2_WebResourceJump_HeadlessReachesEC2Detail(t *testing.T) {
 	const demoEC2InstanceID = "i-0a1b2c3d4e5f60001"
@@ -61,9 +38,8 @@ func TestCostsSelfReview_C2_WebResourceJump_HeadlessReachesEC2Detail(t *testing.
 	})
 	_, drill1Tasks := c.Apply(app.Action{Kind: app.ActionSelect}) // SERVICE -> USAGE_TYPE
 
-	// Loading gates Select unconditionally now (screen.Select's
-	// WaitForRows) — the USAGE_TYPE frame's own fetch must land before the
-	// next Enter.
+	// Loading gates Select (screen.Select's WaitForRows): the USAGE_TYPE
+	// frame's own fetch must land before the next Enter.
 	drill1Payload, found := findFetchCostsTask(drill1Tasks)
 	if !found {
 		t.Fatal("precondition: SERVICE -> USAGE_TYPE drill did not emit a fetch task")
@@ -88,8 +64,6 @@ func TestCostsSelfReview_C2_WebResourceJump_HeadlessReachesEC2Detail(t *testing.
 		Requests: 1,
 	})
 
-	// Enter on the resource row — headless/web lane only (Controller.Apply,
-	// no TUI Model in this test at all).
 	_, selectTasks := c.Apply(app.Action{Kind: app.ActionSelect})
 	var byIDTask *runtime.TaskRequest
 	for i := range selectTasks {
@@ -138,17 +112,11 @@ func TestCostsSelfReview_C2_WebResourceJump_HeadlessReachesEC2Detail(t *testing.
 	}
 }
 
-// ===========================================================================
-// C3 — mapAnomaly (core/aws/costs.go) must normalize CE's anomaly date
-// strings to date-only so marks match grid columns. AWS's GetAnomalies API
-// reference documents AnomalyStartDate/AnomalyEndDate as ISO 8601; live CE
-// sends full RFC3339 timestamps ("2026-06-15T00:00:00Z"), the synthetic demo
-// fixture sends bare dates ("2026-06-15") — grid column matching is exact
-// costs.Period string equality against date-only ("2006-01-02") periods, so
-// an RFC3339-shaped Period.Start/End would never equal any grid column and
-// live anomalies would never render as cell marks even though the fetch
-// succeeds.
-// ===========================================================================
+// AWS's GetAnomalies API reference documents AnomalyStartDate/
+// AnomalyEndDate as ISO 8601: live CE sends RFC3339 timestamps
+// ("2026-06-15T00:00:00Z"), the demo fixture sends bare dates
+// ("2026-06-15"). Grid columns match by exact date-only Period string
+// equality.
 
 type selfReviewAnomaliesStub struct {
 	out *costexplorer.GetAnomaliesOutput
@@ -201,23 +169,11 @@ func TestCostsSelfReview_C3_AnomalyDateFormat_RFC3339AndDateOnly_ProduceMatching
 
 func strPtrSelfReview(s string) *string { return &s }
 
-// ===========================================================================
-// C4 (P1/P2) — anomaly lifecycle, three angles.
-// ===========================================================================
-
-// C4(a): a successful fetch delivering ZERO anomalies must clear cached
-// marks (PutAnomalies unconditional on success), so a genuine "no anomalies
-// this fetch" result overwrites a stale cached mark from an earlier fetch.
-// The typed-seam pin is in costs_screen_test.go
-// (TestCostsScreen_ApplyFetchResult_AnomalyResult_WriteSemantics, case
-// "requested, empty"), reconciled there against the SKIP-must-preserve
-// case; this is the full-stack pin.
 func TestCostsSelfReview_C4a_ZeroAnomalyResult_ClearsCachedMarks(t *testing.T) {
 	c := newCostsController(t, fixedCostsNow)
 	q := costs.Query{Granularity: costs.GranularityMonth.APIGranularity(), GroupBy: []costs.Dimension{costs.DimensionService}}
-	// The cursor starts on the newest (rightmost, currently-open) column by
-	// default (FR-002) — anchor the stale anomaly there so no cursor
-	// movement is needed to observe it via FooterNote.
+	// The cursor starts on the newest (open) column, so an anomaly anchored
+	// there shows in FooterNote without cursor movement.
 	root := topDrill(t, c)
 	curPeriod := root.Window[len(root.Window)-1]
 
@@ -254,14 +210,8 @@ func TestCostsSelfReview_C4a_ZeroAnomalyResult_ClearsCachedMarks(t *testing.T) {
 	}
 }
 
-// C4(b): the anomaly fetch's own request cost must fold into
-// CostsLoaded.Requests, not just the main cost-and-usage fetch's count.
-// Traced precisely: core/runtime/executor.go's KindFetchCosts case sets
-// `Requests: result.RequestCount` — result is CostFetchResult from
-// FetchCostAndUsage/FetchCostAndUsageWithResources ONLY; the anomaly fetch
-// (awsclient.FetchCostAnomalies, a separate GetAnomalies API call) that
-// rides alongside contributes nothing to Requests, silently undercounting
-// billed CE calls whenever the anomaly overlay succeeds.
+// GetAnomalies is a separate billed CE call; CostsLoaded.Requests counts
+// it alongside the cost-and-usage fetch.
 type selfReviewCostsAndAnomaliesAPI struct {
 	usageOut     *costexplorer.GetCostAndUsageOutput
 	anomaliesOut *costexplorer.GetAnomaliesOutput
@@ -362,14 +312,8 @@ func selfReviewStructFieldNames(v any) []string {
 	return names
 }
 
-// ===========================================================================
-// C5 (P1) — settlement-lag immutability: a bucket becomes immutable only
-// when fetched >= 72h AFTER its period's own End (CE revises data for
-// 24-72h after period close). Traced precisely: costs/store.go's
-// periodEntry.immutableAt today is `!e.FetchedAt.Before(end)` — fetched
-// AT OR AFTER End, no lag at all (this is round8 item 1's own fix, now
-// superseded by the narrower settlement-lag boundary; reconciled below).
-// ===========================================================================
+// A bucket becomes immutable only when fetched >= 72h after its period's
+// End: CE revises data for 24-72h after period close.
 
 func TestCostsSelfReview_C5a_DailyBucket_FetchedMorningAfter_StaysRefetchable(t *testing.T) {
 	t.Setenv("A9S_CONFIG_FOLDER", t.TempDir())
@@ -439,16 +383,8 @@ func TestCostsSelfReview_C5c_MergeCoverage_NeverRefreshesFetchedAt_OnBucketRecor
 	}
 }
 
-// ===========================================================================
-// C6 (P2) — UTC day truncation. Traced precisely: both Period.Closed
-// (core/costs/types.go) and ClampResourceDrillWindow
-// (core/costs/drill.go) build `time.Date(now.Year(), now.Month(),
-// [now.Day(),] 0,0,0,0, time.UTC)` — extracting Y/M/D from `now` AS
-// AUTHORED (whatever zone it carries) but then representing that as if it
-// were already a UTC clock reading, instead of `now.UTC()` first. At a
-// zone boundary where the local calendar date differs from the UTC
-// calendar date, this silently compares against the WRONG day.
-// ===========================================================================
+// Period.Closed and ClampResourceDrillWindow compare UTC calendar dates;
+// at a zone boundary the local calendar date differs from the UTC one.
 
 func TestCostsSelfReview_C6_PeriodClosed_UsesUTCDate_NotLocalZoneDate(t *testing.T) {
 	// UTC+13: local midnight July 1 is 2026-06-30 11:00 UTC — a full
@@ -469,10 +405,9 @@ func TestCostsSelfReview_C6_ClampResourceDrillWindow_UsesUTCDate_NotLocalZoneDat
 	tz := time.FixedZone("UTC+13", 13*3600)
 	localMidnightJuly1 := time.Date(2026, 7, 1, 0, 0, 0, 0, tz) // 2026-06-30T11:00:00Z
 
-	// A period starting exactly 14 days before the UTC calendar date
-	// (2026-06-30) is 2026-06-16 — the buggy local-zone cutoff (computed
-	// from "July 1", one calendar day later than the true UTC date) would
-	// place the cutoff at 2026-06-17 instead, wrongly excluding this period.
+	// 14 days before the UTC calendar date (2026-06-30) is 2026-06-16; a
+	// cutoff computed from the local date ("July 1") would give 2026-06-17
+	// and exclude this period.
 	window := []costs.Period{
 		{Start: "2026-06-16", End: "2026-06-17"}, // exactly 14 days before UTC's 2026-06-30
 	}
@@ -481,17 +416,6 @@ func TestCostsSelfReview_C6_ClampResourceDrillWindow_UsesUTCDate_NotLocalZoneDat
 		t.Errorf("ClampResourceDrillWindow dropped a period that is within the 14-day retention window measured from the UTC calendar date (2026-06-30) — got %d periods, want 1; using now's own zone-local Y/M/D instead of now.UTC() computes the cutoff a full day too late in UTC+13, wrongly clamping periods that should survive", len(got))
 	}
 }
-
-// ===========================================================================
-// C9 (P2) — CostsBody.DataThrough must derive from the store: re-entering
-// the costs screen over a warm disk cache (no fetch fired) must still show
-// a correct data-through footer. Traced precisely: EnsureCostsState
-// (core/app/costs_state.go) constructs a fresh CostsState with
-// `Store: costs.LoadStore(...)` (warm from disk) but never initializes
-// DataThrough — it stays "" until ApplyCostsLoaded sets it from a LIVE
-// fetch delivery, which never happens when the shape is already fully
-// covered by the warm store.
-// ===========================================================================
 
 func TestCostsSelfReview_C9_DataThrough_DerivesFromWarmStore_NoFetchNeeded(t *testing.T) {
 	t.Setenv("A9S_CONFIG_FOLDER", t.TempDir())
@@ -531,15 +455,8 @@ func TestCostsSelfReview_C9_DataThrough_DerivesFromWarmStore_NoFetchNeeded(t *te
 	}
 }
 
-// ===========================================================================
-// C10 (P2) — error taxonomy + retry. Traced precisely: classifyCostsError
-// (core/aws/costs.go) only matches "AccessDeniedException" in its
-// switch, but ClassifyAWSError (core/aws/errors.go, the shared
-// taxonomy) matches BOTH "AccessDenied" and "AccessDeniedException" — some
-// AWS API paths return the bare code. CE calls are also not wrapped in
-// RetryOnThrottle at all (zero references in costs.go), unlike
-// FetchEC2InstancesByIDs and other by-ID fetchers.
-// ===========================================================================
+// Some AWS API paths return the bare "AccessDenied" code instead of
+// "AccessDeniedException".
 
 func TestCostsSelfReview_C10a_ClassifyCostsError_MatchesBareAccessDeniedCode(t *testing.T) {
 	bare := &selfReviewAPIError{Code: "AccessDenied", Message: "not authorized"}
@@ -553,11 +470,8 @@ func TestCostsSelfReview_C10a_ClassifyCostsError_MatchesBareAccessDeniedCode(t *
 	}
 }
 
-// selfReviewAPIError is an alias for the package-unit canonical fake
-// (mocks_test.go's MockAPIError) — package unit_test cannot share unexported
-// identifiers with package unit, so this file reuses the exported type
-// instead of keeping its own parallel copy. Fault is left at its zero value
-// (smithy.FaultUnknown), matching this file's original hardcoded fault.
+// selfReviewAPIError is mocks_test.go's MockAPIError; Fault stays at its
+// zero value (smithy.FaultUnknown).
 type selfReviewAPIError = unit.MockAPIError
 
 type selfReviewErroringCostsAPI struct {
@@ -607,15 +521,8 @@ func (s *selfReviewFlakyThrottleCostsAPI) GetCostAndUsage(_ context.Context, _ *
 	return s.successOut, nil
 }
 
-// ===========================================================================
-// C11 (P2) — a CostsLoaded arriving after the costs screen was FULLY
-// popped must still Merge+Save into the session store. Traced precisely:
-// costsStateBeneathOverlay (core/app/costs_state.go) searches the
-// stack top-down for a ScreenCosts entry and returns nil when none exists
-// (the screen was popped all the way off, not merely overlaid by
-// Help/Identity) — ApplyCostsLoaded's `if cs == nil { return }` then drops
-// the delivery entirely, discarding billed CE data.
-// ===========================================================================
+// A delivery after the costs screen was popped is billed CE data; it
+// still reaches the session store.
 
 func TestCostsSelfReview_C11_CostsLoaded_AfterFullPop_StillMergesAndSaves(t *testing.T) {
 	const profile = "demo" // newTestController's (blessed) hardcoded profile
@@ -639,26 +546,12 @@ func TestCostsSelfReview_C11_CostsLoaded_AfterFullPop_StillMergesAndSaves(t *tes
 		Requests: 1,
 	})
 
-	// Independently verify on disk: a fresh Store load for the same
-	// profile must see the merged record.
 	fresh := costs.LoadStore(profile)
 	got, missing := fresh.Lookup(q, []costs.Period{root.Window[len(root.Window)-1]}, fixedCostsNow)
 	if len(missing) != 0 || len(got) != 1 {
 		t.Errorf("CostsLoaded delivered after the costs screen was fully popped was not merged+saved to disk — LoadStore(%q) sees missing=%v got=%v, want the record present", profile, missing, got)
 	}
 }
-
-// ===========================================================================
-// C12 (P2) — FetchEC2InstancesByIDs must recover from AWS's all-or-nothing
-// batch failure on an unknown ID. Traced precisely: DescribeInstances
-// rejects the WHOLE batch call (InvalidInstanceID.NotFound naming the bad
-// ID) when ANY requested ID is invalid/terminated-and-purged — it does not
-// return a partial Reservations list omitting just the bad one. The
-// current implementation only diffs "requested vs returned" AFTER a
-// successful call; a batch-level error (even one naming exactly which ID
-// is bad) returns zero resources for the WHOLE batch, dropping the live
-// instances too.
-// ===========================================================================
 
 func TestCostsSelfReview_C12_BatchNotFound_RecoversLiveInstances(t *testing.T) {
 	liveID := "i-0a1b2c3d4e5f60001"

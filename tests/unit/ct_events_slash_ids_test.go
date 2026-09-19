@@ -1,7 +1,6 @@
 package unit_test
 
-// ct_events_slash_ids_test.go — row 8: a slash inside a resource id is part of
-// the name, not a path to trim.
+// A slash inside a resource id is part of the name, not a path to trim.
 //
 // A CloudTrail event names its resource in one of two shapes: an ARN, whose id
 // is the segment after the last slash ("...:key/1234abcd"), and a plain name,
@@ -64,8 +63,8 @@ func ctSlashEvent(p ctPivot, name string) resource.Resource {
 	}
 }
 
-// TestCtEventsPivots_PathNamedIDResolvesAsWritten pins the shape the fix is
-// for: the event names "prod/api/<id>" and the account holds a resource under
+// TestCtEventsPivots_PathNamedIDResolvesAsWritten: the event names
+// "prod/api/<id>" and the account holds a resource under
 // that whole name. The list confirms it, so the pivot resolves to it — the
 // trimmed tail names nothing and must not turn the answer into a zero.
 func TestCtEventsPivots_PathNamedIDResolvesAsWritten(t *testing.T) {
@@ -88,8 +87,8 @@ func TestCtEventsPivots_PathNamedIDResolvesAsWritten(t *testing.T) {
 	}
 }
 
-// TestCtEventsPivots_ARNShapedNameResolvesByLastSegment is the counterpart
-// that stops the fix from being "never trim": an event that names its resource
+// TestCtEventsPivots_ARNShapedNameResolvesByLastSegment: an event that names
+// its resource
 // as a path ("instance/i-0abc") is resolved by the segment after the slash,
 // which is the id the list is keyed by.
 func TestCtEventsPivots_ARNShapedNameResolvesByLastSegment(t *testing.T) {
@@ -114,8 +113,8 @@ func TestCtEventsPivots_ARNShapedNameResolvesByLastSegment(t *testing.T) {
 // TestCtEventsPivots_PathNamedIDDoesNotOfferTheTail pins the count when the
 // account holds BOTH forms: a secret named "prod/api/stripe-key" and a
 // separate one named "stripe-key". The event named the first. Offering the
-// second is the row-6 defect on another axis — a row the event never
-// established — so the answer is one resource, the one that was named.
+// second invents a row the event never established, so the answer is one
+// resource, the one that was named.
 func TestCtEventsPivots_PathNamedIDDoesNotOfferTheTail(t *testing.T) {
 	for _, p := range ctSlashPivots() {
 		t.Run(p.target, func(t *testing.T) {
@@ -140,10 +139,10 @@ func TestCtEventsPivots_PathNamedIDDoesNotOfferTheTail(t *testing.T) {
 	}
 }
 
-// TestCtEventsSecrets_DemoBenchPathNamedWitness is the bench witness. The demo
-// account holds a secret whose name carries slashes, and an event that reads
-// it; both that event and a plain-named sibling must resolve to their one
-// secret, so a fix cannot trade one shape for the other.
+// TestCtEventsSecrets_DemoBenchPathNamedWitness: the demo account holds a
+// secret whose name carries slashes, and an event that reads it; both that
+// event and a plain-named sibling must resolve to their one secret, so
+// neither shape resolves at the other's expense.
 func TestCtEventsSecrets_DemoBenchPathNamedWitness(t *testing.T) {
 	byType, _ := buildVisibilityTypeCache(t)
 	events := byType["ct-events"]
@@ -187,7 +186,7 @@ func TestCtEventsSecrets_DemoBenchPathNamedWitness(t *testing.T) {
 // TestCTEventTargetRow_NavIDNamesTheResource pins the left column's half of the
 // same rule. The TARGET row's navigation id is the resource id stripped of its
 // TYPE prefix, which is what precedes the FIRST separator — cutting at the last
-// one turned "secret:prod/api/stripe-key" into "stripe-key", which navigates to
+// one would turn "secret:prod/api/stripe-key" into "stripe-key", which navigates to
 // nothing. Where the value carries no prefix the row falls back to Value, so the
 // assertion is on the id the navigation layer actually uses.
 func TestCTEventTargetRow_NavIDNamesTheResource(t *testing.T) {
@@ -252,8 +251,7 @@ func TestCTEventTargetRow_NavIDNamesTheResource(t *testing.T) {
 // TestCTEventTargetRows_DemoNavIDsAreResolvable is the class check for the left
 // column: every navigable TARGET row the demo events produce must point at a
 // resource the demo account holds. CtEventDeletedBucket and CtEventDeletedRole
-// are the exceptions — the resource each names is gone by design, which is what
-// makes them the row-6 and row-12 witnesses.
+// are the exceptions — the resource each names is gone by design.
 func TestCTEventTargetRows_DemoNavIDsAreResolvable(t *testing.T) {
 	byType, _ := buildVisibilityTypeCache(t)
 	events := byType["ct-events"]
@@ -307,7 +305,7 @@ func TestCTEventTargetRows_DemoNavIDsAreResolvable(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// Row 9 — the two id forms are alternatives, and one rule serves every pivot.
+// The two id forms are alternatives, and one rule serves every pivot.
 // ---------------------------------------------------------------------------
 
 // ctSlashEventNaming builds an event whose Resources envelope names each of the
@@ -332,11 +330,10 @@ func ctSlashEventNaming(p ctPivot, names ...string) resource.Resource {
 	}
 }
 
-// TestCtEventsPivots_OneRowPerResourceNamed pins the counting rule now that a
-// candidate group stands for one event resource. Two entries that resolve to
-// the same resource are one row — the event touched it twice, the account holds
-// it once — and two entries naming different resources stay two, which is the
-// half a de-duplicating fix would quietly eat.
+// TestCtEventsPivots_OneRowPerResourceNamed: a candidate group stands for one
+// event resource. Two entries that resolve to the same resource are one row
+// — the event touched it twice, the account holds it once — and two entries
+// naming different resources stay two.
 func TestCtEventsPivots_OneRowPerResourceNamed(t *testing.T) {
 	for _, p := range ctSlashPivots() {
 		t.Run(p.target, func(t *testing.T) {
@@ -425,10 +422,9 @@ func TestCtEventsPivots_ListIDOutranksAnotherResourceName(t *testing.T) {
 	}
 }
 
-// TestCtEventsDBI_ThroughTheSharedExtractor pins the RDS pivot after its own
-// copy of the rule was deleted: the envelope still resolves in both id shapes,
-// the request-body fallback still runs when the envelope names no instance, and
-// a cluster entry is still not an instance id.
+// TestCtEventsDBI_ThroughTheSharedExtractor: the RDS envelope resolves in
+// both id shapes, the request-body fallback runs when the envelope names no
+// instance, and a cluster entry is not an instance id.
 func TestCtEventsDBI_ThroughTheSharedExtractor(t *testing.T) {
 	const dbID = "acme-orders-prod"
 	cache := resource.ResourceCache{"dbi": resource.ResourceCacheEntry{
@@ -496,8 +492,8 @@ func TestCtEventsDBI_ThroughTheSharedExtractor(t *testing.T) {
 	}
 }
 
-// TestCtEventsCFN_StackARNResolvesToTheName pins the CloudFormation pivot after
-// its own copy was deleted. A stack ARN is ".../stack/<name>/<uuid>", so the
+// TestCtEventsCFN_StackARNResolvesToTheName: a stack ARN is
+// ".../stack/<name>/<uuid>", so the
 // generic last-segment candidate would be the uuid; the stack is keyed by name,
 // and an account that happens to hold a stack named like the uuid must not be
 // offered in its place.
@@ -581,8 +577,8 @@ func TestCtEventsLambda_QualifiedARNResolvesTheFunction(t *testing.T) {
 	}
 }
 
-// TestCtEventsKMS_AliasResolvesTheKey pins the other request-body shape that
-// still guesses one form. A KMS list is keyed by key id and carries the alias,
+// TestCtEventsKMS_AliasResolvesTheKey: a KMS list is keyed by key id and
+// carries the alias,
 // prefix included, as the resource's name; an event that names the key by its
 // alias must resolve to that key. Cutting at the last slash leaves a string
 // that is neither the id nor the name, so the pivot reports a confident zero
@@ -629,7 +625,7 @@ func TestCtEventsKMS_AliasResolvesTheKey(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// Row 10 — one id rule for every path. A wider candidate list is only safe
+// One id rule for every path. A wider candidate list is only safe
 // while every candidate is a form of the id the event named.
 // ---------------------------------------------------------------------------
 
@@ -637,8 +633,8 @@ func TestCtEventsKMS_AliasResolvesTheKey(t *testing.T) {
 // rule. An ARN is "arn:<partition>:<service>:<region>:<account>:<type>:<id>",
 // and only the last part is an id — the type word is a literal every ARN of
 // that service carries. Offering it lets an account holding a resource named
-// after that word answer for a call on a resource that is gone, which is the
-// row-6 rule broken from the other side: the panel invents a row.
+// after that word answer for a call on a resource that is gone: the panel
+// invents a row.
 //
 // The realistic instance is Secrets Manager, whose ARNs end ":secret:<name>"
 // and whose names are free-form, so a secret named "secret" is a legal thing to
@@ -673,8 +669,8 @@ func TestCtEventsPivots_AnARNSegmentIsNotAnID(t *testing.T) {
 //
 // The second case: "stripe-key" is a piece of "prod/api/stripe-key", so a
 // secret under that name is a different secret, and answering with it when
-// nothing holds the whole name invents a row for one the account no longer
-// holds.
+// nothing holds the whole name invents a row for one the account does not
+// hold.
 func TestCtEventsSecrets_ARNNamedSecretResolvesTheWholeName(t *testing.T) {
 	const (
 		name = "prod/api/stripe-key"
@@ -719,15 +715,15 @@ func TestCtEventsSecrets_ARNNamedSecretResolvesTheWholeName(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// Row 11 — a candidate is a form of the id, never a fragment of one.
+// A candidate is a form of the id, never a fragment of one.
 // ---------------------------------------------------------------------------
 
-// TestCtEventsPivots_ANameFragmentIsNotAnID pins rule 5. Stripping one leading
+// TestCtEventsPivots_ANameFragmentIsNotAnID: stripping one leading
 // type word is a form of the id — "instance/i-abc" and "i-abc" name the same
 // thing. Cutting again is not: an id that survived the strip is the name, and
 // its last segment is a piece of that name, naming a different resource. An
 // account holding a resource under that piece must not answer for one the event
-// named and the account no longer holds, which is the deleted-resource rule
+// named and the account does not hold, which is the deleted-resource rule
 // from the other side.
 func TestCtEventsPivots_ANameFragmentIsNotAnID(t *testing.T) {
 	for _, p := range ctSlashPivots() {
@@ -790,8 +786,8 @@ func TestCtEventsLambda_TheTypeWordIsNotAFunction(t *testing.T) {
 	}
 }
 
-// TestCtEventsRole_DemoBenchWitnesses is row 12's bench pair, driven through
-// the real role checker over the demo fixtures.
+// TestCtEventsRole_DemoBenchWitnesses drives the real role checker over the
+// demo fixtures.
 //
 // One event assumes a role filed under an IAM path, so its ARN's resource part
 // is "acme/platform/<name>" and only the bare name is a form the role list can
@@ -799,9 +795,9 @@ func TestCtEventsLambda_TheTypeWordIsNotAFunction(t *testing.T) {
 // assumes a role no fixture carries, which is what an AssumeRole recorded
 // before a deletion looks like.
 //
-// The deleted one's answer depends on what was read, which is the whole of row
-// 16: against the complete demo list it is a resolved zero, and only a list
-// that was never read is Unknown. Row 12's own wording predates that amendment.
+// The deleted one's answer depends on what was read: against the complete
+// demo list it is a resolved zero, and only a list that was never read is
+// Unknown.
 func TestCtEventsRole_DemoBenchWitnesses(t *testing.T) {
 	byType, _ := buildVisibilityTypeCache(t)
 	events := byType["ct-events"]

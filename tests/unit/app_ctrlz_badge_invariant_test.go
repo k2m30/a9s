@@ -1,17 +1,8 @@
 package unit_test
 
-// app_ctrlz_badge_invariant_test.go — live-seam replacement for
-// qa_ctrlz_badge_invariant_test.go (022-codebase-cleanup wave 3).
-// views.ResourceListModel's View/FrameTitle/AllResources/CursorPosition/
-// SortState/PaginationState/FilterText/HScrollOffset/AttentionOnly/
-// BottomHints are production-dead — Controller.ListFrameTitle,
-// GetListAllResources, GetListSelectedRow, GetListAttentionOnly, and
-// Snapshot().Body.List are the only reachable equivalents (see
-// internal/tui/renderer.go and internal/app/*.go). This file preserves the
-// original's core business invariant: pressing ctrl+z (ActionToggleAttention)
-// must show exactly the rows where td.Color(r).IsIssue() is true, for EVERY
-// registered resource type — the same rule that drives the main-menu issue
-// badge count.
+// ctrl+z (ActionToggleAttention) shows exactly the rows where
+// td.Color(r).IsIssue() is true, for every registered resource type — the same
+// rule that drives the main-menu issue badge count.
 
 import (
 	"sort"
@@ -23,9 +14,8 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// appCtrlZEc2StateFinding mirrors the retired ec2StateFinding: since
-// colorEC2 is colorFromAnyFinding-only (no raw-field fallback), a synthetic
-// EC2 fixture testing Color/IsIssue must carry the matching Wave-1 Finding.
+// colorEC2 derives color from findings only, so a synthetic EC2 fixture testing
+// Color/IsIssue carries the matching Wave-1 Finding.
 func appCtrlZEc2StateFinding(state string) []domain.Finding {
 	switch state {
 	case "pending":
@@ -52,12 +42,10 @@ func appCtrlZModel(t *testing.T, shortName string, resources []resource.Resource
 	return c
 }
 
-// appCtrlZToggle presses ctrl+z (ActionToggleAttention) on c.
 func appCtrlZToggle(c *app.Controller) {
 	c.Apply(app.Action{Kind: app.ActionToggleAttention})
 }
 
-// appCtrlZVisibleNames returns the ResourceID of every currently-visible row.
 func appCtrlZVisibleIDs(c *app.Controller) map[string]bool {
 	lb := *c.Snapshot().Body.List
 	ids := make(map[string]bool, len(lb.Rows))
@@ -78,11 +66,9 @@ func appCtrlZRegisteredShortNames() []string {
 }
 
 // appCtrlZRawFieldFixtures carries issue/healthy Fields for resource types
-// whose Color func never inspects r.Findings at all (colorSSM, colorSG,
-// colorRTB, colorAlarm, colorTrail, colorCTEvents, colorSNSSub — verified by
-// reading each function body in core/aws/catalog_*.go): a synthetic Finding
-// is invisible to these types, so the issue signal must come from the same
-// raw Fields the fetcher would populate.
+// whose Color func never reads r.Findings (colorSSM, colorSG, colorRTB,
+// colorAlarm, colorTrail, colorCTEvents, colorSNSSub in core/aws/catalog_*.go):
+// the issue signal comes from the raw Fields the fetcher populates.
 type appCtrlZFieldPair struct {
 	issue   map[string]string
 	healthy map[string]string
@@ -121,10 +107,6 @@ var appCtrlZRawFieldFixtures = map[string]appCtrlZFieldPair{
 // colorIGW, where attachments_count defaults to 0. Without it the healthy
 // fixture would itself resolve to an issue color, which the setup-error branch
 // below reports rather than passing quietly.
-//
-// eip and logs no longer need one: both classifiers read findings, or the
-// words the fetcher derives, so a row carrying neither is Healthy whatever the
-// rest of its Fields say.
 var appCtrlZHealthyFieldOverrides = map[string]map[string]string{
 	"igw": {"attachments_count": "1"},
 }
@@ -165,14 +147,9 @@ func appCtrlZPerTypeResources(shortName string) (issue, healthy resource.Resourc
 	return issue, healthy
 }
 
-// TestAppCtrlZInvariant_BadgeCountMatchesVisibleAcrossAllTypes asserts, for
-// every registered resource type, that ActionToggleAttention shows exactly
-// the seeded issue row (never the healthy row) and that GetListIssueCount()
-// equals the seeded issue count. Each type gets its own real issue/healthy
-// fixture pair (appCtrlZPerTypeResources) rather than one shared Fields-only
-// seed: the shared seed carried no Findings, so any type whose Color func is
-// Finding-only (e.g. colorEC2) saw an empty expected-visible set and the
-// ctrl+z filter could have hidden every row and still passed.
+// Each type gets its own issue/healthy fixture pair (appCtrlZPerTypeResources):
+// with a Fields-only seed a Finding-only Color func (e.g. colorEC2) would see an
+// empty expected-visible set, and a filter hiding every row would pass.
 func TestAppCtrlZInvariant_BadgeCountMatchesVisibleAcrossAllTypes(t *testing.T) {
 	for _, short := range appCtrlZRegisteredShortNames() {
 		short := short
@@ -232,8 +209,6 @@ func TestAppCtrlZInvariant_BadgeCountMatchesVisibleAcrossAllTypes(t *testing.T) 
 	}
 }
 
-// TestAppCtrlZ_EC2_27Rows12Issues reproduces a scenario with 27 EC2 rows
-// yielding 12 issues (per ec2.Color(r).IsIssue()).
 func TestAppCtrlZ_EC2_27Rows12Issues(t *testing.T) {
 	issueStatuses := []string{
 		"stopped", "stopped", "stopped", "stopped", "stopped",
@@ -266,7 +241,6 @@ func TestAppCtrlZ_EC2_27Rows12Issues(t *testing.T) {
 
 	c := appCtrlZModel(t, "ec2", resources)
 
-	// Sanity: before toggle, all 27 rows are present.
 	if got := len(c.Snapshot().Body.List.Rows); got != 27 {
 		t.Fatalf("pre-toggle Rows count: got %d want 27", got)
 	}
@@ -294,23 +268,16 @@ func TestAppCtrlZ_EC2_27Rows12Issues(t *testing.T) {
 	}
 }
 
-// TestAppCtrlZ_EC2IssueStatuses_Visible asserts that EC2 issue statuses are
-// visible after ctrl+z, driven by the EC2 type's own Color func.
 func TestAppCtrlZ_EC2IssueStatuses_Visible(t *testing.T) {
 	ec2td := resource.FindResourceType("ec2")
 	if ec2td == nil {
 		t.Fatal("ec2 resource type not found in registry")
 	}
 
-	// colorEC2 is colorFromAnyFinding-only (core/aws/catalog_compute.go, per
-	// this file's own header comment) — it never looks at raw Fields like
-	// "state"/"system_status" directly. A fixture with only those Fields and
-	// no Findings makes ec2td.Color(r).IsIssue() false for every row, so
-	// isIssue != ids[r.ID] would compare false==false for all 8 rows and
-	// pass even if the ctrl+z filter were completely broken. Attach the same
-	// Wave-1/Wave-2 Findings the real enrichment pipeline would produce for
-	// each state so the invariant is checked against a real mix of true and
-	// false expectations.
+	// colorEC2 (core/aws/catalog_compute.go) derives color from findings only: a
+	// fixture with only raw Fields would make IsIssue false for every row and
+	// pass with a broken filter. Each row carries the Findings the enrichment
+	// pipeline produces for its state.
 	ec2Resources := []resource.Resource{
 		{ID: "r-stopped", Name: "row-a-stopped",
 			Fields: map[string]string{"state": "stopped"}, Findings: appCtrlZEc2StateFinding("stopped")},
@@ -358,9 +325,6 @@ func TestAppCtrlZ_EC2IssueStatuses_Visible(t *testing.T) {
 	}
 }
 
-// TestAppCtrlZ_CTEvents_HidesDimRows: after one ctrl+z toggle, ct-info rows
-// disappear from the visible set while the underlying resource count is
-// unchanged.
 func TestAppCtrlZ_CTEvents_HidesDimRows(t *testing.T) {
 	resources := []resource.Resource{
 		{ID: "evt-0001", Name: "read-1", Fields: map[string]string{"status": "ct-info"}},
@@ -395,8 +359,6 @@ func TestAppCtrlZ_CTEvents_HidesDimRows(t *testing.T) {
 	}
 }
 
-// TestAppCtrlZ_Toggles_On_Off_Restores: two ActionToggleAttention Applies (on
-// then off) restore all rows.
 func TestAppCtrlZ_Toggles_On_Off_Restores(t *testing.T) {
 	resources := []resource.Resource{
 		{ID: "evt-0001", Name: "read-1", Fields: map[string]string{"status": "ct-info"}},
@@ -417,8 +379,6 @@ func TestAppCtrlZ_Toggles_On_Off_Restores(t *testing.T) {
 	}
 }
 
-// TestAppCtrlZ_ResetsCursorToTop: moving the cursor then toggling attention
-// resets the selected row to 0.
 func TestAppCtrlZ_ResetsCursorToTop(t *testing.T) {
 	resources := []resource.Resource{
 		{ID: "evt-0001", Name: "read-1", Fields: map[string]string{"status": "ct-info"}},
@@ -441,8 +401,6 @@ func TestAppCtrlZ_ResetsCursorToTop(t *testing.T) {
 	}
 }
 
-// TestAppCtrlZ_EC2_ShowsOnlyIssueRows: ctrl+z shows only rows where
-// ec2.Color(r).IsIssue() is true.
 func TestAppCtrlZ_EC2_ShowsOnlyIssueRows(t *testing.T) {
 	ec2Resources := []resource.Resource{
 		{ID: "i-0001", Name: "web-prod",
@@ -472,8 +430,6 @@ func TestAppCtrlZ_EC2_ShowsOnlyIssueRows(t *testing.T) {
 	}
 }
 
-// TestAppCtrlZ_PerControllerState_DoesNotBleed: toggling attention on one
-// Controller instance must not affect a separate Controller instance.
 func TestAppCtrlZ_PerControllerState_DoesNotBleed(t *testing.T) {
 	ctEventsResources := []resource.Resource{
 		{ID: "evt-0001", Name: "read-1", Fields: map[string]string{"status": "ct-info"}},
@@ -500,9 +456,7 @@ func TestAppCtrlZ_PerControllerState_DoesNotBleed(t *testing.T) {
 	}
 }
 
-// TestAppCtrlZ_PersistsAcrossReload: toggling attention then reloading the
-// same resources (simulating a refresh) must not silently reset
-// AttentionOnly — it is a screen-level setting, not tied to a single fetch.
+// AttentionOnly is a screen-level setting, not tied to a single fetch.
 func TestAppCtrlZ_PersistsAcrossReload(t *testing.T) {
 	resources := []resource.Resource{
 		{ID: "evt-0001", Name: "read-1", Fields: map[string]string{"status": "ct-info"}},
@@ -528,8 +482,6 @@ func TestAppCtrlZ_PersistsAcrossReload(t *testing.T) {
 	}
 }
 
-// TestAppCtrlZ_StatusLineIndicator: ListFrameTitle carries "[!]" only while
-// AttentionOnly is active.
 func TestAppCtrlZ_StatusLineIndicator(t *testing.T) {
 	resources := []resource.Resource{
 		{ID: "evt-0001", Name: "read-1", Fields: map[string]string{"status": "ct-info"}},

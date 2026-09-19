@@ -1,16 +1,5 @@
 package unit
 
-// aws_asg_enricher_test.go — Behavioral tests for EnrichASGScalingActivities.
-//
-// Contract assertions:
-//   - DescribeScalingActivities is called once per ASG resource (bounded fan-out,
-//     cap ~50, mirroring EnrichTargetGroupHealth conventions).
-//   - Both ASGs with Successful latest activity → 0 findings.
-//   - One ASG with Failed latest activity → 1 finding keyed by that ASG name, severity "!".
-//   - clients.AutoScaling == nil → (EnricherResult{Findings: non-nil empty}, nil).
-//   - API error on first ASG → continue to second ASG; result.Truncated=true;
-//     error not propagated (individual errors do not fail the whole enricher).
-
 import (
 	"context"
 	"errors"
@@ -59,7 +48,6 @@ func (f *asgScalingActivitiesFake) DescribeScalingActivities(
 	return &autoscaling.DescribeScalingActivitiesOutput{Activities: acts}, nil
 }
 
-// Compile-time check: asgScalingActivitiesFake satisfies ASGAPI.
 var _ awsclient.ASGAPI = (*asgScalingActivitiesFake)(nil)
 
 // TestEnrichASGScalingActivities_AllSuccessfulProducesNoFindings verifies that
@@ -206,11 +194,9 @@ func TestEnrichASGScalingActivities_APIErrorOnFirstContinuesToSecond(t *testing.
 	if !result.Truncated {
 		t.Error("Truncated must be true when at least one ASG API call failed")
 	}
-	// The second ASG (my-ok-asg) had a failed activity and must produce a finding.
 	if _, ok := result.Findings["my-ok-asg"]; !ok {
 		t.Error("second ASG with failed activity must still produce a finding even after first ASG errored")
 	}
-	// The error ASG must not appear in findings (API call failed, no data).
 	if _, ok := result.Findings["my-error-asg"]; ok {
 		t.Error("ASG that returned an API error must not appear in Findings")
 	}

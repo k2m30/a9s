@@ -1,12 +1,7 @@
-// app_headless_parity_test.go — headless-lane parity tests for
-// core/app.Controller: a failed AWS connect (via Handle's ClientsReady lane
-// and via BootstrapLive) must roll back and surface an error flash exactly
-// like the TUI does, and Controller.OpenProfileSelector is the blessed
-// headless entry point for opening the profile selector outside a TUI
-// adapter (demo-mode block, fetch error, and success + selection).
-//
-// All fake data uses clearly synthetic values — no real AWS account IDs,
-// ARNs, or profile names from real AWS accounts.
+// A failed AWS connect in the headless lane (Handle's ClientsReady lane and
+// BootstrapLive) rolls back and surfaces an error flash exactly like the TUI
+// does, and Controller.OpenProfileSelector is the headless entry point for
+// opening the profile selector outside a TUI adapter.
 package unit_test
 
 import (
@@ -45,12 +40,9 @@ func writeHeadlessAWSConfig(t *testing.T, profiles []string) string {
 	return path
 }
 
-// TestHeadless_SelectProfile_FailedConnect_RollsBackAndFlashes: a headless
-// caller selects a broken profile, the
-// connect task is never drained (this test feeds the failure result
-// directly), and Controller.Handle must roll the session back to the prior
-// stable profile and surface an error flash — the same outcome the TUI's
-// handleClientsReady produces via internal/tui/app_session.go.
+// A failed connect result for a selected profile rolls the session back to the
+// prior stable profile and surfaces an error flash, the same outcome the TUI's
+// handleClientsReady produces (internal/tui/app_session.go).
 func TestHeadless_SelectProfile_FailedConnect_RollsBackAndFlashes(t *testing.T) {
 	core, ctrl := newHermeticLiveController(t, "stable-prof", "us-east-1")
 
@@ -90,17 +82,11 @@ func TestHeadless_SelectProfile_FailedConnect_RollsBackAndFlashes(t *testing.T) 
 	}
 }
 
-// TestBootstrapLive_FailedConnect_SurfacesErrorFlash verifies that a failed
-// STARTUP connect (the web/headless cold-boot seam, distinct from a
-// mid-session profile switch) also routes through Core.HandleClientsReady
-// instead of being silently dropped: the resulting ViewState carries an
-// error flash and the returned tasks include the FlashTick that clears it.
-//
-// "fake-profile-000000000000" is a nonexistent named profile: with nil
-// pre-supplied clients, ConnectAWS's shared-config profile lookup fails
-// synchronously (no network I/O), matching the hermetic pattern already
-// exercised by TestDrainSync_SelectProfile_ConnectTask_TerminatesWithoutHanging
-// in app_drainsync_test.go.
+// A failed startup connect (the web/headless cold-boot seam) routes through
+// Core.HandleClientsReady: the ViewState carries an error flash and the tasks
+// include the FlashTick that clears it. "fake-profile-000000000000" is a
+// nonexistent profile, so ConnectAWS's shared-config lookup fails synchronously
+// with no network I/O.
 func TestBootstrapLive_FailedConnect_SurfacesErrorFlash(t *testing.T) {
 	profile := "fake-profile-000000000000"
 	_, ctrl := newHermeticLiveController(t, profile, "us-east-1")
@@ -124,11 +110,6 @@ func TestBootstrapLive_FailedConnect_SurfacesErrorFlash(t *testing.T) {
 	}
 }
 
-// TestOpenProfileSelector_PushesSelectorHeadless verifies the blessed
-// headless entry point: it fetches the local AWS profiles, pushes the
-// profile selector screen with those profiles visible in the ViewState, and
-// a subsequent ActionSelectProfile against the pushed selector returns a
-// TaskKindConnect task exactly like the TUI's profile-switch flow.
 func TestOpenProfileSelector_PushesSelectorHeadless(t *testing.T) {
 	cfgPath := writeHeadlessAWSConfig(t, []string{"default", "alpha"})
 	t.Setenv("AWS_CONFIG_FILE", cfgPath)
@@ -160,11 +141,9 @@ func TestOpenProfileSelector_PushesSelectorHeadless(t *testing.T) {
 	}
 }
 
-// TestOpenProfileSelector_DemoMode_Blocked verifies OpenProfileSelector
-// mirrors the TUI's demo-mode guard (internal/tui/runtime_adapter_navigate.go's
-// NavigateKindFetchProfiles case): when the controller carries pre-supplied
-// (demo) clients, context switching is blocked with the same error-flash
-// text, the selector is never pushed, and no tasks are returned.
+// OpenProfileSelector applies the TUI's demo-mode guard
+// (internal/tui/runtime_adapter_navigate.go's NavigateKindFetchProfiles case)
+// with the same error-flash text.
 func TestOpenProfileSelector_DemoMode_Blocked(t *testing.T) {
 	core, ctrl := newHermeticLiveController(t, "demo", "us-east-1")
 	core.SetPreSuppliedClients(demo.NewServiceClients())
@@ -186,10 +165,8 @@ func TestOpenProfileSelector_DemoMode_Blocked(t *testing.T) {
 	}
 }
 
-// TestOpenProfileSelector_FetchError_Flashes verifies that when the local
-// AWS config file cannot be read, OpenProfileSelector mirrors the TUI's
-// fetchProfiles error path (internal/tui/fetch_adapter.go): an error flash
-// is set, the selector is never pushed, and no tasks are returned.
+// OpenProfileSelector follows the TUI's fetchProfiles error path
+// (internal/tui/fetch_adapter.go).
 func TestOpenProfileSelector_FetchError_Flashes(t *testing.T) {
 	t.Setenv("AWS_CONFIG_FILE", filepath.Join(t.TempDir(), "missing"))
 

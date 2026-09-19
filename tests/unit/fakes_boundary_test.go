@@ -1,5 +1,5 @@
 // fakes_boundary_test.go — minimal fake AWS client implementations used by
-// aws_boundary_test.go (US3 boundary semantic tests).
+// aws_boundary_test.go (boundary semantic tests).
 //
 // All fakes are in package unit_test so they are isolated from the shared
 // state in mocks_test.go (package unit).
@@ -24,8 +24,7 @@ import (
 // boundaryAPIError — implements smithy.APIError for access-denied / throttle
 // testing. Alias for the package-unit canonical fake (mocks_test.go's
 // MockAPIError) — package unit_test cannot share unexported identifiers with
-// package unit, so this file reuses the exported type instead of keeping its
-// own parallel copy.
+// package unit.
 // ---------------------------------------------------------------------------
 
 type boundaryAPIError = unit.MockAPIError
@@ -150,7 +149,7 @@ func (f *fakeEC2BoundaryThrottle) DescribeSubnets(_ context.Context, _ *ec2.Desc
 	}
 	subnets := make([]ec2types.Subnet, 0, len(f.vpcIDs))
 	for _, vid := range f.vpcIDs {
-		vid := vid // capture loop variable
+		vid := vid
 		subnets = append(subnets, ec2types.Subnet{VpcId: &vid})
 	}
 	return &ec2.DescribeSubnetsOutput{Subnets: subnets}, nil

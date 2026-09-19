@@ -1,14 +1,5 @@
 package unit
 
-// aws_nodegroups_image_id_test.go — Failing tests for nodegroup AMI ID resolution
-// via custom LaunchTemplate → EC2 DescribeLaunchTemplateVersions.
-//
-// These tests are RED until:
-//   1. FetchNodeGroups signature is extended to accept EC2DescribeLaunchTemplateVersionsAPI
-//   2. buildNodeGroupResource (or the fetcher loop) resolves and populates Fields["image_id"]
-//      when the nodegroup has a custom LaunchTemplate.
-//   3. resource.SetFieldKeysForTest("ng", ...) includes "image_id".
-
 import (
 	"context"
 	"fmt"
@@ -26,22 +17,15 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// ---------------------------------------------------------------------------
-// Fake: EC2DescribeLaunchTemplateVersionsAPI
-// ---------------------------------------------------------------------------
-
-// fakeEC2DescribeLaunchTemplateVersions implements awsclient.EC2DescribeLaunchTemplateVersionsAPI
-// for unit tests. Keyed by "launchTemplateId:version" (e.g. "lt-001:3").
-// When the err field is non-nil, every call returns that error. It embeds
-// *fakes.EC2Fake (full EC2API) since the registered "ng" fetcher reads
+// fakeEC2DescribeLaunchTemplateVersions answers DescribeLaunchTemplateVersions
+// from outputs keyed by "launchTemplateId:version" (e.g. "lt-001:3"). It
+// embeds *fakes.EC2Fake because the registered "ng" fetcher reads
 // DescribeLaunchTemplateVersions off the same *ServiceClients.EC2 field every
 // other EC2 operation lives on.
 type fakeEC2DescribeLaunchTemplateVersions struct {
 	*fakes.EC2Fake
-	// outputs keyed by "<launchTemplateId>:<version>" — e.g. "lt-001:3" or "lt-002:$Default"
-	outputs map[string]*ec2.DescribeLaunchTemplateVersionsOutput
-	err     error
-	// lastInput captures the last input for assertion purposes
+	outputs   map[string]*ec2.DescribeLaunchTemplateVersionsOutput
+	err       error
 	lastInput *ec2.DescribeLaunchTemplateVersionsInput
 }
 
@@ -69,10 +53,6 @@ func (f *fakeEC2DescribeLaunchTemplateVersions) DescribeLaunchTemplateVersions(
 	return &ec2.DescribeLaunchTemplateVersionsOutput{}, nil
 }
 
-// ---------------------------------------------------------------------------
-// Helper: build a minimal three-step EKS mock set for a single nodegroup
-// ---------------------------------------------------------------------------
-
 func eksMinimalMocksForNG(clusterName, ngName string, ng *ekstypes.Nodegroup) *mockEKSFullClient {
 	listClusters := &mockEKSListClustersClient{
 		output: &eks.ListClustersOutput{Clusters: []string{clusterName}},
@@ -90,10 +70,6 @@ func eksMinimalMocksForNG(clusterName, ngName string, ng *ekstypes.Nodegroup) *m
 	return newMockEKSFull(listClusters, nil, listNGs, describeNG)
 }
 
-// ---------------------------------------------------------------------------
-// T-NG-IMG01: Custom LaunchTemplate → image_id populated
-// ---------------------------------------------------------------------------
-
 func TestFetchNodeGroups_ResolvesImageIDFromCustomLaunchTemplate(t *testing.T) {
 	desiredSize := int32(2)
 	ng := &ekstypes.Nodegroup{
@@ -104,7 +80,6 @@ func TestFetchNodeGroups_ResolvesImageIDFromCustomLaunchTemplate(t *testing.T) {
 		ScalingConfig: &ekstypes.NodegroupScalingConfig{
 			DesiredSize: &desiredSize,
 		},
-		// Custom LaunchTemplate with explicit version "3"
 		LaunchTemplate: &ekstypes.LaunchTemplateSpecification{
 			Id:      aws.String("lt-001"),
 			Version: aws.String("3"),
@@ -144,10 +119,6 @@ func TestFetchNodeGroups_ResolvesImageIDFromCustomLaunchTemplate(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// T-NG-IMG02: No LaunchTemplate → image_id empty
-// ---------------------------------------------------------------------------
-
 func TestFetchNodeGroups_ImageIDEmptyWhenNoLaunchTemplate(t *testing.T) {
 	desiredSize := int32(1)
 	ng := &ekstypes.Nodegroup{
@@ -164,7 +135,6 @@ func TestFetchNodeGroups_ImageIDEmptyWhenNoLaunchTemplate(t *testing.T) {
 
 	eksFull := eksMinimalMocksForNG("dev-cluster", "ng-managed", ng)
 
-	// Use a safe no-op fake that returns empty output without error.
 	noopLTFake := &fakeEC2DescribeLaunchTemplateVersions{EC2Fake: fakes.NewEC2()}
 
 	pf := resource.GetPaginatedFetcher("ng")
@@ -182,11 +152,6 @@ func TestFetchNodeGroups_ImageIDEmptyWhenNoLaunchTemplate(t *testing.T) {
 		t.Errorf("Fields[\"image_id\"]: expected empty string (EKS-managed AMI type), got %q", got)
 	}
 }
-
-// ---------------------------------------------------------------------------
-// T-NG-IMG03: LaunchTemplate present but DescribeLaunchTemplateVersions errors
-// → image_id empty, nodegroup still emitted
-// ---------------------------------------------------------------------------
 
 func TestFetchNodeGroups_ImageIDEmptyWhenLaunchTemplateResolveFails(t *testing.T) {
 	desiredSize := int32(3)
@@ -217,8 +182,8 @@ func TestFetchNodeGroups_ImageIDEmptyWhenLaunchTemplateResolveFails(t *testing.T
 	// partial-failure aggregate, like every other per-item call in this
 	// fetcher; a nil error would read the refusal as nothing at all, and the
 	// row would land with a blank image_id an operator cannot tell from a
-	// template that declares no image. Non-fatal is still non-fatal — the node
-	// group is emitted, asserted below.
+	// template that declares no image. The failure is non-fatal: the node group
+	// is still emitted.
 	if err == nil {
 		t.Fatal("the refused launch-template read is not carried out of the fetcher, so the blank " +
 			"image_id below reads as a node group whose template declares no image")
@@ -232,7 +197,6 @@ func TestFetchNodeGroups_ImageIDEmptyWhenLaunchTemplateResolveFails(t *testing.T
 		t.Fatalf("expected 1 resource (nodegroup still emitted despite LT error), got %d", len(resources))
 	}
 
-	// Nodegroup is present with other fields populated
 	r := resources[0]
 	if r.Fields["nodegroup_name"] != "ng-lt-error" {
 		t.Errorf("nodegroup_name: expected \"ng-lt-error\", got %q", r.Fields["nodegroup_name"])
@@ -241,16 +205,11 @@ func TestFetchNodeGroups_ImageIDEmptyWhenLaunchTemplateResolveFails(t *testing.T
 		t.Errorf("desired_size: expected \"3\", got %q", r.Fields["desired_size"])
 	}
 
-	// image_id must be empty — not a crash, just unresolvable
 	got := r.Fields["image_id"]
 	if got != "" {
 		t.Errorf("Fields[\"image_id\"]: expected \"\" when LT resolve fails, got %q", got)
 	}
 }
-
-// ---------------------------------------------------------------------------
-// T-NG-IMG04: LaunchTemplate with nil Version → uses "$Default"
-// ---------------------------------------------------------------------------
 
 func TestFetchNodeGroups_UsesDefaultVersionWhenVersionIsEmpty(t *testing.T) {
 	desiredSize := int32(2)
@@ -262,7 +221,6 @@ func TestFetchNodeGroups_UsesDefaultVersionWhenVersionIsEmpty(t *testing.T) {
 		ScalingConfig: &ekstypes.NodegroupScalingConfig{
 			DesiredSize: &desiredSize,
 		},
-		// LaunchTemplate without explicit version — should fall back to "$Default"
 		LaunchTemplate: &ekstypes.LaunchTemplateSpecification{
 			Id:      aws.String("lt-002"),
 			Version: nil,
@@ -302,7 +260,6 @@ func TestFetchNodeGroups_UsesDefaultVersionWhenVersionIsEmpty(t *testing.T) {
 		t.Errorf("Fields[\"image_id\"]: expected \"ami-default-999\" (resolved from $Default version), got %q", got)
 	}
 
-	// Verify the fake was called with "$Default"
 	if ltFake.lastInput == nil {
 		t.Fatal("DescribeLaunchTemplateVersions was never called")
 	}
@@ -313,10 +270,6 @@ func TestFetchNodeGroups_UsesDefaultVersionWhenVersionIsEmpty(t *testing.T) {
 		t.Errorf("DescribeLaunchTemplateVersions Versions: expected [\"$Default\"], got %v", ltFake.lastInput.Versions)
 	}
 }
-
-// ---------------------------------------------------------------------------
-// T-NG-IMG05: SetFieldKeysForTest("ng", ...) includes "image_id"
-// ---------------------------------------------------------------------------
 
 func TestFetchNodeGroups_RegistersImageIDField(t *testing.T) {
 	keys := resource.GetFieldKeys("ng")

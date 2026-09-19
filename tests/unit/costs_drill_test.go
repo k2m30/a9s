@@ -12,13 +12,9 @@ func filterPinning(dim costs.Dimension, values ...string) costs.Filter {
 	return costs.Filter{Equals: map[costs.Dimension][]string{dim: values}}
 }
 
-// TestResourceDrillAllowed covers ResourceDrillAllowed's NEW contract: it no
-// longer inspects period dates itself — the caller passes l.Window through
-// ClampResourceDrillWindow first (see TestClampResourceDrillWindow_* below),
-// so a refusal here means only "nothing remained after clamping" (an empty
-// Window) or "the SERVICE filter isn't pinned to exactly one value", never
-// "some period in Window was too old" (that's ClampResourceDrillWindow's
-// job, and it CLAMPS rather than refuses).
+// The caller passes l.Window through ClampResourceDrillWindow first, so a
+// refusal here means only an empty Window or a SERVICE filter not pinned to
+// exactly one value; a too-old period is clamped away, not refused.
 func TestResourceDrillAllowed(t *testing.T) {
 	now := time.Date(2026, 7, 10, 12, 0, 0, 0, time.UTC)
 	withinWindow := []costs.Period{{Start: "2026-07-05", End: "2026-07-06"}}
@@ -73,11 +69,8 @@ func TestResourceDrillAllowed(t *testing.T) {
 	}
 }
 
-// TestClampResourceDrillWindow_DropsTooOld_KeepsRestExactly pins the CLAMP
-// contract explicitly chosen over refuse: periods starting before now's
-// 14-day retention cutoff are dropped, every retained period is kept byte
-// -for-byte (Start AND End untouched — only the too-early portion of the
-// window is clamped away, never a retained period's own End).
+// Periods starting before now's 14-day retention cutoff are dropped; every
+// retained period is kept byte-for-byte, End included.
 func TestClampResourceDrillWindow_DropsTooOld_KeepsRestExactly(t *testing.T) {
 	now := time.Date(2026, 7, 15, 0, 0, 0, 0, time.UTC) // cutoff: 2026-07-01
 	window := []costs.Period{
@@ -98,8 +91,6 @@ func TestClampResourceDrillWindow_DropsTooOld_KeepsRestExactly(t *testing.T) {
 	}
 }
 
-// TestClampResourceDrillWindow_EverythingTooOld_ReturnsEmpty is the "nothing
-// remains" case ResourceDrillAllowed's refusal now depends on.
 func TestClampResourceDrillWindow_EverythingTooOld_ReturnsEmpty(t *testing.T) {
 	now := time.Date(2026, 7, 15, 0, 0, 0, 0, time.UTC)
 	window := []costs.Period{

@@ -1,14 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
 
-// list_header_width_measure_test.go — the width a header column reserves and
-// the width its text is painted into are the same measure.
-//
-// The reservation counted runes while the padding measured display columns,
-// so a title carrying a wide rune (CJK, an emoji) reserved half the room it
-// needed. Two ways out, both wrong: a short title overflows its reservation
-// and every column to its right slides away from the rows underneath, and a
-// longer one is truncated by the cell that paints it — taking the sort arrow
-// with it, so the header says the list is unsorted while the rows are sorted.
+// A header column reserves and paints its title in the same measure, display
+// columns. A rune-counted reservation fails two ways for a wide-rune title: a
+// short one overflows it and shifts every column to its right off the rows
+// below, and a longer one is truncated inside it, taking the sort arrow with
+// it.
 package unit
 
 import (

@@ -1,23 +1,10 @@
-// event_genstamp_guard_test.go — production-code structural guard closing the
-// "forgot to stamp" class at the source, replacing the uniform-zero-rejection
-// approach that was reverted for costing ~400 test edits against a hole no
-// production path can reach (see fix/connectgen-and-local-audit's commit
-// history: the ConnectGen cross-account leak was closed by seeding
-// session.New()'s ConnectGen at 1, not by making every GenStamped event
-// reject a zero stamp).
+// event_genstamp_guard_test.go — every construction site of a
+// messages.GenStamped event type in production code (core/, internal/, cmd/)
+// must set its Gen-bearing field. core/runtime/messages itself is excluded:
+// AllEventSamples() there deliberately builds unstamped canonical samples.
 //
-// This is the cheap structural replacement: every REAL construction site of a
-// messages.GenStamped event type, anywhere in production code (core/,
-// internal/, cmd/ — never tests/unit itself, and never core/runtime/messages
-// itself, the definition/registry package where AllEventSamples() deliberately
-// builds unstamped canonical samples), must set its Gen-bearing field. A
-// caller that forgets to stamp is exactly the class of bug the ConnectGen
-// leak was, whichever gen field is involved next time.
-//
-// Style follows event_registry_contract_test.go's go/parser scanning
-// (ercScanMarkerReceivers, ercFindFuncDeclByName): declared-set-from-AST, not
-// a hand-maintained list, so the guard cannot silently drift out of sync with
-// a new GenStamped type or a renamed Gen field.
+// The GenStamped set and the Gen field names are derived from the AST, so the
+// guard follows a new GenStamped type or a renamed Gen field.
 package unit
 
 import (
@@ -31,8 +18,6 @@ import (
 	"testing"
 )
 
-// esgRepoRoot returns the repo-relative root, following the same
-// filepath.Join("..", "..") pattern ercMessagesDir uses.
 func esgRepoRoot() string {
 	return filepath.Join("..", "..")
 }
@@ -115,8 +100,6 @@ func esgWalkProductionGo(t *testing.T, roots []string, genFieldByType map[string
 				return err
 			}
 			if info.IsDir() {
-				// core/runtime/messages is the definition/registry package,
-				// not a dispatch site — excluded, not swept for violations.
 				if filepath.ToSlash(path) == filepath.ToSlash(filepath.Join(esgRepoRoot(), "core", "runtime", "messages")) {
 					return filepath.SkipDir
 				}
@@ -150,7 +133,7 @@ func esgWalkProductionGo(t *testing.T, roots []string, genFieldByType map[string
 						continue
 					}
 					if ident, ok := kv.Key.(*ast.Ident); ok && ident.Name == fieldName {
-						return true // stamped — not a violation
+						return true
 					}
 				}
 				violations = append(violations, esgViolation{
@@ -169,13 +152,6 @@ func esgWalkProductionGo(t *testing.T, roots []string, genFieldByType map[string
 	return violations
 }
 
-// TestProductionGenStampGuard_EveryConstructionSiteStampsItsGenField is the
-// structural guard: every production construction site of a GenStamped event
-// type (core/, internal/, cmd/, excluding tests and the messages package
-// itself) must set its Gen-bearing field. This asserts an empty violation
-// set, not a tolerated allowlist: a forgot-to-stamp site fails this test by
-// name, with the exact file:line, rather than silently shipping a
-// ConnectGen-shaped leak.
 func TestProductionGenStampGuard_EveryConstructionSiteStampsItsGenField(t *testing.T) {
 	genFieldByType := esgScanGenFieldNames(t, filepath.Join(esgRepoRoot(), "core", "runtime", "messages"))
 	if len(genFieldByType) == 0 {
@@ -198,17 +174,6 @@ func TestProductionGenStampGuard_EveryConstructionSiteStampsItsGenField(t *testi
 	}
 }
 
-// TestProductionGenStampGuard_ScannerDetectsUnstampedSite_InIsolatedTempDir is
-// the executable detection proof (mirrors
-// TestEventRegistry_ScannerDetectsMarkerType_InIsolatedTempDir): it writes a
-// throwaway package importing "messages" that constructs a canary GenStamped
-// type WITHOUT its Gen field, points esgWalkProductionGo at that directory
-// with a synthetic genFieldByType map, and asserts the canary is reported —
-// proving the scanner actually flags a real violation rather than vacuously
-// passing on an empty or misconfigured directory. Also proves the reverse: a
-// SIBLING file in the same temp dir that DOES stamp the field produces no
-// violation for that construction, and a file whose path IS the excluded
-// messages package is skipped entirely.
 func TestProductionGenStampGuard_ScannerDetectsUnstampedSite_InIsolatedTempDir(t *testing.T) {
 	dir := t.TempDir()
 	src := `package canary

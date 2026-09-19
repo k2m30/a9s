@@ -156,11 +156,10 @@ func TestFindingRowCap_BackupFailedJobRowsCloseWithTheOverflowRow(t *testing.T) 
 // alone cannot show it.
 //
 // The closing row is not a supporting row; it is the statement that there are
-// more of them. Wearing the label of the row above turns it into one, so the
-// detail ended with "State: … +5 more" — a failed job whose state is that
-// text. Blanking domain.DetailRow.Label is half the fix: the projection then
-// has to ask for a value-only line, or the renderer paints a bare ":" where
-// the label was.
+// more of them. Wearing the label of the row above would render "State: …
+// +5 more" — a failed job whose state is that text. With
+// domain.DetailRow.Label blank, the projection must also ask for a value-only
+// line, or the renderer paints a bare ":" where the label was.
 func TestFindingRowCap_ClosingRowRendersWithNoLabel(t *testing.T) {
 	const planID = "acme-label-plan-0000-1111-2222-333333333333"
 	const failed = 14

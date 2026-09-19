@@ -28,8 +28,6 @@ func ebsCheckerByTarget(t *testing.T, target string) resource.RelatedChecker {
 	return nil
 }
 
-// --- Navigable Field Registration ---
-
 func TestNavigableFields_EBS_Registered(t *testing.T) {
 	fields := resource.GetNavigableFields("ebs")
 	if len(fields) == 0 {
@@ -50,8 +48,6 @@ func TestNavigableFields_EBS_Registered(t *testing.T) {
 		}
 	}
 }
-
-// --- EC2 checker (Pattern F) ---
 
 func TestRelated_EBS_EC2_Found(t *testing.T) {
 	source := resource.Resource{
@@ -94,8 +90,6 @@ func TestRelated_EBS_EC2_EmptyID(t *testing.T) {
 		t.Errorf("Count = %d, want 0", result.Count())
 	}
 }
-
-// --- ebs-snap checker (Pattern C) ---
 
 func TestRelated_EBS_Snap_Found(t *testing.T) {
 	snap := resource.Resource{
@@ -163,8 +157,6 @@ func TestRelated_EBS_Snap_MultipleSnaps(t *testing.T) {
 	}
 }
 
-// --- KMS checker (Pattern F) ---
-
 func TestRelated_EBS_KMS_Found(t *testing.T) {
 	source := resource.Resource{
 		ID:     "vol-abc",
@@ -212,12 +204,6 @@ func TestRelated_EBS_KMS_BadRawStruct(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// checkEBSAlarm — Pattern D: VolumeId dimension search in alarm cache
-// ---------------------------------------------------------------------------
-
-// TestRelated_EBS_Alarm_MatchByVolumeId verifies that a cache alarm whose
-// VolumeId dimension matches the volume ID is returned.
 func TestRelated_EBS_Alarm_MatchByVolumeId(t *testing.T) {
 	const volID = "vol-0a1b2c3d4e5f60001"
 	const alarmName = "ebs-vol-high-queue-depth"
@@ -248,8 +234,6 @@ func TestRelated_EBS_Alarm_MatchByVolumeId(t *testing.T) {
 	}
 }
 
-// TestRelated_EBS_Alarm_NoMatchOtherDimension verifies Count=0 when the cache
-// alarm's VolumeId dimension does not match this volume's ID.
 func TestRelated_EBS_Alarm_NoMatchOtherDimension(t *testing.T) {
 	dimName := "VolumeId"
 	dimVal := "vol-other"
@@ -272,8 +256,6 @@ func TestRelated_EBS_Alarm_NoMatchOtherDimension(t *testing.T) {
 	}
 }
 
-// TestRelated_EBS_Alarm_EmptyVolumeIDReturnsZero verifies Count=0 when the
-// source volume has no ID (short-circuit before cache lookup).
 func TestRelated_EBS_Alarm_EmptyVolumeIDReturnsZero(t *testing.T) {
 	source := resource.Resource{ID: "", Fields: map[string]string{}}
 	checker := ebsCheckerByTarget(t, "alarm")
@@ -283,12 +265,6 @@ func TestRelated_EBS_Alarm_EmptyVolumeIDReturnsZero(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// checkEBSCFN — Pattern C: aws:cloudformation:stack-name tag on Volume.Tags
-// ---------------------------------------------------------------------------
-
-// TestRelated_EBS_CFN_MatchByStackTag verifies that a volume with a
-// cloudformation stack-name tag resolves the stack from the cfn cache.
 func TestRelated_EBS_CFN_MatchByStackTag(t *testing.T) {
 	const stackName = "acme-infra-stack"
 	tagKey := "aws:cloudformation:stack-name"
@@ -322,8 +298,6 @@ func TestRelated_EBS_CFN_MatchByStackTag(t *testing.T) {
 	}
 }
 
-// TestRelated_EBS_CFN_NoStackTagReturnsZero verifies Count=0 when the volume
-// has no aws:cloudformation:stack-name tag.
 func TestRelated_EBS_CFN_NoStackTagReturnsZero(t *testing.T) {
 	source := resource.Resource{
 		ID:        "vol-0a1b2c3d4e5f60001",
@@ -337,8 +311,6 @@ func TestRelated_EBS_CFN_NoStackTagReturnsZero(t *testing.T) {
 	}
 }
 
-// TestRelated_EBS_CFN_InvalidRawStructReturnsZero verifies Count=0 when the
-// RawStruct is not an ec2types.Volume (cannot read tags).
 func TestRelated_EBS_CFN_InvalidRawStructReturnsZero(t *testing.T) {
 	source := resource.Resource{
 		ID:        "vol-abc",

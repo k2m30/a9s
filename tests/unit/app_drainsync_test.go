@@ -1,32 +1,5 @@
-// app_drainsync_test.go — behavioral tests for app.DrainSync / app.DrainSyncContext.
-//
-// Coverage map (matches task spec items 1–5):
-//
-//  1. Empty pending  — covered by TestDrainSync_EmptyPendingReturnsImmediately
-//     in app_controller_test.go (pre-existing). Not duplicated here.
-//
-//  2. Terminates / respects cap — seed with a real executable task whose
-//     executor path returns a result event, assert DrainSync returns without
-//     hanging. The maxDrainIterations cap is not exercised by normal fixture
-//     graphs (no self-replenishing task is constructable without fakes against
-//     the real executor); normal termination is the honest assertion here.
-//
-//  3. ErrAdapterOnlyTask skip — seed a batch that mixes adapter-only tasks
-//     (TaskKindFlashTick, TaskKindEmitNavigate) with a real executable task
-//     (TaskKindFetchIdentity). Assert no panic and that the batch drains fully.
-//
-//  4. Executes real work — TaskKindFetchIdentity with nil AWS clients produces
-//     messages.IdentityError (nil STS client path). DrainSync completes without
-//     hanging or panicking and Handle(IdentityError) sets the identity error state
-//     visible in Snapshot().Body.Identity.ErrorMsg.
-//
-//  5. Follow-up tasks — Handle(messages.IdentityError) returns no follow-up tasks
-//     by design. DrainSync terminates after the initial batch without growing pending.
-//
-// All tests are hermetic: no AWS credentials, no disk I/O, no goroutines.
-// newTestController(t) uses runtime.New(session, nil) — no demo clients —
-// which is sufficient because TaskKindFetchIdentity handles nil clients
-// gracefully (returns IdentityError, not a panic).
+// TaskKindFetchIdentity against nil AWS clients returns messages.IdentityError
+// synchronously, so these tests need no credentials or network.
 package unit_test
 
 import (
@@ -38,24 +11,14 @@ import (
 	"github.com/k2m30/a9s/v3/core/runtime"
 )
 
-// TestDrainSync_RealExecutableTask_TerminatesWithoutHanging verifies that
-// DrainSync with a seed containing a genuinely executable task (TaskKindFetchIdentity)
-// returns without hanging. The task executes against nil AWS clients, which
-// produces messages.IdentityError synchronously — no network, no goroutines.
-//
-// After DrainSync, Handle(IdentityError) has been called internally and the
-// identity error state is reflected in Snapshot().Body.Identity.ErrorMsg.
 func TestDrainSync_RealExecutableTask_TerminatesWithoutHanging(t *testing.T) {
 	c := newTestController(t)
 
-	// ActionOpenIdentity pushes ScreenIdentity and returns a TaskKindFetchIdentity
-	// task request.
 	_, tasks := c.Apply(app.Action{Kind: app.ActionOpenIdentity})
 	if len(tasks) == 0 {
 		t.Skip("Apply(OpenIdentity) returned no tasks — test depends on TaskKindFetchIdentity wiring")
 	}
 
-	// Verify the seeded task is the kind we expect (catches any wiring change).
 	hasFetchIdentity := false
 	for _, task := range tasks {
 		if task.Key.Kind == runtime.TaskKindFetchIdentity {
@@ -88,13 +51,9 @@ func TestDrainSync_RealExecutableTask_TerminatesWithoutHanging(t *testing.T) {
 	}
 }
 
-// TestDrainSync_AdapterOnlyTasksSkipped_NoPanic verifies spec item 3:
-// adapter-only task kinds (those for which ExecuteTask returns ErrAdapterOnlyTask)
-// are silently skipped. The batch also contains a real executable task so we
-// confirm draining continues past the skipped entries.
-//
-// Adapter-only kinds tested: TaskKindFlashTick, TaskKindEmitNavigate.
-// Real executable kind: TaskKindFetchIdentity (nil STS → IdentityError, no panic).
+// ExecuteTask returns ErrAdapterOnlyTask for adapter-only kinds
+// (TaskKindFlashTick, TaskKindEmitNavigate); DrainSync skips them and keeps
+// draining.
 func TestDrainSync_AdapterOnlyTasksSkipped_NoPanic(t *testing.T) {
 	c := newTestController(t)
 
@@ -118,15 +77,11 @@ func TestDrainSync_AdapterOnlyTasksSkipped_NoPanic(t *testing.T) {
 		}()
 		app.DrainSync(c, batch)
 	}()
-	// If we reach here the adapter-only kinds were skipped without error or panic,
-	// and the real task (FetchIdentity) was executed to completion.
 }
 
-// TestDrainSyncContext_CancelledContext_ReturnsPromptly verifies that
-// DrainSyncContext with an already-cancelled context does not hang. The
-// executor receives a cancelled context; each task either errors immediately
-// (context-aware AWS calls) or completes synchronously (in-memory demo path).
-// Either way the loop must exit at or before the maxDrainIterations cap.
+// With an already-cancelled context each task either errors immediately
+// (context-aware AWS calls) or completes synchronously (in-memory demo path),
+// so the loop exits at or before the maxDrainIterations cap.
 func TestDrainSyncContext_CancelledContext_ReturnsPromptly(t *testing.T) {
 	c := newTestController(t)
 
@@ -147,10 +102,6 @@ func TestDrainSyncContext_CancelledContext_ReturnsPromptly(t *testing.T) {
 	<-done
 }
 
-// TestDrainSync_MixedBatch_RealAndAdapterOnly_AllDrain verifies that a batch
-// of 5 tasks — 2 adapter-only, 1 real (FetchIdentity), 2 more adapter-only —
-// drains completely without panic. Guards against an off-by-one in the pending
-// slice append logic that could leave tasks undrained.
 func TestDrainSync_MixedBatch_RealAndAdapterOnly_AllDrain(t *testing.T) {
 	c := newTestController(t)
 
@@ -177,22 +128,12 @@ func TestDrainSync_MixedBatch_RealAndAdapterOnly_AllDrain(t *testing.T) {
 	}()
 }
 
-// TestDrainSync_SelectProfile_ConnectTask_TerminatesWithoutHanging verifies
-// that a TaskKindConnect task seeded from ActionSelectProfile drains without
-// hanging. TaskKindConnect with an unreachable profile calls ConnectAWS, which
-// with nil pre-supplied clients returns a ClientsReady{Err: ...} event — no
-// network timeout in the executor's synchronous path.
-//
-// This exercises a second "real executable task" path, distinct from
-// FetchIdentity, confirming DrainSync is not accidentally gated on task kind.
-//
-// ClientsReady is handled via BootstrapLive, not Controller.Handle, so the
-// observable post-DrainSync assertion is structural: Snapshot must be valid
-// (non-empty BodyKind, no panic) regardless of the connect outcome.
+// TaskKindConnect with no pre-supplied clients returns a ClientsReady{Err: ...}
+// event without a network wait. ClientsReady is handled via BootstrapLive, not
+// Controller.Handle, so the post-drain check is structural.
 func TestDrainSync_SelectProfile_ConnectTask_TerminatesWithoutHanging(t *testing.T) {
 	c := newTestController(t)
 
-	// ActionSelectProfile returns a TaskKindConnect task.
 	_, tasks := c.Apply(app.Action{Kind: app.ActionSelectProfile, Arg: "fake-profile-000000000000"})
 	if len(tasks) == 0 {
 		t.Skip("Apply(SelectProfile) returned no tasks — test depends on TaskKindConnect wiring")
@@ -217,22 +158,16 @@ func TestDrainSync_SelectProfile_ConnectTask_TerminatesWithoutHanging(t *testing
 
 	<-done
 
-	// Controller must remain in a structurally valid state after the connect task.
 	snap := c.Snapshot()
 	if snap.Body.Kind == "" {
 		t.Error("Snapshot().Body.Kind is empty after DrainSync(Connect) — controller state is invalid")
 	}
 }
 
-// TestTaskSnap_ApplyReturnedTasks_CarryCreationTimeSnap_ImmuneToLaterClientsSwap
-// pins TaskRequest.Snap's creation-time-stamping contract: every task
-// Controller.Apply returns must carry a non-nil Snap whose Clients pointer is
-// exactly whatever session.Clients was AT THE MOMENT Apply returned it — and,
-// crucially, that already-returned snapshot must stay fixed at that value
-// even after a LATER session Clients swap. Without this, a still-pending task
-// dispatched under one profile/region's clients could silently start
-// executing against a different session's transport if the user switches
-// again before it drains.
+// Every task Controller.Apply returns carries a Snap whose Clients pointer is
+// the session.Clients at the moment Apply returned it, and that Snap stays
+// fixed after a later Clients swap: a pending task dispatched under one
+// profile/region must not execute against another session's transport.
 func TestTaskSnap_ApplyReturnedTasks_CarryCreationTimeSnap_ImmuneToLaterClientsSwap(t *testing.T) {
 	core, c := newTestControllerWithCore(t)
 
@@ -271,12 +206,8 @@ func TestTaskSnap_ApplyReturnedTasks_CarryCreationTimeSnap_ImmuneToLaterClientsS
 	}
 }
 
-// TestTaskSnap_DrainSync_StampedTask_UsesCreationTimeClients_NotLaterSwap is
-// the drain-side half of the same contract: a task dispatched while
-// session.Clients was nil, then drained AFTER a real client set was installed,
-// must still execute against the nil clients it was stamped with at creation
-// time — not the clients that happen to be live when the drain loop finally
-// reaches it.
+// A task dispatched while session.Clients was nil and drained after real
+// clients were installed executes against the nil clients it was stamped with.
 //
 // Mechanism: TaskKindFetchIdentity with nil Clients unconditionally produces
 // messages.IdentityError (Core.FetchIdentity's nil-clients guard); with real

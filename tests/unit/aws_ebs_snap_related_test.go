@@ -25,8 +25,6 @@ func ebsSnapCheckerByTarget(t *testing.T, target string) resource.RelatedChecker
 	return nil
 }
 
-// --- Navigable Field Registration ---
-
 func TestNavigableFields_EBSSnap_Registered(t *testing.T) {
 	fields := resource.GetNavigableFields("ebs-snap")
 	if len(fields) == 0 {
@@ -48,8 +46,6 @@ func TestNavigableFields_EBSSnap_Registered(t *testing.T) {
 		}
 	}
 }
-
-// --- AMI checker (Pattern C — cache-based) ---
 
 func TestRelated_EBSSnap_AMI_Found(t *testing.T) {
 	snapID := "snap-abc"
@@ -150,8 +146,6 @@ func TestRelated_EBSSnap_AMI_EmptySnapID(t *testing.T) {
 	}
 }
 
-// --- EBS Volume checker (Pattern F) ---
-
 func TestRelated_EBSSnap_EBS_Found(t *testing.T) {
 	source := resource.Resource{
 		ID:     "snap-abc",
@@ -185,8 +179,6 @@ func TestRelated_EBSSnap_EBS_NoVolume(t *testing.T) {
 		t.Errorf("Count = %d, want 0", result.Count())
 	}
 }
-
-// --- EC2 checker (Pattern F — parse Description for CreateImage pattern) ---
 
 func TestRelated_EBSSnap_EC2_Found(t *testing.T) {
 	source := resource.Resource{
@@ -235,8 +227,6 @@ func TestRelated_EBSSnap_EC2_EmptyDescription(t *testing.T) {
 		t.Errorf("Count = %d, want 0", result.Count())
 	}
 }
-
-// --- KMS checker (Pattern F — assertStruct[ec2types.Snapshot], extract key ID after last "/") ---
 
 func TestRelated_EBSSnap_KMS_Found(t *testing.T) {
 	source := resource.Resource{

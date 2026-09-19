@@ -24,16 +24,12 @@ func iamUserCheckerByTarget(t *testing.T, target string) resource.RelatedChecker
 	return nil
 }
 
-// --- Navigable Fields ---
-
 func TestNavigableFields_IAMUser_None(t *testing.T) {
 	fields := resource.GetNavigableFields("iam-user")
 	if len(fields) != 0 {
 		t.Errorf("expected no navigable fields for iam-user, got %d: %v", len(fields), fields)
 	}
 }
-
-// --- iam-user→iam-group (IAM API: ListGroupsForUser) ---
 
 func TestRelated_IAMUser_Group_NonNil(t *testing.T) {
 	checker := iamUserCheckerByTarget(t, "iam-group")
@@ -61,14 +57,12 @@ func TestRelated_IAMUser_Group_EmptyID(t *testing.T) {
 		Name: "",
 	}
 	checker := iamUserCheckerByTarget(t, "iam-group")
-	// nil clients: expect -1 not panic (empty userName triggers early return in impl, but nil clients checked first)
+	// Nil clients are checked before the empty-ID guard.
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 	if result.State() != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (nil clients)", result.Count())
 	}
 }
-
-// --- iam-user→policy (IAM API: ListAttachedUserPolicies) ---
 
 func TestRelated_IAMUser_Policy_NonNil(t *testing.T) {
 	checker := iamUserCheckerByTarget(t, "policy")

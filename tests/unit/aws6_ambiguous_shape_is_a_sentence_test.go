@@ -1,17 +1,11 @@
 package unit_test
 
-// aws6_ambiguous_shape_is_a_sentence_test.go — the shape that narrows an
-// ambiguous code is the service's SENTENCE, not the phrase inside it.
-//
-// aws6_ambiguous_error_code_test.go already pins that "not found" as a bare
-// phrase is too loose, with autoscaling's "parameter 'X' not found in the
-// request". The same hole exists once per shape, and cloudformation's is
-// "does not exist": a validation failure can say that about an argument while
-// saying nothing about a stack.
-//
-// A shape earns its place by being a fragment only the not-found sentence
-// contains — "Stack with id", which cloudformation writes before the name —
-// rather than the verb both sentences share.
+// The shape that narrows an ambiguous code is the service's SENTENCE, not the
+// phrase inside it. A cloudformation validation failure can say "does not
+// exist" about an argument while saying nothing about a stack, so a shape must
+// be a fragment only the not-found sentence contains — "Stack with id", which
+// cloudformation writes before the name — rather than the verb both sentences
+// share.
 
 import (
 	"strings"
@@ -61,8 +55,7 @@ func TestAmbiguousShapeIsTheSentenceNotItsVerb(t *testing.T) {
 		})
 	}
 
-	// The positive case stays positive: tightening a shape must not stop the
-	// real not-found sentence from matching.
+	// The real not-found sentence still matches.
 	for _, msg := range []string{
 		"Stack with id acme-not-in-any-fixture does not exist",
 		"AutoScalingGroup name not found - AutoScalingGroup: acme-not-in-any-fixture not found",

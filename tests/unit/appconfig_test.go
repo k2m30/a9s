@@ -11,10 +11,6 @@ import (
 	"github.com/k2m30/a9s/v3/core/config"
 )
 
-// ===========================================================================
-// T023 — LoadAppConfig reads theme filename from config.yaml
-// ===========================================================================
-
 func TestLoadAppConfig_ReadsThemeFromConfig(t *testing.T) {
 	dir := t.TempDir()
 	t.Setenv("A9S_CONFIG_FOLDER", dir)
@@ -34,10 +30,6 @@ func TestLoadAppConfig_ReadsThemeFromConfig(t *testing.T) {
 	}
 }
 
-// ===========================================================================
-// T024 — LoadAppConfig returns default when no config.yaml exists
-// ===========================================================================
-
 func TestLoadAppConfig_DefaultWhenNoConfigFile(t *testing.T) {
 	dir := t.TempDir()
 	t.Setenv("A9S_CONFIG_FOLDER", dir)
@@ -51,10 +43,6 @@ func TestLoadAppConfig_DefaultWhenNoConfigFile(t *testing.T) {
 		t.Errorf("LoadAppConfig Theme: expected empty default, got %q", cfg.Theme)
 	}
 }
-
-// ===========================================================================
-// T025 — LoadAppConfig returns default when theme key is empty string
-// ===========================================================================
 
 func TestLoadAppConfig_EmptyThemeKeyReturnsDefault(t *testing.T) {
 	dir := t.TempDir()
@@ -74,10 +62,6 @@ func TestLoadAppConfig_EmptyThemeKeyReturnsDefault(t *testing.T) {
 		t.Errorf("LoadAppConfig Theme: expected empty string, got %q", cfg.Theme)
 	}
 }
-
-// ===========================================================================
-// T026 — ThemePath rejects path traversal and absolute paths
-// ===========================================================================
 
 func TestThemePath_RejectsTraversalAndAbsolutePaths(t *testing.T) {
 	dir := t.TempDir()
@@ -113,15 +97,10 @@ func TestThemePath_AcceptsSimpleFilename(t *testing.T) {
 	}
 }
 
-// ===========================================================================
-// T039 — SaveTheme writes and overwrites config.yaml theme key
-// ===========================================================================
-
 func TestSaveTheme_WritesAndOverwritesConfig(t *testing.T) {
 	dir := t.TempDir()
 	t.Setenv("A9S_CONFIG_FOLDER", dir)
 
-	// First call: config.yaml must be created with the correct theme.
 	if err := config.SaveTheme("dracula.yaml"); err != nil {
 		t.Fatalf("SaveTheme(\"dracula.yaml\"): unexpected error: %v", err)
 	}
@@ -134,7 +113,6 @@ func TestSaveTheme_WritesAndOverwritesConfig(t *testing.T) {
 		t.Errorf("config.yaml after SaveTheme(\"dracula.yaml\"): expected to contain %q, got:\n%s", "dracula.yaml", string(data))
 	}
 
-	// Second call with different theme: file must be updated in place, not appended.
 	if saveErr := config.SaveTheme("nord.yaml"); saveErr != nil {
 		t.Fatalf("SaveTheme(\"nord.yaml\"): unexpected error: %v", saveErr)
 	}
@@ -147,15 +125,10 @@ func TestSaveTheme_WritesAndOverwritesConfig(t *testing.T) {
 	if !strings.Contains(content, "nord.yaml") {
 		t.Errorf("config.yaml after SaveTheme(\"nord.yaml\"): expected to contain %q, got:\n%s", "nord.yaml", content)
 	}
-	// Old theme must not remain in the file.
 	if strings.Contains(content, "dracula.yaml") {
 		t.Errorf("config.yaml after SaveTheme(\"nord.yaml\"): still contains old value %q:\n%s", "dracula.yaml", content)
 	}
 }
-
-// ===========================================================================
-// T058 — ThemePath returns error when ConfigDir is empty
-// ===========================================================================
 
 func TestThemePath_ErrorWhenConfigDirEmpty(t *testing.T) {
 	// Force ConfigDir() to return "" by unsetting both HOME and A9S_CONFIG_FOLDER.
@@ -170,10 +143,6 @@ func TestThemePath_ErrorWhenConfigDirEmpty(t *testing.T) {
 	}
 }
 
-// ===========================================================================
-// T059 — SaveTheme returns error when ConfigDir is empty
-// ===========================================================================
-
 func TestSaveTheme_ErrorWhenConfigDirEmpty(t *testing.T) {
 	// Force ConfigDir() to return "" by unsetting both HOME and A9S_CONFIG_FOLDER.
 	// On Windows, os.UserHomeDir() uses USERPROFILE, not HOME.
@@ -187,19 +156,6 @@ func TestSaveTheme_ErrorWhenConfigDirEmpty(t *testing.T) {
 	}
 }
 
-// ===========================================================================
-// Data-loss regression: SaveTheme on a corrupt existing config.yaml
-// ===========================================================================
-
-// TestSaveTheme_CorruptExistingConfig_ReturnsErrorAndDoesNotDestroyFile pins
-// the fix for the swallowed-parse-error data-loss path in
-// config.SaveTheme (core/config/appconfig.go): today, when config.yaml exists
-// but is not valid YAML, `_ = yaml.Unmarshal(existing, &data)` discards the
-// parse error, `data` stays nil, and the function rebuilds the map from
-// scratch with ONLY the theme key before rewriting config.yaml — silently
-// returning nil and destroying every other key the file had. This RED test
-// asserts the corrected contract: a corrupt existing config.yaml must cause
-// SaveTheme to return an error, and the file on disk must be left untouched.
 func TestSaveTheme_CorruptExistingConfig_ReturnsErrorAndDoesNotDestroyFile(t *testing.T) {
 	dir := t.TempDir()
 	t.Setenv("A9S_CONFIG_FOLDER", dir)
@@ -224,15 +180,6 @@ func TestSaveTheme_CorruptExistingConfig_ReturnsErrorAndDoesNotDestroyFile(t *te
 	}
 }
 
-// TestSaveTheme_ValidConfigWithExtraKeys_PreservesExtraKeys is a boundary pin,
-// not a regression test for a live bug: the swallowed-error path in SaveTheme
-// only misbehaves when the EXISTING file fails to parse (see
-// TestSaveTheme_CorruptExistingConfig_ReturnsErrorAndDoesNotDestroyFile).
-// When the existing config.yaml is valid YAML with keys beyond "theme",
-// yaml.Unmarshal succeeds, data retains those keys, and only "theme" is
-// overwritten — this already passes today. Kept as a pin so a future
-// SaveTheme rewrite (e.g. switching AppConfig to a typed round-trip) cannot
-// silently regress key preservation.
 func TestSaveTheme_ValidConfigWithExtraKeys_PreservesExtraKeys(t *testing.T) {
 	dir := t.TempDir()
 	t.Setenv("A9S_CONFIG_FOLDER", dir)
@@ -267,10 +214,6 @@ func TestSaveTheme_ValidConfigWithExtraKeys_PreservesExtraKeys(t *testing.T) {
 	}
 }
 
-// ===========================================================================
-// Atomicity: SaveTheme must not truncate-write config.yaml in place
-// ===========================================================================
-
 // statFile stats path and returns its os.FileInfo, for a later os.SameFile
 // comparison. A write that goes through the standard atomic-replace pattern
 // (write to a temp file, then rename over the target) always produces a
@@ -292,14 +235,6 @@ func statFile(t *testing.T, path string) os.FileInfo {
 	return fi
 }
 
-// TestSaveTheme_ExistingFile_WriteIsAtomicByRename pins the fix for
-// SaveTheme's non-atomic write (core/config/appconfig.go: `return
-// os.WriteFile(path, out, 0600)`). A direct os.WriteFile truncates and
-// rewrites config.yaml in place, so a process crash or a concurrent reader
-// mid-write can observe (or be left with) a half-written file. This RED test
-// asserts the corrected contract: SaveTheme replaces config.yaml via a
-// temp-file-then-rename, observable as an inode change on the destination
-// path. Today the write is in place, so the inode is unchanged — RED.
 func TestSaveTheme_ExistingFile_WriteIsAtomicByRename(t *testing.T) {
 	dir := t.TempDir()
 	t.Setenv("A9S_CONFIG_FOLDER", dir)

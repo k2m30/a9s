@@ -1,18 +1,3 @@
-// costs_round4_test.go — Cost Explorer live-usage pins on a second account
-// plus the evergreen-demo prerequisite for the smoke walk.
-//
-// package unit_test (not unit): every item here is reachable via the
-// headless app.Controller / pure core/costs package — no TUI-level helper is
-// needed, so this file reuses costs_state_test.go's
-// newCostsController/topDrill/fixedCostsNow/monthRecord directly (same
-// package).
-//
-// Item 3 tests week->day spill only: weekWindowsInMonth clips at the month
-// boundary (mondayOnOrBefore + the s/e clip logic), and only
-// dayWindowsInWeek (week->day) has month-boundary clipping to pin. Item 2
-// pins the OBSERVABLE live symptom end-to-end (seeded daily data must
-// survive a month->week zoom as non-zero service rows), not a specific
-// internal mechanism.
 package unit_test
 
 import (
@@ -41,11 +26,8 @@ func round4FindFetchCostsTask(tasks []runtime.TaskRequest) (runtime.FetchCostsPa
 	return runtime.FetchCostsPayload{}, false
 }
 
-// ===========================================================================
-// 1 (P1) — CE range clamp: no query built anywhere may carry Range.End
-// later than the first day of the month after "now"'s month (CE rejects
-// "end date past the beginning of next month" — a live-verified crash).
-// ===========================================================================
+// Cost Explorer rejects a Range.End later than the first day of the month
+// after the current month.
 
 func TestCostsRound4_CERangeClamp_BuildWindow_NeverPastFirstOfNextMonth(t *testing.T) {
 	now := time.Date(2026, time.July, 31, 12, 0, 0, 0, time.UTC) // near month-end
@@ -93,22 +75,11 @@ func TestCostsRound4_CERangeClamp_ZoomOutToYear_ExecutorQueryClamped(t *testing.
 	}
 }
 
-// ===========================================================================
-// 2 (P1) — week bucket alignment: zooming from a month cell into weeks over
-// seeded DAILY records must produce a grid whose service rows carry data
-// (live bug: weeks rendered an empty zero grid while days had data).
-//
-// This pins the OBSERVABLE symptom end-to-end, not a specific internal
-// mechanism (root cause unconfirmed statically — see the round-4 score
-// rationale). Empirically run against current code with the cursor on the
-// default (newest, FR-002) column: [RESULT REPORTED BELOW].
-// ===========================================================================
-
 func TestCostsRound4_WeekZoom_ServiceRowsCarryData_NotEmptyGrid(t *testing.T) {
 	c := newCostsController(t, fixedCostsNow)
 	root := topDrill(t, c)
 
-	targetPeriod := root.Window[root.Cursor.Col] // default cursor: newest column (FR-002)
+	targetPeriod := root.Window[root.Cursor.Col] // default cursor: newest column
 
 	start, err := time.Parse("2006-01-02", targetPeriod.Start)
 	if err != nil {
@@ -160,9 +131,6 @@ func TestCostsRound4_WeekZoom_ServiceRowsCarryData_NotEmptyGrid(t *testing.T) {
 	}
 }
 
-// TestCostsRound4_WeekZoom_ServiceRowsCarryData_NotEmptyGrid_NonCurrentMonth
-// is the sibling of the newest-column (open/current month) case above: this
-// variant puts the cursor on an OLDER, already-closed month instead.
 func TestCostsRound4_WeekZoom_ServiceRowsCarryData_NotEmptyGrid_NonCurrentMonth(t *testing.T) {
 	c := newCostsController(t, fixedCostsNow)
 	root := topDrill(t, c)
@@ -229,12 +197,6 @@ func TestCostsRound4_WeekZoom_ServiceRowsCarryData_NotEmptyGrid_NonCurrentMonth(
 	}
 }
 
-// ===========================================================================
-// 3 (P2) — day-zoom anchoring: week->day must land entirely inside the
-// enclosing month (dayWindowsInWeek has no month-boundary clipping, unlike
-// weekWindowsInMonth — the confirmed half of the live bug).
-// ===========================================================================
-
 func TestCostsRound4_DayZoom_WeekToDay_NeverSpillsBeforeMonthStart(t *testing.T) {
 	c := newCostsController(t, fixedCostsNow)
 	root := topDrill(t, c)
@@ -284,13 +246,6 @@ func TestCostsRound4_DayZoom_WeekToDay_NeverSpillsBeforeMonthStart(t *testing.T)
 		}
 	}
 }
-
-// ===========================================================================
-// 4 (P2) — scroll-to-load (new behavior): ActionScrollLeft at the oldest
-// loaded column must extend the range (KindFetchCosts + Loading), not
-// clamp dead, when older history exists within CE's 13-month horizon.
-// ActionScrollRight at the newest period stays a clamp.
-// ===========================================================================
 
 func TestCostsRound4_ScrollLeftAtOldestColumn_ExtendsRange_NotDeadClamp(t *testing.T) {
 	c := newCostsController(t, fixedCostsNow)
@@ -381,11 +336,6 @@ func TestCostsRound4_ScrollLeftExtension_WindowGrows_WhenResultMerges(t *testing
 	}
 }
 
-// ===========================================================================
-// 5 (P2) — error body keeps state: ErrorMsg does not blank out
-// Pivot/Metric/Granularity (live bug: title rendered "Costs: by · ·").
-// ===========================================================================
-
 func TestCostsRound4_ErrorBody_KeepsPivotMetricGranularity(t *testing.T) {
 	c := newCostsController(t, fixedCostsNow)
 
@@ -408,12 +358,6 @@ func TestCostsRound4_ErrorBody_KeepsPivotMetricGranularity(t *testing.T) {
 		t.Errorf("error body Granularity got %q want %q", vs.Body.Costs.Granularity, costs.GranularityMonth)
 	}
 }
-
-// ===========================================================================
-// 6 (P3) — help documents the sort rule: the Cost Explorer help section
-// states that rows sort by total spend across the visible window, largest
-// absolute first.
-// ===========================================================================
 
 func TestCostsRound4_HelpSection_DocumentsSortRule(t *testing.T) {
 	sections := domain.HelpGroupsFor(domain.HelpFromCosts, "ctrl+z")

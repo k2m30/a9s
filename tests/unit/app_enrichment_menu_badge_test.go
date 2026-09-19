@@ -1,21 +1,8 @@
-// app_enrichment_menu_badge_test.go — RED pins for the missing menu-badge
-// sync-back on Controller.ApplyEnrichmentState (core/app/list_filter.go).
-//
-// Defect: visiting the s3 list in the WEB session runs Wave-2 enrichment and
-// flags rows, but after Escape back to the menu the s3 row shows no issue
-// badge. Root cause: applyEnrichmentState (core/app/list_filter.go)
-// receives issueCount/truncated and stores per-resource findings for the
-// list, but discards issueCount (`_ = issueCount`) and never touches
-// MenuState.IssueCounts/IssueKnown/IssueTruncated. The web lane runs no
-// background availability/issue sweep (unlike the TUI's ResourceListModel,
-// which separately syncs via the sweep lane), so ApplyEnrichmentState is the
-// ONLY chance the menu badge has to learn the in-session Wave-2 result.
-//
-// The menu-sync semantics pinned here mirror the monotonic guard already
-// pinned for the sweep lane in syncExactTotalToMenu (core/app/handle.go):
-// only raise the count, set Known once any count is observed, and clear a
-// stale truncated flag once an equal-count exact (untruncated) observation
-// lands.
+// The web lane runs no background availability/issue sweep, so
+// Controller.ApplyEnrichmentState (core/app/list_filter.go) is where the menu
+// badge learns an in-session Wave-2 result: it sets the menu issue count,
+// marks it Known, and clears a truncated flag once an equal-count exact
+// observation lands.
 package unit_test
 
 import (
@@ -29,10 +16,7 @@ import (
 	"github.com/k2m30/a9s/v3/core/session"
 )
 
-// newEnrichmentMenuBadgeController builds a Controller + its backing Core,
-// mirroring newSeededTestController in app_cache_first_seeding_test.go — a
-// small variant duplicated here per that file's own stated precedent (no
-// cross-file coupling to another test file's helper lifetime).
+// newEnrichmentMenuBadgeController builds a Controller + its backing Core.
 func newEnrichmentMenuBadgeController(t *testing.T) *app.Controller {
 	t.Helper()
 	t.Setenv("A9S_CONFIG_FOLDER", t.TempDir())
@@ -75,10 +59,6 @@ func menuEntryFor(mb *app.MenuBody, shortName string) *app.MenuEntry {
 	return nil
 }
 
-// TestApplyEnrichmentState_SyncsMenuIssueBadge_S3 pins the primary defect:
-// a fresh controller with no prior issue info for "s3" must show the
-// wave-2-derived issue badge on the s3 menu entry after ApplyEnrichmentState,
-// even though no background sweep ever ran (the web/headless lane).
 func TestApplyEnrichmentState_SyncsMenuIssueBadge_S3(t *testing.T) {
 	c := newEnrichmentMenuBadgeController(t)
 
@@ -135,11 +115,8 @@ func TestApplyEnrichmentState_MenuBadge_AuthoritativeResultLowersCount(t *testin
 	}
 }
 
-// TestApplyEnrichmentState_MenuBadge_RowsDerivedResultNeverLowersCount is the
-// other half of cachegen row 7: a NON-authoritative observation — one whose
-// number comes from bare list rows, where Wave-2 may not have run — still
-// only raises. It cannot prove an issue is gone, so it must not clear a
-// badge a real Wave-2 result set.
+// A non-authoritative observation — a number from bare list rows, where Wave-2
+// may not have run — only raises the badge: it cannot prove an issue gone.
 func TestApplyEnrichmentState_MenuBadge_RowsDerivedResultNeverLowersCount(t *testing.T) {
 	c := newEnrichmentMenuBadgeController(t)
 
@@ -158,9 +135,6 @@ func TestApplyEnrichmentState_MenuBadge_RowsDerivedResultNeverLowersCount(t *tes
 	}
 }
 
-// TestApplyEnrichmentState_MenuBadge_ClearsTruncationAtEqualCount pins the
-// truncation-clear rule: a menu issue count seeded as truncated at 5 becomes
-// exact once an equal-count, untruncated ApplyEnrichmentState result lands.
 func TestApplyEnrichmentState_MenuBadge_ClearsTruncationAtEqualCount(t *testing.T) {
 	c := newEnrichmentMenuBadgeController(t)
 
@@ -181,15 +155,11 @@ func TestApplyEnrichmentState_MenuBadge_ClearsTruncationAtEqualCount(t *testing.
 	}
 }
 
-// TestApplyEnrichmentState_MenuBadge_CanonicalizesAlias pins type-name
-// canonicalization: production always calls ApplyEnrichmentState with the
-// type's canonical ShortName (ResourceListModel passes m.typeDef.ShortName —
-// internal/tui/views/resourcelist.go), but the menu-sync chokepoint must
-// still resolve an alias variant to the canonical key, mirroring
-// handleResourcesLoadedEvent's "Resolve canonical short name (handles
-// aliases like ...)" step (core/app/handle.go) and menuActiveKey's own
-// alias-resolution contract (core/app/menu.go). "workgroups" is a real,
-// registered alias of the "athena" resource type (core/aws/catalog_data.go).
+// Production passes the canonical ShortName (ResourceListModel passes
+// m.typeDef.ShortName), and the menu-sync chokepoint also resolves an alias to
+// the canonical key, as handleResourcesLoadedEvent (core/app/handle.go) and
+// menuActiveKey (core/app/menu.go) do. "workgroups" is a registered alias of
+// "athena" (core/aws/catalog_data.go).
 func TestApplyEnrichmentState_MenuBadge_CanonicalizesAlias(t *testing.T) {
 	c := newEnrichmentMenuBadgeController(t)
 
@@ -206,12 +176,9 @@ func TestApplyEnrichmentState_MenuBadge_CanonicalizesAlias(t *testing.T) {
 	}
 }
 
-// TestApplyEnrichmentState_ZeroIssues_StillBecomesKnown pins the
-// authoritative-zero case: a type whose Wave-2 enrichment reports ZERO
-// issues must still flip IssueKnown to true (a genuinely clean type must not
-// stay stuck "unknown" forever just because its confirmed result happens to
-// be zero). syncMenuIssueCount's newIssues > curIssues guard alone never
-// fires on a 0-vs-0 comparison; the authoritative flag is what sets Known.
+// A type whose Wave-2 enrichment reports zero issues becomes IssueKnown:
+// syncMenuIssueCount's newIssues > curIssues guard never fires on 0-vs-0, so the
+// authoritative flag is what sets Known.
 func TestApplyEnrichmentState_ZeroIssues_StillBecomesKnown(t *testing.T) {
 	c := newEnrichmentMenuBadgeController(t)
 
@@ -232,13 +199,10 @@ func TestApplyEnrichmentState_ZeroIssues_StillBecomesKnown(t *testing.T) {
 	}
 }
 
-// TestSyncExactTotalToMenu_RowsWithoutFindings_DoesNotSetIssueKnown pins the
-// other half of the authoritative distinction: the rows-derived lane
-// (syncExactTotalToMenu, reached via ResourcesLoaded handling) must NOT set
-// IssueKnown just because a list of rows loaded with zero enrichment
-// findings — Wave-2 may simply not have run yet for that type. Driven via
-// Controller.Handle(messages.ResourcesLoaded{Gen: 0}) (the
-// ApplyResourcesLoaded test seam bypasses this sync-back entirely).
+// IssueKnown stays unset when rows with zero findings load through the
+// rows-derived lane (syncExactTotalToMenu, reached via ResourcesLoaded): Wave-2
+// may not have run for that type. ApplyResourcesLoaded bypasses this
+// sync-back, so the test drives Controller.Handle.
 func TestSyncExactTotalToMenu_RowsWithoutFindings_DoesNotSetIssueKnown(t *testing.T) {
 	c := newEnrichmentMenuBadgeController(t)
 

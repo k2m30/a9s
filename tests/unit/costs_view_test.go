@@ -1,23 +1,3 @@
-// costs_view_test.go — Cost Explorer Phase 2: TUI renderer parity with
-// wireframe.md (specs/021-cost-explorer/wireframe.md).
-//
-// Target: views.RenderCosts(body app.CostsBody, width, height int) string.
-// A thin renderer
-// per the CostsBody doc comment ("renderers consume verbatim, never
-// recompute — same contract as ListRow.Color"), so every test here builds
-// an app.CostsBody literal directly rather than routing through a
-// Controller: RenderCosts's contract is "given this body, produce this
-// text", independent of how the body was assembled.
-//
-// "Frame title" (the breadcrumb text shown in the box's top border, e.g.
-// "Costs: by service · invoice · monthly · Aug'25-Jul'26*") is NOT
-// exercised here: every other screen kind (list/detail/menu) keeps its
-// title in a separate FrameTitle()-style accessor rather than baking it
-// into the body-render function, and RenderCosts's signature
-// (body, width, height) carries no title-construction inputs beyond what
-// CostsBody itself exposes — this file only asserts what is verifiably
-// RenderCosts's job: the grid body, cursor highlight, pinned TOTAL,
-// footer line, and the FR-017 error block.
 package unit_test
 
 import (
@@ -30,8 +10,7 @@ import (
 )
 
 // baseCostsBody returns a realistic default-view body: 3 monthly columns
-// (the last open), 2 rows (EC2 growing, RDS dropping), a pinned TOTAL row —
-// mirrors wireframe.md's default grid shape.
+// (the last open), 2 rows (EC2 growing, RDS dropping), a pinned TOTAL row.
 func baseCostsBody() app.CostsBody {
 	return app.CostsBody{
 		Pivot:       "SERVICE",
@@ -74,10 +53,6 @@ func baseCostsBody() app.CostsBody {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// Cursor cell highlight
-// ---------------------------------------------------------------------------
-
 func TestRenderCosts_CursorCellIsHighlighted(t *testing.T) {
 	atRow0 := baseCostsBody()
 	atRow0.CursorRow, atRow0.CursorCol = 0, 2
@@ -96,10 +71,6 @@ func TestRenderCosts_CursorCellIsHighlighted(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// Pinned TOTAL row
-// ---------------------------------------------------------------------------
-
 func TestRenderCosts_TotalRowPresent(t *testing.T) {
 	body := baseCostsBody()
 	out := tuitest.StripANSI(views.RenderCosts(body, 120, 32))
@@ -112,17 +83,13 @@ func TestRenderCosts_TotalRowPresent(t *testing.T) {
 			t.Errorf("rendered output missing TOTAL cell amount %q:\n%s", cell.Amount, out)
 		}
 	}
-	// TOTAL is pinned LAST (below every data row), per wireframe.md.
+	// TOTAL is pinned LAST, below every data row.
 	totalIdx := strings.Index(out, "TOTAL")
 	lastRowIdx := strings.LastIndex(out, "Amazon RDS")
 	if lastRowIdx == -1 || totalIdx < lastRowIdx {
 		t.Errorf("TOTAL row must render after every data row; TOTAL at %d, last data row at %d", totalIdx, lastRowIdx)
 	}
 }
-
-// ---------------------------------------------------------------------------
-// Grid content: row labels + formatted amounts
-// ---------------------------------------------------------------------------
 
 func TestRenderCosts_RendersEveryRowLabelAndAmount(t *testing.T) {
 	body := baseCostsBody()
@@ -140,10 +107,6 @@ func TestRenderCosts_RendersEveryRowLabelAndAmount(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// Open-period marker
-// ---------------------------------------------------------------------------
-
 func TestRenderCosts_OpenPeriodColumnGetsAsteriskSuffix(t *testing.T) {
 	body := baseCostsBody()
 	out := tuitest.StripANSI(views.RenderCosts(body, 120, 32))
@@ -155,12 +118,6 @@ func TestRenderCosts_OpenPeriodColumnGetsAsteriskSuffix(t *testing.T) {
 		t.Errorf("closed period columns must NOT render the open-period asterisk:\n%s", out)
 	}
 }
-
-// ---------------------------------------------------------------------------
-// Footer: anomaly/delta slot + data-through date (amended FR-013: the "CE
-// calls" API counter/cost-estimate element was deleted from the footer
-// entirely — this test now also pins its absence).
-// ---------------------------------------------------------------------------
 
 func TestRenderCosts_FooterHasDeltaSlotAndDataThrough(t *testing.T) {
 	body := baseCostsBody()
@@ -180,10 +137,6 @@ func TestRenderCosts_FooterHasDeltaSlotAndDataThrough(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// Error state (FR-017): centered explicit message block, never an empty grid
-// ---------------------------------------------------------------------------
-
 func TestRenderCosts_ErrorState_RendersMessageBlock_NotEmptyGrid(t *testing.T) {
 	body := app.CostsBody{
 		ErrorMsg: "Cost Explorer unavailable: AccessDenied — profile needs ce:GetCostAndUsage",
@@ -201,10 +154,6 @@ func TestRenderCosts_ErrorState_RendersMessageBlock_NotEmptyGrid(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// Every metric / granularity combination renders without panicking
-// ---------------------------------------------------------------------------
-
 func TestRenderCosts_AllMetricsAndGranularities_RenderWithoutPanic(t *testing.T) {
 	metrics := []string{"invoice", "unblended", "amortized", "net-amortized", "blended"}
 	granularities := []string{"year", "month", "week", "day"}
@@ -221,10 +170,6 @@ func TestRenderCosts_AllMetricsAndGranularities_RenderWithoutPanic(t *testing.T)
 		}
 	}
 }
-
-// ---------------------------------------------------------------------------
-// Terminal width/height edge cases — must not panic
-// ---------------------------------------------------------------------------
 
 func TestRenderCosts_TerminalSizeEdgeCases_DoNotPanic(t *testing.T) {
 	sizes := []struct{ w, h int }{

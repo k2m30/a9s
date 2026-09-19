@@ -1,7 +1,6 @@
 package unit
 
-// codex10_failed_of_total_test.go — the "failed for N of M IDs" line counts
-// what it names.
+// The "failed for N of M IDs" line counts what it names.
 //
 // N is resources, M is resources: a check that issues several calls per
 // resource must not report more failures than there are resources to fail.
@@ -82,10 +81,6 @@ func TestAggregateFailures_NumeratorIsResourcesNotCalls(t *testing.T) {
 	}
 }
 
-// TestAggregateFailures_NumeratorCountsEachResourceOnce pins the same rule
-// with the failures spread over two of three resources, so a numerator that
-// counted calls (3) and one that counted resources (2) differ from the total
-// and from each other.
 func TestAggregateFailures_NumeratorCountsEachResourceOnce(t *testing.T) {
 	failures := []awsclient.Failure{
 		awsclient.FailedCall("bucket-alpha", deniedCall("GetBucketPolicy", "s3:GetBucketPolicy")),
@@ -104,9 +99,6 @@ func TestAggregateFailures_NumeratorCountsEachResourceOnce(t *testing.T) {
 	}
 }
 
-// TestAggregateFailures_OneCallPerResourceIsUnchanged is the counterpart: a
-// check with one call per resource already counted resources, and the line it
-// produced must read exactly as it did.
 func TestAggregateFailures_OneCallPerResourceIsUnchanged(t *testing.T) {
 	failures := []awsclient.Failure{
 		awsclient.FailedCall("bucket-alpha", deniedCall("GetBucketAcl", "s3:GetBucketAcl")),
@@ -124,10 +116,8 @@ func TestAggregateFailures_OneCallPerResourceIsUnchanged(t *testing.T) {
 	}
 }
 
-// TestAggregateFailures_PageWalkStaysWithinItsTotal covers the records that
-// name no resource at all: a page that never arrived holds nothing to count as
-// a resource, and the count must still stay within the total it names while
-// every page keeps its own group.
+// A page that never arrived names no resource, and the count must still stay
+// within the total it names while every page keeps its own group.
 func TestAggregateFailures_PageWalkStaysWithinItsTotal(t *testing.T) {
 	failures := []awsclient.Failure{
 		awsclient.FailedOnPage(1, deniedCall("ListObjectsV2", "s3:ListBucket")),
@@ -280,8 +270,6 @@ func TestEnrichECRRepository_DeniedPostureNamesTheCheckNotACall(t *testing.T) {
 	}
 }
 
-// TestEnrichECRRepository_ReadablePostureReportsNoFailure is the counterpart:
-// a role that may read both policies produces no failure line at all.
 func TestEnrichECRRepository_ReadablePostureReportsNoFailure(t *testing.T) {
 	clients := &awsclient.ServiceClients{ECR: &ecrPostureFake{}}
 
@@ -295,10 +283,6 @@ func TestEnrichECRRepository_ReadablePostureReportsNoFailure(t *testing.T) {
 	}
 }
 
-// TestEnrichECRRepository_OneDeniedReadOfTwoRepos pins the mixed case: one of
-// two repositories refuses both policy reads, so the line reads 1 of 2 — the
-// numerator can neither count the two refused calls nor the readable
-// repository.
 func TestEnrichECRRepository_OneDeniedReadOfTwoRepos(t *testing.T) {
 	const deniedRepo = "example-denied"
 	const okRepo = "example-readable"

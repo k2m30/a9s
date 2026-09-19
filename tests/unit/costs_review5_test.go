@@ -1,13 +1,8 @@
-// costs_review5_test.go — S3: the by-ID fetch failure must travel as its
-// own typed outcome (messages.ByIDFetchFailed), and that must be the ONLY
-// mechanism that can pop dispatchCostsByIDTask's placeholder — no parallel
-// messages.Flash text-sniff (strings.Contains(msg.Text, id)) surviving
-// alongside it. A dual path is exactly as unsound as the original
-// GetListAutoOpenSingle() heuristic it was meant to replace: any string
-// that happens to contain the pending ID (a coincidence, a copy-pasted
-// error, an unrelated resource sharing a substring) would still mis-pop.
-// package unit (not unit_test): needs the full TUI Model, same reason as
-// costs_review4_test.go.
+// A by-ID fetch failure travels as its own typed outcome,
+// messages.ByIDFetchFailed, and that is the only mechanism that pops
+// dispatchCostsByIDTask's placeholder: a messages.Flash whose text merely
+// contains the pending ID (a coincidence, a copy-pasted error, an unrelated
+// resource sharing a substring) must not pop it.
 package unit
 
 import (
@@ -29,11 +24,10 @@ import (
 // re-deriving it from the helper's return value.
 const costsReview5BogusInstanceID = "i-doesnotexist00000001"
 
-// costsReview5DrillToStrandedByIDPlaceholder replays costs_review4_test.go's
-// P4 setup verbatim through the Enter on the RESOURCE_ID leaf that pushes
-// the placeholder and dispatches the by-ID fetch — returning the model and
-// the (non-nil) dispatched cmd, still unresolved, so callers can inject
-// whatever arrives before/instead of the fetch's own result.
+// costsReview5DrillToStrandedByIDPlaceholder drills through Enter on the
+// RESOURCE_ID leaf, which pushes the placeholder and dispatches the by-ID
+// fetch, and returns the model and the still-unresolved cmd so callers can
+// inject whatever arrives before or instead of the fetch's result.
 func costsReview5DrillToStrandedByIDPlaceholder(t *testing.T, profile string) (tui.Model, tea.Cmd) {
 	t.Helper()
 	tui.Version = "1.0.2"
@@ -109,16 +103,9 @@ func costsReview5DrillToStrandedByIDPlaceholder(t *testing.T, profile string) (t
 	return m, cmd
 }
 
-// ===========================================================================
-// S3a — an error Flash whose TEXT happens to mention the pending instance
-// ID must NOT pop the placeholder — the inverse of the old behavior. This is
-// deliberately the HARDEST case for a lingering text-sniff fallback (unlike
-// an unrelated flash with no mention of the ID at all): only an exact typed
-// messages.ByIDFetchFailed match may pop it, never a string coincidence.
-// The placeholder's own fetch (cmd) must itself resolve as
-// messages.ByIDFetchFailed directly — not a messages.Flash a separate case
-// then has to sniff for the ID — proving there is exactly ONE mechanism.
-// ===========================================================================
+// An error Flash whose text mentions the pending instance ID must not pop the
+// placeholder; the placeholder's own fetch resolves as
+// messages.ByIDFetchFailed directly.
 
 func TestCostsReview5_S3a_ErrorFlashMentioningPendingID_MustNotPop(t *testing.T) {
 	m, cmd := costsReview5DrillToStrandedByIDPlaceholder(t, "testprofile-s3a")
@@ -136,9 +123,6 @@ func TestCostsReview5_S3a_ErrorFlashMentioningPendingID_MustNotPop(t *testing.T)
 		t.Errorf("a messages.Flash whose TEXT merely MENTIONS the pending instance ID (%s) popped the stranded placeholder anyway — only an exact typed messages.ByIDFetchFailed{TargetType,ID} match may pop it, never a string-sniff fallback on an ordinary Flash\n%s", costsReview5BogusInstanceID, plain)
 	}
 
-	// The placeholder's own fetch must resolve as messages.ByIDFetchFailed
-	// DIRECTLY — the ONE mechanism, not a messages.Flash a separate case
-	// then sniffs for the ID.
 	msg := cmd()
 	failed, ok := msg.(messages.ByIDFetchFailed)
 	if !ok {
@@ -153,11 +137,8 @@ func TestCostsReview5_S3a_ErrorFlashMentioningPendingID_MustNotPop(t *testing.T)
 	}
 }
 
-// ===========================================================================
-// S3b — the by-ID fetch failure's Reason text (the user-facing note) must
-// still reach the user once the typed outcome pops the placeholder — the
-// typed match is not just a silent pop, the failure reason is not lost.
-// ===========================================================================
+// The by-ID failure's Reason text reaches the user once the typed outcome pops
+// the placeholder.
 
 func TestCostsReview5_S3b_TypedByIDFetchFailed_PopsAndSurfacesReason(t *testing.T) {
 	m, cmd := costsReview5DrillToStrandedByIDPlaceholder(t, "testprofile-s3b")
@@ -178,12 +159,8 @@ func TestCostsReview5_S3b_TypedByIDFetchFailed_PopsAndSurfacesReason(t *testing.
 	}
 }
 
-// ===========================================================================
-// S3c — messages.ByIDFetchFailed for a DIFFERENT target than the one
-// currently pending must NOT pop the placeholder — the exact guarantee a
-// text/flag-only heuristic can never make, since it never looks at which
-// fetch actually failed.
-// ===========================================================================
+// messages.ByIDFetchFailed for a target other than the pending one must not
+// pop the placeholder.
 
 func TestCostsReview5_S3c_TypedByIDFetchFailed_MismatchedTarget_DoesNotPop(t *testing.T) {
 	m, _ := costsReview5DrillToStrandedByIDPlaceholder(t, "testprofile-s3c")

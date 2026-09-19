@@ -1,42 +1,3 @@
-// list_loadmore_ports_test.go — live-seam port pins for the ActionLoadMore
-// no-op/debounce/error-recovery mechanism and the
-// sort/cursor stability of a plain (non-checker) load-more append, ported
-// from the doomed legacy qa_pagination_stories_test.go funcs onto the LIVE
-// Controller seam (core/app/actions_list.go handleActionLoadMore,
-// core/app/list_state.go ClearListLoading, core/app/list_body.go
-// buildListBody's per-render sort/select-clamp) so those legacy funcs can be
-// deleted without losing coverage:
-//
-//   - TestStoryH1_DemoMode_PaginationForLargeTypes / _ChildViews_Pagination
-//     (M-key no-op when not truncated, produces a cmd when truncated) and
-//     TestStoryI1_EmptyLoadMore_MBecomesNoop / TestStoryI2_RapidMPresses_Debounced:
-//     core/app/headless_regression_test.go's TestActionLoadMore_* funcs
-//     only cover the "truncated -> produces a KindFetchMore task" branch
-//     (payload shape). Nothing exercises the "!HasPagination -> nil tasks"
-//     or "already LoadingMore -> nil tasks (debounce)" guard branches.
-//   - TestStoryI4_LoadMoreAfterSort_PreservesSortOrder: core/app/list_test.go's
-//     TestListSort_* never combines an active sort with an append; the only
-//     append+sort coverage anywhere (list_ports_test.go's
-//     RelatedCheckerCarry_PreservesSortAfterMerge) drives the reapplyCheckerAgainst
-//     merge path, not a plain non-checker ActionLoadMore append.
-//   - TestStoryI5_LoadMoreAtBottom_CursorStays: nothing pins that ls.SelectedRow
-//     is left untouched by an append (buildListBody clamps it but does not
-//     reset it) when the cursor sits at the pre-append last row.
-//   - TestStoryE4_ErrorDuringLoadMore_PreservesData / _AllResourceTypes: these
-//     drove the DEAD views.ResourceListModel.ClearLoading() (zero production
-//     callers). The live equivalent is Controller.ClearListLoading(), and
-//     nothing pins that it preserves rows/pagination and clears LoadingMore
-//     so a retry ActionLoadMore produces a task again.
-//   - TestStory_LoadMoreIndicator_* (5 funcs) and qa_pagination_hint_test.go:
-//     these all drove the DEAD views.ResourceListModel.View()/Update() legacy
-//     harness. The hint text ("m: load more" / filter-aware variant /
-//     "loading...") is real production behavior — internal/tui/views/
-//     resourcelist.go's RenderList (LIVE, called from internal/tui/renderer.go's
-//     renderList) reads it straight off body.Truncated/body.Filter/
-//     body.LoadingMore — but nothing anywhere drives RenderList itself (the
-//     live rendering entry point) with a truncated/loading/filtered ListBody
-//     and asserts on the hint text. Ported directly against RenderList via
-//     views.NewTransientResourceList, mirroring renderer.go's own call shape.
 package unit_test
 
 import (
@@ -53,8 +14,7 @@ import (
 
 // wave3LoadMoreResources returns n synthetic EC2 resources named so that
 // reverse-alpha insertion order (highest suffix first) differs from both
-// insertion order and ascending-name sort order — the same shape the ported
-// legacy I.4/I.5 stories used.
+// insertion order and ascending-name sort order.
 func wave3LoadMoreResources(n int, idOffset int) []resource.Resource {
 	out := make([]resource.Resource, n)
 	for i := range n {
@@ -67,10 +27,6 @@ func wave3LoadMoreResources(n int, idOffset int) []resource.Resource {
 	}
 	return out
 }
-
-// ===========================================================================
-// ActionLoadMore no-op / debounce guard branches
-// ===========================================================================
 
 func TestActionLoadMore_NotTruncated_Noop(t *testing.T) {
 	c := openListController(t, "ec2")
@@ -93,8 +49,7 @@ func TestActionLoadMore_AlreadyLoading_Debounced(t *testing.T) {
 		t.Fatal("precondition: first ActionLoadMore on a truncated list must produce a task")
 	}
 
-	// Rapid repeats before the fetch result lands: ls.LoadingMore is now true,
-	// so every subsequent press must be inert.
+	// ls.LoadingMore stays set until the fetch result lands, so repeat presses are inert.
 	for i := range 5 {
 		_, tasks := c.Apply(app.Action{Kind: app.ActionLoadMore})
 		if len(tasks) != 0 {
@@ -102,11 +57,6 @@ func TestActionLoadMore_AlreadyLoading_Debounced(t *testing.T) {
 		}
 	}
 }
-
-// ===========================================================================
-// Error during load-more: Controller.ClearListLoading() preserves data and
-// re-arms ActionLoadMore.
-// ===========================================================================
 
 func TestActionLoadMore_ErrorClearsLoading_PreservesRowsAndAllowsRetry(t *testing.T) {
 	c := openListController(t, "ec2")
@@ -118,9 +68,7 @@ func TestActionLoadMore_ErrorClearsLoading_PreservesRowsAndAllowsRetry(t *testin
 		t.Fatal("precondition: ActionLoadMore must produce a task before the simulated error")
 	}
 
-	// Simulate the app-level error handler: a load-more fetch failed. loadMore=true
-	// selects the load-more request's own flag (LoadingMore) — this scenario never
-	// started a concurrent refresh, so there is nothing else to preserve here.
+	// loadMore=true clears only the load-more request's own flag, LoadingMore.
 	c.ClearListLoading(true)
 
 	lb := c.Snapshot().Body.List
@@ -142,14 +90,9 @@ func TestActionLoadMore_ErrorClearsLoading_PreservesRowsAndAllowsRetry(t *testin
 	}
 }
 
-// ===========================================================================
-// Sort and cursor stability across a plain (non-checker) load-more append.
-// ===========================================================================
-
 func TestListSort_PreservedAfterLoadMoreAppend(t *testing.T) {
 	c := openListController(t, "ec2")
 
-	// Page 1: 200 items named in reverse-alpha order.
 	c.ApplyResourcesLoaded("ec2", wave3LoadMoreResources(200, 0), &resource.PaginationMeta{
 		IsTruncated: true, NextToken: "tok-p2",
 	}, false)
@@ -197,7 +140,6 @@ func TestListCursor_StableAfterLoadMoreAppend(t *testing.T) {
 	seed := wave3LoadMoreResources(200, 0)
 	c.ApplyResourcesLoaded("ec2", seed, &resource.PaginationMeta{IsTruncated: true, NextToken: "tok-p2"}, false)
 
-	// No sort active: move the cursor to the last row.
 	c.Apply(app.Action{Kind: app.ActionMoveBottom})
 	if got := c.GetListSelectedRow(); got != 199 {
 		t.Fatalf("precondition: SelectedRow should be 199, got %d", got)
@@ -229,8 +171,6 @@ func TestListCursor_StableAfterLoadMoreAppend(t *testing.T) {
 		t.Errorf("cursor moved to a different resource after append: got %q, want %q (unchanged)", postAppend.ID, preAppend.ID)
 	}
 
-	// The newly appended rows must be reachable by moving down from the
-	// preserved cursor position.
 	c.Apply(app.Action{Kind: app.ActionMoveDown})
 	next, ok := c.ListSelected()
 	if !ok || next.ID != "i-00200" {
@@ -241,13 +181,6 @@ func TestListCursor_StableAfterLoadMoreAppend(t *testing.T) {
 		t.Errorf("after moving down from the preserved cursor, expected the first appended row %q, got %q", "i-00200", gotID)
 	}
 }
-
-// ===========================================================================
-// RenderList "load more" hint text — driven through the LIVE render seam
-// (views.NewTransientResourceList + RenderList, mirroring internal/tui/
-// renderer.go's renderList free function) rather than the dead View()/
-// Update() legacy harness.
-// ===========================================================================
 
 // wave3RenderListBody renders the top list screen exactly as production's
 // renderList() free function does: a zero-lifetime ResourceListModel built
@@ -335,11 +268,6 @@ func TestRenderList_LoadMoreHint_HiddenAfterAllPagesLoaded(t *testing.T) {
 	}
 }
 
-// ===========================================================================
-// ResourcesLoaded-provenance fixes (branch fix/resourcesloaded-provenance,
-// wave C): clearFetchInFlight choke point + hadErr-gated LastFetchError clear.
-// ===========================================================================
-
 // errLoadMoreAPIFailed is a fixed sentinel used to simulate a failed
 // KindFetchMore/KindFetchResources execution delivered as a real
 // messages.APIError, mirroring errTUIFetchFailed in
@@ -348,16 +276,9 @@ type errLoadMoreAPIFailed struct{}
 
 func (errLoadMoreAPIFailed) Error() string { return "load-more ports pin: simulated fetch failure" }
 
-// TestActionLoadMore_APIError_ClearsLoadingMoreAndRefreshing_HeadlessLane is a
-// BUG CATCH. Before core/app/list_state.go's clearFetchInFlight choke point,
-// the headless/web ClearActiveListLoadingIntent case (core/app/intents.go)
-// only cleared ls.Loading (and ls.Refreshing conditionally on v.Err != "") —
-// it never touched ls.LoadingMore. A failed load-more on the headless/web
-// lane left the "── loading... ──" indicator stuck forever with no user
-// recovery: handleActionLoadMore's own debounce guard (core/app/actions_list.go)
-// is `if ls.LoadingMore { return nil, nil }`, so every subsequent 'm' press
-// after the failure was silently swallowed. This is the highest-value pin in
-// this file — a permanently stuck UI state, not a transient glitch.
+// A failed load-more on the headless/web lane clears LoadingMore; otherwise
+// handleActionLoadMore's debounce guard swallows every later 'm' press and the
+// loading indicator never clears.
 func TestActionLoadMore_APIError_ClearsLoadingMoreAndRefreshing_HeadlessLane(t *testing.T) {
 	c := openListController(t, "ec2")
 	c.ApplyResourcesLoaded("ec2", wave3LoadMoreResources(50, 0), &resource.PaginationMeta{
@@ -373,19 +294,10 @@ func TestActionLoadMore_APIError_ClearsLoadingMoreAndRefreshing_HeadlessLane(t *
 		t.Fatal("precondition: LoadingMore must be true after ActionLoadMore dispatched a fetch")
 	}
 
-	// Simulate the headless/web task-result lane: the in-flight load-more
-	// fetch failed, delivered as a real messages.APIError through
-	// Controller.Handle — the same event HandleAPIError/
-	// ClearActiveListLoadingIntent produce for any failed
-	// KindFetchResources/KindFetchMore execution (core/runtime/handlers.go).
-	// Append/LoadingMore mirror executor.go's own KindFetchMore-failure
-	// construction — this failure is the outcome of the load-more
-	// continuation dispatched above, so only LoadingMore may clear.
-	// LoadingMore is the field the clear reads: the request records which
-	// flag it raised instead of the handler inferring it from Append, which
-	// answers how the rows would have merged. Do not drop it back to
-	// Append-only — that is the shape the drill-opens-on-a-continuation
-	// defect lived in.
+	// The failure arrives as a messages.APIError through Controller.Handle,
+	// shaped as executor.go builds a KindFetchMore failure. LoadingMore records
+	// which flag the request raised; the clear reads it rather than inferring it
+	// from Append, which says how rows would merge.
 	vs, _ := c.Handle(messages.APIError{ResourceType: "ec2", Err: errLoadMoreAPIFailed{}, Append: true, LoadingMore: true})
 
 	got := vs.Body.List
@@ -402,27 +314,15 @@ func TestActionLoadMore_APIError_ClearsLoadingMoreAndRefreshing_HeadlessLane(t *
 		t.Error("Refreshing = true after APIError landed, want false")
 	}
 
-	// Confirm the stuck state is actually gone: a retry must produce a task.
 	_, retry := c.Apply(app.Action{Kind: app.ActionLoadMore})
 	if len(retry) == 0 {
 		t.Error("after the failure clears LoadingMore, ActionLoadMore must produce a task again (retry) — a stranded LoadingMore=true would debounce this forever")
 	}
 }
 
-// TestApplyResourcesLoaded_PartialSuccessErr_InstallsCurrentFetchError pins
-// the CURRENT contract: per cache contract C4 ("a fetch failure ... swaps
-// the marker for an error marker" — docs/design/cache-requirements.md), each
-// landed fetch's outcome — success or partial-success — installs ITS OWN
-// marker text, never leaving a stale marker from an unrelated earlier
-// attempt in place. applyResourcesLoaded's hadErr bool became a fetchErr
-// error for exactly this reason: a bare bool could only say "an error
-// happened", not carry which one, so the prior implementation could only
-// ever leave whatever marker was already there. This test previously
-// asserted the opposite — that an existing marker survives a new
-// partial-success error unchanged — which would let a retry's genuinely new
-// failure hide silently behind stale, possibly unrelated error text forever.
-// Pins both halves: the new rows still land, AND the marker reflects the
-// failure that just happened.
+// Each landed fetch installs its own error marker text, replacing a marker
+// from an earlier attempt (docs/design/cache-requirements.md: a fetch failure
+// swaps the marker for an error marker), and its rows still land.
 func TestApplyResourcesLoaded_PartialSuccessErr_InstallsCurrentFetchError(t *testing.T) {
 	c := openListController(t, "ec2")
 	c.ApplyResourcesLoaded("ec2", wave3LoadMoreResources(2, 0), &resource.PaginationMeta{
@@ -456,17 +356,8 @@ func TestApplyResourcesLoaded_PartialSuccessErr_InstallsCurrentFetchError(t *tes
 	}
 }
 
-// TestClearListLoading_AlsoClearsRefreshing_ContractLock is a CONTRACT LOCK,
-// not a live-bug catch. ClearListLoading's only production caller
-// (internal/tui/runtime_adapter.go's ClearActiveListLoadingIntent case)
-// always follows this call with SetListFetchError(v.Err), and the intent's
-// one construction site (core/runtime/handlers.go's HandleAPIError) never
-// leaves text empty — so SetListFetchError already forces Refreshing=false on
-// that lane today regardless of what ClearListLoading itself does. This pin
-// exists so a FUTURE caller that invokes ClearListLoading without a following
-// SetListFetchError (e.g. a bare "stop everything, nothing to report" clear)
-// cannot reintroduce a stranded Refreshing marker — not because the
-// divergence is live now.
+// ClearListLoading clears Refreshing itself, whether or not a
+// SetListFetchError call follows it.
 func TestClearListLoading_AlsoClearsRefreshing_ContractLock(t *testing.T) {
 	c := openListController(t, "ec2")
 	c.ApplyResourcesLoaded("ec2", wave3LoadMoreResources(3, 0), &resource.PaginationMeta{
@@ -479,10 +370,8 @@ func TestClearListLoading_AlsoClearsRefreshing_ContractLock(t *testing.T) {
 		t.Fatal("precondition: Refreshing must be true before ClearListLoading")
 	}
 
-	// loadMore=false: this scenario never started a load-more (only
-	// SetListRefreshing(true) above), so the completing request is a plain
-	// (non-load-more) fetch — false selects the Loading+Refreshing pair,
-	// which is what a real refresh-failure completion would pass.
+	// loadMore=false: the completing request is a plain refresh fetch, which
+	// clears Loading and Refreshing.
 	c.ClearListLoading(false)
 
 	lb := c.Snapshot().Body.List
@@ -494,19 +383,10 @@ func TestClearListLoading_AlsoClearsRefreshing_ContractLock(t *testing.T) {
 	}
 }
 
-// TestClearListLoading_LoadMoreFailure_LeavesRefreshingSet is a BUG CATCH for
-// the exact regression this branch's clearFetchInFlight choke point fixes:
-// before the loadMore parameter existed, ANY completion (load-more or
-// refresh) cleared all three flags unconditionally, so a failed load-more
-// silently cleared an in-flight Ctrl+R refresh that had not itself completed
-// — stopping its "refreshing..." indicator and, worse, letting a second
-// refresh be dispatched while the first was still genuinely in flight
-// (ActionRefresh has no debounce guard of its own the way ActionLoadMore
-// does). Drives both actions through the real Apply seam (mirrors
-// TestListState_LoadingMoreAndRefreshing_CoexistAndRenderIndependently
-// below) so LoadingMore and Refreshing are both genuinely true before the
-// simulated load-more failure, then asserts ClearListLoading(true) clears
-// only the flag belonging to the request that actually completed.
+// A failed load-more clears only LoadingMore. An in-flight Ctrl+R refresh
+// keeps Refreshing: ActionRefresh has no debounce guard of its own, so
+// clearing it would let a second refresh dispatch while the first is still in
+// flight.
 func TestClearListLoading_LoadMoreFailure_LeavesRefreshingSet(t *testing.T) {
 	c := openListController(t, "ec2")
 	c.ApplyResourcesLoaded("ec2", wave3LoadMoreResources(5, 0), &resource.PaginationMeta{
@@ -526,9 +406,6 @@ func TestClearListLoading_LoadMoreFailure_LeavesRefreshingSet(t *testing.T) {
 		t.Fatal("precondition: both LoadingMore and Refreshing must be true before the simulated load-more failure")
 	}
 
-	// The in-flight load-more's own fetch failed — the completing request is
-	// the load-more, not the concurrent Ctrl+R refresh that is still
-	// genuinely outstanding.
 	c.ClearListLoading(true)
 
 	lb := c.Snapshot().Body.List
@@ -543,13 +420,9 @@ func TestClearListLoading_LoadMoreFailure_LeavesRefreshingSet(t *testing.T) {
 	}
 }
 
-// TestClearListLoading_RefreshFailure_LeavesLoadingMoreSet is the mirror-image
-// BUG CATCH: a failed Ctrl+R refresh must not clear a still-outstanding
-// load-more continuation. Before the loadMore parameter existed, this
-// direction was just as broken — a refresh failure would have cleared
-// LoadingMore, and handleActionLoadMore's `if ls.LoadingMore { return nil,
-// nil }` debounce guard would then let a second, duplicate continuation
-// request fire for the same page while the original was still in flight.
+// A failed Ctrl+R refresh leaves LoadingMore set; clearing it would let
+// handleActionLoadMore's debounce guard pass a duplicate continuation for the
+// same page.
 func TestClearListLoading_RefreshFailure_LeavesLoadingMoreSet(t *testing.T) {
 	c := openListController(t, "ec2")
 	c.ApplyResourcesLoaded("ec2", wave3LoadMoreResources(5, 0), &resource.PaginationMeta{
@@ -569,9 +442,6 @@ func TestClearListLoading_RefreshFailure_LeavesLoadingMoreSet(t *testing.T) {
 		t.Fatal("precondition: both LoadingMore and Refreshing must be true before the simulated refresh failure")
 	}
 
-	// The concurrent Ctrl+R refresh's own fetch failed — the completing
-	// request is the refresh, not the still-outstanding load-more
-	// continuation.
 	c.ClearListLoading(false)
 
 	lb := c.Snapshot().Body.List
@@ -586,28 +456,9 @@ func TestClearListLoading_RefreshFailure_LeavesLoadingMoreSet(t *testing.T) {
 	}
 }
 
-// TestListState_LoadingMoreAndRefreshing_CoexistAndRenderIndependently is a
-// DESIGN-DECISION LOCK, not a bug catch. The collapse of Loading/LoadingMore/
-// Refreshing into a single enum was proposed and refused: LoadingMore and
-// Refreshing are legitimately simultaneous (Ctrl+R fired while an m-key
-// load-more is still in flight), and internal/tui/views/resourcelist.go
-// renders both indicator lines independently and deliberately — the
-// load-more hint block ("── loading... ──" / "m: load more", gated on
-// body.LoadingMore/body.Truncated) and the separate "── refreshing... ──"
-// line (gated on body.Refreshing) never interact. This pin exists so the
-// next person who looks at three booleans and reaches for an enum does not
-// silently drop one indicator.
-//
-// NOT RED-revertable against the current diff: there is no single line in
-// this branch's change to revert, since this invariant predates it and the
-// pin guards a hypothetical future refactor, not something wave C touched.
-// Verified instead by temporarily editing core/app/actions_list.go's
-// activeListRefreshTasks to add `ls.LoadingMore = false` right after
-// `ls.Refreshing = true` — simulating the exact clobber a naive single-enum
-// collapse would introduce — confirming this test failed (LoadingMore=false
-// where it must be true), then restoring the file byte-identically (verified
-// via `git diff`, exit 0). See the QA session notes for that run; the edit
-// was never left in the tree.
+// LoadingMore and Refreshing are legitimately simultaneous (Ctrl+R during an
+// in-flight load-more), and resourcelist.go renders their indicator lines
+// independently.
 func TestListState_LoadingMoreAndRefreshing_CoexistAndRenderIndependently(t *testing.T) {
 	c := openListController(t, "ec2")
 	c.ApplyResourcesLoaded("ec2", wave3LoadMoreResources(5, 0), &resource.PaginationMeta{

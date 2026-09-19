@@ -4,13 +4,9 @@ package unit
 
 // dbi_ca_cert_severity_test.go — a finding's severity belongs to its code.
 //
-// The CA-certificate row was one code emitted at two severities: warning
-// beyond 30 days, broken inside it. The catalog declares one severity per
-// code, so half the emissions contradicted the declaration — and the demo
-// fixtures never reach the inner window, so the standing severity gate had
-// nothing to compare. This drives a certificate through the real fetcher at
-// each side of the boundary and reads the severity back off the row and its
-// detail sentence.
+// The catalog declares one severity per code. The demo fixtures never reach
+// the inner 30-day window, so the standing severity gate cannot see either
+// side of this boundary.
 
 import (
 	"testing"

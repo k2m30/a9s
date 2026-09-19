@@ -1,14 +1,6 @@
 package unit
 
 // enrichment_codebuild_findings_test.go — Behavioral tests for EnrichCodeBuildStatus.
-//
-// Contract assertions (enricher-contract.md):
-//   - Returns EnricherResult.Findings keyed by project name (r.ID).
-//   - Severity "!" for all findings.
-//   - Summary format: "latest build failed (<YYYY-MM-DD>)" (humanized phrase, not raw enum).
-//   - Truncated = true when len(resources) > EnrichmentCap (50).
-//   - Empty resources slice → non-nil empty Findings map.
-//   - Successful builds (SUCCEEDED) must NOT appear in Findings.
 
 import (
 	"context"
@@ -106,7 +98,7 @@ func TestEnrichCodeBuildStatus_FailedBuildFindingKeyedByProjectName(t *testing.T
 
 // TestEnrichCodeBuildStatus_SummaryContainsDateAndStatus verifies the summary format
 // "latest build failed (<date>)" — the raw AWS enum ("FAILED") is routed through
-// domain.HumanizeStatusPhrase before reaching the Wave-2 summary (11933a6f).
+// domain.HumanizeStatusPhrase before reaching the Wave-2 summary.
 func TestEnrichCodeBuildStatus_SummaryContainsDateAndStatus(t *testing.T) {
 	endTime := time.Date(2026, 4, 14, 12, 0, 0, 0, time.UTC)
 	fake := &codeBuildEnrichFake{
@@ -216,7 +208,6 @@ func TestEnrichCodeBuildStatus_MultipleFailedProjects_AllKeyedInFindings(t *test
 // TestEnrichCodeBuildStatus_TruncatedWhenResourcesExceedCap verifies Truncated=true
 // when len(resources) > EnrichmentCap (50).
 func TestEnrichCodeBuildStatus_TruncatedWhenResourcesExceedCap(t *testing.T) {
-	// Build 51 resources to trigger truncation.
 	count := awsclient.EnrichmentCap + 1
 	resources := make([]resource.Resource, count)
 	projectBuilds := make(map[string]string, count)

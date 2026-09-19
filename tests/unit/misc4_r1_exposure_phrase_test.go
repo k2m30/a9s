@@ -1,13 +1,11 @@
 package unit
 
-// misc4_r1_exposure_phrase_test.go — misc4 row 1.
-//
 // A registered wording is read aloud by an operator, so a hedge like "port(s)"
 // outside a slot reaches the screen verbatim: the reader is told the tool does
 // not know whether there is one port or several, when the emitter knew. The
-// slot machinery already agrees number off the value ("<port(s) LIST>"), and
-// the wide-open case is a different sentence, not a list whose only member is
-// the word "all".
+// slot machinery agrees number off the value ("<port(s) LIST>"), and the
+// wide-open case is a different sentence, not a list whose only member is the
+// word "all".
 
 import (
 	"testing"

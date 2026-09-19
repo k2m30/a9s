@@ -13,10 +13,6 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// ---------------------------------------------------------------------------
-// Lambda fetcher tests
-// ---------------------------------------------------------------------------
-
 func TestFetchLambdaFunctions_ParsesMultipleFunctions(t *testing.T) {
 	mock := &mockLambdaListFunctionsClient{
 		output: &lambda.ListFunctionsOutput{
@@ -68,7 +64,6 @@ func TestFetchLambdaFunctions_ParsesMultipleFunctions(t *testing.T) {
 		t.Fatalf("expected 2 resources, got %d", len(resources))
 	}
 
-	// Verify required fields exist
 	requiredFields := []string{"function_name", "runtime", "memory", "timeout", "handler", "last_modified", "code_size"}
 	for i, r := range resources {
 		for _, key := range requiredFields {
@@ -78,7 +73,6 @@ func TestFetchLambdaFunctions_ParsesMultipleFunctions(t *testing.T) {
 		}
 	}
 
-	// Verify first function
 	r0 := resources[0]
 	if r0.ID != "my-go-function" {
 		t.Errorf("resource[0].ID: expected %q, got %q", "my-go-function", r0.ID)
@@ -86,8 +80,7 @@ func TestFetchLambdaFunctions_ParsesMultipleFunctions(t *testing.T) {
 	if r0.Name != "my-go-function" {
 		t.Errorf("resource[0].Name: expected %q, got %q", "my-go-function", r0.Name)
 	}
-	// Post-fold contract: fetcher stops writing Status (runtime is in Fields["runtime"], not Status).
-	// go1.x is a deprecated Lambda runtime, so the structural classifier now emits a
+	// go1.x is a deprecated Lambda runtime, so the structural classifier emits a
 	// wave1 Finding for it (see core/aws/lambda.go isDeprecatedLambdaRuntime).
 	if len(r0.Findings) != 1 {
 		t.Errorf("resource[0].Findings: expected 1 (deprecated go1.x runtime) for Active function, got %d", len(r0.Findings))
@@ -114,7 +107,6 @@ func TestFetchLambdaFunctions_ParsesMultipleFunctions(t *testing.T) {
 		t.Errorf("resource[0].Fields[\"code_size\"]: expected %q, got %q", "5 MB", r0.Fields["code_size"])
 	}
 
-	// Verify second function
 	r1 := resources[1]
 	if r1.ID != "my-python-function" {
 		t.Errorf("resource[1].ID: expected %q, got %q", "my-python-function", r1.ID)
@@ -161,10 +153,6 @@ func TestFetchLambdaFunctions_EmptyResponse(t *testing.T) {
 		t.Errorf("expected 0 resources, got %d", len(resources))
 	}
 }
-
-// ---------------------------------------------------------------------------
-// Lambda parent fetcher: new Fields required for child views
-// ---------------------------------------------------------------------------
 
 // TestLambdaFetcherPopulatesLogGroup verifies that the Lambda fetcher
 // populates the "log_group" field. When LoggingConfig.LogGroup is set, use

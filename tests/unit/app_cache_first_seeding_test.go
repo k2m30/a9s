@@ -1,26 +1,12 @@
-// app_cache_first_seeding_test.go — cache-first seeding (in-session seeding)
-// and the menu-refreshing signal.
-//
 // Cache-first seeding: when a list screen opens and the session already
 // holds rows for that type (RowStore — first-page rows retained by
-// availability probes), the list must render those rows IMMEDIATELY:
+// availability probes), the list renders those rows immediately:
 // ListBody.Loading=false, rows visible, and ListBody.Refreshing=true while
 // the fresh fetch runs. On ResourcesLoaded the rows swap in place and
 // Refreshing=false. When no rows are known: Loading=true, no Refreshing.
 //
-// Menu-refreshing: MenuBody gains Refreshing=true while a background
-// availability sweep is running after a cache-seeded startup. It flips false
-// when the sweep completes.
-//
-// Seeding source: core.Session().RowStore.Observe(type, rows, ...,
-// session.OriginProbe, false). List-open trigger: app.Action{Kind:
-// app.ActionCommand, Arg: shortName}, driving applyNavResult's
-// NavigateKindPushResourceList branch. The fresh fetch is the
-// ResourcesLoaded task-result lane (Handle), which swaps ls.Rows and clears
-// ls.Loading/LoadingMore; Refreshing joins that same clear-on-load contract.
-// Two resource types are pinned: "ec2" (Path-based columns) and "s3"
-// (Key-based columns) go through the identical seeding path with no
-// per-type special-casing.
+// MenuBody.Refreshing is true while a background availability sweep runs
+// after a cache-seeded startup, and false once the sweep completes.
 package unit_test
 
 import (
@@ -35,18 +21,10 @@ import (
 	"github.com/k2m30/a9s/v3/core/session"
 )
 
-// newSeededTestController builds a Controller + its backing Core, exactly
-// like newTestControllerWithCore in app_controller_pr_b_test.go (same
-// package, precedented helper) — duplicated here as a small variant so this
-// file has no cross-file coupling to another test file's helper lifetime.
-//
 // A9S_CONFIG_FOLDER is redirected to t.TempDir() so the disk-store fallback
-// HandleNavigate now consults reads/writes an isolated per-test
-// directory instead of the developer's real ~/.a9s/cache — a leftover
-// ec2.yaml from a prior manual run (or another test package sharing the same
-// "demo"/"us-east-1" pair) would otherwise leak rows into
-// TestListOpen_NoProbeResources_KeepsTodaysLoadingBehavior's "nothing seeded"
-// precondition.
+// HandleNavigate consults reads an isolated directory instead of
+// ~/.a9s/cache, where a leftover ec2.yaml would leak rows into a "nothing
+// seeded" precondition.
 func newSeededTestController(t *testing.T) (*runtime.Core, *app.Controller) {
 	t.Helper()
 	t.Setenv("A9S_CONFIG_FOLDER", t.TempDir())
@@ -59,13 +37,6 @@ func newSeededTestController(t *testing.T) (*runtime.Core, *app.Controller) {
 	return core, c
 }
 
-// -----------------------------------------------------------------------
-// Cache-first seeding — in-session seeding from ProbeResources
-// -----------------------------------------------------------------------
-
-// TestListOpen_SeedsFromProbeResources_EC2 pins cache-first seeding for "ec2": when
-// the session already holds ProbeResources for ec2, opening the ec2 list
-// must render those rows immediately with Loading=false and Refreshing=true.
 func TestListOpen_SeedsFromProbeResources_EC2(t *testing.T) {
 	core, c := newSeededTestController(t)
 
@@ -102,10 +73,8 @@ func TestListOpen_SeedsFromProbeResources_EC2(t *testing.T) {
 	}
 }
 
-// TestListOpen_SeedsFromProbeResources_S3 pins cache-first seeding for a second,
-// differently-shaped resource type (s3, Key-based columns vs ec2's
-// Path-based columns) to guard against a seeding path that only works for
-// one column-resolution style.
+// s3 resolves Key-based columns and ec2 Path-based ones; seeding works for
+// both column-resolution styles.
 func TestListOpen_SeedsFromProbeResources_S3(t *testing.T) {
 	core, c := newSeededTestController(t)
 
@@ -132,24 +101,8 @@ func TestListOpen_SeedsFromProbeResources_S3(t *testing.T) {
 	}
 }
 
-// TestListOpen_NoProbeResourcesNoDiskStore_KeepsTodaysLoadingBehavior
-// verifies the "genuinely nothing known" branch is unchanged: Loading=true,
-// Refreshing not set, no rows. This is the regression guard that stops
-// cache-first seeding from firing unconditionally.
-//
-// Renamed from TestListOpen_NoProbeResources_KeepsTodaysLoadingBehavior
-// once HandleNavigate grew a disk-store fallback for warm
-// list-opens, "no ProbeResources" alone no longer implies Loading=true — a
-// populated on-disk per-type cache for this pair now seeds the list too (see
-// TestListOpen_NoProbeResourcesButDiskStoreHasRows_SeedsFromDiskStore below).
-// This test's actual precondition is narrower than its old name claimed: NO
-// ProbeResources AND NO on-disk cache for the pair (newSeededTestController's
-// t.TempDir()-isolated A9S_CONFIG_FOLDER guarantees the disk side is empty
-// here) — the true "nothing anywhere" cold-start case.
 func TestListOpen_NoProbeResourcesNoDiskStore_KeepsTodaysLoadingBehavior(t *testing.T) {
 	_, c := newSeededTestController(t)
-	// No RowStore rows seeded, and newSeededTestController's isolated
-	// A9S_CONFIG_FOLDER guarantees no on-disk per-type cache exists either.
 
 	_, _ = c.Apply(app.Action{Kind: app.ActionCommand, Arg: "ec2"})
 	snap := c.Snapshot()
@@ -169,21 +122,8 @@ func TestListOpen_NoProbeResourcesNoDiskStore_KeepsTodaysLoadingBehavior(t *test
 	}
 }
 
-// TestListOpen_NoProbeResourcesButDiskStoreHasRows_SeedsFromDiskStore pins
-// the post-sweep disk-store fallback contract at the Controller/list-open layer
-// (a layer above the runtime.HandleNavigate-level and TUI-Update-level pins
-// in tests/unit/tui_post_sweep_seed_test.go): when RowStore holds nothing for
-// the type but the on-disk per-type cache for the current profile/region pair
-// does, opening the list must still seed
-// Loading=false/Refreshing=true/rows-populated from that disk data — exactly
-// as if RowStore had held it via a probe/disk seed. This is the behavior that
-// makes the renamed guard above's narrower precondition ("no RowStore rows"
-// is no longer sufficient by itself) correct.
 func TestListOpen_NoProbeResourcesButDiskStoreHasRows_SeedsFromDiskStore(t *testing.T) {
 	core, c := newSeededTestController(t)
-	// No RowStore rows seeded — this isolates the disk-store fallback from
-	// the RowStore seeding source pinned in
-	// TestListOpen_SeedsFromProbeResources_EC2.
 
 	store := core.EnsureCacheStore()
 	if store == nil {
@@ -219,12 +159,6 @@ func TestListOpen_NoProbeResourcesButDiskStoreHasRows_SeedsFromDiskStore(t *test
 	}
 }
 
-// TestListOpen_SeedsFromResourceCache_PreviousVisit pins the second half of
-// the cache-first seeding contract's second seeding source: "or a previous visit's ResourceCache" — not
-// just the availability-probe ProbeResources map. Simulates a user who
-// already opened the ec2 list once this session (populating session
-// ResourceCache), popped back to the menu, then re-opens the list — the
-// second open must seed instantly.
 func TestListOpen_SeedsFromResourceCache_PreviousVisit(t *testing.T) {
 	core, c := newSeededTestController(t)
 
@@ -251,9 +185,6 @@ func TestListOpen_SeedsFromResourceCache_PreviousVisit(t *testing.T) {
 	}
 }
 
-// TestListOpen_ResourcesLoaded_ClearsRefreshingAndSwapsRows pins the
-// "on ResourcesLoaded the rows swap in place and Refreshing=false" half of
-// the cache-first seeding contract.
 func TestListOpen_ResourcesLoaded_ClearsRefreshingAndSwapsRows(t *testing.T) {
 	core, c := newSeededTestController(t)
 
@@ -299,22 +230,8 @@ func TestListOpen_ResourcesLoaded_ClearsRefreshingAndSwapsRows(t *testing.T) {
 	}
 }
 
-// -----------------------------------------------------------------------
-// Menu-refreshing signal during background availability sweep
-// -----------------------------------------------------------------------
-
-// TestMenu_Refreshing_TrueDuringBackgroundSweep_FalseOnComplete pins the
-// menu-refreshing signal: MenuBody.Refreshing=true while a background availability sweep runs
-// after a cache-seeded startup, flipping false when the sweep completes.
-//
-// Ambiguity resolution: "sweep running" is modeled the same way the rest of
-// the availability pipeline models "in flight" state — via a per-type
-// AvailChecked/AvailTotal progress counter already present on MenuState
-// (see menuProgressIndicator in menu.go). This test pins the OUTCOME
-// (MenuBody.Refreshing) rather than a specific internal counter name.
-//
-// "During" is reached through the sweep-start progress intent: the counters
-// are Refreshing's only source, and a bare RowStore seed is not a sweep.
+// The sweep-start progress intent is Refreshing's only source; a bare
+// RowStore seed is not a sweep.
 func TestMenu_Refreshing_TrueDuringBackgroundSweep_FalseOnComplete(t *testing.T) {
 	core, c := newSeededTestController(t)
 
@@ -345,11 +262,8 @@ func TestMenu_Refreshing_TrueDuringBackgroundSweep_FalseOnComplete(t *testing.T)
 		t.Error("MenuBody.Refreshing = false, want true — a background availability sweep is in flight after cache-seeded startup")
 	}
 
-	// Sweep completes: every registered type has been probed.
-	// Gen is the live availability generation: cachegen row 10 acknowledges
-	// the sweep only for a result of the CURRENT generation, so a
-	// hand-built zero-gen message no longer stands in for a real probe
-	// result (HandleEvent already discarded it everywhere else).
+	// Gen is the live availability generation: the sweep is acknowledged only
+	// for a result of the current generation.
 	vs, _ := c.Handle(messages.AvailabilityChecked{
 		ResourceType: "ec2",
 		HasResources: true,
@@ -360,19 +274,11 @@ func TestMenu_Refreshing_TrueDuringBackgroundSweep_FalseOnComplete(t *testing.T)
 	if vs.Body.Menu == nil {
 		t.Fatal("Handle(AvailabilityChecked) returned nil Body.Menu")
 	}
-	// NOTE: full-sweep completion in production spans every registered
-	// resource type; this single-type Handle call pins the transition
-	// direction (false once this type's probe result lands and no other
-	// probe is outstanding), matching the "no other RowStore sweep signal
-	// remains" outcome for a controller seeded with only one type.
 	if vs.Body.Menu.Refreshing {
 		t.Error("MenuBody.Refreshing = true, want false — sweep must clear Refreshing once its results land")
 	}
 }
 
-// TestMenu_Refreshing_FalseWithNoSweepInFlight guards against Refreshing
-// firing unconditionally on every menu snapshot (the "no probe ever
-// started" baseline).
 func TestMenu_Refreshing_FalseWithNoSweepInFlight(t *testing.T) {
 	_, c := newSeededTestController(t)
 
@@ -385,11 +291,6 @@ func TestMenu_Refreshing_FalseWithNoSweepInFlight(t *testing.T) {
 	}
 }
 
-// TestListOpen_Refreshing_AllResourceTypes_Generic verifies the seeding
-// contract has no per-type special-casing by driving it against every
-// registered resource type with RowStore rows seeded. This is the
-// "generic-ness pin" required by the epic across ALL 66 types, not just
-// the two spot-checked above.
 func TestListOpen_Refreshing_AllResourceTypes_Generic(t *testing.T) {
 	for _, td := range resource.AllResourceTypes() {
 		shortName := td.ShortName
@@ -422,7 +323,4 @@ func TestListOpen_Refreshing_AllResourceTypes_Generic(t *testing.T) {
 	}
 }
 
-// domain import guard: keep the domain.Gen usage explicit for the Gen field
-// on messages so a future refactor of ResourcesLoaded.Gen's type is caught
-// at compile time rather than silently accepting an int.
 var _ domain.Gen = domain.Gen(0)

@@ -78,7 +78,6 @@ func TestRetryOnThrottle_MaxRetriesExceeded(t *testing.T) {
 	if calls != 3 {
 		t.Errorf("expected 3 calls, got %d", calls)
 	}
-	// Error message should mention max retries
 	if !errors.Is(err, throttleErr) {
 		t.Errorf("expected error to wrap throttle error, got %v", err)
 	}

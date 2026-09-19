@@ -15,10 +15,6 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// ---------------------------------------------------------------------------
-// ACM - Test FetchACMCertificates response parsing
-// ---------------------------------------------------------------------------
-
 func TestFetchACMCertificates_ParsesMultipleCertificates(t *testing.T) {
 	notAfter := time.Date(2026, 6, 15, 0, 0, 0, 0, time.UTC)
 	notBefore := time.Date(2025, 6, 15, 0, 0, 0, 0, time.UTC)
@@ -63,7 +59,6 @@ func TestFetchACMCertificates_ParsesMultipleCertificates(t *testing.T) {
 		t.Fatalf("expected 2 resources, got %d", len(resources))
 	}
 
-	// Verify required fields exist
 	requiredFields := []string{"domain_name", "status", "type", "not_after", "in_use"}
 	for i, r := range resources {
 		for _, key := range requiredFields {
@@ -82,12 +77,8 @@ func TestFetchACMCertificates_ParsesMultipleCertificates(t *testing.T) {
 	if r0.Name != "api.example.com" {
 		t.Errorf("resource[0].Name: expected %q, got %q", "api.example.com", r0.Name)
 	}
-	// status/type are rendered raw in the acm list's cells — both must go
-	// through the shared humanize seam (domain.HumanizeStatusPhrase) into a
-	// lowercase phrase, matching how the status field is already humanized
-	// elsewhere; the humanize doctrine forbids a raw UPPER_SNAKE enum in any
-	// rendered cell (live smoke caught "AMAZON_ISSUED" leaking through the
-	// unhumanized type field).
+	// status/type are rendered in the acm list's cells, so both go through
+	// domain.HumanizeStatusPhrase: no rendered cell shows a raw UPPER_SNAKE enum.
 	if r0.Fields["status"] != "issued" {
 		t.Errorf("resource[0].Status: expected %q, got %q", "issued", r0.Fields["status"])
 	}
@@ -106,13 +97,9 @@ func TestFetchACMCertificates_ParsesMultipleCertificates(t *testing.T) {
 	if r0.Fields["in_use"] != "true" {
 		t.Errorf("resource[0].Fields[\"in_use\"]: expected %q, got %q", "true", r0.Fields["in_use"])
 	}
-	// ISSUED certs carry their expiry signal as a wave1 Finding
-	// (docs/attention-signals.md `acm` Wave 1: "NotAfter - now() < 30d ->
-	// Warning, < 7d -> Broken" — read straight off ListCertificates, zero
-	// extra calls; acm has no Wave 2 IssueEnricher at all). This
-	// fixture's NotAfter (2026-06-15) is already in the past relative to
-	// "now", so it falls in the expired bucket: exactly 1 Finding,
-	// code "acm.expired", severity SevBroken.
+	// ISSUED certs carry their expiry signal as a wave1 Finding read straight off
+	// ListCertificates (docs/attention-signals.md, `acm`). This fixture's NotAfter
+	// (2026-06-15) is in the past, so it lands in the expired bucket.
 	if len(r0.Findings) != 1 {
 		t.Fatalf("resource[0].Findings: expected 1 (expires-critical) for an expired ISSUED cert, got %d: %v", len(r0.Findings), r0.Findings)
 	}
@@ -125,16 +112,10 @@ func TestFetchACMCertificates_ParsesMultipleCertificates(t *testing.T) {
 	if r0.Findings[0].Severity != domain.SevBroken {
 		t.Errorf("resource[0].Findings[0].Severity: expected %v, got %v", domain.SevBroken, r0.Findings[0].Severity)
 	}
-	// acmColor reads Fields["status"] directly for the ISSUED case (the only
-	// status with no Finding to short-circuit through colorFromAnyFinding) —
-	// humanizing the stamped field must not break that fallback. This
-	// fixture's notAfter (2026-06-15) is already in the past, so a correctly
-	// reconciled acmColor must still reach the ISSUED branch's "expired"
-	// sub-case (ColorBroken) — an unreconciled colorer that no longer
-	// matches the humanized "issued" value falls through to its unmatched-
-	// status default, which is ALSO ColorHealthy-shaped for other cases but
-	// diverges from ColorBroken here, so this assertion actually
-	// discriminates instead of accidentally passing either way.
+	// acmColor reads Fields["status"] directly for ISSUED, the only status with no
+	// Finding for colorFromAnyFinding to use, so it must match the humanized
+	// "issued". The fixture's NotAfter is past, so the ISSUED branch's expired case
+	// gives ColorBroken, which the unmatched-status default does not.
 	acmType := resource.FindResourceType("acm")
 	if acmType == nil {
 		t.Fatal("acm type not registered")
@@ -143,7 +124,6 @@ func TestFetchACMCertificates_ParsesMultipleCertificates(t *testing.T) {
 		t.Errorf("acm type.Color(resource[0]) = %v, want %v (issued, expired)", got, resource.ColorBroken)
 	}
 
-	// Verify second certificate
 	r1 := resources[1]
 	if r1.ID != "arn:aws:acm:us-east-1:123456789012:certificate/def67890-5678-5678-5678-fedcba654321" {
 		t.Errorf("resource[1].ID: expected the certificate ARN, got %q", r1.ID)
@@ -160,11 +140,9 @@ func TestFetchACMCertificates_ParsesMultipleCertificates(t *testing.T) {
 	if r1.Fields["in_use"] != "false" {
 		t.Errorf("resource[1].Fields[\"in_use\"]: expected %q, got %q", "false", r1.Fields["in_use"])
 	}
-	// acmStatusFindings (acm.go:151) switches on the certificate's RAW status
-	// before Fields["status"] is humanized for display — pin that PENDING_
-	// VALIDATION still emits its wave1 Finding (and hence its ColorWarning
-	// via colorFromAnyFinding) even though the rendered field is now "pending
-	// validation", not "PENDING_VALIDATION".
+	// acmStatusFindings switches on the certificate's raw status before
+	// Fields["status"] is humanized, so PENDING_VALIDATION still emits its wave1
+	// Finding (and ColorWarning via colorFromAnyFinding).
 	if len(r1.Findings) != 1 {
 		t.Fatalf("resource[1].Findings: expected 1 finding for PENDING_VALIDATION, got %d: %v", len(r1.Findings), r1.Findings)
 	}
@@ -179,9 +157,8 @@ func TestFetchACMCertificates_ParsesMultipleCertificates(t *testing.T) {
 // TestFetchACMCertificates_SameDomainDistinctARN_UniqueIDs pins that two
 // certificates for the SAME domain (an expired cert and its active renewal)
 // get DISTINCT resource IDs — the certificate ARN, not the shared domain name.
-// A shared domain-name ID collides in the related-panel cache (keyed type:id):
-// the second cert's detail replays the first's related panel (confirmed live —
-// an unused expired cert showed the active cert's "Load Balancers (3)").
+// A shared domain-name ID collides in the related-panel cache (keyed type:id),
+// so the second cert's detail would replay the first's related panel.
 func TestFetchACMCertificates_SameDomainDistinctARN_UniqueIDs(t *testing.T) {
 	arnA := "arn:aws:acm:eu-central-1:123456789012:certificate/11111111-1111-1111-1111-111111111111"
 	arnB := "arn:aws:acm:eu-central-1:123456789012:certificate/22222222-2222-2222-2222-222222222222"
@@ -246,15 +223,6 @@ func TestFetchACMCertificates_EmptyResponse(t *testing.T) {
 		t.Errorf("expected 0 resources, got %d", len(resources))
 	}
 }
-
-// ---------------------------------------------------------------------------
-// ACM - Wave 1 expiry/orphan findings (docs/attention-signals.md `acm` row)
-//
-// These signals are read straight off ListCertificates' CertificateSummary
-// (NotAfter, InUse) — zero extra API calls, hence Wave 1, not Wave 2. Every
-// test in this section drives FetchACMCertificatesPage with
-// fakeACMListCertificates ONLY; none needs a DescribeCertificate fake.
-// ---------------------------------------------------------------------------
 
 // TestFetchACMCertificates_ExpiresWithin30Days_WarnFinding pins that an
 // ISSUED cert with NotAfter 29 days out gets a "acm.expires-soon" Finding at
@@ -398,8 +366,7 @@ func TestFetchACMCertificates_OrphanNotExpired_WarnFinding(t *testing.T) {
 
 // TestFetchACMCertificates_HealthyIssuedCert_NoFindings verifies the negative
 // case: an ISSUED cert that is neither expiring soon nor orphaned (far-future
-// NotAfter, InUse=true) produces zero Findings and colors Healthy. This is
-// the boundary guard against the new Wave 1 logic over-firing.
+// NotAfter, InUse=true) produces zero Findings and colors Healthy.
 func TestFetchACMCertificates_HealthyIssuedCert_NoFindings(t *testing.T) {
 	notAfter := time.Now().Add(90 * 24 * time.Hour)
 	mock := &fakeACMListCertificates{

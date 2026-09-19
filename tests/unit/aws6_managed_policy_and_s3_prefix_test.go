@@ -1,7 +1,6 @@
 package unit_test
 
-// aws6_managed_policy_and_s3_prefix_test.go — two decisions taken with a
-// witness on the demo bench.
+// Two decisions, each carried by a role or bucket on the demo bench.
 //
 // The first: a pivot naming an AWS-managed policy the account cannot read. The
 // name came from the role's OWN attachment list, so a not-found there is not
@@ -30,21 +29,14 @@ import (
 
 // unreadableManagedPolicyName is a policy name no account can resolve: AWS
 // retired it, so a role attachment naming it survives while GetPolicy does not.
-// It is the shape row 8 is decided on.
 const unreadableManagedPolicyName = "AmazonElasticTranscoder_FullAccess"
 
-// TestManagedPolicyPivotToAnUnreadableNameStaysAFailure locks row 8's decision.
-//
 // A name that cannot be resolved came from the role's OWN attachment list, so
 // it is not the deleted-between-list-and-read race MarkSkipped exists for — it
 // is a navigation pointing at something unreadable, and the batch says so while
 // still returning every policy it could read. Silently dropping the name would
 // render the role's attachments one row short with no sign anything was
 // missing.
-//
-// This pin is green today and stays that way: the decision is that the current
-// behaviour is right, so the test exists to stop a later "tidy-up" from routing
-// it through MarkSkipped.
 func TestManagedPolicyPivotToAnUnreadableNameStaysAFailure(t *testing.T) {
 	clients := demo.NewServiceClients()
 	td := resource.FindResourceType("policy")
@@ -88,11 +80,8 @@ func TestManagedPolicyPivotToAnUnreadableNameStaysAFailure(t *testing.T) {
 	}
 }
 
-// TestDemoBenchHasARoleAttachedToAnUnreadablePolicy is the witness half of row
-// 8. The decision above is only visible to someone opening the app if the demo
-// account actually contains a role whose attachment list names a policy that
-// cannot be read — otherwise the failure path is a branch nobody ever sees, and
-// the next person to read it has no way to tell it apart from dead code.
+// A demo role attaches a policy that cannot be read, so the failure path is
+// visible to someone opening the app rather than a branch nobody ever sees.
 func TestDemoBenchHasARoleAttachedToAnUnreadablePolicy(t *testing.T) {
 	clients := demo.NewServiceClients()
 	td := resource.FindResourceType("policy")
@@ -173,7 +162,6 @@ func policyIDs(rows []resource.Resource) []string {
 	return out
 }
 
-// TestS3PrefixRowCarriesTheSameKeysAsAnObjectRow pins the first half of row 9.
 // A prefix row and an object row are rendered by the same columns, so a prefix
 // row that carries fewer keys renders cells no formatter ever saw.
 func TestS3PrefixRowCarriesTheSameKeysAsAnObjectRow(t *testing.T) {
@@ -193,9 +181,8 @@ func TestS3PrefixRowCarriesTheSameKeysAsAnObjectRow(t *testing.T) {
 	}
 }
 
-// TestS3PrefixRowWritesNoEmptyString pins the second half. The fetcher does not
-// know how "no size" should read; the cell formatter does. Writing "" here is
-// the fetcher deciding, and deciding on a blank.
+// The fetcher does not know how "no size" should read; the cell formatter
+// does. Writing "" here is the fetcher deciding, and deciding on a blank.
 func TestS3PrefixRowWritesNoEmptyString(t *testing.T) {
 	folders, _ := demoS3ObjectRows(t, demo.NewServiceClients())
 	if len(folders) == 0 {
@@ -251,8 +238,8 @@ func TestS3PrefixSizeReadsTheSameOnEveryPrefixRow(t *testing.T) {
 	}
 }
 
-// TestS3PrefixRowsSortFirstAscending pins what must NOT change: within one
-// bucket listing, prefixes lead, the way a file browser puts folders first.
+// Within one bucket listing, prefixes lead, the way a file browser puts
+// folders first.
 func TestS3PrefixRowsSortFirstAscending(t *testing.T) {
 	listings := demoS3ObjectListings(t, demo.NewServiceClients())
 	if len(listings) == 0 {

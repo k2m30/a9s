@@ -1,10 +1,10 @@
 package unit_test
 
-// canonical_ref_ids_test.go — a reference AWS hands back is one fact with one
-// reading. A related row counts the target's rows by that reading and a
-// navigable field opens the target by it, so both go through the target
-// type's own resolver (resource.ResolveRef → catalog RefToID); a second parse
-// would let the count show a row the drill cannot open.
+// A reference AWS hands back is one fact with one reading. A related row
+// counts the target's rows by that reading and a navigable field opens the
+// target by it, so both go through the target type's own resolver
+// (resource.ResolveRef → catalog RefToID); a second parse would let the count
+// show a row the drill cannot open.
 
 import (
 	"context"
@@ -107,8 +107,6 @@ func sortedIDs(r resource.RelatedCheckResult) []string {
 	return ids
 }
 
-// ── every target type parses its own references ────────────────────────────
-
 type refCase struct {
 	name   string
 	target string
@@ -132,9 +130,8 @@ func runRefCases(t *testing.T, b refBench, cases []refCase) {
 	}
 }
 
-// TestResolveRef_EachTargetParsesItsOwnReferences pins the reading every
-// target type gives the reference shapes AWS actually returns for it. The row
-// ID is what the type's list keys on; anything else drills into nothing.
+// The row ID is what the type's list keys on; anything else drills into
+// nothing.
 func TestResolveRef_EachTargetParsesItsOwnReferences(t *testing.T) {
 	b := newRefBench(t)
 	const (
@@ -200,9 +197,8 @@ func TestResolveRef_EachTargetParsesItsOwnReferences(t *testing.T) {
 	})
 }
 
-// TestApigwCertificates_CountAndDrillAgree is the apigw witness: a custom
-// domain's certificate is counted by the ACM row ID, the full ARN, so the
-// drill lands on the certificate the badge counted.
+// A custom domain's certificate is counted by the ACM row ID, the full ARN,
+// so the drill lands on the certificate the badge counted.
 func TestApigwCertificates_CountAndDrillAgree(t *testing.T) {
 	b := newRefBench(t)
 	src := b.row(t, "apigw", "abc123def4")
@@ -219,9 +215,6 @@ func TestApigwCertificates_CountAndDrillAgree(t *testing.T) {
 	}
 }
 
-// TestLambdaMSK_ClusterCountedByItsRowID pins the MSK reading on the pivot
-// that emits cluster ARNs: the function with a Kafka trigger counts the
-// cluster row, and a function without one counts nothing.
 func TestLambdaMSK_ClusterCountedByItsRowID(t *testing.T) {
 	b := newRefBench(t)
 	check := refChecker(t, "lambda", "msk")
@@ -235,8 +228,7 @@ func TestLambdaMSK_ClusterCountedByItsRowID(t *testing.T) {
 	}
 }
 
-// TestLambdaEFS_AccessPointCountedAsItsFileSystem pins the EFS reading: a
-// function mounts an access point, and the EFS list is keyed by file system.
+// A function mounts an access point, and the EFS list is keyed by file system.
 func TestLambdaEFS_AccessPointCountedAsItsFileSystem(t *testing.T) {
 	b := newRefBench(t)
 	got := refChecker(t, "lambda", "efs")(context.Background(), refClients(), b.row(t, "lambda", "efs-data-processor"), b.cache)
@@ -245,10 +237,7 @@ func TestLambdaEFS_AccessPointCountedAsItsFileSystem(t *testing.T) {
 	}
 }
 
-// ── related checkers return through the shared resolver ────────────────────
-
-// TestEcsTaskSecrets_JSONKeyTailCountsTheSecret is the ecs-task witness. A
-// container can inject one JSON key of a secret; the reference then carries
+// A container can inject one JSON key of a secret; the reference then carries
 // ":json-key:stage:version" after the secret ARN, and still names that one
 // secret. Two keys of the same secret are one secret.
 func TestEcsTaskSecrets_JSONKeyTailCountsTheSecret(t *testing.T) {
@@ -269,8 +258,7 @@ func TestEcsTaskSecrets_JSONKeyTailCountsTheSecret(t *testing.T) {
 	}
 }
 
-// TestEcsTaskSecrets_DemoCarriesAJSONKeyReference requires the demo bench to
-// show the json-key shape, so ./a9s --demo reproduces the witness.
+// The demo bench carries the json-key reference shape, so ./a9s --demo shows it.
 func TestEcsTaskSecrets_DemoCarriesAJSONKeyReference(t *testing.T) {
 	b := newRefBench(t)
 	check := refChecker(t, "ecs-task", "secrets")
@@ -295,9 +283,9 @@ func TestEcsTaskSecrets_DemoCarriesAJSONKeyReference(t *testing.T) {
 		"the ecs-task witness is not reproducible in --demo")
 }
 
-// TestSecretsPivots_EverySourceCountsBySecretName pins the secret reading on
-// each pivot that reaches Secrets Manager from an ARN: the ecs service reads
-// its task definition, glue its connection, msk its SASL/SCRAM secret list.
+// Each pivot reaching Secrets Manager from an ARN counts by secret name: the
+// ecs service reads its task definition, glue its connection, msk its
+// SASL/SCRAM secret list.
 func TestSecretsPivots_EverySourceCountsBySecretName(t *testing.T) {
 	b := newRefBench(t)
 	cases := []struct {
@@ -357,7 +345,6 @@ func relatedParseCall(call *ast.CallExpr) string {
 	return ""
 }
 
-// TestRelatedCheckers_ParseNoReferenceThemselves is the class guard behind
 // A checker that splits an ARN itself is a second reading of a fact the
 // target type's resolver owns. Only a RefToID function may parse.
 func TestRelatedCheckers_ParseNoReferenceThemselves(t *testing.T) {
@@ -398,8 +385,6 @@ func TestRelatedCheckers_ParseNoReferenceThemselves(t *testing.T) {
 		t.Errorf("%d reference parse(s) in related checker files outside a RefToID:\n  %s", len(hits), strings.Join(hits, "\n  "))
 	}
 }
-
-// ── a navigable field and a related row read one reference alike ───────────
 
 // refDetailController is a controller on the demo bench with every type's
 // rows loaded and navigability bootstrapped as the app does at startup.
@@ -493,8 +478,7 @@ func TestSSMKeyId_AliasFieldAndRelatedRowOpenTheSameKey(t *testing.T) {
 	}
 }
 
-// TestAWSManagedKeys_ResolveThroughTheKeyLookup is the ssm witness. An
-// alias/aws/* alias names an AWS-managed key, which the kms list (customer
+// An alias/aws/* alias names an AWS-managed key, which the kms list (customer
 // keys only) never holds. The related row still counts that key by its key
 // ID, found through the kms type's own by-ID lookup, and once the related
 // result lazy-adds the key, KeyId opens it.
@@ -693,8 +677,6 @@ func TestSSMKeyId_KeyListArrivingAfterTheDetailStillResolves(t *testing.T) {
 	}
 }
 
-// ── every navigable field resolves to its target row ───────────────────────
-
 // rowsNamedBy returns every rendered row whose value is ref, with or without
 // the list-item dash a string list renders.
 func rowsNamedBy(fields []app.FieldRow, ref string) []app.FieldRow {
@@ -709,9 +691,8 @@ func rowsNamedBy(fields []app.FieldRow, ref string) []app.FieldRow {
 	return out
 }
 
-// TestNavigableFields_ARNListsAndGatewaysOpenTheirRow is the tg witness and
-// its siblings: every reference the detail shows as navigable opens the row
-// it names, including the entries of a list of ARNs.
+// Every reference the detail shows as navigable opens the row it names,
+// including the entries of a list of ARNs.
 func TestNavigableFields_ARNListsAndGatewaysOpenTheirRow(t *testing.T) {
 	b := newRefBench(t)
 	const (
@@ -744,9 +725,8 @@ func TestNavigableFields_ARNListsAndGatewaysOpenTheirRow(t *testing.T) {
 	}
 }
 
-// TestNavigableFields_RouteToNoGatewayIsNotAnIGW pins the negative half: the
-// VPC-local route's GatewayId is "local", which is not an internet gateway,
-// so Enter on it must not open an empty IGW list.
+// The VPC-local route's GatewayId is "local", which is not an internet
+// gateway, so Enter on it must not open an empty IGW list.
 func TestNavigableFields_RouteToNoGatewayIsNotAnIGW(t *testing.T) {
 	b := newRefBench(t)
 	c := refDetailController(t, b)
@@ -784,11 +764,8 @@ func TestNavIDFromValue_TargetsWithoutAnExtractorResolve(t *testing.T) {
 	}
 }
 
-// ── a reference to another account or region is not a local row ────────────
-
-// TestResolveRef_ForeignAccountOrRegionIsNotLocal pins that a same-named or
-// same-ID resource in another account or region never resolves to the local
-// row. IAM and S3 ARNs carry no region and stay local.
+// A same-named or same-ID resource in another account or region never
+// resolves to the local row. IAM and S3 ARNs carry no region and stay local.
 func TestResolveRef_ForeignAccountOrRegionIsNotLocal(t *testing.T) {
 	b := newRefBench(t)
 	runRefCases(t, b, []refCase{
@@ -816,8 +793,7 @@ func (f *refBucketPolicyFake) GetBucketPolicy(_ context.Context, _ *s3.GetBucket
 	return &s3.GetBucketPolicyOutput{Policy: aws.String(f.policy)}, nil
 }
 
-// TestS3Roles_ForeignRoleWithALocalNameIsNotCounted is the s3 witness: a
-// bucket policy grants a role in another account whose name a local role
+// A bucket policy grants a role in another account whose name a local role
 // shares. The Roles row must not count the local role for it, and says the
 // count is a lower bound because a principal was left out.
 func TestS3Roles_ForeignRoleWithALocalNameIsNotCounted(t *testing.T) {

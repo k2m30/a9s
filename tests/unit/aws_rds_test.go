@@ -13,10 +13,6 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// ---------------------------------------------------------------------------
-// T056 - Test RDS response parsing
-// ---------------------------------------------------------------------------
-
 func TestFetchRDSInstances_ParsesMultipleInstances(t *testing.T) {
 	mock := &fakeRDSDescribeDBInstances{
 		Output: &rds.DescribeDBInstancesOutput{
@@ -58,13 +54,11 @@ func TestFetchRDSInstances_ParsesMultipleInstances(t *testing.T) {
 		t.Fatalf("expected 2 resources, got %d", len(resources))
 	}
 
-	// Verify first instance
 	r0 := resources[0]
 	if r0.ID != "prod-db-01" {
 		t.Errorf("resource[0].ID: expected %q, got %q", "prod-db-01", r0.ID)
 	}
 
-	// Verify required fields exist and have correct values
 	requiredFields := []string{"db_identifier", "engine", "engine_version", "status", "class", "endpoint", "multi_az"}
 	for i, r := range resources {
 		for _, key := range requiredFields {
@@ -74,7 +68,6 @@ func TestFetchRDSInstances_ParsesMultipleInstances(t *testing.T) {
 		}
 	}
 
-	// Verify specific field values on first instance
 	if r0.Fields["db_identifier"] != "prod-db-01" {
 		t.Errorf("resource[0].Fields[\"db_identifier\"]: expected %q, got %q", "prod-db-01", r0.Fields["db_identifier"])
 	}
@@ -97,7 +90,6 @@ func TestFetchRDSInstances_ParsesMultipleInstances(t *testing.T) {
 		t.Errorf("resource[0].Fields[\"multi_az\"]: expected %q, got %q", "Yes", r0.Fields["multi_az"])
 	}
 
-	// Verify second instance
 	r1 := resources[1]
 	if r1.Fields["db_identifier"] != "staging-db-01" {
 		t.Errorf("resource[1].Fields[\"db_identifier\"]: expected %q, got %q", "staging-db-01", r1.Fields["db_identifier"])

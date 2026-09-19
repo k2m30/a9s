@@ -2,9 +2,8 @@
 
 package unit
 
-// aws3_degraded_recovery_test.go — the finding a Fields-only row recovers is
-// the one whose CODE the row carries, never the one whose rendered status
-// text matches a phrase constant.
+// The finding a Fields-only row recovers is the one whose CODE the row
+// carries, never the one whose rendered status text matches a phrase constant.
 
 import (
 	"errors"
@@ -17,11 +16,8 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// TestDegradedRecoveryReadsTheCodeNotTheStatusText rewords the status cell of
-// a degraded row and reads the recovery back intact. A recovery keyed on the
-// phrase would retire silently the moment the wording moved on, which is the
-// defect this pins shut. Do not "fix" this test by restoring the phrase — the
-// point is that the phrase is not the key.
+// A recovery keyed on the status phrase would retire silently once the wording
+// changed; the phrase is not the key.
 func TestDegradedRecoveryReadsTheCodeNotTheStatusText(t *testing.T) {
 	denied := &smithy.GenericAPIError{Code: "AccessDenied", Message: "not authorized"}
 	for _, tc := range []struct {
@@ -41,8 +37,8 @@ func TestDegradedRecoveryReadsTheCodeNotTheStatusText(t *testing.T) {
 				t.Fatalf("DegradedDetails findings = %+v, want one %s", built.Findings, tc.code)
 			}
 
-			// The row as a cache read or a colour fallback sees it: Fields
-			// only, no Findings, and a status cell whose wording has moved on.
+			// The row as a cache read or a colour fallback sees it: Fields only, no
+			// Findings, and a reworded status cell.
 			rebuilt := domain.Resource{ID: built.ID, Name: built.Name, Fields: map[string]string{}}
 			for k, v := range built.Fields {
 				rebuilt.Fields[k] = v

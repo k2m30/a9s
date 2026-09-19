@@ -14,11 +14,6 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// ---------------------------------------------------------------------------
-// T-ECSSVC01 - Test ECS Services three-step fetch
-// (ListClusters -> ListServices -> DescribeServices)
-// ---------------------------------------------------------------------------
-
 func TestFetchECSServices_ParsesMultipleServices(t *testing.T) {
 	clusterArn := "arn:aws:ecs:us-east-1:123456789012:cluster/prod-cluster"
 	createdAt := time.Now()
@@ -81,7 +76,6 @@ func TestFetchECSServices_ParsesMultipleServices(t *testing.T) {
 		t.Fatalf("expected 2 resources, got %d", len(resources))
 	}
 
-	// Verify required fields exist
 	requiredFields := []string{"service_name", "cluster", "status", "desired_count", "running_count", "launch_type"}
 	for i, r := range resources {
 		for _, key := range requiredFields {
@@ -91,7 +85,6 @@ func TestFetchECSServices_ParsesMultipleServices(t *testing.T) {
 		}
 	}
 
-	// Verify first service
 	r0 := resources[0]
 	if r0.ID != "web-service" {
 		t.Errorf("resource[0].ID: expected %q, got %q", "web-service", r0.ID)
@@ -99,8 +92,7 @@ func TestFetchECSServices_ParsesMultipleServices(t *testing.T) {
 	if r0.Name != "web-service" {
 		t.Errorf("resource[0].Name: expected %q, got %q", "web-service", r0.Name)
 	}
-	// Post-PR-03c: fetcher no longer writes Status for ACTIVE services.
-	// State lives in Fields["status"]; ACTIVE services emit no Finding.
+	// ACTIVE services emit no Finding; the state lives in Fields["status"].
 	if len(r0.Findings) != 0 {
 		t.Errorf("resource[0].Findings: got %d, want 0 for ACTIVE service", len(r0.Findings))
 	}
@@ -123,7 +115,6 @@ func TestFetchECSServices_ParsesMultipleServices(t *testing.T) {
 		t.Errorf("resource[0].Fields[\"launch_type\"]: expected %q, got %q", "FARGATE", r0.Fields["launch_type"])
 	}
 
-	// Verify second service
 	r1 := resources[1]
 	if r1.ID != "api-service" {
 		t.Errorf("resource[1].ID: expected %q, got %q", "api-service", r1.ID)

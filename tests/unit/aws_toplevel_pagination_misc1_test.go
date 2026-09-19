@@ -42,10 +42,6 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// ---------------------------------------------------------------------------
-// 1. IAM ListGroups — Marker/IsTruncated pagination
-// ---------------------------------------------------------------------------
-
 type mockIAMListGroupsPaginatedClient struct {
 	outputs []*iam.ListGroupsOutput
 	inputs  []*iam.ListGroupsInput
@@ -134,10 +130,6 @@ func TestFetchIAMGroups_Pagination(t *testing.T) {
 	})
 }
 
-// ---------------------------------------------------------------------------
-// 2. API Gateway V2 GetApis — NextToken pagination
-// ---------------------------------------------------------------------------
-
 type mockAPIGWPaginatedClient struct {
 	outputs []*apigatewayv2.GetApisOutput
 	inputs  []*apigatewayv2.GetApisInput
@@ -224,13 +216,6 @@ func TestFetchAPIGateways_Pagination(t *testing.T) {
 	})
 }
 
-// ---------------------------------------------------------------------------
-// 3. Athena ListWorkGroups — NextToken pagination
-// ---------------------------------------------------------------------------
-// The fake client for this operation now lives in fakes_athena_test.go
-// (fakeAthenaListWorkGroups) — see that file's header for the one-fake-per-
-// interface convention.
-
 func TestFetchAthenaWorkgroups_Pagination(t *testing.T) {
 	mock := &fakeAthenaListWorkGroups{
 		Pages: []*athena.ListWorkGroupsOutput{
@@ -292,10 +277,6 @@ func TestFetchAthenaWorkgroups_Pagination(t *testing.T) {
 		}
 	})
 }
-
-// ---------------------------------------------------------------------------
-// 4. Backup ListBackupPlans — NextToken pagination
-// ---------------------------------------------------------------------------
 
 type mockBackupPaginatedClient struct {
 	outputs []*backup.ListBackupPlansOutput
@@ -383,13 +364,6 @@ func TestFetchBackupPlans_Pagination(t *testing.T) {
 	})
 }
 
-// ---------------------------------------------------------------------------
-// 5. CodeBuild ListProjects — NextToken pagination (two-step: List + BatchGet)
-// ---------------------------------------------------------------------------
-// The fake clients for these operations now live in fakes_codebuild_test.go
-// (fakeCodeBuildListProjects, fakeCodeBuildBatchGetProjects) — see that
-// file's header for the one-fake-per-interface convention.
-
 func TestFetchCodeBuildProjects_Pagination(t *testing.T) {
 	listMock := &fakeCodeBuildListProjects{
 		Pages: []*codebuild.ListProjectsOutput{
@@ -457,10 +431,6 @@ func TestFetchCodeBuildProjects_Pagination(t *testing.T) {
 		}
 	})
 }
-
-// ---------------------------------------------------------------------------
-// 6. CodePipeline ListPipelines — NextToken pagination
-// ---------------------------------------------------------------------------
 
 type mockCodePipelinePaginatedClient struct {
 	outputs []*codepipeline.ListPipelinesOutput
@@ -560,10 +530,6 @@ func TestFetchCodePipelines_Pagination(t *testing.T) {
 	})
 }
 
-// ---------------------------------------------------------------------------
-// 7. CodeArtifact ListRepositories — NextToken pagination
-// ---------------------------------------------------------------------------
-
 type mockCodeArtifactPaginatedClient struct {
 	outputs []*codeartifact.ListRepositoriesOutput
 	inputs  []*codeartifact.ListRepositoriesInput
@@ -649,10 +615,6 @@ func TestFetchCodeArtifactRepos_Pagination(t *testing.T) {
 		}
 	})
 }
-
-// ---------------------------------------------------------------------------
-// 8. Elastic Beanstalk DescribeEnvironments — NextToken pagination
-// ---------------------------------------------------------------------------
 
 type mockEBPaginatedClient struct {
 	outputs []*elasticbeanstalk.DescribeEnvironmentsOutput
@@ -740,10 +702,6 @@ func TestFetchEBEnvironments_Pagination(t *testing.T) {
 	})
 }
 
-// ---------------------------------------------------------------------------
-// 9. EFS DescribeFileSystems — Marker/NextMarker pagination
-// ---------------------------------------------------------------------------
-
 func TestFetchEFSFileSystems_Pagination(t *testing.T) {
 	mock := &fakeEFSDescribeFileSystems{
 		Pages: []*efs.DescribeFileSystemsOutput{
@@ -805,10 +763,6 @@ func TestFetchEFSFileSystems_Pagination(t *testing.T) {
 		}
 	})
 }
-
-// ---------------------------------------------------------------------------
-// 10. EKS ListClusters + DescribeCluster — NextToken pagination on ListClusters
-// ---------------------------------------------------------------------------
 
 type mockEKSListClustersPaginatedClient struct {
 	outputs []*eks.ListClustersOutput
@@ -941,10 +895,6 @@ func TestFetchEKSClusters_Pagination(t *testing.T) {
 	})
 }
 
-// ---------------------------------------------------------------------------
-// 11. Glue GetJobs — NextToken pagination
-// ---------------------------------------------------------------------------
-
 type mockGluePaginatedClient struct {
 	outputs []*glue.GetJobsOutput
 	inputs  []*glue.GetJobsInput
@@ -1030,10 +980,6 @@ func TestFetchGlueJobs_Pagination(t *testing.T) {
 		}
 	})
 }
-
-// ---------------------------------------------------------------------------
-// 12. MSK ListClustersV2 — NextToken pagination
-// ---------------------------------------------------------------------------
 
 type mockMSKPaginatedClient struct {
 	outputs []*kafka.ListClustersV2Output
@@ -1121,10 +1067,6 @@ func TestFetchMSKClusters_Pagination(t *testing.T) {
 	})
 }
 
-// ---------------------------------------------------------------------------
-// 13. SES ListEmailIdentities — NextToken pagination
-// ---------------------------------------------------------------------------
-
 type mockSESPaginatedClient struct {
 	outputs []*sesv2.ListEmailIdentitiesOutput
 	inputs  []*sesv2.ListEmailIdentitiesInput
@@ -1210,10 +1152,6 @@ func TestFetchSESIdentities_Pagination(t *testing.T) {
 		}
 	})
 }
-
-// ---------------------------------------------------------------------------
-// 14. WAF ListWebACLs — NextMarker pagination
-// ---------------------------------------------------------------------------
 
 type mockWAFPaginatedClient struct {
 	outputs []*wafv2.ListWebACLsOutput
@@ -1301,10 +1239,6 @@ func TestFetchWAFWebACLs_Pagination(t *testing.T) {
 	})
 }
 
-// ---------------------------------------------------------------------------
-// 15. Node Groups — ListClusters + ListNodegroups + DescribeNodegroup pagination
-// ---------------------------------------------------------------------------
-
 type mockEKSListNodegroupsPaginatedClient struct {
 	outputs map[string][]*eks.ListNodegroupsOutput
 	callIdx map[string]int
@@ -1371,7 +1305,6 @@ func (f *ngPaginatedFullFake) DescribeCluster(
 }
 
 func TestFetchNodeGroups_Pagination(t *testing.T) {
-	// ListClusters returns 2 pages with 1 cluster each
 	listClustersMock := &mockEKSListClustersPaginatedClient{
 		outputs: []*eks.ListClustersOutput{
 			{
@@ -1384,13 +1317,6 @@ func TestFetchNodeGroups_Pagination(t *testing.T) {
 		},
 	}
 
-	// ListNodegroups returns one page per cluster. The registered "ng"
-	// fetcher drains each cluster's own ListNodegroups pages before moving
-	// to the next cluster; this fixture keeps every cluster to a single
-	// page so it stays focused on the cluster-level (ListClusters)
-	// pagination this test targets. Multi-page-per-cluster draining is
-	// covered separately by TestFetchNodeGroups_MultiPageClusterLosesNoNodeGroups
-	// below.
 	listNGMock := &mockEKSListNodegroupsPaginatedClient{
 		outputs: map[string][]*eks.ListNodegroupsOutput{
 			"cluster-A": {
@@ -1477,17 +1403,10 @@ func collectNGPagesBounded(t *testing.T, fetch func(token string) (resource.Fetc
 	return nil
 }
 
-// TestFetchNodeGroups_MultiPageClusterLosesNoNodeGroups guards against a
-// cluster whose node groups span more than one ListNodegroups page losing
-// any of them: fetchNodeGroupsPage (core/aws/catalog_containers.go) fully
-// drains each cluster's own ListNodegroups pages before moving on to the
-// next cluster, so nothing goes missing even when the outer ListClusters
-// pagination also advances. It checks the observable contract only — every
-// node group of a multi-page cluster appears exactly once across bounded
-// successive fetch calls, fully enriched via DescribeNodegroup — not how the
-// draining happens, so either draining within one fetch call or across
-// calls via a per-cluster resume token in the returned continuation token
-// stays valid.
+// Every node group of a cluster whose node groups span several ListNodegroups
+// pages appears exactly once across bounded successive fetch calls, enriched
+// via DescribeNodegroup. Draining within one call or across calls through a
+// per-cluster resume token both satisfy it.
 func TestFetchNodeGroups_MultiPageClusterLosesNoNodeGroups(t *testing.T) {
 	t.Run("single_cluster_two_nodegroup_pages", func(t *testing.T) {
 		listClustersMock := &mockEKSListClustersPaginatedClient{
@@ -1508,12 +1427,8 @@ func TestFetchNodeGroups_MultiPageClusterLosesNoNodeGroups(t *testing.T) {
 			},
 		}
 
-		// Fixture self-check, using its own mock instance (a separate
-		// callIdx counter from the one the fetcher under test will drive)
-		// so this doesn't consume state the real call below needs: proves
-		// the fake itself correctly serves cluster-solo's second
-		// ListNodegroups page, so a RED result below can't be blamed on a
-		// fake defect.
+		// The fake's second page is checked on a separate mock instance, so a
+		// failure below is the fetcher's.
 		selfCheckMock := &mockEKSListNodegroupsPaginatedClient{outputs: ngSoloOutputs}
 		ctx := context.Background()
 		page1, err := selfCheckMock.ListNodegroups(ctx, &eks.ListNodegroupsInput{ClusterName: aws.String("cluster-solo")})
@@ -1538,8 +1453,7 @@ func TestFetchNodeGroups_MultiPageClusterLosesNoNodeGroups(t *testing.T) {
 				"cluster-solo/ng-s1": {Nodegroup: &ekstypes.Nodegroup{NodegroupName: aws.String("ng-s1"), ClusterName: aws.String("cluster-solo"), Status: ekstypes.NodegroupStatusActive}},
 				"cluster-solo/ng-s2": {Nodegroup: &ekstypes.Nodegroup{NodegroupName: aws.String("ng-s2"), ClusterName: aws.String("cluster-solo"), Status: ekstypes.NodegroupStatusActive}},
 				"cluster-solo/ng-s3": {Nodegroup: &ekstypes.Nodegroup{NodegroupName: aws.String("ng-s3"), ClusterName: aws.String("cluster-solo"), Status: ekstypes.NodegroupStatusActive}},
-				// ng-s4 and ng-s5 live on the cluster's second ListNodegroups page —
-				// the page the current fetcher never requests.
+				// ng-s4 and ng-s5 live on the cluster's second ListNodegroups page.
 				"cluster-solo/ng-s4": {Nodegroup: &ekstypes.Nodegroup{NodegroupName: aws.String("ng-s4"), ClusterName: aws.String("cluster-solo"), Status: ekstypes.NodegroupStatusUpdating}},
 				"cluster-solo/ng-s5": {Nodegroup: &ekstypes.Nodegroup{NodegroupName: aws.String("ng-s5"), ClusterName: aws.String("cluster-solo"), Status: ekstypes.NodegroupStatusActive}},
 			},
@@ -1573,8 +1487,8 @@ func TestFetchNodeGroups_MultiPageClusterLosesNoNodeGroups(t *testing.T) {
 			}
 		}
 
-		// c) DescribeNodegroup enrichment must reach the late-page node
-		// groups too — they must not come back as bare/degraded rows.
+		// DescribeNodegroup enrichment reaches the late-page node groups too; they
+		// never come back as bare rows.
 		if late, ok := seen["cluster-solo/ng-s4"]; ok {
 			if got := late.Fields["status"]; got != "UPDATING" {
 				t.Errorf("ng-s4 (page-2 node group) status = %q, want %q — DescribeNodegroup enrichment not applied", got, "UPDATING")
@@ -1630,9 +1544,8 @@ func TestFetchNodeGroups_MultiPageClusterLosesNoNodeGroups(t *testing.T) {
 			nodegroups: map[string]*eks.DescribeNodegroupOutput{
 				"cluster-A/ng-a1": {Nodegroup: &ekstypes.Nodegroup{NodegroupName: aws.String("ng-a1"), ClusterName: aws.String("cluster-A"), Status: ekstypes.NodegroupStatusActive}},
 				"cluster-A/ng-a2": {Nodegroup: &ekstypes.Nodegroup{NodegroupName: aws.String("ng-a2"), ClusterName: aws.String("cluster-A"), Status: ekstypes.NodegroupStatusActive}},
-				// ng-a3 is cluster-A's second ListNodegroups page — by the time the
-				// current fetcher would revisit it, the outer ListClusters
-				// continuation token has already moved on to cluster-B.
+				// ng-a3 is on cluster-A's second ListNodegroups page, after the outer
+				// ListClusters token has moved on to cluster-B.
 				"cluster-A/ng-a3": {Nodegroup: &ekstypes.Nodegroup{NodegroupName: aws.String("ng-a3"), ClusterName: aws.String("cluster-A"), Status: ekstypes.NodegroupStatusActive}},
 				"cluster-B/ng-b1": {Nodegroup: &ekstypes.Nodegroup{NodegroupName: aws.String("ng-b1"), ClusterName: aws.String("cluster-B"), Status: ekstypes.NodegroupStatusActive}},
 			},
@@ -1666,28 +1579,9 @@ func TestFetchNodeGroups_MultiPageClusterLosesNoNodeGroups(t *testing.T) {
 	})
 }
 
-// ---------------------------------------------------------------------------
-// 15b. Node Groups — result-cap continuation loss
-// ---------------------------------------------------------------------------
-// fetchNodeGroupsPage (core/aws/catalog_containers.go) caps its per-call
-// result count at resource.DefaultPageSize (hitCap, checked inside the
-// per-cluster ListNodegroups drain loop). When the cap is hit while the
-// current cluster still has more ListNodegroups pages, the function only
-// ever returns the *outer* ListClusters token (clusterOutput.NextToken) as
-// its continuation token — there is no per-cluster resume state. If the
-// ListClusters call itself was not truncated (single outer page), that
-// token is empty, so the fetcher reports IsTruncated=true with NextToken=""
-// and the capped cluster's remaining node groups become unreachable. Worse,
-// the hitCap check at the top of the outer cluster loop treats "cap hit"
-// as "stop touching every remaining cluster", not just "stop draining the
-// current one" — so a capped first cluster silently swallows every cluster
-// after it in the same ListClusters page too.
-
-// assertNGSecondPageServed proves a ListNodegroups fake genuinely serves a
-// cluster's page beyond the first once given that first page's NextToken,
-// using its own throwaway mock instance so the assertion doesn't consume
-// call state the fetcher under test still needs. Without this, a RED result
-// below could be blamed on a broken fixture instead of the fetcher.
+// assertNGSecondPageServed checks, on a throwaway mock instance, that a
+// ListNodegroups fake serves a cluster's page beyond the first given that
+// page's NextToken.
 func assertNGSecondPageServed(t *testing.T, outputs map[string][]*eks.ListNodegroupsOutput, cluster string, wantPage2 []string) {
 	t.Helper()
 	check := &mockEKSListNodegroupsPaginatedClient{outputs: outputs}
@@ -1724,8 +1618,6 @@ func ngNamesFrom(prefix string, offset, n int) []string {
 	return names
 }
 
-// ngDescribeMockFor builds a mockEKSDescribeNodegroupPaginatedClient
-// covering every name in names for one cluster.
 func ngDescribeMockFor(cluster string, names []string) *mockEKSDescribeNodegroupPaginatedClient {
 	nodegroups := make(map[string]*eks.DescribeNodegroupOutput, len(names))
 	for _, name := range names {
@@ -1740,12 +1632,8 @@ func ngDescribeMockFor(cluster string, names []string) *mockEKSDescribeNodegroup
 	return &mockEKSDescribeNodegroupPaginatedClient{nodegroups: nodegroups}
 }
 
-// TestFetchNodeGroups_ResultCapLosesContinuation is the RED counterpart to
-// TestFetchNodeGroups_MultiPageClusterLosesNoNodeGroups above: that test
-// deliberately keeps every cluster under resource.DefaultPageSize so it
-// never exercises hitCap. Here the cluster's node groups are sized to
-// exceed the cap across multiple ListNodegroups pages, which is exactly the
-// case the current continuation token can't represent.
+// The cluster's node groups exceed resource.DefaultPageSize across several
+// ListNodegroups pages, so the call is capped mid-cluster.
 func TestFetchNodeGroups_ResultCapLosesContinuation(t *testing.T) {
 	const overflow = 5 // node groups beyond the cap, served on cluster-mega's 2nd ListNodegroups page
 
@@ -1873,13 +1761,6 @@ func TestFetchNodeGroups_ResultCapLosesContinuation(t *testing.T) {
 		}
 	})
 }
-
-// ---------------------------------------------------------------------------
-// 16. SNS ListSubscriptions — NextToken pagination
-// ---------------------------------------------------------------------------
-// The fake client for this operation now lives in fakes_sns_test.go
-// (fakeSNSListSubscriptions) — see that file's header for the one-fake-per-
-// interface convention.
 
 func TestFetchSNSSubscriptions_Pagination(t *testing.T) {
 	mock := &fakeSNSListSubscriptions{

@@ -1,13 +1,8 @@
 package unit
 
-// Tests for §1.4 cross-account actor format.
-//
-// §1.4: When accountId != recipientAccountId, the ACTOR cell text is prefixed
-// with the counterparty account ID using slash separator: <accountID>/<actor>,
-// never a "[cross] " literal prefix.
-//
-// These tests assert Resource.Fields["_ct.actor"] values after
-// FetchCloudTrailEventsPage (computeCTActor in core/aws/ct_events.go).
+// When accountId != recipientAccountId, the ACTOR cell text is prefixed with
+// the counterparty account ID using a slash separator: <accountID>/<actor>.
+// computeCTActor in core/aws/ct_events.go writes it to Fields["_ct.actor"].
 
 import (
 	"context"
@@ -54,13 +49,7 @@ func buildCrossAccountCTEvent(
 	)
 }
 
-// ===========================================================================
-// CT-CA1: IAMUser cross-account — actor must be "999988887777/alice"
-// §1.4: <accountID>/<actor>, no "[cross] " prefix.
-// ===========================================================================
-
 func TestCTCrossAccountActor_IAMUser_CrossAccount(t *testing.T) {
-	// Spec: §1.4 — cross-account actor format is "999988887777/alice", not "[cross] alice"
 	event := buildCrossAccountCTEvent(
 		"ca-01", "GetObject", "IAMUser", "alice", "",
 		"999988887777", "123456789012",
@@ -79,20 +68,12 @@ func TestCTCrossAccountActor_IAMUser_CrossAccount(t *testing.T) {
 	if actor != want {
 		t.Errorf("_ct.actor = %q, want %q per §1.4 (slash separator, no [cross] prefix)", actor, want)
 	}
-	// Verify the legacy "[cross] " prefix is NOT present.
 	if len(actor) >= 7 && actor[:7] == "[cross]" {
 		t.Errorf("_ct.actor = %q: legacy [cross] prefix must be removed per §1.4", actor)
 	}
 }
 
-// ===========================================================================
-// CT-CA2: AssumedRole cross-account — actor must be "999988887777/AdminRole/session-xyz"
-// §1.4: accountID/roleName/sessionName format for AssumedRole.
-// ===========================================================================
-
 func TestCTCrossAccountActor_AssumedRole_CrossAccount(t *testing.T) {
-	// Spec: §1.4 — cross-account AssumedRole format: "999988887777/AdminRole/session-xyz"
-	// ARN: arn:aws:sts::999988887777:assumed-role/AdminRole/session-xyz
 	// sessionIssuer.userName = "AdminRole", session name extracted from ARN last segment
 	event := buildCrossAccountCTEvent(
 		"ca-02", "AssumeRole", "AssumedRole", "AdminRole",
@@ -113,19 +94,12 @@ func TestCTCrossAccountActor_AssumedRole_CrossAccount(t *testing.T) {
 	if actor != want {
 		t.Errorf("_ct.actor = %q, want %q per §1.4 cross-account AssumedRole format", actor, want)
 	}
-	// Verify legacy "[cross] " prefix is NOT present.
 	if len(actor) >= 7 && actor[:7] == "[cross]" {
 		t.Errorf("_ct.actor = %q: legacy [cross] prefix must be removed per §1.4", actor)
 	}
 }
 
-// ===========================================================================
-// CT-CA3: Same-account IAMUser — actor must be "alice" (no prefix at all).
-// §1.4: prefix only when cross-account.
-// ===========================================================================
-
 func TestCTCrossAccountActor_SameAccount_NoPrefix(t *testing.T) {
-	// Spec: §1.4 — no prefix when accountId == recipientAccountId
 	event := buildCrossAccountCTEvent(
 		"ca-03", "GetObject", "IAMUser", "alice", "",
 		"123456789012", "123456789012",
@@ -146,13 +120,8 @@ func TestCTCrossAccountActor_SameAccount_NoPrefix(t *testing.T) {
 	}
 }
 
-// ===========================================================================
-// CT-CA4: Root identity same-account — actor must be "ROOT" (unchanged by §1.4).
-// §1.4 exempts ROOT from the cross-account prefix (Root has no account prefix).
-// ===========================================================================
-
 func TestCTCrossAccountActor_SameAccountRoot_Preserved(t *testing.T) {
-	// Spec: §1.4 — Root format is "ROOT", unchanged (existing code already exempts ROOT)
+	// A same-account ROOT carries no account prefix.
 	event := buildCrossAccountCTEvent(
 		"ca-04", "DescribeInstances", "Root", "", "",
 		"123456789012", "123456789012",

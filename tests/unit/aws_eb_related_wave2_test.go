@@ -1,6 +1,3 @@
-// aws_eb_related_wave2_test.go — coverage wave 2 for eb_related.go checkers
-// Covers: checkEbCFN, checkEbLogs, checkEbASG, checkEbEC2, checkEbAlarm
-// Each has: happy-path (match → IDs), no-match, and one edge case.
 package unit_test
 
 import (
@@ -16,10 +13,6 @@ import (
 	_ "github.com/k2m30/a9s/v3/core/aws"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
-
-// ---------------------------------------------------------------------------
-// checkEbCFN — Pattern C: cache scan, stack name prefix "awseb-{envID}"
-// ---------------------------------------------------------------------------
 
 func TestRelated_Eb_CFN_MatchByEnvIDPrefix(t *testing.T) {
 	const envID = "e-abcdef1234"
@@ -89,7 +82,6 @@ func TestRelated_Eb_CFN_NoMatchDifferentEnv(t *testing.T) {
 	}
 }
 
-// Edge: no RawStruct — falls back to res.ID as envID.
 func TestRelated_Eb_CFN_FallsBackToResID(t *testing.T) {
 	const envID = "e-fallback1234"
 	stackName := "awseb-" + envID + "-stack"
@@ -105,7 +97,6 @@ func TestRelated_Eb_CFN_FallsBackToResID(t *testing.T) {
 		"cfn": resource.ResourceCacheEntry{Resources: []resource.Resource{cfnRes}},
 	}
 
-	// RawStruct is nil (wrong type) — should fall back to res.ID
 	src := resource.Resource{
 		ID:        envID,
 		Name:      "prod-env",
@@ -122,10 +113,6 @@ func TestRelated_Eb_CFN_FallsBackToResID(t *testing.T) {
 		t.Errorf("ResourceIDs = %v, want [%s]", result.ResourceIDs(), stackName)
 	}
 }
-
-// ---------------------------------------------------------------------------
-// checkEbLogs — Pattern C: log group prefix "/aws/elasticbeanstalk/{envName}/"
-// ---------------------------------------------------------------------------
 
 func TestRelated_Eb_Logs_MatchByEnvNamePrefix(t *testing.T) {
 	const envName = "my-beanstalk-env"
@@ -188,7 +175,6 @@ func TestRelated_Eb_Logs_NoMatchDifferentEnv(t *testing.T) {
 	}
 }
 
-// Edge: multiple log groups for same env — all returned.
 func TestRelated_Eb_Logs_MultipleGroupsSameEnv(t *testing.T) {
 	const envName = "prod-java-env"
 	prefix := "/aws/elasticbeanstalk/" + envName + "/"
@@ -219,10 +205,6 @@ func TestRelated_Eb_Logs_MultipleGroupsSameEnv(t *testing.T) {
 		t.Errorf("Count = %d, want 2", result.Count())
 	}
 }
-
-// ---------------------------------------------------------------------------
-// checkEbASG — Pattern C: ASG tag "elasticbeanstalk:environment-name"
-// ---------------------------------------------------------------------------
 
 func TestRelated_Eb_ASG_MatchByTag(t *testing.T) {
 	const envName = "prod-python-env"
@@ -277,7 +259,7 @@ func TestRelated_Eb_ASG_NoMatchDifferentTag(t *testing.T) {
 			Tags: []asgtypes.TagDescription{
 				{
 					Key:   aws.String("elasticbeanstalk:environment-name"),
-					Value: aws.String("staging-python-env"), // different env
+					Value: aws.String("staging-python-env"),
 				},
 			},
 		},
@@ -303,12 +285,10 @@ func TestRelated_Eb_ASG_NoMatchDifferentTag(t *testing.T) {
 	}
 }
 
-// Edge: ASG with wrong RawStruct type is skipped, not counted.
 func TestRelated_Eb_ASG_SkipsWrongRawStructASG(t *testing.T) {
 	const envName = "prod-python-env"
 	const asgName = "awseb-e-abc123-AWSEBAutoScalingGroup"
 
-	// Wrong RawStruct — assertStruct[asgtypes.AutoScalingGroup] will fail.
 	asgRes := resource.Resource{
 		ID:        asgName,
 		Name:      asgName,
@@ -334,10 +314,6 @@ func TestRelated_Eb_ASG_SkipsWrongRawStructASG(t *testing.T) {
 		t.Errorf("Count = %d, want 0 (skipped wrong RawStruct ASG)", result.Count())
 	}
 }
-
-// ---------------------------------------------------------------------------
-// checkEbEC2 — Pattern C: EC2 tag "elasticbeanstalk:environment-name"
-// ---------------------------------------------------------------------------
 
 func TestRelated_Eb_EC2_MatchByTag(t *testing.T) {
 	const envName = "prod-node-env"
@@ -417,7 +393,6 @@ func TestRelated_Eb_EC2_NoMatchDifferentEnvTag(t *testing.T) {
 	}
 }
 
-// Edge: EC2 instance with no EB tag is skipped.
 func TestRelated_Eb_EC2_SkipsInstanceWithoutEBTag(t *testing.T) {
 	const envName = "prod-node-env"
 
@@ -451,10 +426,6 @@ func TestRelated_Eb_EC2_SkipsInstanceWithoutEBTag(t *testing.T) {
 		t.Errorf("Count = %d, want 0 (no EB tag on instance)", result.Count())
 	}
 }
-
-// ---------------------------------------------------------------------------
-// checkEbAlarm — Pattern D: alarm dimension or name substring match
-// ---------------------------------------------------------------------------
 
 func TestRelated_Eb_Alarm_MatchByDimension(t *testing.T) {
 	const envName = "prod-php-env"
@@ -534,10 +505,8 @@ func TestRelated_Eb_Alarm_NoMatchNeitherDimensionNorName(t *testing.T) {
 	}
 }
 
-// Edge: alarm matched by name substring fallback (no dimension match).
 func TestRelated_Eb_Alarm_FallbackMatchByNameSubstring(t *testing.T) {
 	const envName = "prod-php-env"
-	// alarm name contains envName but dimension value does not match
 	alarmName := "custom-" + envName + "-alert"
 
 	alarmRes := resource.Resource{
@@ -547,7 +516,6 @@ func TestRelated_Eb_Alarm_FallbackMatchByNameSubstring(t *testing.T) {
 			AlarmName: aws.String(alarmName),
 			Dimensions: []cwtypes.Dimension{
 				{
-					// Dimension name differs but not matched
 					Name:  aws.String("SomeOtherDimension"),
 					Value: aws.String("unrelated-value"),
 				},

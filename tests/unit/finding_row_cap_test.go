@@ -317,7 +317,7 @@ func soleWave1Rows(t *testing.T, r resource.Resource) []domain.DetailRow {
 }
 
 // ---------------------------------------------------------------------------
-// privEscComboRows loses its private cap and inherits the shared one.
+// privEscComboRows has no cap of its own; the shared one applies.
 // ---------------------------------------------------------------------------
 
 // privEscCapPolicyDocument allows every action of several services outright,
@@ -396,11 +396,10 @@ func TestFindingRowCap_PrivEscCombosUseTheSharedCap(t *testing.T) {
 	}
 }
 
-// TestFindingRowCap_PrivEscComboBuilderHasNoCapOfItsOwn pins the deletion of
-// the one site that capped on its own. Two rules for one thing is how the
-// shapes drift apart: the builder must hand every combo to the sink and let
-// the sink decide. The constant is package-private, so the pin reads the
-// source — the assertion the compiler would make if it were exported.
+// Two rules for one thing drift apart: the builder hands every combo to the
+// sink and lets the sink decide. The constant is package-private, so the pin
+// reads the source — the assertion the compiler would make if it were
+// exported.
 func TestFindingRowCap_PrivEscComboBuilderHasNoCapOfItsOwn(t *testing.T) {
 	const src = "../../core/aws/iam_policy_issue_enrichment.go"
 	b, err := os.ReadFile(src)
@@ -417,11 +416,10 @@ func TestFindingRowCap_PrivEscComboBuilderHasNoCapOfItsOwn(t *testing.T) {
 // The contract doc states the bound an operator will hit.
 // ---------------------------------------------------------------------------
 
-// TestFindingRowCap_StatedInAttentionSignalsS5 keeps the S5 mechanism cell
-// honest: an operator who sees "… +3 more" and no way to reach the rest is
-// owed the rule in the contract that governs that surface. The number is
-// pinned from the constant, so raising the cap without touching the sentence
-// is the failure.
+// An operator who sees "… +3 more" and no way to reach the rest is owed the
+// rule in docs/attention-signals.md's visualization-surfaces table. The number
+// is pinned from the constant, so raising the cap without touching the
+// sentence fails.
 func TestFindingRowCap_StatedInAttentionSignalsS5(t *testing.T) {
 	const doc = "../../docs/attention-signals.md"
 	b, err := os.ReadFile(doc)
@@ -545,8 +543,7 @@ func TestFindingRowCap_RepeatedEmissionsReachingExactlyTheCapHaveNoClosingRow(t 
 // TestFindingRowCap_RoleInlinePrivEscRowsAreCapped pins the second caller of
 // privEscComboRows. A role with an inline policy that matches the same
 // escalation combinations lists them on the role row, and that list is as
-// unbounded as the policy one — the builder no longer caps, so whatever the
-// role's rows pass through has to.
+// unbounded as the policy one, so the role's rows are capped at the sink.
 func TestFindingRowCap_RoleInlinePrivEscRowsAreCapped(t *testing.T) {
 	const roleName = "acme-inline-escalate-many"
 	doc := privEscCapPolicyDocument()

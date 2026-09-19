@@ -28,8 +28,6 @@ func glueCheckerByTarget(t *testing.T, target string) resource.RelatedChecker {
 	return nil
 }
 
-// --- Navigable Field Registration ---
-
 func TestNavigableFields_Glue_Registered(t *testing.T) {
 	nav := resource.IsFieldNavigableForTest("glue", "Role")
 	if nav == nil {
@@ -39,8 +37,6 @@ func TestNavigableFields_Glue_Registered(t *testing.T) {
 		t.Errorf("Role TargetType = %q, want %q", nav.TargetType, "role")
 	}
 }
-
-// --- IAM Role checker (Pattern C — cache, name extracted from ARN) ---
 
 func TestRelated_Glue_Role_Found(t *testing.T) {
 	const roleARN = "arn:aws:iam::123456789012:role/GlueServiceRole"
@@ -156,8 +152,6 @@ func TestRelated_Glue_Role_CacheMissNoClients(t *testing.T) {
 	}
 }
 
-// --- CloudWatch Alarms checker (Pattern C — cache, JobName dimension) ---
-
 func TestRelated_Glue_Alarms_Found(t *testing.T) {
 	const jobName = "acme-etl-orders"
 
@@ -255,8 +249,6 @@ func TestRelated_Glue_Alarms_CacheMissNoClients(t *testing.T) {
 	}
 }
 
-// --- glue→cfn: undeterminable without GetTags, returns State: RelatedUnknown ---
-
 func TestRelated_Glue_CFN_Unknown(t *testing.T) {
 	source := resource.Resource{
 		ID:   "acme-etl-orders",
@@ -271,8 +263,6 @@ func TestRelated_Glue_CFN_Unknown(t *testing.T) {
 		t.Errorf("TargetType = %q, want %q", result.TargetType(), "cfn")
 	}
 }
-
-// --- checkGlueLogs tests (Pattern N — shared log groups /aws-glue/jobs/output and /aws-glue/jobs/error) ---
 
 func TestRelated_Glue_Logs_MatchBothSharedGroups(t *testing.T) {
 	outputLogRes := resource.Resource{ID: "/aws-glue/jobs/output", Name: "/aws-glue/jobs/output"}
@@ -333,8 +323,6 @@ func TestRelated_Glue_Logs_CacheMissNoClients(t *testing.T) {
 	}
 }
 
-// --- checkGlueS3 tests (Pattern F — s3:// script location from Command.ScriptLocation) ---
-
 func TestRelated_Glue_S3_MatchScriptBucket(t *testing.T) {
 	source := resource.Resource{
 		ID:   "acme-etl-job",
@@ -389,8 +377,6 @@ func TestRelated_Glue_S3_InvalidRawStruct(t *testing.T) {
 		t.Errorf("Count = %d, want -1 for invalid RawStruct", result.Count())
 	}
 }
-
-// --- checkGlueSecrets tests (Pattern F — DefaultArguments secrets ARNs) ---
 
 func TestRelated_Glue_Secrets_MatchSecretARN(t *testing.T) {
 	const secretARN = "arn:aws:secretsmanager:us-east-1:123456789012:secret:acme/db-password-AbcDef"
@@ -471,8 +457,6 @@ func TestRelated_Glue_Secrets_InvalidRawStruct(t *testing.T) {
 	}
 }
 
-// --- checkGlueAthena tests (Pattern C — athena workgroup cache, glue_job field match) ---
-
 func TestRelated_Glue_Athena_MatchByGlueJobField(t *testing.T) {
 	const jobName = "acme-etl-job"
 	wgRes := resource.Resource{
@@ -525,10 +509,6 @@ func TestRelated_Glue_Athena_CacheMissNoClients(t *testing.T) {
 		t.Errorf("Count = %d, want -1 (cache miss, no clients)", result.Count())
 	}
 }
-
-// ---------------------------------------------------------------------------
-// checkGlueKMS — Pattern C: GetSecurityConfiguration → KMS key ARNs
-// ---------------------------------------------------------------------------
 
 // TestRelated_Glue_KMS_InvalidRawStruct verifies Count=-1 when the RawStruct
 // is not a gluetypes.Job.
@@ -616,10 +596,6 @@ func TestRelated_Glue_KMS_EmptyEncryptionReturnsZero(t *testing.T) {
 		t.Errorf("Count = %d, want 0 (empty encryption config)", result.Count())
 	}
 }
-
-// ---------------------------------------------------------------------------
-// checkGlueCFN — Pattern C: GetTags → aws:cloudformation:stack-name
-// ---------------------------------------------------------------------------
 
 // TestRelated_Glue_CFN_EmptyJobIDReturnsZero verifies Count=0 when the job
 // has no ID (short-circuit before any API call).

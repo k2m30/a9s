@@ -1,19 +1,12 @@
-// costs_demo_test.go — the demo transport serves Cost Explorer data
-// (specs/021-cost-explorer/spec.md SC-001, FR-003): core/demo.NewDemoAWSConfig
-// routes any *costexplorer.Client through the demo transport, exactly like
-// tests/unit/demo_app_test.go's pattern for other services via
-// core/aws.CreateServiceClients, and the "ce:GetCostAndUsage" /
-// "ce:GetAnomalies" handlers are backed by core/demo/fixtures/costs.go.
+// core/demo.NewDemoAWSConfig routes any *costexplorer.Client through the demo
+// transport, and the "ce:GetCostAndUsage" / "ce:GetAnomalies" handlers are
+// backed by core/demo/fixtures/costs.go.
 //
-// The growth-story numbers asserted here (service/usage-type pinned via
-// fixtures.CostsGrowthService/CostsGrowthUsageType, a sharp single-month
-// jump) come from wireframe.md's default-view example row, the documented
-// visual truth the fixture is built to match. The jump magnitude is asserted
-// as a ratio threshold ("roughly doubling"), not an exact float. Pinned via
-// the constants, not literals: the story must live under a service with a
-// registered a9s detail-view mapping (CostsResourceRowsByService) so SC-001's
-// spike -> usage type -> resource chain can resolve a resource, and a
-// re-plant needs no edit here.
+// The growth story is pinned via fixtures.CostsGrowthService /
+// CostsGrowthUsageType rather than literals: it must live under a service
+// with a registered a9s detail-view mapping (CostsResourceRowsByService) for
+// the spike -> usage type -> resource chain to resolve a resource. The jump is
+// asserted as a ratio threshold, not an exact float.
 package unit_test
 
 import (
@@ -46,10 +39,6 @@ func newDemoCostsClient() *costexplorer.Client {
 	return costexplorer.NewFromConfig(demo.NewDemoAWSConfig())
 }
 
-// ---------------------------------------------------------------------------
-// 13 months of monthly SERVICE-grouped data
-// ---------------------------------------------------------------------------
-
 func TestCostsDemo_FetchCostAndUsage_ServiceGrouped_ThirteenMonths(t *testing.T) {
 	client := newDemoCostsClient()
 	q := demoCostsQuery(costs.Filter{}, costs.DimensionService)
@@ -71,13 +60,9 @@ func TestCostsDemo_FetchCostAndUsage_ServiceGrouped_ThirteenMonths(t *testing.T)
 	}
 }
 
-// ---------------------------------------------------------------------------
-// FR-003: invoice totals include a Tax row
-// ---------------------------------------------------------------------------
-
 func TestCostsDemo_InvoiceTotals_IncludeTaxRow(t *testing.T) {
 	client := newDemoCostsClient()
-	// No RECORD_TYPE filter -> invoice mode (FR-003: everything incl. Tax).
+	// No RECORD_TYPE filter -> invoice mode, which includes Tax.
 	q := demoCostsQuery(costs.Filter{}, costs.DimensionService)
 
 	result, err := a9saws.FetchCostAndUsage(context.Background(), client, q)
@@ -103,15 +88,6 @@ func TestCostsDemo_InvoiceTotals_IncludeTaxRow(t *testing.T) {
 		t.Fatal("SERVICE-grouped invoice-mode fetch has no \"Tax\" row (FR-003)")
 	}
 }
-
-// ---------------------------------------------------------------------------
-// Planted growth story: fixtures.CostsGrowthService, driven by
-// fixtures.CostsGrowthUsageType — pinned via the constants (not literals) so
-// a re-plant under a different service/usage type (the story must live under
-// a service with a registered resource-row mapping, e.g. "Amazon Elastic
-// Compute Cloud - Compute") only requires editing the fixture, never this
-// test.
-// ---------------------------------------------------------------------------
 
 func TestCostsDemo_GrowthStory_Doubling(t *testing.T) {
 	client := newDemoCostsClient()
@@ -152,10 +128,6 @@ func TestCostsDemo_GrowthStory_Doubling(t *testing.T) {
 		t.Errorf("planted growth story not found: largest month-over-month %s ratio under %s is %.2fx, want >= %.1fx", fixtures.CostsGrowthUsageType, fixtures.CostsGrowthService, maxRatio, doublingThreshold)
 	}
 }
-
-// ---------------------------------------------------------------------------
-// Planted anomaly names the same service + usage type
-// ---------------------------------------------------------------------------
 
 func TestCostsDemo_Anomaly_RootCauseNamesServiceAndUsageType(t *testing.T) {
 	client := newDemoCostsClient()

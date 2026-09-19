@@ -1,12 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
 
-// detail_key_column_width_test.go — the detail key column is measured, and
-// there is one function that measures it.
+// detail_key_column_width_test.go — the detail key column is measured in
+// terminal columns, and there is one function that measures it.
 //
-// The width was counted in bytes, so a key with any multi-byte character
-// reserved more of the row than it paints: a key of twelve CJK characters
-// takes twenty-four terminal columns and was given thirty-seven, pushing every
-// value on the screen a dozen columns to the right of where it belongs.
+// A key of twelve CJK characters takes twenty-four terminal columns but
+// thirty-six bytes; a column sized in bytes pushes every value on the screen a
+// dozen columns right of where it belongs.
 package unit
 
 import (
@@ -81,10 +80,9 @@ func TestDetailKeyColumn_IsMeasuredNotCounted(t *testing.T) {
 	}
 }
 
-// TestDetailKeyColumn_ShortKeysKeepTheFloor pins the floor the surviving
-// measure carries: a resource whose longest key is short still gets a key
-// column wide enough that the values line up down the screen rather than
-// crowding the left edge.
+// TestDetailKeyColumn_ShortKeysKeepTheFloor: a resource whose longest key is
+// short still gets a key column wide enough that the values line up down the
+// screen rather than crowding the left edge.
 func TestDetailKeyColumn_ShortKeysKeepTheFloor(t *testing.T) {
 	rows := []app.FieldRow{
 		{Key: "ID", Value: "i-0abc123def4567890"},

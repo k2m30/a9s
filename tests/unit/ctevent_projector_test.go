@@ -1,27 +1,5 @@
 package unit_test
 
-// ctevent_projector_test.go — verifies that ctevent.Project wraps BuildSections
-// faithfully and produces identical section/item content.
-//
-// This is the most visible regression risk in PR-01: ct-events detail is the only
-// resource type that already had a custom rendering path. The move from
-// core/aws/ctdetail/ to core/semantics/ctevent/ plus the wrapper to
-// []domain.Section must not change a single byte of rendered output for any
-// ct-event fixture.
-//
-// Note on fixture behavior:
-//   - buildCTResource sets r.RawStruct to cloudtrailtypes.Event (not *ctevent.Event).
-//   - ctevent.Project.parseResource first tries r.RawStruct.(*ctevent.Event) — that fails.
-//   - It then tries r.Fields["raw"] — that is empty in demo fixtures.
-//   - So ctevent.Project returns nil for raw demo fixtures.
-//
-// To test the projector, we construct domain.Resource values with RawStruct set
-// to *ctevent.Event (the form ctevent.Project expects), by parsing the
-// CloudTrailEvent JSON via ctevent.Parse.
-//
-// If ctevent.Project returns nil for a fixture, the test fatals — that is the
-// correct failure signal during PR-01 development if the wrapper is incomplete.
-
 import (
 	"context"
 	"fmt"
@@ -35,10 +13,6 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 	"github.com/k2m30/a9s/v3/core/semantics/ctevent"
 )
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
 
 // loadCTEventFixtures loads all ct-event demo resources via the CloudTrail fake.
 func loadCTEventFixtures(t *testing.T) []domain.Resource {
@@ -88,17 +62,9 @@ func buildProjectorResource(t *testing.T, r domain.Resource) (domain.Resource, b
 	return projectorResource, true
 }
 
-// ---------------------------------------------------------------------------
-// TestCTEventProjectorNonEmpty
-// ---------------------------------------------------------------------------
-
 // TestCTEventProjectorNonEmpty asserts that ctevent.Project returns a non-empty
 // []domain.Section for every demo ct-event fixture when given a resource whose
 // RawStruct is a *ctevent.Event.
-//
-// This is a liveness check: if the wrapper is a stub returning nil, every sub-test
-// fails immediately, making the regression obvious before any rendered-output
-// comparison is needed.
 func TestCTEventProjectorNonEmpty(t *testing.T) {
 	fixtures := loadCTEventFixtures(t)
 
@@ -125,48 +91,17 @@ func TestCTEventProjectorNonEmpty(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// TestCTEventProjectorMatchesBuildSections
-// ---------------------------------------------------------------------------
-
 // TestCTEventProjectorMatchesBuildSections asserts that ctevent.Project, when
 // given a ct-event resource, returns a []domain.Section that structurally matches
 // the output of ctevent.BuildSections — same section count, same section titles in
 // order, same item count per section, and correct field mapping (Label←Key,
 // Value←Value, Tier←Severity, Navigable←IsNavigable, TargetType←TargetType).
-//
-// This is the most important regression guard in PR-01: ct-events detail is the
-// only resource type with a custom rendering path. The semantics layer must
-// preserve every field label, value, tier string, and navigability flag.
-//
-// Implementation note on ordering:
-// BuildSections has non-deterministic map iteration in catchAllScan (ExtractTarget)
-// which means two independent calls to BuildSections, even on the same *Event
-// instance, can produce different (Key, Value) pairs in TARGET and REQUEST sections
-// because Go randomizes map iteration order on every for-range call.
-//
-// To remain stable, this test calls BuildSections exactly once to capture the
-// expected section structure (counts and titles), then verifies Project's output
-// against that same BuildSections call's rows by converting them to domain.Item
-// with the same mapping rules and doing a set-based (sorted) comparison within
-// each section.
-//
-// Because Project internally calls BuildSections a second time on the same *Event,
-// the specific items in TARGET/REQUEST may differ from our reference BuildSections
-// call. The set-based comparison therefore spans all sections together:
-// items are compared as a cross-section multiset, asserting that every item
-// produced by Project appears (with correct Label/Value/Tier/Navigable/TargetType)
-// somewhere across all sections, and vice versa.
-//
-// Section ORDER (titles in sequence) IS deterministic and is still asserted.
-// The total item count across all sections is also asserted.
 func TestCTEventProjectorMatchesBuildSections(t *testing.T) {
 	fixtures := loadCTEventFixtures(t)
 
 	for _, r := range fixtures {
 		r := r
 		t.Run(r.ID, func(t *testing.T) {
-			// Build the *ctevent.Event from the raw fixture.
 			evt, ok := r.RawStruct.(cloudtrailtypes.Event)
 			if !ok || evt.CloudTrailEvent == nil || *evt.CloudTrailEvent == "" {
 				t.Skip("fixture has no CloudTrailEvent JSON")
@@ -177,15 +112,8 @@ func TestCTEventProjectorMatchesBuildSections(t *testing.T) {
 			}
 			parsedEvent.Status = r.Fields["status"]
 
-			// Reference path: BuildSections on the parsed event (called exactly once).
 			legacySections := ctevent.BuildSections(parsedEvent)
 
-			// New path: ctevent.Project on a domain.Resource with *ctevent.Event RawStruct.
-			// Uses the same parsedEvent instance so Project's internal BuildSections call
-			// operates on the same *Event, but note that Go's map iteration is randomized
-			// per for-range call — not just per map instance — so Project's internal
-			// BuildSections call may still distribute items differently across TARGET/REQUEST
-			// sections than our legacySections reference above.
 			projRes := domain.Resource{
 				ID:        r.ID,
 				Name:      r.Name,
@@ -200,14 +128,12 @@ func TestCTEventProjectorMatchesBuildSections(t *testing.T) {
 					len(legacySections))
 			}
 
-			// Assert section count.
 			if len(projSections) != len(legacySections) {
 				t.Errorf("section count mismatch: ctevent.Project=%d, BuildSections=%d",
 					len(projSections), len(legacySections))
 				return
 			}
 
-			// Assert section titles in order — section ordering IS deterministic.
 			for i, legacySec := range legacySections {
 				projSec := projSections[i]
 				if projSec.Title != legacySec.Name {
@@ -215,11 +141,6 @@ func TestCTEventProjectorMatchesBuildSections(t *testing.T) {
 				}
 			}
 
-			// Assert total item count across all sections.
-			// BuildSections has non-deterministic map iteration in ExtractTarget/catchAllScan;
-			// the same total count of items is produced regardless of which map key wins,
-			// because catchAllScan always lifts exactly one item to TARGET and removes that
-			// key from REQUEST. Total count is therefore stable.
 			legacyTotal := 0
 			for _, s := range legacySections {
 				legacyTotal += len(s.Rows)
@@ -234,10 +155,6 @@ func TestCTEventProjectorMatchesBuildSections(t *testing.T) {
 				return
 			}
 
-			// Per-section item count must match.
-			// BuildSections has non-deterministic map iteration in ExtractTarget/catchAllScan;
-			// however, catchAllScan always lifts exactly one item and removes it from the
-			// cleaned params, so per-section item counts are stable across calls.
 			for i, legacySec := range legacySections {
 				projSec := projSections[i]
 				if len(projSec.Items) != len(legacySec.Rows) {
@@ -246,45 +163,26 @@ func TestCTEventProjectorMatchesBuildSections(t *testing.T) {
 				}
 			}
 
-			// Item mapping correctness: verify the convertRow contract on every item in
-			// ctevent.Project output, without round-tripping through a second BuildSections call.
-			//
-			// BuildSections has non-deterministic map iteration in ExtractTarget and
-			// catchAllScan paths; comparison is set-based within each section.
-			// Section ORDER is deterministic and is still asserted at the section-count level.
-			//
-			// The convertRow contract (from projector.go) is:
-			//   domain.Item.Label      ← ctevent.Row.Key         (always non-empty)
-			//   domain.Item.Value      ← ctevent.Row.Value        (may be empty for some rows)
-			//   domain.Item.Tier       ← ctevent.Row.Severity     (tier string, may be "")
-			//   domain.Item.Navigable  ← ctevent.Row.IsNavigable  (bool)
-			//   domain.Item.TargetType ← ctevent.Row.TargetType   (non-empty iff IsNavigable)
-			//   domain.Item.Kind       = domain.ItemField          (always)
 			for i, projSec := range projSections {
 				for j, item := range projSec.Items {
 					loc := fmt.Sprintf("section[%d](%q) item[%d]", i, projSec.Title, j)
 
-					// Label must be non-empty — ctevent Row.Key is always non-empty.
 					if item.Label == "" {
 						t.Errorf("%s: Label is empty; convertRow must preserve Row.Key", loc)
 					}
 
-					// Kind must be ItemField — convertRow always sets this.
 					if item.Kind != domain.ItemField {
 						t.Errorf("%s: Kind got %v, want ItemField", loc, item.Kind)
 					}
 
-					// When Navigable is true, TargetType must be non-empty.
 					if item.Navigable && item.TargetType == "" {
 						t.Errorf("%s: Navigable=true but TargetType is empty", loc)
 					}
 
-					// When Navigable is false, TargetType should be empty.
 					if !item.Navigable && item.TargetType != "" {
 						t.Errorf("%s: Navigable=false but TargetType=%q (should be empty)", loc, item.TargetType)
 					}
 
-					// Tier must be one of the known ct-event tier strings or empty.
 					switch item.Tier {
 					case "", "ct-info", "ct-attention", "ct-danger":
 						// valid
@@ -294,9 +192,8 @@ func TestCTEventProjectorMatchesBuildSections(t *testing.T) {
 				}
 			}
 
-			// ACTION section invariant: the Event row must be present with the correct tier.
-			// This is the FR-002 single-cell exception — the only row that carries a Severity.
-			// The event fixture's Status must be propagated to the ACTION Event row.
+			// The ACTION section's Event row is the only row that carries a Severity;
+			// the fixture's Status propagates to it.
 			for _, sec := range projSections {
 				if sec.Title != "ACTION" {
 					continue
@@ -322,19 +219,12 @@ func TestCTEventProjectorMatchesBuildSections(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// TestCTEventProjectorTierMapping
-// ---------------------------------------------------------------------------
-
 // TestCTEventProjectorTierMapping asserts that the tier-to-severity mapping in
 // ctevent.Project is correct for the three tier strings used by ct-events:
 //
 //   - "ct-danger"     → domain.SevBroken
 //   - "ct-attention"  → domain.SevWarn
 //   - anything else   → domain.SevOK
-//
-// This exercises the convertRow path in ctevent/projector.go that maps
-// ctevent Row.Severity (a tier string) to both domain.Item.Tier and domain.Item.Severity.
 func TestCTEventProjectorTierMapping(t *testing.T) {
 	cases := []struct {
 		tier    string
@@ -369,7 +259,6 @@ func TestCTEventProjectorTierMapping(t *testing.T) {
 				t.Fatalf("ctevent.Project returned zero sections for tier=%q; projector stub not yet implemented", tc.tier)
 			}
 
-			// Find the ACTION section Event row.
 			for _, sec := range sections {
 				if sec.Title != "ACTION" {
 					continue

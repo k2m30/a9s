@@ -9,8 +9,6 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// --- iam-group→iam-user ---
-
 func TestRelated_IAMGroup_IAMUser_NonNil(t *testing.T) {
 	checker := checkerByTarget(t, "iam-group", "iam-user")
 	_ = checker
@@ -40,7 +38,6 @@ func TestRelated_IAMGroup_IAMUser_EmptyID(t *testing.T) {
 		Name: "",
 	}
 	checker := checkerByTarget(t, "iam-group", "iam-user")
-	// nil clients must return -1, not panic
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 	if result.State() != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (nil clients)", result.Count())

@@ -44,10 +44,6 @@ func (m *pagedCloudTrailClient) LookupEvents(ctx context.Context, input *cloudtr
 	return out, nil
 }
 
-// ---------------------------------------------------------------------------
-// CloudTrail Events fetcher tests
-// ---------------------------------------------------------------------------
-
 func TestFetchCloudTrailEvents_ParsesMultipleEvents(t *testing.T) {
 	eventTime := time.Date(2025, 3, 15, 12, 0, 0, 0, time.UTC)
 
@@ -91,7 +87,6 @@ func TestFetchCloudTrailEvents_ParsesMultipleEvents(t *testing.T) {
 		t.Fatalf("expected 2 resources, got %d", len(resources))
 	}
 
-	// Verify first event
 	r0 := resources[0]
 	if r0.ID != "evt-0001-abcd-1234" {
 		t.Errorf("resource[0].ID: expected %q, got %q", "evt-0001-abcd-1234", r0.ID)
@@ -104,7 +99,6 @@ func TestFetchCloudTrailEvents_ParsesMultipleEvents(t *testing.T) {
 		t.Errorf("resource[0].Fields[status]: expected %q (RunInstances is W verb → ct-attention per §1.2), got %q", "ct-attention", r0.Fields["status"])
 	}
 
-	// Verify second event (read-only, empty Resources)
 	r1 := resources[1]
 	if r1.ID != "evt-0002-efgh-5678" {
 		t.Errorf("resource[1].ID: expected %q, got %q", "evt-0002-efgh-5678", r1.ID)
@@ -227,7 +221,6 @@ func TestFetchCloudTrailEvents_FieldExtraction(t *testing.T) {
 
 	r := resources[0]
 
-	// Verify all FieldKeys are present and have exact values
 	if r.Fields["event_name"] != "RunInstances" {
 		t.Errorf("Fields[\"event_name\"]: expected %q, got %q", "RunInstances", r.Fields["event_name"])
 	}
@@ -293,7 +286,6 @@ func TestFetchCloudTrailEvents_FieldExtraction_MultipleResources(t *testing.T) {
 }
 
 func TestFetchCloudTrailEvents_EmptyResources(t *testing.T) {
-	// Event with empty Resources slice — resource_type and resource_name should be empty
 	eventTime := time.Date(2025, 3, 15, 12, 0, 0, 0, time.UTC)
 
 	mock := &mockCloudTrailLookupEventsClient{
@@ -333,9 +325,6 @@ func TestFetchCloudTrailEvents_EmptyResources(t *testing.T) {
 
 func TestFetchCloudTrailEvents_ReadOnlyIsString(t *testing.T) {
 	// ReadOnly is *string ("true" or "false"), not *bool.
-	// The legacy ReadOnly→Status mapping is removed; Status is now severity-based ("ct-info"/"ct-attention"/"ct-danger").
-	// This test verifies: (a) Fields["read_only"] is preserved as-is, (b) Status is severity-based,
-	// and (c) Fields["_ct.outcome"] is a non-empty string.
 	eventTime := time.Date(2025, 3, 15, 12, 0, 0, 0, time.UTC)
 
 	mock := &mockCloudTrailLookupEventsClient{
@@ -362,7 +351,6 @@ func TestFetchCloudTrailEvents_ReadOnlyIsString(t *testing.T) {
 	}
 
 	r := resources[0]
-	// read_only field is preserved for backwards compat.
 	if r.Fields["read_only"] != "true" {
 		t.Errorf("Fields[\"read_only\"]: expected %q, got %q", "true", r.Fields["read_only"])
 	}
@@ -414,10 +402,6 @@ func TestFetchCloudTrailEvents_RawStructIsEvent(t *testing.T) {
 		t.Errorf("RawStruct.EventId: expected %q, got %v", "evt-rawstruct", event.EventId)
 	}
 }
-
-// ---------------------------------------------------------------------------
-// FetchCloudTrailEventsPage pagination tests
-// ---------------------------------------------------------------------------
 
 func TestFetchCloudTrailEventsPage_ReturnsPageWithPagination(t *testing.T) {
 	eventTime := time.Date(2025, 3, 15, 12, 0, 0, 0, time.UTC)
@@ -628,10 +612,6 @@ func TestFetchCloudTrailEventsPage_FieldExtraction(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// FetchCloudTrailEventsPageFiltered tests
-// ---------------------------------------------------------------------------
-
 // TestFetchCloudTrailEventsPageFiltered_UsernameFilter verifies that a "Username"
 // filter key is wired to LookupAttributeKeyUsername in the API request.
 func TestFetchCloudTrailEventsPageFiltered_UsernameFilter(t *testing.T) {
@@ -770,10 +750,6 @@ func TestFetchCloudTrailEventsPageFiltered_RegisteredAsFilteredFetcher(t *testin
 	}
 }
 
-// ---------------------------------------------------------------------------
-// AssumedRole: role_name field extraction via CloudTrailEvent JSON
-// ---------------------------------------------------------------------------
-
 // TestFetchCloudTrailEventsPage_RoleNameFieldExtracted verifies that when a
 // CloudTrail event contains CloudTrailEvent JSON with
 // userIdentity.sessionContext.sessionIssuer.userName, the fetcher populates
@@ -808,10 +784,6 @@ func TestFetchCloudTrailEventsPage_RoleNameFieldExtracted(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// NavigableFields registration for ct-events
-// ---------------------------------------------------------------------------
-
 // TestCtEvents_NavigableFields_Registered verifies that ct-events has navigable
 // fields registered for both "user" → "iam-user" and "role_name" → "role".
 func TestCtEvents_NavigableFields_Registered(t *testing.T) {
@@ -842,10 +814,6 @@ func TestCtEvents_NavigableFields_Registered(t *testing.T) {
 		}
 	}
 }
-
-// ---------------------------------------------------------------------------
-// "_localfield." reserved-key filter partition (splitCTFilter contract)
-// ---------------------------------------------------------------------------
 
 // TestFetchCloudTrailEventsPageFiltered_LocalFieldKeysExcludedFromLookupAttributes
 // verifies that filter keys prefixed with "_localfield." are never turned into
@@ -902,7 +870,7 @@ func TestFetchCloudTrailEventsPageFiltered_LocalFieldKeysExcludedFromLookupAttri
 }
 
 // TestFetchCloudTrailEventsPageFiltered_LocalFieldFilter_AssumedRoleSessionName
-// verifies the fix for the IAM Role -> CloudTrail Events pivot: CloudTrail's
+// covers the IAM Role -> CloudTrail Events pivot: CloudTrail's
 // top-level Username for an assumed-role session is the session name, not the
 // role name, so a "_localfield.role_name" filter must be applied locally against
 // Fields["role_name"] (extracted from userIdentity.sessionContext.sessionIssuer.userName)
@@ -961,11 +929,9 @@ func TestFetchCloudTrailEventsPageFiltered_LocalFieldFilter_AssumedRoleSessionNa
 	}
 }
 
-// TestFetchCloudTrailEventsPageFiltered_ServerOnlyFilter_NoLocalFiltering is a
-// regression guard: a filter with no "_localfield." keys must still produce a
-// server-side LookupAttribute exactly as before, and must not drop any fetched
-// resource via local filtering — the other resource types' CloudTrail pivots
-// (ResourceName:ID, Username:ID, etc.) are unaffected by the local-filter feature.
+// TestFetchCloudTrailEventsPageFiltered_ServerOnlyFilter_NoLocalFiltering: a
+// filter with no "_localfield." keys produces a server-side LookupAttribute and
+// drops no fetched resource via local filtering.
 func TestFetchCloudTrailEventsPageFiltered_ServerOnlyFilter_NoLocalFiltering(t *testing.T) {
 	mock := &capturingCloudTrailClient{
 		output: &cloudtrail.LookupEventsOutput{

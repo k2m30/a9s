@@ -1,9 +1,9 @@
 package unit
 
-// d3_enrichers_test.go — rows 5, 6, 7 and 14: a paginated walk that throws
-// away what it collected, a per-group read serialised behind the caller's
-// lock, an event scan that assumes an order the API does not promise, and a
-// "not found" that means "there is none" being read as "we could not look".
+// d3_enrichers_test.go — a paginated walk keeps what it collected, a
+// per-group read runs outside the caller's lock, an event scan reads the whole
+// list (the API promises no order), and a "not found" that means "there is
+// none" is an answer.
 
 import (
 	"context"
@@ -38,7 +38,7 @@ const (
 	d3CodeLambdaPublic    domain.FindingCode = "lambda.public-policy"
 )
 
-// --- row 5: a page error must not discard the pages already read ------------
+// --- a page error must not discard the pages already read ------------
 
 // d3RDSFake serves DescribePendingMaintenanceActions as two pages, the second
 // of which fails — the shape of a large account whose walk is interrupted.
@@ -61,7 +61,7 @@ func (f *d3RDSFake) DescribePendingMaintenanceActions(
 
 var _ awsclient.RDSAPI = (*d3RDSFake)(nil)
 
-// TestD3MaintenanceWalkKeepsThePagesItRead pins row 5: an error on the second
+// TestD3MaintenanceWalkKeepsThePagesItRead: an error on the second
 // page loses the instances that page would have named, not the ones already
 // read. Returning early throws away a page of true findings because a later
 // page failed.
@@ -88,7 +88,7 @@ func TestD3MaintenanceWalkKeepsThePagesItRead(t *testing.T) {
 	}
 }
 
-// --- row 6: the per-group read must not serialise the whole pass ------------
+// --- the per-group read must not serialise the whole pass ------------
 
 // d3RedshiftFake blocks inside DescribeClusterParameters until two calls are
 // in flight at once. A pass that reads parameter groups under the caller's
@@ -155,7 +155,7 @@ func d3RedshiftCluster(id, group string) resource.Resource {
 	}
 }
 
-// TestD3RedshiftParameterGroupsAreReadConcurrently pins row 6: two clusters on
+// TestD3RedshiftParameterGroupsAreReadConcurrently pins that two clusters on
 // two parameter groups read them at the same time. Holding the result mutex
 // across the API call turns a parallel pass into a serial one, and the cost
 // grows with the cluster count.
@@ -175,9 +175,9 @@ func TestD3RedshiftParameterGroupsAreReadConcurrently(t *testing.T) {
 	}
 }
 
-// TestD3RedshiftParameterGroupReadOncePerGroup pins the other half of row 6:
-// deduplication by group survives whatever makes the reads concurrent. Two
-// clusters sharing a group cost one call, not two.
+// TestD3RedshiftParameterGroupReadOncePerGroup pins that deduplication by
+// group survives concurrent reads. Two clusters sharing a group cost one
+// call, not two.
 func TestD3RedshiftParameterGroupReadOncePerGroup(t *testing.T) {
 	fake := &d3RedshiftFake{calls: map[string]int{}, overlap: make(chan struct{})}
 	close(fake.overlap) // no barrier here; this test counts calls only
@@ -201,7 +201,7 @@ func TestD3RedshiftParameterGroupReadOncePerGroup(t *testing.T) {
 	}
 }
 
-// --- row 7: the event scan must not assume an order -------------------------
+// --- the event scan must not assume an order -------------------------
 
 type d3ECSFake struct {
 	awsclient.ECSAPI
@@ -216,7 +216,7 @@ func (f *d3ECSFake) DescribeServices(
 
 var _ awsclient.ECSAPI = (*d3ECSFake)(nil)
 
-// TestD3ECSRecentEventFoundOutOfOrder pins row 7: a placement failure inside
+// TestD3ECSRecentEventFoundOutOfOrder pins that a placement failure inside
 // the recent window is reported wherever it sits in the list. Stopping at the
 // first old event only works if the API promises newest-first, and nothing in
 // the code cites that promise.
@@ -247,10 +247,8 @@ func TestD3ECSRecentEventFoundOutOfOrder(t *testing.T) {
 	w4AssertFinding(t, res.Findings[svc], d3CodeECSDeployFailed,
 		catalog.Phrase(d3CodeECSDeployFailed), domain.SevBroken, "wave2")
 
-	// The inversion above moved the event text off the phrase but left nothing
-	// asserting it survives at all, so the out-of-order scan this test exists
-	// for could have stopped finding the recent event without failing. The
-	// event is a supporting row now, and this is the pin on it.
+	// The event text is a supporting row; asserting it pins that the
+	// out-of-order scan finds the recent event.
 	var eventRows []string
 	for _, row := range res.AttentionDetails[svc][d3CodeECSDeployFailed].Rows {
 		if row.Label == "Event" {
@@ -265,7 +263,7 @@ func TestD3ECSRecentEventFoundOutOfOrder(t *testing.T) {
 }
 
 // TestD3ECSQuietServiceReportsNothing pins the negative case: a service whose
-// only recent event is a steady state is healthy, so relaxing the scan must
+// only recent event is a steady state is healthy, so an order-independent scan must
 // not start reporting old noise.
 func TestD3ECSQuietServiceReportsNothing(t *testing.T) {
 	const svc = "acme-quiet-svc"
@@ -292,7 +290,7 @@ func TestD3ECSQuietServiceReportsNothing(t *testing.T) {
 	w4AssertNoCode(t, res.Findings[svc], d3CodeECSDeployFailed)
 }
 
-// --- row 14: "there is none" is an answer -----------------------------------
+// --- "there is none" is an answer -----------------------------------
 
 type d3LambdaFake struct {
 	awsclient.LambdaAPI
@@ -318,12 +316,10 @@ func (f *d3LambdaFake) ListFunctionUrlConfigs(
 	return &lambda.ListFunctionUrlConfigsOutput{}, nil
 }
 
-// GetFunction is the stub half of a partial test double: this fake embeds
-// LambdaAPI as a nil interface and implements only the calls the enricher
-// made when it was written. The posture enricher now asks this one to tell a
-// function with no resource policy (what these scenarios are about) from a
-// function that no longer exists — both of which GetPolicy answers with
-// ResourceNotFoundException. Every function here exists, so it answers.
+// GetFunction completes this partial test double (LambdaAPI embedded as a nil
+// interface). The posture enricher calls it to tell a function with no
+// resource policy from a function that does not exist: GetPolicy answers both
+// with ResourceNotFoundException. Every function here exists, so it answers.
 func (f *d3LambdaFake) GetFunction(
 	_ context.Context, in *lambda.GetFunctionInput, _ ...func(*lambda.Options),
 ) (*lambda.GetFunctionOutput, error) {
@@ -399,9 +395,9 @@ func (f *d3RDSFirstPageFails) DescribePendingMaintenanceActions(
 
 var _ awsclient.RDSAPI = (*d3RDSFirstPageFails)(nil)
 
-// TestD3MaintenanceFirstPageFailureIsNotClean attacks row 5 from the other
-// side: keeping the pages already read must not turn a walk that read nothing
-// into a clean verdict. No pages means no coverage, and the pass says so.
+// TestD3MaintenanceFirstPageFailureIsNotClean pins that keeping the pages
+// already read does not turn a walk that read nothing into a clean verdict.
+// No pages means no coverage, and the pass says so.
 func TestD3MaintenanceFirstPageFailureIsNotClean(t *testing.T) {
 	const instance = "acme-orders-db"
 	res, err := awsclient.EnrichDBIMaintenance(context.Background(),
@@ -414,7 +410,7 @@ func TestD3MaintenanceFirstPageFailureIsNotClean(t *testing.T) {
 	w4AssertNoCode(t, res.Findings[instance], d3CodeDBIMaintenance)
 }
 
-// TestD3EveryKeyFailingMarksTheUserOnce attacks row 1: a user whose keys all
+// TestD3EveryKeyFailingMarksTheUserOnce pins that a user whose keys all
 // fail to read is unknown once, not once per key, and still carries no
 // finding.
 func TestD3EveryKeyFailingMarksTheUserOnce(t *testing.T) {

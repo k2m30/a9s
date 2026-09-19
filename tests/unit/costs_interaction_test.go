@@ -1,20 +1,6 @@
-// costs_interaction_test.go — Cost Explorer interaction contracts (D1-D5),
-// not covered by costs_state_test.go/costs_body_test.go (which assert state
-// fields but never fetch dispatch or window anchoring). Contract sources:
-// specs/021-cost-explorer/spec.md FR-004/FR-005/FR-010/FR-011/FR-017,
-// data-model.md, core/app/costs_state.go + core/costs/window.go.
-//
-//   - Controller.SetCostsViewportCols(n int) — the D4/D5 renderer-supplied
-//     visible-column-count seam, named and shaped after
-//     DetailState.ViewportHeight / Controller.SetDetailViewportHeight
-//     (core/app/screenstate.go, core/app/detail_state.go). Reconciling
-//     CostsBody.ScrollX against CursorCol once ViewportCols is known mirrors
-//     detail_cursor.go's reconcileDetailScrollToCursor.
-//   - D1's fetch-task assertions go through Controller.Apply's
-//     []runtime.TaskRequest return: handleActionCostPivot/Metric/ZoomIn
-//     dispatch runtime.KindFetchCosts with a runtime.FetchCostsPayload, the
-//     same mechanism as HandleNavigate's initial NavigateTargetCosts
-//     dispatch. D2/D3 assert CostsBody/DrillLevel fields.
+// Controller.SetCostsViewportCols(n) is the renderer-supplied visible-column
+// count; reconciling CostsBody.ScrollX against CursorCol once it is known
+// mirrors detail_cursor.go's reconcileDetailScrollToCursor.
 package unit_test
 
 import (
@@ -32,11 +18,9 @@ import (
 )
 
 // fullMetricRecord builds a realistic multi-metric record for period p:
-// invoice plus the three metrics that share invoice's Query shape
-// (amortized/net-amortized/blended all read a different metric KEY from
-// the SAME fetch — data-model.md's display mapping). unblended is
-// deliberately absent: it is fetched under a DISTINCT, tax-excluded
-// Query/CacheKey per data-model.md, never mixed into the base fetch.
+// invoice plus the three metrics that read a different metric key from the
+// same fetch. Unblended is fetched under a distinct, tax-excluded
+// Query/CacheKey and never mixed into the base fetch.
 func fullMetricRecord(p costs.Period, rowKey string, amount float64) costs.Record {
 	return costs.Record{
 		Period: p,
@@ -83,13 +67,8 @@ func windowContainsPeriod(window []costs.Period, target costs.Period) bool {
 	return false
 }
 
-// ===========================================================================
-// D1 — fetch-on-shape-miss
-// ===========================================================================
-
 func TestCostsInteraction_D1_MetricSwitchToUnblended_ShapeMiss_SetsLoadingAndEmitsFetchTask(t *testing.T) {
 	c := newCostsController(t, fixedCostsNow)
-	// Fresh store: nothing fetched yet, not even the default invoice shape.
 
 	vs, tasks := c.Apply(app.Action{Kind: app.ActionCostMetric}) // invoice -> unblended
 
@@ -122,8 +101,6 @@ func TestCostsInteraction_D1_MetricCycleAmongCachedShapes_NoFetchTask(t *testing
 		Requests:  1,
 	})
 
-	// invoice -> unblended: distinct shape, not cached (covered by the test
-	// above) — advance past it without asserting here.
 	c.Apply(app.Action{Kind: app.ActionCostMetric})
 
 	// unblended -> amortized -> net-amortized -> blended: every one of these
@@ -144,7 +121,6 @@ func TestCostsInteraction_D1_MetricCycleAmongCachedShapes_NoFetchTask(t *testing
 func TestCostsInteraction_D1_PivotToLinkedAccount_ShapeMiss_EmitsFetchTaskWithNewGroupBy(t *testing.T) {
 	c := newCostsController(t, fixedCostsNow)
 	window := topDrill(t, c).Window
-	// Seed only the default SERVICE-pivot shape.
 	c.Handle(messages.CostsLoaded{
 		Query:    baseServiceQuery(),
 		Grid:     costs.GridResult{Fetched: true, Records: []costs.Record{fullMetricRecord(window[len(window)-1], "Amazon EC2", 1200.0)}},
@@ -217,13 +193,6 @@ func TestCostsInteraction_D1_ZoomOutBackToCachedMonthShape_NoFetchTask(t *testin
 	}
 }
 
-// ===========================================================================
-// D2 — zoom anchoring
-// ===========================================================================
-
-// TestCostsInteraction_D2_ZoomIn_AnchorsOnCursorPeriod is the one retained
-// zoom-IN pin (already correctly implemented by applyCostZoom — this guards
-// against a regression, it is not the live defect).
 func TestCostsInteraction_D2_ZoomIn_AnchorsOnCursorPeriod(t *testing.T) {
 	c := newCostsController(t, fixedCostsNow)
 	root := topDrill(t, c)
@@ -231,9 +200,8 @@ func TestCostsInteraction_D2_ZoomIn_AnchorsOnCursorPeriod(t *testing.T) {
 		t.Fatalf("precondition: root window has %d columns, need enough for a mid-window month", len(root.Window))
 	}
 	midIdx := len(root.Window) / 2
-	// FR-002 "open at today": the cursor starts on the newest (last)
-	// column, not column 0 — scroll LEFT from there to reach the
-	// mid-window target column.
+	// The cursor starts on the newest (last) column, so the mid-window target
+	// column is reached by scrolling left.
 	stepsLeft := (len(root.Window) - 1) - midIdx
 	for range stepsLeft {
 		c.Apply(app.Action{Kind: app.ActionScrollLeft})
@@ -263,9 +231,8 @@ func TestCostsInteraction_D2_ZoomIn_AnchorsOnCursorPeriod(t *testing.T) {
 	}
 }
 
-// TestCostsInteraction_D2_ZoomOut_WindowContainsCursorPeriod is the live
-// defect's first half: the restored coarser window must contain the
-// cursor's period, not merely be "some 12-month window".
+// The restored coarser window must contain the cursor's period, not merely be
+// some 12-month window.
 func TestCostsInteraction_D2_ZoomOut_WindowContainsCursorPeriod(t *testing.T) {
 	c := newCostsController(t, fixedCostsNow)
 	root := topDrill(t, c)
@@ -284,11 +251,9 @@ func TestCostsInteraction_D2_ZoomOut_WindowContainsCursorPeriod(t *testing.T) {
 	}
 }
 
-// TestCostsInteraction_D2_ZoomOut_NeverSlidesBeforeEarliestFetchedPeriod is
-// the live defect's core: zooming in on the OLDEST fetched month then back
-// out re-anchors on the cursor's (now-clipped) week start, which can walk
-// the restored window's start date before any data this session has ever
-// fetched.
+// Zooming in on the oldest fetched month then back out re-anchors on the
+// cursor's clipped week start, which can walk the restored window's start
+// before any data the session fetched.
 func TestCostsInteraction_D2_ZoomOut_NeverSlidesBeforeEarliestFetchedPeriod(t *testing.T) {
 	c := newCostsController(t, fixedCostsNow)
 	root := topDrill(t, c)
@@ -347,19 +312,12 @@ func TestCostsInteraction_D2_ZoomOut_AtYearBoundary_NoOp(t *testing.T) {
 	}
 }
 
-// ===========================================================================
-// D3 — data-through
-// ===========================================================================
-
 func TestCostsInteraction_D3_DataThrough_IsInclusiveLastDay_NotExclusiveQueryEnd(t *testing.T) {
 	c := newCostsController(t, fixedCostsNow)
 	window := topDrill(t, c).Window
-	// A CLOSED period (round7, item 3: an OPEN/current period's DataThrough
-	// now caps at cs.Now's own date instead of End-1 — window[len-1] is
-	// fixedCostsNow's own, still-open month, so this test uses the
-	// second-to-last (already-closed) column to keep pinning the
-	// exclusive-End-vs-inclusive-day contract this test exists for, without
-	// tripping the open-period cap a different test now owns).
+	// An open period's DataThrough caps at cs.Now's date instead of End-1, and
+	// window[len-1] is fixedCostsNow's still-open month, so the second-to-last,
+	// closed column pins the exclusive-End-vs-inclusive-day contract.
 	last := window[len(window)-2] // e.g. Start="2026-06-01" End="2026-07-01" (exclusive), closed relative to fixedCostsNow (2026-07-15)
 
 	c.Handle(messages.CostsLoaded{
@@ -385,9 +343,7 @@ func TestCostsInteraction_D3_DataThrough_IsInclusiveLastDay_NotExclusiveQueryEnd
 func TestCostsInteraction_D3_DataThrough_StaysPinnedToLatestAcrossOutOfOrderFetches(t *testing.T) {
 	c := newCostsController(t, fixedCostsNow)
 	window := topDrill(t, c).Window
-	// Both CLOSED periods (round7, item 3's open-period cap doesn't apply —
-	// see the sibling test above for why window[len-1], fixedCostsNow's own
-	// open month, is avoided here).
+	// Both periods are closed, clear of the open-period cap.
 	older := window[len(window)-4]
 	newer := window[len(window)-2]
 	q := baseServiceQuery()
@@ -406,17 +362,6 @@ func TestCostsInteraction_D3_DataThrough_StaysPinnedToLatestAcrossOutOfOrderFetc
 		t.Errorf("DataThrough after an older period's fetch result arrives second: got %q want %q (must stay pinned to the latest period's inclusive last day)", got, want)
 	}
 }
-
-// ===========================================================================
-// D4/D5 — horizontal window scroll. The viewport-slice mechanism
-// (costsVisibleColumnRange's [start,count) window, ScrollX reconciliation) is
-// BuildViewModel's VisibleCols output, pinned at the typed seam in
-// costs_screen_test.go
-// (TestCostsScreen_BuildViewModel_ViewportSlice_AppliesScrollWindow); this
-// group (four tests, including
-// TestRenderCosts_D4D5_LabelColumnStaysWhileTimeColumnsShift below) pins the
-// full stack (controller -> render).
-// ===========================================================================
 
 func TestCostsInteraction_D4_ScrollRight_AdvancesWindowToNewestPeriod_ClampsThere(t *testing.T) {
 	c := newCostsController(t, fixedCostsNow)
@@ -482,13 +427,8 @@ func TestCostsInteraction_D4D5_NoScrollNeeded_WhenColumnsFitViewport(t *testing.
 	}
 }
 
-// TestRenderCosts_D4D5_LabelColumnStaysWhileTimeColumnsShift is the
-// renderer-level half of D4/D5: RenderCosts is a thin, stateless renderer
-// (per CostsBody's doc comment — "consumed verbatim, never recomputed"), so
-// this asserts the CONTRACT the body-layer scroll fix must uphold, using
-// two manually pre-sliced CostsBody literals simulating "before" and
-// "after" a scroll — it exercises only already-existing symbols and should
-// already be green today.
+// RenderCosts consumes CostsBody verbatim, so two pre-sliced CostsBody
+// literals stand for the frames before and after a scroll.
 func TestRenderCosts_D4D5_LabelColumnStaysWhileTimeColumnsShift(t *testing.T) {
 	before := app.CostsBody{
 		Pivot: "SERVICE", Metric: "invoice", Granularity: "month",

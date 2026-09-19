@@ -1,18 +1,8 @@
 package unit
 
-// app_handlers_theme_profile_test.go — behavioral tests for zero-hit handlers
-// in internal/tui/app_handlers.go:
-//   - handleThemeSelected (0.0%)  — ThemeSelectedMsg → FlashMsg on error paths
-//   - handleProfilesLoaded (0.0%) — profilesLoadedMsg → profile selector pushed
-//
-// handleThemeSelected is triggered by sending ThemeSelectedMsg directly.
-// handleProfilesLoaded is triggered by triggering fetchProfiles() via
-// NavigateMsg{Target: TargetProfile}, executing its cmd, and re-sending
-// the opaque profilesLoadedMsg back to rootApplyMsg.
-//
-// profilesLoadedMsg is unexported from package tui — we obtain it by executing
-// the cmd returned from NavigateMsg{Target: TargetProfile} after setting
-// AWS_CONFIG_FILE to a synthetic config file containing known profiles.
+// profilesLoadedMsg is unexported from package tui, so tests obtain it by
+// executing the cmd returned from NavigateMsg{Target: TargetProfile} with
+// AWS_CONFIG_FILE pointing at a synthetic config.
 
 import (
 	"fmt"
@@ -26,12 +16,6 @@ import (
 	"github.com/k2m30/a9s/v3/core/runtime/messages"
 )
 
-// ─────────────────────────────────────────────────────────────────────────────
-// handleThemeSelected
-// ─────────────────────────────────────────────────────────────────────────────
-
-// TestHandleThemeSelected_InvalidThemeName verifies that sending a ThemeSelectedMsg
-// with an absolute path (which ThemePath rejects) returns a FlashMsg{IsError: true}.
 func TestHandleThemeSelected_InvalidThemeName(t *testing.T) {
 	withTuiVersion(t, "test")
 	m := newRootSizedModel()
@@ -54,10 +38,6 @@ func TestHandleThemeSelected_InvalidThemeName(t *testing.T) {
 	}
 }
 
-// TestHandleThemeSelected_ThemeFileNotFound verifies that selecting a theme
-// whose filename is syntactically valid but missing on disk surfaces a
-// "Cannot read theme: …" FlashMsg to the user.
-//
 // The theme-selected flow is two round trips:
 // ThemeSelected → TaskKindReadThemeFile dispatch → messages.ThemeFileRead →
 // HandleThemeFileRead → FlashIntent (error). The test drives both steps:
@@ -84,9 +64,8 @@ func TestHandleThemeSelected_ThemeFileNotFound(t *testing.T) {
 		t.Fatalf("expected ThemeFileRead.Err to be set for missing file, got nil")
 	}
 
-	// Step 2: feed ThemeFileRead back through the root model.
-	// HandleThemeFileRead branches on Err and emits a FlashIntent which the
-	// h4-a plural-dispatch path re-emits as messages.Flash.
+	// Step 2: HandleThemeFileRead branches on Err and emits a FlashIntent, which
+	// is re-emitted as messages.Flash.
 	_, flashCmd := rootApplyMsg(m, tfr)
 	if flashCmd == nil {
 		t.Fatal("handleThemeFileRead on read error should return a cmd (flash re-emit)")
@@ -104,8 +83,6 @@ func TestHandleThemeSelected_ThemeFileNotFound(t *testing.T) {
 	}
 }
 
-// TestHandleThemeSelected_EmptyThemeName verifies that an empty theme name
-// is rejected by ThemePath and returns a FlashMsg{IsError: true}.
 func TestHandleThemeSelected_EmptyThemeName(t *testing.T) {
 	withTuiVersion(t, "test")
 	m := newRootSizedModel()
@@ -124,8 +101,6 @@ func TestHandleThemeSelected_EmptyThemeName(t *testing.T) {
 	}
 }
 
-// TestHandleThemeSelected_TraversalRejected verifies that a theme name containing
-// ".." is rejected by ThemePath.
 func TestHandleThemeSelected_TraversalRejected(t *testing.T) {
 	withTuiVersion(t, "test")
 	m := newRootSizedModel()
@@ -143,10 +118,6 @@ func TestHandleThemeSelected_TraversalRejected(t *testing.T) {
 		t.Errorf("FlashMsg.IsError = false, want true (traversal attempt rejected)")
 	}
 }
-
-// ─────────────────────────────────────────────────────────────────────────────
-// handleProfilesLoaded
-// ─────────────────────────────────────────────────────────────────────────────
 
 // writeAWSConfig writes a minimal AWS config file with the given profile names
 // to a temp directory and returns the path to the config file.
@@ -168,12 +139,6 @@ func writeAWSConfig(t *testing.T, profiles []string) string {
 	return p
 }
 
-// TestHandleProfilesLoaded_PushesProfileSelectorView verifies that when
-// profilesLoadedMsg arrives the model's stack gains a profile-selector view.
-// We trigger fetchProfiles() indirectly via NavigateMsg{Target: TargetProfile},
-// execute the returned cmd, and pipe the opaque profilesLoadedMsg back into
-// the model — exercising handleProfilesLoaded without constructing the
-// unexported type directly.
 func TestHandleProfilesLoaded_PushesProfileSelectorView(t *testing.T) {
 	withTuiVersion(t, "test")
 
@@ -199,36 +164,21 @@ func TestHandleProfilesLoaded_PushesProfileSelectorView(t *testing.T) {
 		t.Fatalf("fetchProfiles returned FlashMsg — config file may be malformed: %v", loadedMsg)
 	}
 
-	// Feed profilesLoadedMsg back into the model to trigger handleProfilesLoaded.
 	updatedM, cmd := rootApplyMsg(m, loadedMsg)
 
-	// handleProfilesLoaded always returns nil cmd.
 	if cmd != nil {
 		t.Errorf("handleProfilesLoaded should return nil cmd, got non-nil")
 	}
 
-	// The profile selector should now be on the view stack.
 	viewOutput := stripANSI(rootViewContent(updatedM))
 	if !strings.Contains(viewOutput, "staging") && !strings.Contains(viewOutput, "prod") {
 		t.Errorf("after profilesLoadedMsg, view should show profile names; got:\n%s", viewOutput)
 	}
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// handleThemeFileRead — adapter-layer YAML validation (SC-009 boundary fix)
-// ─────────────────────────────────────────────────────────────────────────────
-
-// TestHandleThemeFileRead_MalformedYAML_EmitsErrorFlashNoApply verifies that
-// when ThemeFileRead arrives with syntactically invalid YAML bytes (Err==nil),
-// the adapter calls styles.ThemeFromYAML, sets ParseErr, and the runtime emits
-// a "Bad theme YAML: …" error flash — with no theme-apply side effect.
-//
-// This covers the SC-009 adapter-boundary: the actual parse/validation
-// (real bad bytes → real error) now lives in the TUI adapter's
-// handleThemeFileRead, NOT in the runtime package. The runtime-package
-// tests (TestCore_HandleThemeFileRead_ParseErrorEmitsFlashOnly) only test
-// the ParseErr branch with a synthetic error; this test exercises the real
-// styles.ThemeFromYAML call with genuinely bad bytes.
+// The TUI adapter's handleThemeFileRead parses the bytes (styles.ThemeFromYAML)
+// and sets ParseErr for invalid YAML; the runtime then emits a "Bad theme
+// YAML: …" error flash and applies no theme.
 func TestHandleThemeFileRead_MalformedYAML_EmitsErrorFlashNoApply(t *testing.T) {
 	withTuiVersion(t, "test")
 	tmp := t.TempDir()
@@ -270,6 +220,3 @@ func TestHandleThemeFileRead_MalformedYAML_EmitsErrorFlashNoApply(t *testing.T) 
 		t.Errorf("view changed after malformed theme — theme was unexpectedly applied\nbefore: %q\nafter:  %q", viewBefore, viewAfter)
 	}
 }
-
-// TestHandleProfilesLoaded_SingleProfile verifies edge case: only one profile
-// in the list still results in the selector being pushed and nil cmd.

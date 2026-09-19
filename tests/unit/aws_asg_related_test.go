@@ -29,17 +29,17 @@ func TestRelated_ASG_Registered(t *testing.T) {
 	}
 
 	checkerExpected := map[string]bool{
-		"ec2":    true, // non-nil
-		"tg":     true, // non-nil
-		"subnet": true, // non-nil
-		"alarm":  true, // non-nil
-		"ng":     true, // non-nil
-		"ami":    true, // non-nil (T009)
-		"elb":    true, // non-nil (T010)
-		"role":   true, // non-nil (T011)
-		"sg":     true, // non-nil (T012)
-		"sns":    true, // non-nil (T013)
-		"vpc":    true, // non-nil (T014)
+		"ec2":    true,
+		"tg":     true,
+		"subnet": true,
+		"alarm":  true,
+		"ng":     true,
+		"ami":    true,
+		"elb":    true,
+		"role":   true,
+		"sg":     true,
+		"sns":    true,
+		"vpc":    true,
 	}
 	for target, wantChecker := range checkerExpected {
 		found := false
@@ -619,7 +619,7 @@ func TestRelated_ASG_Subnets_NoRawStruct(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// T009 — checkASGAMI (forward: LC.ImageId or LT.LaunchTemplateData.ImageId)
+// checkASGAMI (forward: LC.ImageId or LT.LaunchTemplateData.ImageId)
 // ---------------------------------------------------------------------------
 
 // TestRelated_ASG_AMI_MatchByLaunchTemplate verifies that checkASGAMI returns
@@ -679,7 +679,6 @@ func TestRelated_ASG_AMI_NoLaunchConfigOrTemplate(t *testing.T) {
 		Fields: map[string]string{},
 		RawStruct: asgtypes.AutoScalingGroup{
 			AutoScalingGroupName: aws.String("my-asg"),
-			// No LaunchConfigurationName, no LaunchTemplate
 		},
 	}
 
@@ -709,7 +708,7 @@ func TestRelated_ASG_AMI_WrongRawStruct(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// T010 — checkASGELB (forward: LoadBalancerNames + resolve TG ARNs via ELBv2)
+// checkASGELB (forward: LoadBalancerNames + resolve TG ARNs via ELBv2)
 // ---------------------------------------------------------------------------
 
 // TestRelated_ASG_ELB_MatchByClassicELBNames verifies that checkASGELB counts
@@ -776,7 +775,7 @@ func TestRelated_ASG_ELB_WrongRawStruct(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// T011 — checkASGRole (forward: ServiceLinkedRoleARN + LC/LT IamInstanceProfile)
+// checkASGRole (forward: ServiceLinkedRoleARN + LC/LT IamInstanceProfile)
 // ---------------------------------------------------------------------------
 
 // TestRelated_ASG_Role_MatchByServiceLinkedRole verifies that checkASGRole
@@ -807,7 +806,7 @@ func TestRelated_ASG_Role_MatchByServiceLinkedRole(t *testing.T) {
 		t.Errorf("Count = %d, want >= 1 (service-linked role found)", result.Count())
 	}
 	// Role pivots return the bare RoleName, not the full ARN, so the role
-	// cache's FetchByIDs (keyed on RoleName) can resolve it — docs/resources/asg.md §2 `role`.
+	// cache's FetchByIDs (keyed on RoleName) can resolve it.
 	wantRoleName := "AWSServiceRoleForAutoScaling"
 	found := false
 	for _, id := range result.ResourceIDs() {
@@ -855,7 +854,7 @@ func TestRelated_ASG_Role_MatchByLaunchConfigInstanceProfile(t *testing.T) {
 	if result.Count() < 1 {
 		t.Errorf("Count = %d, want >= 1 (role from instance profile)", result.Count())
 	}
-	// Role pivots return the bare RoleName, not the full ARN — docs/resources/asg.md §2 `role`.
+	// Role pivots return the bare RoleName, not the full ARN.
 	wantRoleName := "my-ec2-role"
 	found := false
 	for _, id := range result.ResourceIDs() {
@@ -885,7 +884,6 @@ func TestRelated_ASG_Role_NoRoles(t *testing.T) {
 		Fields: map[string]string{},
 		RawStruct: asgtypes.AutoScalingGroup{
 			AutoScalingGroupName: aws.String("my-asg"),
-			// No ServiceLinkedRoleARN, no LC, no LT
 		},
 	}
 
@@ -915,7 +913,7 @@ func TestRelated_ASG_Role_WrongRawStruct(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// T012 — checkASGSG (forward: LC.SecurityGroups or LT.LaunchTemplateData.SecurityGroupIds)
+// checkASGSG (forward: LC.SecurityGroups or LT.LaunchTemplateData.SecurityGroupIds)
 // ---------------------------------------------------------------------------
 
 // TestRelated_ASG_SG_MatchByLaunchConfig verifies that checkASGSG returns the
@@ -966,7 +964,6 @@ func TestRelated_ASG_SG_NoLaunchConfigOrTemplate(t *testing.T) {
 		Fields: map[string]string{},
 		RawStruct: asgtypes.AutoScalingGroup{
 			AutoScalingGroupName: aws.String("my-asg"),
-			// No LaunchConfigurationName, no LaunchTemplate
 		},
 	}
 
@@ -996,8 +993,8 @@ func TestRelated_ASG_SG_WrongRawStruct(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// T013 — checkASGSNS (forward: DescribeNotificationConfigurations.TopicARN +
-//                              DescribeLifecycleHooks.NotificationTargetARN)
+// checkASGSNS (forward: DescribeNotificationConfigurations.TopicARN +
+//                       DescribeLifecycleHooks.NotificationTargetARN)
 // ---------------------------------------------------------------------------
 
 // TestRelated_ASG_SNS_MatchByNotificationConfig verifies that checkASGSNS returns
@@ -1080,7 +1077,7 @@ func TestRelated_ASG_SNS_WrongRawStruct(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// T014 — checkASGVPC (forward: VPCZoneIdentifier → ec2:DescribeSubnets.VpcId)
+// checkASGVPC (forward: VPCZoneIdentifier → ec2:DescribeSubnets.VpcId)
 // ---------------------------------------------------------------------------
 
 // TestRelated_ASG_VPC_MatchBySubnets verifies that checkASGVPC resolves the
@@ -1321,7 +1318,7 @@ func TestRelated_ASG_Role_MatchByLaunchTemplateInstanceProfile(t *testing.T) {
 	if result.Count() < 1 {
 		t.Errorf("Count = %d, want >= 1 (role from LT instance profile ARN)", result.Count())
 	}
-	// Role pivots return the bare RoleName, not the full ARN — docs/resources/asg.md §2 `role`.
+	// Role pivots return the bare RoleName, not the full ARN.
 	wantRoleName := "ec2-role-from-lt"
 	found := false
 	for _, id := range result.ResourceIDs() {

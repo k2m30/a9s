@@ -1,10 +1,7 @@
 package unit
 
-// help_test.go — the CloudTrail "t" key appears in help: the "t"/cloudtrail
-// keybinding entry itself (not the ct-events data-format legend, which is
-// covered by views_help_ct_events_legend_test.go /
-// views_help_resource_wiring_test.go) appears in the general keybinding list
-// for ResourceList/Detail/YAML help contexts, through the live
+// help_test.go — the "t"/cloudtrail keybinding entry appears in the general
+// keybinding list for ResourceList/Detail/YAML help contexts, through the live
 // NewHelpWithResource constructor (buildGroups/domainContext).
 
 import (

@@ -1,16 +1,11 @@
-// detail_controller_scroll_follow_test.go — TDD red-phase pin for the
-// detail-view scroll-follows-cursor bug: applyDetailActions (core/app/
-// detail_cursor.go) moves DetailState.FieldCursor on ActionMoveUp/MoveDown/
-// MoveBottom but never reconciles DetailState.ScrollY, so the highlighted
-// field can scroll off the bottom of the viewport. ActionMoveTop and
-// PageUp/PageDown already mutate ScrollY; MoveUp/MoveDown/MoveBottom must
-// reconcile it the same way, using the controller-stored DetailState.
-// ViewportHeight (set once via Controller.SetDetailViewportHeight) as the
-// renderer-supplied usable viewport height — the controller is the single
-// owner of scroll reconciliation, so move actions no longer read Action.N
-// per key-dispatch call site (the live path forgot to pass it — the bug)
-// (mirrors the legacy syncViewportToCursor in
-// internal/tui/views/detail_helpers.go:250-261).
+// detail_controller_scroll_follow_test.go — ActionMoveUp/MoveDown/MoveBottom
+// in applyDetailActions (core/app/detail_cursor.go) reconcile
+// DetailState.ScrollY with DetailState.FieldCursor, the same way
+// ActionMoveTop and PageUp/PageDown do, using the controller-stored
+// DetailState.ViewportHeight (set via Controller.SetDetailViewportHeight) as
+// the renderer-supplied usable viewport height. The controller is the single
+// owner of scroll reconciliation, so no key-dispatch call site has to pass a
+// height.
 package unit_test
 
 import (
@@ -71,11 +66,9 @@ func assertScrollInvariant(t *testing.T, body *app.DetailBody, height int) {
 	}
 }
 
-// TestDetailControllerScrollFollowsCursorDown pins the fix for
-// ActionMoveDown: repeatedly moving the cursor down must keep it inside the
-// visible viewport, and once the cursor has moved past the first page the
-// viewport must actually have scrolled (ScrollY>0) — not just left the
-// cursor invisibly off-screen.
+// TestDetailControllerScrollFollowsCursorDown: repeatedly moving the cursor
+// down must keep it inside the visible viewport, and once the cursor has moved
+// past the first page the viewport must actually have scrolled (ScrollY>0).
 func TestDetailControllerScrollFollowsCursorDown(t *testing.T) {
 	c := newScrollProbeController(t)
 	c.SetDetailViewportHeight(scrollProbeHeight)
@@ -105,9 +98,8 @@ func TestDetailControllerScrollFollowsCursorDown(t *testing.T) {
 	}
 }
 
-// TestDetailControllerMoveBottomScrolls pins the fix for ActionMoveBottom:
-// jumping straight to the last field must also scroll the viewport so the
-// selected (last) field is actually visible.
+// TestDetailControllerMoveBottomScrolls: jumping straight to the last field
+// must also scroll the viewport so the selected (last) field is visible.
 func TestDetailControllerMoveBottomScrolls(t *testing.T) {
 	c := newScrollProbeController(t)
 	c.SetDetailViewportHeight(scrollProbeHeight)
@@ -127,13 +119,11 @@ func TestDetailControllerMoveBottomScrolls(t *testing.T) {
 	assertScrollInvariant(t, body, scrollProbeHeight)
 }
 
-// TestDetailControllerMoveUpReturnsScrollToTop pins the fix for
-// ActionMoveUp: walking the cursor back up from the bottom to the very
-// first field must keep it inside the viewport at every step (not just at
-// the final position — ScrollY sitting at 0 throughout, per the current
-// bug, would otherwise satisfy a end-of-walk-only "ScrollY==0" assertion by
-// accident) and must bring the viewport back to ScrollY==0 once the cursor
-// reaches the top.
+// TestDetailControllerMoveUpReturnsScrollToTop: walking the cursor back up
+// from the bottom to the very first field must keep it inside the viewport at
+// every step and bring the viewport back to ScrollY==0 at the top. Checking
+// every step matters: a ScrollY that never moved would satisfy an
+// end-of-walk-only ScrollY==0 check.
 func TestDetailControllerMoveUpReturnsScrollToTop(t *testing.T) {
 	c := newScrollProbeController(t)
 	c.SetDetailViewportHeight(scrollProbeHeight)
@@ -162,12 +152,10 @@ func TestDetailControllerMoveUpReturnsScrollToTop(t *testing.T) {
 	}
 }
 
-// TestDetailControllerMoveDownNoHeightLeavesScrollUnchanged is a regression
-// guard: when the controller was never told the viewport height (no
-// SetDetailViewportHeight call, so DetailState.ViewportHeight stays at its
-// zero value, e.g. a screen not yet rendered by any renderer), scroll
-// reconciliation must be skipped entirely — ScrollY stays whatever it
-// already was. This must stay green across the fix.
+// TestDetailControllerMoveDownNoHeightLeavesScrollUnchanged: when the
+// controller was never told the viewport height (DetailState.ViewportHeight at
+// its zero value, e.g. a screen not yet rendered by any renderer), scroll
+// reconciliation is skipped and ScrollY stays whatever it already was.
 func TestDetailControllerMoveDownNoHeightLeavesScrollUnchanged(t *testing.T) {
 	c := newScrollProbeController(t)
 

@@ -684,12 +684,10 @@ func TestErrorWrapping_AllFetchers(t *testing.T) {
 				t.Fatal("expected an error, got nil")
 			}
 
-			// Must wrap the original error
 			if !errors.Is(err, sentinel) {
 				t.Errorf("error does not wrap sentinel: %v", err)
 			}
 
-			// Must contain the descriptive context
 			if !strings.Contains(err.Error(), tt.contains) {
 				t.Errorf("error %q does not contain %q", err.Error(), tt.contains)
 			}

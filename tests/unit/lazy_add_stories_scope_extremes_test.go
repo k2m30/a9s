@@ -1,13 +1,5 @@
 package unit
 
-// lazy_add_stories_scope_extremes_test.go — orchestration unit tests for
-// Section B (LA-010..LA-017) and Section H (LA-070..LA-072) of
-// tests/stories/lazy_add.md.
-//
-// Pattern: synthetic source + target types via unique "test-<la-id>-*" short
-// names; t.Cleanup unregisters every Register* call so tests are isolated.
-// Mirrors the style of lazy_add_orchestration_edges_test.go.
-
 import (
 	"context"
 	"fmt"
@@ -21,15 +13,8 @@ import (
 	"github.com/k2m30/a9s/v3/core/runtime/messages"
 )
 
-// ---------------------------------------------------------------------------
-// LA-010 — Mixed in-scope + out-of-scope targets resolve together
-// ---------------------------------------------------------------------------
-
-// Test_LA_010_MixedInScopeAndOutOfScope verifies that when a checker emits
-// two IDs — one already in cache (in-scope) and one not in cache
-// (out-of-scope) — the LazyAddedResources slice contains only the
-// out-of-scope resource, while Result.Count and Result.ResourceIDs preserve
-// both IDs.
+// Only IDs missing from the target cache are lazy-added; Count and ResourceIDs
+// keep every checker-emitted ID.
 func Test_LA_010_MixedInScopeAndOutOfScope(t *testing.T) {
 	const (
 		srcType    = "test-la010-source"
@@ -68,7 +53,6 @@ func Test_LA_010_MixedInScopeAndOutOfScope(t *testing.T) {
 	m := newBlessedModel(t, "testprofile", "us-east-1")
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 36})
 
-	// Pre-seed the target cache with the in-scope resource via CachedPages.
 	inScopeRes := resource.Resource{ID: inScopeID, Name: inScopeID}
 	m, _ = rootApplyMsg(m, messages.RelatedCheckResult{
 		ResourceType:     srcType,
@@ -94,12 +78,10 @@ func Test_LA_010_MixedInScopeAndOutOfScope(t *testing.T) {
 		t.Fatal("no RelatedCheckResultMsg received")
 	}
 
-	// Count must equal the checker's declared count.
 	if resultMsg.Result.Count() != 2 {
 		t.Errorf("Result.Count: got %d, want 2", resultMsg.Result.Count())
 	}
 
-	// ResourceIDs must contain both IDs.
 	idSet := make(map[string]bool)
 	for _, id := range resultMsg.Result.ResourceIDs() {
 		idSet[id] = true
@@ -111,8 +93,6 @@ func Test_LA_010_MixedInScopeAndOutOfScope(t *testing.T) {
 		t.Errorf("Result.ResourceIDs missing out-of-scope ID %q; got %v", outScopeID, resultMsg.Result.ResourceIDs())
 	}
 
-	// LazyAddedResources must contain only the out-of-scope resource (the in-scope
-	// one was already in cache and must NOT be re-fetched).
 	if resultMsg.LazyAddedResources == nil {
 		t.Fatal("LazyAddedResources is nil — out-of-scope resource was not fetched")
 	}
@@ -124,19 +104,11 @@ func Test_LA_010_MixedInScopeAndOutOfScope(t *testing.T) {
 		t.Errorf("LazyAddedResources[%s][0].ID = %q, want %q", targetType, lazySlice[0].ID, outScopeID)
 	}
 
-	// FetchByIDs must have been called exactly once (only for the missing ID).
 	if atomic.LoadInt32(&fetchByIDsCalled) != 1 {
 		t.Errorf("FetchByIDs call count: got %d, want 1", atomic.LoadInt32(&fetchByIDsCalled))
 	}
 }
 
-// ---------------------------------------------------------------------------
-// LA-011 — All out-of-scope targets populate the drill
-// ---------------------------------------------------------------------------
-
-// Test_LA_011_AllOutOfScopePopulatesDrill verifies that when a checker emits
-// 3 IDs none of which are in the target cache, all 3 are fetched and appear
-// in LazyAddedResources.
 func Test_LA_011_AllOutOfScopePopulatesDrill(t *testing.T) {
 	const (
 		srcType    = "test-la011-source"
@@ -193,13 +165,6 @@ func Test_LA_011_AllOutOfScopePopulatesDrill(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// LA-012 — All in-scope targets: no lazy-add needed
-// ---------------------------------------------------------------------------
-
-// Test_LA_012_AllInScopeNoLazyAdd verifies that when a checker emits IDs
-// that are all already in the target cache, FetchByIDs is never called and
-// LazyAddedResources is nil.
 func Test_LA_012_AllInScopeNoLazyAdd(t *testing.T) {
 	const (
 		srcType    = "test-la012-source"
@@ -234,7 +199,6 @@ func Test_LA_012_AllInScopeNoLazyAdd(t *testing.T) {
 	m := newBlessedModel(t, "testprofile", "us-east-1")
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 36})
 
-	// Pre-seed cache with both resources so they are "in-scope" / already loaded.
 	m, _ = rootApplyMsg(m, messages.RelatedCheckResult{
 		ResourceType:     srcType,
 		SourceResourceID: "src-la012-seed",
@@ -259,48 +223,25 @@ func Test_LA_012_AllInScopeNoLazyAdd(t *testing.T) {
 		t.Fatal("no RelatedCheckResultMsg received")
 	}
 
-	// No lazy-add should have occurred — both IDs were in cache.
 	if resultMsg.LazyAddedResources != nil {
 		t.Errorf("LazyAddedResources should be nil when all IDs are in cache; got %v", resultMsg.LazyAddedResources)
 	}
 
-	// FetchByIDs must NOT have been called.
 	if calls := atomic.LoadInt32(&fetchByIDsCallCount); calls != 0 {
 		t.Errorf("FetchByIDs call count: got %d, want 0 (all IDs were in cache)", calls)
 	}
 }
 
-// ---------------------------------------------------------------------------
-// LA-013 — Duplicate IDs: already covered by existing test
-// ---------------------------------------------------------------------------
-
-// Test_LA_013_DuplicateIDs_Dedup is a coverage-map placeholder.
-// The actual behavior is fully verified by
-// TestLazyAdd_MissingFromCache_DedupsRepeatedIDsInChecker in
-// lazy_add_orchestration_edges_test.go.
 func Test_LA_013_DuplicateIDs_Dedup(t *testing.T) {
 	t.Skip("covered by TestLazyAdd_MissingFromCache_DedupsRepeatedIDsInChecker in lazy_add_orchestration_edges_test.go")
 }
 
-// ---------------------------------------------------------------------------
-// LA-014 — Empty pivot (Count=0): OCQ#1
-// ---------------------------------------------------------------------------
-
-// Test_LA_014_EmptyPivot_OCQ is skipped: the behavior when Count=0 (whether
-// Enter is a no-op or opens the scope-filtered top-level list) is an open
-// contract question and not yet specified. See lazy_add.md OCQ #1.
 func Test_LA_014_EmptyPivot_OCQ(t *testing.T) {
 	t.Skip("OCQ#1 — LA-014: empty pivot (Count=0) drill behavior is unspecified. See lazy_add.md.")
 }
 
-// ---------------------------------------------------------------------------
-// LA-015 — ARN vs bare name: checker emits full ARN, resource has bare ID
-// ---------------------------------------------------------------------------
-
-// Test_LA_015_ARNvsBareNameTolerance verifies that when a checker emits a
-// full ARN and FetchByIDs returns a resource with a bare ID, the wire is
-// tolerant: Result.ResourceIDs preserves the ARN (the checker-emitted value)
-// and LazyAddedResources contains the resource with the bare ID.
+// ResourceIDs keep the checker-emitted ARN even when FetchByIDs returns the
+// resource under its bare ID.
 func Test_LA_015_ARNvsBareNameTolerance(t *testing.T) {
 	const (
 		srcType    = "test-la015-source"
@@ -322,7 +263,6 @@ func Test_LA_015_ARNvsBareNameTolerance(t *testing.T) {
 	})
 
 	resource.SetFetchByIDsForTest(targetType, func(_ context.Context, _ any, _ []string) ([]resource.Resource, error) {
-		// Returns resource with bare ID regardless of the ARN input.
 		return []resource.Resource{{ID: bareID, Name: bareID}}, nil
 	})
 
@@ -346,7 +286,6 @@ func Test_LA_015_ARNvsBareNameTolerance(t *testing.T) {
 		t.Fatal("no RelatedCheckResultMsg received")
 	}
 
-	// The checker-emitted ARN must be preserved in ResourceIDs.
 	if len(resultMsg.Result.ResourceIDs()) == 0 {
 		t.Fatal("Result.ResourceIDs is empty — checker ARN was not preserved")
 	}
@@ -354,7 +293,6 @@ func Test_LA_015_ARNvsBareNameTolerance(t *testing.T) {
 		t.Errorf("Result.ResourceIDs()[0] = %q, want full ARN %q", resultMsg.Result.ResourceIDs()[0], fullARN)
 	}
 
-	// LazyAddedResources must contain the resource with the bare ID.
 	if resultMsg.LazyAddedResources == nil {
 		t.Fatal("LazyAddedResources is nil — FetchByIDs was not called")
 	}
@@ -367,13 +305,6 @@ func Test_LA_015_ARNvsBareNameTolerance(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// LA-016 — UUID vs alias display
-// ---------------------------------------------------------------------------
-
-// Test_LA_016_UUIDvsAliasDisplay verifies that when a checker emits a KMS key
-// UUID and FetchByIDs returns a resource with an alias field, the alias is
-// preserved in the LazyAddedResources entry.
 func Test_LA_016_UUIDvsAliasDisplay(t *testing.T) {
 	const (
 		srcType    = "test-la016-source"
@@ -442,24 +373,10 @@ func Test_LA_016_UUIDvsAliasDisplay(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// LA-017 — Inline IAM policy as policy rows: OCQ#2
-// ---------------------------------------------------------------------------
-
-// Test_LA_017_InlinePolicy_OCQ is skipped: whether inline IAM policies surface
-// as rows in the policy resource list during a drill-through is an open
-// contract question. See lazy_add.md OCQ #2.
 func Test_LA_017_InlinePolicy_OCQ(t *testing.T) {
 	t.Skip("OCQ#2 — LA-017: inline IAM policies as `policy` rows in drill-through is unspecified. See lazy_add.md.")
 }
 
-// ---------------------------------------------------------------------------
-// LA-070 — 100 IDs drill without timeout
-// ---------------------------------------------------------------------------
-
-// Test_LA_070_100IDsDrillWithoutTimeout verifies that a checker emitting 100
-// IDs completes within 5 seconds, all 100 resources are returned via
-// LazyAddedResources, and there are no duplicate IDs.
 func Test_LA_070_100IDsDrillWithoutTimeout(t *testing.T) {
 	const (
 		srcType    = "test-la070-source"
@@ -531,7 +448,6 @@ func Test_LA_070_100IDsDrillWithoutTimeout(t *testing.T) {
 		if len(lazySlice) != idCount {
 			t.Fatalf("LazyAddedResources[%s]: got %d resources, want %d", targetType, len(lazySlice), idCount)
 		}
-		// Verify no duplicate IDs.
 		seen := make(map[string]bool, idCount)
 		for _, r := range lazySlice {
 			if seen[r.ID] {
@@ -544,21 +460,8 @@ func Test_LA_070_100IDsDrillWithoutTimeout(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// LA-071 — Malformed IDs filtered
-// ---------------------------------------------------------------------------
-
-// Test_LA_071_MalformedIDsFiltered pins the missingFromCache behavior for
-// malformed inputs: empty strings are filtered, duplicates are deduplicated
-// in first-appearance order, but non-empty semantically-invalid strings like
-// "arn:aws:" are passed through (the orchestrator does NOT validate semantic
-// shape, only empty-string).
-//
-// Checker emits: ["", "arn:aws:", "kms-valid-la071", "", "kms-valid-la071"]
-// Expected FetchByIDs input: ["arn:aws:", "kms-valid-la071"]
-//   - "" is filtered (empty string guard in missingFromCache line 399)
-//   - "kms-valid-la071" appears once (dedup, first appearance at index 2)
-//   - "arn:aws:" is non-empty and passes through (no semantic validation)
+// missingFromCache drops empty IDs and duplicates but does not validate ID
+// shape: a malformed non-empty ID reaches FetchByIDs.
 func Test_LA_071_MalformedIDsFiltered(t *testing.T) {
 	const (
 		srcType    = "test-la071-source"
@@ -620,10 +523,6 @@ func Test_LA_071_MalformedIDsFiltered(t *testing.T) {
 		t.Fatal("FetchByIDs was not called — lazy-add path was not exercised")
 	}
 
-	// Pin observed behavior: "" is filtered, duplicates are deduped, but
-	// "arn:aws:" (non-empty, semantically invalid) passes through.
-	// Expected: ["arn:aws:", "kms-valid-la071"] (first-appearance order from
-	// the non-empty, non-duplicate subset).
 	wantIDs := []string{"arn:aws:", "kms-valid-la071"}
 	if len(capturedIDs) != len(wantIDs) {
 		t.Fatalf("FetchByIDs received %d IDs %v, want %d %v",
@@ -636,14 +535,6 @@ func Test_LA_071_MalformedIDsFiltered(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// LA-072 — ID set grows across re-drill
-// ---------------------------------------------------------------------------
-
-// Test_LA_072_IDSetGrowsAcrossRedrill verifies that when a checker first emits
-// 2 IDs (first drill), then emits 3 IDs (second drill, superset), the second
-// result has Count==3 and LazyAddedResources contains only the new third ID
-// (the first two were already cached from the prior lazy-add).
 func Test_LA_072_IDSetGrowsAcrossRedrill(t *testing.T) {
 	const (
 		srcType    = "test-la072-source"
@@ -654,7 +545,6 @@ func Test_LA_072_IDSetGrowsAcrossRedrill(t *testing.T) {
 	id2 := "policy-la072-002"
 	id3 := "policy-la072-003"
 
-	// checkerIDs is swapped between the two drill phases.
 	checkerIDs := []string{id1, id2}
 
 	resource.SetRelatedForTest(srcType, []resource.RelatedDef{
@@ -687,7 +577,6 @@ func Test_LA_072_IDSetGrowsAcrossRedrill(t *testing.T) {
 
 	srcRes := resource.Resource{ID: "src-la072-001"}
 
-	// --- First drill: checker emits id1, id2 ---
 	var batchCmd tea.Cmd
 	m, batchCmd = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetDetail,
@@ -709,17 +598,12 @@ func Test_LA_072_IDSetGrowsAcrossRedrill(t *testing.T) {
 		t.Fatalf("first drill LazyAddedResources[%s]: got %d, want 2", targetType, len(firstResult.LazyAddedResources[targetType]))
 	}
 
-	// Apply the first result's LazyAddedResources back to the model so the
-	// model's cache is seeded with id1 and id2 (simulating the app write-back).
 	m, _ = rootApplyMsg(m, firstResult)
 
-	// --- Second drill: checker now emits id1, id2, id3 (superset) ---
 	checkerIDs = []string{id1, id2, id3}
 
-	// A plain re-navigate would hit replayRelatedCache's cache-hit suppression
-	// (D6: no re-fan-out over cached data) and never invoke the checker again,
-	// so Ctrl+R (the only unconditional re-dispatch entry point) drives the
-	// second, genuinely fresh drill.
+	// A plain re-navigate replays the cached related result without running the
+	// checker; Ctrl+R invalidates the cache and runs it again.
 	_, batchCmd = rootApplyMsg(m, ctrlR())
 
 	secondResult, found := collectRelatedResult(t, batchCmd)
@@ -731,7 +615,6 @@ func Test_LA_072_IDSetGrowsAcrossRedrill(t *testing.T) {
 		t.Errorf("second drill Result.Count: got %d, want 3", secondResult.Result.Count())
 	}
 
-	// LazyAddedResources must contain only id3 — id1 and id2 are now in cache.
 	if secondResult.LazyAddedResources == nil {
 		t.Fatal("second drill: LazyAddedResources is nil — id3 was not fetched")
 	}

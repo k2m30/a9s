@@ -84,9 +84,8 @@ func fullIntegrationExpectedFirstPageCount(t *testing.T, clients *awsclient.Serv
 	}
 	result, err := pf(ctx, clients, "")
 	if err != nil && len(result.Resources) == 0 {
-		// Rows + composite error together are the designed E5 partial-
-		// success outcome (listed-but-denied demo witnesses); only a
-		// row-less error is a harness failure.
+		// Rows plus a composite error are a partial success (listed-but-denied
+		// demo resources); only a row-less error is a harness failure.
 		t.Fatalf("fetcher for %s (%s) failed: %v", rt.ShortName, rt.Name, err)
 	}
 	truncated := result.Pagination != nil && result.Pagination.IsTruncated
@@ -259,8 +258,8 @@ func fullIntegrationExpectedRelatedCounts(t *testing.T, clients *awsclient.Servi
 		}
 		result, err := pf(ctx, clients, "")
 		if err != nil && len(result.Resources) == 0 {
-			// E5 partial success (see above): degraded rows may accompany a
-			// composite error; only a row-less error fails the harness.
+			// Degraded rows may accompany a composite error; only a row-less
+			// error fails the harness.
 			t.Fatalf("related target fetcher for %s -> %s failed: %v", sourceType, def.TargetType, err)
 		}
 		truncated := result.Pagination != nil && result.Pagination.IsTruncated
@@ -414,11 +413,10 @@ func fullIntegrationEnterFocusedRelated(t *testing.T, m *tui.Model, targetType, 
 
 func fullIntegrationRunRelatedChecksFromStartCmd(t *testing.T, m *tui.Model, startCmd tea.Cmd, resourceType string) []messages.RelatedCheckResult {
 	t.Helper()
-	// The related-check fan-out is now dispatched directly by the
-	// navigation flow itself — startCmd (may be a tea.BatchMsg carrying
-	// other detail-load messages, e.g. EnrichDetailMsg, alongside them)
-	// already carries the terminal messages.RelatedCheckResult leaves, with
-	// no intermediate RelatedCheckStarted trigger message to find first.
+	// The navigation flow dispatches the related-check fan-out itself:
+	// startCmd (possibly a tea.BatchMsg carrying other detail-load messages,
+	// e.g. EnrichDetailMsg) carries the terminal messages.RelatedCheckResult
+	// leaves.
 	results := fullIntegrationCollectRelatedCheckResults(startCmd)
 	return fullIntegrationApplyStartedAndCollectResults(t, m, results, resourceType)
 }
@@ -495,12 +493,11 @@ func fullIntegrationAssertRelatedResults(t *testing.T, sourceType string, expect
 			t.Fatalf("%s: missing related result %q; got %v", context, name, gotByName)
 		}
 		t.Logf("%s related result %s: actual=%d expected=%d", context, name, rr.Count(), want)
-		// Post-#58 a deferred/unknown/loading view result carries no
-		// authoritative count — it is State, not Count==-1, that marks it. When
-		// the def registers no target prefetch, the view could not resolve it
-		// from its own cache while the oracle did (from its separately prefetched
-		// cache): the documented cold-cache contract. Skip the strict view
-		// assertion for it, exactly as the old Count==-1 path did.
+		// A deferred/unknown/loading result carries no authoritative count —
+		// State marks it, not Count. When the def registers no target prefetch,
+		// the view could not resolve it from its own cache while the oracle did
+		// (from its separately prefetched cache): the documented cold-cache
+		// contract. Skip the strict view assertion for it.
 		if rr.State() != domain.RelatedResolved {
 			if !prefetched[name] {
 				coldUnknown[name] = true

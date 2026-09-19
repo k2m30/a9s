@@ -122,8 +122,7 @@ func TestLambdaPaginatedFetcher_DoesNotCallEventSourceAPI(t *testing.T) {
 }
 
 // TestLambdaPaginatedFetcher_DoesNotCallEventSourceAPI_ManyFunctions verifies
-// the N+1 fix holds with a larger function count (5 functions → still 0
-// event-source calls, not 5).
+// that 5 functions still produce 0 event-source calls.
 func TestLambdaPaginatedFetcher_DoesNotCallEventSourceAPI_ManyFunctions(t *testing.T) {
 	fetcher := resource.GetPaginatedFetcher("lambda")
 	if fetcher == nil {

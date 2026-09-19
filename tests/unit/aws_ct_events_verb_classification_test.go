@@ -1,12 +1,5 @@
 package unit
 
-// Tests for §2.1 verb classification table.
-//
-// TestClassifyCTVerb_V2Table is a single table-driven test covering every entry
-// in the §2.1 verb table plus the bug-fix cases (BatchGetImage, Decrypt, Encrypt,
-// Sign, ReEncrypt, GenerateDataKey*) for ClassifyCTVerb in
-// core/aws/ct_events.go.
-
 import (
 	"testing"
 
@@ -14,7 +7,7 @@ import (
 )
 
 func TestClassifyCTVerb_V2Table(t *testing.T) {
-	// Spec: §2.1 verb table — order matters, first match wins.
+	// Order matters: first match wins.
 	cases := []struct {
 		name          string
 		eventName     string
@@ -23,7 +16,7 @@ func TestClassifyCTVerb_V2Table(t *testing.T) {
 		want          string
 	}{
 		// ---------------------------------------------------------------
-		// Destructive prefixes — §2.1 D row
+		// Destructive prefixes
 		// ---------------------------------------------------------------
 		{"DeleteBucket", "DeleteBucket", "", "", "D"},
 		{"TerminateInstances", "TerminateInstances", "", "", "D"},
@@ -41,7 +34,7 @@ func TestClassifyCTVerb_V2Table(t *testing.T) {
 		{"DestroyCluster", "DestroyCluster", "", "", "D"},
 
 		// ---------------------------------------------------------------
-		// Read prefixes — §2.1 R row (first block)
+		// Read prefixes
 		// ---------------------------------------------------------------
 		{"GetObject", "GetObject", "", "", "R"},
 		{"DescribeInstances", "DescribeInstances", "", "", "R"},
@@ -57,13 +50,12 @@ func TestClassifyCTVerb_V2Table(t *testing.T) {
 		{"VerifySignature", "VerifySignature", "", "", "R"},
 
 		// ---------------------------------------------------------------
-		// Bug-fix cases per §2.1 — currently misclassified in production code
-		// ---------------------------------------------------------------
-		// BatchGet* → R (was W because "Batch" prefix hit writePrefixes first)
+		// BatchGet* and KMS use-key ops
+		// BatchGet* → R even though "Batch" is a write prefix
 		{"BatchGetImage_R", "BatchGetImage", "", "", "R"},
 		{"BatchGetSecretValue_R", "BatchGetSecretValue", "", "", "R"},
 		{"BatchGetItem_R", "BatchGetItem", "", "", "R"},
-		// KMS use-key ops → R (no resource mutation per §2.1 note + §10 decision #5)
+		// KMS use-key ops → R (no resource mutation)
 		{"Decrypt_R", "Decrypt", "", "", "R"},
 		{"Encrypt_R", "Encrypt", "", "", "R"},
 		{"Sign_R", "Sign", "", "", "R"},
@@ -72,7 +64,7 @@ func TestClassifyCTVerb_V2Table(t *testing.T) {
 		{"GenerateDataKeyWithoutPlaintext_R", "GenerateDataKeyWithoutPlaintext", "", "", "R"},
 
 		// ---------------------------------------------------------------
-		// §1.4 exact-match overrides — all AssumeRole* ops are R (STS session-vending).
+		// Exact-match overrides — all AssumeRole* ops are R (STS session-vending).
 		// Identity exchange, not state mutation. Exact-matched before the W prefix table runs.
 		// ---------------------------------------------------------------
 		// AssumeRoleWithWebIdentity: exact-match R (IRSA/OIDC — not a write op)
@@ -83,7 +75,7 @@ func TestClassifyCTVerb_V2Table(t *testing.T) {
 		{"AssumeRoleWithSAML_R", "AssumeRoleWithSAML", "", "", "R"},
 
 		// ---------------------------------------------------------------
-		// Write prefixes — §2.1 W row
+		// Write prefixes
 		// ---------------------------------------------------------------
 		{"CreateBucket", "CreateBucket", "", "", "W"},
 		{"PutObject", "PutObject", "", "", "W"},
@@ -99,21 +91,18 @@ func TestClassifyCTVerb_V2Table(t *testing.T) {
 		{"RunInstances", "RunInstances", "", "", "W"},
 		{"RebootInstances", "RebootInstances", "", "", "W"},
 		{"TagResource", "TagResource", "", "", "W"},
-		// BatchWriteItem: BatchGet prefix → R, but BatchWrite hits W ("Batch" prefix is W,
-		// but §2.1 says BatchGet → R and other Batch* fall through to W/D normally).
-		// "BatchWriteItem" has prefix "Batch" (W) but does NOT have prefix "BatchGet" (R),
-		// so it stays W.
+		// BatchWriteItem has prefix "Batch" (W) but not "BatchGet" (R), so it stays W.
 		{"BatchWriteItem_W", "BatchWriteItem", "", "", "W"},
 
 		// ---------------------------------------------------------------
-		// Category-based verbs — §2.1
+		// Category-based verbs
 		// ---------------------------------------------------------------
 		{"Insight_I", "ApiCallRateInsight", "Insight", "", "I"},
 		{"NetworkActivity_N", "VpcEndpointAccess", "NetworkActivity", "", "N"},
 		{"AwsServiceEvent_S", "InvokeExecution", "", "AwsServiceEvent", "S"},
 
 		// ---------------------------------------------------------------
-		// Unknown verb — §2.1 fallback
+		// Unknown verb fallback
 		// ---------------------------------------------------------------
 		{"Unknown_Question", "FrobnicateWidgets", "", "", "?"},
 	}

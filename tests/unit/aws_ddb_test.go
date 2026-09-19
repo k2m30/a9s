@@ -1,25 +1,5 @@
 package unit
 
-// aws_ddb_test.go — fetcher behavior tests for DynamoDB Tables.
-//
-// Tests drive FetchDynamoDBTablesPage with stubbed DDBListTablesAPI +
-// DDBDescribeTableAPI and assert Resource.Status and Resource.Issues match
-// the §4 phrase table verbatim:
-//
-//	ACTIVE                              → Status="",                Issues=nil
-//	CREATING                            → Status="creating",        Issues=["creating"]
-//	UPDATING                            → Status="updating",        Issues=["updating"]
-//	DELETING                            → Status="deleting",        Issues=["deleting"]
-//	ARCHIVING                           → Status="archiving",       Issues=["archiving"]
-//	INACCESSIBLE_ENCRYPTION_CREDENTIALS → Status="kms key inaccessible",        Issues=["kms key inaccessible"]
-//	ARCHIVED                            → Status="archived: kms key lost",       Issues=["archived: kms key lost"]
-//
-// Adversarial cases (inline — never in fixture file):
-//   - DescribeTable returns nil Table → skip, do not crash.
-//   - TableStatus==ARCHIVED + ArchivalSummary==nil → fallback phrase, no panic.
-//
-// Wave 3 (CloudWatch throttle / 5xx metrics) must NOT surface.
-
 import (
 	"context"
 	"reflect"
@@ -34,11 +14,6 @@ import (
 	"github.com/k2m30/a9s/v3/core/demo/fixtures"
 )
 
-// ---------------------------------------------------------------------------
-// mocks
-// ---------------------------------------------------------------------------
-
-// ddbListStub implements DDBListTablesAPI and returns a fixed list of names.
 type ddbListStub struct {
 	names []string
 	err   error
@@ -51,7 +26,6 @@ func (s *ddbListStub) ListTables(_ context.Context, _ *dynamodb.ListTablesInput,
 	return &dynamodb.ListTablesOutput{TableNames: s.names}, nil
 }
 
-// ddbDescribeStub implements DDBDescribeTableAPI and returns per-name descriptions.
 type ddbDescribeStub struct {
 	tables map[string]*ddbtypes.TableDescription
 }
@@ -67,15 +41,6 @@ func (s *ddbDescribeStub) DescribeTable(_ context.Context, in *dynamodb.Describe
 	return &dynamodb.DescribeTableOutput{Table: td}, nil
 }
 
-// ---------------------------------------------------------------------------
-// helpers
-// ---------------------------------------------------------------------------
-
-// fetchDDBSingle wires a single TableDescription through FetchDynamoDBTablesPage
-// and returns (status, issues, fields) derived from the new Findings-based contract:
-//   - status  is r.Fields["status"]   (fetcher writes phrase here; r.Fields["status"] is always "")
-//   - issues  is a []string of r.Findings[i].Phrase (same phrases, different carrier)
-//   - fields  is r.Fields
 func fetchDDBSingle(t *testing.T, table *ddbtypes.TableDescription) (status string, issues []string, fields map[string]string) {
 	t.Helper()
 	if table.TableName == nil {
@@ -93,7 +58,6 @@ func fetchDDBSingle(t *testing.T, table *ddbtypes.TableDescription) (status stri
 		t.Fatalf("expected 1 resource, got %d", len(result.Resources))
 	}
 	r := result.Resources[0]
-	// Derive issues from Findings so existing assertions stay intact.
 	phrases := make([]string, 0, len(r.Findings))
 	for _, f := range r.Findings {
 		phrases = append(phrases, f.Phrase)
@@ -101,7 +65,6 @@ func fetchDDBSingle(t *testing.T, table *ddbtypes.TableDescription) (status stri
 	return r.Fields["status"], phrases, r.Fields
 }
 
-// findDDBTable returns the TableDescription with the given name from the fixture.
 func findDDBTable(t *testing.T, id string) *ddbtypes.TableDescription {
 	t.Helper()
 	for _, td := range fixtures.NewDDBFixtures().Tables {
@@ -113,11 +76,6 @@ func findDDBTable(t *testing.T, id string) *ddbtypes.TableDescription {
 	return nil
 }
 
-// ---------------------------------------------------------------------------
-// §4 phrase mapping — one test per distinct TableStatus
-// ---------------------------------------------------------------------------
-
-// TestDDB_Fetch_Active_StatusBlank verifies ACTIVE → empty Status, nil Issues.
 func TestDDB_Fetch_Active_StatusBlank(t *testing.T) {
 	table := findDDBTable(t, fixtures.OrdersProdID)
 	status, issues, fields := fetchDDBSingle(t, table)
@@ -138,7 +96,6 @@ func TestDDB_Fetch_Active_StatusBlank(t *testing.T) {
 	}
 }
 
-// TestDDB_Fetch_Creating_StatusPhrase verifies CREATING → "creating" + Issues.
 func TestDDB_Fetch_Creating_StatusPhrase(t *testing.T) {
 	table := findDDBTable(t, fixtures.SessionsCreatingID)
 	status, issues, _ := fetchDDBSingle(t, table)
@@ -152,7 +109,6 @@ func TestDDB_Fetch_Creating_StatusPhrase(t *testing.T) {
 	}
 }
 
-// TestDDB_Fetch_Updating_StatusPhrase verifies UPDATING → "updating" + Issues.
 func TestDDB_Fetch_Updating_StatusPhrase(t *testing.T) {
 	table := findDDBTable(t, fixtures.SessionsUpdatingID)
 	status, issues, _ := fetchDDBSingle(t, table)
@@ -166,7 +122,6 @@ func TestDDB_Fetch_Updating_StatusPhrase(t *testing.T) {
 	}
 }
 
-// TestDDB_Fetch_Deleting_StatusPhrase verifies DELETING → "deleting" + Issues.
 func TestDDB_Fetch_Deleting_StatusPhrase(t *testing.T) {
 	table := findDDBTable(t, fixtures.AnalyticsDeletingID)
 	status, issues, _ := fetchDDBSingle(t, table)
@@ -180,7 +135,6 @@ func TestDDB_Fetch_Deleting_StatusPhrase(t *testing.T) {
 	}
 }
 
-// TestDDB_Fetch_Archiving_StatusPhrase verifies ARCHIVING → "archiving" + Issues.
 func TestDDB_Fetch_Archiving_StatusPhrase(t *testing.T) {
 	table := findDDBTable(t, fixtures.LegacyArchivingID)
 	status, issues, _ := fetchDDBSingle(t, table)
@@ -194,8 +148,6 @@ func TestDDB_Fetch_Archiving_StatusPhrase(t *testing.T) {
 	}
 }
 
-// TestDDB_Fetch_KMSInaccessible_StatusPhrase verifies INACCESSIBLE_ENCRYPTION_CREDENTIALS
-// → "kms key inaccessible" + Issues.
 func TestDDB_Fetch_KMSInaccessible_StatusPhrase(t *testing.T) {
 	table := findDDBTable(t, fixtures.LegacyKMSLostID)
 	status, issues, _ := fetchDDBSingle(t, table)
@@ -209,7 +161,6 @@ func TestDDB_Fetch_KMSInaccessible_StatusPhrase(t *testing.T) {
 	}
 }
 
-// TestDDB_Fetch_Archived_StatusPhrase verifies ARCHIVED → "archived: kms key lost" + Issues.
 func TestDDB_Fetch_Archived_StatusPhrase(t *testing.T) {
 	table := findDDBTable(t, fixtures.LegacyArchivedID)
 	status, issues, _ := fetchDDBSingle(t, table)
@@ -223,12 +174,6 @@ func TestDDB_Fetch_Archived_StatusPhrase(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// fetcher_populates_resource_issues (covers U7f adapted for Wave-2-only)
-// ---------------------------------------------------------------------------
-
-// TestDDB_Fetch_IssuesPopulated_EveryTableStatus is a table-driven audit across
-// all named DDB fixtures asserting Resource.Issues matches spec §4 exactly.
 func TestDDB_Fetch_IssuesPopulated_EveryTableStatus(t *testing.T) {
 	type tableCase struct {
 		id     string
@@ -260,18 +205,12 @@ func TestDDB_Fetch_IssuesPopulated_EveryTableStatus(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// Adversarial edge cases (inline, never in fixture file)
-// ---------------------------------------------------------------------------
-
-// TestDDB_Fetch_ArchivedNilArchivalSummary verifies ARCHIVED + nil ArchivalSummary
-// falls back to stock phrase "archived: kms key lost" without panicking.
 func TestDDB_Fetch_ArchivedNilArchivalSummary(t *testing.T) {
 	table := &ddbtypes.TableDescription{
 		TableName:       aws.String("inline-archived-nil-summary"),
 		TableArn:        aws.String("arn:aws:dynamodb:us-east-1:123456789012:table/inline-archived-nil-summary"),
 		TableStatus:     ddbtypes.TableStatusArchived,
-		ArchivalSummary: nil, // adversarial: no ArchivalSummary
+		ArchivalSummary: nil,
 	}
 	status, issues, _ := fetchDDBSingle(t, table)
 
@@ -284,19 +223,14 @@ func TestDDB_Fetch_ArchivedNilArchivalSummary(t *testing.T) {
 	}
 }
 
-// TestDDB_Fetch_NilTable_SkipDoNotCrash verifies that a nil TableDescription
-// returned by DescribeTable causes the table to be skipped, not panicked.
-// We simulate by registering nil for the described table.
 func TestDDB_Fetch_NilTable_SkipDoNotCrash(t *testing.T) {
 	listStub := &ddbListStub{names: []string{"ghost-table"}}
-	// describeStub returns nil table for "ghost-table"
 	descStub := &ddbDescribeStub{tables: map[string]*ddbtypes.TableDescription{
 		"ghost-table": nil,
 	}}
 
-	// Should not panic; ghost-table is KEPT as a name-only degraded row
-	// (a listed table must never vanish) and the failure aggregates into
-	// the composite error.
+	// ghost-table stays as a name-only degraded row (a listed table never
+	// vanishes) and the failure aggregates into the composite error.
 	result, err := awsclient.FetchDynamoDBTablesPage(context.Background(), listStub, descStub, "")
 	if err == nil || !strings.Contains(err.Error(), "ghost-table") {
 		t.Fatalf("composite error must name ghost-table, got: %v", err)
@@ -311,12 +245,6 @@ func TestDDB_Fetch_NilTable_SkipDoNotCrash(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// Wave 3 anti-tests — ensure throttle/5xx signals are NOT surfaced
-// ---------------------------------------------------------------------------
-
-// TestDDB_Fetch_AntiThrottle_NotSurfaced verifies a healthy ACTIVE table with
-// no status phrase does NOT include any "throttle" or "5xx"-related text.
 func TestDDB_Fetch_AntiThrottle_NotSurfaced(t *testing.T) {
 	table := findDDBTable(t, fixtures.OrdersProdID)
 	status, issues, _ := fetchDDBSingle(t, table)
@@ -337,11 +265,6 @@ func TestDDB_Fetch_AntiThrottle_NotSurfaced(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// internal helpers shared by aws_ddb_test.go
-// ---------------------------------------------------------------------------
-
-// normalizeIssues converts nil and empty to nil for DeepEqual comparisons.
 func normalizeIssues(s []string) []string {
 	if len(s) == 0 {
 		return nil

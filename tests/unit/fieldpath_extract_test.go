@@ -40,7 +40,7 @@ type testInstance struct {
 }
 
 // ---------------------------------------------------------------------------
-// T004 — Dot-path extraction on simple structs
+// Dot-path extraction on simple structs
 // ---------------------------------------------------------------------------
 
 func TestExtractValue_SimpleStringField(t *testing.T) {
@@ -65,7 +65,6 @@ func TestExtractValue_PointerToString(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	// After extraction the pointer should be dereferenced to the underlying string.
 	if val.Kind() == reflect.Pointer {
 		val = val.Elem()
 	}
@@ -145,7 +144,7 @@ func TestExtractScalar_NestedStruct(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// T006 — Edge cases
+// Edge cases
 // ---------------------------------------------------------------------------
 
 func TestExtractValue_NilPointerField(t *testing.T) {
@@ -230,7 +229,7 @@ func TestExtractScalar_NilNestedPointer(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// T007 — YAML subtree extraction
+// YAML subtree extraction
 // ---------------------------------------------------------------------------
 
 func TestExtractSubtree_ScalarReturnsFormattedValue(t *testing.T) {
@@ -251,7 +250,6 @@ func TestExtractSubtree_NestedStructReturnsYAML(t *testing.T) {
 	if got == "" {
 		t.Fatal("expected non-empty YAML output for nested struct")
 	}
-	// The YAML should contain both fields.
 	t.Run("contains_name", func(t *testing.T) {
 		if !containsSubstring(got, "name") || !containsSubstring(got, "running") {
 			t.Errorf("YAML output missing name field, got:\n%s", got)
@@ -276,7 +274,6 @@ func TestExtractSubtree_SliceReturnsYAML(t *testing.T) {
 	if got == "" {
 		t.Fatal("expected non-empty YAML output for slice")
 	}
-	// The YAML should represent the slice with both tags.
 	if !containsSubstring(got, "env") {
 		t.Errorf("YAML output missing 'env' key, got:\n%s", got)
 	}
@@ -315,7 +312,7 @@ func TestExtractSubtree_MissingFieldReturnsEmpty(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// T-JSON — JSON-in-string detection via ExtractSubtree and ToSafeValue
+// JSON-in-string detection via ExtractSubtree and ToSafeValue
 // ---------------------------------------------------------------------------
 
 // testJSONHolder has a *string field that can hold JSON content.
@@ -335,7 +332,6 @@ func TestExtractSubtree_JSONStringObject(t *testing.T) {
 			t.Errorf("ExtractSubtree JSON object: expected %q in output, got:\n%s", want, got)
 		}
 	}
-	// Must NOT return the raw JSON blob as a single line
 	if containsSubstring(got, `{"eventVersion"`) {
 		t.Errorf("ExtractSubtree JSON object: output contains raw JSON blob, expected structured YAML:\n%s", got)
 	}
@@ -420,19 +416,17 @@ func TestExtractSubtree_JSONStringWithNulls(t *testing.T) {
 	if !containsSubstring(got, "value1") {
 		t.Errorf("ExtractSubtree JSON with nulls: expected %q in output, got:\n%s", "value1", got)
 	}
-	// key2 null is acceptable as empty or omitted — no assertion on it
 }
 
 // TestExtractSubtree_JSONStringTrailingGarbageRejected pins tryParseJSON's
-// EOF-token requirement (#261 boundary-sealing wave): a single json.Decoder
-// Decode call does not itself reject trailing content the way json.Unmarshal
-// does, and dec.More() is insufficient — it only reports whether another
-// VALUE follows, so a stray closing delimiter ("{...}}", "[1,2]]") or a
-// second concatenated value slips through undetected. Only requiring the
-// next token to be io.EOF closes this: any of those must fall back to the
-// raw string unchanged, exactly like TestExtractSubtree_JSONStringMalformed's
-// contract, while an ordinary single object/array (no trailing content)
-// still parses to structured YAML.
+// EOF-token requirement: a single json.Decoder Decode call does not itself
+// reject trailing content the way json.Unmarshal does, and dec.More() is
+// insufficient — it only reports whether another VALUE follows, so a stray
+// closing delimiter ("{...}}", "[1,2]]") or a second concatenated value would
+// pass. Requiring the next token to be io.EOF rejects them: any of those must
+// fall back to the raw string unchanged, exactly like
+// TestExtractSubtree_JSONStringMalformed's contract, while an ordinary single
+// object/array (no trailing content) still parses to structured YAML.
 func TestExtractSubtree_JSONStringTrailingGarbageRejected(t *testing.T) {
 	cases := []struct {
 		name         string
@@ -476,7 +470,6 @@ func TestExtractSubtree_JSONStringWhitespace(t *testing.T) {
 			t.Errorf("ExtractSubtree whitespace-padded JSON: expected %q in output, got:\n%s", want, got)
 		}
 	}
-	// Should be structured YAML, not the padded raw JSON
 	if containsSubstring(got, `  {"key"`) {
 		t.Errorf("ExtractSubtree whitespace-padded JSON: output contains unstripped JSON blob:\n%s", got)
 	}
@@ -601,14 +594,9 @@ type unexportedEmbedWrapper struct {
 }
 
 // TestToSafeValue_UnexportedAnonymousEmbed_ShapeParityWithEncodingJSON pins
-// #261's ToSafeValue fix: the promote-inline pass no longer gates on
-// field.IsExported() (core/fieldpath/extract.go), matching resolveField and
-// encoding/json — Foo/Bar promote into the top-level map exactly like
-// encoding/json.Marshal renders them, instead of vanishing because the
-// embedded TYPE's name happens to be unexported. Compares ToSafeValue's
-// output against a real encoding/json round trip so this is a genuine
-// shape-parity pin, not an assumption about either pipeline's exact
-// behavior.
+// ToSafeValue's promote-inline pass against encoding/json: Foo/Bar promote
+// into the top-level map exactly like encoding/json.Marshal renders them,
+// even though the embedded TYPE's name is unexported.
 func TestToSafeValue_UnexportedAnonymousEmbed_ShapeParityWithEncodingJSON(t *testing.T) {
 	v := unexportedEmbedWrapper{
 		unexportedEmbedInner: unexportedEmbedInner{Foo: "foo-value", Bar: 42},

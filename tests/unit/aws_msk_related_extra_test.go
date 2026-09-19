@@ -1,11 +1,5 @@
 package unit_test
 
-// aws_msk_related_extra_test.go — additional coverage for msk_related.go.
-// Covers: checkMSKSG (wrong-rawstruct), checkMSKKMS, checkMSKSubnet,
-// checkMSKVPC, checkMSKLogs, checkMSKS3, checkMSKSecrets.
-// checkMSKAlarms, checkMSKLambda, checkMSKCFN are already covered in
-// aws_msk_related_test.go and related_uncovered_struct_test.go.
-
 import (
 	"context"
 	"testing"
@@ -21,9 +15,7 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// ---------------------------------------------------------------------------
-// fakeMSKScram — implements MSKListScramSecretsAPI for checkMSKSecrets tests
-// ---------------------------------------------------------------------------
+// fakeMSKScram implements MSKListScramSecretsAPI.
 
 type fakeMSKScram struct {
 	secretArns []string
@@ -51,8 +43,6 @@ func (f *fakeMSKScram) DescribeClusterV2(_ context.Context, _ *kafka.DescribeClu
 
 var _ awsclient.MSKAPI = (*fakeMSKScram)(nil)
 
-// --- checkMSKSG: wrong RawStruct → -1 ---
-
 func TestRelated_MSK_SG_WrongRawStruct(t *testing.T) {
 	source := resource.Resource{ID: "msk-cluster-1", RawStruct: "not-a-kafka-cluster"}
 	checker := mskCheckerByTarget(t, "sg")
@@ -62,8 +52,6 @@ func TestRelated_MSK_SG_WrongRawStruct(t *testing.T) {
 		t.Errorf("Count = %d, want -1 (wrong RawStruct)", result.Count())
 	}
 }
-
-// --- checkMSKKMS (Pattern F — reads DataVolumeKMSKeyId) ---
 
 func TestRelated_MSK_KMS_Found(t *testing.T) {
 	source := resource.Resource{
@@ -133,8 +121,6 @@ func TestRelated_MSK_KMS_WrongRawStruct(t *testing.T) {
 	}
 }
 
-// --- checkMSKSubnet (Pattern F — reads ClientSubnets from Provisioned) ---
-
 func TestRelated_MSK_Subnet_Found(t *testing.T) {
 	source := resource.Resource{
 		ID: "analytics-kafka-cluster",
@@ -183,8 +169,6 @@ func TestRelated_MSK_Subnet_WrongRawStruct(t *testing.T) {
 		t.Errorf("Count = %d, want -1 (wrong RawStruct)", result.Count())
 	}
 }
-
-// --- checkMSKVPC (Pattern F+C — looks up first ClientSubnet in subnet cache) ---
 
 func TestRelated_MSK_VPC_FoundViaSubnetCache(t *testing.T) {
 	source := resource.Resource{
@@ -253,7 +237,6 @@ func TestRelated_MSK_VPC_EmptySubnets(t *testing.T) {
 }
 
 func TestRelated_MSK_VPC_SubnetNotInCache(t *testing.T) {
-	// Subnet is listed on cluster, but not in cache and no clients → -1
 	source := resource.Resource{
 		ID: "analytics-kafka-cluster",
 		RawStruct: kafkatypes.Cluster{
@@ -272,8 +255,6 @@ func TestRelated_MSK_VPC_SubnetNotInCache(t *testing.T) {
 		t.Errorf("Count = %d, want -1 (empty cache, nil clients)", result.Count())
 	}
 }
-
-// --- checkMSKLogs (Pattern F — reads CloudWatchLogs LogGroup) ---
 
 func TestRelated_MSK_Logs_Found(t *testing.T) {
 	source := resource.Resource{
@@ -352,8 +333,6 @@ func TestRelated_MSK_Logs_WrongRawStruct(t *testing.T) {
 		t.Errorf("Count = %d, want -1 (wrong RawStruct)", result.Count())
 	}
 }
-
-// --- checkMSKS3 (Pattern F — reads S3.Bucket from BrokerLogs) ---
 
 func TestRelated_MSK_S3_Found(t *testing.T) {
 	source := resource.Resource{
@@ -437,8 +416,6 @@ func TestRelated_MSK_S3_WrongRawStruct(t *testing.T) {
 		t.Errorf("Count = %d, want -1 (wrong RawStruct)", result.Count())
 	}
 }
-
-// --- checkMSKSecrets (Pattern C — calls kafka:ListScramSecrets) ---
 
 func TestRelated_MSK_Secrets_Found(t *testing.T) {
 	const clusterARN = "arn:aws:kafka:us-east-1:123456789012:cluster/analytics-kafka-cluster/abc-123"

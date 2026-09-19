@@ -1,26 +1,5 @@
 package unit
 
-// aws_cfn_detail_enrich_test.go — coverage for enrichCfn (core/aws/cfn_detail_enrichment.go),
-// the on-demand detail enricher registered for the "cfn" resource type (#261).
-//
-// Covers:
-//   - wrong clients type / nil DetailEnrichmentCtx / nil Clients / nil DetailDocs → error
-//   - wrong RawStruct type → error
-//   - missing stack identifier (both StackId and StackName empty) → error
-//   - StackId preferred over StackName when both are present
-//   - cache miss → calls GetTemplate; JSON template body parsed to structured
-//     data; YAML template body kept raw
-//   - cache key is version-aware (LastUpdatedTime, falling back to
-//     CreationTime) — verified behaviorally (call counts + returned
-//     TemplateBody), not by asserting the literal key string: a stack update
-//     within the same session changes the row's LastUpdatedTime, so the next
-//     open naturally misses the pre-update template instead of serving it
-//     stale; an unchanged version hits; LastUpdatedTime nil falls back to
-//     CreationTime without colliding across two stacks that only differ by
-//     CreationTime
-//   - StackEnriched re-enrichment path accepted as RawStruct
-//   - API error propagated
-
 import (
 	"context"
 	"testing"
@@ -33,10 +12,6 @@ import (
 	awsclient "github.com/k2m30/a9s/v3/core/aws"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
-
-// ---------------------------------------------------------------------------
-// enrichCfnFake — narrow CFNAPI + CFNGetTemplateAPI fake with a call counter
-// ---------------------------------------------------------------------------
 
 type enrichCfnFake struct {
 	getTemplateFn    func(*cloudformation.GetTemplateInput) (*cloudformation.GetTemplateOutput, error)
@@ -63,10 +38,6 @@ func (f *enrichCfnFake) ListStackResources(_ context.Context, _ *cloudformation.
 
 var _ awsclient.CFNAPI = (*enrichCfnFake)(nil)
 var _ awsclient.CFNGetTemplateAPI = (*enrichCfnFake)(nil)
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
 
 func cfnEnricher(t *testing.T) resource.DetailEnricher {
 	t.Helper()
@@ -110,10 +81,6 @@ func makeCfnStack(stackID, stackName string) cfntypes.Stack {
 func makeCfnRes(stackID, stackName string) resource.Resource {
 	return resource.Resource{ID: stackID, RawStruct: makeCfnStack(stackID, stackName)}
 }
-
-// ---------------------------------------------------------------------------
-// Tests: invalid context
-// ---------------------------------------------------------------------------
 
 func TestEnrichCfn_WrongClientsType_ReturnsError(t *testing.T) {
 	enricher := cfnEnricher(t)
@@ -160,10 +127,6 @@ func TestEnrichCfn_NilDetailDocs_ReturnsError(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// Tests: bad RawStruct / missing identifier
-// ---------------------------------------------------------------------------
-
 func TestEnrichCfn_WrongRawStructType_ReturnsError(t *testing.T) {
 	enricher := cfnEnricher(t)
 	res := resource.Resource{ID: cfnTestStackID, RawStruct: "not-a-stack"}
@@ -183,10 +146,6 @@ func TestEnrichCfn_NoIdentifier_ReturnsError(t *testing.T) {
 		t.Fatal("expected error for stack with no StackId or StackName, got nil")
 	}
 }
-
-// ---------------------------------------------------------------------------
-// Tests: cache miss, JSON vs YAML template body
-// ---------------------------------------------------------------------------
 
 func TestEnrichCfn_CacheMiss_JSONTemplate_Parsed(t *testing.T) {
 	fake := &enrichCfnFake{
@@ -217,12 +176,10 @@ func TestEnrichCfn_CacheMiss_JSONTemplate_Parsed(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// Tests: cache key is version-aware (LastUpdatedTime, falling back to
-// CreationTime) — exercised behaviorally (call counts + returned
-// TemplateBody), never by asserting the literal key string, so these don't
-// couple to enrichCfn's internal key format.
-// ---------------------------------------------------------------------------
+// The cache key is version-aware (LastUpdatedTime, falling back to
+// CreationTime). These tests check it through call counts and the returned
+// TemplateBody, never the literal key string, so they stay independent of
+// enrichCfn's internal key format.
 
 const cfnTemplateV1 = "template-v1-body"
 const cfnTemplateV2 = "template-v2-body"
@@ -346,12 +303,9 @@ func TestEnrichCfn_CacheKey_NilLastUpdatedTime_FallsBackToCreationTime_NoCollisi
 	}
 }
 
-// ---------------------------------------------------------------------------
-// Tests: DetailEnrichmentCtx.SkipCache (explicit detail refresh) bypasses the
-// cache READ only — the fetch result is still WRITTEN, so a subsequent
-// non-refresh open benefits from the freshly-refreshed entry
-// (core/aws/detail_enrich_engine.go).
-// ---------------------------------------------------------------------------
+// DetailEnrichmentCtx.SkipCache (explicit detail refresh) bypasses the cache
+// read only; the fetch result is still written, so a later non-refresh open
+// sees the refreshed entry (core/aws/detail_enrich_engine.go).
 
 func TestEnrichCfn_SkipCacheTrue_BypassesReadButStillWrites(t *testing.T) {
 	var calls int
@@ -368,8 +322,6 @@ func TestEnrichCfn_SkipCacheTrue_BypassesReadButStillWrites(t *testing.T) {
 	cache := &awsclient.DetailDocCache{}
 	stack := makeCfnStackVersioned(cfnTestStackID, aws.Time(cfnTestCreationTime), aws.Time(cfnTestCreationTime))
 
-	// Pre-populate the cache under the current versioned key via a normal
-	// (non-refresh) enrichment.
 	normalCtx := makeCfnCtx(fake, cache)
 	if _, err := cfnEnricher(t)(context.Background(), normalCtx, resource.Resource{ID: cfnTestStackID, RawStruct: stack}); err != nil {
 		t.Fatalf("seed call error: %v", err)
@@ -378,8 +330,6 @@ func TestEnrichCfn_SkipCacheTrue_BypassesReadButStillWrites(t *testing.T) {
 		t.Fatalf("sanity check failed: seed call GetTemplate calls = %d, want 1", calls)
 	}
 
-	// An explicit refresh (SkipCache: true) must still call the API despite
-	// the warm cache entry, and attach the fresh payload.
 	refreshCtx := &awsclient.DetailEnrichmentCtx{
 		Clients:    &awsclient.ServiceClients{CloudFormation: fake},
 		DetailDocs: cache,
@@ -396,8 +346,6 @@ func TestEnrichCfn_SkipCacheTrue_BypassesReadButStillWrites(t *testing.T) {
 		t.Errorf("refresh call TemplateBody = %v, want %q (fresh fetch, not the cached %q)", body, cfnTemplateV2, cfnTemplateV1)
 	}
 
-	// The refreshed entry must have overwritten the cache: a subsequent
-	// non-refresh open sees the fresh payload, not the original seed.
 	got3, err := cfnEnricher(t)(context.Background(), normalCtx, resource.Resource{ID: cfnTestStackID, RawStruct: stack})
 	if err != nil {
 		t.Fatalf("post-refresh call error: %v", err)
@@ -429,10 +377,6 @@ func TestEnrichCfn_YAMLTemplate_KeptAsRawString(t *testing.T) {
 		t.Errorf("enriched.TemplateBody = %v, want raw YAML string", enriched.TemplateBody)
 	}
 }
-
-// ---------------------------------------------------------------------------
-// Tests: StackId preferred over StackName; second call uses cache
-// ---------------------------------------------------------------------------
 
 func TestEnrichCfn_StackIdPreferredOverStackName(t *testing.T) {
 	var seenStackName *string
@@ -496,10 +440,6 @@ func TestEnrichCfn_SecondCall_UsesCacheNotAPI(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// Tests: re-enrichment path
-// ---------------------------------------------------------------------------
-
 func TestEnrichCfn_StackEnrichedRawStruct_Accepted(t *testing.T) {
 	fake := &enrichCfnFake{
 		getTemplateFn: func(_ *cloudformation.GetTemplateInput) (*cloudformation.GetTemplateOutput, error) {
@@ -528,10 +468,6 @@ func TestEnrichCfn_StackEnrichedRawStruct_Accepted(t *testing.T) {
 		t.Errorf("enriched.StackId = %v, want %q", enriched.StackId, cfnTestStackID)
 	}
 }
-
-// ---------------------------------------------------------------------------
-// Tests: API error propagation
-// ---------------------------------------------------------------------------
 
 func TestEnrichCfn_APIError_Propagated(t *testing.T) {
 	fake := &enrichCfnFake{

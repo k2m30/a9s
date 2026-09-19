@@ -13,10 +13,6 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// ---------------------------------------------------------------------------
-// Dir(profile, region)
-// ---------------------------------------------------------------------------
-
 func TestCache_DirForTest(t *testing.T) {
 	tmpDir := t.TempDir()
 	t.Setenv("A9S_CONFIG_FOLDER", tmpDir)
@@ -45,7 +41,6 @@ func TestCache_DirForTest_EscapesSlashesInjectively(t *testing.T) {
 	}
 }
 
-// Spaces are percent-escaped, not folded to "_".
 func TestCache_DirForTest_EscapesSpacesInjectively(t *testing.T) {
 	tmpDir := t.TempDir()
 	t.Setenv("A9S_CONFIG_FOLDER", tmpDir)
@@ -57,7 +52,6 @@ func TestCache_DirForTest_EscapesSpacesInjectively(t *testing.T) {
 	}
 }
 
-// Backslashes are percent-escaped, not folded.
 func TestCache_DirForTest_EscapesBackslashInjectively(t *testing.T) {
 	tmpDir := t.TempDir()
 	t.Setenv("A9S_CONFIG_FOLDER", tmpDir)
@@ -90,10 +84,6 @@ func TestCache_DirForTest_EmptyRegion(t *testing.T) {
 		t.Errorf("Dir('test-profile', '') = %q, want %q", got, want)
 	}
 }
-
-// ---------------------------------------------------------------------------
-// LoadDir() — never fails, absent directory
-// ---------------------------------------------------------------------------
 
 func TestCache_LoadDirForTest_NotExists(t *testing.T) {
 	tmpDir := t.TempDir()
@@ -189,9 +179,8 @@ func TestCache_LoadDirForTest_CorruptTypeFile_SkipsOnlyThatType(t *testing.T) {
 		t.Fatalf("writing corrupt file: %v", err)
 	}
 
-	// A sibling healthy type file must still load normally (C7: "An
-	// unreadable or wrong-version file means 'no cache' for that type
-	// only: the other types load normally").
+	// An unreadable or wrong-version file means no cache for that type only;
+	// the other types load normally.
 	healthy := cache.LoadDirForTest("test-profile", "us-east-1")
 	healthy.Put("s3", cache.TypeFile{HasResources: true, Count: 3})
 	if err := healthy.SaveType("s3"); err != nil {
@@ -213,10 +202,6 @@ func TestCache_LoadDirForTest_CorruptTypeFile_SkipsOnlyThatType(t *testing.T) {
 		t.Errorf("s3 Count = %d, want 3", s3Entry.Count)
 	}
 }
-
-// ---------------------------------------------------------------------------
-// Store.Put / Store.SaveType — round trip
-// ---------------------------------------------------------------------------
 
 func TestCache_SaveType_CreatesDir(t *testing.T) {
 	tmpDir := t.TempDir()
@@ -259,10 +244,8 @@ func TestCache_SaveType_WritesValidYAML(t *testing.T) {
 		t.Fatalf("SaveType(lambda): %v", err)
 	}
 
-	// "rds" is an alias of the "dbi" type: cachegen row 11 canonicalizes a
-	// type file's key once, at load, so an alias-named file supplies the
-	// canonical type's counts AND rows instead of sitting under a key the
-	// row lookup never asks for. Reading it back under "rds" was the defect.
+	// "rds" is an alias of "dbi": a type file's key is canonicalized once, at
+	// load, so an alias-named file supplies the canonical type's counts and rows.
 	reloaded := cache.LoadDirForTest("test-profile", "us-west-2")
 	rds, ok := reloaded.Type("dbi")
 	if !ok || rds.Count != 3 {
@@ -374,11 +357,9 @@ func TestCache_LoadDirForTest_AllResourceTypes(t *testing.T) {
 		}
 	}
 
-	// cachegen row 11: a type file's key is canonicalized once, at load, so
-	// an alias-named file (rds.yaml for "dbi", cloudtrail.yaml for its
-	// canonical type) is read back under the canonical short name. The names
-	// above are the ones an operator's directory can actually hold; the
-	// lookup resolves each the way every production reader does.
+	// A type file's key is canonicalized once, at load, so an alias-named file
+	// (rds.yaml for "dbi", cloudtrail.yaml for its canonical type) is read back
+	// under the canonical short name.
 	reloaded := cache.LoadDirForTest("multi-resource-profile", "us-east-1")
 	for name, orig := range entries {
 		canon := name
@@ -399,22 +380,12 @@ func TestCache_LoadDirForTest_AllResourceTypes(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// SchemaVersion constant
-// ---------------------------------------------------------------------------
-
 func TestCache_SchemaVersion_IsTwo(t *testing.T) {
 	if cache.SchemaVersion != 2 {
 		t.Errorf("SchemaVersion = %d, want 2 (issue #463: per-finding FirstSeen bumped the on-disk schema)", cache.SchemaVersion)
 	}
 }
 
-// ---------------------------------------------------------------------------
-// SaveType() atomicity — per-type file
-// ---------------------------------------------------------------------------
-
-// TestCache_SaveType_NoTempFileLingers verifies that after SaveType returns,
-// no .tmp file remains in the per-pair cache directory.
 func TestCache_SaveType_NoTempFileLingers(t *testing.T) {
 	tmpDir := t.TempDir()
 	t.Setenv("A9S_CONFIG_FOLDER", tmpDir)
@@ -438,11 +409,6 @@ func TestCache_SaveType_NoTempFileLingers(t *testing.T) {
 	}
 }
 
-// TestCache_SaveType_ConcurrentWrites_NoCorruption spawns N goroutines that
-// each call SaveType on the SAME type concurrently. After all goroutines
-// complete, LoadDir must succeed and return a well-formed TypeFile for that
-// type — the atomic-rename write must never leave a half-written file
-// observable.
 func TestCache_SaveType_ConcurrentWrites_NoCorruption(t *testing.T) {
 	const N = 20
 	tmpDir := t.TempDir()
@@ -480,10 +446,6 @@ func TestCache_SaveType_ConcurrentWrites_NoCorruption(t *testing.T) {
 	}
 }
 
-// TestCache_SaveType_AtomicVisibility is the strongest atomicity test. A
-// writer goroutine repeatedly calls SaveType in a tight loop on one type. The
-// main goroutine concurrently calls LoadDir and asserts every read observes
-// a well-formed TypeFile — never a corrupt/partial one.
 func TestCache_SaveType_AtomicVisibility(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("Windows file locking prevents concurrent read during rename")

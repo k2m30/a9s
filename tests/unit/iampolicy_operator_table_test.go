@@ -159,7 +159,7 @@ var operatorTable = []condCase{
 	},
 	// An ARN condition value whose account field is "*" matches a principal in
 	// every account, exactly as the principal "arn:aws:iam::*:root" does. The
-	// value side has to read that ARN the way the principal side now does.
+	// value side reads that ARN the way the principal side does.
 	{
 		name: "PrincipalArn with a wildcard account and a wildcard resource",
 		cond: `{"ArnLike":{"aws:PrincipalArn":"arn:aws:iam::*:*"}}`,

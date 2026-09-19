@@ -11,12 +11,7 @@ import (
 	"github.com/k2m30/a9s/v3/internal/tui/views"
 )
 
-// ===========================================================================
-// handleChildKey — data-driven Enter key routing
-// ===========================================================================
-
 func TestHandleChildKey_EnterOnS3Bucket_ProducesEnterChildViewMsg(t *testing.T) {
-	// Create an S3 bucket list with Children defined
 	td := resource.ResourceTypeDef{
 		Name:      "S3 Buckets",
 		ShortName: "s3",
@@ -37,12 +32,10 @@ func TestHandleChildKey_EnterOnS3Bucket_ProducesEnterChildViewMsg(t *testing.T) 
 	m.SetSize(120, 20)
 	m, _ = m.Init()
 
-	// Load buckets
 	ctrl.ApplyResourcesLoaded("s3", []resource.Resource{
 		{ID: "my-bucket", Name: "my-bucket", Fields: map[string]string{"name": "my-bucket", "creation_date": "2025-01-01"}},
 	}, nil, false)
 
-	// Press Enter
 	m, cmd := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 	if cmd == nil {
 		t.Fatal("Enter on S3 bucket with Children should return a command")
@@ -114,7 +107,6 @@ func TestHandleChildKey_EnterOnR53Zone_ProducesEnterChildViewMsg(t *testing.T) {
 }
 
 func TestHandleChildKey_DrillConditionFalse_FallsThrough(t *testing.T) {
-	// S3 object list with drill condition: only folders
 	td := resource.ResourceTypeDef{
 		Name:      "S3 Objects",
 		ShortName: "s3_objects",
@@ -133,12 +125,10 @@ func TestHandleChildKey_DrillConditionFalse_FallsThrough(t *testing.T) {
 	m.SetSize(120, 20)
 	m, _ = m.Init()
 
-	// Load a file (not a folder)
 	ctrl.ApplyResourcesLoaded("s3_objects", []resource.Resource{
 		{ID: "data/file.txt", Name: "data/file.txt", Fields: map[string]string{"status": "file", "key": "data/file.txt"}},
 	}, nil, false)
 
-	// Press Enter — should fall through to detail view (not child drill)
 	m, cmd := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 	if cmd == nil {
 		t.Fatal("Enter on S3 file should still produce a command (detail view)")
@@ -173,12 +163,10 @@ func TestHandleChildKey_DrillConditionTrue_ProducesChildMsg(t *testing.T) {
 	m.SetSize(120, 20)
 	m, _ = m.Init()
 
-	// Load a folder
 	ctrl.ApplyResourcesLoaded("s3_objects", []resource.Resource{
 		{ID: "data/", Name: "data/", Fields: map[string]string{"status": "folder", "key": "data/"}},
 	}, nil, false)
 
-	// Press Enter — should produce EnterChildViewMsg
 	m, cmd := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 	if cmd == nil {
 		t.Fatal("Enter on S3 folder should return a command")
@@ -201,7 +189,6 @@ func TestHandleChildKey_DrillConditionTrue_ProducesChildMsg(t *testing.T) {
 }
 
 func TestHandleChildKey_NoChildren_DefaultsToDetail(t *testing.T) {
-	// EC2 has no Children — Enter should go to detail
 	td := resource.ResourceTypeDef{
 		Name:      "EC2 Instances",
 		ShortName: "ec2",
@@ -234,10 +221,6 @@ func TestHandleChildKey_NoChildren_DefaultsToDetail(t *testing.T) {
 	}
 }
 
-// ===========================================================================
-// buildChildContext — resolves context keys
-// ===========================================================================
-
 func TestBuildChildContext_ID(t *testing.T) {
 	td := resource.ResourceTypeDef{
 		Name:      "S3 Buckets",
@@ -259,7 +242,6 @@ func TestBuildChildContext_ID(t *testing.T) {
 		{ID: "test-bucket", Name: "test-bucket", Fields: map[string]string{}},
 	}, nil, false)
 
-	// Press Enter, verify context
 	_, cmd := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 	msg := cmd()
 	childMsg := msg.(messages.EnterChildView)
@@ -365,12 +347,7 @@ func TestBuildChildContext_FieldsKey(t *testing.T) {
 	}
 }
 
-// ===========================================================================
-// handleChildKey for non-"enter" keys (e.g., "e" for events)
-// ===========================================================================
-
 func TestHandleChildKey_NonEnterKey_EventsKey(t *testing.T) {
-	// Create a resource type with a child bound to the "e" key (events)
 	td := resource.ResourceTypeDef{
 		Name:      "Test Parent",
 		ShortName: "test_parent_events",
@@ -391,12 +368,10 @@ func TestHandleChildKey_NonEnterKey_EventsKey(t *testing.T) {
 	m.SetSize(120, 20)
 	m, _ = m.Init()
 
-	// Load a resource
 	ctrl.ApplyResourcesLoaded("test_parent_events", []resource.Resource{
 		{ID: "res-123", Name: "my-resource", Fields: map[string]string{"status": "active", "id": "res-123", "name": "my-resource"}},
 	}, nil, false)
 
-	// Press "e" key — triggers keys.Events which calls handleChildKey("e", ...)
 	m, cmd := m.Update(tea.KeyPressMsg{Code: 'e', Text: "e"})
 	if cmd == nil {
 		t.Fatal("pressing 'e' on resource with Children[Key='e'] should return a command")
@@ -419,14 +394,12 @@ func TestHandleChildKey_NonEnterKey_EventsKey(t *testing.T) {
 }
 
 func TestHandleChildKey_NonEnterKey_NoChildDefined(t *testing.T) {
-	// Create a resource type with NO children for the "e" key
 	td := resource.ResourceTypeDef{
 		Name:      "EC2 Instances",
 		ShortName: "ec2_no_events",
 		Columns: []resource.Column{
 			{Key: "instance_id", Title: "Instance ID", Width: 20},
 		},
-		// No Children defined — pressing "e" should be a no-op
 	}
 	k := keys.Default()
 	ctrl := newListViewCtrl(t, td)
@@ -438,7 +411,6 @@ func TestHandleChildKey_NonEnterKey_NoChildDefined(t *testing.T) {
 		{ID: "i-123", Name: "web-1", Fields: map[string]string{"status": "running", "instance_id": "i-123"}},
 	}, nil, false)
 
-	// Press "e" key — no child defined, should return nil cmd (no-op)
 	_, cmd := m.Update(tea.KeyPressMsg{Code: 'e', Text: "e"})
 	if cmd != nil {
 		t.Error("pressing 'e' on resource type with no events child should return nil cmd")

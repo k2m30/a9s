@@ -24,7 +24,6 @@ var countSuffixRE = regexp.MustCompile(`\(\d+\+?\)`)
 func TestDemoMainMenu_ShowsResourceCounts(t *testing.T) {
 	m := newDemoColdCacheApp(t)
 
-	// Size the model so View() renders a realistic menu.
 	*m, _ = rootApplyMsg(*m, tea.WindowSizeMsg{Width: 120, Height: 40})
 
 	// Inject ClientsReadyMsg to wire the fake clients. ConnectGen seeds at 1
@@ -43,7 +42,6 @@ func TestDemoMainMenu_ShowsResourceCounts(t *testing.T) {
 		}
 	}
 
-	// Render the main menu.
 	plain := stripANSI(rootViewContent(*m))
 
 	// The main menu must be visible (not a list or detail view).
@@ -51,7 +49,6 @@ func TestDemoMainMenu_ShowsResourceCounts(t *testing.T) {
 		t.Fatalf("expected to be on main menu after ClientsReadyMsg, got:\n%s", plain)
 	}
 
-	// Count how many distinct "(N)" or "(N+)" suffixes appear in the rendered menu.
 	matches := countSuffixRE.FindAllString(plain, -1)
 	distinctCounts := make(map[string]bool)
 	for _, m := range matches {
@@ -92,7 +89,6 @@ func TestDemoMainMenu_EC2CountNonZero(t *testing.T) {
 
 	plain := stripANSI(rootViewContent(*m))
 
-	// EC2 Instances row must appear with a non-zero count suffix.
 	ec2LineRE := regexp.MustCompile(`EC2 Instances.*\(([1-9]\d*)\+?\)`)
 	if !ec2LineRE.MatchString(plain) {
 		t.Errorf(

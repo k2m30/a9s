@@ -1,15 +1,5 @@
 package unit
 
-// aws_iam_role_enricher_test.go — Behavioral tests for EnrichIAMRoleLastUsed.
-//
-// Contract:
-//   - GetRole is called once per role resource (keyed by role name).
-//   - Role with RoleLastUsed.LastUsedDate = now → 0 findings.
-//   - Role with RoleLastUsed.LastUsedDate = now-100d → 1 finding sev "~" (dormant).
-//   - Role with RoleLastUsed = nil (never used) → 1 finding sev "~" (dormant).
-//   - Role with Path starting with /aws-service-role/ → skipped (0 findings) even if never used.
-//   - clients.IAM == nil → 0 findings, no error.
-
 import (
 	"context"
 	"testing"
@@ -57,7 +47,6 @@ func (f *iamGetRoleFake) GetRole(
 	return &iam.GetRoleOutput{Role: role}, nil
 }
 
-// Compile-time check: iamGetRoleFake satisfies IAMAPI.
 var _ awsclient.IAMAPI = (*iamGetRoleFake)(nil)
 
 // iamRoleResources returns a slice of 3 role Resource stubs.

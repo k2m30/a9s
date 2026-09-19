@@ -12,10 +12,9 @@ import (
 	"github.com/k2m30/a9s/v3/internal/tui"
 )
 
-// TestBug82_NewAWSSession_EmptyRegionProducesEmptyConfig demonstrates the root
-// cause of the bug: when no AWS config file, no env vars, and empty region
-// parameter are provided, NewAWSSession produces a config with empty Region.
-// Any API call made with this config will fail with "Missing Region".
+// With no AWS config file, no env vars and an empty region parameter,
+// NewAWSSession produces a config with an empty Region, and any API call made
+// with it fails with "Missing Region".
 func TestBug82_NewAWSSession_EmptyRegionProducesEmptyConfig(t *testing.T) {
 	t.Setenv("AWS_CONFIG_FILE", "/nonexistent/path/config")
 	t.Setenv("AWS_SHARED_CREDENTIALS_FILE", "/nonexistent/path/credentials")
@@ -23,9 +22,6 @@ func TestBug82_NewAWSSession_EmptyRegionProducesEmptyConfig(t *testing.T) {
 	t.Setenv("AWS_DEFAULT_REGION", "")
 	t.Setenv("AWS_PROFILE", "")
 
-	// This simulates what happens BEFORE the fix: connectAWS calls
-	// NewAWSSession("", "") — the empty region parameter means no
-	// config.WithRegion option is added.
 	cfg, err := awsclient.NewAWSSessionContext(context.Background(), "", "")
 	if err != nil {
 		// Profile error is acceptable in isolated env
@@ -33,8 +29,6 @@ func TestBug82_NewAWSSession_EmptyRegionProducesEmptyConfig(t *testing.T) {
 		return
 	}
 
-	// Without any region source, cfg.Region should be empty.
-	// This is the root cause: later API calls fail with "Missing Region".
 	if cfg.Region == "" {
 		t.Log("Confirmed: NewAWSSession with empty region and no config produces empty Region in cfg")
 	} else {
@@ -42,9 +36,6 @@ func TestBug82_NewAWSSession_EmptyRegionProducesEmptyConfig(t *testing.T) {
 	}
 }
 
-// TestBug82_NewAWSSession_ExplicitRegionPopulatesConfig verifies that when
-// GetDefaultRegion resolves a fallback region and passes it to NewAWSSession,
-// the config Region is properly set. This is the behavior we want after the fix.
 func TestBug82_NewAWSSession_ExplicitRegionPopulatesConfig(t *testing.T) {
 	t.Setenv("AWS_CONFIG_FILE", "/nonexistent/path/config")
 	t.Setenv("AWS_SHARED_CREDENTIALS_FILE", "/nonexistent/path/credentials")
@@ -52,27 +43,22 @@ func TestBug82_NewAWSSession_ExplicitRegionPopulatesConfig(t *testing.T) {
 	t.Setenv("AWS_DEFAULT_REGION", "")
 	t.Setenv("AWS_PROFILE", "")
 
-	// Resolve region via GetDefaultRegion — this is what the fix does
 	region := awsclient.GetDefaultRegion("/nonexistent/path/config", "default")
 	if region != "us-east-1" {
 		t.Fatalf("GetDefaultRegion should return us-east-1 fallback, got %q", region)
 	}
 
-	// Now pass the resolved region to NewAWSSession
 	cfg, err := awsclient.NewAWSSessionContext(context.Background(), "", region)
 	if err != nil {
 		t.Logf("NewAWSSession error (expected in isolated env): %v", err)
 		return
 	}
 
-	// With the resolved region, cfg.Region should be "us-east-1"
 	if cfg.Region != "us-east-1" {
 		t.Errorf("expected Region=us-east-1 in config, got %q", cfg.Region)
 	}
 }
 
-// TestBug82_GetDefaultRegion_FallbackWhenNoConfig verifies that GetDefaultRegion
-// returns "us-east-1" when the config file doesn't exist.
 func TestBug82_GetDefaultRegion_FallbackWhenNoConfig(t *testing.T) {
 	region := awsclient.GetDefaultRegion("/nonexistent/path/config", "default")
 	if region != "us-east-1" {
@@ -80,7 +66,6 @@ func TestBug82_GetDefaultRegion_FallbackWhenNoConfig(t *testing.T) {
 	}
 }
 
-// TestBug82_GetDefaultRegion_EmptyProfile verifies the fallback for empty profile.
 func TestBug82_GetDefaultRegion_EmptyProfile(t *testing.T) {
 	region := awsclient.GetDefaultRegion("/nonexistent/path/config", "")
 	if region != "us-east-1" {
@@ -88,10 +73,8 @@ func TestBug82_GetDefaultRegion_EmptyProfile(t *testing.T) {
 	}
 }
 
-// TestBug82_ConnectAWS_NoMissingRegionError verifies that when connectAWS
-// is called with empty region, the resulting ClientsReadyMsg does NOT contain
-// a "Missing Region" error. It may contain other errors (profile not found,
-// credentials not found) which are acceptable.
+// Other connect errors (profile or credentials not found) are acceptable in an
+// isolated environment; "Missing Region" is not.
 func TestBug82_ConnectAWS_NoMissingRegionError(t *testing.T) {
 	tui.Version = "test"
 	m := newBlessedModel(t, "default", "")
@@ -118,8 +101,7 @@ func TestBug82_ConnectAWS_NoMissingRegionError(t *testing.T) {
 	}
 }
 
-// TestBug82_ProfileSwitch_NoMissingRegionError verifies that profile switching
-// (which calls connectAWS with empty region) does not produce "Missing Region" errors.
+// Profile switching calls connectAWS with an empty region.
 func TestBug82_ProfileSwitch_NoMissingRegionError(t *testing.T) {
 	tui.Version = "test"
 	m := newBlessedModel(t, "dev", "us-west-2")
@@ -155,8 +137,6 @@ func TestBug82_ProfileSwitch_NoMissingRegionError(t *testing.T) {
 	}
 }
 
-// TestBug82_RegionSwitch_PassesExplicitRegion verifies explicit region selection
-// passes the region directly (no fallback needed).
 func TestBug82_RegionSwitch_PassesExplicitRegion(t *testing.T) {
 	tui.Version = "test"
 	m := newBlessedModel(t, "dev", "us-east-1")

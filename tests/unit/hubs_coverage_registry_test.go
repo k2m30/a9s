@@ -1,9 +1,9 @@
 package unit_test
 
 // hubs_coverage_registry_test.go pins that the demo-state burn-down allowlist
-// lives with the fixtures it describes. While it was one map literal in
-// qa_demo_state_coverage_test.go, every type's burn-down edited the same file,
-// so two tasks closing gaps on two different types conflicted for no reason.
+// lives with the fixtures it describes. One shared map literal would make
+// every type's burn-down edit the same file, so two tasks closing gaps on two
+// different types would conflict.
 
 import (
 	"os"
@@ -57,9 +57,8 @@ func TestCoverageGaps_EveryKeyNamesARealTypeAndGap(t *testing.T) {
 	}
 }
 
-// TestCoverageGaps_AllowlistLiteralIsGone pins the burn-down itself: the map
-// literal must not come back beside the registry, or the two lists disagree
-// and the file is a shared hub again.
+// A map literal beside the registry would be a second list that can disagree
+// with it, and a shared hub file.
 func TestCoverageGaps_AllowlistLiteralIsGone(t *testing.T) {
 	raw, err := os.ReadFile("qa_demo_state_coverage_test.go")
 	if err != nil {

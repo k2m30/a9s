@@ -1,34 +1,8 @@
 package unit_test
 
 // detail_operation_test.go — lifecycle contract tests for the single
-// per-detail-view identity core/runtime.DetailOperation was rebuilt around
-// (Core.BeginDetailOperation / OperationID / messages.AspectDetailOp),
-// replacing the old per-message RelatedCheckStarted/EnrichDetail trigger
-// messages and the Generation staleness field. Core.DetailOperationTasks was
-// later deleted (#261 boundary-sealing wave): BeginDetailOperation itself now
-// returns (op, enrichTask, relatedTask) in one call — see Group 4.
-//
-// Five invariants, one per group below:
-//
-//  1. Acceptance ordering: a result stamped with a superseded operation is
-//     dropped whole regardless of whether it arrives before or after the
-//     active operation's own result — the guard compares against the
-//     CURRENT active operation at receipt time, never against "the last
-//     accepted" value, so delivery order cannot matter.
-//  2. Rotation (profile/region switch) invalidates every in-flight
-//     operation: a result stamped with a pre-rotation operation ID must
-//     never fold after Session.Rotate() runs.
-//  3. One-flight-per-operation: concurrent identical AWS calls made under
-//     the SAME real DetailOperation.ID coalesce into one underlying call
-//     (via awsclient.NewCoalescingSFN + awsclient.WithDetailOp), and two
-//     separate operations — even for the identical AWS-level key — never
-//     coalesce with each other.
-//  4. Core.BeginDetailOperation's task-gating table: enrich/related tasks
-//     are present only when the resource type has a registered
-//     enricher/related defs, and Refresh=true sets
-//     EnrichDetailPayload.DetailCtx.SkipCache.
-//  5. Core.BeginDetailOperation is strictly monotonic across calls, and
-//     Core.ActiveDetailOp always reflects the most recently begun operation.
+// per-detail-view identity core/runtime.DetailOperation
+// (Core.BeginDetailOperation / OperationID / messages.AspectDetailOp).
 
 import (
 	"context"
@@ -51,10 +25,8 @@ import (
 )
 
 // detailOpFindTaskKind returns the first task in tasks whose Key.Kind
-// matches kind, or nil. BeginDetailOperation now returns its workload as one
-// merged []TaskRequest (task pair no longer public — #261 boundary-sealing
-// wave, Core API reshape) instead of two separately named *TaskRequest
-// pointers.
+// matches kind, or nil. BeginDetailOperation returns its workload as one
+// merged []TaskRequest.
 func detailOpFindTaskKind(tasks []runtime.TaskRequest, kind runtime.TaskKind) *runtime.TaskRequest {
 	for i := range tasks {
 		if tasks[i].Key.Kind == kind {
@@ -63,10 +35,6 @@ func detailOpFindTaskKind(tasks []runtime.TaskRequest, kind runtime.TaskKind) *r
 	}
 	return nil
 }
-
-// ---------------------------------------------------------------------------
-// Group 1 — ordering invariant
-// ---------------------------------------------------------------------------
 
 // TestDetailOperation_AcceptanceOrdering_SupersededResultNeverFoldsRegardlessOfDeliveryOrder
 // pins that Controller.Handle's OperationID acceptance guard (messages.IsStale
@@ -149,10 +117,6 @@ func TestDetailOperation_AcceptanceOrdering_SupersededResultNeverFoldsRegardless
 	}
 }
 
-// ---------------------------------------------------------------------------
-// Group 2 — rotation invalidates an operation
-// ---------------------------------------------------------------------------
-
 // TestDetailOperation_Rotation_InvalidatesPreRotationOperation pins that
 // Session.Rotate() (profile/region switch) bumps DetailOpGen, so a
 // RelatedCheckResult stamped with the operation active before the rotation
@@ -190,10 +154,6 @@ func TestDetailOperation_Rotation_InvalidatesPreRotationOperation(t *testing.T) 
 		t.Error("Rotate() must invalidate the pre-rotation DetailOperation — a result stamped with it must never populate RelatedCache")
 	}
 }
-
-// ---------------------------------------------------------------------------
-// Group 3 — one-flight-per-operation via NewCoalescingSFN
-// ---------------------------------------------------------------------------
 
 // detailOpSfnFake implements awsclient.SFNAPI, counting DescribeStateMachine
 // calls and optionally blocking on describeBlock before returning — the same
@@ -315,10 +275,6 @@ func TestDetailOperation_OneFlightPerOperation_DifferentOperationsNeverCoalesce(
 	}
 }
 
-// ---------------------------------------------------------------------------
-// Group 4 — Core.DetailOperationTasks gating table
-// ---------------------------------------------------------------------------
-
 // TestDetailOperationTasks_GatingTable exercises every combination of
 // (enricher registered, related defs registered) plus the Refresh flag,
 // pinning: enrichTask is non-nil iff resource.HasDetailEnricher is true;
@@ -406,10 +362,6 @@ func TestDetailOperationTasks_GatingTable(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// Group 5 — Core.BeginDetailOperation monotonicity
-// ---------------------------------------------------------------------------
-
 // TestBeginDetailOperation_MonotonicallyIncreasingAcrossCalls pins that every
 // call to BeginDetailOperation returns a strictly greater ID than the last —
 // each open, re-open, and Ctrl+R refresh mints a fresh identity — and that
@@ -432,10 +384,6 @@ func TestBeginDetailOperation_MonotonicallyIncreasingAcrossCalls(t *testing.T) {
 		t.Errorf("ActiveDetailOp() = %d, want %d (the most recently begun operation)", got, op3.ID)
 	}
 }
-
-// ---------------------------------------------------------------------------
-// Group 6 — Operation Type backfill
-// ---------------------------------------------------------------------------
 
 // TestBeginDetailOperation_BackfillsEmptyResourceType pins that
 // Core.BeginDetailOperation backfills op.Resource.Type from the resourceType
@@ -581,11 +529,11 @@ func TestRunRelatedDef_CTEventsExemption_ReadsOperationResourceTypeNotResourceTy
 	}
 }
 
-// TestRunRelatedDef_TotalPrefetchFailure_ReturnsUnknownWithoutRunningChecker
-// pins the other g-item fix: a NeedsTargetCache def whose prefetch fails
-// completely (an error with zero rows — e.g. access denied) must short-circuit
-// to UnknownRelated BEFORE the checker ever runs, rather than letting the
-// checker read the missing/stale target cache as a confirmed zero.
+// TestRunRelatedDef_TotalPrefetchFailure_ReturnsUnknownWithoutRunningChecker:
+// a NeedsTargetCache def whose prefetch fails completely (an error with zero
+// rows — e.g. access denied) must short-circuit to UnknownRelated before the
+// checker runs, rather than letting the checker read the missing/stale
+// target cache as a confirmed zero.
 func TestRunRelatedDef_TotalPrefetchFailure_ReturnsUnknownWithoutRunningChecker(t *testing.T) {
 	const targetType = "test-prefetch-failure-target"
 	resource.SetPaginatedForTest(targetType, func(_ context.Context, _ any, _ string) (domain.FetchResult, error) {
@@ -619,10 +567,6 @@ func TestRunRelatedDef_TotalPrefetchFailure_ReturnsUnknownWithoutRunningChecker(
 		t.Errorf("Result.Count = %d, want 0 (Unknown, not a false confirmed zero)", result.Result.Count())
 	}
 }
-
-// ---------------------------------------------------------------------------
-// Group 7 — pending sticky-refresh clear converges on Core.HandleEnrichDetailResult
-// ---------------------------------------------------------------------------
 
 // TestHandleEnrichDetailResult_PendingRefreshClear exercises
 // Core.HandleEnrichDetailResult directly — the TUI lane's shape

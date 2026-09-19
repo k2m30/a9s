@@ -30,7 +30,7 @@ import (
 )
 
 // fillPerTypeMenuFields populates every map-typed (per-resource-type) field of
-// ms with one entry, so a clear that misses a field leaves a witness behind.
+// ms with one entry, so a clear that misses a field leaves an entry behind.
 func fillPerTypeMenuFields(t *testing.T, ms *app.MenuState) {
 	t.Helper()
 	v := reflect.ValueOf(ms).Elem()
@@ -196,7 +196,7 @@ func regionGapErr() error {
 
 // TestAggregateFailures_StripsOperationPrefixForEveryClass pins that the
 // aggregated line loses the "operation error <Svc>: <Op>," prefix whatever the
-// error class is — it was previously stripped only for API errors.
+// error class is.
 func TestAggregateFailures_StripsOperationPrefixForEveryClass(t *testing.T) {
 	for name, err := range map[string]error{
 		"timeout":    timeoutShapedErr(),
@@ -310,8 +310,7 @@ func probeAllTypes(t *testing.T, c *app.Controller, core *runtime.Core, err erro
 // TestProbeFailure_RowTitleAndLogAgreeOnTheClass pins that a timed-out and an
 // unreachable probe read as themselves everywhere the operator meets them: the
 // row's alias column, the account-wide title when every type failed that way,
-// and the flash the failure logs. Before this, both read "error" on the row
-// while the log said "timeout" — two tables, two vocabularies.
+// and the flash the failure logs.
 func TestProbeFailure_RowTitleAndLogAgreeOnTheClass(t *testing.T) {
 	for _, tc := range []struct {
 		name, class, rowWord, sweepTitle string
@@ -388,8 +387,6 @@ func TestErrClassTable_EveryClassHasARowWordAndASweepTitle(t *testing.T) {
 // TestRegionUnavailable_RowAndLogSayTheServiceIsNotHere pins the class a
 // service not offered in the selected region gets: the row says so in the
 // alias column and the error-history line says so in full, from one wording.
-// Before this it classed as a transport failure and the row read "transport"
-// while the log said the service was not available here.
 func TestRegionUnavailable_RowAndLogSayTheServiceIsNotHere(t *testing.T) {
 	err := regionGapErr()
 	if got, want := awsclient.ErrClass(err), "region-unavailable"; got != want {

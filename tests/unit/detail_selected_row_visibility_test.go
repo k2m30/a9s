@@ -11,8 +11,8 @@ import (
 	"github.com/k2m30/a9s/v3/tests/unit/tuitest"
 )
 
-// Regression guard: selected rows must keep labels readable and avoid carrying
-// navigable underline into the selected state.
+// Selected rows must keep labels readable and avoid carrying navigable
+// underline into the selected state.
 func TestDetail_SelectedRow_LabelVisible_NoNestedKeyTint(t *testing.T) {
 	tuitest.ForceColor(t)
 
@@ -42,7 +42,6 @@ func TestDetail_SelectedNavigableRow_DropsUnderline(t *testing.T) {
 	withIssue140EC2RelatedDefs(t)
 
 	c := makePreviewEC2Detail(t, 120, 35)
-	// Move to VpcId.
 	for range 80 {
 		if strings.Contains(findSelectedLine(previewDetailView(t, c, 120, 35)), "VpcId:") {
 			break

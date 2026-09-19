@@ -1,15 +1,5 @@
 package unit
 
-// aws_enrichment_waf_logs_ebs_test.go — Deep-branch coverage for Wave-2 enrichers.
-//
-// Enrichers covered:
-//   - EnrichWAFLogging
-//   - EnrichLogsMetricFilters
-//   - EnrichEBSVolumeStatus
-//
-// This file covers branches that were NOT covered by the existing test files
-// (aws_waf_enricher_test.go, aws_logs_enricher_test.go, enrichment_ebs_findings_test.go).
-
 import (
 	"context"
 	"errors"
@@ -31,24 +21,15 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// =============================================================================
-// WAF fakes — wave4
-// =============================================================================
-
-// wafFullFake implements WAFv2API AND WAFv2GetWebACLAPI so the enricher's
-// type-assertion path for rules_summary is exercised.
 type wafFullFake struct {
 	awsclient.WAFv2API
 
-	// GetLoggingConfiguration
 	loggingResults  map[string]*wafv2svc.GetLoggingConfigurationOutput
 	loggingErrByARN map[string]error
 
-	// ListResourcesForWebACL
 	resourcesResults  map[string]*wafv2svc.ListResourcesForWebACLOutput
 	resourcesErrByARN map[string]error
 
-	// GetWebACL
 	getACLOutput *wafv2svc.GetWebACLOutput
 	getACLErr    error
 }
@@ -93,7 +74,6 @@ func (f *wafFullFake) ListResourcesForWebACL(
 	return &wafv2svc.ListResourcesForWebACLOutput{}, nil
 }
 
-// GetWebACL makes wafFullFake also satisfy WAFv2GetWebACLAPI.
 func (f *wafFullFake) GetWebACL(
 	_ context.Context,
 	_ *wafv2svc.GetWebACLInput,
@@ -108,10 +88,8 @@ func (f *wafFullFake) GetWebACL(
 	return &wafv2svc.GetWebACLOutput{}, nil
 }
 
-// Compile-time check: wafFullFake satisfies WAFv2API.
 var _ awsclient.WAFv2API = (*wafFullFake)(nil)
 
-// Compile-time check: wafFullFake satisfies WAFv2GetWebACLAPI.
 var _ awsclient.WAFv2GetWebACLAPI = (*wafFullFake)(nil)
 
 // wafWebACLResourceWithNameID builds a WAF resource stub with name, id, arn, and
@@ -132,15 +110,10 @@ func wafWebACLResourceWithNameID(arn, name, id, scope string) resource.Resource 
 	}
 }
 
-// =============================================================================
-// EnrichWAFLogging — GetWebACL type-assertion path (rules_summary with blocks)
-// =============================================================================
-
 // TestEnrichWAFLogging_GetWebACLPathPopulatesBlockRulesSummary verifies that when
 // the WAFv2 client also implements WAFv2GetWebACLAPI and the resource has name+id
 // fields, the rules_summary FieldUpdate is populated with the block count format
 // "N/T BLOCK" rather than the default "0 rules".
-// Covers EnrichWAFLogging GetWebACL type-assertion branch.
 func TestEnrichWAFLogging_GetWebACLPathPopulatesBlockRulesSummary(t *testing.T) {
 	const arn = "arn:aws:wafv2:us-east-1:123456789012:regional/webacl/prod-acl/aaaa0001"
 	const name = "prod-acl"
@@ -191,7 +164,6 @@ func TestEnrichWAFLogging_GetWebACLPathPopulatesBlockRulesSummary(t *testing.T) 
 		t.Fatalf("FieldUpdates missing entry for %q", arn)
 	}
 	rulesSummary := fu["rules_summary"]
-	// Expected: "2/3 BLOCK"
 	if !strings.Contains(rulesSummary, "BLOCK") {
 		t.Errorf("rules_summary = %q, expected to contain \"BLOCK\" (type-assertion path)", rulesSummary)
 	}
@@ -201,7 +173,6 @@ func TestEnrichWAFLogging_GetWebACLPathPopulatesBlockRulesSummary(t *testing.T) 
 	if !strings.Contains(rulesSummary, "3") {
 		t.Errorf("rules_summary = %q, expected total count 3", rulesSummary)
 	}
-	// No findings expected — logging is configured and ACL is associated.
 	if len(result.Findings) != 0 {
 		t.Errorf("expected 0 findings, got %d", len(result.Findings))
 	}
@@ -209,8 +180,6 @@ func TestEnrichWAFLogging_GetWebACLPathPopulatesBlockRulesSummary(t *testing.T) 
 
 // TestEnrichWAFLogging_EmptyScopeDefaultsToREGIONAL verifies that when r.Fields["scope"]
 // is empty the enricher uses "REGIONAL" as the default scope when calling GetWebACL.
-// This is a behavior assertion: the call must succeed (non-error output) which means
-// the scope string was accepted. Covers EnrichWAFLogging empty-scope default branch.
 func TestEnrichWAFLogging_EmptyScopeDefaultsToREGIONAL(t *testing.T) {
 	const arn = "arn:aws:wafv2:us-east-1:123456789012:regional/webacl/scope-test/bbbb0002"
 	const name = "scope-test"
@@ -228,17 +197,14 @@ func TestEnrichWAFLogging_EmptyScopeDefaultsToREGIONAL(t *testing.T) {
 			WebACL: &wafv2types.WebACL{Rules: []wafv2types.Rule{}},
 		},
 	}
-	// Wrap to detect the call and verify Scope field.
 	wrapped := &scopeCaptureFake{wafFullFake: fake, scopeCapture: &getACLCalled}
 	clients := &awsclient.ServiceClients{WAFv2: wrapped}
-	// Resource has NO "scope" field — should default to REGIONAL.
 	resources := []resource.Resource{wafWebACLResourceWithNameID(arn, name, id, "")}
 
 	result, err := awsclient.EnrichWAFLogging(context.Background(), clients, resources, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	// rules_summary should be "0 rules" (no rules in the WebACL).
 	fu := result.FieldUpdates[arn]
 	if fu["rules_summary"] != "0 rules" {
 		t.Errorf("rules_summary = %q, want %q (empty WebACL via REGIONAL scope)", fu["rules_summary"], "0 rules")
@@ -254,8 +220,7 @@ func TestEnrichWAFLogging_EmptyScopeDefaultsToREGIONAL(t *testing.T) {
 // scopeCaptureFake wraps wafFullFake and records the Scope argument passed to
 // GetWebACL. mu guards scopeCapture/capturedScope: EnrichWAFLogging fans out
 // GetWebACL calls per resource via core/aws.ForEachParallel
-// (EnrichmentParallelism goroutines), so concurrent writers are possible even
-// though the tests in this file currently drive it with a single resource.
+// (EnrichmentParallelism goroutines), so concurrent writers are possible.
 type scopeCaptureFake struct {
 	*wafFullFake
 	mu            sync.Mutex
@@ -285,7 +250,6 @@ func (f *scopeCaptureFake) capturedScopeSafe() string {
 	return f.capturedScope
 }
 
-// Compile-time: scopeCaptureFake satisfies WAFv2API and WAFv2GetWebACLAPI.
 var _ awsclient.WAFv2API = (*scopeCaptureFake)(nil)
 var _ awsclient.WAFv2GetWebACLAPI = (*scopeCaptureFake)(nil)
 
@@ -296,7 +260,6 @@ var _ awsclient.WAFv2GetWebACLAPI = (*scopeCaptureFake)(nil)
 // prefix and the failing ARN — while leaving the aggregate Truncated flag
 // false, since waf only ever emits "~" (informational) findings and a
 // coverage gap must never lower-bound the issue badge.
-// Covers EnrichWAFLogging ListResourcesForWebACL error branch.
 func TestEnrichWAFLogging_ListResourcesErrorMarksRowTruncatedIDNotBadge(t *testing.T) {
 	assocErr := errors.New("wafv2: ListResourcesForWebACL throttled")
 	fake := &wafLoggingFake{
@@ -346,7 +309,6 @@ func TestEnrichWAFLogging_ListResourcesErrorMarksRowTruncatedIDNotBadge(t *testi
 // TestEnrichWAFLogging_TypeAssertionFailsRulesSummaryZero verifies that when the
 // WAFv2 client does NOT implement WAFv2GetWebACLAPI (type assertion fails in
 // EnrichWAFLogging), rules_summary defaults to "0 rules" without an error.
-// This is the wafLoggingFake path — it only implements WAFv2API, not WAFv2GetWebACLAPI.
 func TestEnrichWAFLogging_TypeAssertionFailsRulesSummaryZero(t *testing.T) {
 	// wafLoggingFake (defined in aws_waf_enricher_test.go) does NOT implement GetWebACL.
 	fake := &wafLoggingFake{
@@ -384,20 +346,13 @@ func TestEnrichWAFLogging_TypeAssertionFailsRulesSummaryZero(t *testing.T) {
 	}
 }
 
-// =============================================================================
-// EnrichLogsMetricFilters — deep branch tests
-// =============================================================================
-
 // cwLogsFullFake implements CWLogsAPI including DescribeLogStreams.
-// Allows wave4 tests to exercise the hasStreams=true path and time-bucket logic.
 type cwLogsFullFake struct {
 	awsclient.CWLogsAPI
 
-	// DescribeMetricFilters
 	filtersByGroup   map[string][]cwlogstypes.MetricFilter
 	metricFiltersErr error
 
-	// DescribeLogStreams
 	streamsByGroup map[string]*cwlogssvc.DescribeLogStreamsOutput
 	streamsErr     error
 }
@@ -436,7 +391,6 @@ func (f *cwLogsFullFake) DescribeLogStreams(
 	return &cwlogssvc.DescribeLogStreamsOutput{}, nil
 }
 
-// Compile-time checks: cwLogsFullFake satisfies both CWLogsAPI interfaces.
 var _ awsclient.CWLogsAPI = (*cwLogsFullFake)(nil)
 var _ awsclient.CWLogsDescribeLogStreamsAPI = (*cwLogsFullFake)(nil)
 var _ awsclient.CWLogsDescribeMetricFiltersAPI = (*cwLogsFullFake)(nil)
@@ -461,46 +415,17 @@ func (f *cwLogsNoStreamsFake) DescribeMetricFilters(
 	return &cwlogssvc.DescribeMetricFiltersOutput{MetricFilters: f.filtersByGroup[name]}, nil
 }
 
-// Compile-time check: cwLogsNoStreamsFake satisfies CWLogsAPI.
 var _ awsclient.CWLogsAPI = (*cwLogsNoStreamsFake)(nil)
 
-// TestEnrichLogsMetricFilters_MetricFiltersAPIAssertionFailsReturnsEmpty verifies
-// that when clients.CloudWatchLogs does NOT implement CWLogsDescribeMetricFiltersAPI
-// (type assertion in EnrichLogsMetricFilters fails), the enricher returns empty results
-// without error.
-// We simulate this by using a fake that only implements CWLogsDescribeLogStreamsAPI
-// (not CWLogsDescribeMetricFiltersAPI), so the enricher cannot cast it.
 func TestEnrichLogsMetricFilters_MetricFiltersAPIAssertionFailsReturnsEmpty(t *testing.T) {
-	// cwLogsStreamsOnlyFake implements CWLogsAPI via embedding but does NOT
-	// override DescribeMetricFilters — so the type assertion
-	// clients.CloudWatchLogs.(CWLogsDescribeMetricFiltersAPI) must succeed because
-	// the embedded awsclient.CWLogsAPI interface includes it. To get the assertion
-	// to FAIL we need a value that is CWLogsAPI-assignable but does NOT implement
-	// CWLogsDescribeMetricFiltersAPI.
-	//
-	// The only way to get hasMetricFilters=false is to have clients.CloudWatchLogs
-	// be a type that implements CWLogsAPI (so the nil-check passes) but does NOT
-	// implement CWLogsDescribeMetricFiltersAPI. This is impossible in Go when
-	// CWLogsAPI embeds CWLogsDescribeMetricFiltersAPI. Therefore we test the
-	// nearest achievable guard: the nil-client guard (already covered in the
-	// existing test file). This test is a documentation stub confirming the
-	// assertion always succeeds for any valid CWLogsAPI implementation.
-	//
-	// SKIP — assertion cannot fail for any valid CWLogsAPI value because
-	// CWLogsAPI embeds CWLogsDescribeMetricFiltersAPI. The nil guard (line 4115)
-	// is the only reachable guard; it is already covered by
-	// TestEnrichLogsMetricFilters_NilClientReturnsEmptyFindingsNoError.
 	t.Skip("CWLogsAPI embeds CWLogsDescribeMetricFiltersAPI — assertion always succeeds for valid clients; nil guard already covered")
 }
 
 // TestEnrichLogsMetricFilters_NoStreamsAPISkipsLastEventAt verifies that when
 // clients.CloudWatchLogs does NOT implement CWLogsDescribeLogStreamsAPI
 // (hasStreams=false in EnrichLogsMetricFilters), the last_event_at field is not
-// populated in FieldUpdates. Covers EnrichLogsMetricFilters hasStreams guard.
+// populated in FieldUpdates.
 func TestEnrichLogsMetricFilters_NoStreamsAPISkipsLastEventAt(t *testing.T) {
-	// cwLogsNoStreamsFake embeds awsclient.CWLogsAPI as a nil value.
-	// The dynamic type is *cwLogsNoStreamsFake which does NOT have a DescribeLogStreams
-	// method, so the type assertion .(CWLogsDescribeLogStreamsAPI) fails → hasStreams=false.
 	auditGroup := "/aws/cloudtrail/no-streams"
 	fake := &cwLogsNoStreamsFake{
 		filtersByGroup: map[string][]cwlogstypes.MetricFilter{
@@ -514,11 +439,9 @@ func TestEnrichLogsMetricFilters_NoStreamsAPISkipsLastEventAt(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	// No findings (audit group has filters).
 	if len(result.Findings) != 0 {
 		t.Errorf("expected 0 findings, got %d", len(result.Findings))
 	}
-	// last_event_at must NOT be set when DescribeLogStreams is unavailable.
 	if fu := result.FieldUpdates[auditGroup]; fu != nil {
 		if _, ok := fu["last_event_at"]; ok {
 			t.Errorf("last_event_at must not be set when hasStreams=false, got %q", fu["last_event_at"])
@@ -529,7 +452,6 @@ func TestEnrichLogsMetricFilters_NoStreamsAPISkipsLastEventAt(t *testing.T) {
 // TestEnrichLogsMetricFilters_StreamsErrorNoLastEventAt verifies that when
 // DescribeLogStreams returns an error the enricher continues without setting
 // last_event_at (no truncation for log-stream errors).
-// Covers EnrichLogsMetricFilters streamsErr != nil path via safeDescribeLogStreams.
 func TestEnrichLogsMetricFilters_StreamsErrorNoLastEventAt(t *testing.T) {
 	auditGroup := "/aws/cloudtrail/streams-err"
 	fake := &cwLogsFullFake{
@@ -552,7 +474,6 @@ func TestEnrichLogsMetricFilters_StreamsErrorNoLastEventAt(t *testing.T) {
 	if result.Truncated {
 		t.Error("Truncated must be false for DescribeLogStreams errors — only DescribeMetricFilters triggers truncation")
 	}
-	// last_event_at must NOT be set when DescribeLogStreams errors.
 	if fu := result.FieldUpdates[auditGroup]; fu != nil {
 		if _, ok := fu["last_event_at"]; ok {
 			t.Errorf("last_event_at must not be set when DescribeLogStreams errors, got %q", fu["last_event_at"])
@@ -567,7 +488,6 @@ func TestEnrichLogsMetricFilters_StreamsErrorNoLastEventAt(t *testing.T) {
 // ID, while leaving the aggregate Truncated flag false — logs is a
 // "~"-only enricher (IssueCount always 0), so a coverage gap must never
 // lower-bound the issue badge.
-// Covers EnrichLogsMetricFilters DescribeMetricFilters error branch.
 func TestEnrichLogsMetricFilters_DescribeMetricFiltersErrorMarksRowNotBadge(t *testing.T) {
 	auditGroup := "/aws/cloudtrail/mf-err"
 	fake := &cwLogsFullFake{
@@ -602,7 +522,6 @@ func TestEnrichLogsMetricFilters_DescribeMetricFiltersErrorMarksRowNotBadge(t *t
 
 // TestEnrichLogsMetricFilters_LastEventAt_MinutesAgo verifies that the last_event_at
 // FieldUpdate is formatted as "%dm ago" when the most-recent stream event is < 1 hour ago.
-// Covers EnrichLogsMetricFilters dur < time.Hour branch.
 func TestEnrichLogsMetricFilters_LastEventAt_MinutesAgo(t *testing.T) {
 	logGroup := "/aws/lambda/recent-func"
 	tsMillis := time.Now().Add(-25 * time.Minute).UnixMilli()
@@ -635,7 +554,7 @@ func TestEnrichLogsMetricFilters_LastEventAt_MinutesAgo(t *testing.T) {
 
 // TestEnrichLogsMetricFilters_LastEventAt_HoursAgo verifies that the last_event_at
 // FieldUpdate is formatted as "%dh ago" when the most-recent stream event is ≥1h but
-// < 24h ago. Covers EnrichLogsMetricFilters dur < 24*time.Hour branch.
+// < 24h ago.
 func TestEnrichLogsMetricFilters_LastEventAt_HoursAgo(t *testing.T) {
 	logGroup := "/aws/lambda/hours-ago-func"
 	tsMillis := time.Now().Add(-5 * time.Hour).UnixMilli()
@@ -668,7 +587,7 @@ func TestEnrichLogsMetricFilters_LastEventAt_HoursAgo(t *testing.T) {
 
 // TestEnrichLogsMetricFilters_LastEventAt_DaysAgo verifies that the last_event_at
 // FieldUpdate is formatted as "%dd ago" when the most-recent stream event is ≥1d but
-// < 7d ago. Covers EnrichLogsMetricFilters dur < 7*24*time.Hour branch.
+// < 7d ago.
 func TestEnrichLogsMetricFilters_LastEventAt_DaysAgo(t *testing.T) {
 	logGroup := "/aws/lambda/days-ago-func"
 	tsMillis := time.Now().Add(-3 * 24 * time.Hour).UnixMilli()
@@ -701,7 +620,6 @@ func TestEnrichLogsMetricFilters_LastEventAt_DaysAgo(t *testing.T) {
 
 // TestEnrichLogsMetricFilters_LastEventAt_DateFormat verifies that the last_event_at
 // FieldUpdate is formatted as "YYYY-MM-DD" when the most-recent stream event is ≥7d ago.
-// Covers EnrichLogsMetricFilters default/date-format branch.
 func TestEnrichLogsMetricFilters_LastEventAt_DateFormat(t *testing.T) {
 	logGroup := "/aws/lambda/old-func"
 	tsMillis := time.Now().Add(-10 * 24 * time.Hour).UnixMilli()
@@ -727,7 +645,6 @@ func TestEnrichLogsMetricFilters_LastEventAt_DateFormat(t *testing.T) {
 		t.Fatalf("FieldUpdates[%q] must not be nil", logGroup)
 	}
 	lastEventAt := fu["last_event_at"]
-	// Must match "YYYY-MM-DD" (10 chars, digits and dashes, no "ago").
 	if len(lastEventAt) != 10 || strings.Contains(lastEventAt, "ago") {
 		t.Errorf("last_event_at = %q, want \"YYYY-MM-DD\" date format (>=7d ago)", lastEventAt)
 	}
@@ -736,13 +653,8 @@ func TestEnrichLogsMetricFilters_LastEventAt_DateFormat(t *testing.T) {
 	}
 }
 
-// =============================================================================
-// EnrichEBSVolumeStatus — nil EC2 client guard
-// =============================================================================
-
 // TestEnrichEBSVolumeStatus_NilEC2ClientReturnsEmptyNoError verifies that when
 // clients.EC2 is nil the enricher returns a non-nil empty Findings map and no error.
-// Covers EnrichEBSVolumeStatus EC2 nil guard.
 func TestEnrichEBSVolumeStatus_NilEC2ClientReturnsEmptyNoError(t *testing.T) {
 	clients := &awsclient.ServiceClients{EC2: nil}
 
@@ -763,7 +675,6 @@ func TestEnrichEBSVolumeStatus_NilEC2ClientReturnsEmptyNoError(t *testing.T) {
 
 // TestEnrichEBSVolumeStatus_APIErrorReturnsError verifies that when DescribeVolumeStatus
 // returns an error the enricher propagates the error (not just truncation).
-// Covers EnrichEBSVolumeStatus API error → return err branch.
 func TestEnrichEBSVolumeStatus_APIErrorReturnsError(t *testing.T) {
 	apiErr := errors.New("ec2: DescribeVolumeStatus throttled")
 	fake := &ebsStatusFake{volumeErr: apiErr}
@@ -780,7 +691,6 @@ func TestEnrichEBSVolumeStatus_APIErrorReturnsError(t *testing.T) {
 
 // TestEnrichEBSVolumeStatus_WarningStatusProducesFinding verifies that a volume
 // with "warning" status produces a "!" finding with summary "volume I/O degraded".
-// Covers EnrichEBSVolumeStatus non-ok, non-impaired status path for "warning".
 func TestEnrichEBSVolumeStatus_WarningStatusProducesFinding(t *testing.T) {
 	out := &ec2svc.DescribeVolumeStatusOutput{
 		VolumeStatuses: []ec2types.VolumeStatusItem{
@@ -807,7 +717,6 @@ func TestEnrichEBSVolumeStatus_WarningStatusProducesFinding(t *testing.T) {
 	if f.Phrase != "volume I/O degraded" {
 		t.Errorf("summary = %q, want %q", f.Phrase, "volume I/O degraded")
 	}
-	// The I/O State row must reflect the actual status string.
 	volWarnRows := result.AttentionDetails["vol-warn"][f.Code].Rows
 	if len(volWarnRows) == 0 {
 		t.Fatal("expected at least one finding row")
@@ -820,7 +729,6 @@ func TestEnrichEBSVolumeStatus_WarningStatusProducesFinding(t *testing.T) {
 // TestEnrichEBSVolumeStatus_EventAndActionRowsPopulated verifies that when a
 // non-ok volume has Events and Actions, the finding rows include "Event" and
 // "Action Code" entries.
-// Covers EnrichEBSVolumeStatus event and action row branches.
 func TestEnrichEBSVolumeStatus_EventAndActionRowsPopulated(t *testing.T) {
 	out := &ec2svc.DescribeVolumeStatusOutput{
 		VolumeStatuses: []ec2types.VolumeStatusItem{
@@ -878,16 +786,13 @@ func TestEnrichEBSVolumeStatus_EventAndActionRowsPopulated(t *testing.T) {
 // TestEnrichEBSVolumeStatus_KnownIDsFilterExcludesUnmatchedVolumes verifies that
 // when a non-empty resource list is provided, volumes NOT in that list are excluded
 // from findings even if the API returns them.
-// Covers EnrichEBSVolumeStatus knownIDs filter branch.
 func TestEnrichEBSVolumeStatus_KnownIDsFilterExcludesUnmatchedVolumes(t *testing.T) {
 	out := &ec2svc.DescribeVolumeStatusOutput{
 		VolumeStatuses: []ec2types.VolumeStatusItem{
-			// in-scope: vol-known
 			{
 				VolumeId:     aws.String("vol-known"),
 				VolumeStatus: &ec2types.VolumeStatusInfo{Status: "impaired"},
 			},
-			// out-of-scope: vol-foreign (API returned it but it's not in our resources)
 			{
 				VolumeId:     aws.String("vol-foreign"),
 				VolumeStatus: &ec2types.VolumeStatusInfo{Status: "impaired"},
@@ -895,7 +800,6 @@ func TestEnrichEBSVolumeStatus_KnownIDsFilterExcludesUnmatchedVolumes(t *testing
 		},
 	}
 	clients := &awsclient.ServiceClients{EC2: &ebsStatusFake{volumeOutput: out}}
-	// Only vol-known is in the resource list.
 	resources := []resource.Resource{
 		{ID: "vol-known", Name: "known-volume"},
 	}
@@ -914,7 +818,6 @@ func TestEnrichEBSVolumeStatus_KnownIDsFilterExcludesUnmatchedVolumes(t *testing
 
 // TestEnrichEBSVolumeStatus_NilVolumeIdSkipped verifies that a VolumeStatusItem
 // with a nil VolumeId is silently skipped without a panic or error.
-// Covers EnrichEBSVolumeStatus nil VolumeId guard.
 func TestEnrichEBSVolumeStatus_NilVolumeIdSkipped(t *testing.T) {
 	out := &ec2svc.DescribeVolumeStatusOutput{
 		VolumeStatuses: []ec2types.VolumeStatusItem{
@@ -934,7 +837,6 @@ func TestEnrichEBSVolumeStatus_NilVolumeIdSkipped(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	// Only vol-real should appear.
 	if _, ok := result.Findings["vol-real"]; !ok {
 		t.Error("vol-real must appear in Findings")
 	}

@@ -18,7 +18,7 @@ func ctrlZ() tea.KeyPressMsg {
 	return tea.KeyPressMsg{Code: 'z', Mod: tea.ModCtrl}
 }
 
-// ansiRe is kept for direct call sites in search tests that use it inline.
+// ansiRe is used inline by search tests.
 var ansiRe = regexp.MustCompile(`\x1b\[[0-9;]*[a-zA-Z]`)
 
 // stripANSI removes ANSI escape sequences from a string for plain-text comparison.
@@ -32,10 +32,9 @@ func lipglossWidth(s string) int {
 }
 
 // collectAllPages drains a paginated fetcher (a *Page function bound to its
-// ctx/api args via closure) until IsTruncated is false, mirroring the
-// deleted all-pages FetchX wrappers' exact semantics: append each page's
-// resources, stop on the first error (discarding any partial results), and
-// stop once Pagination is nil or IsTruncated is false.
+// ctx/api args via closure): append each page's resources, stop on the first
+// error (discarding any partial results), and stop once Pagination is nil or
+// IsTruncated is false.
 func collectAllPages(fetch func(token string) (resource.FetchResult, error)) ([]resource.Resource, error) {
 	return CollectAllPages(fetch)
 }

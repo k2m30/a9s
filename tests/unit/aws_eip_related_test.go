@@ -26,8 +26,6 @@ func eipCheckerByTarget(t *testing.T, target string) resource.RelatedChecker {
 	return nil
 }
 
-// --- Navigable Field Registration ---
-
 func TestNavigableFields_EIP(t *testing.T) {
 	expected := map[string]string{
 		"InstanceId":         "ec2",
@@ -44,8 +42,6 @@ func TestNavigableFields_EIP(t *testing.T) {
 		}
 	}
 }
-
-// --- EC2 checker (Pattern F — reads InstanceId from RawStruct) ---
 
 func TestRelated_EIP_EC2_Associated(t *testing.T) {
 	source := resource.Resource{
@@ -90,8 +86,6 @@ func TestRelated_EIP_EC2_NoInstance(t *testing.T) {
 	}
 }
 
-// --- ENI checker (Pattern F — reads NetworkInterfaceId from RawStruct) ---
-
 func TestRelated_EIP_ENI_Associated(t *testing.T) {
 	source := resource.Resource{
 		ID:     "eipalloc-0a1b2c3d4e5f60003",
@@ -134,8 +128,6 @@ func TestRelated_EIP_ENI_NoENI(t *testing.T) {
 		t.Errorf("unexpected error: %v", result.Err())
 	}
 }
-
-// --- NAT checker (Pattern C — cache-based, matches AllocationId in NatGatewayAddresses) ---
 
 func TestRelated_EIP_NAT_Found(t *testing.T) {
 	allocationID := "eipalloc-0a1b2c3d4e5f60005"

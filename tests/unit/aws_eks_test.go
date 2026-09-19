@@ -17,10 +17,6 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// ---------------------------------------------------------------------------
-// T059 - Test EKS two-step fetch (ListClusters + DescribeCluster)
-// ---------------------------------------------------------------------------
-
 func TestFetchEKSClusters_ParsesMultipleClusters(t *testing.T) {
 	listMock := &mockEKSListClustersClient{
 		output: &eks.ListClustersOutput{
@@ -62,7 +58,6 @@ func TestFetchEKSClusters_ParsesMultipleClusters(t *testing.T) {
 		t.Fatalf("expected 2 resources, got %d", len(resources))
 	}
 
-	// Verify required fields exist
 	requiredFields := []string{"cluster_name", "version", "status", "endpoint", "platform_version"}
 	for i, r := range resources {
 		for _, key := range requiredFields {
@@ -72,7 +67,6 @@ func TestFetchEKSClusters_ParsesMultipleClusters(t *testing.T) {
 		}
 	}
 
-	// Verify first cluster
 	r0 := resources[0]
 	if r0.ID != "cluster-a" {
 		t.Errorf("resource[0].ID: expected %q, got %q", "cluster-a", r0.ID)
@@ -111,7 +105,6 @@ func TestFetchEKSClusters_ParsesMultipleClusters(t *testing.T) {
 		t.Errorf("resource[0].Fields[\"platform_version\"]: expected %q, got %q", "eks.5", r0.Fields["platform_version"])
 	}
 
-	// Verify second cluster
 	r1 := resources[1]
 	if r1.ID != "cluster-b" {
 		t.Errorf("resource[1].ID: expected %q, got %q", "cluster-b", r1.ID)
@@ -159,15 +152,8 @@ func TestFetchEKSClusters_EmptyResponse(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// TestFetchEKSClusters_DescribeFailureSurfacesError verifies that
-// FetchEKSClustersPage returns partial results for successful clusters AND a
-// composite error for failed DescribeCluster calls. The failed cluster is not
-// silently dropped — the caller receives the error via the second return value.
-// ---------------------------------------------------------------------------
-
-// eksTestFake implements awsclient.EKSAPI for registered-fetcher tests.
-// It supports per-cluster describe errors via errByName.
+// eksDescribeFailFake implements awsclient.EKSAPI with per-cluster
+// DescribeCluster errors via errByName.
 type eksDescribeFailFake struct {
 	// clusters returned by ListClusters
 	clusters []string
@@ -216,7 +202,6 @@ func (f *eksDescribeFailFake) DescribeNodegroup(
 	return &eks.DescribeNodegroupOutput{}, nil
 }
 
-// Compile-time check: eksDescribeFailFake satisfies awsclient.EKSAPI.
 var _ awsclient.EKSAPI = (*eksDescribeFailFake)(nil)
 
 func TestFetchEKSClusters_DescribeFailureSurfacesError(t *testing.T) {
@@ -246,7 +231,6 @@ func TestFetchEKSClusters_DescribeFailureSurfacesError(t *testing.T) {
 
 	result, err := awsclient.FetchEKSClustersPage(context.Background(), clients, "")
 
-	// The fetcher must surface a composite error for the failing cluster.
 	if err == nil {
 		t.Fatal("FetchEKSClustersPage must return a non-nil error when DescribeCluster fails for a cluster")
 	}
@@ -281,12 +265,9 @@ func TestFetchEKSClusters_DescribeFailureSurfacesError(t *testing.T) {
 	}
 }
 
-// TestFetchEKSClusters_HealthIssue_PhraseIsNotRepeatedAsARow pins the fold
-// (core/aws/ng.go, healthIssueFindingSev): the Attention rows
-// start at the second reported issue code, since the first is already the
-// Phrase. acme-degraded-prod's demo fixture carries two Health.Issues codes
-// (ConfigurationConflict, AccessDenied) so this is witnessed end to end
-// through the real demo fetcher, not a hand-built Health struct.
+// acme-degraded-prod's demo fixture carries two Health.Issues codes
+// (ConfigurationConflict, AccessDenied), so this runs through the real demo
+// fetcher rather than a hand-built Health struct.
 func TestFetchEKSClusters_HealthIssue_PhraseIsNotRepeatedAsARow(t *testing.T) {
 	clients := demo.NewServiceClients()
 	result, err := awsclient.FetchEKSClustersPage(context.Background(), clients, "")

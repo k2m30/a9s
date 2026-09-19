@@ -3,7 +3,7 @@ package unit_test
 // ctevent_demo_golden_case_d_test.go — golden snapshot test for ct-events detail view,
 // Case D: kms:RotateKey AwsServiceEvent.
 //
-// Uses demo fixture "e-d4e5f6a7" from core/demo/fixtures_monitoring.go.
+// Uses demo fixture "e-d4e5f6a7" from core/demo/fixtures/cloudtrail.go.
 //
 // Generation:
 //
@@ -37,7 +37,6 @@ import (
 func TestCTDetailDemoGolden_CaseD(t *testing.T) {
 	ensureNoColor(t)
 
-	// Load the demo fixture for ct-events.
 	ctClient := fakes.NewCloudTrail()
 	resources, fetchErr := collectAllPages(func(token string) (resource.FetchResult, error) {
 		return awsclient.FetchCloudTrailEventsPage(context.Background(), ctClient, token)
@@ -59,8 +58,7 @@ func TestCTDetailDemoGolden_CaseD(t *testing.T) {
 	}
 	res := resources[caseDIdx]
 
-	// Render via the live controller + NewTransientDetail seam (views.NewDetail/
-	// DetailModel.View are dead — see specs/022-codebase-cleanup/wave3-map-detail.md).
+	// Render via the live controller + NewTransientDetail seam.
 	c := newDetailController(t, res, "ct-events")
 	c.SetViewConfig(configForType("ct-events"))
 	body := c.Snapshot().Body.Detail

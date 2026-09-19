@@ -1,14 +1,5 @@
 package unit
 
-// Live (demo-client) coverage tests for checkRolePolicy.
-// These complement aws_iam_roles_related_test.go (package unit_test) which only
-// exercises nil-client and cache-based paths. Here we use demo.NewServiceClients()
-// to cover the two paths not yet covered at 66.7%:
-//
-//   - RawStruct fallback (lines 150-153): empty ID + valid RawStruct.RoleName → resolved
-//   - AWS-managed-only role: acme-eks-node-role has only `:aws:policy/` ARNs → Count=0
-//   - Happy path: acme-lambda-execution has 2 customer-managed policies → Count=2
-
 import (
 	"context"
 	"testing"
@@ -73,8 +64,7 @@ func TestCheckRolePolicy_HappyPath(t *testing.T) {
 // TestCheckRolePolicy_AWSManagedOnlyRole verifies that checkRolePolicy emits
 // every attached policy name, including AWS-managed ones. The lazy-add path
 // (FetchIAMPoliciesByIDsFull) resolves AWS-managed names to real entries at
-// drill time — previously the checker pre-filtered by ARN which hid these
-// attachments from the operator entirely.
+// drill time.
 //
 // acme-eks-node-role has AmazonEKSWorkerNodePolicy, AmazonEKS_CNI_Policy,
 // and AmazonEC2ContainerRegistryReadOnly attached — all AWS-managed.
@@ -107,14 +97,13 @@ func TestCheckRolePolicy_AWSManagedOnlyRole(t *testing.T) {
 }
 
 // TestCheckRolePolicy_RawStructFallback exercises the RawStruct fallback path
-// (iam_roles_related.go:149-153): when resource.ID is empty but RawStruct holds
+// when resource.ID is empty but RawStruct holds
 // an iamtypes.Role with a valid RoleName, the checker must resolve the name from
 // RawStruct and call ListAttachedRolePolicies successfully.
 func TestCheckRolePolicy_RawStructFallback(t *testing.T) {
 	clients := demo.NewServiceClients()
 	checker := iamRolePolicyChecker(t)
 
-	// Empty ID but valid RawStruct — should fall through to RawStruct resolution.
 	res := resource.Resource{
 		ID:   "",
 		Name: "",

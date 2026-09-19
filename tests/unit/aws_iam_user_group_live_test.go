@@ -1,15 +1,5 @@
 package unit
 
-// Live (demo-client) coverage tests for checkUserGroup.
-// These complement aws_iam_user_related_test.go (package unit_test) which only
-// exercises nil-client paths. Here we use demo.NewServiceClients() to exercise
-// the real IAM fake and cover the paths unreachable without a live client:
-//
-//   - Happy path: alice.johnson belongs to admins + developers → Count=2, IDs match
-//   - Empty user name: → Count=0 (empty-ID early return in checkUserGroup)
-//   - User with no groups: → Count=0
-//   - API error path: covered by nil-client test in existing file (Count=-1)
-
 import (
 	"context"
 	"testing"
@@ -52,7 +42,6 @@ func TestCheckUserGroup_HappyPath(t *testing.T) {
 		t.Errorf("unexpected error: %v", result.Err())
 	}
 
-	// Verify exact group names are present in IDs.
 	wantGroups := map[string]bool{"admins": false, "developers": false}
 	for _, id := range result.ResourceIDs() {
 		wantGroups[id] = true
@@ -65,7 +54,7 @@ func TestCheckUserGroup_HappyPath(t *testing.T) {
 }
 
 // TestCheckUserGroup_EmptyID verifies that an empty user ID returns Count=0
-// (early return at checkUserGroup:21-23) without calling the API.
+// without calling the API.
 func TestCheckUserGroup_EmptyID(t *testing.T) {
 	clients := demo.NewServiceClients()
 	checker := iamUserGroupChecker(t)

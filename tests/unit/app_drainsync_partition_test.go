@@ -1,46 +1,14 @@
-// app_drainsync_partition_test.go — RED-phase pin for app.DrainSyncPartition.
+// DrainSyncPartition behaves like DrainSyncContextProgress but partitions the
+// pending queue by isBackground: background tasks, including follow-ups
+// emitted by executed tasks, are collected unexecuted and returned; blocking
+// tasks run via Core.ExecuteTask, their results fed through Controller.Handle
+// and their follow-ups re-enqueued under the same split. A web request handler
+// drains only the tasks its response needs and hands background tasks
+// (related-check fan-out, detail enrichment, save-cache) to a goroutine that
+// completes after the response is written.
 //
-// TDD RED: app.DrainSyncPartition does not exist yet. This file is
-// compile-red until the web detail-latency fix adds it to core/app.
-//
-// Contract (per the fix task spec):
-//
-//	func DrainSyncPartition(
-//	    ctx context.Context,
-//	    c *Controller,
-//	    pending []runtime.TaskRequest,
-//	    isBackground func(runtime.TaskKind) bool,
-//	    onEvent func(),
-//	) []runtime.TaskRequest
-//
-// Behaves like DrainSyncContextProgress but partitions the pending queue by
-// isBackground: tasks classified background are collected (never executed)
-// and returned to the caller instead of being run inline — INCLUDING
-// follow-up tasks emitted by tasks that WERE executed. Tasks classified
-// blocking (isBackground returns false) run exactly as DrainSyncContextProgress
-// would: executed via Core.ExecuteTask, results fed through Controller.Handle,
-// any follow-ups re-enqueued (subject to the same background/blocking split).
-//
-// This lets a web request handler drain only the tasks whose result the HTTP
-// response needs (blocking) and hand background tasks (related-check fan-out,
-// detail enrichment, save-cache) to a goroutine that completes after the
-// response has already been written — fixing the 18.5s synchronous
-// related-check fan-out latency this fix task targets.
-//
-// Harness notes:
-//   - Mirrors the fake-task seams in app_drainsync_test.go: real executable
-//     TaskKindFetchIdentity (nil AWS clients -> deterministic IdentityError,
-//     no network) and adapter-only kinds (TaskKindFlashTick, TaskKindEmitNavigate)
-//     that ExecuteTask rejects with ErrAdapterOnlyTask.
-//   - The "blocking task whose follow-up is background" case drives the real
-//     handleAvailabilityChecked chain: seeding session.AvailQueue with exactly
-//     one more resource type makes TaskKindProbeAvailability's execution
-//     deterministically emit a TaskKindSaveCache follow-up once the queue and
-//     AvailChecked/AvailTotal counters drain to equal (see
-//     core/runtime/handlers_availability.go:216-239). ProbeResourceAvailability
-//     tolerates nil session.Clients (returns an Err-populated result, no
-//     network, no panic), so this is fully hermetic like the rest of the
-//     DrainSync suite.
+// ProbeResourceAvailability tolerates nil session.Clients (it returns an
+// Err-populated result), so the availability chain here needs no network.
 package unit_test
 
 import (
@@ -52,16 +20,8 @@ import (
 	"github.com/k2m30/a9s/v3/core/session"
 )
 
-// alwaysBackground classifies every kind as background — used to assert the
-// "empty/all-blocking" DrainSyncContextProgress-equivalence case via its
-// logical inverse (never used directly; see alwaysBlocking below).
 func alwaysBlocking(runtime.TaskKind) bool { return false }
 
-// TestDrainSyncPartition_MixedBatch_BlockingExecuted_BackgroundReturned
-// verifies (a): a batch mixing a real blocking task (TaskKindFetchIdentity)
-// with background-classified adapter-only tasks (TaskKindFlashTick,
-// TaskKindEmitNavigate) executes the blocking task and returns the
-// background tasks unexecuted, in the original relative order.
 func TestDrainSyncPartition_MixedBatch_BlockingExecuted_BackgroundReturned(t *testing.T) {
 	c := newTestController(t)
 
@@ -104,13 +64,6 @@ func TestDrainSyncPartition_MixedBatch_BlockingExecuted_BackgroundReturned(t *te
 	}
 }
 
-// TestDrainSyncPartition_BlockingFollowUp_IsBackground_ReturnedNotExecuted
-// verifies (b): a blocking task whose execution emits a background-classified
-// follow-up task returns that follow-up unexecuted, rather than draining it
-// inline. Drives the real handleAvailabilityChecked chain: session.AvailQueue
-// is empty and AvailChecked+1 == AvailTotal, so executing the seed
-// TaskKindProbeAvailability deterministically appends a single
-// TaskKindSaveCache follow-up (queue-exhausted branch).
 func TestDrainSyncPartition_BlockingFollowUp_IsBackground_ReturnedNotExecuted(t *testing.T) {
 	s := session.New()
 	s.Profile = "demo"
@@ -144,10 +97,6 @@ func TestDrainSyncPartition_BlockingFollowUp_IsBackground_ReturnedNotExecuted(t 
 	}
 }
 
-// TestDrainSyncPartition_AllBlocking_BehavesLikeDrainSyncContextProgress
-// verifies (c): when isBackground never matches, DrainSyncPartition drains
-// the entire batch exactly like DrainSyncContextProgress (nothing deferred)
-// and produces the same observable end state.
 func TestDrainSyncPartition_AllBlocking_BehavesLikeDrainSyncContextProgress(t *testing.T) {
 	c := newTestController(t)
 
@@ -172,10 +121,6 @@ func TestDrainSyncPartition_AllBlocking_BehavesLikeDrainSyncContextProgress(t *t
 	}
 }
 
-// TestDrainSyncPartition_EmptyPending_ReturnsNil verifies (c)'s empty-queue
-// edge: an empty pending slice returns nil (or empty) deferred tasks without
-// touching controller state, matching DrainSyncContextProgress's immediate
-// return on an empty queue.
 func TestDrainSyncPartition_EmptyPending_ReturnsNil(t *testing.T) {
 	c := newTestController(t)
 
@@ -186,10 +131,6 @@ func TestDrainSyncPartition_EmptyPending_ReturnsNil(t *testing.T) {
 	}
 }
 
-// TestDrainSyncPartition_OnEventCalledOnlyForExecutedTasks verifies that
-// onEvent fires once per executed (blocking) task result, mirroring
-// DrainSyncProgress semantics, and is NOT invoked for tasks that were
-// deferred as background without executing.
 func TestDrainSyncPartition_OnEventCalledOnlyForExecutedTasks(t *testing.T) {
 	c := newTestController(t)
 

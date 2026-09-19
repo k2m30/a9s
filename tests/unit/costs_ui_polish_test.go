@@ -1,10 +1,3 @@
-// costs_ui_polish_test.go — Cost Explorer: regression pins for the user's
-// screenshot-review batch.
-//
-// package unit_test (not unit): none of these items need TUI-level helpers —
-// a pure views.RenderCosts call, a headless Controller via newCostsController
-// (costs_state_test.go, same package), or a pure costs.BuildGrid/
-// domain.HelpGroupsFor call cover every case.
 package unit_test
 
 import (
@@ -25,9 +18,8 @@ import (
 	"github.com/k2m30/a9s/v3/tests/unit/tuitest"
 )
 
-// costsUIPolishBody builds a CostsBody with n synthetic time columns/cells —
-// enough to force a fractional/partial trailing column at several widths if
-// the broken-right-border guard (RenderCosts's costsFittingCols) regressed.
+// costsUIPolishBody builds a CostsBody with n synthetic time columns/cells,
+// enough to leave a partial trailing column at several widths.
 func costsUIPolishBody(n int) app.CostsBody {
 	cols := make([]app.CostColumn, n)
 	cells := make([]app.CostCell, n)
@@ -50,16 +42,10 @@ func costsUIPolishBody(n int) app.CostsBody {
 	}
 }
 
-// ===========================================================================
-// 1 — every RenderCosts grid line is exactly the requested width; no line
-// ever exceeds it (the broken-right-border overflow bug).
-// ===========================================================================
-
 func TestCostsUIPolish_RenderCosts_GridLinesExactWidth_NeverOverflow(t *testing.T) {
 	body := costsUIPolishBody(15)
-	// 60/79/137 are deliberately NOT round multiples of a column width, so a
-	// regression in the fitting-column guard would previously have produced
-	// a partial trailing column that overflowed the requested width.
+	// 60/79/137 are not multiples of a column width, so each leaves room for
+	// a partial trailing column.
 	for _, width := range []int{60, 79, 137} {
 		out := tuitest.StripANSI(views.RenderCosts(body, width, 32))
 		lines := strings.Split(out, "\n")
@@ -74,7 +60,6 @@ func TestCostsUIPolish_RenderCosts_GridLinesExactWidth_NeverOverflow(t *testing.
 				t.Errorf("width=%d line=%d: got width %d, want exactly %d — overflow would break the frame's right border:\n%q", width, i, w, width, l)
 			}
 		}
-		// No line, anywhere, may exceed the requested width.
 		for i, l := range lines {
 			if w := lipgloss.Width(l); w > width {
 				t.Errorf("width=%d line=%d: got width %d, exceeds requested width %d:\n%q", width, i, w, width, l)
@@ -82,10 +67,6 @@ func TestCostsUIPolish_RenderCosts_GridLinesExactWidth_NeverOverflow(t *testing.
 		}
 	}
 }
-
-// ===========================================================================
-// 2 — the footer renders no "CE calls" element.
-// ===========================================================================
 
 func TestCostsUIPolish_Footer_NeverContainsCECalls(t *testing.T) {
 	body := costsUIPolishBody(3)
@@ -99,13 +80,6 @@ func TestCostsUIPolish_Footer_NeverContainsCECalls(t *testing.T) {
 		t.Errorf("rendered output contains the removed API cost estimate %q:\n%s", body.APICostUSD, out)
 	}
 }
-
-// ===========================================================================
-// 3 — ViewState.Footer for the costs screen carries CostsFooterHintsFor's
-// hint set (b/+/-/digits/enter/esc/ctrl+r); single source, no renderer-side
-// duplicate (cross-checked: internal/tui has no hardcoded "Metric"/"Zoom"/
-// "Pivot"/"Drill" footer-hint literal anywhere outside viewstate.go).
-// ===========================================================================
 
 func TestCostsUIPolish_Footer_CarriesCostsFooterHintsFor_SingleSource(t *testing.T) {
 	c := newCostsController(t, fixedCostsNow)
@@ -123,12 +97,6 @@ func TestCostsUIPolish_Footer_CarriesCostsFooterHintsFor_SingleSource(t *testing
 		}
 	}
 }
-
-// ===========================================================================
-// 4 — FR-002 "open at today": the cursor sits on the newest period and is
-// VISIBLE (ScrollX positions it) on open, after pivot reset, and after
-// zoom-out.
-// ===========================================================================
 
 func TestCostsUIPolish_CursorOpensOnNewestPeriod_AndIsVisible(t *testing.T) {
 	c := newCostsController(t, fixedCostsNow)
@@ -153,28 +121,19 @@ func TestCostsUIPolish_CursorOpensOnNewestPeriod_AndIsVisible(t *testing.T) {
 		}
 	}
 
-	// On open.
 	c.SetCostsViewportCols(viewportCols)
 	assertCursorVisibleAtNewest("on open")
 
-	// After pivot reset (digit 0).
 	c.Apply(app.Action{Kind: app.ActionCostPivot, N: 1}) // move off default first, so the reset is observable
 	c.Apply(app.Action{Kind: app.ActionCostPivot, N: 0})
 	assertCursorVisibleAtNewest("after pivot reset")
 
-	// After zoom-out: zoom IN (month -> week, bounded) then back OUT
-	// (week -> month, trailing-anchored) — the FR-002 re-land applies only
-	// to the trailing-anchored (month/year) landing.
+	// Zoom IN (month -> week) then back OUT: the re-land on the newest period
+	// applies only to the trailing-anchored (month/year) landing.
 	c.Apply(app.Action{Kind: app.ActionCostZoomIn})
 	c.Apply(app.Action{Kind: app.ActionCostZoomOut})
 	assertCursorVisibleAtNewest("after zoom-out")
 }
-
-// ===========================================================================
-// 5 — the costs context's help sections include the Cost Explorer section
-// with the documented keys (HelpFromCosts / domain.costsSections via
-// HelpGroupsFor).
-// ===========================================================================
 
 func TestCostsUIPolish_HelpSections_IncludeCostExplorerKeys(t *testing.T) {
 	sections := domain.HelpGroupsFor(domain.HelpFromCosts, "ctrl+z")
@@ -216,13 +175,6 @@ func TestCostsUIPolish_HelpSections_IncludeCostExplorerKeys(t *testing.T) {
 		}
 	}
 }
-
-// ===========================================================================
-// 6 — sort/determinism: rows sort desc by ABSOLUTE total (a large negative
-// credit row ranks by its true magnitude); NaN-producing rows keep
-// deterministic order across repeated runs. The noise-floor fold itself was
-// removed (spec.md Edge Cases "Many small rows" — see costs_round3_test.go).
-// ===========================================================================
 
 func costsUIPolishRecord(period costs.Period, key string, amount float64) costs.Record {
 	return costs.Record{
@@ -283,23 +235,15 @@ func TestCostsUIPolish_NaNRow_DeterministicOrder_AcrossRepeatedRuns(t *testing.T
 	}
 }
 
-// ===========================================================================
-// 7 — "-0.0" never appears in any rendered amount.
-// ===========================================================================
-
 func TestCostsUIPolish_NegativeZero_NeverRendered(t *testing.T) {
 	c := newCostsController(t, fixedCostsNow)
 	q := costs.Query{
 		Granularity: costs.GranularityMonth.APIGranularity(),
 		GroupBy:     []costs.Dimension{costs.DimensionService},
 	}
-	// The -0.04 cell must sit alongside a real-spend cell IN THE SAME ROW
-	// (a second, prior-month period): the display-level zero-row filter
-	// (round6, item 9) hides a row only when EVERY one of its own visible
-	// cells formats as "0.0" — a lone -0.04 record would now be hidden
-	// outright before ever reaching the "-0.0" rendering check this test
-	// exists to pin. A real prior-month amount keeps the row (and its
-	// current-month -0.04 cell) visible without changing what's asserted.
+	// The -0.04 cell sits beside a real-spend cell in the same row: the
+	// display-level zero-row filter hides a row whose every visible cell
+	// formats as "0.0".
 	curStart := time.Date(fixedCostsNow.Year(), fixedCostsNow.Month(), 1, 0, 0, 0, 0, time.UTC)
 	curEnd := curStart.AddDate(0, 1, 0)
 	prevStart := curStart.AddDate(0, -1, 0)
@@ -344,11 +288,6 @@ func TestCostsUIPolish_NegativeZero_NeverRendered(t *testing.T) {
 	}
 }
 
-// ===========================================================================
-// 8 — Enter on a drill-refused row surfaces the honest reason in
-// FooterNote (DrillRefusedReason), not a silent no-op.
-// ===========================================================================
-
 func TestCostsUIPolish_DrillRefused_SurfacesHonestReasonInFooter_NotSilentNoOp(t *testing.T) {
 	c := newCostsController(t, fixedCostsNow)
 	root := topDrill(t, c)
@@ -366,9 +305,8 @@ func TestCostsUIPolish_DrillRefused_SurfacesHonestReasonInFooter_NotSilentNoOp(t
 		t.Fatalf("precondition: cursor did not land on column 0, got %d", got)
 	}
 
-	// Loading (screen.Select's WaitForRows) gates Select unconditionally
-	// now — the root SERVICE shape's own fetch must land before Enter can
-	// drill anywhere at all.
+	// Loading (screen.Select's WaitForRows) gates Select: the root SERVICE
+	// shape's own fetch must land before Enter can drill.
 	_, rootTasks := c.Apply(app.Action{Kind: app.ActionCostPivot, N: 1}) // SERVICE, already current — dispatches the shape-miss fetch
 	rootPayload, found := findFetchCostsTask(rootTasks)
 	if !found {
@@ -380,9 +318,8 @@ func TestCostsUIPolish_DrillRefused_SurfacesHonestReasonInFooter_NotSilentNoOp(t
 		Grid:     costs.GridResult{Fetched: true, Records: []costs.Record{fullMetricRecord(oldestCol, "Amazon EC2", 100)}},
 		Requests: 1,
 	})
-	// The cursor column is preserved across a pivot now (it no longer
-	// resets to 0), so it's still on the oldest column from the scroll
-	// above.
+	// The cursor column is preserved across a pivot, so it is still on the
+	// oldest column.
 	if got := topDrill(t, c).Cursor.Col; got != 0 {
 		t.Fatalf("precondition: cursor column drifted off the oldest column after the pivot, got %d", got)
 	}
@@ -404,8 +341,6 @@ func TestCostsUIPolish_DrillRefused_SurfacesHonestReasonInFooter_NotSilentNoOp(t
 		Requests: 1,
 	})
 
-	// Second Enter: attempts the RESOURCE_ID drill — must be refused, not a
-	// silent no-op.
 	vs, _ := c.Apply(app.Action{Kind: app.ActionSelect})
 
 	stack := c.GetCostsDrillStack()

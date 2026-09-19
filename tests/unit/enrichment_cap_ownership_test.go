@@ -33,10 +33,6 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// ---------------------------------------------------------------------------
-// Row 1 — the account-wide page cap
-// ---------------------------------------------------------------------------
-
 // alwaysPagingInstanceStatus returns n pages that each name one instance and
 // each carry a NextToken, so the walk only ever ends because its own bound
 // stopped it.
@@ -117,10 +113,6 @@ func TestPageCap_CompletedWalkMarksNoRowUninspected(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// Row 3 — one writer for Truncated
-// ---------------------------------------------------------------------------
-
 // TestSetTruncated_NeverLowersAFlagAlreadyRaised pins what the writer is for.
 // An enricher that caps its work list and then finishes its remaining batches
 // without a failure must still report the cut: Finish's zero-failure case, and
@@ -139,10 +131,6 @@ func TestSetTruncated_NeverLowersAFlagAlreadyRaised(t *testing.T) {
 		t.Error("SetTruncated(result, false) raised the flag on an untouched result")
 	}
 }
-
-// ---------------------------------------------------------------------------
-// Row 5 — capRows' stored-count parse
-// ---------------------------------------------------------------------------
 
 // scheduledEventStatus returns an instance status carrying one scheduled event
 // whose code is eventCode, due tomorrow so the enricher reports it.
@@ -234,10 +222,6 @@ func TestCapRows_ZeroAndNegativeCountsAreContent(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// Row 2 — the ECS task cap bites at the advertised count
-// ---------------------------------------------------------------------------
-
 // ecsTaskCapFake answers DescribeTasks for whatever it is asked and records
 // every task ID the enricher asked about, so the pin reads the work the cap
 // was supposed to bound rather than the calls it took to do it.
@@ -299,10 +283,6 @@ func TestECSTasks_CapBitesBeforeTheBatchIsSized(t *testing.T) {
 		t.Errorf("task %q is inside the cap but was marked uninspected", resources[0].ID)
 	}
 }
-
-// ---------------------------------------------------------------------------
-// Row 6 — the demo bench carries a witness for the closing row
-// ---------------------------------------------------------------------------
 
 // TestDemo_TargetGroupOverTheRowCapRendersTheClosingRow reads the demo
 // fixtures through the demo fake and the real tg enricher. Without a fixture

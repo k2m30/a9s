@@ -1,24 +1,11 @@
 package unit_test
 
-// aws_s3_notfound_classification_test.go — the four S3
-// related-def checkers that issue a per-bucket S3 API call (checkS3CFN →
-// GetBucketTagging, checkS3KMS → GetBucketEncryption, checkS3Logs →
-// GetBucketLogging, checkS3Role → GetBucketPolicy) must classify a deleted
-// bucket (Code "NoSuchBucket", and the empty-body-404 "NotFound" shape) as a
-// benign absence — the same honest-zero outcome as the existing
-// sub-config-absent cases (NoSuchTagSet, ServerSideEncryptionConfigurationNotFoundError,
-// NoSuchBucketPolicy) — never a State: RelatedError related cell.
-//
-// Also pins that classification is code-based, not message-substring-based:
-// the existing benign codes must still resolve as benign when delivered as a
-// smithy.GenericAPIError carrying the Code plus an unrelated message.
-//
-// Reuses the s3NoopAPI / s3*ErrFake fakes and s3CheckerByTarget /
-// s3CheckerByDisplayName / emptyBucketResource helpers defined in
-// qa_s3_related_cross_region_test.go and aws_s3_related_test.go (same
-// package unit_test), driving new `code` values through the fakes' `code`
-// field.
-// through the fakes' existing `code` field.
+// A deleted bucket (Code "NoSuchBucket", or the empty-body-404 "NotFound")
+// is a benign absence for the per-bucket S3 checkers, like the
+// sub-config-absent codes (NoSuchTagSet,
+// ServerSideEncryptionConfigurationNotFoundError, NoSuchBucketPolicy): an
+// honest zero, never RelatedError. Classification reads ErrorCode(), not the
+// message text.
 
 import (
 	"context"
@@ -28,13 +15,6 @@ import (
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
-
-// ---------------------------------------------------------------------------
-// Deleted-bucket taxonomy — 4 checkers × 2 codes (NoSuchBucket, NotFound) = 8
-// sub-tests. Each asserts the benign-absence contract: Count=0,
-// State=RelatedResolved (honest zero), Truncated=false, Err=nil — NOT the
-// dimmed State: RelatedError related cell a genuine failure would render.
-// ---------------------------------------------------------------------------
 
 func TestS3Related_DeletedBucket_BenignAbsence(t *testing.T) {
 	const deletedBucket = "gone-bucket"
@@ -117,13 +97,6 @@ func TestS3Related_DeletedBucket_BenignAbsence(t *testing.T) {
 		}
 	}
 }
-
-// ---------------------------------------------------------------------------
-// Code-based classification guard — the three checkers with a pre-existing
-// benign-absence special case must still resolve benign when the error
-// carries the Code plus an unrelated message, proving the match is on
-// ErrorCode() and not a strings.Contains(err.Error(), "<code>") scan.
-// ---------------------------------------------------------------------------
 
 func TestS3Related_ExistingBenignCodes_AreCodeBased(t *testing.T) {
 	type kase struct {

@@ -1,17 +1,7 @@
-// costs_round3_test.go — Cost Explorer live-usage pins.
-//
-// package unit (not unit_test): item 1 (CLI -c costs/ce) needs the full TUI
-// Model (tui.New/rootApplyMsg/extractMsg, package-unit-only, following
-// qa_cli_command_flag_test.go's exact convention) alongside the three
-// headless-Controller/pure-costs pins, and Go permits only one package per
-// file — everything here lives in package unit with small locally-prefixed
-// (round3*) helpers mirroring costs_state_test.go's unit_test helpers, to
-// avoid implying they are the same functions across packages.
-//
-// Item 1 tests only the runtime/TUI navigation half of "-c costs"/"-c ce"
-// (tui.WithCommand onward, matching qa_cli_command_flag_test.go's
-// convention); cmd/a9s/main.go's own flag VALIDATION is package main and
-// covered separately by main_wiring_test.go.
+// The round3*-prefixed helpers mirror costs_state_test.go's package unit_test
+// helpers under local names, so they do not read as the same functions across
+// packages. cmd/a9s/main.go's flag validation is package main, covered by
+// main_wiring_test.go.
 package unit
 
 import (
@@ -71,11 +61,6 @@ func round3MonthRecord(now time.Time, rowKey string, amount float64) costs.Recor
 	}
 }
 
-// ===========================================================================
-// 1 (P1) — CLI entry: "-c costs" and "-c ce" auto-open the Cost Explorer
-// screen on start.
-// ===========================================================================
-
 func TestCostsRound3_CLICommand_EmitsNavigateTargetCosts(t *testing.T) {
 	for _, cliCmd := range []string{"costs", "ce"} {
 		t.Run(cliCmd, func(t *testing.T) {
@@ -109,11 +94,8 @@ func TestCostsRound3_CLICommand_EmitsNavigateTargetCosts(t *testing.T) {
 	}
 }
 
-// ===========================================================================
-// 2 (P2) — SERVICE-pivot rows render without the "Amazon "/"AWS " vendor
-// prefix; the label column stays wide enough that a full un-prefixed
-// service name survives untruncated.
-// ===========================================================================
+// SERVICE-pivot rows render without the "Amazon "/"AWS " vendor prefix, in a
+// label column wide enough for the full un-prefixed service name.
 
 func TestCostsRound3_ServiceLabel_StripsVendorPrefix(t *testing.T) {
 	c := newCostsScreenController(t, round3Now)
@@ -164,13 +146,8 @@ func TestCostsRound3_ServiceLabel_ColumnWideEnoughToAvoidTruncation(t *testing.T
 	}
 }
 
-// ===========================================================================
-// 3 (P2) — fold REMOVED (spec.md Edge Cases "Many small rows"): every
-// non-zero row renders individually (no "… others" rollup, regardless of
-// magnitude), zero-only rows are hidden, TOTAL stays pinned; vertical
-// scroll keeps the cursor row visible and TOTAL pinned as the cursor moves
-// past the initial viewport.
-// ===========================================================================
+// Every non-zero row renders individually with no "… others" rollup, zero-only
+// rows are hidden, and TOTAL stays pinned.
 
 func TestCostsRound3_Fold_Removed_AllNonZeroRowsRenderIndividually_ZeroOnlyHidden(t *testing.T) {
 	window := []costs.Period{{Start: "2026-07-01", End: "2026-08-01"}}
@@ -206,13 +183,8 @@ func TestCostsRound3_Fold_Removed_AllNonZeroRowsRenderIndividually_ZeroOnlyHidde
 	}
 }
 
-// TestCostsRound3_VerticalScroll_CursorVisible_TotalPinned_AsCursorMovesBeyondViewport
-// tests the OBSERVABLE rendered behavior, not the (dead, never-mutated)
-// DrillLevel.ScrollY field: RenderCosts's own clipCostsRows already
-// cursor-centers the visible data-row window and keeps header/TOTAL pinned,
-// independent of ScrollY — if this is already correct today it is a green
-// regression pin; this test's row-count precondition still requires fold
-// removal (item 3's other half) to have landed first.
+// RenderCosts's clipCostsRows cursor-centers the visible data-row window and
+// keeps header and TOTAL pinned, independent of DrillLevel.ScrollY.
 func TestCostsRound3_VerticalScroll_CursorVisible_TotalPinned_AsCursorMovesBeyondViewport(t *testing.T) {
 	c := newCostsScreenController(t, round3Now)
 	const rowCount = 30
@@ -254,11 +226,6 @@ func TestCostsRound3_VerticalScroll_CursorVisible_TotalPinned_AsCursorMovesBeyon
 	}
 }
 
-// ===========================================================================
-// 4 (P2) — zero-valued cells carry NO delta color tag (neutral), regardless
-// of the period-over-period delta math.
-// ===========================================================================
-
 func TestCostsRound3_ZeroValueCell_NeverColoredAsGrowthOrDrop(t *testing.T) {
 	c := newCostsScreenController(t, round3Now)
 	topSnap := c.Snapshot()
@@ -277,14 +244,11 @@ func TestCostsRound3_ZeroValueCell_NeverColoredAsGrowthOrDrop(t *testing.T) {
 	last := window[len(window)-1]
 
 	recs := []costs.Record{
-		// A row with real spend that drops to EXACTLY zero in the last
-		// (current) column — today this computes a -100% delta and gets
-		// tagged "drop"; the fix must pin a zero-value cell as neutral
-		// regardless of the delta math.
+		// Real spend dropping to exactly zero in the current column is a -100% delta;
+		// a zero-value cell is neutral regardless.
 		{Period: prev, Keys: []string{"EC2 - Other"}, Metrics: map[costs.Metric]costs.Amount{costs.MetricInvoice: {Value: 500, Unit: "USD"}}},
 		{Period: last, Keys: []string{"EC2 - Other"}, Metrics: map[costs.Metric]costs.Amount{costs.MetricInvoice: {Value: 0, Unit: "USD"}}},
-		// Control: a genuine (non-zero) growth transition must still be
-		// tagged — the fix must not suppress delta coloring entirely.
+		// A non-zero growth transition is still tagged.
 		{Period: prev, Keys: []string{"Elastic Load Balancing"}, Metrics: map[costs.Metric]costs.Amount{costs.MetricInvoice: {Value: 100, Unit: "USD"}}},
 		{Period: last, Keys: []string{"Elastic Load Balancing"}, Metrics: map[costs.Metric]costs.Amount{costs.MetricInvoice: {Value: 200, Unit: "USD"}}},
 	}
@@ -315,15 +279,12 @@ func TestCostsRound3_ZeroValueCell_NeverColoredAsGrowthOrDrop(t *testing.T) {
 	if zeroCell.Amount != "0.0" {
 		t.Fatalf("precondition: EC2 - Other's last cell Amount got %q want \"0.0\"", zeroCell.Amount)
 	}
-	// costs_quality_test.go, item 1: DeltaTag is now one of 5 values
-	// (neutral / growth-soft / growth-strong / drop-soft / drop-strong) —
-	// a zero-value cell must be exactly "neutral", not any growth/drop tier.
+	// A zero-value cell is exactly "neutral", not any growth/drop tier.
 	if zeroCell.DeltaTag != "neutral" {
 		t.Errorf("a zero-value cell got DeltaTag %q — a cell whose own amount is 0.0 must be neutral (no color) regardless of the period-over-period delta math (a $500 -> $0.0 transition is not a meaningful \"drop\" signal)", zeroCell.DeltaTag)
 	}
 
-	// $100 -> $200 is +100%, unambiguously the "strong" growth tier
-	// (>=25%) under item 1's 4-tier scale.
+	// $100 -> $200 is +100%, the strong growth tier (>=25%).
 	growthCell := growthRow.Cells[len(growthRow.Cells)-1]
 	if growthCell.DeltaTag != "growth-strong" {
 		t.Errorf("control failed: Elastic Load Balancing's genuine $100 -> $200 growth got DeltaTag %q want %q — the fix must not suppress delta coloring for non-zero cells", growthCell.DeltaTag, "growth-strong")

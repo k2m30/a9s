@@ -1,12 +1,5 @@
 package unit
 
-// aws_enrichment_iam_asg_codepipeline_test.go — Targets the 1-4 uncovered branches in each
-// Wave 2 enricher: EnrichIAMRoleLastUsed, EnrichIAMPolicy, EnrichIAMGroup,
-// EnrichASGScalingActivities, EnrichCodePipelineStatus, plus full coverage of
-// the pure helpers isMSKVersionOutdated and parseVersionPart.
-//
-// Each test covers exactly one previously-uncovered branch; no tautologies.
-
 import (
 	"context"
 	"errors"
@@ -26,8 +19,6 @@ import (
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
-
-// ─── EnrichIAMRoleLastUsed — uncovered branches ──────────────────────────────
 
 // iamGetRoleFakeWithNilRole implements IAMAPI returning GetRoleOutput with
 // Role=nil for the named role, simulating an empty but non-error response.
@@ -69,7 +60,7 @@ var _ awsclient.IAMAPI = (*iamBareAPI)(nil)
 
 // TestEnrichIAMRoleLastUsed_NilRoleOutputSkipped verifies that when GetRole
 // returns a non-error response with Role=nil, no finding is produced for that
-// role. This exercises the `if out.Role == nil { continue }` branch.
+// role.
 func TestEnrichIAMRoleLastUsed_NilRoleOutputSkipped(t *testing.T) {
 	fake := &iamGetRoleFakeWithNilRole{nilRoleName: "ghost-role"}
 	clients := &awsclient.ServiceClients{IAM: fake}
@@ -107,7 +98,7 @@ func TestEnrichIAMRoleLastUsed_NilRoleOutputSkipped(t *testing.T) {
 // (core/runtime/probes.go, "Always populate fields from result regardless of
 // err") keeps every finding when the enricher returns one, so nothing is lost
 // by reporting it. A vanished resource is the one error that stays out of the
-// aggregate (codex2_round4_test.go).
+// aggregate.
 func TestEnrichIAMRoleLastUsed_APIErrorMarksRowTruncatedIDContinuesNoBadge(t *testing.T) {
 	// broken-role errors on GetRole; dormant-role has nil RoleLastUsed → finding.
 	combo := &iamGetRoleFakeCombo{
@@ -188,7 +179,6 @@ func TestEnrichIAMRoleLastUsed_RoleNameFallsBackToID(t *testing.T) {
 		nilLastUsedFor: map[string]bool{"role-by-id-only": true},
 	}
 	clients := &awsclient.ServiceClients{IAM: fake}
-	// No "role_name" in Fields — only r.ID is set.
 	resources := []resource.Resource{
 		{
 			ID:     "role-by-id-only",
@@ -245,12 +235,10 @@ func TestEnrichIAMRoleLastUsed_IAMClientNotGetRoleAPI(t *testing.T) {
 	}
 }
 
-// ─── EnrichIAMPolicy — uncovered branches ────────────────────────────────────
-
 // TestEnrichIAMPolicy_APIErrorSetsTruncatedNoError verifies that when
-// FetchManagedPolicyDocument returns an error for a policy, that policy is added
-// to TruncatedIDs, Truncated is set, but the enricher does not return an error.
-// A second safe policy is still processed.
+// FetchManagedPolicyDocument fails for a policy, that policy is added to
+// TruncatedIDs, Truncated is set, the failure is reported in the returned
+// error, and a second safe policy is still processed.
 func TestEnrichIAMPolicy_APIErrorSetsTruncatedNoError(t *testing.T) {
 	fake := &iamPolicyFake{
 		getPolicyResults: map[string]*iam.GetPolicyOutput{
@@ -270,9 +258,8 @@ func TestEnrichIAMPolicy_APIErrorSetsTruncatedNoError(t *testing.T) {
 	}
 
 	result, err := awsclient.EnrichIAMPolicy(context.Background(), clients, resources, nil)
-	// "must not propagate" is a proxy for "must not abort the batch" and does
-	// not require the reason to be dropped: the batch completes — the safe
-	// policy below is evaluated — and the policy that could not be read says so.
+	// A failed fetch does not abort the batch: the safe policy below is still
+	// evaluated, and the policy that could not be read reports why.
 	if err == nil {
 		t.Fatal("a failed document fetch returned no error — the reason never reaches the log")
 	}
@@ -282,7 +269,6 @@ func TestEnrichIAMPolicy_APIErrorSetsTruncatedNoError(t *testing.T) {
 	if _, ok := result.TruncatedIDs[iamPolicyARN2]; !ok {
 		t.Errorf("TruncatedIDs must contain %s", iamPolicyARN2)
 	}
-	// Safe policy was processed OK — no finding.
 	if _, ok := result.Findings[iamPolicyARN1]; ok {
 		t.Error("safe policy must NOT appear in Findings")
 	}
@@ -302,14 +288,11 @@ func TestEnrichIAMPolicy_NoRawStructARNFallbackFromID(t *testing.T) {
 		},
 	}
 	clients := &awsclient.ServiceClients{IAM: fake}
-	// RawStruct is nil — forces extractIAMPolicyARN to return ("", false).
-	// r.ID is a valid ARN so the fallback kicks in.
 	resources := []resource.Resource{
 		{
 			ID:     iamPolicyARN1,
 			Name:   "ArbitraryPolicy",
 			Fields: map[string]string{"attachment_count": "1"},
-			// RawStruct intentionally left nil.
 		},
 	}
 
@@ -339,7 +322,6 @@ func TestEnrichIAMPolicy_EmptyARNSkipped(t *testing.T) {
 			ID:     "not-an-arn",
 			Name:   "UnresolvablePolicy",
 			Fields: map[string]string{},
-			// RawStruct nil, r.ID not an ARN → policyARN stays empty.
 		},
 	}
 
@@ -351,8 +333,6 @@ func TestEnrichIAMPolicy_EmptyARNSkipped(t *testing.T) {
 		t.Errorf("expected 0 findings for unresolvable ARN resource, got %d", len(result.Findings))
 	}
 }
-
-// ─── EnrichIAMGroup — uncovered branches ────────────────────────────────────
 
 // iamGroupErrorFake is like iamGroupFake but can return errors per group name.
 type iamGroupErrorFake struct {
@@ -457,8 +437,7 @@ func TestEnrichIAMGroup_GetGroupAPIErrorSkipsGroupMarksTruncatedIDNotBadge(t *te
 	if _, ok := result.Findings["broken-group"]; ok {
 		t.Error("broken-group must NOT appear in Findings when GetGroup errored")
 	}
-	// ok-group has members but no members (0 users) → finds orphan finding.
-	// Actually ok-group has 0 users → should produce a "no members" finding.
+	// ok-group has 0 users → a "no members" finding.
 	if _, ok := result.Findings["ok-group"]; !ok {
 		t.Error("ok-group with 0 members should still produce a finding")
 	}
@@ -491,11 +470,9 @@ func TestEnrichIAMGroup_EmptyGroupNameSkipped(t *testing.T) {
 	}
 }
 
-// ─── EnrichASGScalingActivities — uncovered branches ─────────────────────────
-
 // TestEnrichASGScalingActivities_EmptyActivitiesProducesNoFindings verifies
 // that an ASG whose DescribeScalingActivities returns an empty Activities slice
-// produces no finding. This exercises the `len(out.Activities) == 0` branch.
+// produces no finding.
 func TestEnrichASGScalingActivities_EmptyActivitiesProducesNoFindings(t *testing.T) {
 	fake := &asgScalingActivitiesFake{
 		activities: map[string][]asgtypes.Activity{
@@ -555,7 +532,6 @@ func TestEnrichASGScalingActivities_FailedWithStatusMessageSummarized(t *testing
 	if want := catalog.Phrase("asg.scaling-activity-failed"); f.Phrase != want {
 		t.Errorf("Phrase = %q, want the catalog's %q", f.Phrase, want)
 	}
-	// Rows must include a "Message" row.
 	var hasMessageRow, hasCauseRow, hasStartedRow bool
 	for _, row := range result.AttentionDetails["capacity-asg"][f.Code].Rows {
 		switch row.Label {
@@ -648,8 +624,6 @@ func TestEnrichASGScalingActivities_EmptyIDSkipped(t *testing.T) {
 	}
 }
 
-// ─── EnrichCodePipelineStatus — uncovered branches ───────────────────────────
-
 // TestEnrichCodePipelineStatus_EmptyNameSkipped verifies that a resource with
 // an empty Name is silently skipped and produces no finding.
 func TestEnrichCodePipelineStatus_EmptyNameSkipped(t *testing.T) {
@@ -669,8 +643,7 @@ func TestEnrichCodePipelineStatus_EmptyNameSkipped(t *testing.T) {
 }
 
 // TestEnrichCodePipelineStatus_EmptyIDKeyedByName verifies that when r.ID is
-// empty, the finding is keyed by r.Name (the fallback key path). This tests the
-// `key := r.Name` fallback branch.
+// empty, the finding is keyed by r.Name.
 func TestEnrichCodePipelineStatus_EmptyIDKeyedByName(t *testing.T) {
 	fake := &pipelineStateFake{
 		states: map[string]*codepipeline.GetPipelineStateOutput{
@@ -794,8 +767,6 @@ func TestEnrichCodePipelineStatus_ActionNilExecutionSkipped(t *testing.T) {
 	}
 }
 
-// ─── isMSKVersionOutdated / parseVersionPart — via EnrichMSKCluster ──────────
-//
 // isMSKVersionOutdated and parseVersionPart are unexported. They are exercised
 // indirectly via EnrichMSKCluster, which calls isMSKVersionOutdated for each
 // provisioned cluster's KafkaVersion string. A finding with Summary

@@ -5,10 +5,9 @@ package unit_test
 //
 // A list read in part is a resolved lower bound: what matched is real, and the
 // truncation flag carries "there may be more". A rule that renders nowhere on
-// the bench cannot be checked there: a regression back to a question mark, or
-// to a bare count, would leave every screen identical. The log
-// groups are the paginated one, and these pins hold the three facts the rendered
-// witnesses rest on: the first page is short of the whole fixture set, it says
+// the bench cannot be checked there: a regression to a question mark, or to a
+// bare count, would leave every screen identical. The log groups are the
+// paginated list: the first page is short of the whole fixture set, it says
 // so, and the count oracle reports that page rather than the fixture total.
 
 import (
@@ -21,7 +20,7 @@ import (
 )
 
 // TestDemoLogGroups_FirstPageIsTruncated pins the fixture arrangement the
-// lower-bound witnesses depend on. Nothing else on the bench pages, so if this
+// rendered lower bound depends on. Nothing else on the bench pages, so if this
 // list stops paging the "+" disappears from every screen at once.
 func TestDemoLogGroups_FirstPageIsTruncated(t *testing.T) {
 	fetch := resource.GetPaginatedFetcher("logs")
@@ -78,7 +77,7 @@ func TestDemoLogGroups_SecondPageCompletesTheList(t *testing.T) {
 	}
 
 	// Page two holds the one group no pivot matches, and nothing else. Every
-	// other group in the file is some pivot's witness, so a group that drifts
+	// other group in the file is matched by some pivot, so a group that drifts
 	// onto page two takes a count a scenario pins down with it.
 	if len(second.Resources) != 1 || second.Resources[0].ID != demofixtures.LogGroupSecondPageOnly {
 		var ids []string

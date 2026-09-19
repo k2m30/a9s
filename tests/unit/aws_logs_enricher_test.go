@@ -1,13 +1,5 @@
 package unit
 
-// aws_logs_enricher_test.go — Behavioral tests for EnrichLogsMetricFilters.
-//
-// Contract assertions:
-//   - Audit log group (name matches /aws/cloudtrail/) + DescribeMetricFilters returns ≥1 filter → 0 findings.
-//   - Audit log group + DescribeMetricFilters returns [] → 1 finding sev "~".
-//   - Non-audit log group (e.g. /aws/lambda/foo) → 0 findings (skipped).
-//   - clients.CloudWatchLogs == nil → 0 findings, no error.
-
 import (
 	"context"
 	"testing"
@@ -44,7 +36,6 @@ func (f *cwLogsMetricFilterFake) DescribeMetricFilters(
 	return &cloudwatchlogs.DescribeMetricFiltersOutput{MetricFilters: filters}, nil
 }
 
-// Compile-time check: cwLogsMetricFilterFake satisfies CWLogsAPI.
 var _ awsclient.CWLogsAPI = (*cwLogsMetricFilterFake)(nil)
 
 // logsGroupResource builds a logs Resource stub for the given log group name.
@@ -137,7 +128,7 @@ func TestEnrichLogsMetricFilters_NonAuditGroupSkipped(t *testing.T) {
 	lambdaGroup := "/aws/lambda/my-function"
 	fake := &cwLogsMetricFilterFake{
 		filtersByGroup: map[string][]cwlogstypes.MetricFilter{
-			// no filters for lambda group — but it should be skipped anyway
+			// A non-audit group is skipped whatever its filters.
 		},
 	}
 	clients := &awsclient.ServiceClients{CloudWatchLogs: fake}

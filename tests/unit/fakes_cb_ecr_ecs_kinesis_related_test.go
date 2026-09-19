@@ -54,7 +54,6 @@ func (f *fakeCodePipelineForCBECR) GetPipeline(_ context.Context, input *codepip
 	return &codepipeline.GetPipelineOutput{}, nil
 }
 
-// Compile-time check: fakeCodePipelineForCBECR satisfies CodePipelineAPI.
 var _ awsclient.CodePipelineAPI = (*fakeCodePipelineForCBECR)(nil)
 
 // newFakeCodePipelineWithDeclarations returns a fakeCodePipelineForCBECR whose
@@ -372,7 +371,6 @@ func (f *fakeECRForRole) ListTagsForResource(_ context.Context, _ *ecr.ListTagsF
 	return &ecr.ListTagsForResourceOutput{}, nil
 }
 
-// Compile-time check: fakeECRForRole satisfies ECRAPI.
 var _ awsclient.ECRAPI = (*fakeECRForRole)(nil)
 
 // newFakeECRWithRepositoryPolicy returns a fakeECRForRole whose GetRepositoryPolicy
@@ -438,7 +436,6 @@ func (f *fakeECSForSvcPivots) DescribeTaskDefinition(_ context.Context, input *e
 	return &ecs.DescribeTaskDefinitionOutput{}, nil
 }
 
-// Compile-time check: fakeECSForSvcPivots satisfies ECSAPI.
 var _ awsclient.ECSAPI = (*fakeECSForSvcPivots)(nil)
 
 // newFakeECSWithTaskDefinition returns a fakeECSForSvcPivots whose DescribeTaskDefinition
@@ -494,7 +491,6 @@ func (f *fakeDynamoDBForKinesis) DescribeKinesisStreamingDestination(_ context.C
 	}, nil
 }
 
-// Compile-time check: fakeDynamoDBForKinesis satisfies DynamoDBAPI.
 var _ awsclient.DynamoDBAPI = (*fakeDynamoDBForKinesis)(nil)
 
 // newFakeDynamoDBWithKinesisDestination returns a fakeDynamoDBForKinesis whose

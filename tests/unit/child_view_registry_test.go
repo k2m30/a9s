@@ -7,10 +7,6 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// ===========================================================================
-// Step 1: ChildViewDef struct and child type/fetcher registries
-// ===========================================================================
-
 func TestChildViewDef_NilDrillCondition(t *testing.T) {
 	var def resource.ChildViewDef
 
@@ -39,10 +35,6 @@ func TestResourceTypeDef_Children(t *testing.T) {
 		t.Errorf("Children[0].ChildType = %q, want %q", td.Children[0].ChildType, "s3_objects")
 	}
 }
-
-// ===========================================================================
-// Child type registry
-// ===========================================================================
 
 func TestRegisterChildType(t *testing.T) {
 	childDef := resource.ResourceTypeDef{
@@ -84,10 +76,6 @@ func TestUnregisterChildType(t *testing.T) {
 		t.Error("GetChildType should return nil after CleanupChildTypeForTest")
 	}
 }
-
-// ===========================================================================
-// Child fetcher registry
-// ===========================================================================
 
 func TestRegisterChildFetcher(t *testing.T) {
 	called := false
@@ -144,10 +132,6 @@ func TestUnregisterChildFetcher(t *testing.T) {
 	}
 }
 
-// ===========================================================================
-// Multiple child types on one parent
-// ===========================================================================
-
 func TestResourceTypeDef_MultipleChildren(t *testing.T) {
 	td := resource.ResourceTypeDef{
 		Children: []resource.ChildViewDef{
@@ -167,10 +151,6 @@ func TestResourceTypeDef_MultipleChildren(t *testing.T) {
 		}
 	}
 }
-
-// ===========================================================================
-// Child fetcher receives ParentContext correctly
-// ===========================================================================
 
 func TestChildFetcher_ReceivesParentContext(t *testing.T) {
 	var receivedCtx resource.ParentContext

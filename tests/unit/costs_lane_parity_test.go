@@ -1,34 +1,15 @@
-// costs_lane_parity_test.go — M2: the lane-parity harness. Both the TUI
-// Model (internal/tui, package unit's rootApplyMsg idiom) and the headless
-// Controller (Apply/Handle, package unit_test) are thin adapters around the
-// SAME *app.Controller — the parity question is whether each lane's own
-// surrounding plumbing (dispatchTaskRequests, the rendererState stack,
-// autoOpenSingleDetail vs dispatchCostsByIDTask) reaches the same
-// user-observable outcome the shared Controller computed.
+// Both the TUI Model and the headless Controller are thin adapters around the
+// same *app.Controller; each lane's surrounding plumbing (dispatchTaskRequests,
+// the rendererState stack, autoOpenSingleDetail vs dispatchCostsByIDTask) must
+// reach the same user-observable outcome the shared Controller computed.
 //
-// "Observable outcome" is deliberately taken at the surface each lane
-// actually exposes: the headless lane via Controller.Snapshot() (an
-// exported ViewState), the TUI lane via its rendered view text
-// (rootViewContent) — package unit_test has no access to tui.Model's
-// unexported ctrl field, and the rendered text IS what a real user/browser
-// sees, so this is the genuinely lane-neutral comparison surface, not a
-// weaker substitute for one.
+// The outcome is taken at the surface each lane exposes: the headless lane via
+// Controller.Snapshot(), the TUI lane via its rendered view text
+// (rootViewContent), which is what a real user sees.
 //
-// Six scenarios total: the full drill chain to a successful resource jump
-// (A), a granularity-fallback delivery (B), Ctrl+R force-refresh (C), the
-// by-ID FAILURE variant of A (D), pre-connect-then-ClientsReady recovery
-// (E), and Esc from a loading child frame (F). D/E/F close the two
-// deferrals this file's earlier pass left open (each of P5/P3 already had a
-// single-lane pin; this is the lane-parity version).
-//
-// D now pins MECHANISM parity, not just outcome: the headless/web lane's
-// own not-found signal must be the SAME typed messages.ByIDFetchFailed the
-// TUI lane uses, matched to the placeholder's exact TargetType+ID — never
-// Controller.Handle's old X10 popAutoOpenSinglePlaceholderOnNotFound
-// (a messages.Flash + "is the top screen a zero-row placeholder" sniff that
-// never even looked at which fetch actually failed). See
-// TestCostsLaneParity_G_ErrorFlashMentioningPendingID_MustNotPopHeadless
-// below for X10's own death pin — the exact mirror of S3a on the TUI side.
+// A not-found by-ID fetch reaches both lanes as the same typed
+// messages.ByIDFetchFailed, matched to the placeholder's exact TargetType+ID;
+// an error messages.Flash never pops the placeholder.
 package unit
 
 import (
@@ -110,11 +91,8 @@ func m2MoveTUICursorToNewestColumn(m tui.Model) tui.Model {
 	return m
 }
 
-// ===========================================================================
-// Scenario A — full drill chain (SERVICE -> USAGE_TYPE -> RESOURCE_ID) to a
-// SUCCESSFUL by-ID resource jump. Both lanes must land on the resource's
-// own detail (not stranded on the placeholder, not back on costs).
-// ===========================================================================
+// The full drill chain (SERVICE -> USAGE_TYPE -> RESOURCE_ID) ending in a
+// successful by-ID jump lands both lanes on the resource's own detail.
 
 func TestCostsLaneParity_A_DrillToResourceJump_Success(t *testing.T) {
 	const ec2Service = "Amazon Elastic Compute Cloud - Compute"
@@ -129,7 +107,6 @@ func TestCostsLaneParity_A_DrillToResourceJump_Success(t *testing.T) {
 	period := costs.Period{Start: start.Format("2006-01-02"), End: start.AddDate(0, 1, 0).Format("2006-01-02")}
 	q := costs.Query{Granularity: costs.GranularityMonth.APIGranularity(), GroupBy: []costs.Dimension{costs.DimensionService}}
 
-	// --- headless lane ---
 	c := m2NewHeadlessController(t, "matrix-a-headless", now)
 	c.Handle(messages.CostsLoaded{
 		Query:    q,
@@ -187,7 +164,6 @@ func TestCostsLaneParity_A_DrillToResourceJump_Success(t *testing.T) {
 	}
 	headlessKind := byIDPayload.TargetType
 
-	// --- TUI lane: the SAME drill chain, driven via key presses. ---
 	tui.Version = "1.0.2"
 	m := newBlessedModel(t, "matrix-a-tui", "us-east-1", tui.WithClients(demo.NewServiceClients()), tui.WithNoCache(true))
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 80, Height: 40})
@@ -249,11 +225,8 @@ func TestCostsLaneParity_A_DrillToResourceJump_Success(t *testing.T) {
 	}
 }
 
-// ===========================================================================
-// Scenario B — a granularity-fallback delivery (N3): a child frame's own
-// fetch genuinely returns zero at an eligible cell, triggering a coarser
-// re-fetch. Both lanes must dispatch the SAME re-fetch task shape.
-// ===========================================================================
+// A child frame's fetch returning zero at an eligible cell triggers a coarser
+// re-fetch; both lanes must dispatch the same re-fetch task shape.
 
 func TestCostsLaneParity_B_GranularityFallbackDelivery(t *testing.T) {
 	// A real clock, not a pinned literal — for the same reason scenario A
@@ -267,7 +240,6 @@ func TestCostsLaneParity_B_GranularityFallbackDelivery(t *testing.T) {
 	period := costs.Period{Start: start.Format("2006-01-02"), End: start.AddDate(0, 1, 0).Format("2006-01-02")}
 	q := costs.Query{Granularity: costs.GranularityMonth.APIGranularity(), GroupBy: []costs.Dimension{costs.DimensionService}}
 
-	// --- headless lane ---
 	c := m2NewHeadlessController(t, "matrix-b-headless", now)
 	c.Handle(messages.CostsLoaded{
 		Query:    q,
@@ -286,7 +258,6 @@ func TestCostsLaneParity_B_GranularityFallbackDelivery(t *testing.T) {
 	})
 	_, headlessFired := m2FindFetchCostsTask(fallbackTasks)
 
-	// --- TUI lane ---
 	tui.Version = "1.0.2"
 	m := newRootSizedModel()
 	m, _ = rootApplyMsg(m, messages.Navigate{Target: messages.TargetCosts})
@@ -311,10 +282,8 @@ func TestCostsLaneParity_B_GranularityFallbackDelivery(t *testing.T) {
 	}
 }
 
-// ===========================================================================
-// Scenario C — Ctrl+R force-refresh on a warm costs screen (FR-012). Both
-// lanes must dispatch a fetch task for the active shape's open period.
-// ===========================================================================
+// Ctrl+R on a warm costs screen dispatches a fetch for the active shape's open
+// period in both lanes.
 
 func TestCostsLaneParity_C_ForceRefresh(t *testing.T) {
 	// Real clock, same rule as scenario A — the TUI lane driven below has
@@ -324,7 +293,6 @@ func TestCostsLaneParity_C_ForceRefresh(t *testing.T) {
 	period := costs.Period{Start: start.Format("2006-01-02"), End: start.AddDate(0, 1, 0).Format("2006-01-02")}
 	q := costs.Query{Granularity: costs.GranularityMonth.APIGranularity(), GroupBy: []costs.Dimension{costs.DimensionService}}
 
-	// --- headless lane ---
 	c := m2NewHeadlessController(t, "matrix-c-headless", now)
 	c.Handle(messages.CostsLoaded{
 		Query:    q,
@@ -337,10 +305,8 @@ func TestCostsLaneParity_C_ForceRefresh(t *testing.T) {
 	headlessTasks := c.ForceRefreshCosts()
 	_, headlessFound := m2FindFetchCostsTask(headlessTasks)
 
-	// --- TUI lane: ctrl+r is bound to both the literal string "ctrl+r" and
-	// the raw control byte \x12 (keys.go) — sending the control-byte rune
-	// directly matches the SAME binding a real terminal's ctrl+r keystroke
-	// produces.
+	// ctrl+r is bound to both "ctrl+r" and the raw control byte \x12 (keys.go);
+	// the control-byte rune matches what a real terminal's ctrl+r produces.
 	tui.Version = "1.0.2"
 	m := newRootSizedModel()
 	m, _ = rootApplyMsg(m, messages.Navigate{Target: messages.TargetCosts})
@@ -359,13 +325,8 @@ func TestCostsLaneParity_C_ForceRefresh(t *testing.T) {
 	}
 }
 
-// ===========================================================================
-// Scenario D — the by-ID FAILURE variant of A: a not-found resource drill.
-// Both lanes must land back on the costs screen with a note, never stranded
-// on the empty placeholder list. See the file-level doc comment for why
-// D's headless half exercises the pre-existing X10/Flash mechanism rather
-// than S3's typed messages.ByIDFetchFailed (TUI-only fix).
-// ===========================================================================
+// A not-found resource drill returns both lanes to the costs screen with a
+// note, never stranded on the empty placeholder list.
 
 // m2DrillHeadlessToStrandedByIDPlaceholder replays the SERVICE ->
 // USAGE_TYPE -> RESOURCE_ID drill chain against the headless lane through
@@ -435,13 +396,9 @@ func TestCostsLaneParity_D_DrillToResourceJump_NotFound(t *testing.T) {
 	now := time.Now()
 	const bogusID = "i-doesnotexistlaneparity1"
 
-	// --- headless lane ---
 	c, byIDPayload := m2DrillHeadlessToStrandedByIDPlaceholder(t, "matrix-d-headless", now, bogusID)
-	// MECHANISM parity, not just outcome: the headless lane's own not-found
-	// signal must be the SAME typed messages.ByIDFetchFailed the TUI lane
-	// now uses — executor.go's KindFetchByIDDetail case already knows
-	// TargetType+ID from its own payload, so it constructs this directly,
-	// never a messages.Flash a separate X10-era case has to text-match.
+	// executor.go's KindFetchByIDDetail case knows TargetType+ID from its payload
+	// and constructs the typed messages.ByIDFetchFailed the TUI lane uses.
 	c.Handle(messages.ByIDFetchFailed{
 		TargetType: byIDPayload.TargetType,
 		ID:         byIDPayload.ID,
@@ -450,8 +407,8 @@ func TestCostsLaneParity_D_DrillToResourceJump_NotFound(t *testing.T) {
 
 	headlessVS := c.Snapshot()
 
-	// --- TUI lane: reuses costs_review5_test.go's own drill helper (same
-	// package) — its fixed bogus target, not this scenario's own bogusID.
+	// costsReview5DrillToStrandedByIDPlaceholder drills to its own fixed bogus
+	// target, not bogusID.
 	m, cmd := costsReview5DrillToStrandedByIDPlaceholder(t, "matrix-d-tui")
 	msg := cmd()
 	failed, ok := msg.(messages.ByIDFetchFailed)
@@ -472,20 +429,16 @@ func TestCostsLaneParity_D_DrillToResourceJump_NotFound(t *testing.T) {
 	}
 }
 
-// ===========================================================================
-// Scenario E — a costs screen opened BEFORE AWS connect completes recovers
-// once messages.ClientsReady arrives (P5's headless pin, extended to
-// parity): both lanes must clear the pre-connect ErrorMsg and dispatch a
-// retry fetch for the active shape.
-// ===========================================================================
+// A costs screen opened before AWS connect completes recovers once
+// messages.ClientsReady arrives: both lanes clear the pre-connect ErrorMsg and
+// dispatch a retry fetch for the active shape.
 
 func TestCostsLaneParity_E_PreConnectThenClientsReady(t *testing.T) {
 	now := time.Date(2026, time.July, 15, 12, 0, 0, 0, time.UTC)
 	preConnectErr := "cost explorer: no client configured for this session"
 	q := costs.Query{Granularity: costs.GranularityMonth.APIGranularity(), GroupBy: []costs.Dimension{costs.DimensionService}}
 
-	// --- headless lane: a fresh Controller's Core has nil Clients until a
-	// real ClientsReady lands (mirrors costs_review3_test.go's own P5 test).
+	// A fresh Controller's Core has nil Clients until a real ClientsReady lands.
 	c := m2NewHeadlessController(t, "matrix-e-headless", now)
 	c.Handle(messages.CostsLoaded{Query: q, Err: fmt.Errorf("%s", preConnectErr)})
 	if got := c.Snapshot().Body.Costs.ErrorMsg; got == "" {
@@ -497,8 +450,8 @@ func TestCostsLaneParity_E_PreConnectThenClientsReady(t *testing.T) {
 	headlessVS := c.Snapshot()
 	_, headlessRetried := m2FindFetchCostsTask(headlessTasks)
 
-	// --- TUI lane: tui.New with no WithClients option — Clients() is nil
-	// until Init()/ClientsReady installs it, same pre-connect state.
+	// tui.New with no WithClients option has nil Clients() until
+	// Init()/ClientsReady installs it.
 	tui.Version = "1.0.2"
 	m := newBlessedModel(t, "matrix-e-tui", "us-east-1", tui.WithNoCache(true))
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 80, Height: 40})
@@ -521,12 +474,9 @@ func TestCostsLaneParity_E_PreConnectThenClientsReady(t *testing.T) {
 	assertStackInSync(t, m, "after ClientsReady recovers the pre-connect costs screen")
 }
 
-// ===========================================================================
-// Scenario F — Esc from a loading child drill frame (P3's headless
-// Back-clears-Loading pin, extended to parity): both lanes must clear the
-// child's own Loading state and render the parent's already-available data,
-// never stay blocked on the popped child's in-flight fetch.
-// ===========================================================================
+// Esc from a loading child drill frame clears the child's Loading state and
+// renders the parent's data in both lanes, never blocked on the popped child's
+// in-flight fetch.
 
 func TestCostsLaneParity_F_EscFromLoadingChild(t *testing.T) {
 	// Real clock, same rule as scenario A — the TUI lane driven below has
@@ -536,7 +486,6 @@ func TestCostsLaneParity_F_EscFromLoadingChild(t *testing.T) {
 	period := costs.Period{Start: start.Format("2006-01-02"), End: start.AddDate(0, 1, 0).Format("2006-01-02")}
 	q := costs.Query{Granularity: costs.GranularityMonth.APIGranularity(), GroupBy: []costs.Dimension{costs.DimensionService}}
 
-	// --- headless lane ---
 	c := m2NewHeadlessController(t, "matrix-f-headless", now)
 	c.Handle(messages.CostsLoaded{
 		Query:    q,
@@ -553,7 +502,6 @@ func TestCostsLaneParity_F_EscFromLoadingChild(t *testing.T) {
 	c.Apply(app.Action{Kind: app.ActionBack}) // Esc before the child's own fetch ever resolves
 	headlessLoading := c.Snapshot().Body.Costs.Loading
 
-	// --- TUI lane ---
 	tui.Version = "1.0.2"
 	m := newRootSizedModel()
 	m, _ = rootApplyMsg(m, messages.Navigate{Target: messages.TargetCosts})
@@ -574,17 +522,9 @@ func TestCostsLaneParity_F_EscFromLoadingChild(t *testing.T) {
 	}
 }
 
-// ===========================================================================
-// Scenario G — X10's death: an error messages.Flash whose TEXT happens to
-// mention the pending instance ID must NOT pop the headless placeholder —
-// the mirror of costs_review5_test.go's own TUI-side S3a. Handle's old
-// popAutoOpenSinglePlaceholderOnNotFound doesn't even look at msg.Text (it
-// pops on ANY error Flash while the top screen is a zero-row placeholder,
-// text or no text) — deliberately using an ID-mentioning Flash here is the
-// harder case for a lingering text-sniff fallback, same rationale as S3a.
-// Only messages.ByIDFetchFailed matched to the exact pending target may
-// pop it (Scenario D's own positive pin, above).
-// ===========================================================================
+// An error messages.Flash whose text mentions the pending instance ID must not
+// pop the headless placeholder; only a messages.ByIDFetchFailed matched to the
+// exact pending target may pop it.
 
 func TestCostsLaneParity_G_ErrorFlashMentioningPendingID_MustNotPopHeadless(t *testing.T) {
 	now := time.Date(2026, time.July, 15, 12, 0, 0, 0, time.UTC)

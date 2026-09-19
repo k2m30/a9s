@@ -1,8 +1,7 @@
 package unit
 
-// aws5_clock_and_file_errors_test.go — two failures that only show up later:
-// a demo witness stamped once at startup, and a local file error wearing the
-// network's class word.
+// Two failures that only show up later: a demo event stamped once at startup,
+// and a local file error wearing the network's class word.
 
 import (
 	"context"
@@ -26,13 +25,10 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// ── The demo event witness holds for the life of a session ────────────────
-
-// TestECSDemo_EventWitnessSurvivesALongSession pins the clock. The enricher
-// reads a ten-minute window, so an event stamped once when the fixtures were
-// built ages out of a session left open longer than that: the finding's Event
-// and Reason rows vanish and the demo bench drifts with the wall clock. The
-// fake stamps the event against the call instead.
+// The enricher reads a ten-minute window, so an event stamped once when the
+// fixtures were built would age out of a session left open longer than that
+// and the finding's Event and Reason rows would vanish. The fake stamps the
+// event against the call.
 func TestECSDemo_EventWitnessSurvivesALongSession(t *testing.T) {
 	fake := fakes.NewECS()
 	built := time.Now()
@@ -72,13 +68,9 @@ func TestECSDemo_EventWitnessSurvivesALongSession(t *testing.T) {
 	}
 }
 
-// ── A local file failure is not a transport failure ───────────────────────
-
-// TestErrClass_LocalFileFailureIsNotTransport pins the three shapes a local
-// file error takes. Every one of them unwraps to a syscall.Errno, which
-// carries Timeout and Temporary and so satisfies net.Error — which is how a
-// missing config file came to read "transport failure", pointing the operator
-// at the network for a problem on their own disk.
+// A local file error unwraps to a syscall.Errno, which carries Timeout and
+// Temporary and so satisfies net.Error; classed by that alone, a missing config
+// file would read "transport failure" and point the operator at the network.
 func TestErrClass_LocalFileFailureIsNotTransport(t *testing.T) {
 	if stdruntime.GOOS == "windows" {
 		t.Skip("Windows has no POSIX file modes and phrases file errors in its own words")
@@ -125,8 +117,7 @@ func TestErrClass_LocalFileFailureIsNotTransport(t *testing.T) {
 	}
 }
 
-// TestErrClass_RefusedConnectionIsStillTransport is the other half: narrowing
-// the arm must not stop recognising the shape it was written for.
+// A refused connection is a transport failure.
 func TestErrClass_RefusedConnectionIsStillTransport(t *testing.T) {
 	if got := awsclient.ErrClass(aws5RefusedTransportErr()); got != "transport" {
 		t.Errorf("ErrClass(refused connection) = %q, want %q", got, "transport")

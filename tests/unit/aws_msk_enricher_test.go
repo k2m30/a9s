@@ -1,16 +1,5 @@
 package unit
 
-// aws_msk_enricher_test.go — Behavioral tests for EnrichMSKCluster.
-//
-// Contract assertions:
-//   - DescribeClusterV2 is called once per MSK resource (keyed by cluster name).
-//   - KafkaVersion >= 3.0 AND EncryptionInTransit=TLS → 0 findings.
-//   - KafkaVersion < 3.0 → 1 finding sev "~" for that cluster.
-//   - EncryptionInTransit=PLAINTEXT → 1 finding sev "~" for that cluster.
-//   - Serverless cluster (Provisioned==nil, Serverless!=nil) → skipped, 0 findings.
-//   - clients.MSK == nil → (EnricherResult{Findings: non-nil empty}, nil).
-//   - API error for a resource → 0 findings for that resource, Truncated=true, no error returned.
-
 import (
 	"context"
 	"errors"
@@ -24,10 +13,6 @@ import (
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
-
-// The fake client for DescribeClusterV2 now lives in fakes_msk_test.go
-// (fakeMSKDescribeClusterV2) — see that file's header for the one-fake-per-
-// interface convention.
 
 // mskClusterResources returns a slice of MSK Resource stubs with the given ARNs.
 // Mirrors the fetcher contract: ID = bare cluster name, Fields["cluster_arn"] = full ARN.

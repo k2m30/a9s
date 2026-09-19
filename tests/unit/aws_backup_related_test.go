@@ -1,20 +1,3 @@
-// aws_backup_related_test.go — related-target discovery tests for backup.
-//
-// Covers TEST: related_pivots_resolve_nonzero_on_graph_root (U9).
-//
-// Graph-root is ProdDatabasePlanID (plan-broken-2failed):
-//   - Rules → TargetBackupVaultName = "acme-prod-vault"
-//   - acme-prod-vault → EncryptionKeyArn = BackupProdVaultKMSKeyARN → ID "acme-prod-master-key"
-//   - acme-prod-vault → SNSTopicArn = BackupAlertsSNSTopicARN → name "acme-backup-alerts"
-//   - Selections → IamRoleArn = AcmeBackupRoleARN → name "AcmeBackupRoleProd"
-//
-// Non-graph-root baseline: HealthyDailyPlanID (plan-healthy-daily):
-//   - Rules → TargetBackupVaultName = "acme-default-vault"
-//   - acme-default-vault → no EncryptionKeyArn → kms count == 0
-//   - acme-default-vault → no SNS topic → sns count == 0
-//   - Selections → AWSBackupDefaultServiceRole → role count >= 1
-//
-// ct-events pivot is count-shown: unknown (spec §2) — exempt from assertions here.
 package unit
 
 import (
@@ -29,10 +12,6 @@ import (
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
-
-// ---------------------------------------------------------------------------
-// helpers
-// ---------------------------------------------------------------------------
 
 // backupCheckerByTarget returns the RelatedChecker for the given target type
 // from the backup related registry. Fails if not found or checker is nil.
@@ -104,10 +83,6 @@ func sliceContainsSubstr(haystack []string, needle string) bool {
 	return false
 }
 
-// ---------------------------------------------------------------------------
-// TEST: related_pivots_resolve_nonzero_on_graph_root (U9) — role pivot
-// ---------------------------------------------------------------------------
-
 // TestBackup_Related_GraphRoot_RoleResolvesAtLeastOne verifies that the role
 // checker returns Count >= 1 for the graph-root plan and that the result
 // mentions "AcmeBackupRoleProd" in ResourceIDs (extracted from ARN by checker).
@@ -131,10 +106,6 @@ func TestBackup_Related_GraphRoot_RoleResolvesAtLeastOne(t *testing.T) {
 		t.Fatalf("role pivot must not return an error for graph-root: %v", result.Err())
 	}
 }
-
-// ---------------------------------------------------------------------------
-// TEST: related_pivots_resolve_nonzero_on_graph_root (U9) — kms pivot
-// ---------------------------------------------------------------------------
 
 // TestBackup_Related_GraphRoot_KMSResolvesAtLeastOne verifies that the kms
 // checker returns Count >= 1 for the graph-root plan, resolving through
@@ -161,10 +132,6 @@ func TestBackup_Related_GraphRoot_KMSResolvesAtLeastOne(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// TEST: related_pivots_resolve_nonzero_on_graph_root (U9) — sns pivot
-// ---------------------------------------------------------------------------
-
 // TestBackup_Related_GraphRoot_SNSResolvesAtLeastOne verifies that the sns
 // checker returns Count >= 1 for the graph-root plan, resolving through
 // acme-prod-vault → GetBackupVaultNotifications → SNSTopicArn → "acme-backup-alerts".
@@ -190,10 +157,6 @@ func TestBackup_Related_GraphRoot_SNSResolvesAtLeastOne(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// Baseline: healthy plan (acme-default-vault) — kms count == 0
-// ---------------------------------------------------------------------------
-
 // TestBackup_Related_HealthyPlan_KMS_DefaultVault_CountZero verifies that the
 // kms checker returns Count == 0 for the healthy daily plan, whose rules point
 // to acme-default-vault which has NO customer-managed EncryptionKeyArn (the
@@ -210,10 +173,6 @@ func TestBackup_Related_HealthyPlan_KMS_DefaultVault_CountZero(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// Baseline: healthy plan (acme-default-vault) — sns count == 0
-// ---------------------------------------------------------------------------
-
 // TestBackup_Related_HealthyPlan_SNS_DefaultVault_CountZero verifies that the
 // sns checker returns Count == 0 for the healthy daily plan, whose vault has no
 // SNS notification configured (VaultSNSTopics does not contain BackupDefaultVaultName).
@@ -229,10 +188,6 @@ func TestBackup_Related_HealthyPlan_SNS_DefaultVault_CountZero(t *testing.T) {
 		t.Fatalf("sns pivot must return Count=0 for healthy plan using acme-default-vault (no SNS topic configured): got %d", result.Count())
 	}
 }
-
-// ---------------------------------------------------------------------------
-// Baseline: healthy plan — role count >= 1 (uses AWSBackupDefaultServiceRole)
-// ---------------------------------------------------------------------------
 
 // TestBackup_Related_HealthyPlan_Role_DefaultServiceRole_Resolves verifies that
 // the role checker returns Count >= 1 for the healthy daily plan.
@@ -252,10 +207,6 @@ func TestBackup_Related_HealthyPlan_Role_DefaultServiceRole_Resolves(t *testing.
 			result.ResourceIDs())
 	}
 }
-
-// ---------------------------------------------------------------------------
-// Edge: empty plan ID — all pivots return State: RelatedUnknown
-// ---------------------------------------------------------------------------
 
 // TestBackup_Related_EmptyPlanID_AllPivotsReturnUnknown verifies that when
 // the resource has an empty ID, every pivot returns State: RelatedUnknown
@@ -281,10 +232,6 @@ func TestBackup_Related_EmptyPlanID_AllPivotsReturnUnknown(t *testing.T) {
 		})
 	}
 }
-
-// ---------------------------------------------------------------------------
-// Registry: all registered backup pivots have non-nil checkers
-// ---------------------------------------------------------------------------
 
 // TestBackup_Related_RegistryComplete verifies that backup has registered
 // related definitions for role, kms, and sns — and that none have nil checkers.

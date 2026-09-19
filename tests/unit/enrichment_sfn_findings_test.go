@@ -1,17 +1,6 @@
 package unit
 
 // enrichment_sfn_findings_test.go — Behavioral tests for EnrichStepFunctionsStatus.
-//
-// Contract assertions (enricher-contract.md):
-//   - Returns EnricherResult.Findings keyed by r.ID (the bare state-machine name
-//     set by the sfn fetcher); ListExecutions is called with r.Fields["arn"].
-//   - Severity "!" for all findings.
-//   - Summary: "latest execution failed" / "latest execution timed out" / "latest execution aborted"
-//     (humanized phrase via domain.HumanizeStatusPhrase, not the raw AWS enum).
-//   - IssueCount = len(Findings).
-//   - Truncated = true when len(resources) > EnrichmentCap.
-//   - State machines with SUCCEEDED/RUNNING latest execution must NOT appear in Findings.
-//   - Empty resources → non-nil empty Findings map.
 
 import (
 	"context"
@@ -78,7 +67,7 @@ func TestEnrichStepFunctionsStatus_FailedFindingKeyedByID(t *testing.T) {
 }
 
 // TestEnrichStepFunctionsStatus_SummaryContainsFAILED verifies the summary for
-// FAILED status is humanized to "failed" and never leaks the raw AWS enum (11933a6f).
+// FAILED status is humanized to "failed" and never leaks the raw AWS enum.
 func TestEnrichStepFunctionsStatus_SummaryContainsFAILED(t *testing.T) {
 	smName := "sum-sm"
 	smARN := "arn:aws:states:us-east-1:123456789012:stateMachine:sum-sm"
@@ -103,7 +92,7 @@ func TestEnrichStepFunctionsStatus_SummaryContainsFAILED(t *testing.T) {
 // TestEnrichStepFunctionsStatus_SummaryTimedOut verifies the summary for
 // TIMED_OUT is humanized to "timed out" (the underscore splits into a space
 // per domain.HumanizeStatusPhrase's snake_case branch) and never leaks the
-// raw AWS enum "TIMED_OUT" (11933a6f).
+// raw AWS enum "TIMED_OUT".
 func TestEnrichStepFunctionsStatus_SummaryTimedOut(t *testing.T) {
 	smName := "to-sm"
 	smARN := "arn:aws:states:us-east-1:123456789012:stateMachine:to-sm"
@@ -126,7 +115,7 @@ func TestEnrichStepFunctionsStatus_SummaryTimedOut(t *testing.T) {
 }
 
 // TestEnrichStepFunctionsStatus_SummaryAborted verifies the summary for
-// ABORTED is humanized to "aborted" and never leaks the raw AWS enum (11933a6f).
+// ABORTED is humanized to "aborted" and never leaks the raw AWS enum.
 func TestEnrichStepFunctionsStatus_SummaryAborted(t *testing.T) {
 	smName := "ab-sm"
 	smARN := "arn:aws:states:us-east-1:123456789012:stateMachine:ab-sm"
@@ -227,9 +216,9 @@ func TestEnrichStepFunctionsStatus_EmptyResourcesReturnsEmptyFindings(t *testing
 }
 
 // DescribeStateMachine is the stub half of a partial test double: this fake
-// embeds SFNAPI as a nil interface and implements only ListExecutions, which
-// was the enricher's only call when it was written. The enricher now also
-// reads logging, encryption and definition posture.
+// embeds SFNAPI as a nil interface and implements ListExecutions plus this
+// stub, since the enricher also reads logging, encryption and definition
+// posture.
 //
 // The body returned is a HEALTHY one, not an empty one. An empty
 // DescribeStateMachineOutput is not neutral — nil LoggingConfiguration means

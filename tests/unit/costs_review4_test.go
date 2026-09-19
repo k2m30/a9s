@@ -1,22 +1,10 @@
-// costs_review4_test.go — Cost Explorer TUI-layer pins: package unit (not
-// unit_test), same reason as costs_review_findings_test.go's own file-level
-// doc — these need the full TUI Model
-// (newRootSizedModel/rootApplyMsg/assertStackInSync), unreachable from the
-// headless-only package unit_test. Reuses
-// reviewBaseServiceQuery/reviewFullMetricRecord (costs_review_findings_test.go,
-// same package).
+// The TUI's messages.CostsLoaded case must dispatch the TaskRequest
+// ApplyCostsLoaded returns (the granularity-fallback re-fetch), or the
+// fallback never runs in the terminal app.
 //
-// P2 (internal/tui/app.go): `case messages.CostsLoaded` must dispatch the
-// TaskRequest Handle returns from ApplyCostsLoaded (the N3 fallback
-// re-fetch), or the fallback is dead in the terminal app.
-//
-// P4 (internal/tui/app_costs.go): dispatchCostsByIDTask pushes a placeholder
-// rendererState; its wrapped cmd must pop it on the Flash (failure) branch
-// as well as on messages.Navigate (success), or the placeholder is stranded
-// on the TUI's own m.stack. Generic Flash handling does not reach it:
-// handleFlash (app_flash.go) only calls m.core.HandleFlash (session-level
-// runtime.Core), never app.Controller.Handle, so the Controller's
-// popAutoOpenSinglePlaceholderOnNotFound is never reached from this path.
+// dispatchCostsByIDTask pushes a placeholder rendererState that must be popped
+// on a failed fetch as well as on messages.Navigate, or it is stranded on the
+// TUI's m.stack.
 package unit
 
 import (
@@ -32,14 +20,9 @@ import (
 	"github.com/k2m30/a9s/v3/internal/tui"
 )
 
-// ===========================================================================
-// P2 — the TUI's CostsLoaded handler must dispatch ApplyCostsLoaded's
-// returned TaskRequest (the N3 granularity-fallback re-fetch), not discard
-// it. matchesAwaited's own escape hatch (a zero-value ev.Query.Range skips
-// the Range/Identity comparison) lets this pin the child frame's query
-// SHAPE alone, without needing the TUI's real (uninjected time.Now())
-// window boundaries.
-// ===========================================================================
+// matchesAwaited skips the Range/Identity comparison for a zero-value
+// ev.Query.Range, so the child frame's query shape alone matches it without
+// the TUI's real-clock window boundaries.
 
 func TestCostsReview4_P2_TUI_CostsLoaded_DispatchesReturnedFallbackTask(t *testing.T) {
 	tui.Version = "1.0.2"
@@ -48,9 +31,8 @@ func TestCostsReview4_P2_TUI_CostsLoaded_DispatchesReturnedFallbackTask(t *testi
 	m, _ = rootApplyMsg(m, messages.Navigate{Target: messages.TargetCosts})
 	assertStackInSync(t, m, "after navigating to costs")
 
-	// The TUI navigates via time.Now() (no injected clock at this layer,
-	// same as F3's own pattern) — the seeded record's period anchors to the
-	// real current month so it lands inside the real window.
+	// The TUI navigates via time.Now(), so the seeded record's period anchors to
+	// the real current month.
 	now := time.Now()
 	start := time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, time.UTC)
 	period := costs.Period{Start: start.Format("2006-01-02"), End: start.AddDate(0, 1, 0).Format("2006-01-02")}
@@ -67,12 +49,8 @@ func TestCostsReview4_P2_TUI_CostsLoaded_DispatchesReturnedFallbackTask(t *testi
 	m, _ = rootApplyMsg(m, rootSpecialKey(tea.KeyEnter))
 	assertStackInSync(t, m, "after drilling one level")
 
-	// The child frame's own fetch genuinely returns zero records — the N3
-	// fallback fires and ApplyCostsLoaded RETURNS a coarser-fetch
-	// TaskRequest. childQuery matches the child frame's own SHAPE only
-	// (Range left at its zero value — matchesAwaited's documented escape
-	// hatch), so this needs no knowledge of the TUI's real-clock window
-	// boundaries.
+	// The child frame's fetch returns zero records, so ApplyCostsLoaded returns a
+	// coarser-fetch TaskRequest; childQuery leaves Range at its zero value.
 	childQuery := costs.Query{
 		Granularity: costs.GranularityWeek.APIGranularity(),
 		GroupBy:     []costs.Dimension{costs.DimensionUsageType},
@@ -84,12 +62,6 @@ func TestCostsReview4_P2_TUI_CostsLoaded_DispatchesReturnedFallbackTask(t *testi
 		t.Error("m.Update(messages.CostsLoaded{Grid: costs.GridResult{Fetched: true}, ...}) returned a nil tea.Cmd even though the delivery triggered the N3 granularity fallback — internal/tui/app.go's CostsLoaded case discards Controller.Handle's returned TaskRequest entirely (`m.ctrl.Handle(msg); return m, nil`)")
 	}
 }
-
-// ===========================================================================
-// P4 — a by-ID resource-drill fetch that finds nothing must pop the
-// placeholder list the TUI itself pushed (dispatchCostsByIDTask), not
-// strand it above the costs screen.
-// ===========================================================================
 
 func TestCostsReview4_P4_TUI_ByIDFetchNotFound_PopsStrandedPlaceholder(t *testing.T) {
 	tui.Version = "1.0.2"
@@ -114,12 +86,8 @@ func TestCostsReview4_P4_TUI_ByIDFetchNotFound_PopsStrandedPlaceholder(t *testin
 	})
 	m, _ = rootApplyMsg(m, rootSpecialKey(tea.KeyEnter)) // -> USAGE_TYPE child
 
-	// A freshly-pushed drill child's Cursor is left at its zero value
-	// (Row:0, Col:0) — applyCostsSelect's PushDrill case never sets it — so
-	// the selected cell is the OLDEST week. Late in the month that week is
-	// outside the 14-day resource-drill clamp, so the RESOURCE_ID drill would
-	// be refused: plant the record on the newest week and scroll the cursor
-	// there before drilling.
+	// The record is planted on the newest week and the cursor scrolled there, so
+	// the RESOURCE_ID drill starts inside the 14-day resource-drill clamp.
 	usageWindow := costs.WindowWithin(period, costs.GranularityWeek, now)
 	usagePeriod := usageWindow[len(usageWindow)-1]
 	usageQuery := costs.Query{
@@ -161,14 +129,10 @@ func TestCostsReview4_P4_TUI_ByIDFetchNotFound_PopsStrandedPlaceholder(t *testin
 	assertStackInSync(t, m, "before the by-ID drill")
 	m = m2MoveTUICursorToNewestColumn(m) // align the cursor with the newest-day cell the record above was planted at
 
-	// Enter on the RESOURCE_ID leaf: applyCostsSelect pushes a placeholder
-	// ScreenResourceList (both controller and TUI stacks) and returns
-	// KindFetchByIDDetail. dispatchCostsByIDTask's own wrapped cmd fetches
-	// the bogus ID against the REAL demo EC2 fixtures (safe — no client is
-	// nil, unlike a raw pre-connect harness), which genuinely finds
-	// nothing. S3: the ONE mechanism is the typed outcome itself — the
-	// fetch wrapper's own failure IS messages.ByIDFetchFailed, not a
-	// messages.Flash a separate case has to sniff for the pending ID.
+	// Enter on the RESOURCE_ID leaf pushes a placeholder ScreenResourceList on
+	// both stacks and returns KindFetchByIDDetail; the wrapped cmd fetches the
+	// bogus ID against the demo EC2 fixtures, finds nothing, and resolves as
+	// messages.ByIDFetchFailed.
 	m, cmd := rootApplyMsg(m, rootSpecialKey(tea.KeyEnter))
 	if cmd == nil {
 		t.Fatal("precondition: Enter on the RESOURCE_ID leaf returned a nil cmd — the by-ID fetch never dispatched")

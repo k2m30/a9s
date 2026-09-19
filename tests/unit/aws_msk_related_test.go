@@ -29,8 +29,6 @@ func mskCheckerByTarget(t *testing.T, target string) resource.RelatedChecker {
 	return nil
 }
 
-// --- Navigable Fields ---
-
 func TestNavigableFields_MSK_KmsKey(t *testing.T) {
 	nav := resource.IsFieldNavigableForTest("msk", "Provisioned.EncryptionInfo.EncryptionAtRest.DataVolumeKMSKeyId")
 	if nav == nil {
@@ -40,8 +38,6 @@ func TestNavigableFields_MSK_KmsKey(t *testing.T) {
 		t.Errorf("expected TargetType=kms, got %q", nav.TargetType)
 	}
 }
-
-// --- CloudWatch Alarms checker (Pattern C — cache, "Cluster Name" dimension) ---
 
 func TestRelated_MSK_Alarms_Found(t *testing.T) {
 	const clusterName = "analytics-kafka-cluster"
@@ -127,10 +123,6 @@ func TestRelated_MSK_Alarms_CacheMissNoClients(t *testing.T) {
 		t.Errorf("Count = %d, want -1 (unknown)", result.Count())
 	}
 }
-
-// --- checkMSKLambda (checker-owned lambda:ListEventSourceMappings call
-// filtered by EventSourceArn=<ClusterARN>, mapped against the lambda cache —
-// spec docs/resources/msk.md §lambda L46-49) ---
 
 func TestRelated_MSK_Lambda_Found(t *testing.T) {
 	const clusterARN = "arn:aws:kafka:us-east-1:123456789012:cluster/analytics-kafka-cluster/abc-123"
@@ -244,8 +236,6 @@ func TestRelated_MSK_Lambda_NoClusterARN(t *testing.T) {
 		t.Errorf("Count = %d, want 0 (no cluster ARN)", result.Count())
 	}
 }
-
-// --- checkMSKCFN (Tags map, match aws:cloudformation:stack-name to CFN cache) ---
 
 func TestRelated_MSK_CFN_Found(t *testing.T) {
 	cfnRes := resource.Resource{

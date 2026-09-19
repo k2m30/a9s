@@ -13,10 +13,6 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// ---------------------------------------------------------------------------
-// CloudWatch Alarms fetcher tests
-// ---------------------------------------------------------------------------
-
 func TestFetchCloudWatchAlarms_ParsesMultipleAlarms(t *testing.T) {
 	mock := &fakeCloudWatchDescribeAlarms{
 		Output: &cloudwatch.DescribeAlarmsOutput{
@@ -64,7 +60,6 @@ func TestFetchCloudWatchAlarms_ParsesMultipleAlarms(t *testing.T) {
 		t.Fatalf("expected 2 resources, got %d", len(resources))
 	}
 
-	// Verify required fields exist
 	requiredFields := []string{"alarm_name", "state", "metric_name", "namespace", "threshold"}
 	for i, r := range resources {
 		for _, key := range requiredFields {
@@ -74,7 +69,6 @@ func TestFetchCloudWatchAlarms_ParsesMultipleAlarms(t *testing.T) {
 		}
 	}
 
-	// Verify first alarm
 	r0 := resources[0]
 	if r0.ID != "high-cpu-alarm" {
 		t.Errorf("resource[0].ID: expected %q, got %q", "high-cpu-alarm", r0.ID)
@@ -101,7 +95,6 @@ func TestFetchCloudWatchAlarms_ParsesMultipleAlarms(t *testing.T) {
 		t.Errorf("resource[0].Fields[\"threshold\"]: expected %q, got %q", "80.00", r0.Fields["threshold"])
 	}
 
-	// Verify second alarm
 	r1 := resources[1]
 	if r1.ID != "low-disk-alarm" {
 		t.Errorf("resource[1].ID: expected %q, got %q", "low-disk-alarm", r1.ID)
@@ -109,7 +102,6 @@ func TestFetchCloudWatchAlarms_ParsesMultipleAlarms(t *testing.T) {
 	if r1.Fields["state"] != "OK" {
 		t.Errorf("resource[1].Fields[state]: expected %q, got %q", "OK", r1.Fields["state"])
 	}
-	// OK alarm with no AlarmActions → no_actions finding.
 	if len(r1.Findings) == 0 || string(r1.Findings[0].Code) != "alarm.no_actions" {
 		t.Errorf("resource[1].Findings: expected alarm.no_actions finding, got %v", r1.Findings)
 	}
@@ -164,7 +156,6 @@ func TestFetchCloudWatchAlarms_ActionsCount_AlarmActionsOnly(t *testing.T) {
 		Output: &cloudwatch.DescribeAlarmsOutput{
 			MetricAlarms: []cwtypes.MetricAlarm{
 				{
-					// Only AlarmActions populated — count must be 1.
 					AlarmName:               aws.String("alarm-with-alarm-actions"),
 					StateValue:              cwtypes.StateValueOk,
 					AlarmActions:            []string{"arn:aws:sns:us-east-1:123456789012:my-topic"},
@@ -172,8 +163,6 @@ func TestFetchCloudWatchAlarms_ActionsCount_AlarmActionsOnly(t *testing.T) {
 					InsufficientDataActions: []string{},
 				},
 				{
-					// Only OKActions populated — actions_count must be "0"
-					// because OKActions are not alarm-trigger actions.
 					AlarmName:               aws.String("alarm-no-alarm-actions-but-ok-actions"),
 					StateValue:              cwtypes.StateValueOk,
 					AlarmActions:            []string{},
@@ -181,7 +170,6 @@ func TestFetchCloudWatchAlarms_ActionsCount_AlarmActionsOnly(t *testing.T) {
 					InsufficientDataActions: []string{},
 				},
 				{
-					// Only InsufficientDataActions populated — actions_count must be "0".
 					AlarmName:               aws.String("alarm-only-insufficient-data-actions"),
 					StateValue:              cwtypes.StateValueOk,
 					AlarmActions:            []string{},
@@ -202,21 +190,16 @@ func TestFetchCloudWatchAlarms_ActionsCount_AlarmActionsOnly(t *testing.T) {
 		t.Fatalf("expected 3 resources, got %d", len(resources))
 	}
 
-	// alarm-with-alarm-actions: 1 AlarmAction → actions_count must be "1"
 	r0 := resources[0]
 	if r0.Fields["actions_count"] != "1" {
 		t.Errorf("alarm-with-alarm-actions: actions_count = %q, want %q", r0.Fields["actions_count"], "1")
 	}
 
-	// alarm-no-alarm-actions-but-ok-actions: 0 AlarmActions → actions_count must be "0"
-	// (NOT "2" which would result from counting OKActions too)
 	r1 := resources[1]
 	if r1.Fields["actions_count"] != "0" {
 		t.Errorf("alarm-no-alarm-actions-but-ok-actions: actions_count = %q, want %q (OKActions must not be counted)", r1.Fields["actions_count"], "0")
 	}
 
-	// alarm-only-insufficient-data-actions: 0 AlarmActions → actions_count must be "0"
-	// (NOT "1" which would result from counting InsufficientDataActions too)
 	r2 := resources[2]
 	if r2.Fields["actions_count"] != "0" {
 		t.Errorf("alarm-only-insufficient-data-actions: actions_count = %q, want %q (InsufficientDataActions must not be counted)", r2.Fields["actions_count"], "0")

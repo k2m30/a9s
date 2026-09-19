@@ -1,16 +1,11 @@
 package unit
 
-// column_keys_have_producers_test.go — the one gate over one property: every
-// column names where its cell comes from, and a named Fields key has something
-// that writes it.
+// Every column names where its cell comes from, and a named Fields key has
+// something that writes it.
 //
-// The columns a type declares ARE the columns its view renders, for every
-// parent type and every child type (TestDefaultConfigColumnsAreTheCatalogs),
-// so one walk over the catalog's columns covers the built-in views too.
-//
-// TestEnricherFieldKeys_RegisterCallsAreInInitBlock is a stringy smoke test that
-// globs core/aws/*_issue_enrichment.go to verify every enricher file makes its
-// RegisterEnricherFieldKeys call.
+// The columns a type declares are the columns its view renders, for every
+// parent and child type (TestDefaultConfigColumnsAreTheCatalogs), so one walk
+// over the catalog's columns covers the built-in views too.
 
 import (
 	"os"
@@ -36,22 +31,11 @@ var columnKeyProducerAllowlist = map[string]map[string]string{
 	// "<shortName>": {"<colKey>": "justification"},
 }
 
-// TestColumnKeysHaveProducers verifies that every List-column Key defined in
-// the built-in default views (core/config/defaults_*.go, merged via
-// config.DefaultConfig()) is present in GetAllFieldKeys — the union of the
-// fetcher (SetFieldKeysForTest) and enricher (RegisterEnricherFieldKeys)
-// registries for that resource type.
+// The built-in defaults are the columns shipped to end users; a default view
+// Key referencing a Resource.Fields entry nobody writes renders blank forever.
 //
-// The built-in defaults are the ACTUAL columns shipped to end users; the
-// baked-in ResourceTypeDef.Columns is an older layer that most types no
-// longer populate. The gap this guards against: a default view Key references
-// a Resource.Fields entry nobody writes → column renders blank forever.
-//
-// Failure message: column %q on type %q has no producer (fetcher or enricher)
-//
-// If this test finds real gaps and you believe they are intentional, add them
-// to columnKeyProducerAllowlist with a justification comment — do NOT weaken
-// the assertion.
+// Intentional gaps go in columnKeyProducerAllowlist with a justification; do
+// not weaken the assertion.
 func TestColumnKeysHaveProducers(t *testing.T) {
 	cfg := config.DefaultConfig()
 	if len(cfg.Views) == 0 {
@@ -134,20 +118,14 @@ func TestColumnKeysHaveProducers(t *testing.T) {
 	}
 }
 
-// TestEnricherFieldKeys_RegisterCallsAreInInitBlock is a stringy smoke test that
-// globs core/aws/catalog_*.go and counts IssueEnricherFieldKeys: literals
-// on per-resource catalog struct literals. The Wave 2 field-key
-// registrations live in the catalog (the bridge in install.go replays them
-// into the legacy resource.SetIssueEnricherFieldKeysForTest map). Requiring at
-// least 10 occurrences proves the catalog actually wires Wave 2 field keys
-// rather than declaring the catalog field and leaving it empty everywhere.
+// At least 10 IssueEnricherFieldKeys: literals across core/aws/catalog_*.go
+// show the catalog wires Wave 2 field keys rather than declaring the field and
+// leaving it empty everywhere.
 func TestEnricherFieldKeys_RegisterCallsAreInInitBlock(t *testing.T) {
-	// Locate the repo root via the test file's own path.
 	_, filename, _, ok := runtime.Caller(0)
 	if !ok {
 		t.Fatal("runtime.Caller(0) failed — cannot determine source file path")
 	}
-	// tests/unit/ -> two levels up -> repo root
 	repoRoot := filepath.Join(filepath.Dir(filename), "..", "..")
 
 	matches, err := filepath.Glob(filepath.Join(repoRoot, "core", "aws", "catalog_*.go"))

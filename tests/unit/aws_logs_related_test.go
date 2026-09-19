@@ -28,8 +28,6 @@ func logsCheckerByTarget(t *testing.T, target string) resource.RelatedChecker {
 	return nil
 }
 
-// --- Lambda checker (Pattern C — cache, name parsed from /aws/lambda/{name}) ---
-
 func TestRelated_Logs_Lambda_Found(t *testing.T) {
 	const logGroupName = "/aws/lambda/my-function"
 	const functionName = "my-function"
@@ -108,8 +106,6 @@ func TestRelated_Logs_Lambda_CacheMissNoClients(t *testing.T) {
 		t.Errorf("Count = %d, want -1 (unknown/cache miss)", result.Count())
 	}
 }
-
-// --- Alarms checker (Pattern C — cache, LogGroupName dimension) ---
 
 func TestRelated_Logs_Alarms_Found(t *testing.T) {
 	const logGroupName = "/aws/lambda/my-function"
@@ -199,8 +195,6 @@ func TestRelated_Logs_Alarms_CacheMissNoClients(t *testing.T) {
 	}
 }
 
-// --- KMS checker (Pattern F — reads KmsKeyId from LogGroup RawStruct) ---
-
 func TestRelated_Logs_KMS_MatchByARN(t *testing.T) {
 	source := resource.Resource{
 		ID: "/aws/lambda/my-function",
@@ -272,8 +266,6 @@ func TestRelated_Logs_KMS_InvalidRawStruct(t *testing.T) {
 	}
 }
 
-// --- APIGW checker (Pattern N+C — "API-Gateway-Execution-Logs_{id}/{stage}") ---
-
 func TestRelated_Logs_APIGW_MatchByExecutionLogName(t *testing.T) {
 	const apiID = "abc1234567"
 	apiRes := resource.Resource{ID: apiID, Name: "my-api"}
@@ -336,12 +328,10 @@ func TestRelated_Logs_APIGW_CacheMissNoClients(t *testing.T) {
 	}
 }
 
-// --- ECSTask checker (Pattern N+C — "/ecs/{family}") ---
-
 // TestRelated_Logs_ECSTask_MatchByFamily verifies that checkLogsECSTask
 // extracts the family from Fields["task_definition"] (the full task-definition
 // ARN, with the trailing :revision stripped after arnLastSegment), not from
-// the task's Name/ID — docs/resources/logs.md §2 `ecs-task`.
+// the task's Name/ID.
 func TestRelated_Logs_ECSTask_MatchByFamily(t *testing.T) {
 	const family = "web-task"
 	taskRes := resource.Resource{
@@ -393,8 +383,6 @@ func TestRelated_Logs_ECSTask_CacheMissNoClients(t *testing.T) {
 	}
 }
 
-// --- Kinesis checker (Pattern C — nil clients → -1, empty filter list → 0) ---
-
 func TestRelated_Logs_Kinesis_NilClients(t *testing.T) {
 	source := resource.Resource{ID: "/aws/lambda/my-function"}
 
@@ -406,8 +394,6 @@ func TestRelated_Logs_Kinesis_NilClients(t *testing.T) {
 	}
 }
 
-// --- S3 checker (Pattern C — nil clients → -1) ---
-
 func TestRelated_Logs_S3_NilClients(t *testing.T) {
 	source := resource.Resource{ID: "/aws/lambda/my-function"}
 
@@ -418,10 +404,6 @@ func TestRelated_Logs_S3_NilClients(t *testing.T) {
 		t.Errorf("Count = %d, want -1 (nil clients)", result.Count())
 	}
 }
-
-// ---------------------------------------------------------------------------
-// checkLogsKinesis — live DescribeSubscriptionFilters path
-// ---------------------------------------------------------------------------
 
 // TestRelated_Logs_Kinesis_FoundViaSubscriptionFilter verifies that a
 // subscription filter whose DestinationArn is a Kinesis stream ARN returns
@@ -486,10 +468,6 @@ func TestRelated_Logs_Kinesis_EmptyFilterListReturnsZero(t *testing.T) {
 		t.Errorf("Count = %d, want 0 (empty filter list)", result.Count())
 	}
 }
-
-// ---------------------------------------------------------------------------
-// checkLogsS3 — live DescribeSubscriptionFilters path
-// ---------------------------------------------------------------------------
 
 // TestRelated_Logs_S3_FoundViaSubscriptionFilter verifies that a subscription
 // filter whose DestinationArn is an S3 bucket ARN returns the bucket name.

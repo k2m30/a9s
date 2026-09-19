@@ -49,7 +49,6 @@ func TestEC2RelatedCheckers_FetchLiveDataOnColdCache(t *testing.T) {
 	}
 
 	// asg: ASG fixture data does not populate Instances lists, so Count=0 is expected.
-	// The test verifies the checker resolves (no error, not unknown) — not that it finds matches.
 	{
 		checker := ec2CheckerByTarget(t, "asg")
 		got := checker(context.Background(), clients, instance, cache)
@@ -107,10 +106,6 @@ func TestEC2RelatedCheckers_EIPResolvesOnColdCache(t *testing.T) {
 	}
 }
 
-// T003: verifies that on a cold cache miss the "tg" checker calls the registered
-// paginated fetcher exactly once — NOT the old full-account FetchTargetGroups.
-// Currently FAILS because relatedResourcesFor uses FetchTargetGroups directly and
-// early-returns on nil clients before ever calling the paginated fetcher.
 func TestEC2RelatedColdCache_FirstPageOnly_TG(t *testing.T) {
 	var mockCallCount int
 	mockFetcher := resource.PaginatedFetcher(func(_ context.Context, _ any, _ string) (resource.FetchResult, error) {
@@ -146,10 +141,6 @@ func TestEC2RelatedColdCache_FirstPageOnly_TG(t *testing.T) {
 	}
 }
 
-// T004: verifies that on a cold cache miss the "cfn" checker calls the registered
-// paginated fetcher exactly once — NOT the old full-account FetchCloudFormationStacks.
-// Currently FAILS because relatedResourcesFor uses FetchCloudFormationStacks directly and
-// early-returns on nil clients before ever calling the paginated fetcher.
 func TestEC2RelatedColdCache_FirstPageOnly_CFN(t *testing.T) {
 	var mockCallCount int
 	mockFetcher := resource.PaginatedFetcher(func(_ context.Context, _ any, _ string) (resource.FetchResult, error) {
@@ -183,24 +174,20 @@ func TestEC2RelatedColdCache_FirstPageOnly_CFN(t *testing.T) {
 	checker := ec2CheckerByTarget(t, "cfn")
 	got := checker(context.Background(), nil, instance, resource.ResourceCache{})
 
-	// Business logic: instance with a CFN stack tag must find the related stack on cold cache.
 	if got.Count() != 1 {
 		t.Errorf("T004: expected Count=1 for instance with CFN tag, got %d", got.Count())
 	}
 	if len(got.ResourceIDs()) != 1 || got.ResourceIDs()[0] != "my-cfn-stack" {
 		t.Errorf("T004: expected ResourceIDs=[my-cfn-stack], got %v", got.ResourceIDs())
 	}
-	// Guard: fetcher must be called exactly once (N+1 prevention).
 	if mockCallCount != 1 {
 		t.Errorf("T004: expected paginated fetcher called once, got %d calls", mockCallCount)
 	}
 }
 
-// T005: verifies that when the paginated fetcher returns a truncated first page with
-// zero matches for the given EC2 instance, the checker returns {Count: 0, Truncated: true}
-// (the TruncatedResult honest-lower-bound contract from core/resource/related.go).
-// This ensures partial pages are not treated as conclusive negatives but ALSO preserve
-// the honest lower bound instead of dropping it as Count=-1 (unknown).
+// A truncated first page with no match is the honest lower bound
+// {Count: 0, Truncated: true}, neither a conclusive zero nor unknown
+// (core/resource/related.go).
 func TestEC2RelatedColdCache_TruncatedZeroMatch_Truncated(t *testing.T) {
 	mockFetcher := resource.PaginatedFetcher(func(_ context.Context, _ any, _ string) (resource.FetchResult, error) {
 		return resource.FetchResult{
@@ -219,8 +206,6 @@ func TestEC2RelatedColdCache_TruncatedZeroMatch_Truncated(t *testing.T) {
 		}
 	})
 
-	// Use an instance with no matching TG — the truncated page contains zero entries,
-	// so a correct implementation must return {Count: 0, Truncated: true} (TruncatedResult).
 	instance := resource.Resource{
 		ID: "i-no-matches",
 		RawStruct: ec2types.Instance{

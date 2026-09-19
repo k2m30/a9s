@@ -1,11 +1,7 @@
-// aws_empty_id_guard_test.go — RED pins for a single defect class seen in
-// LIVE readonly-profile validation: a related-panel drill can produce a row
-// whose identifying field is empty (a rule with no name, a stack with no
-// name, a hosted zone with no ID), and today each of the three per-row AWS
-// fetchers below fires its API call anyway with that empty identifier,
-// rather than skipping the row. Each pin drives the fetcher across two rows
-// — one valid, one with an empty identifier — via a recording fake client,
-// and asserts exactly one call was made (for the valid row only).
+// aws_empty_id_guard_test.go — a related-panel drill can produce a row whose
+// identifying field is empty (a rule with no name, a stack with no name, a
+// hosted zone with no ID). A per-row fetcher skips such a row rather than
+// calling AWS with an empty identifier.
 package unit_test
 
 import (

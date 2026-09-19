@@ -1,7 +1,3 @@
-// costs_codex_test.go — Cost Explorer pins reachable via the headless
-// app.Controller / core/costs / core/aws surface, reusing sibling unit_test
-// files' helpers (newCostsController/topDrill/fixedCostsNow/monthRecord/
-// fullMetricRecord/findFetchCostsTask/baseServiceQuery).
 package unit_test
 
 import (
@@ -23,17 +19,13 @@ import (
 	"github.com/k2m30/a9s/v3/core/session"
 )
 
-// ===========================================================================
-// Demo acceptance path: costs.ResourceDrillAllowed (core/costs/drill.go)
-// refuses any SERVICE other than the literal resourceDrillAllowedService
-// BEFORE reaching CostsResourceRowsByService, so the planted growth story
-// must live under that service for SC-001's spike -> usage type -> resource
-// chain to resolve. Pinned via the constants, not literals, so a re-plant
-// needs no edit here. The placeholder ScreenResourceList costs_state.go
-// pushes for screen.OpenResource goes through pushByIDPlaceholderList, which
-// sets ls.EscPops, so isTopLevelCanonicalList excludes it and the by-ID
-// result's rows apply.
-// ===========================================================================
+// costs.ResourceDrillAllowed (core/costs/drill.go) refuses any SERVICE other
+// than resourceDrillAllowedService before reaching CostsResourceRowsByService,
+// so the planted growth series must live under that service for the spike ->
+// usage type -> resource chain to resolve. The placeholder ScreenResourceList
+// that costs_state.go pushes for screen.OpenResource goes through
+// pushByIDPlaceholderList, which sets ls.EscPops, so isTopLevelCanonicalList
+// excludes it and the by-ID result's rows apply.
 
 // deliverCodexDemoFetch executes payload's KindFetchCosts task against the
 // real demo transport and delivers the resulting event into c — the actual
@@ -105,12 +97,6 @@ func TestCostsCodex_X1_GrowthStory_ResourceChain_EndToEnd_OverDemoTransport(t *t
 	c.ApplyIntents([]runtime.UIIntent{runtime.PushScreen{ID: runtime.ScreenCosts}})
 	c.EnsureCostsState(time.Now())
 
-	// Enter 1: SERVICE level. ActionCostPivot resets Cursor.Col to 0 (the
-	// OLDEST column) as a side effect of digit-key pivoting (applyCostPivot
-	// case 1-6: "top.Cursor.Row, top.Cursor.Col = 0, 0") — the root frame's
-	// own FR-002 "opens at newest" default only holds before any pivot, so
-	// this test must re-position to the newest column itself, matching a
-	// real user who presses "1" then looks at "today"'s column.
 	_, tasks := c.Apply(app.Action{Kind: app.ActionCostPivot, N: 1})
 	payload, found := findFetchCostsTask(tasks)
 	if !found {
@@ -129,13 +115,6 @@ func TestCostsCodex_X1_GrowthStory_ResourceChain_EndToEnd_OverDemoTransport(t *t
 	}
 	deliverCodexDemoFetch(t, core, c, payload)
 
-	// Enter 2: USAGE_TYPE level. A freshly-pushed child frame now opens with
-	// the cursor already on the newest column of its own window
-	// (applyCostsSelect's PushDrill case pins Cursor.Col = len(Window)-1 and
-	// reconciles scroll, same as the root frame's own FR-002 default) —
-	// codexMoveCursorToNewestColumn below is therefore a no-op here, kept
-	// only so this precondition stays explicit about which column the
-	// growth-usage-type row lookup depends on.
 	codexMoveCursorToNewestColumn(c)
 	if !codexMoveCursorToRow(c, fixtures.CostsGrowthUsageType) {
 		t.Fatalf("precondition: no USAGE_TYPE row labeled %q in the demo grid after the fetch landed", fixtures.CostsGrowthUsageType)
@@ -153,8 +132,6 @@ func TestCostsCodex_X1_GrowthStory_ResourceChain_EndToEnd_OverDemoTransport(t *t
 	}
 	deliverCodexDemoFetch(t, core, c, payload)
 
-	// Enter 3: RESOURCE_ID level — select the (only, or first) resource row;
-	// this must navigate straight to the EC2 detail view.
 	vs := c.Snapshot()
 	if vs.Body.Costs == nil || len(vs.Body.Costs.Rows) == 0 {
 		t.Fatalf("RESOURCE_ID grid has zero rows after the demo fetch landed — CostsResourceRowsByService has no entry for %q (or the story's service does not match it)", fixtures.CostsGrowthService)
@@ -181,20 +158,14 @@ func TestCostsCodex_X1_GrowthStory_ResourceChain_EndToEnd_OverDemoTransport(t *t
 	}
 }
 
-// ===========================================================================
-// A CostsLoaded produced under SkipAnomalies must not clear cached marks
-// nor renew the anomaly TTL. The typed-seam pin is in costs_screen_test.go
-// (TestCostsScreen_ApplyFetchResult_AnomalyResult_WriteSemantics, case "not
-// requested"); this is the full-stack pin.
-// ===========================================================================
+// A CostsLoaded produced under SkipAnomalies must not clear cached marks nor
+// renew the anomaly TTL.
 
 func TestCostsCodex_X2_SkipAnomalies_PreservesMarksAndTTL(t *testing.T) {
 	t.Setenv("A9S_CONFIG_FOLDER", t.TempDir())
 	const profile = "codex-x2"
 	t0 := fixedCostsNow
 
-	// Gen 1 (t0): full delivery with a planted anomaly mark on the newest
-	// column, persisted to disk.
 	s1 := session.New()
 	s1.Profile = profile
 	s1.Region = "us-east-1"
@@ -228,12 +199,10 @@ func TestCostsCodex_X2_SkipAnomalies_PreservesMarksAndTTL(t *testing.T) {
 	}
 	c1.Close()
 
-	// Gen 2 (t1 = t0+20h, within the 24h anomaly TTL): a metric cycle forces
-	// a genuine shape-miss (Invoice -> Unblended has a distinct Filter) while
-	// anomalies are still fresh from t0 — the executor's own SkipAnomalies
-	// decision (ensureCostsShapeFetched) should fire, and this test
-	// simulates exactly what that executor delivery looks like: Anomalies
-	// nil because they were never re-fetched, not because CE returned zero.
+	// t0+20h is within the 24h anomaly TTL. The metric cycle forces a real
+	// shape-miss (Invoice -> Unblended has a distinct Filter) while anomalies are
+	// fresh, so the executor delivers with SkipAnomalies (ensureCostsShapeFetched):
+	// Anomalies nil because they were not re-fetched, not because CE returned zero.
 	t1 := t0.Add(20 * time.Hour)
 	s2 := session.New()
 	s2.Profile = profile
@@ -254,12 +223,10 @@ func TestCostsCodex_X2_SkipAnomalies_PreservesMarksAndTTL(t *testing.T) {
 	c2.Handle(messages.CostsLoaded{
 		Query: skipPayload.Query,
 		Grid:  costs.GridResult{Fetched: true, Records: []costs.Record{{Period: newestCol, Keys: []string{"Amazon EC2"}, Metrics: map[costs.Metric]costs.Amount{costs.MetricUnblended: {Value: 90, Unit: "USD"}}}}},
-		// Anomalies deliberately nil — SkipAnomalies delivery.
+		// Anomalies nil: a SkipAnomalies delivery.
 		Requests: 1,
 	})
 
-	// Cycle back to Invoice (already cached from Gen1) — no new fetch — and
-	// confirm the original mark still renders (must not have been cleared).
 	c2.Apply(app.Action{Kind: app.ActionCostMetric})
 	c2.Apply(app.Action{Kind: app.ActionCostMetric})
 	c2.Apply(app.Action{Kind: app.ActionCostMetric})
@@ -299,13 +266,9 @@ func TestCostsCodex_X2_SkipAnomalies_PreservesMarksAndTTL(t *testing.T) {
 	}
 }
 
-// ===========================================================================
 // A warm-cache restart (cost data fully covered, anomaly slot absent) must
-// still emit an anomalies-only fetch: Grid/Anomalies freshness derive
-// independently (architecture.md Seam 1; typed-seam pin in
-// costs_screen_test.go,
-// TestCostsScreen_PlanFetch_GridAndAnomalyFreshnessDeriveIndependently).
-// ===========================================================================
+// still emit an anomalies-only fetch: Grid and Anomalies freshness derive
+// independently.
 
 func TestCostsCodex_X3_WarmCostCache_AbsentAnomalies_StillEmitsFetch(t *testing.T) {
 	t.Setenv("A9S_CONFIG_FOLDER", t.TempDir())
@@ -314,12 +277,9 @@ func TestCostsCodex_X3_WarmCostCache_AbsentAnomalies_StillEmitsFetch(t *testing.
 	q := baseServiceQuery()
 	window := costs.BuildWindow(costs.GranularityMonth, now)
 
-	// Pre-seed a store whose cost data fully covers the default root
-	// window — closed periods old enough to be trusted regardless of fetch
-	// age, and the OPEN (current-month) period fetched fresh (within
-	// openPeriodTTL=24h of now) so ITS coverage doesn't confound this
-	// test's own anomaly-only gap — but never registers any anomaly fetch
-	// at all.
+	// Closed periods are old enough to be trusted regardless of fetch age, and the
+	// open period is fetched within openPeriodTTL=24h, so the only gap is the
+	// anomaly slot.
 	store := costs.LoadStore(profile)
 	var closedRecs, openRecs []costs.Record
 	var closedWindow, openWindow []costs.Period
@@ -341,10 +301,6 @@ func TestCostsCodex_X3_WarmCostCache_AbsentAnomalies_StillEmitsFetch(t *testing.
 		t.Fatalf("seeding on-disk store: %v", err)
 	}
 
-	// Precondition: reload a throwaway Store the same way EnsureCostsState
-	// will and confirm the cost data itself is genuinely fully covered
-	// (missing==0) at now — isolating this test from any coverage bug
-	// unrelated to the anomaly-freshness gap under test.
 	if _, missing := costs.LoadStore(profile).Lookup(q, window, now); len(missing) != 0 {
 		t.Fatalf("precondition: seeded store still reports %d missing periods — the cost-data seed itself is incomplete, not the anomaly gap this test targets: %+v", len(missing), missing)
 	}
@@ -364,14 +320,9 @@ func TestCostsCodex_X3_WarmCostCache_AbsentAnomalies_StillEmitsFetch(t *testing.
 	}
 }
 
-// ===========================================================================
-// The drilled frame's window must lie WITHIN the selected cell's period: a
+// The drilled frame's window must lie within the selected cell's period: a
 // year cell (Jan 1-Dec 31) drills into that year's months, never a trailing
-// 12-month window ending at the anchor's month. WindowWithin
-// (costs_screen_test.go, TestCostsScreen_WindowWithin_YearToMonths_InsideSelectedYear)
-// is the typed-seam pin; this is the full-stack pin, checked at cursor col=0
-// and col=len-1.
-// ===========================================================================
+// 12-month window ending at the anchor's month.
 
 func TestCostsCodex_X4a_YearCellDrill_MonthWindowStaysWithinSelectedYear(t *testing.T) {
 	c := newCostsController(t, fixedCostsNow)
@@ -418,7 +369,7 @@ func TestCostsCodex_X4b_MonthCellDrill_WeekWindowStaysWithinSelectedMonth_BothCu
 			c := newCostsController(t, fixedCostsNow)
 			root := topDrill(t, c)
 
-			_, tasks := c.Apply(app.Action{Kind: app.ActionCostPivot, N: 1}) // SERVICE — resets Cursor.Col to 0
+			_, tasks := c.Apply(app.Action{Kind: app.ActionCostPivot, N: 1})
 			payload, found := findFetchCostsTask(tasks)
 			if !found {
 				t.Fatal("precondition: SERVICE pivot did not emit a fetch task")
@@ -452,21 +403,16 @@ func TestCostsCodex_X4b_MonthCellDrill_WeekWindowStaysWithinSelectedMonth_BothCu
 	}
 }
 
-// ===========================================================================
-// The STATE cursor must clamp when the display filter shrinks rows (metric
-// change), so Enter always acts on the row the user actually sees
-// highlighted. BuildViewModel (architecture.md Seam 8) clamps Cursor against
-// the display-filtered Rows/VisibleCols in one place and callers read the
-// clamped Cursor FROM the ViewModel; the typed-seam pin is
-// TestCostsScreen_BuildViewModel_CursorClamp_AlwaysValidIndex.
-// ===========================================================================
+// The state cursor must clamp when the display filter shrinks rows (metric
+// change), so Enter acts on the row the user sees highlighted. BuildViewModel
+// clamps Cursor against the display-filtered Rows/VisibleCols in one place,
+// and callers read the clamped Cursor from the ViewModel.
 
 func TestCostsCodex_X6_CursorBeyondFilteredEnd_EnterDrillsClampedRow_NeverNoOps(t *testing.T) {
 	c := newCostsController(t, fixedCostsNow)
 	root := topDrill(t, c)
 	newestCol := root.Window[len(root.Window)-1]
 
-	// Invoice: two non-zero rows (EC2, RDS) — cursor moves to row 1 (RDS).
 	_, tasks := c.Apply(app.Action{Kind: app.ActionCostPivot, N: 1})
 	payload, found := findFetchCostsTask(tasks)
 	if !found {
@@ -512,24 +458,18 @@ func TestCostsCodex_X6_CursorBeyondFilteredEnd_EnterDrillsClampedRow_NeverNoOps(
 	}
 }
 
-// ===========================================================================
-// Enter must never pin Equals[dim]=[""]: state.Loading gates Select
-// unconditionally, so a second, fast Enter on a still-loading frame waits for
-// rows instead of drilling with rowKey=="". The typed-seam pin is
-// TestCostsScreen_Select_LoadingShape_AlwaysWaitForRows.
-// ===========================================================================
+// Enter must never pin Equals[dim]=[""]: state.Loading gates Select, so a fast
+// second Enter on a still-loading frame waits for rows instead of drilling
+// with rowKey=="".
 
 func TestCostsCodex_X7_FastEnterEnter_ThroughLoadingLevel_NeverPinsEmptyValue(t *testing.T) {
 	c := newCostsController(t, fixedCostsNow)
 	root := topDrill(t, c)
 	newestCol := root.Window[len(root.Window)-1]
 
-	// ActionCostPivot resets Cursor.Col to 0 (oldest) as a side effect —
-	// use the resource-drill-allowed service name and re-position to the
-	// newest column so a fast SERVICE -> USAGE_TYPE -> (fast Enter) chain
-	// actually reaches the RESOURCE_ID push this test targets, instead of
-	// being refused earlier by an unrelated gate (stale window or disallowed
-	// service).
+	// The resource-drill-allowed service and the newest column keep the fast
+	// SERVICE -> USAGE_TYPE -> Enter chain clear of the stale-window and
+	// disallowed-service gates, so it reaches the RESOURCE_ID push.
 	_, tasks := c.Apply(app.Action{Kind: app.ActionCostPivot, N: 1})
 	payload, found := findFetchCostsTask(tasks)
 	if !found {
@@ -542,35 +482,24 @@ func TestCostsCodex_X7_FastEnterEnter_ThroughLoadingLevel_NeverPinsEmptyValue(t 
 	})
 	codexMoveCursorToNewestColumn(c)
 
-	// Enter 1: SERVICE -> USAGE_TYPE (pushes a fresh, still-loading frame).
 	c.Apply(app.Action{Kind: app.ActionSelect})
 	if len(c.GetCostsDrillStack()) != 2 {
 		t.Fatal("precondition: Enter 1 did not push a USAGE_TYPE frame")
 	}
 	codexMoveCursorToNewestColumn(c)
 
-	// Enter 2: fast, before the USAGE_TYPE fetch has landed — the fresh
-	// frame has zero rows and zero cached records anywhere for its shape.
+	// Before the USAGE_TYPE fetch lands, the fresh frame has zero rows and no
+	// cached records for its shape.
 	c.Apply(app.Action{Kind: app.ActionSelect})
 
-	// The new seam gates Select on Loading unconditionally (screen.
-	// WaitForRows) — the fast second Enter, on a still-loading USAGE_TYPE
-	// frame, must now be a strict no-op: the stack must NOT advance to a
-	// 3rd frame at all, closing the empty-value bug class outright rather
-	// than special-casing its symptom.
 	stack := c.GetCostsDrillStack()
 	if len(stack) != 2 {
 		t.Errorf("a fast Enter-Enter through a still-loading fresh drill level advanced the stack to depth %d, want 2 (a strict no-op — Loading gates Select unconditionally now)", len(stack))
 	}
 }
 
-// ===========================================================================
-// Mixed currencies: with two Amount.Units in the same window, the TOTAL row
-// must not render a bare numeric sum across incompatible units. The
-// domain-level half is pinned at the typed seam
-// (TestCostsScreen_SumCells_MixedUnits_NoTotalValueConsumed); this pins the
-// RENDERED note.
-// ===========================================================================
+// With two Amount.Units in the same window, the TOTAL row must not render a
+// bare numeric sum across incompatible units.
 
 func TestCostsCodex_X8_MixedCurrencies_TotalNotBareNumber(t *testing.T) {
 	c := newCostsController(t, fixedCostsNow)
@@ -605,14 +534,9 @@ func TestCostsCodex_X8_MixedCurrencies_TotalNotBareNumber(t *testing.T) {
 	}
 }
 
-// ===========================================================================
-// LoadStore.Recovered()==true must surface a user-visible flash when the
-// costs screen initializes: a corrupt on-disk cache is renamed and replaced,
-// never silently discarded. The Store behaviour is pinned in
-// costs_store_test.go (TestStore_CorruptYAML_RenamedToBakFreshStoreNoPanic /
-// TestStore_AlienVersion_RenamedToBakFreshStoreNoPanic); this pins that the
-// flash actually renders.
-// ===========================================================================
+// LoadStore.Recovered()==true must surface a user-visible flash when the costs
+// screen initializes: a corrupt on-disk cache is renamed and replaced, never
+// silently discarded.
 
 func TestCostsCodex_X9_RecoveredStore_SurfacesFlashOnInit(t *testing.T) {
 	t.Setenv("A9S_CONFIG_FOLDER", t.TempDir())
@@ -644,14 +568,9 @@ func TestCostsCodex_X9_RecoveredStore_SurfacesFlashOnInit(t *testing.T) {
 	}
 }
 
-// ===========================================================================
 // A by-ID resource-drill fetch that finds nothing (instance in another
-// region/account) must return the user to the costs screen with an honest
-// region-caveat footer note, never an empty stranded resource list. The
-// not-found pop-back and footer caveat are app-level concerns; Type/ID
-// construction of the locator is pinned in costs_screen_test.go
-// (TestCostsScreen_Select_ResourceLeaf_CatalogMapped_OpenResource).
-// ===========================================================================
+// region/account) must return the user to the costs screen with a
+// region-caveat footer note, never an empty stranded resource list.
 
 func TestCostsCodex_X10_ResourceJump_NotFound_ReturnsToCostsWithHonestNote(t *testing.T) {
 	t.Setenv("A9S_CONFIG_FOLDER", t.TempDir())
@@ -699,20 +618,11 @@ func TestCostsCodex_X10_ResourceJump_NotFound_ReturnsToCostsWithHonestNote(t *te
 	}
 }
 
-// ===========================================================================
-// A legitimately empty finer-grain drill (a cell that HAD a monthly amount,
-// but the finer window's fetch returns zero records because the charge is
-// billed monthly, e.g. NoRegion support-fee-style items) must explain
-// itself, not render a silent zero grid. A zero finer-grain result for a
-// NON-zero parent cell re-plans ONE coarser (parent-granularity) re-fetch;
-// once that lands the data itself renders, with ViewModel.Note explaining
-// WHY the columns are coarser than the drilled level. The "note alone, no
-// re-fetch" contract belongs only to a genuinely ZERO-parent drill
-// (costs_noregion_test.go, TestCostsNoRegion_N3_ZeroParentCell_NoFallback);
-// this test drives the fallback through to completion. The pure "empty grid
-// -> non-empty Note" half is pinned at the typed seam
-// (TestCostsScreen_BuildViewModel_Note_EmptyFinerGrainHonesty).
-// ===========================================================================
+// A zero finer-grain result for a non-zero parent cell (a charge billed
+// monthly, e.g. NoRegion support-fee-style items) re-plans one coarser,
+// parent-granularity re-fetch; once it lands the data renders, with
+// ViewModel.Note explaining why the columns are coarser than the drilled
+// level. A zero-parent drill gets the note alone, with no re-fetch.
 
 func TestCostsCodex_X11_EmptyFinerGrainDrill_ExplainsInsteadOfSilentZeroGrid(t *testing.T) {
 	c := newCostsController(t, fixedCostsNow)
@@ -738,11 +648,8 @@ func TestCostsCodex_X11_EmptyFinerGrainDrill_ExplainsInsteadOfSilentZeroGrid(t *
 	if !found {
 		t.Fatal("precondition: drilling into the monthly-only service emitted no fetch task")
 	}
-	// The finer-grain fetch succeeds but genuinely returns zero records —
-	// this charge is only billed monthly. The parent (SERVICE) cell was
-	// non-zero (100), so the N3 fallback must now re-plan a coarser
-	// (parent-granularity) re-fetch here, rather than leaving a silent
-	// empty grid behind a note alone.
+	// The parent SERVICE cell was non-zero (100), so a zero-record finer-grain
+	// result re-plans a coarser re-fetch.
 	_, fallbackTasks := c.Handle(messages.CostsLoaded{Query: usagePayload.Query, Grid: costs.GridResult{Fetched: true}, Requests: 1})
 
 	monthPayload, found := findFetchCostsTask(fallbackTasks)

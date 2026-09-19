@@ -1,7 +1,5 @@
 package unit
 
-// aws_ssm_reveal_test.go tests RevealSSMParameter (core/aws/ssm.go).
-
 import (
 	"context"
 	"errors"
@@ -14,12 +12,6 @@ import (
 	awsclient "github.com/k2m30/a9s/v3/core/aws"
 )
 
-// ---------------------------------------------------------------------------
-// TestRevealSSMParameter_ReturnsValue
-// ---------------------------------------------------------------------------
-
-// TestRevealSSMParameter_ReturnsValue verifies that RevealSSMParameter returns
-// the Value field from the SSM GetParameter response.
 func TestRevealSSMParameter_ReturnsValue(t *testing.T) {
 	mock := &mockSSMGetParameterClient{
 		output: &ssm.GetParameterOutput{
@@ -38,13 +30,6 @@ func TestRevealSSMParameter_ReturnsValue(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// TestRevealSSMParameter_WithDecryption
-// ---------------------------------------------------------------------------
-
-// TestRevealSSMParameter_WithDecryption verifies that the mock receives
-// WithDecryption=true in the GetParameter request, ensuring SecureString
-// parameter values are decrypted automatically.
 func TestRevealSSMParameter_WithDecryption(t *testing.T) {
 	mock := &mockSSMGetParameterClient{
 		output: &ssm.GetParameterOutput{
@@ -67,12 +52,6 @@ func TestRevealSSMParameter_WithDecryption(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// TestRevealSSMParameter_ErrorResponse
-// ---------------------------------------------------------------------------
-
-// TestRevealSSMParameter_ErrorResponse verifies that an API error from
-// GetParameter is wrapped and returned as a non-nil error.
 func TestRevealSSMParameter_ErrorResponse(t *testing.T) {
 	apiErr := errors.New("ParameterNotFound: /missing/param")
 	mock := &mockSSMGetParameterClient{
@@ -83,25 +62,17 @@ func TestRevealSSMParameter_ErrorResponse(t *testing.T) {
 	if err == nil {
 		t.Fatal("RevealSSMParameter should return an error when the API fails, got nil")
 	}
-	// Error should wrap the original error.
 	if !errors.Is(err, apiErr) {
 		t.Errorf("expected error to wrap %v, got: %v", apiErr, err)
 	}
 }
 
-// ---------------------------------------------------------------------------
-// TestRevealSSMParameter_NilValue
-// ---------------------------------------------------------------------------
-
-// TestRevealSSMParameter_NilValue verifies that when the Parameter.Value is
-// nil (e.g., StringList type), RevealSSMParameter returns an empty string
-// without error.
 func TestRevealSSMParameter_NilValue(t *testing.T) {
 	mock := &mockSSMGetParameterClient{
 		output: &ssm.GetParameterOutput{
 			Parameter: &ssmtypes.Parameter{
 				Name:  aws.String("/my/param"),
-				Value: nil, // explicitly nil
+				Value: nil,
 			},
 		},
 	}
@@ -115,17 +86,10 @@ func TestRevealSSMParameter_NilValue(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// TestRevealSSMParameter_NilParameter
-// ---------------------------------------------------------------------------
-
-// TestRevealSSMParameter_NilParameter verifies that when the output.Parameter
-// field itself is nil, RevealSSMParameter returns an empty string without
-// panicking or returning an error.
 func TestRevealSSMParameter_NilParameter(t *testing.T) {
 	mock := &mockSSMGetParameterClient{
 		output: &ssm.GetParameterOutput{
-			Parameter: nil, // no parameter in the response
+			Parameter: nil,
 		},
 	}
 

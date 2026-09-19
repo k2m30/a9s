@@ -1,6 +1,6 @@
 package unit
 
-// aws_coalesce_test.go — regression coverage for core/aws/coalesce.go's
+// core/aws/coalesce.go's
 // singleflight decorators: NewCoalescingSFN/NewCoalescingSNS/NewCoalescingS3
 // each wrap a live client, coalescing concurrent identical calls to exactly
 // one narrow-interface method (DescribeStateMachine keyed by StateMachineArn
@@ -15,19 +15,6 @@ package unit
 // type-assert at their own call sites — must keep passing straight through,
 // since SNSFullAPI/S3FullAPI widen the embedded field far enough for Go's
 // automatic interface-method promotion to cover them for free.
-//
-// Axes per decorator: N concurrent identical-key calls share one underlying
-// call and one identical result; two sequential calls both re-execute (no
-// caching); two concurrent DIFFERENT-key calls both execute independently;
-// a non-coalesced aggregate method passes straight through; the
-// non-aggregate narrow interfaces the FullAPI widening exists for are
-// reachable through the SAME narrowed static type production code actually
-// uses (ServiceClients.SNS/S3 are typed SNSAPI/S3API, not the wide FullAPI),
-// then re-asserted back to the narrow interface exactly like
-// enrichS3/s3_related.go/the sns fetchers do. SFN has no non-aggregate
-// narrow interface (coalesce.go's own doc comment: SFNAPI is already the
-// complete aggregate), so its interface-transparency axis is skipped —
-// nothing beyond SFNAPI itself to pin.
 //
 // The concurrent-call axes use golang.org/x/sync/singleflight's own
 // canonical test idiom (TestDoDup): launch N goroutines, sleep briefly so
@@ -224,19 +211,11 @@ func (f *coalesceS3Fake) GetBucketLogging(_ context.Context, _ *s3.GetBucketLogg
 
 var _ awsclient.S3FullAPI = (*coalesceS3Fake)(nil)
 
-// ---------------------------------------------------------------------------
-// Sequential one-fetch-per-op memoization (boundary-sealing wave).
-//
-// TestNewCoalescingSFN_SequentialCalls_BothReexecute above pins the
-// pre-existing, still-true axis: two sequential calls under a bare
-// context.Background() (opID 0) must both reach the inner fake — "opID 0
-// never memoized" is not a new carve-out, it is that exact test, unchanged.
-// The two tests below add the genuinely new axis: a NON-ZERO op now
-// memoizes a completed result across sequential (non-overlapping) calls —
-// singleflight alone (coalesce.go's pre-existing mechanism) cannot do this,
-// since a call made after the previous one already returned always starts a
-// fresh singleflight entry and re-executes.
-// ---------------------------------------------------------------------------
+// A non-zero op memoizes a completed result across sequential
+// (non-overlapping) calls; singleflight alone cannot, since a call made after
+// the previous one returned starts a fresh entry and re-executes. Under a bare
+// context.Background() (opID 0) sequential calls are never memoized; see
+// TestNewCoalescingSFN_SequentialCalls_BothReexecute.
 
 // TestNewCoalescingSFN_SequentialCalls_SameNonZeroOp_MemoizesToOneUnderlyingCall
 // drives two SEQUENTIAL calls (the first fully returns before the second
@@ -297,10 +276,6 @@ func TestNewCoalescingSFN_SequentialCalls_DifferentNonZeroOps_EachFetchesIndepen
 		t.Errorf("DescribeStateMachine reached the inner fake %d times for two sequential DIFFERENT non-zero operations on the same key, want 2 (each operation gets its own memo entry)", got)
 	}
 }
-
-// ---------------------------------------------------------------------------
-// SFN: NewCoalescingSFN
-// ---------------------------------------------------------------------------
 
 func TestNewCoalescingSFN_ConcurrentIdenticalCalls_ShareOneUnderlyingCallAndResult(t *testing.T) {
 	const arn = "arn:aws:states:us-east-1:123456789012:stateMachine:order-processing"
@@ -397,10 +372,6 @@ func TestNewCoalescingSFN_PassThrough_ListStateMachinesReachesInnerFake(t *testi
 		t.Errorf("ListStateMachines reached the inner fake %d times, want 1 (non-coalesced method must pass straight through)", got)
 	}
 }
-
-// ---------------------------------------------------------------------------
-// SNS: NewCoalescingSNS
-// ---------------------------------------------------------------------------
 
 func TestNewCoalescingSNS_ConcurrentIdenticalCalls_ShareOneUnderlyingCallAndResult(t *testing.T) {
 	const topicArn = "arn:aws:sns:us-east-1:123456789012:order-events"
@@ -555,10 +526,6 @@ func TestNewCoalescingSNS_InterfaceTransparency_NonAggregateNarrowInterfaces(t *
 	}
 }
 
-// ---------------------------------------------------------------------------
-// S3: NewCoalescingS3
-// ---------------------------------------------------------------------------
-
 func TestNewCoalescingS3_ConcurrentIdenticalCalls_ShareOneUnderlyingCallAndResult(t *testing.T) {
 	const bucket = "acme-app-logs-prod"
 	fake := &coalesceS3Fake{getPolicyBlock: make(chan struct{})}
@@ -635,8 +602,8 @@ func TestNewCoalescingS3_SequentialCalls_SameNonZeroOp_MemoizesToOneUnderlyingCa
 }
 
 // TestNewCoalescingS3_SequentialCalls_BenignNoSuchBucketPolicy_MemoizedWithinOp
-// pins coalescingS3's benign-absence memoization split (#261 boundary-sealing
-// wave, item c): a NoSuchBucketPolicy error — the common, expected "no
+// pins coalescingS3's benign-absence memoization split: a NoSuchBucketPolicy
+// error — the common, expected "no
 // policy attached" case — is a definitive answer for the rest of the
 // operation, so a second sequential call under the SAME op must be served
 // from the memo, not re-fetched.
@@ -860,8 +827,7 @@ func TestWithDetailOp_DifferentOperations_BothExecuteIndependently(t *testing.T)
 // structural guarantee coalesce.go's doc comment describes: a refresh begins
 // a brand-new operation — a new ID, a new namespace — so it is structurally
 // unable to join whatever pre-refresh call is still in flight under the old
-// ID. No Forget call is involved: the namespaces simply never collide, so
-// the new
+// ID. The namespaces never collide, so the new
 // operation's call executes immediately rather than waiting for the older,
 // still-blocked one to complete.
 func TestWithDetailOp_NewOperationNeverJoinsOlderOperationsInFlightCall(t *testing.T) {
@@ -933,8 +899,7 @@ func TestWithDetailOp_NewOperationNeverJoinsOlderOperationsInFlightCall(t *testi
 
 // TestWithDetailOp_NoOpContext_CoalescesAsSharedDefaultNamespace pins
 // DetailOpFromContext's zero-value fallback: a context that never passed
-// through WithDetailOp (e.g. a call site not yet wired into the
-// DetailOperation lifecycle) resolves to operation ID 0, and every such
+// through WithDetailOp resolves to operation ID 0, and every such
 // caller shares that SAME default namespace — they coalesce with each other
 // exactly as same-operation callers do, never as if each had its own
 // unnamespaced identity.
@@ -955,8 +920,6 @@ func TestWithDetailOp_NoOpContext_CoalescesAsSharedDefaultNamespace(t *testing.T
 	for i := range n {
 		go func(i int) {
 			defer wg.Done()
-			// No WithDetailOp — a bare context, exactly like a call site that
-			// has not (yet) been wired into the DetailOperation lifecycle.
 			results[i], errs[i] = decorated.GetBucketPolicy(context.Background(), &s3.GetBucketPolicyInput{Bucket: aws.String(bucket)})
 		}(i)
 	}
@@ -978,7 +941,7 @@ func TestWithDetailOp_NoOpContext_CoalescesAsSharedDefaultNamespace(t *testing.T
 }
 
 // ---------------------------------------------------------------------------
-// Lambda: NewCoalescingLambda (#261 boundary-sealing wave, item d) —
+// Lambda: NewCoalescingLambda —
 // coalesceLambdaFake implements awsclient.LambdaAPI. LambdaAPI is already
 // the complete aggregate of every Lambda operation asserted anywhere in
 // core/aws (coalesce.go's own doc comment), so no wider FullAPI type exists
@@ -1165,7 +1128,7 @@ func coalesceLambdaECRDefByTarget(t *testing.T) resource.RelatedChecker {
 }
 
 // TestLambdaGetFunction_ECRCheckerAndEnricher_ShareOneUnderlyingCallPerOperation
-// pins item (d)'s integration scenario end to end through the REAL exported
+// pins the integration scenario end to end through the REAL exported
 // consumers: opening an Image-package-type Lambda's detail dispatches BOTH
 // the ecr related checker (checkLambdaECR) and the detail enricher
 // (enrichLambda), and both call GetFunction for the identical function.

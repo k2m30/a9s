@@ -1,23 +1,7 @@
-// app_background_task_kinds_test.go — contract pin for app.IsBackgroundTaskKind.
-//
-// Contract: IsBackgroundTaskKind classifies a
-// runtime.TaskKind as "background" (its result feeds core/session state
-// that a later render consumes, rather than being the screen content itself)
-// versus "blocking" (its result IS the screen content, or it is a
-// renderer-only adapter task that must complete before the screen is usable).
-//
-// Background kinds (exactly 4):
-//
-//	runtime.KindRelatedCheck     — related-panel fan-out; result feeds RelatedCache/RelatedRows async.
-//	runtime.KindEnrichDetail     — Wave-2 detail enrichment; result patches DetailState async.
-//	runtime.TaskKindProbeEnrich  — Wave-2 menu enrichment probe; result patches menu badges async.
-//	runtime.TaskKindSaveCache    — disk cache persistence; no screen content at all.
-//
-// Every other enumerated TaskKind (18 total, read from core/runtime/tasks.go,
-// related.go, enrich.go, handlers_navigate.go, handlers_related.go) is blocking:
-// the caller's request should stall until the task completes because the
-// task's own result IS the screen the user is waiting on, or the adapter has
-// no meaningful state to render before the task lands.
+// IsBackgroundTaskKind classifies a runtime.TaskKind as background (its result
+// feeds core/session state that a later render consumes) or blocking (its
+// result is the screen content, or it is a renderer-only adapter task that must
+// complete before the screen is usable).
 package unit_test
 
 import (
@@ -33,7 +17,7 @@ func TestIsBackgroundTaskKind_TableAllKnownKinds(t *testing.T) {
 		kind runtime.TaskKind
 		want bool
 	}{
-		// -- background (4) --
+		// -- background --
 		{"KindRelatedCheck", runtime.KindRelatedCheck, true},
 		{"KindEnrichDetail", runtime.KindEnrichDetail, true},
 		{"KindEnrichRow", runtime.KindEnrichRow, true},
@@ -56,8 +40,7 @@ func TestIsBackgroundTaskKind_TableAllKnownKinds(t *testing.T) {
 		{"TaskKindLoadAvailCache", runtime.TaskKindLoadAvailCache, false},
 		{"TaskKindDemoPrefetchCounts", runtime.TaskKindDemoPrefetchCounts, false},
 
-		// -- blocking: renderer-only adapter kinds (no screen meaning headless,
-		// but not part of the 4-kind background allowlist either) --
+		// -- blocking: renderer-only adapter kinds --
 		{"TaskKindFlashTick", runtime.TaskKindFlashTick, false},
 		{"TaskKindEmitNavigate", runtime.TaskKindEmitNavigate, false},
 		{"TaskKindEmitAPIError", runtime.TaskKindEmitAPIError, false},

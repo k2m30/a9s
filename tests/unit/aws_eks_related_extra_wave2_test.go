@@ -1,6 +1,3 @@
-// aws_eks_related_extra_wave2_test.go — coverage wave 2 for eks_related_extra.go
-// Covers: checkEKSSubnet, checkEKSASG, checkEKSCTEvents
-// Each has: happy-path, no-match, and one edge case.
 package unit_test
 
 import (
@@ -14,10 +11,6 @@ import (
 	_ "github.com/k2m30/a9s/v3/core/aws"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
-
-// ---------------------------------------------------------------------------
-// checkEKSSubnet — Pattern F: ResourcesVpcConfig.SubnetIds
-// ---------------------------------------------------------------------------
 
 func TestRelated_EKS_Subnet_ReturnsSubnetIDs(t *testing.T) {
 	const subnet1 = "subnet-0aaa111111111111a"
@@ -69,7 +62,6 @@ func TestRelated_EKS_Subnet_ReturnsZeroWhenNoVpcConfig(t *testing.T) {
 	}
 }
 
-// Edge: empty SubnetIds slice → Count=0.
 func TestRelated_EKS_Subnet_ReturnsZeroWhenEmptySubnetIDs(t *testing.T) {
 	src := resource.Resource{
 		ID:   "acme-services",
@@ -89,10 +81,6 @@ func TestRelated_EKS_Subnet_ReturnsZeroWhenEmptySubnetIDs(t *testing.T) {
 		t.Errorf("Count = %d, want 0 (empty SubnetIds)", result.Count())
 	}
 }
-
-// ---------------------------------------------------------------------------
-// checkEKSASG — Pattern C: scan ng cache for matching ClusterName + extract ASG names
-// ---------------------------------------------------------------------------
 
 func TestRelated_EKS_ASG_MatchByNodeGroupClusterName(t *testing.T) {
 	const clusterName = "acme-services"
@@ -170,7 +158,6 @@ func TestRelated_EKS_ASG_NoMatchDifferentCluster(t *testing.T) {
 	}
 }
 
-// Edge: two node groups in same cluster → both ASGs deduplicated.
 func TestRelated_EKS_ASG_DeduplicatesAcrossNodeGroups(t *testing.T) {
 	const clusterName = "acme-services"
 	const asg1 = "eks-acme-ng1-asg"
@@ -231,10 +218,6 @@ func TestRelated_EKS_ASG_DeduplicatesAcrossNodeGroups(t *testing.T) {
 		t.Errorf("ResourceIDs missing %q; got %v", asg2, result.ResourceIDs())
 	}
 }
-
-// ---------------------------------------------------------------------------
-// checkEKSCTEvents — Pattern C: scan ct-events for ResourceName containing clusterName
-// ---------------------------------------------------------------------------
 
 func TestRelated_EKS_CTEvents_MatchByResourceName(t *testing.T) {
 	const clusterName = "acme-services"
@@ -310,11 +293,9 @@ func TestRelated_EKS_CTEvents_NoMatchDifferentCluster(t *testing.T) {
 	}
 }
 
-// Edge: event with wrong RawStruct (not cloudtrailtypes.Event) is skipped.
 func TestRelated_EKS_CTEvents_SkipsWrongRawStructEvent(t *testing.T) {
 	const clusterName = "acme-services"
 
-	// RawStruct is wrong type — assertStruct will fail, event is skipped.
 	evRes := resource.Resource{
 		ID:        "ct-event-abc123",
 		RawStruct: "not-a-cloudtrail-event",
@@ -369,7 +350,7 @@ func TestRelated_EKS_ASG_NilClientFallsBackToCache(t *testing.T) {
 		},
 	}
 
-	// Pass nil clients — the ng cache path does not require live clients.
+	// The ng cache path needs no live clients.
 	checker := eksCheckerByTarget(t, "asg")
 	result := checker(context.Background(), nil, src, cache)
 

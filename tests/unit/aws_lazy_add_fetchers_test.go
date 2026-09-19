@@ -23,10 +23,6 @@ import (
 	awsclient "github.com/k2m30/a9s/v3/core/aws"
 )
 
-// ---------------------------------------------------------------------------
-// AMI — FetchAMIsByIDs
-// ---------------------------------------------------------------------------
-
 type fetchAMIsByIDsMock struct {
 	gotInput *ec2.DescribeImagesInput
 	out      *ec2.DescribeImagesOutput
@@ -71,12 +67,10 @@ func TestFetchAMIsByIDs_PassesIDsUnfiltered(t *testing.T) {
 		t.Errorf("DescribeImages input ImageIds = %v, want %v", mock.gotInput.ImageIds, wantIDs)
 	}
 
-	// Partial success: the 1 found resource is returned.
 	if len(got) != 1 || got[0].ID != "ami-public-0001" {
 		t.Errorf("got = %+v, want one resource with ID=ami-public-0001", got)
 	}
 
-	// Error must be non-nil and name the missing ID.
 	if err == nil {
 		t.Fatal("expected non-nil error for missing AMI ID ami-public-0002")
 	}
@@ -101,10 +95,6 @@ func TestFetchAMIsByIDs_EmptyInput_NoAPICall(t *testing.T) {
 		t.Error("DescribeImages was called with empty input slice; expected a fast-path skip")
 	}
 }
-
-// ---------------------------------------------------------------------------
-// EBS Snapshot — FetchEBSSnapshotsByIDs
-// ---------------------------------------------------------------------------
 
 type fetchEBSSnapshotsByIDsMock struct {
 	gotInput *ec2.DescribeSnapshotsInput

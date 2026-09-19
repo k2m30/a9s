@@ -1,17 +1,3 @@
-// aws_efs_test.go — Wave-1 fetcher behavioral tests for EFS file systems.
-//
-// Tests the CONTRACT from docs/historical/resources-impl-plans/efs-impl-plan.md §1.
-//
-// Covered invariants:
-//   - TEST: efs_available_silence (U1) — healthy baseline: Status="", Issues=nil, Fields["status"]="".
-//   - TEST: efs_lifecycle_creating_warning — Status="creating", Issues=["creating"], Warning.
-//   - TEST: efs_lifecycle_updating_warning — Status="updating", Issues=["updating"], Warning.
-//   - TEST: efs_lifecycle_deleting_warning — Status="deleting", Issues=["deleting"], Warning.
-//   - TEST: efs_lifecycle_error_broken — Status="error", Issues=["error"], Broken.
-//   - TEST: efs_no_mount_targets_broken — Status="no mount targets", Issues=["no mount targets"], Broken.
-//   - TEST: efs_multi_w1_no_mounts_plus_deleting_suffix (U7a) — multi-W1: "no mount targets (+1)".
-//   - TEST: efs_fetcher_populates_resource_issues (U7f) — table-driven across every fixture.
-//   - TEST: efs_out_of_scope_percentiolimit_unreachable — zero CW metric calls.
 package unit
 
 import (
@@ -30,11 +16,6 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// ---------------------------------------------------------------------------
-// mockEFSDescribeOnly — implements EFSDescribeFileSystemsAPI for fetcher tests.
-// Delegates to fakeEFSDescribeFileSystems (defined in fakes_efs_test.go).
-// ---------------------------------------------------------------------------
-
 func buildEFSResourcesFromFake() ([]resource.Resource, error) {
 	fake := fakes.NewEFS()
 	return collectAllPages(func(token string) (resource.FetchResult, error) {
@@ -51,17 +32,6 @@ func efsResourceByID(resources []resource.Resource, id string) (resource.Resourc
 	return resource.Resource{}, false
 }
 
-// ---------------------------------------------------------------------------
-// TEST: efs_available_silence (U1)
-// ---------------------------------------------------------------------------
-
-// TestFetchEFSFileSystems_HealthyBaseline_Silence verifies that the graph-root
-// fixture (prod-app-data, LifeCycleState="available", 3 MTs) produces:
-//   - Resource.Status = "" (NOT "available")
-//   - Resource.Fields["status"] = ""
-//   - Resource.Issues = nil or empty
-//
-// Spec §4: "Wave 1 Healthy → no §4 row; S4 renders blank."
 func TestFetchEFSFileSystems_HealthyBaseline_Silence(t *testing.T) {
 	resources, err := buildEFSResourcesFromFake()
 	if err != nil {
@@ -81,12 +51,6 @@ func TestFetchEFSFileSystems_HealthyBaseline_Silence(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// TEST: efs_lifecycle_creating_warning
-// ---------------------------------------------------------------------------
-
-// TestFetchEFSFileSystems_Creating_Warning verifies that LifeCycleState="creating"
-// maps to Status="creating", Issues=["creating"].
 func TestFetchEFSFileSystems_Creating_Warning(t *testing.T) {
 	const fsID = "fs-0warncreating0001"
 
@@ -108,12 +72,6 @@ func TestFetchEFSFileSystems_Creating_Warning(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// TEST: efs_lifecycle_updating_warning
-// ---------------------------------------------------------------------------
-
-// TestFetchEFSFileSystems_Updating_Warning verifies that LifeCycleState="updating"
-// maps to Status="updating", Issues=["updating"].
 func TestFetchEFSFileSystems_Updating_Warning(t *testing.T) {
 	const fsID = "fs-0warnupdating0001"
 
@@ -135,12 +93,6 @@ func TestFetchEFSFileSystems_Updating_Warning(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// TEST: efs_lifecycle_deleting_warning
-// ---------------------------------------------------------------------------
-
-// TestFetchEFSFileSystems_Deleting_Warning verifies that LifeCycleState="deleting"
-// maps to Status="deleting", Issues=["deleting"].
 func TestFetchEFSFileSystems_Deleting_Warning(t *testing.T) {
 	const fsID = "fs-0warndeleting0001"
 
@@ -162,12 +114,6 @@ func TestFetchEFSFileSystems_Deleting_Warning(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// TEST: efs_lifecycle_error_broken
-// ---------------------------------------------------------------------------
-
-// TestFetchEFSFileSystems_Error_Broken verifies that LifeCycleState="error"
-// maps to Status="error", Issues=["error"].
 func TestFetchEFSFileSystems_Error_Broken(t *testing.T) {
 	const fsID = "fs-0brokenerror00001"
 
@@ -189,13 +135,6 @@ func TestFetchEFSFileSystems_Error_Broken(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// TEST: efs_no_mount_targets_broken
-// ---------------------------------------------------------------------------
-
-// TestFetchEFSFileSystems_NoMountTargets_Broken verifies that
-// NumberOfMountTargets == 0 maps to Status="no mount targets",
-// Issues=["no mount targets"], even when LifeCycleState="available".
 func TestFetchEFSFileSystems_NoMountTargets_Broken(t *testing.T) {
 	const fsID = "fs-0brokennomt000001"
 
@@ -217,17 +156,6 @@ func TestFetchEFSFileSystems_NoMountTargets_Broken(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// TEST: efs_multi_w1_no_mounts_plus_deleting_suffix (U7a)
-// ---------------------------------------------------------------------------
-
-// TestFetchEFSFileSystems_MultiW1_NomountsPlusDeleting verifies the multi-W1
-// fixture (warn-efs-multi: LifeCycleState="deleting" + NumberOfMountTargets=0):
-//
-//   - §4 precedence (severity first, then table order): Broken > Warning
-//   - Resource.Status = "no mount targets (+1)"
-//   - Resource.Fields["status"] = "no mount targets (+1)"
-//   - Resource.Issues = ["no mount targets", "deleting"]
 func TestFetchEFSFileSystems_MultiW1_NomountsPlusDeleting(t *testing.T) {
 	const fsID = "fs-0warnmulti0000001"
 
@@ -257,20 +185,12 @@ func TestFetchEFSFileSystems_MultiW1_NomountsPlusDeleting(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// TEST: efs_fetcher_populates_resource_issues (U7f)
-// ---------------------------------------------------------------------------
-
-// TestFetchEFSFileSystems_PopulatesResourceIssues is a table-driven test that
-// verifies every fixture yields the correct Resource.Issues slice (U7f).
-// Wave-2-only fixtures (healthy-efs-with-mt-down) must have Issues nil/empty.
 func TestFetchEFSFileSystems_PopulatesResourceIssues(t *testing.T) {
 	resources, err := buildEFSResourcesFromFake()
 	if err != nil {
 		t.Fatalf("FetchEFSFileSystems error: %v", err)
 	}
 
-	// indexByID for quick lookup
 	byID := make(map[string]resource.Resource, len(resources))
 	for _, r := range resources {
 		byID[r.ID] = r
@@ -353,7 +273,6 @@ func TestFetchEFSFileSystems_PopulatesResourceIssues(t *testing.T) {
 	}
 }
 
-// sortedKeys returns sorted keys of a resource map for diagnostic output.
 func sortedKeys(m map[string]resource.Resource) []string {
 	keys := make([]string, 0, len(m))
 	for k := range m {
@@ -363,23 +282,8 @@ func sortedKeys(m map[string]resource.Resource) []string {
 	return keys
 }
 
-// ---------------------------------------------------------------------------
-// TEST: efs_out_of_scope (Wave-3 anti-test)
-// ---------------------------------------------------------------------------
-
-// failingCWClient is a mock CloudWatch client that fails the test if any metric
-// call is made. It is a no-op struct that does not implement any real interface;
-// the test verifies that no real CW client is ever called during EFS fetch/enrich.
-//
-// Since EFS does NOT import or use CloudWatch, this test verifies the contract
-// at the API level: FetchEFSFileSystems never calls any CloudWatch API.
+// With no CloudWatch client in scope, any CloudWatch call panics or errors.
 func TestEFS_NoCloudWatchMetricCalls(t *testing.T) {
-	// Construct a mock EFS API client that intercepts DescribeFileSystems.
-	// If FetchEFSFileSystems internally calls any CW metric API, the test will
-	// fail because no CW client is provided and no CW import exists in efs.go.
-	//
-	// This test verifies the absence of a CW call by ensuring the fetcher
-	// completes successfully using ONLY the EFS client — no CW client in scope.
 	mock := &fakeEFSDescribeFileSystems{
 		Output: &efs.DescribeFileSystemsOutput{
 			FileSystems: []efstypes.FileSystemDescription{
@@ -400,9 +304,6 @@ func TestEFS_NoCloudWatchMetricCalls(t *testing.T) {
 		},
 	}
 
-	// FetchEFSFileSystems must complete with ZERO external service calls beyond
-	// the EFS client passed in. If the implementation calls CloudWatch, it would
-	// panic on nil-client access or return an error — neither is acceptable.
 	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
 		return awsclient.FetchEFSFileSystemsPage(context.Background(), mock, token)
 	})
@@ -412,12 +313,8 @@ func TestEFS_NoCloudWatchMetricCalls(t *testing.T) {
 	if len(resources) != 1 {
 		t.Errorf("expected 1 resource, got %d", len(resources))
 	}
-	// If we reach here, no CloudWatch call was attempted (no panic, no nil-deref).
 }
 
-// TestEFS_NoCloudWatchMetricCalls_Enricher verifies that the Wave-2 enricher
-// (EnrichEFSMountTargets) also makes zero CloudWatch metric calls.
-// The enricher only calls DescribeMountTargets — nothing else.
 func TestEFS_NoCloudWatchMetricCalls_Enricher(t *testing.T) {
 	fake := &efsMountTargetFake{
 		results: map[string][]efstypes.MountTargetDescription{
@@ -432,8 +329,7 @@ func TestEFS_NoCloudWatchMetricCalls_Enricher(t *testing.T) {
 		},
 	}
 
-	// ServiceClients with ONLY EFS set — CloudWatch is nil.
-	// If EnrichEFSMountTargets tries to use a CW client, it will panic on nil access.
+	// CloudWatch is nil, so any CloudWatch use by the enricher panics.
 	clients := &awsclient.ServiceClients{EFS: fake}
 	resources := efsResources("fs-nocw-enrich001")
 
@@ -441,19 +337,11 @@ func TestEFS_NoCloudWatchMetricCalls_Enricher(t *testing.T) {
 	if err != nil {
 		t.Fatalf("EnrichEFSMountTargets must not call CloudWatch; error: %v", err)
 	}
-	// Healthy FS → no findings.
 	if len(result.Findings) != 0 {
 		t.Errorf("expected 0 findings, got %d", len(result.Findings))
 	}
-	// If we reach here, no CloudWatch call was attempted.
 }
 
-// ---------------------------------------------------------------------------
-// Wave-1 single-fixture status field contract tests.
-// ---------------------------------------------------------------------------
-
-// TestFetchEFSFileSystems_StatusField_Warning verifies that Warning fixtures
-// have Fields["status"] set to the §4 phrase (not raw LifeCycleState enum).
 func TestFetchEFSFileSystems_StatusField_Warning(t *testing.T) {
 	resources, err := buildEFSResourcesFromFake()
 	if err != nil {
@@ -492,8 +380,6 @@ func TestFetchEFSFileSystems_StatusField_Warning(t *testing.T) {
 	}
 }
 
-// TestFetchEFSFileSystems_StatusField_Broken verifies that Broken fixtures
-// have Fields["status"] set to the §4 phrase.
 func TestFetchEFSFileSystems_StatusField_Broken(t *testing.T) {
 	resources, err := buildEFSResourcesFromFake()
 	if err != nil {
@@ -527,9 +413,6 @@ func TestFetchEFSFileSystems_StatusField_Broken(t *testing.T) {
 	}
 }
 
-// TestFetchEFSFileSystems_W1Updating_IsolatesFromMTState verifies that the
-// warn-efs-updating fixture (which has 2 available MTs) produces Status="updating"
-// from Wave-1 alone — the MT state is irrelevant at this phase.
 func TestFetchEFSFileSystems_W1Updating_IsolatesFromMTState(t *testing.T) {
 	const fsID = "fs-0warnupdating0001"
 
@@ -543,7 +426,6 @@ func TestFetchEFSFileSystems_W1Updating_IsolatesFromMTState(t *testing.T) {
 		t.Fatalf("fixture %q not found", fsID)
 	}
 
-	// Phase 1 contract: lifecycle-state signal only.
 	if r.Fields["status"] != "updating" {
 		t.Errorf("Fields[\"status\"] = %q, want %q (W1 signal only; MT state is W2)", r.Fields["status"], "updating")
 	}

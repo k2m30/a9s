@@ -1,31 +1,5 @@
 package unit
 
-// Regression tests for 4 bugs surfaced during code review of ct-events v2.
-//
-// Each test is labelled with the bug it locks.
-//
-// Bug 1 (sort uses display-formatted time string, breaking month boundaries;
-// sortColKey="time" → lexicographic compare, fix: sort by event_time
-// RFC3339 instead) is ported onto the live seam in list_ports_test.go's
-// TestCTEventsSort_RFC3339_AcrossMonthBoundary — this file's
-// ResourceListModel.SelectedResource() harness is dead code.
-//
-// Bug 2 (TestCTVerb_BatchDeleteAttributes_IsDestructive):
-//   "Batch" is in the write-prefix table AFTER the BatchGet* short-circuit.
-//   BatchDelete* therefore hits "Batch" prefix → W.  Must be D.
-//
-// Bug 3 (TestCTTarget_BatchGetItem_JoinsTableNames):
-//   extractTargetByEventName has no case for BatchGetItem; catch-all cannot
-//   handle map-valued requestItems → target falls through to "" / "(none)".
-//
-// Bug 4 (TestCTActor_CrossAccountRoot_HasCounterpartyPrefix):
-//   computeCTActor excludes "ROOT" from the cross-account prefix branch, so
-//   a cross-account root event renders "ROOT" instead of "<acct>/ROOT".
-//
-// Bug 5 (TestFormatCTTarget_EmptyLocalAccount_StripsAccount):
-//   When localAccount=="" the condition account != localAccount is always true
-//   for any ARN with a non-empty account segment → every ARN gets prefixed.
-
 import (
 	"context"
 	"strings"
@@ -39,16 +13,10 @@ import (
 	"github.com/k2m30/a9s/v3/core/semantics/ctevent"
 )
 
-// ===========================================================================
-// Bug 2: BatchDelete* classified as W instead of D.
-//
-// "Batch" appears in the write-prefix table. BatchGet* has an early short-circuit
-// that returns "R", but BatchDelete* has no early exit so it falls through to the
-// write table and matches "Batch" → W instead of hitting the destructive table.
-// ===========================================================================
+// "Batch" is in the write-prefix table and BatchGet* short-circuits to R;
+// BatchDelete* must reach the destructive table and classify as D.
 
 func TestCTVerb_BatchDeleteAttributes_IsDestructive(t *testing.T) {
-	// Primary regression: BatchDeleteAttributes must be D (delete verb).
 	got := ctevent.ClassifyCTVerb("BatchDeleteAttributes", "", "")
 	if got != "D" {
 		t.Errorf("ClassifyCTVerb(%q) = %q, want %q — BatchDelete* must be D, not W; "+
@@ -66,7 +34,6 @@ func TestCTVerb_BatchDeleteImage_IsDestructive(t *testing.T) {
 }
 
 func TestCTVerb_BatchWriteItem_IsWrite_Regression(t *testing.T) {
-	// Regression guard: BatchWriteItem must remain W.
 	got := ctevent.ClassifyCTVerb("BatchWriteItem", "", "")
 	if got != "W" {
 		t.Errorf("ClassifyCTVerb(%q) = %q, want %q — BatchWriteItem regression: must stay W",
@@ -75,7 +42,7 @@ func TestCTVerb_BatchWriteItem_IsWrite_Regression(t *testing.T) {
 }
 
 func TestCTVerb_BatchGetItem_IsRead_Regression(t *testing.T) {
-	// Regression guard: BatchGetItem must remain R (caught by BatchGet* short-circuit).
+	// BatchGetItem is caught by the BatchGet* short-circuit.
 	got := ctevent.ClassifyCTVerb("BatchGetItem", "", "")
 	if got != "R" {
 		t.Errorf("ClassifyCTVerb(%q) = %q, want %q — BatchGetItem regression: must stay R",
@@ -83,14 +50,8 @@ func TestCTVerb_BatchGetItem_IsRead_Regression(t *testing.T) {
 	}
 }
 
-// ===========================================================================
-// Bug 3: BatchGetItem target fallback missing.
-//
-// extractTargetByEventName has no case for BatchGetItem. The catch-all scans
-// for *Id/*Name/*Arn keys at top level, but requestItems is a map (not a
-// string), so the scan yields nothing. The target becomes "" / "(none)".
-// Expected: "Users,Sessions" (keys of requestItems joined).
-// ===========================================================================
+// requestItems in a BatchGetItem request is a map keyed by table name, so the
+// target is those keys joined: "Users,Sessions".
 
 func TestCTTarget_BatchGetItem_JoinsTableNames(t *testing.T) {
 	ctJSON := `{` +
@@ -146,20 +107,14 @@ func TestCTTarget_BatchGetItem_JoinsTableNames(t *testing.T) {
 		t.Errorf("_ct.target = %q, want to contain %q — BatchGetItem must extract requestItems keys",
 			target, "Sessions")
 	}
-	// Must not be the empty / fallback value.
 	if target == "" || target == "(none)" {
 		t.Errorf("_ct.target = %q, must not be empty or (none) for BatchGetItem with known requestItems",
 			target)
 	}
 }
 
-// ===========================================================================
-// Bug 4: Cross-account ROOT actor lacks counterparty prefix.
-//
-// computeCTActor excludes actor == "ROOT" from the cross-account prefix branch:
-//   if crossAccount && actor != "ROOT" && actor != "-" && ...
-// A cross-account root event therefore renders "ROOT" instead of "999988887777/ROOT".
-// ===========================================================================
+// A cross-account root event carries the counterparty prefix like any other
+// actor: "999988887777/ROOT".
 
 func TestCTActor_CrossAccountRoot_HasCounterpartyPrefix(t *testing.T) {
 	ctJSON := `{` +
@@ -207,15 +162,8 @@ func TestCTActor_CrossAccountRoot_HasCounterpartyPrefix(t *testing.T) {
 	}
 }
 
-// ===========================================================================
-// Bug 5: FormatCTTarget spurious account prefix when localAccount is empty.
-//
-// When localAccount=="" the condition `account != localAccount` evaluates to
-// true for ANY ARN with a non-empty account segment (any non-empty string != ""),
-// so every ARN gets prefixed with its own account ID. This is wrong: when the
-// local account is unknown, strip the account unconditionally (no cross-account
-// signal is available).
-// ===========================================================================
+// When the local account is unknown, FormatCTTarget strips the account
+// segment unconditionally: there is no cross-account signal to preserve.
 
 func TestFormatCTTarget_EmptyLocalAccount_StripsAccount(t *testing.T) {
 	cases := []struct {
@@ -226,11 +174,9 @@ func TestFormatCTTarget_EmptyLocalAccount_StripsAccount(t *testing.T) {
 		// There is no cross-account signal to preserve — prefix would be misleading.
 		{"arn:aws:iam::123456789012:role/Foo", "role/Foo"},
 		{"arn:aws:lambda:us-east-1:123456789012:function:my-fn", "function:my-fn"},
-		// S3 bucket ARN: no account segment, unchanged behavior.
+		// S3 bucket ARN: no account segment.
 		{"arn:aws:s3:::bucket", "bucket"},
-		// Empty ARN: passthrough.
 		{"", ""},
-		// Non-ARN: passthrough.
 		{"not-an-arn", "not-an-arn"},
 	}
 

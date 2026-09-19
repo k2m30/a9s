@@ -1,20 +1,10 @@
 package unit_test
 
-// aws_related_def_fragility_test.go — three related-def rules:
-//
-//  1. checkEKSAMI must soft-skip nodegroups whose launch template has been
-//     deleted upstream (InvalidLaunchTemplateId.NotFound) instead of hard
-//     failing the whole AMI panel.
-//  2. checkNGAMI must return Count:0 (a true zero) when the launch template
-//     has been deleted upstream, not State: RelatedError with the API error.
-//  3. checkELBWAF must skip the wafv2:GetWebACLForResource call for non-ALB
-//     load balancers (NLB / GWLB), because AWS WAFv2 only supports ALBs and
-//     would return WAFInvalidParameterException.
-//
-// The checkers:
-//   - core/aws/eks_related_extra.go (checkEKSAMI)
-//   - core/aws/ng_related.go (checkNGAMI)
-//   - core/aws/elb_related.go (checkELBWAF)
+// A launch template deleted upstream (InvalidLaunchTemplateId.NotFound)
+// names no AMI: checkEKSAMI skips that node group and checkNGAMI reports a
+// true zero. AWS WAFv2 attaches only to ALBs and answers
+// WAFInvalidParameterException for an NLB or GWLB, so checkELBWAF skips
+// GetWebACLForResource for them.
 
 import (
 	"context"
@@ -36,15 +26,6 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// ---------------------------------------------------------------------------
-// Fix 1 — checkEKSAMI: soft-skip InvalidLaunchTemplateId.NotFound per NG
-// ---------------------------------------------------------------------------
-
-// TestCheckEKSAMI_SkipsDeletedLaunchTemplate verifies that when one node group
-// references a launch template that has been deleted upstream, the AMI panel
-// still surfaces the AMIs from the other node groups (rather than hard-failing
-// with State: RelatedError). The deleted-LT NG is recorded as a partial failure entry in
-// the aggregated error per the existing AggregateFailures format.
 func TestCheckEKSAMI_SkipsDeletedLaunchTemplate(t *testing.T) {
 	const (
 		ltGood    = "lt-good001"
@@ -109,7 +90,7 @@ func TestCheckEKSAMI_SkipsDeletedLaunchTemplate(t *testing.T) {
 		t.Errorf("ResourceIDs = %v, want [%s]", result.ResourceIDs(), amiGood)
 	}
 	if result.Err() == nil {
-		// Acceptable: the issue allows Err nil OR a soft-skip note.
+		// A nil Err is as valid as a soft-skip note.
 		return
 	}
 	if !strings.Contains(result.Err().Error(), "launch template deleted") {
@@ -120,9 +101,6 @@ func TestCheckEKSAMI_SkipsDeletedLaunchTemplate(t *testing.T) {
 	}
 }
 
-// TestCheckEKSAMI_HardFailsOnOtherErrors verifies that errors other than
-// InvalidLaunchTemplateId.NotFound keep the existing partial-failure behavior:
-// the failure is aggregated into Err, surfacing the underlying error.
 func TestCheckEKSAMI_HardFailsOnOtherErrors(t *testing.T) {
 	eksNodegroups := map[string]*ekstypes.Nodegroup{
 		"ng-throttled": {
@@ -158,14 +136,6 @@ func TestCheckEKSAMI_HardFailsOnOtherErrors(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// Fix 2 — checkNGAMI: Count:0 (true zero) on InvalidLaunchTemplateId.NotFound
-// ---------------------------------------------------------------------------
-
-// TestCheckNGAMI_SkipsDeletedLaunchTemplate verifies that when the node group's
-// launch template has been deleted upstream, the AMI checker returns
-// Count:0 / Err:nil instead of State: RelatedError with the API error — the
-// LT is gone, so there is no AMI to relate to.
 func TestCheckNGAMI_SkipsDeletedLaunchTemplate(t *testing.T) {
 	const ltDeleted = "lt-deleted999"
 
@@ -190,12 +160,7 @@ func TestCheckNGAMI_SkipsDeletedLaunchTemplate(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// Fix 3 — checkELBWAF: gate on Fields["type"] before calling WAF API
-// ---------------------------------------------------------------------------
-
 // fakeWAFv2NoCallExpected fails the test if GetWebACLForResource is invoked.
-// Used to enforce the type-gate skip in checkELBWAF.
 type fakeWAFv2NoCallExpected struct {
 	t *testing.T
 }
@@ -217,8 +182,6 @@ func (f *fakeWAFv2NoCallExpected) GetLoggingConfiguration(_ context.Context, _ *
 	return &wafv2.GetLoggingConfigurationOutput{}, nil
 }
 
-// TestCheckELBWAF_SkipsNetworkLoadBalancer verifies that for an NLB (Fields["type"]="network"),
-// the checker returns Count:0 without calling wafv2:GetWebACLForResource.
 func TestCheckELBWAF_SkipsNetworkLoadBalancer(t *testing.T) {
 	const nlbARN = "arn:aws:elasticloadbalancing:us-east-1:123456789012:loadbalancer/net/prod-nlb/1234567890abcdef"
 	source := resource.Resource{
@@ -240,8 +203,6 @@ func TestCheckELBWAF_SkipsNetworkLoadBalancer(t *testing.T) {
 	}
 }
 
-// TestCheckELBWAF_SkipsGatewayLoadBalancer verifies that for a GWLB
-// (Fields["type"]="gateway"), the checker returns Count:0 without calling the API.
 func TestCheckELBWAF_SkipsGatewayLoadBalancer(t *testing.T) {
 	const gwlbARN = "arn:aws:elasticloadbalancing:us-east-1:123456789012:loadbalancer/gwy/prod-gwlb/abcdef1234567890"
 	source := resource.Resource{
@@ -263,9 +224,6 @@ func TestCheckELBWAF_SkipsGatewayLoadBalancer(t *testing.T) {
 	}
 }
 
-// TestCheckELBWAF_CallsAPIForApplicationLB verifies that the happy path for
-// ALB (Fields["type"]="application") still calls the WAF API and surfaces the
-// Web ACL.
 func TestCheckELBWAF_CallsAPIForApplicationLB(t *testing.T) {
 	const albARN = "arn:aws:elasticloadbalancing:us-east-1:123456789012:loadbalancer/app/prod-alb/abcdef1234567890"
 	const wafID = "waf-web-acl-id-abc123"
@@ -296,19 +254,16 @@ func TestCheckELBWAF_CallsAPIForApplicationLB(t *testing.T) {
 	}
 }
 
-// TestCheckELBWAF_EmptyTypeFallbackToRawStruct verifies the defense-in-depth
-// fallback: when Fields["type"] is empty (e.g. cache rehydration paths that
-// drop the field), the checker falls back to RawStruct.Type. If RawStruct
-// resolves to "application", the WAF API call still proceeds. This mirrors
-// the existing elbARN RawStruct fallback at lines 370-376 and prevents a
-// silent false-negative on a security-relevant pivot.
+// Fields["type"] can be empty on cache rehydration paths, so the checker
+// falls back to RawStruct.Type; a miss would be a silent false negative on a
+// security-relevant pivot.
 func TestCheckELBWAF_EmptyTypeFallbackToRawStruct(t *testing.T) {
 	const albARN = "arn:aws:elasticloadbalancing:us-east-1:123456789012:loadbalancer/app/prod-alb/abcdef1234567890"
 	const wafID = "waf-web-acl-id-fallback"
 	source := resource.Resource{
 		ID:     "prod-alb",
 		Name:   "prod-alb",
-		Fields: map[string]string{"load_balancer_arn": albARN}, // type missing
+		Fields: map[string]string{"load_balancer_arn": albARN},
 		RawStruct: elbv2types.LoadBalancer{
 			LoadBalancerArn: aws.String(albARN),
 			Type:            elbv2types.LoadBalancerTypeEnumApplication,

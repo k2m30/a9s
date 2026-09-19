@@ -16,7 +16,6 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// ebCheckerByTarget looks up the EB checker for the given target type via the registry.
 func ebCheckerByTarget(t *testing.T, target string) resource.RelatedChecker {
 	t.Helper()
 	for _, def := range resource.GetRelated("eb") {
@@ -31,8 +30,6 @@ func ebCheckerByTarget(t *testing.T, target string) resource.RelatedChecker {
 	return nil
 }
 
-// TestRelated_EB_Registered verifies that all 10 EB related defs are registered
-// with non-nil checkers.
 func TestRelated_EB_Registered(t *testing.T) {
 	defs := resource.GetRelated("eb")
 	if len(defs) == 0 {
@@ -45,11 +42,11 @@ func TestRelated_EB_Registered(t *testing.T) {
 		"asg":   true,
 		"ec2":   true,
 		"alarm": true,
-		"elb":   true, // T020
-		"tg":    true, // T024
-		"sg":    true, // T023
-		"role":  true, // T021
-		"s3":    true, // T022
+		"elb":   true,
+		"tg":    true,
+		"sg":    true,
+		"role":  true,
+		"s3":    true,
 	}
 	for target, wantChecker := range checkerExpected {
 		found := false
@@ -69,12 +66,6 @@ func TestRelated_EB_Registered(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// T020 — checkEbELB (forward: DescribeEnvironmentResources.LoadBalancers[].Name)
-// ---------------------------------------------------------------------------
-
-// TestRelated_Eb_ELB_MatchByEnvironmentResources verifies that checkEbELB returns
-// the load balancer name from DescribeEnvironmentResources.
 func TestRelated_Eb_ELB_MatchByEnvironmentResources(t *testing.T) {
 	elbName := "awseb-e-abc12345-AWSEBLoad-ABCDEF123456"
 	envName := "my-eb-env"
@@ -112,8 +103,6 @@ func TestRelated_Eb_ELB_MatchByEnvironmentResources(t *testing.T) {
 	}
 }
 
-// TestRelated_Eb_ELB_NoLoadBalancers verifies that checkEbELB returns Count=0
-// when DescribeEnvironmentResources returns no load balancers.
 func TestRelated_Eb_ELB_NoLoadBalancers(t *testing.T) {
 	envName := "my-eb-env"
 
@@ -142,8 +131,6 @@ func TestRelated_Eb_ELB_NoLoadBalancers(t *testing.T) {
 	}
 }
 
-// TestRelated_Eb_ELB_WrongRawStruct verifies that checkEbELB returns Count=-1
-// when RawStruct is the wrong type.
 func TestRelated_Eb_ELB_WrongRawStruct(t *testing.T) {
 	res := resource.Resource{
 		ID:        "my-eb-env",
@@ -159,14 +146,6 @@ func TestRelated_Eb_ELB_WrongRawStruct(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// T021 — checkEbRole (forward: DescribeConfigurationSettings →
-//         IamInstanceProfile + ServiceRole → iam:GetInstanceProfile)
-// ---------------------------------------------------------------------------
-
-// TestRelated_Eb_Role_MatchByIamInstanceProfile verifies that checkEbRole resolves
-// bare role names (via asgInstanceProfileToRoles/arnRoleName) from the
-// IamInstanceProfile option setting — docs/resources/eb.md §2 `role`.
 func TestRelated_Eb_Role_MatchByIamInstanceProfile(t *testing.T) {
 	envName := "my-eb-env"
 	appName := "my-app"
@@ -220,8 +199,6 @@ func TestRelated_Eb_Role_MatchByIamInstanceProfile(t *testing.T) {
 	}
 }
 
-// TestRelated_Eb_Role_NoRoleSettings verifies that checkEbRole returns Count=0
-// when DescribeConfigurationSettings has no IAM-related option settings.
 func TestRelated_Eb_Role_NoRoleSettings(t *testing.T) {
 	envName := "my-eb-env"
 	appName := "my-app"
@@ -257,8 +234,6 @@ func TestRelated_Eb_Role_NoRoleSettings(t *testing.T) {
 	}
 }
 
-// TestRelated_Eb_Role_WrongRawStruct verifies that checkEbRole returns Count=-1
-// when RawStruct is the wrong type.
 func TestRelated_Eb_Role_WrongRawStruct(t *testing.T) {
 	res := resource.Resource{
 		ID:        "my-eb-env",
@@ -274,12 +249,6 @@ func TestRelated_Eb_Role_WrongRawStruct(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// T022 — checkEbS3 (forward: DescribeApplicationVersions.SourceBundle.S3Bucket)
-// ---------------------------------------------------------------------------
-
-// TestRelated_Eb_S3_MatchBySourceBundle verifies that checkEbS3 returns the
-// S3 bucket from DescribeApplicationVersions.SourceBundle.S3Bucket.
 func TestRelated_Eb_S3_MatchBySourceBundle(t *testing.T) {
 	envName := "my-eb-env"
 	appName := "my-app"
@@ -330,8 +299,6 @@ func TestRelated_Eb_S3_MatchBySourceBundle(t *testing.T) {
 	}
 }
 
-// TestRelated_Eb_S3_NoApplicationVersions verifies that checkEbS3 returns Count=0
-// when DescribeApplicationVersions returns no versions.
 func TestRelated_Eb_S3_NoApplicationVersions(t *testing.T) {
 	envName := "my-eb-env"
 	appName := "my-app"
@@ -359,8 +326,6 @@ func TestRelated_Eb_S3_NoApplicationVersions(t *testing.T) {
 	}
 }
 
-// TestRelated_Eb_S3_WrongRawStruct verifies that checkEbS3 returns Count=-1
-// when RawStruct is the wrong type.
 func TestRelated_Eb_S3_WrongRawStruct(t *testing.T) {
 	res := resource.Resource{
 		ID:        "my-eb-env",
@@ -376,14 +341,6 @@ func TestRelated_Eb_S3_WrongRawStruct(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// T023 — checkEbSG (forward: DescribeConfigurationSettings →
-//         aws:autoscaling:launchconfiguration:SecurityGroups +
-//         aws:elbv2:loadbalancer:SecurityGroups)
-// ---------------------------------------------------------------------------
-
-// TestRelated_Eb_SG_MatchByLaunchConfigSecurityGroups verifies that checkEbSG
-// returns the security group ID from the launchconfiguration option setting.
 func TestRelated_Eb_SG_MatchByLaunchConfigSecurityGroups(t *testing.T) {
 	envName := "my-eb-env"
 	appName := "my-app"
@@ -431,8 +388,6 @@ func TestRelated_Eb_SG_MatchByLaunchConfigSecurityGroups(t *testing.T) {
 	}
 }
 
-// TestRelated_Eb_SG_NoSecurityGroupSettings verifies that checkEbSG returns Count=0
-// when DescribeConfigurationSettings has no security group option settings.
 func TestRelated_Eb_SG_NoSecurityGroupSettings(t *testing.T) {
 	envName := "my-eb-env"
 	appName := "my-app"
@@ -466,8 +421,6 @@ func TestRelated_Eb_SG_NoSecurityGroupSettings(t *testing.T) {
 	}
 }
 
-// TestRelated_Eb_SG_WrongRawStruct verifies that checkEbSG returns Count=-1
-// when RawStruct is the wrong type.
 func TestRelated_Eb_SG_WrongRawStruct(t *testing.T) {
 	res := resource.Resource{
 		ID:        "my-eb-env",
@@ -483,15 +436,8 @@ func TestRelated_Eb_SG_WrongRawStruct(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// T024 — checkEbTG (forward: DescribeEnvironmentResources.LoadBalancers[] →
-//                   elbv2:DescribeListeners.DefaultActions[].TargetGroupArn)
-// ---------------------------------------------------------------------------
-
-// TestRelated_Eb_TG_MatchByListenerDefaultAction verifies that checkEbTG resolves
-// the target group ARN from the EB environment's load balancer listeners.
-// DescribeEnvironmentResources returns the LB by name; checkEbTG must resolve
-// name→ARN via DescribeLoadBalancers before calling DescribeListeners.
+// DescribeEnvironmentResources names the load balancer; DescribeListeners
+// needs its ARN, so checkEbTG resolves it through DescribeLoadBalancers first.
 func TestRelated_Eb_TG_MatchByListenerDefaultAction(t *testing.T) {
 	envName := "my-eb-env"
 	lbName := "awseb-AWSEBLB-ABCDEF123456"
@@ -552,8 +498,6 @@ func TestRelated_Eb_TG_MatchByListenerDefaultAction(t *testing.T) {
 	}
 }
 
-// TestRelated_Eb_TG_NoLoadBalancers verifies that checkEbTG returns Count=0
-// when DescribeEnvironmentResources returns no load balancers.
 func TestRelated_Eb_TG_NoLoadBalancers(t *testing.T) {
 	envName := "my-eb-env"
 
@@ -583,8 +527,6 @@ func TestRelated_Eb_TG_NoLoadBalancers(t *testing.T) {
 	}
 }
 
-// TestRelated_Eb_TG_WrongRawStruct verifies that checkEbTG returns Count=-1
-// when RawStruct is the wrong type.
 func TestRelated_Eb_TG_WrongRawStruct(t *testing.T) {
 	res := resource.Resource{
 		ID:        "my-eb-env",

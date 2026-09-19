@@ -1,25 +1,5 @@
 package unit
 
-// TestCTEventsViewLayout_MatchesDesignSpec asserts the ct-events column layout
-// in the built-in defaults matches §8 of docs/historical/design/ct-event-list-v2.md, plus
-// the single Status column added by the title-based cascade (a56dc887): every
-// list view now carries exactly one column titled "Status", key="status",
-// populated by the ct-events fetcher (ct_events.go Fields["status"]).
-//
-// This test catches any accidental width drift in defaults_monitoring.go that
-// would not be caught by compilation. A width change (e.g., TIME from 15→19)
-// is a silent regression — the code compiles but the layout violates the spec.
-//
-// §8 column spec (plus the Status column, inserted after TIME):
-//   V       width=1   key="_ct.verb"
-//   TIME    width=15  key="time"
-//   Status  width=12  key="status"
-//   ACTOR   width=36  key="_ct.actor"
-//   ORIGIN  width=7   key="_ct.origin"
-//   EVENT   width=34  path="EventName"
-//   TARGET  width=36  key="_ct.target"
-//   OUTCOME width=14  key="_ct.outcome"
-
 import (
 	"testing"
 
@@ -35,9 +15,8 @@ func TestCTEventsViewLayout_MatchesDesignSpec(t *testing.T) {
 		width int
 	}{
 		{"V", 1},
-		// TIME ahead of Status: §8 puts TIME second, the catalog literal builds
-		// the same two columns in TIME-then-Status order, and the two
-		// declarations of one list must hold one order.
+		// The catalog literal builds TIME then Status, and the two declarations of
+		// one list must hold one order.
 		{"TIME", 15},
 		{"Status", 12},
 		{"ACTOR", 36},
@@ -66,8 +45,6 @@ func TestCTEventsViewLayout_MatchesDesignSpec(t *testing.T) {
 }
 
 func TestCTEventsViewLayout_DetailFieldsMatchDesignSpec(t *testing.T) {
-	// §8 detail fields: EventId, EventName, EventTime, EventSource, Username,
-	// ReadOnly, AccessKeyId, Resources, CloudTrailEvent.
 	cfg := config.DefaultConfig()
 	vd := config.GetViewDef(cfg, "ct-events")
 

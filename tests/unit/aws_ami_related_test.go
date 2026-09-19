@@ -26,8 +26,6 @@ func amiCheckerByTarget(t *testing.T, target string) resource.RelatedChecker {
 	return nil
 }
 
-// --- EC2 Checker Tests (Pattern C) ---
-
 func TestRelated_AMI_EC2_Found(t *testing.T) {
 	amiID := "ami-0abc123"
 	cache := resource.ResourceCache{
@@ -84,8 +82,6 @@ func TestRelated_AMI_EC2_EmptyAMIID(t *testing.T) {
 		t.Errorf("Count = %d, want 0 for empty AMI ID", result.Count())
 	}
 }
-
-// --- EBS Snapshot Checker Tests (Pattern F) ---
 
 func TestRelated_AMI_EBSSnaps_Found(t *testing.T) {
 	snapID := "snap-0abc123"

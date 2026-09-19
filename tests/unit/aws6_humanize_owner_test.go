@@ -1,13 +1,11 @@
 package unit_test
 
-// aws6_humanize_owner_test.go — one owner of the "this field carries an AWS
-// constant an operator should not have to read" declaration.
+// One owner of the "this field carries an AWS constant an operator should not
+// have to read" declaration.
 //
 // The opt-in says something about the FACT, not about the list: a field that
 // needs readable wording in a column needs it in the detail too, and a field
-// that no column happens to show needs it just the same. While the flag lives
-// on a column, a fact with no column has no way to ask, and the detail shows
-// the SDK constant verbatim.
+// no column shows needs it just the same.
 //
 // These tests are written against the rendered value only. Whatever shape the
 // declaration takes, the demo detail must read the same words a person would.
@@ -28,30 +26,23 @@ import (
 )
 
 // humanizedDetailWitness names one demo detail row that must read as words.
-// The raw value is recorded so the failure says what is on screen today.
+// The raw value is recorded so the failure says what is on screen.
 var humanizedDetailWitnesses = []struct {
 	shortName  string
 	resourceID string
 	path       string
 	raw        string
 	want       string
-	// statusColumnShowsAFinding marks a witness whose type spells its Status
+	// statusColumnShowsAFinding marks an entry whose type spells its Status
 	// COLUMN from findings rather than from this field, so the column and the
 	// detail are showing two different facts and comparing them says nothing.
 	statusColumnShowsAFinding bool
 }{
-	// The field row 4 is about: mwaa declares no column for it, so the
-	// column-owned opt-in cannot reach it at all. The path is the SDK's,
-	// because that is the row the detail projector renders once the view
-	// config is loaded — which production always loads.
-	//
-	// mwaa's LastUpdate.Status is NOT here: it renders as a nested line under
-	// a struct rather than a row of its own, which is the shape rows 23-24
-	// cover, and it is watched by the ratchet in
-	// aws6_humanize_declared_fields_test.go instead.
+	// mwaa declares no column for this field, so a column-owned opt-in could not
+	// reach it. The path is the SDK's, because that is the row the detail
+	// projector renders once the view config is loaded.
 	{"mwaa", "prod-airflow-etl", "EndpointManagement", "SERVICE", "service", false},
 
-	// The three other demo detail screens showing a raw constant.
 	{"apigw", "efg567hij8", "protocol", "WEBSOCKET", "websocket", false},
 	{"ecs-svc", "api-gateway", "LaunchType", "FARGATE", "fargate", false},
 	{"ecs-svc", "api-gateway", "status", "ACTIVE", "active", true},
@@ -100,10 +91,9 @@ func TestDemoDetailShowsWordsNotConstants(t *testing.T) {
 	}
 }
 
-// TestListColumnAndDetailAgreeOnWording pins the second half of row 4: one
-// declaration read by both surfaces. A field that reads as words on the detail
-// and as a constant in its column (or the reverse) is the fact declared twice
-// and disagreeing, which is the shape this change removes.
+// One declaration is read by both surfaces: a field that reads as words on the
+// detail and as a constant in its column is the fact declared twice and
+// disagreeing.
 func TestListColumnAndDetailAgreeOnWording(t *testing.T) {
 	clients := demo.NewServiceClients()
 	byType, cache := buildVisibilityTypeCache(t)
@@ -124,8 +114,7 @@ func TestListColumnAndDetailAgreeOnWording(t *testing.T) {
 			}
 		}
 		if colIndex < 0 {
-			// No column shows this field; row 4 is exactly about that case, and
-			// the detail pin above already covers it.
+			// No column shows this field; the detail check covers it.
 			continue
 		}
 
@@ -209,14 +198,7 @@ var verbatimDetailPaths = map[string]string{
 }
 
 // rawEnumDetailDebtCeiling is how many entries rawEnumDetailDebt is allowed to
-// hold. It is lowered by the change that empties an entry and never raised: a
-// field belongs on this list only because it was already broken when the list
-// was written, and nothing broken later qualifies.
-//
-// Without it "only shrinks" was a claim and not a gate. Moving a field into the
-// map left both other checks green — the sweep skips whatever the map names,
-// and the stale check only asks whether listed fields still render raw — so the
-// list could grow silently, which is exactly how an allowlist starts.
+// hold. It is never raised.
 const rawEnumDetailDebtCeiling = 0
 
 // rawEnumDetailDebt lists fields that render an SDK constant on a demo detail
@@ -230,7 +212,7 @@ const rawEnumDetailDebtCeiling = 0
 //     TestNoDemoDetailRowIsARawConstant, so a new one cannot be shipped;
 //   - adding an entry here fails the ceiling above, so a raw constant cannot be
 //     silenced by recording it instead;
-//   - an entry that no longer renders raw fails
+//   - an entry that renders as words fails
 //     TestRawEnumDebtNeitherGrowsNorGoesStale.
 var rawEnumDetailDebt = map[string]string{}
 
@@ -273,9 +255,8 @@ func TestNoDemoDetailRowIsARawConstant(t *testing.T) {
 				}
 				if declaredHumanizedPaths[key] {
 					// Declared fields have an owner already — the ratchet in
-					// aws6_humanize_declared_fields_test.go, which reports them
-					// with the declaration to restore. Two owners for one field
-					// means two failures for one fix.
+					// aws6_humanize_declared_fields_test.go, which names the missing declaration.
+					// Two owners for one field means two failures for one fix.
 					continue
 				}
 				offenders = append(offenders, fmt.Sprintf("%s (row %s) = %q", key, r.ID, f.Value))
@@ -292,8 +273,8 @@ func TestNoDemoDetailRowIsARawConstant(t *testing.T) {
 }
 
 // logEventStatusClasses names each class classifyLogEventStatus recognizes and
-// the words its status must read as. The demo account must contain a witness
-// for every one: a class with no witness is a classification nobody can see.
+// the words its status must read as. The demo account must carry an event for
+// every one: a class no demo event carries is a classification nobody can see.
 var logEventStatusClasses = []struct {
 	class string
 	want  string
@@ -304,9 +285,8 @@ var logEventStatusClasses = []struct {
 	{"META", "meta"},
 }
 
-// TestLogEventStatusReadsAsWords pins row 6 on the demo bench. The status a log
-// event carries is classified by a9s, not returned by AWS, so a raw token there
-// is a9s writing an SDK-shaped constant of its own.
+// The status a log event carries is classified by a9s, not returned by AWS, so
+// a raw token there is a9s writing an SDK-shaped constant of its own.
 func TestLogEventStatusReadsAsWords(t *testing.T) {
 	events := demoLogEvents(t, demo.NewServiceClients())
 	if len(events) == 0 {
@@ -452,8 +432,8 @@ func demoLogEvents(t *testing.T, clients *awsclient.ServiceClients) []resource.R
 //
 // A list of known-bad fields is only honest while it is exactly the known-bad
 // fields. One entry too few and the sweep above goes red, which is the point.
-// One entry too many and the list quietly excuses a field that has since been
-// fixed — the shape an allowlist decays into, and the reason this test looks
+// One entry too many and the list quietly excuses a field that already reads as
+// words — the shape an allowlist decays into, and the reason this test looks
 // for stale entries as hard as it looks for new ones.
 func TestRawEnumDebtNeitherGrowsNorGoesStale(t *testing.T) {
 	if len(rawEnumDetailDebt) > rawEnumDetailDebtCeiling {

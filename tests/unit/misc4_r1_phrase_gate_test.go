@@ -2,8 +2,6 @@
 
 package unit_test
 
-// misc4_r1_phrase_gate_test.go — misc4 row 1's gate and demo witness.
-//
 // fillSlot agrees a noun's number against the emitted value, but only inside a
 // "<…>" slot. A plural marker written anywhere else in a declared wording is
 // never resolved and reaches the operator's screen as "port(s)".

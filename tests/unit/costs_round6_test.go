@@ -1,15 +1,3 @@
-// costs_round6_test.go — Cost Explorer: six contract pins plus a state
-// corruption (items 2/7) and display-level zero-row filtering (item 9).
-//
-// package unit (not unit_test): item 2 needs the TUI key-routing helpers
-// (rootApplyMsg/rootKeyPress/newRootSizedModel, tui_root_test.go) which
-// only live in package unit — every other item reuses only EXPORTED
-// app/costs/runtime/aws surface, so it's cheaper to keep the whole file in
-// one package (local round6* helpers below) than to split it.
-//
-// Item 1 is a static template-content check, not a template EXECUTION
-// test — see its doc comment for why (no exported web-render hook, zero
-// existing core/web unit tests).
 package unit
 
 import (
@@ -34,16 +22,7 @@ import (
 	"github.com/k2m30/a9s/v3/internal/tui/views"
 )
 
-// ---------------------------------------------------------------------------
-// Local helpers (package unit cannot reach costs_state_test.go's/
-// costs_interaction_test.go's package-unit_test equivalents)
-// ---------------------------------------------------------------------------
-
 var round6Now = time.Date(2026, time.July, 15, 12, 0, 0, 0, time.UTC)
-
-// newCostsScreenController (costs_round3_test.go, same package) is the
-// shared builder — closure-wave harness dedup collapsed round6's own
-// former round6NewCostsController into it.
 
 func round6TopDrill(t *testing.T, c *app.Controller) costs.DrillLevel {
 	t.Helper()
@@ -107,18 +86,10 @@ func round6FullWindowRecords(window []costs.Period, rowKey string, amount float6
 	return recs
 }
 
-// ===========================================================================
-// Item 1 (P2, core/app/viewstate.go:95 + core/web) — BodyKindCosts
-// must render the grid in web mode, not the generic "Loading…" fallthrough.
-//
-// WEAKNESS FLAG: core/web/render.go's renderPage/renderMainFragment are
-// unexported, and there are zero existing core/web unit tests (web
-// rendering is exercised only by tests/e2e's Playwright specs, outside
-// tests/unit's reach). This is therefore a static source-text check on the
-// template FILE, not a template EXECUTION test — it catches a missing
-// "costs" case outright, but cannot catch a case that exists yet reads the
-// wrong field or renders the wrong sub-template.
-// ===========================================================================
+// Static source-text check on the template file: core/web's
+// renderPage/renderMainFragment are unexported. It catches a missing
+// "costs" case, not a case that reads the wrong field or renders the wrong
+// sub-template.
 
 func TestCostsRound6_Item1_WebBodyTemplate_HasCostsCase(t *testing.T) {
 	path := filepath.Join("..", "..", "core", "web", "templates", "body.html")
@@ -135,12 +106,6 @@ func TestCostsRound6_Item1_WebBodyTemplate_HasCostsCase(t *testing.T) {
 		t.Error(`body.html's "costs" case does not appear to reference .Costs (the CostsBody field) — it must actually render the grid, not merely switch on the kind string`)
 	}
 }
-
-// ===========================================================================
-// Item 2 (P2, internal/tui/app_costs.go:31) — ActionScrollLeft/ScrollRight
-// must capture and dispatch the []runtime.TaskRequest from ctrl.Apply like
-// the zoom/metric/Enter branches do, at the real TUI key-routing layer.
-// ===========================================================================
 
 func TestCostsRound6_Item2_TUI_ScrollLeftAtOldestColumn_DispatchesFetchCmd(t *testing.T) {
 	m := newRootSizedModel()
@@ -160,12 +125,6 @@ func TestCostsRound6_Item2_TUI_ScrollLeftAtOldestColumn_DispatchesFetchCmd(t *te
 		t.Fatal("pressing ScrollLeft ('h') past the oldest loaded column produced a nil tea.Cmd — handleCostsKeyMsg's ScrollLeft branch (internal/tui/app_costs.go) does not capture/dispatch the []runtime.TaskRequest ctrl.Apply returns, unlike the zoom/metric/Enter branches, so the scroll-to-load fetch never executes")
 	}
 }
-
-// ===========================================================================
-// Item 3 (P2, core/costs/grid.go:123) — the row filter must drop only
-// rows whose cells are ALL zero/no-data: a row with +100 in one period and
-// -100 in another (net zero total) must still render; TOTAL unchanged.
-// ===========================================================================
 
 func TestCostsRound6_Item3_BuildGrid_NetZeroRow_StillRenders_TotalUnchanged(t *testing.T) {
 	window := []costs.Period{
@@ -206,13 +165,6 @@ func TestCostsRound6_Item3_BuildGrid_NetZeroRow_StillRenders_TotalUnchanged(t *t
 		t.Errorf("Totals[1] = %v, want -40 (-100 EC2 + 60 RDS)", got)
 	}
 }
-
-// ===========================================================================
-// Item 4 (P2, core/aws/costs.go:80) — invoiceMetricKey must not remap
-// invoice -> unblended for a RECORD_TYPE clause coming from a RECORD_TYPE
-// DRILL in invoice mode; only the unblended display shape's own exclusion
-// filter does.
-// ===========================================================================
 
 type round6MockGetCostAndUsageClient struct {
 	output *costexplorer.GetCostAndUsageOutput
@@ -280,12 +232,6 @@ func TestCostsRound6_Item4_InvoiceModeRecordTypeDrill_ParsesUnblendedCostIntoInv
 		t.Errorf("Metrics also carries MetricUnblended for the same UnblendedCost value — this is an invoice-mode drill, only MetricInvoice should be populated")
 	}
 }
-
-// ===========================================================================
-// Item 5 (P2, core/app/costs_state.go:300) — a stale ErrorMsg must
-// clear when the requested shape is fully covered by cache (switch to a
-// warm shape renders the grid, not the old error) and when a retry starts.
-// ===========================================================================
 
 func TestCostsRound6_Item5_StaleErrorMsg_ClearsOnWarmShapeSwitch(t *testing.T) {
 	c := newCostsScreenController(t, round6Now)
@@ -363,14 +309,6 @@ func TestCostsRound6_Item5_StaleErrorMsg_ClearsWhenRetryStarts(t *testing.T) {
 	}
 
 	vs := c.Snapshot()
-	// ensureCostsShapeFetched DID set the internal cs.Loading=true (proven
-	// by retryTasks being non-empty above) — but buildCostsBody's
-	// ErrorMsg-early-return branch (core/app/costs_body.go:28-44)
-	// constructs the returned CostsBody WITHOUT ever copying cs.Loading
-	// into it, so Loading reads back false from the outside regardless.
-	// Same root cause as the warm-switch half of this finding: the stale
-	// ErrorMsg branch keeps short-circuiting buildCostsBody, this time
-	// hiding the fact that a retry is genuinely in flight.
 	if !vs.Body.Costs.Loading {
 		t.Error("Loading is false immediately after ForceRefreshCosts dispatched a new fetch — the UI must show a loading state while a retry is in flight, not a frozen stale error with no loading indication")
 	}
@@ -378,14 +316,6 @@ func TestCostsRound6_Item5_StaleErrorMsg_ClearsWhenRetryStarts(t *testing.T) {
 		t.Errorf("ErrorMsg = %q, want \"\" once a retry fetch has started — the UI must not keep showing a stale error while a new attempt is already in flight", vs.Body.Costs.ErrorMsg)
 	}
 }
-
-// ===========================================================================
-// Item 6 (P3, internal/tui/views/costs.go:78) — with more rows than height,
-// the data-through/anomaly footer line must still render: clipCostsRows
-// must reserve room for the 2 trailing lines (blank + footer) RenderCosts
-// unconditionally appends afterward, so the total output never exceeds the
-// requested height budget.
-// ===========================================================================
 
 func TestCostsRound6_Item6_FooterSurvives_HeightBudget_WhenClipping(t *testing.T) {
 	body := app.CostsBody{
@@ -413,20 +343,6 @@ func TestCostsRound6_Item6_FooterSurvives_HeightBudget_WhenClipping(t *testing.T
 	}
 }
 
-// ===========================================================================
-// Item 7 — row totals must treat missing cells as zero, never NaN, so a row
-// with real amounts in covered columns and no record for one visible column
-// keeps its real total and is never demoted below tiny complete rows.
-//
-// A missing column's cellAgg is the zero value (sum=0), never NaN; BuildGrid's
-// per-row total is a plain sum over every column, so a missing column simply
-// contributes 0, and NaN can only enter via a genuinely malformed
-// Amount.Value (never produced on this path — core/aws/costs.go's mapCEGroup
-// hard-errors on an unparseable amount rather than substituting NaN). A
-// refactor of BuildGrid's total/sort math that reintroduced NaN would show
-// as all-zero viewports on every pivot.
-// ===========================================================================
-
 func TestCostsRound6_Item7_MissingCellRow_SortsByRealTotal_GreenRegressionPin(t *testing.T) {
 	window := []costs.Period{
 		{Start: "2025-07-01", End: "2025-08-01"},
@@ -435,9 +351,7 @@ func TestCostsRound6_Item7_MissingCellRow_SortsByRealTotal_GreenRegressionPin(t 
 	}
 	recs := []costs.Record{
 		{Period: window[0], Keys: []string{"BigSpender"}, Metrics: map[costs.Metric]costs.Amount{costs.MetricInvoice: {Value: 5000, Unit: "USD"}}},
-		// window[1] deliberately has NO BigSpender record — an uncovered/
-		// missing column for this row, matching the live scroll-left
-		// dropped-task repro (item 2).
+		// window[1] has no BigSpender record: a missing column for this row.
 		{Period: window[2], Keys: []string{"BigSpender"}, Metrics: map[costs.Metric]costs.Amount{costs.MetricInvoice: {Value: 5000, Unit: "USD"}}},
 
 		{Period: window[0], Keys: []string{"TinySpender"}, Metrics: map[costs.Metric]costs.Amount{costs.MetricInvoice: {Value: 1, Unit: "USD"}}},
@@ -453,24 +367,6 @@ func TestCostsRound6_Item7_MissingCellRow_SortsByRealTotal_GreenRegressionPin(t 
 		t.Errorf("row order: got [0]=%q want BigSpender first (10000 real total vs TinySpender's 3) — a missing column must not corrupt the sort", grid.Rows[0].Key)
 	}
 }
-
-// ===========================================================================
-// Item 8 (NEW) — cost cache schema version bump: core/costs/store.go's
-// schemaVersion goes to 2, so a version-1 file (this branch's earlier
-// builds wrote incompatible shapes/keys under the same version number)
-// gets set aside to .bak with a fresh store, exercising the existing
-// alien-version recovery path (already correct and covered by
-// TestStore_AlienVersion_RenamedToBakFreshStoreNoPanic in
-// costs_store_test.go, whose fixture uses "version: 999" — a version that
-// stays alien regardless of schemaVersion's own value, so it needs no
-// reconciliation).
-//
-// No existing test pins "version: 1" as a successful, non-recovered load —
-// checked costs_store_test.go directly; its round-trip test always Saves
-// then Loads (version-agnostic), and its two disk-fixture tests use
-// "version: 999" (alien-version) and "version: 1" + malformed YAML
-// (corrupt-parse, fails regardless of version). No reconciliation needed.
-// ===========================================================================
 
 func TestCostsRound6_Item8_VersionOneFile_TreatedAsAlien_AfterSchemaBump(t *testing.T) {
 	t.Setenv("A9S_CONFIG_FOLDER", t.TempDir())
@@ -500,21 +396,6 @@ func TestCostsRound6_Item8_VersionOneFile_TreatedAsAlien_AfterSchemaBump(t *test
 		t.Errorf(".bak content = %q, want the original version:1 bytes %q", bak, v1)
 	}
 }
-
-// ===========================================================================
-// Item 9 — display-level zero-row filter: a row whose every visible cell
-// FORMATS as "0.0" (real sub-cent data that rounds to zero at display
-// precision) must not render — on any pivot EXCEPT LINKED_ACCOUNT, where
-// rows always show. Interaction with item 3: the offsetting +100/-100 row
-// still renders (its cells format non-zero: "100.0"/"-100.0"); a row of
-// sub-cent noise does not — pinned at the CostsBody row level, one
-// render-level absence check, and the LINKED_ACCOUNT exemption. The
-// mechanism (filterCostsZeroDisplayGridRows' sub-cent hide + the
-// LINKED_ACCOUNT exemption, core/app/costs_state.go's liveCostGrid) is
-// pinned at the typed seam in costs_screen_test.go
-// (TestCostsScreen_BuildViewModel_DisplayFilter_SubCentHidden_LinkedAccountExempt);
-// these four tests pin the full stack (controller -> CostsBody).
-// ===========================================================================
 
 func TestCostsRound6_Item9_SubCentNoiseRow_HiddenAtDisplayLevel_DefaultPivot(t *testing.T) {
 	c := newCostsScreenController(t, round6Now)

@@ -26,17 +26,10 @@ func (f *iamUserPolicyOverrideFake) ListAttachedUserPolicies(_ context.Context, 
 	return &iam.ListAttachedUserPoliciesOutput{AttachedPolicies: f.attachedPolicies}, nil
 }
 
-// These tests originally pinned the old behavior: the checker filtered
-// AWS-managed ARNs out of the emitted list so Count reflected only
-// customer-managed policies. That hid AWS-managed attachments from the
-// operator entirely.
-//
-// The lazy-add path now resolves AWS-managed policy names on demand via
-// FetchIAMPoliciesByIDsFull, so checkers emit every attached policy name
-// (managed or AWS-managed). The drill lands on real entries because the
-// orchestrator populates the cache with lazy-added AWS-managed policies.
-// The new assertion is: the checker returns the full attached-count and
-// every PolicyName appears in ResourceIDs.
+// Checkers emit every attached policy name, managed or AWS-managed; the
+// lazy-add path (FetchIAMPoliciesByIDsFull) resolves AWS-managed names on
+// demand, so a drill lands on real entries. The checker returns the full
+// attached count and every PolicyName appears in ResourceIDs.
 
 func TestRelated_IAMGroup_Policy_EmitsAllAttachedPolicies(t *testing.T) {
 	checker := iamGroupCheckerByTarget(t, "policy")
@@ -145,7 +138,7 @@ func TestDemoExpectedTopLevelCountsForTest_Policy_ExcludesAWSManaged(t *testing.
 	// inline group policy surfaced by ListGroupPolicies. AWS-managed policies
 	// are excluded by the Scope=Local filter in the fetcher and by
 	// IsCustomerManagedPolicyARN in countTopLevelIAMPolicies.
-	// 28 includes the privilege-escalation witness policy acme-privesc-policy.
+	// 28 includes the privilege-escalation fixture policy acme-privesc-policy.
 	counts := fixtures.ExpectedTopLevelCountsForTest()
 	if got, want := counts["policy"], 28; got != want {
 		t.Fatalf("policy count = %d, want %d", got, want)

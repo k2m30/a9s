@@ -1,13 +1,6 @@
 package unit_test
 
-// Tests for helper functions that were previously uncovered:
-//
-//  1. checkSQSSQS (exercises sqsRedriveTarget via public related checker)
-//  2. Actor() via IAMUser ARN path (exercises arnLastSegment indirectly)
-//  3. ExtractTarget() via ARN-only resources (exercises labelFromARN indirectly)
-//  4. FetchS3BucketsPageWithNotifications (exercises s3NotificationTargets)
-//  5. buildinfo.ResolveCommit
-//  6. buildinfo.ResolveDate
+// Tests for unexported helper functions, reached through public APIs.
 
 import (
 	"context"
@@ -27,7 +20,7 @@ import (
 )
 
 // ---------------------------------------------------------------------------
-// 1. SQS DLQ relationship checker (exercises sqsRedriveTarget via public API)
+// SQS DLQ relationship checker (exercises sqsRedriveTarget via public API)
 // ---------------------------------------------------------------------------
 
 // sqsSQSCheckerForTest retrieves the "sqs" → "sqs" related checker.
@@ -200,7 +193,7 @@ func TestRelated_SQS_SQS_NoRelationship(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// 3. ExtractTarget() — ARN-only ResourceRef (exercises labelFromARN)
+// ExtractTarget() — ARN-only ResourceRef (exercises labelFromARN)
 // ---------------------------------------------------------------------------
 
 // TestCTDetailExtractTarget_LabelFromARN_IAMRole verifies that an IAM role ARN
@@ -318,14 +311,13 @@ func TestCTDetailExtractTarget_LabelFromARN_UnknownService(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// 4. FetchS3BucketsPageWithNotifications (exercises firstS3NotificationTargets)
+// FetchS3BucketsPageWithNotifications (exercises firstS3NotificationTargets)
 // ---------------------------------------------------------------------------
 
 // mockS3GetBucketNotificationClient implements S3GetBucketNotificationConfigurationAPI.
 // It is an alias for the package-unit canonical fake (aws_s3_test.go's
 // S3BucketNotificationFake) — package unit_test cannot share unexported
-// identifiers with package unit, so this file reuses the exported type
-// instead of keeping its own parallel copy.
+// identifiers with package unit.
 type mockS3GetBucketNotificationClient = unit.S3BucketNotificationFake
 
 // mockS3ListBucketsForNotification implements S3ListBucketsAPI for notification tests.
@@ -493,10 +485,10 @@ func TestFetchS3BucketsPageWithNotifications_NilNotificationAPI(t *testing.T) {
 // refused notification lookup keeps the bucket in the list and reports the
 // refusal.
 //
-// Spec row s3-0916/2: the destinations are unknown, not absent, so the
-// aggregated error and Fields["notification_error"] carry the refusal and the
-// three notification pivots render it instead of a zero. A nil error here
-// would put the pivots back to claiming the bucket notifies nothing.
+// The destinations are unknown, not absent, so the aggregated error and
+// Fields["notification_error"] carry the refusal and the three notification
+// pivots render it instead of a zero. A nil error here would make the pivots
+// claim the bucket notifies nothing.
 func TestFetchS3BucketsPageWithNotifications_NotificationAPIError(t *testing.T) {
 	listMock := &mockS3ListBucketsForNotification{
 		output: &s3.ListBucketsOutput{
@@ -550,7 +542,7 @@ func (e *mockAWSError) Error() string {
 }
 
 // ---------------------------------------------------------------------------
-// 5 & 6. buildinfo.ResolveCommit and buildinfo.ResolveDate
+// buildinfo.ResolveCommit and buildinfo.ResolveDate
 // ---------------------------------------------------------------------------
 
 // TestBuildinfo_ResolveCommit_ExplicitValue verifies that an explicit non-empty,
@@ -578,9 +570,6 @@ func TestBuildinfo_ResolveCommit_NoneValue(t *testing.T) {
 // VCS lookup (or returns "" if no VCS info in test context).
 func TestBuildinfo_ResolveCommit_EmptyString(t *testing.T) {
 	got := buildinfo.ResolveCommit("")
-	// Empty input with no VCS info should return "".
-	// The function returns c (the input) as fallback, so empty → "".
-	// This is the intended behavior per the source.
 	_ = got // any value is valid here; main goal is no panic
 }
 

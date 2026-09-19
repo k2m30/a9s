@@ -1,16 +1,10 @@
-// codex8_menu_refreshing_test.go — the terminal main menu's dim "refreshing…"
-// line is a statement about the Wave-1 availability sweep that is in flight
-// right now, so it must disappear when that sweep ends. An operator who sees
-// it for the rest of the session cannot tell a finished start-up from a hung
-// one.
+// The terminal main menu's dim "refreshing…" line is a statement about the
+// Wave-1 availability sweep in flight, so it must disappear when that sweep
+// ends; an operator who sees it for the rest of the session cannot tell a
+// finished start-up from a hung one.
 //
-// Driven end to end through the real Bubble Tea Update/View seam
-// (rootApplyMsg -> tui.Model.Update, rootViewContent -> View), the way
-// tui_post_sweep_seed_test.go drives the same cache-seeded start: an
-// AvailabilityCacheLoaded seed followed by one messages.AvailabilityChecked
-// per type of the sweep's queue, each stamped with the session's current
-// AvailabilityGen (seeded at 1, so Gen: 1 is the live stamp for a fresh
-// session — messages.AvailabilityChecked.AcceptZeroGen() is false).
+// A fresh session's AvailabilityGen is seeded at 1, so Gen: 1 is the live
+// stamp; messages.AvailabilityChecked.AcceptZeroGen() is false.
 package unit
 
 import (
@@ -43,23 +37,13 @@ func probeResultFor(shortName string) messages.AvailabilityChecked {
 	}
 }
 
-// menuRefreshingVisible renders the model and reports whether the menu's
-// refreshing line is on screen.
 func menuRefreshingVisible(m tui.Model) bool {
 	return strings.Contains(stripANSI(rootViewContent(m)), menuRefreshingLine)
 }
 
-// TestTerminalMenu_RefreshingClearsWhenSweepCompletes pins the terminal lane's
-// refreshing signal to the lifetime of the sweep itself. The start is
-// cache-seeded (a populated on-disk per-type cache for the pair, plus the
-// AvailabilityCacheLoaded event that seeds the menu counts from it), which is
-// the state in which the line is supposed to appear: counts on screen that
-// have not yet been confirmed by a live probe.
-//
-// Every type of the sweep's queue then reports its probe result. Once the last
-// one has landed there is nothing left to confirm, so the line must be gone.
-// The mid-sweep assertions bracket it: present at the seeded start, still
-// present with a single type outstanding.
+// A cache-seeded start is the state the line exists for: counts on screen that
+// no live probe has confirmed yet. Once every queued type has reported there
+// is nothing left to confirm.
 func TestTerminalMenu_RefreshingClearsWhenSweepCompletes(t *testing.T) {
 	t.Setenv("A9S_CONFIG_FOLDER", t.TempDir())
 	const profile, region = "refreshing-tui-profile", "us-east-1"

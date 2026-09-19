@@ -3,11 +3,11 @@
 // header_flash_width_test.go — a flash message is cut to the columns the
 // header keeps for it.
 //
-// The header reserves that slot in terminal columns but cut the message to fit
-// by counting runes. A message written in characters the terminal paints two
-// cells wide passed the rune test at twice the width, and the header made room
-// by dropping the profile and region — so the operator lost which account they
-// were looking at in order to read "copied".
+// The header reserves that slot in terminal columns. A message written in
+// characters the terminal paints two cells wide fits a rune count at twice
+// the width, and an overlong flash makes the header drop the profile and
+// region — the operator loses which account they are looking at in order to
+// read "copied".
 package unit
 
 import (

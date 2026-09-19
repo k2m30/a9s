@@ -1,13 +1,7 @@
 package unit
 
-// aws5_one_fact_one_field_test.go — one field per fact, a region that declines
-// instead of guessing, a cause that stays one line, and the backup enricher's
-// uninspected marking.
-//
-// Rows 1-4 of the aws5 spec. Every assertion here is about what a fetcher
-// writes, what a related checker answers when the session lost its region,
-// what CauseOf renders on a one-line surface, and which plans an uncut backup
-// walk leaves marked uninspected.
+// One field per fact, a region that declines instead of guessing, a cause
+// that stays one line, and the backup enricher's uninspected marking.
 
 import (
 	"context"
@@ -38,8 +32,6 @@ import (
 	"github.com/k2m30/a9s/v3/core/session"
 )
 
-// ── Row 1: one field per fact ─────────────────────────────────────────────
-
 // aws5NoSecondKey fails when a resource carries a key that names a fact one of
 // its other keys already carries.
 func aws5NoSecondKey(t *testing.T, r resource.Resource, dropped, kept, wantKept string) {
@@ -52,10 +44,8 @@ func aws5NoSecondKey(t *testing.T, r resource.Resource, dropped, kept, wantKept 
 	}
 }
 
-// TestLogGroup_RetentionIsOneField pins the log group's retention as one
-// field. It was two: a number that was empty for exactly the groups the
-// never-expire warning fires on, so the Retention cell went blank beside the
-// warning that explains it.
+// Retention is one field, so the Retention cell never goes blank beside the
+// never-expire warning that explains it.
 func TestLogGroup_RetentionIsOneField(t *testing.T) {
 	mock := &mockCWLogsDescribeLogGroupsClient{
 		output: &cloudwatchlogs.DescribeLogGroupsOutput{
@@ -90,8 +80,7 @@ func TestLogGroup_RetentionIsOneField(t *testing.T) {
 	}
 }
 
-// TestS3Bucket_NameIsOneField pins the bucket name as one field. Fields["name"]
-// is what the built-in column reads; bucket_name was a second copy of it.
+// Fields["name"] is what the built-in column reads.
 func TestS3Bucket_NameIsOneField(t *testing.T) {
 	listMock := &fakeS3ListBuckets{
 		Output: &s3.ListBucketsOutput{
@@ -115,9 +104,7 @@ func TestS3Bucket_NameIsOneField(t *testing.T) {
 	}
 }
 
-// TestAsgActivity_StatusIsOneField pins the scaling activity's status as one
-// field. status_code is the key both the built-in column and the YAML view
-// read; status was the same string under a second name.
+// status_code is the key both the built-in column and the YAML view read.
 func TestAsgActivity_StatusIsOneField(t *testing.T) {
 	mock := &mockASGDescribeScalingActivitiesClient{
 		output: &autoscaling.DescribeScalingActivitiesOutput{
@@ -140,8 +127,7 @@ func TestAsgActivity_StatusIsOneField(t *testing.T) {
 	aws5NoSecondKey(t, result.Resources[0], "status", "status_code", "Successful")
 }
 
-// TestTargetHealth_StatusIsOneField pins the target's health as one field.
-// health is the type's LifecycleKey and its column key; status was a copy.
+// health is the type's LifecycleKey and its column key.
 func TestTargetHealth_StatusIsOneField(t *testing.T) {
 	mock := &mockELBv2DescribeTargetHealthClient{
 		output: &elbv2.DescribeTargetHealthOutput{
@@ -162,9 +148,7 @@ func TestTargetHealth_StatusIsOneField(t *testing.T) {
 	aws5NoSecondKey(t, result.Resources[0], "status", "health", "healthy")
 }
 
-// TestCTEvent_EventTimeIsOneField pins the event's raw timestamp as one field.
-// event_time is what the YAML view sorts on; event_time_raw was the same
-// string under a second name and nothing read it.
+// event_time is what the YAML view sorts on.
 func TestCTEvent_EventTimeIsOneField(t *testing.T) {
 	when := time.Date(2026, 3, 15, 12, 0, 0, 0, time.UTC)
 	mock := &mockCloudTrailLookupEventsClient{
@@ -208,8 +192,6 @@ func aws5TypeDef(t *testing.T, short string) resource.ResourceTypeDef {
 	t.Fatalf("no registered resource type %q", short)
 	return resource.ResourceTypeDef{}
 }
-
-// ── Row 2: a region that declines instead of guessing ─────────────────────
 
 // aws5RelatedChecker is checkerByTarget for this package: the existing one
 // lives in the external unit_test package, and the fetcher mocks these rows
@@ -274,8 +256,7 @@ func TestS3BackupPivot_NamesTheSessionsPartition(t *testing.T) {
 }
 
 // aws5GlueFake answers GetTags for one ARN and nothing else. A job ARN built
-// from the wrong region simply misses, which is the confident zero this row
-// is about.
+// from the wrong region simply misses, answering a confident zero.
 type aws5GlueFake struct {
 	awsclient.GlueAPI
 	arn  string
@@ -310,8 +291,6 @@ func TestGlueCFNPivot_DeclinesWhenTheSessionHasNoRegion(t *testing.T) {
 	}
 }
 
-// ── Row 3: a cause that stays one line ────────────────────────────────────
-
 // TestCauseOf_UnmodeledResponseKeepsItsFirstClause pins the fallback for a
 // response the SDK could not model. Its words are the service's, not a9s's,
 // and a future one could carry a host and a port; a flash and a menu row are
@@ -339,10 +318,9 @@ func TestCauseOf_UnmodeledResponseKeepsItsFirstClause(t *testing.T) {
 	}
 }
 
-// TestCauseOf_ComposedSentenceKeepsBothClauses is the other half of the same
-// decision: a9s's own composites are unclassed too, and their second clause
-// is the whole diagnostic. Cutting every unclassed error at the first colon
-// left "fetch ec2: partial failure" where the operator needed the reason.
+// a9s's own composites are unclassed too, and their second clause is the
+// whole diagnostic; cut at the first colon, "fetch ec2: partial failure" would
+// lose the reason.
 func TestCauseOf_ComposedSentenceKeepsBothClauses(t *testing.T) {
 	const sentence = "partial failure: one item timed out"
 	if got := awsclient.CauseOf(errors.New(sentence)); got != sentence {
@@ -376,8 +354,6 @@ func (e *aws5APIErr) ErrorCode() string             { return e.code }
 func (e *aws5APIErr) ErrorMessage() string          { return e.msg }
 func (e *aws5APIErr) ErrorFault() smithy.ErrorFault { return smithy.FaultClient }
 
-// ── Row 4: an uncut backup walk leaves no plan uninspected ────────────────
-
 type aws5BackupFake struct {
 	awsclient.BackupAPI
 	jobs []backuptypes.BackupJob
@@ -387,10 +363,9 @@ func (f *aws5BackupFake) ListBackupJobs(_ context.Context, _ *backupsdk.ListBack
 	return &backupsdk.ListBackupJobsOutput{BackupJobs: f.jobs}, nil
 }
 
-// TestEnrichBackupJobs_UncutWalkLeavesNoPlanUninspected is the row-4 check.
 // The walk marks every plan uninspected when it is cut, because a plan's jobs
-// are spread over the pages; the question is whether a plan with no job on a
-// completed walk is marked too, which would render a healthy plan as "?".
+// are spread over the pages. A plan with no job on a completed walk stays
+// unmarked, or a healthy plan would render as "?".
 func TestEnrichBackupJobs_UncutWalkLeavesNoPlanUninspected(t *testing.T) {
 	now := time.Now()
 	rows := []resource.Resource{

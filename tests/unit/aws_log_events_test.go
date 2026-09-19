@@ -15,12 +15,6 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// ---------------------------------------------------------------------------
-// Log Events fetcher tests (child of Log Streams)
-// ---------------------------------------------------------------------------
-
-// TestFetchLogEvents_Basic verifies parsing of multiple log events with correct
-// ID, Name, Fields, and RawStruct.
 func TestFetchLogEvents_Basic(t *testing.T) {
 	mock := &mockCWLogsGetLogEventsClient{
 		output: &cloudwatchlogs.GetLogEventsOutput{
@@ -98,7 +92,6 @@ func TestFetchLogEvents_Basic(t *testing.T) {
 		}
 	})
 
-	// Verify all events have required fields
 	t.Run("required_fields_present", func(t *testing.T) {
 		requiredFields := []string{"timestamp", "message", "ingestion_time"}
 		for i, r := range resources {
@@ -111,8 +104,6 @@ func TestFetchLogEvents_Basic(t *testing.T) {
 	})
 }
 
-// TestFetchLogEvents_Empty verifies that an empty response returns an empty
-// slice with no error.
 func TestFetchLogEvents_Empty(t *testing.T) {
 	mock := &mockCWLogsGetLogEventsClient{
 		output: &cloudwatchlogs.GetLogEventsOutput{
@@ -129,7 +120,6 @@ func TestFetchLogEvents_Empty(t *testing.T) {
 	}
 }
 
-// TestFetchLogEvents_APIError verifies that API errors are propagated correctly.
 func TestFetchLogEvents_APIError(t *testing.T) {
 	mock := &mockCWLogsGetLogEventsClient{
 		err: fmt.Errorf("AWS API error: resource not found"),
@@ -251,8 +241,6 @@ func TestFetchLogEvents_MessageTruncation(t *testing.T) {
 	})
 }
 
-// TestFetchLogEvents_NilFields verifies that events with nil Message and nil
-// Timestamp do not panic and produce reasonable defaults.
 func TestFetchLogEvents_NilFields(t *testing.T) {
 	mock := &mockCWLogsGetLogEventsClient{
 		output: &cloudwatchlogs.GetLogEventsOutput{
@@ -277,7 +265,6 @@ func TestFetchLogEvents_NilFields(t *testing.T) {
 	r := resources[0]
 
 	t.Run("no_panic", func(t *testing.T) {
-		// If we got here, no panic occurred
 	})
 
 	t.Run("ID_not_empty", func(t *testing.T) {
@@ -299,8 +286,6 @@ func TestFetchLogEvents_NilFields(t *testing.T) {
 	})
 }
 
-// TestFetchLogEvents_RawStruct verifies that RawStruct is the original
-// cwlogstypes.OutputLogEvent, preserving all SDK fields.
 func TestFetchLogEvents_RawStruct(t *testing.T) {
 	mock := &mockCWLogsGetLogEventsClient{
 		output: &cloudwatchlogs.GetLogEventsOutput{
@@ -353,8 +338,6 @@ func TestFetchLogEvents_RawStruct(t *testing.T) {
 	})
 }
 
-// TestLogEventColumns verifies that LogEventColumns returns the expected
-// columns with correct keys: timestamp, message, ingestion_time.
 func TestLogEventColumns(t *testing.T) {
 	cols := resource.LogEventColumns()
 
@@ -433,11 +416,9 @@ func TestFetchLogEvents_NewestFirst(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// Clean-Name tests (bug fix): Name must be a clean, human-readable summary —
-// never a raw-JSON prefix or a byte-sliced multibyte string. Fields["message"]
-// must always retain the full RAW message unchanged.
-// ---------------------------------------------------------------------------
+// Name is a clean, human-readable summary — never a raw-JSON prefix or a
+// byte-sliced multibyte string. Fields["message"] always retains the full RAW
+// message unchanged.
 
 // TestFetchLogEvents_Name_JSONMessage_ExtractsInnerMessageField verifies that
 // when the raw log message is a JSON object with a string "message" field,

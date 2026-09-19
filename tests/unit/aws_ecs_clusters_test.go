@@ -13,10 +13,6 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// ---------------------------------------------------------------------------
-// T-ECS01 - Test ECS Clusters two-step fetch (ListClusters + DescribeClusters)
-// ---------------------------------------------------------------------------
-
 func TestFetchECSClusters_ParsesMultipleClusters(t *testing.T) {
 	listMock := &mockECSListClustersClient{
 		output: &ecs.ListClustersOutput{
@@ -63,7 +59,6 @@ func TestFetchECSClusters_ParsesMultipleClusters(t *testing.T) {
 		t.Fatalf("expected 2 resources, got %d", len(resources))
 	}
 
-	// Verify required fields exist
 	requiredFields := []string{"cluster_name", "status", "running_tasks", "pending_tasks", "services_count"}
 	for i, r := range resources {
 		for _, key := range requiredFields {
@@ -73,7 +68,6 @@ func TestFetchECSClusters_ParsesMultipleClusters(t *testing.T) {
 		}
 	}
 
-	// Verify first cluster
 	r0 := resources[0]
 	if r0.ID != "prod-cluster" {
 		t.Errorf("resource[0].ID: expected %q, got %q", "prod-cluster", r0.ID)
@@ -81,8 +75,7 @@ func TestFetchECSClusters_ParsesMultipleClusters(t *testing.T) {
 	if r0.Name != "prod-cluster" {
 		t.Errorf("resource[0].Name: expected %q, got %q", "prod-cluster", r0.Name)
 	}
-	// Post-PR-03c: fetcher no longer writes Status for ACTIVE clusters.
-	// State lives in Fields["status"]; ACTIVE clusters emit no Finding.
+	// ACTIVE clusters emit no Finding; the state lives in Fields["status"].
 	if len(r0.Findings) != 0 {
 		t.Errorf("resource[0].Findings: got %d, want 0 for ACTIVE cluster", len(r0.Findings))
 	}
@@ -102,7 +95,6 @@ func TestFetchECSClusters_ParsesMultipleClusters(t *testing.T) {
 		t.Errorf("resource[0].Fields[\"services_count\"]: expected %q, got %q", "5", r0.Fields["services_count"])
 	}
 
-	// Verify second cluster
 	r1 := resources[1]
 	if r1.ID != "staging-cluster" {
 		t.Errorf("resource[1].ID: expected %q, got %q", "staging-cluster", r1.ID)
@@ -155,17 +147,10 @@ func TestFetchECSClusters_EmptyResponse(t *testing.T) {
 	}
 }
 
-// TestFetchECSClusters_EmptyPageSkipsDescribeClustersAndReportsTruncated pins
-// two behaviors of the truncation-honesty fix in one page:
-//  1. Zero ClusterArns must NOT call DescribeClusters — AWS treats an
-//     empty/omitted Clusters list on DescribeClusters as "describe the
-//     default cluster", so calling it here would invent a resource that was
-//     never in the list. describeMock is configured to error if invoked at
-//     all, so a regression that resurrects the unconditional call fails this
-//     test via that error, not via a silently wrong answer.
-//  2. IsTruncated must still be true when ListClusters reports a NextToken,
-//     even though this page found no ARNs to describe — an empty page is
-//     not a proven zero.
+// AWS treats an empty Clusters list on DescribeClusters as "describe the
+// default cluster", so a page with no ARNs skips the call; describeMock errors
+// if invoked. A NextToken still marks the page truncated: an empty page is not
+// a proven zero.
 func TestFetchECSClusters_EmptyPageSkipsDescribeClustersAndReportsTruncated(t *testing.T) {
 	listMock := &mockECSListClustersClient{
 		output: &ecs.ListClustersOutput{

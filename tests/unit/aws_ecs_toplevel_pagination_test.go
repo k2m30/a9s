@@ -15,13 +15,6 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// ===========================================================================
-// 1. ECS Clusters — ListClusters pagination (NextToken)
-//    Current code calls ListClusters once without following NextToken.
-// ===========================================================================
-
-// mockPaginatedECSListClustersClient returns multiple pages of ListClusters
-// results, controlled by NextToken.
 type mockPaginatedECSListClustersClient struct {
 	outputs []*ecs.ListClustersOutput
 	inputs  []*ecs.ListClustersInput
@@ -42,8 +35,6 @@ func (m *mockPaginatedECSListClustersClient) ListClusters(
 	return out, nil
 }
 
-// mockPaginatedECSDescribeClustersClient returns cluster details for
-// whichever ARNs are requested.
 type mockPaginatedECSDescribeClustersClient struct {
 	clustersByARN map[string]ecstypes.Cluster
 	callCount     int
@@ -145,14 +136,6 @@ func TestFetchECSClusters_Pagination(t *testing.T) {
 	})
 }
 
-// ===========================================================================
-// 2. ECS Services — ListClusters pagination affects service discovery
-//    Current code calls ListClusters once; services in clusters from page 2
-//    are never discovered.
-// ===========================================================================
-
-// mockPaginatedECSSvcListClustersClient returns paginated ListClusters results
-// for the ECS Services fetcher.
 type mockPaginatedECSSvcListClustersClient struct {
 	outputs []*ecs.ListClustersOutput
 	inputs  []*ecs.ListClustersInput
@@ -173,7 +156,6 @@ func (m *mockPaginatedECSSvcListClustersClient) ListClusters(
 	return out, nil
 }
 
-// mockPaginatedECSSvcListServicesClient returns services per cluster.
 type mockPaginatedECSSvcListServicesClient struct {
 	servicesByCluster map[string]*ecs.ListServicesOutput
 }
@@ -189,8 +171,6 @@ func (m *mockPaginatedECSSvcListServicesClient) ListServices(
 	return &ecs.ListServicesOutput{}, nil
 }
 
-// mockPaginatedECSSvcDescribeServicesClient returns service details for
-// any requested service ARNs.
 type mockPaginatedECSSvcDescribeServicesClient struct {
 	servicesByARN map[string]ecstypes.Service
 	callCount     int
@@ -319,14 +299,6 @@ func TestFetchECSServices_PaginatedListClusters(t *testing.T) {
 	})
 }
 
-// ===========================================================================
-// 3. ECS Tasks — ListClusters pagination affects task discovery
-//    Current code calls ListClusters once; tasks in clusters from page 2
-//    are never discovered.
-// ===========================================================================
-
-// mockPaginatedECSTaskListClustersClient returns paginated ListClusters results
-// for the ECS Tasks fetcher.
 type mockPaginatedECSTaskListClustersClient struct {
 	outputs []*ecs.ListClustersOutput
 	inputs  []*ecs.ListClustersInput
@@ -347,7 +319,6 @@ func (m *mockPaginatedECSTaskListClustersClient) ListClusters(
 	return out, nil
 }
 
-// mockPaginatedECSTaskListTasksClient returns tasks per cluster.
 type mockPaginatedECSTaskListTasksClient struct {
 	tasksByCluster map[string]*ecs.ListTasksOutput
 }
@@ -363,8 +334,6 @@ func (m *mockPaginatedECSTaskListTasksClient) ListTasks(
 	return &ecs.ListTasksOutput{}, nil
 }
 
-// mockPaginatedECSTaskDescribeTasksClient returns task details for
-// any requested task ARNs.
 type mockPaginatedECSTaskDescribeTasksClient struct {
 	tasksByARN map[string]ecstypes.Task
 	callCount  int
@@ -385,13 +354,10 @@ func (m *mockPaginatedECSTaskDescribeTasksClient) DescribeTasks(
 	return &ecs.DescribeTasksOutput{Tasks: tasks}, nil
 }
 
-// ecsTaskFullPaginatedFake composes the three paginated ECS task mocks above
-// into one awsclient.ECSAPI value — the registered "ecs-task" paginated
-// fetcher reads ListClusters/ListTasks/DescribeTasks off a single
-// *ServiceClients.ECS field. DescribeTaskDefinition returns a ClientException
-// ("does not exist"), matching the pre-refactor 3-arg FetchECSTasksPage
-// contract (which never queried task definitions), so
-// Fields["task_def_join_error"] stays unset.
+// The registered ecs-task fetcher reads ListClusters/ListTasks/DescribeTasks
+// off a single ServiceClients.ECS field. DescribeTaskDefinition returns a
+// ClientException ("does not exist"), so Fields["task_def_join_error"] stays
+// unset.
 type ecsTaskFullPaginatedFake struct {
 	*mockPaginatedECSTaskListClustersClient
 	*mockPaginatedECSTaskListTasksClient
@@ -520,12 +486,6 @@ func TestFetchECSTasks_PaginatedListClusters(t *testing.T) {
 	})
 }
 
-// ===========================================================================
-// 4. Kinesis — ListStreams pagination (HasMoreStreams + NextToken)
-//    Current code calls ListStreams once without following pagination.
-// ===========================================================================
-
-// mockPaginatedKinesisClient returns multiple pages of ListStreams results.
 type mockPaginatedKinesisClient struct {
 	outputs []*kinesis.ListStreamsOutput
 	inputs  []*kinesis.ListStreamsInput

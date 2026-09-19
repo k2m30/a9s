@@ -16,7 +16,6 @@ import (
 	"github.com/k2m30/a9s/v3/internal/tui"
 )
 
-// testBinary is the path to the compiled a9s binary for CLI tests.
 var testBinary string
 
 func TestMain(m *testing.M) {
@@ -56,7 +55,6 @@ func TestMain(m *testing.M) {
 }
 
 func findProjectRoot() string {
-	// Walk up from this file's location to find go.mod
 	dir, _ := os.Getwd()
 	for {
 		if _, err := os.Stat(filepath.Join(dir, "go.mod")); err == nil {
@@ -71,24 +69,19 @@ func findProjectRoot() string {
 	return "."
 }
 
-// QA-011: Launch with invalid/corrupt AWS config file
 func TestQA_011_CorruptConfigFile(t *testing.T) {
-	// Create a temporary corrupt config file
 	tmpFile, err := os.CreateTemp("", "corrupt-aws-config-*")
 	if err != nil {
 		t.Fatalf("failed to create temp file: %v", err)
 	}
 	defer os.Remove(tmpFile.Name())
 
-	// Write corrupt content
 	_, err = tmpFile.WriteString("this is not [valid ini\n\x00\x01garbage\n[broken")
 	if err != nil {
 		t.Fatalf("failed to write corrupt config: %v", err)
 	}
 	tmpFile.Close()
 
-	// Set AWS_CONFIG_FILE to the corrupt file and run the binary with --version
-	// to verify the binary doesn't crash on corrupt config
 	cmd := exec.CommandContext(t.Context(), testBinary, "--version")
 	cmd.Env = append(os.Environ(),
 		"AWS_CONFIG_FILE="+tmpFile.Name(),
@@ -103,7 +96,6 @@ func TestQA_011_CorruptConfigFile(t *testing.T) {
 	}
 }
 
-// QA-012: Launch with --version flag
 func TestQA_012_VersionFlag(t *testing.T) {
 	cmd := exec.CommandContext(t.Context(), testBinary, "--version")
 	out, err := cmd.CombinedOutput()
@@ -114,13 +106,11 @@ func TestQA_012_VersionFlag(t *testing.T) {
 	if !strings.Contains(output, "a9s") {
 		t.Errorf("expected --version output to contain 'a9s', got %q", output)
 	}
-	// Should contain a version number pattern (X.Y.Z)
 	if !strings.Contains(output, ".") {
 		t.Errorf("expected --version output to contain a version number, got %q", output)
 	}
 }
 
-// QA-012b: Launch with -v shorthand for --version
 func TestQA_012b_ShortVersionFlag(t *testing.T) {
 	cmd := exec.CommandContext(t.Context(), testBinary, "-v")
 	out, err := cmd.CombinedOutput()
@@ -133,7 +123,6 @@ func TestQA_012b_ShortVersionFlag(t *testing.T) {
 	}
 }
 
-// QA-013: Launch with --help flag
 func TestQA_013_HelpFlag(t *testing.T) {
 	cmd := exec.CommandContext(t.Context(), testBinary, "--help")
 	out, err := cmd.CombinedOutput()
@@ -152,7 +141,6 @@ func TestQA_013_HelpFlag(t *testing.T) {
 	}
 }
 
-// QA-013b: Launch with -h shorthand for --help
 func TestQA_013b_ShortHelpFlag(t *testing.T) {
 	cmd := exec.CommandContext(t.Context(), testBinary, "-h")
 	out, err := cmd.CombinedOutput()
@@ -165,15 +153,12 @@ func TestQA_013b_ShortHelpFlag(t *testing.T) {
 	}
 }
 
-// QA-017: Launch with -p shorthand for --profile
-// We can't fully test TUI interaction, but we verify the binary starts
-// and doesn't crash immediately when given a -p flag.
 func TestQA_017_ShorthandProfileFlag(t *testing.T) {
 	cmd := exec.CommandContext(t.Context(), testBinary, "-p", "nonexistent-test-profile")
 	cmd.Env = append(os.Environ(), "TERM=dumb")
 
-	// Use a short timeout -- TUI will block waiting for terminal input,
-	// but we just want to verify it doesn't crash on startup.
+	// The TUI blocks on terminal input, so a process still alive after the
+	// timeout started without crashing.
 	done := make(chan error, 1)
 	go func() {
 		done <- cmd.Run()
@@ -181,22 +166,15 @@ func TestQA_017_ShorthandProfileFlag(t *testing.T) {
 
 	select {
 	case err := <-done:
-		// If it exits immediately, it should be with an error about the profile
-		// or a normal exit (e.g. if no terminal is detected).
-		// Either way, it should not panic.
 		if err != nil {
-			// An exit error is acceptable -- the TUI can't run without a terminal.
 			t.Logf("binary exited (expected without a terminal): %v", err)
 		}
 	case <-time.After(3 * time.Second):
-		// If it's still running after 3s, that means the TUI started successfully
-		// with the -p flag. Kill it and consider the test passed.
 		cmd.Process.Kill()
 		t.Log("-p flag accepted; TUI started (killed after timeout)")
 	}
 }
 
-// QA-018: Launch with -r shorthand for --region
 func TestQA_018_ShorthandRegionFlag(t *testing.T) {
 	cmd := exec.CommandContext(t.Context(), testBinary, "-r", "eu-central-1")
 	cmd.Env = append(os.Environ(), "TERM=dumb")

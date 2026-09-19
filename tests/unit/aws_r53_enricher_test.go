@@ -1,15 +1,5 @@
 package unit
 
-// aws_r53_enricher_test.go — Behavioral tests for EnrichRoute53Zone.
-//
-// Contract assertions:
-//   - GetHostedZone is called once per r53 resource (keyed by zone ID).
-//   - Public zones (Config.PrivateZone=false) → 0 findings (no orphan risk).
-//   - Private zone with associated VPCs (VPCs non-empty) → 0 findings.
-//   - Private zone with no associated VPCs (VPCs empty) → 1 finding sev "~" for that zone.
-//   - clients.Route53 == nil → (EnricherResult{Findings: non-nil empty}, nil).
-//   - API error → 0 findings, Truncated=true, no error returned.
-
 import (
 	"context"
 	"errors"
@@ -25,13 +15,8 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// r53GetHostedZoneFake implements Route53API for enrichment testing.
-// It embeds the interface and overrides only GetHostedZone so the fake
-// only needs to serve the single method used by EnrichRoute53Zone.
-// The results map is keyed by hosted zone ID.
 type r53GetHostedZoneFake struct {
 	awsclient.Route53API
-	// results maps zone ID → GetHostedZoneOutput.
 	results map[string]*route53.GetHostedZoneOutput
 	// errByID maps zone ID → error; overrides results when set.
 	errByID map[string]error
@@ -88,10 +73,8 @@ func (f *r53GetHostedZoneFake) GetHostedZone(
 	return out, nil
 }
 
-// Compile-time check: r53GetHostedZoneFake satisfies Route53API.
 var _ awsclient.Route53API = (*r53GetHostedZoneFake)(nil)
 
-// r53ZoneResources returns a slice of r53 Resource stubs with the given zone IDs.
 func r53ZoneResources(ids ...string) []resource.Resource {
 	res := make([]resource.Resource, 0, len(ids))
 	for _, id := range ids {
@@ -110,8 +93,6 @@ func r53ZoneResources(ids ...string) []resource.Resource {
 	return res
 }
 
-// r53ZoneOutput builds a GetHostedZoneOutput for the given zone ID, with
-// PrivateZone flag and associated VPCs.
 func r53ZoneOutput(zoneID string, private bool, vpcIDs []string) *route53.GetHostedZoneOutput {
 	vpcs := make([]r53types.VPC, 0, len(vpcIDs))
 	for _, vid := range vpcIDs {
@@ -136,8 +117,6 @@ const (
 	r53ZoneID2 = "/hostedzone/Z2AAABBBCCC222"
 )
 
-// TestEnrichRoute53Zone_PublicZonesProduceNoFindings verifies that when both zones
-// are public (Config.PrivateZone=false), no findings are produced.
 func TestEnrichRoute53Zone_PublicZonesProduceNoFindings(t *testing.T) {
 	fake := &r53GetHostedZoneFake{
 		results: map[string]*route53.GetHostedZoneOutput{
@@ -160,8 +139,6 @@ func TestEnrichRoute53Zone_PublicZonesProduceNoFindings(t *testing.T) {
 	}
 }
 
-// TestEnrichRoute53Zone_PrivateZoneWithVPCsProducesNoFindings verifies that a private
-// zone with at least one associated VPC is healthy (no findings).
 func TestEnrichRoute53Zone_PrivateZoneWithVPCsProducesNoFindings(t *testing.T) {
 	fake := &r53GetHostedZoneFake{
 		results: map[string]*route53.GetHostedZoneOutput{
@@ -181,9 +158,6 @@ func TestEnrichRoute53Zone_PrivateZoneWithVPCsProducesNoFindings(t *testing.T) {
 	}
 }
 
-// TestEnrichRoute53Zone_PrivateOrphanZoneProducesFindingSevTilde verifies that a
-// private zone with no associated VPCs produces a finding with severity "~" for
-// that zone only. The second zone is public and must not appear in Findings.
 func TestEnrichRoute53Zone_PrivateOrphanZoneProducesFindingSevTilde(t *testing.T) {
 	fake := &r53GetHostedZoneFake{
 		results: map[string]*route53.GetHostedZoneOutput{
@@ -211,8 +185,6 @@ func TestEnrichRoute53Zone_PrivateOrphanZoneProducesFindingSevTilde(t *testing.T
 	}
 }
 
-// TestEnrichRoute53Zone_NilClientReturnsEmptyFindingsNoError verifies that when
-// clients.Route53 is nil the enricher returns a non-nil empty Findings map and no error.
 func TestEnrichRoute53Zone_NilClientReturnsEmptyFindingsNoError(t *testing.T) {
 	clients := &awsclient.ServiceClients{Route53: nil}
 
@@ -228,13 +200,9 @@ func TestEnrichRoute53Zone_NilClientReturnsEmptyFindingsNoError(t *testing.T) {
 	}
 }
 
-// TestEnrichRoute53Zone_APIErrorMarksRowTruncatedIDNotBadge verifies that when the
-// API call for zone-1 returns an error, the enricher marks each failing
-// zone's row via TruncatedIDs, produces 0 findings for the failed zones, and
-// returns a composite error containing the enricher prefix and the failing
-// zone ID. r53 only ever emits "~" (informational) findings, so the
-// aggregate Truncated flag must stay false — a coverage gap never
-// lower-bounds the issue badge.
+// r53 only emits "~" findings, so a failed zone read marks its row in
+// TruncatedIDs and leaves the aggregate Truncated flag false: a coverage gap
+// never lower-bounds the issue badge.
 func TestEnrichRoute53Zone_APIErrorMarksRowTruncatedIDNotBadge(t *testing.T) {
 	apiErr := errors.New("route53: GetHostedZone throttled")
 	fake := &r53GetHostedZoneFake{

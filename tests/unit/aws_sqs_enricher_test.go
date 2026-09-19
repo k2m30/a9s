@@ -1,15 +1,5 @@
 package unit
 
-// aws_sqs_enricher_test.go — Behavioral tests for EnrichSQSAttributes.
-//
-// Contract assertions:
-//   - GetQueueAttributes is called once per SQS resource (keyed by queue URL from resource fields).
-//   - Both RedrivePolicy and KmsMasterKeyId present → 0 findings.
-//   - Missing RedrivePolicy → finding for that queue, severity "~".
-//   - Missing KmsMasterKeyId → finding for that queue, severity "~".
-//   - clients.SQS == nil → (EnricherResult{Findings: non-nil empty}, nil).
-//   - API error for a resource → 0 findings for that resource, Truncated=true, no error returned.
-
 import (
 	"context"
 	"errors"
@@ -23,15 +13,9 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// sqsGetQueueAttributesFake implements SQSAPI for enrichment testing.
-// It embeds the aggregate interface and overrides only GetQueueAttributes.
-// The results map is keyed by QueueUrl (from the input) so the fake
-// can serve different responses per resource.
 type sqsGetQueueAttributesFake struct {
 	awsclient.SQSAPI
-	// results maps QueueUrl → attributes. If absent the fake returns errByURL.
-	results map[string]map[string]string
-	// errByURL maps QueueUrl → error; overrides results when set.
+	results  map[string]map[string]string
 	errByURL map[string]error
 }
 
@@ -56,11 +40,8 @@ func (f *sqsGetQueueAttributesFake) GetQueueAttributes(
 	return &sqs.GetQueueAttributesOutput{Attributes: attrs}, nil
 }
 
-// Compile-time check: sqsGetQueueAttributesFake satisfies SQSAPI.
 var _ awsclient.SQSAPI = (*sqsGetQueueAttributesFake)(nil)
 
-// sqsResources returns a slice of SQS Resource stubs with the given names.
-// The queue_url field is set to a realistic URL derived from the name.
 func sqsResources(names ...string) []resource.Resource {
 	res := make([]resource.Resource, 0, len(names))
 	for _, name := range names {
@@ -78,13 +59,10 @@ func sqsResources(names ...string) []resource.Resource {
 	return res
 }
 
-// sqsURLFor returns the queue URL used by sqsResources for the given name.
 func sqsURLFor(name string) string {
 	return "https://sqs.us-east-1.amazonaws.com/123456789012/" + name
 }
 
-// TestEnrichSQSAttributes_BothConfiguredProducesNoFindings verifies that when
-// both queues have a RedrivePolicy and KmsMasterKeyId no findings are produced.
 func TestEnrichSQSAttributes_BothConfiguredProducesNoFindings(t *testing.T) {
 	fake := &sqsGetQueueAttributesFake{
 		results: map[string]map[string]string{
@@ -113,14 +91,10 @@ func TestEnrichSQSAttributes_BothConfiguredProducesNoFindings(t *testing.T) {
 	}
 }
 
-// TestEnrichSQSAttributes_MissingRedrivePolicyProducesFindingSevTilde verifies
-// that when queue-1 has no RedrivePolicy a finding with severity "~" is produced
-// for queue-1 and queue-2 (which has both attributes) produces no finding.
 func TestEnrichSQSAttributes_MissingRedrivePolicyProducesFindingSevTilde(t *testing.T) {
 	fake := &sqsGetQueueAttributesFake{
 		results: map[string]map[string]string{
 			sqsURLFor("my-queue-1"): {
-				// No RedrivePolicy key
 				"KmsMasterKeyId": "alias/my-key",
 			},
 			sqsURLFor("my-queue-2"): {
@@ -149,15 +123,11 @@ func TestEnrichSQSAttributes_MissingRedrivePolicyProducesFindingSevTilde(t *test
 	}
 }
 
-// TestEnrichSQSAttributes_MissingEncryptionProducesFindingSevTilde verifies
-// that when queue-1 has no KmsMasterKeyId a finding with severity "~" is
-// produced for queue-1 and queue-2 (which has both attributes) produces no finding.
 func TestEnrichSQSAttributes_MissingEncryptionProducesFindingSevTilde(t *testing.T) {
 	fake := &sqsGetQueueAttributesFake{
 		results: map[string]map[string]string{
 			sqsURLFor("my-queue-1"): {
 				"RedrivePolicy": `{"deadLetterTargetArn":"arn:aws:sqs:us-east-1:123456789012:my-queue-1-dlq","maxReceiveCount":"5"}`,
-				// No KmsMasterKeyId key
 			},
 			sqsURLFor("my-queue-2"): {
 				"RedrivePolicy":  `{"deadLetterTargetArn":"arn:aws:sqs:us-east-1:123456789012:my-queue-2-dlq","maxReceiveCount":"3"}`,
@@ -185,8 +155,6 @@ func TestEnrichSQSAttributes_MissingEncryptionProducesFindingSevTilde(t *testing
 	}
 }
 
-// TestEnrichSQSAttributes_NilClientReturnsEmptyFindingsNoError verifies that
-// when clients.SQS is nil the enricher returns a non-nil empty Findings map and no error.
 func TestEnrichSQSAttributes_NilClientReturnsEmptyFindingsNoError(t *testing.T) {
 	clients := &awsclient.ServiceClients{SQS: nil}
 
@@ -202,13 +170,8 @@ func TestEnrichSQSAttributes_NilClientReturnsEmptyFindingsNoError(t *testing.T) 
 	}
 }
 
-// TestEnrichSQSAttributes_APIErrorMarksRowTruncatedIDNotBadge verifies that when
-// the GetQueueAttributes call for queue-1 returns an error, the enricher
-// marks that queue's row via TruncatedIDs, produces 0 findings for the
-// failed queue, and returns a composite error containing the enricher
-// prefix and the failing queue ID. sqs only ever emits "~" (informational)
-// findings, so the aggregate Truncated flag must stay false — a coverage
-// gap never lower-bounds the issue badge.
+// sqs only emits "~" findings, so a coverage gap never lower-bounds the
+// issue badge: Truncated stays false.
 func TestEnrichSQSAttributes_APIErrorMarksRowTruncatedIDNotBadge(t *testing.T) {
 	apiErr := errors.New("sqs: GetQueueAttributes throttled")
 	fake := &sqsGetQueueAttributesFake{

@@ -11,8 +11,6 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// vpcCheckerByTarget retrieves the RelatedChecker for the given targetType
-// and fails the test if the checker is nil or not found.
 func vpcCheckerByTarget(t *testing.T, target string) resource.RelatedChecker {
 	t.Helper()
 	for _, def := range resource.GetRelated("vpc") {
@@ -29,7 +27,6 @@ func vpcCheckerByTarget(t *testing.T, target string) resource.RelatedChecker {
 
 const vpcTestID = "vpc-abc123"
 
-// vpcSrcResource returns a canonical test VPC resource.
 func vpcSrcResource() resource.Resource {
 	return resource.Resource{
 		ID:   vpcTestID,
@@ -43,10 +40,6 @@ func vpcSrcResource() resource.Resource {
 	}
 }
 
-// --- Subnet checker (Pattern C — reverse cache lookup by vpc_id field) ---
-
-// TestRelated_VPC_Subnet_Match verifies that a subnet whose vpc_id matches the
-// source VPC ID is counted.
 func TestRelated_VPC_Subnet_Match(t *testing.T) {
 	res := vpcSrcResource()
 	cache := resource.ResourceCache{
@@ -66,10 +59,6 @@ func TestRelated_VPC_Subnet_Match(t *testing.T) {
 	}
 }
 
-// --- Security Group checker ---
-
-// TestRelated_VPC_SG_Match verifies that a security group whose vpc_id matches
-// the source VPC ID is counted.
 func TestRelated_VPC_SG_Match(t *testing.T) {
 	res := vpcSrcResource()
 	cache := resource.ResourceCache{
@@ -89,10 +78,6 @@ func TestRelated_VPC_SG_Match(t *testing.T) {
 	}
 }
 
-// --- EC2 checker ---
-
-// TestRelated_VPC_EC2_Match verifies that an EC2 instance whose vpc_id matches
-// the source VPC ID is counted.
 func TestRelated_VPC_EC2_Match(t *testing.T) {
 	res := vpcSrcResource()
 	cache := resource.ResourceCache{
@@ -112,10 +97,6 @@ func TestRelated_VPC_EC2_Match(t *testing.T) {
 	}
 }
 
-// --- ELB checker ---
-
-// TestRelated_VPC_ELB_Match verifies that a load balancer whose vpc_id matches
-// the source VPC ID is counted.
 func TestRelated_VPC_ELB_Match(t *testing.T) {
 	res := vpcSrcResource()
 	cache := resource.ResourceCache{
@@ -135,10 +116,6 @@ func TestRelated_VPC_ELB_Match(t *testing.T) {
 	}
 }
 
-// --- NAT checker ---
-
-// TestRelated_VPC_NAT_Match verifies that a NAT gateway whose vpc_id matches
-// the source VPC ID is counted.
 func TestRelated_VPC_NAT_Match(t *testing.T) {
 	res := vpcSrcResource()
 	cache := resource.ResourceCache{
@@ -158,10 +135,6 @@ func TestRelated_VPC_NAT_Match(t *testing.T) {
 	}
 }
 
-// --- IGW checker ---
-
-// TestRelated_VPC_IGW_Match verifies that an internet gateway whose vpc_id
-// matches the source VPC ID is counted.
 func TestRelated_VPC_IGW_Match(t *testing.T) {
 	res := vpcSrcResource()
 	cache := resource.ResourceCache{
@@ -181,10 +154,6 @@ func TestRelated_VPC_IGW_Match(t *testing.T) {
 	}
 }
 
-// --- Route Table checker ---
-
-// TestRelated_VPC_RTB_Match verifies that a route table whose vpc_id matches
-// the source VPC ID is counted.
 func TestRelated_VPC_RTB_Match(t *testing.T) {
 	res := vpcSrcResource()
 	cache := resource.ResourceCache{
@@ -204,10 +173,6 @@ func TestRelated_VPC_RTB_Match(t *testing.T) {
 	}
 }
 
-// --- VPC Endpoint checker ---
-
-// TestRelated_VPC_VPCE_Match verifies that a VPC endpoint whose vpc_id matches
-// the source VPC ID is counted.
 func TestRelated_VPC_VPCE_Match(t *testing.T) {
 	res := vpcSrcResource()
 	cache := resource.ResourceCache{
@@ -227,10 +192,6 @@ func TestRelated_VPC_VPCE_Match(t *testing.T) {
 	}
 }
 
-// --- NoMatch: all caches contain resources in a different VPC ---
-
-// TestRelated_VPC_NoMatch verifies that resources belonging to a different VPC
-// produce Count=0 across all real checkers.
 func TestRelated_VPC_NoMatch(t *testing.T) {
 	const otherVPC = "vpc-zzzzzz"
 	res := vpcSrcResource()
@@ -262,10 +223,6 @@ func TestRelated_VPC_NoMatch(t *testing.T) {
 	}
 }
 
-// --- NilClients: empty cache → Count=-1 ---
-
-// TestRelated_VPC_NilClients verifies that all real checkers return Count=-1
-// when the cache is empty and no clients are provided.
 func TestRelated_VPC_NilClients(t *testing.T) {
 	res := vpcSrcResource()
 	emptyCache := resource.ResourceCache{}
@@ -280,10 +237,6 @@ func TestRelated_VPC_NilClients(t *testing.T) {
 	}
 }
 
-// --- CFN checker tests (tag-based, no cache needed) ---
-
-// TestRelated_VPC_CFN_HasTag verifies that a VPC with the aws:cloudformation:stack-name
-// tag produces Count=1 with the stack name in ResourceIDs.
 func TestRelated_VPC_CFN_HasTag(t *testing.T) {
 	res := resource.Resource{
 		ID:     vpcTestID,
@@ -306,8 +259,6 @@ func TestRelated_VPC_CFN_HasTag(t *testing.T) {
 	}
 }
 
-// TestRelated_VPC_CFN_NoTag verifies that a VPC without the aws:cloudformation:stack-name
-// tag produces Count=0.
 func TestRelated_VPC_CFN_NoTag(t *testing.T) {
 	res := resource.Resource{
 		ID:        vpcTestID,

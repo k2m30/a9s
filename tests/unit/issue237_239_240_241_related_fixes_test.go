@@ -1,25 +1,5 @@
 package unit
 
-// issue237_239_240_241_related_fixes_test.go — regression tests for related-view
-// infrastructure fixes from code review of branch 006-related-views-infra.
-//
-// Business rules verified:
-//
-//   #237 — Cold-miss write-back must preserve NextToken so pagination past the
-//           probe's first page works when the user opens the resource from the main menu.
-//
-//   #239 — RelatedCheckResultMsg from a previous check batch (wrong generation)
-//           must be silently discarded; only results from the current generation
-//           should update the right column. Prevents stale counts after Ctrl+R,
-//           profile switch, and region switch.
-//
-//   #240 — Field-only related checkers (NeedsTargetCache=false) must NOT trigger
-//           a cold-cache prefetch of the target type. Only checkers that actually
-//           read the target cache should pay the API cost of a cold fetch.
-//
-//   #241 — At most maxConcurrentProbes (4) related checkers should run concurrently
-//           for a single detail view, matching the architecture spec.
-
 import (
 	"context"
 	"fmt"
@@ -35,19 +15,9 @@ import (
 	"github.com/k2m30/a9s/v3/core/runtime/messages"
 )
 
-// ---------------------------------------------------------------------------
-// #237 — NextToken preserved in cold-miss write-back
-// ---------------------------------------------------------------------------
-
-// TestIssue237_ColdMissWriteBack_PreservesNextToken verifies that when a related
-// checker cold-fetches a target type, the pagination token from the AWS response is
-// preserved end-to-end so that users can advance past the probe's first page.
-//
-// Given: a target type whose paginated fetcher returns a first page with NextToken
-// When:  a related checker cold-misses and triggers a prefetch (NeedsTargetCache=true)
-// Then:  the RelatedCheckResultMsg.CachedPages entry carries the full Pagination
-//
-//	(including NextToken), not a synthetic PaginationMeta with an empty token
+// A cold-miss prefetch carries the full Pagination, NextToken included, in
+// RelatedCheckResult.CachedPages, so the operator can page past the probe's
+// first page.
 
 // distinctiveIDs returns n distinct, non-empty IDs — used to construct a
 // resource.KnownRelated result whose Count is a specific test-chosen marker
@@ -68,7 +38,6 @@ func TestIssue237_ColdMissWriteBack_PreservesNextToken(t *testing.T) {
 		wantToken  = "next-page-token-abc123"
 	)
 
-	// Register a paginated fetcher that returns a truncated first page with a token.
 	resource.SetPaginatedForTest(targetType, func(_ context.Context, _ any, _ string) (resource.FetchResult, error) {
 		return resource.FetchResult{
 			Resources: []resource.Resource{{ID: "r1"}},
@@ -79,8 +48,6 @@ func TestIssue237_ColdMissWriteBack_PreservesNextToken(t *testing.T) {
 		}, nil
 	})
 
-	// Register a related def that reads the target from cache (NeedsTargetCache=true),
-	// ensuring the cold-miss prefetch path is exercised.
 	resource.SetRelatedForTest(srcType, []resource.RelatedDef{
 		{
 			TargetType:       targetType,
@@ -110,7 +77,6 @@ func TestIssue237_ColdMissWriteBack_PreservesNextToken(t *testing.T) {
 
 	srcRes := resource.Resource{ID: "src-237-instance"}
 
-	// Dispatch: returns a batch of checker cmds.
 	_, batchCmd := rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetDetail,
 		ResourceType: srcType,
@@ -120,8 +86,8 @@ func TestIssue237_ColdMissWriteBack_PreservesNextToken(t *testing.T) {
 		t.Fatal("handleRelatedCheckStarted returned nil — expected checker batch")
 	}
 
-	// Execute the batch. With a single def, Bubble Tea may return the result
-	// directly rather than wrapping it in tea.BatchMsg — handle both cases.
+	// With a single def, Bubble Tea may return the result directly rather than
+	// wrapping it in tea.BatchMsg.
 	rawMsg := batchCmd()
 	var resultMsg messages.RelatedCheckResult
 	found := false
@@ -144,7 +110,6 @@ func TestIssue237_ColdMissWriteBack_PreservesNextToken(t *testing.T) {
 		t.Fatalf("no RelatedCheckResultMsg received; got %T", rawMsg)
 	}
 
-	// The checker cold-missed, so CachedPages must carry the full Pagination.
 	if resultMsg.CachedPages == nil {
 		t.Fatal("CachedPages is nil — cold-miss prefetch did not fire (check NeedsTargetCache=true)")
 	}
@@ -163,43 +128,22 @@ func TestIssue237_ColdMissWriteBack_PreservesNextToken(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// #239 — Stale related-check results discarded after Ctrl+R
-// ---------------------------------------------------------------------------
-
-// TestIssue239_StaleGenerationResult_IsDiscarded verifies that a RelatedCheckResultMsg
-// carrying a non-zero generation that doesn't match the current relatedGen is silently
-// dropped and does not update the right column.
-//
-// Business rule: the right column must not show counts from a previous check batch
-// after the user has triggered a refresh (Ctrl+R).
-//
-// Mechanism: setupEC2DetailWithResults opens the detail once, beginning one
-// DetailOperation. Ctrl+R begins a fresh one (BeginDetailOperation bumps
-// session.DetailOpGen). Late results from the PRIOR operation must be
-// discarded — their OperationID no longer matches the session's active one.
-//
-// Observable proxy: if a stale-operation result is applied after Ctrl+R,
-// the right column shows the stale count; if discarded, no count appears.
+// A late result from the detail operation before Ctrl+R is dropped: Ctrl+R
+// begins a fresh DetailOperation (BeginDetailOperation bumps
+// session.DetailOpGen), so the right column never shows counts from the
+// previous check batch.
 func TestIssue239_StaleGenerationResult_IsDiscarded(t *testing.T) {
 	const viewedResourceID = "i-0a1b2c3d4e5f60001"
 
-	// Set up EC2 detail view using demo fixtures so the right column is rendered.
 	m := setupEC2DetailWithResults(t)
 
-	// Capture the operation ID BEFORE Ctrl+R — this is the id a late result
-	// from the initial batch would carry, guaranteed stale once Ctrl+R begins
-	// a new operation.
 	staleOp := m.Core().ActiveDetailOp()
 
-	// Verify precondition: the view shows related counts after setup.
 	viewBefore := stripANSI(rootViewContent(m))
 	if !strings.Contains(viewBefore, "(7)") {
 		t.Fatalf("precondition: expected '(7)' in view before test; got:\n%s", viewBefore)
 	}
 
-	// Trigger Ctrl+R: begins a fresh DetailOperation and clears the
-	// relatedCache entry so the right column returns to loading state.
 	m, _ = rootApplyMsg(m, ctrlR())
 
 	viewAfterRefresh := stripANSI(rootViewContent(m))
@@ -207,9 +151,6 @@ func TestIssue239_StaleGenerationResult_IsDiscarded(t *testing.T) {
 		t.Fatalf("precondition: after Ctrl+R stale '(7)' still visible — relatedCache not cleared:\n%s", viewAfterRefresh)
 	}
 
-	// Replay a result stamped with the pre-Ctrl+R operation ID — stale
-	// relative to the operation Ctrl+R just began. This simulates a late
-	// arrival from the previous batch.
 	m, _ = rootApplyMsg(m, messages.RelatedCheckResult{
 		ResourceType:     "ec2",
 		SourceResourceID: viewedResourceID,
@@ -224,11 +165,6 @@ func TestIssue239_StaleGenerationResult_IsDiscarded(t *testing.T) {
 	}
 }
 
-// TestIssue239_CurrentGenerationResult_IsAccepted verifies that results stamped with
-// the CURRENT DetailOperation ID ARE applied to the right column.
-//
-// After Ctrl+R begins a fresh operation, a result stamped with that exact
-// operation ID must be accepted.
 func TestIssue239_CurrentGenerationResult_IsAccepted(t *testing.T) {
 	const viewedResourceID = "i-0a1b2c3d4e5f60001"
 
@@ -237,7 +173,6 @@ func TestIssue239_CurrentGenerationResult_IsAccepted(t *testing.T) {
 
 	currentOp := m.Core().ActiveDetailOp()
 
-	// A result stamped with the CURRENT operation ID must be accepted.
 	m, _ = rootApplyMsg(m, messages.RelatedCheckResult{
 		ResourceType:     "ec2",
 		SourceResourceID: viewedResourceID,
@@ -251,17 +186,8 @@ func TestIssue239_CurrentGenerationResult_IsAccepted(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// #240 — Field-only checkers skip cold-cache prefetch
-// ---------------------------------------------------------------------------
-
-// TestIssue240_FieldOnlyChecker_NoPrefetch verifies that a checker with
-// NeedsTargetCache=false does NOT trigger a cold-cache API call, even when the
-// target type is absent from the resource cache.
-//
-// Given: a related def with NeedsTargetCache=false and a checker that ignores the cache
-// When:  RelatedCheckStartedMsg is dispatched with no existing cache
-// Then:  RelatedCheckResultMsg.CachedPages is nil — no AWS API call was made
+// A checker with NeedsTargetCache=false triggers no cold-cache fetch of its
+// target type: only checkers that read the target cache pay that API cost.
 func TestIssue240_FieldOnlyChecker_NoPrefetch(t *testing.T) {
 	const (
 		srcType    = "_t240_src_field"
@@ -281,7 +207,6 @@ func TestIssue240_FieldOnlyChecker_NoPrefetch(t *testing.T) {
 			DisplayName:      "Field-Only Checker",
 			NeedsTargetCache: false, // field-only: derives result from source, not target cache
 			Checker: func(_ context.Context, _ any, res resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-				// Derive result purely from source resource fields — no cache reads.
 				if res.Fields["has_target"] == "true" {
 					return resource.KnownRelated(targetType, []string{"derived-id"}, false)
 				}
@@ -312,7 +237,6 @@ func TestIssue240_FieldOnlyChecker_NoPrefetch(t *testing.T) {
 		t.Fatal("handleRelatedCheckStarted returned nil")
 	}
 
-	// Collect all RelatedCheckResultMsg values (handle single-def and multi-def batches).
 	var results []messages.RelatedCheckResult
 	rawMsg := batchCmd()
 	switch v := rawMsg.(type) {
@@ -342,12 +266,6 @@ func TestIssue240_FieldOnlyChecker_NoPrefetch(t *testing.T) {
 	}
 }
 
-// TestIssue240_CacheDependentChecker_DoesPrefetch verifies the positive case:
-// a checker with NeedsTargetCache=true DOES trigger the cold-cache prefetch.
-//
-// Given: a related def with NeedsTargetCache=true
-// When:  the target type is absent from the resource cache
-// Then:  the paginated fetcher is called and CachedPages is non-nil
 func TestIssue240_CacheDependentChecker_DoesPrefetch(t *testing.T) {
 	const (
 		srcType    = "_t240_src_cache"
@@ -428,19 +346,8 @@ func TestIssue240_CacheDependentChecker_DoesPrefetch(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// #241 — Concurrency cap: at most 4 checkers run simultaneously
-// ---------------------------------------------------------------------------
-
-// TestIssue241_ConcurrentProbesCappedAt4 verifies that when more than 4 related
-// checkers are registered, at most 4 run simultaneously.
-//
-// Business rule (architecture spec): max 4 concurrent probes per detail view
-// to avoid saturating AWS API rate limits.
-//
-// Method: register 8 checkers, each of which blocks on a gate channel until released.
-// Count the maximum number observed running simultaneously using an atomic counter.
-// The max concurrent count must be <= 4.
+// At most 4 related checkers run concurrently for one detail view, to avoid
+// saturating AWS API rate limits.
 func TestIssue241_ConcurrentProbesCappedAt4(t *testing.T) {
 	const (
 		srcType     = "_t241_src"
@@ -448,7 +355,6 @@ func TestIssue241_ConcurrentProbesCappedAt4(t *testing.T) {
 		maxAllowed  = 4
 	)
 
-	// Register 8 target types.
 	for i := range numCheckers {
 		targetType := "_t241_target_" + string(rune('a'+i))
 		idx := i
@@ -467,7 +373,6 @@ func TestIssue241_ConcurrentProbesCappedAt4(t *testing.T) {
 		mu            sync.Mutex
 	)
 
-	// gate blocks each checker until all are known to have started (or been gated).
 	gate := make(chan struct{})
 
 	defs := make([]resource.RelatedDef, numCheckers)
@@ -485,7 +390,6 @@ func TestIssue241_ConcurrentProbesCappedAt4(t *testing.T) {
 				}
 				mu.Unlock()
 
-				// Block until the test releases the gate or until timeout.
 				select {
 				case <-gate:
 				case <-time.After(2 * time.Second):
@@ -520,7 +424,6 @@ func TestIssue241_ConcurrentProbesCappedAt4(t *testing.T) {
 		t.Fatalf("expected tea.BatchMsg, got %T", rawMsg)
 	}
 
-	// Launch all checker cmds concurrently, as tea.Batch would.
 	var wg sync.WaitGroup
 	for _, cmd := range batchMsg {
 		if cmd == nil {
@@ -531,8 +434,7 @@ func TestIssue241_ConcurrentProbesCappedAt4(t *testing.T) {
 		})
 	}
 
-	// Allow checkers to start and stabilize, then release the gate.
-	// 10ms is sufficient for goroutines to reach the select statement.
+	// 10ms lets the goroutines reach the select before the gate is released.
 	time.Sleep(10 * time.Millisecond)
 	close(gate)
 	wg.Wait()

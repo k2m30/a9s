@@ -1,19 +1,9 @@
-// costs_noregion_test.go — Cost Explorer: the REGION="NoRegion" drill defect,
-// live-verified against a real account (aws ce get-dimension-values):
-// CE returns region-less charges under GROUPING key "NoRegion", but the
-// FILTERABLE value for the REGION dimension is the EMPTY STRING — filtering
-// REGION=["NoRegion"] returns $0.00 at every granularity, REGION=[""]
-// returns exactly the grid's own monthly amount (5,207.90 for March 2026,
-// all Tax). Our drill pins the display key verbatim, so the drilled child
-// frame's fetch is filtered on a value CE never matches — zeros forever.
-// Second layer: Tax has no daily-granularity records at all, so even a
-// correctly-filtered week drill comes back empty — the fix is a
-// granularity fallback, not just the filter translation.
-//
-// package unit_test: reuses newCostsController/topDrill/fixedCostsNow/
-// fullMetricRecord/findFetchCostsTask/codexMoveCursorToNewestColumn/
-// codexMoveCursorToRow from costs_state_test.go/costs_interaction_test.go/
-// costs_codex_test.go, same convention as those files.
+// Cost Explorer returns region-less charges under GROUPING key "NoRegion", but
+// the FILTERABLE value for the REGION dimension is the empty string: filtering
+// REGION=["NoRegion"] returns $0.00 at every granularity, REGION=[""] returns
+// the grid's own monthly amount (verified with aws ce get-dimension-values).
+// Tax has no daily-granularity records at all, so even a correctly filtered
+// week drill comes back empty.
 package unit_test
 
 import (
@@ -26,11 +16,8 @@ import (
 	"github.com/k2m30/a9s/v3/core/runtime/messages"
 )
 
-// ===========================================================================
-// N1 — filter translation: screen.Select on a REGION-pivot row keyed
-// "NoRegion" must pin the CE FILTERABLE value ("") for REGION, not the
-// display key ("NoRegion") verbatim — the root cause of the live defect.
-// ===========================================================================
+// screen.Select on a REGION-pivot row keyed "NoRegion" must pin the CE
+// filterable value ("") for REGION, not the display key.
 
 func TestCostsNoRegion_N1_Select_PushDrillPinsCEFilterableEmptyValue(t *testing.T) {
 	cell := screen.PeriodRef{Period: costs.Period{Start: "2026-07-01", End: "2026-08-01"}}
@@ -51,9 +38,8 @@ func TestCostsNoRegion_N1_Select_PushDrillPinsCEFilterableEmptyValue(t *testing.
 		t.Errorf("PushDrill.Value = %q, want \"\" — CE's own filterable value for a region-less charge; pinning the display key %q verbatim filters on a value CE never matches, returning $0.00 forever", pd.Value, row.Value)
 	}
 
-	// The resulting fetch shape must differ from a "NoRegion"-valued one —
-	// otherwise the cache/fetch layer can't tell the (broken) old shape from
-	// the (correct) new one.
+	// The fetch shape must differ from a "NoRegion"-valued one, or the
+	// cache/fetch layer cannot tell the two apart.
 	qNoRegion := costs.Query{
 		Granularity: pd.Granularity.APIGranularity(),
 		GroupBy:     []costs.Dimension{pd.Dim},
@@ -69,11 +55,8 @@ func TestCostsNoRegion_N1_Select_PushDrillPinsCEFilterableEmptyValue(t *testing.
 	}
 }
 
-// TestCostsNoRegion_N1_Breadcrumb_RendersDisplayFormNeverBlank drives the
-// SAME drill through the full controller: the pinned CE filter value is
-// legitimately "" (N1 above), but the breadcrumb/frame-title segment naming
-// this drill step must still show the human-readable "NoRegion" — never a
-// blank segment a user can't make sense of.
+// The pinned CE filter value is "", but the breadcrumb/frame-title segment for
+// this drill step must still show "NoRegion", never a blank segment.
 func TestCostsNoRegion_N1_Breadcrumb_RendersDisplayFormNeverBlank(t *testing.T) {
 	c := newCostsController(t, fixedCostsNow)
 	root := topDrill(t, c)
@@ -101,12 +84,8 @@ func TestCostsNoRegion_N1_Breadcrumb_RendersDisplayFormNeverBlank(t *testing.T) 
 	}
 }
 
-// ===========================================================================
-// N2 — guard scope: the "never pin a blank value" invariant (screen.go's
-// PushDrill doc, X7's own "NeverPinsEmptyValue" contract) must not collide
-// with N1's now-legitimate empty pinned FILTER value. It must still refuse a
-// genuinely UNRESOLVED row exactly as before.
-// ===========================================================================
+// The "never pin a blank value" invariant (screen.go's PushDrill doc) must
+// allow a translated empty filter value and still refuse an unresolved row.
 
 func TestCostsNoRegion_N2_GuardScope_TranslatedEmptyValueSurvives_UnresolvedRowStillRefused(t *testing.T) {
 	cell := screen.PeriodRef{Period: costs.Period{Start: "2026-07-01", End: "2026-08-01"}}
@@ -134,19 +113,14 @@ func TestCostsNoRegion_N2_GuardScope_TranslatedEmptyValueSurvives_UnresolvedRowS
 	})
 }
 
-// ===========================================================================
-// N3 — granularity fallback: Tax has no daily-granularity records at all,
-// so even a correctly REGION=""-filtered week drill comes back empty. A
-// drilled frame whose fetch delivers zero records while the selected PARENT
-// cell was non-zero must re-plan ONCE at the parent's own granularity
-// (window narrowed to exactly the selected period) rather than leave a
-// silent, permanently empty grid.
-// ===========================================================================
+// A drilled frame whose fetch delivers zero records while the selected parent
+// cell was non-zero re-plans once at the parent's own granularity, with the
+// window narrowed to exactly the selected period, rather than leave a silent,
+// permanently empty grid.
 
 // pushNoRegionDrill drives the controller through the REGION pivot, seeds a
 // NoRegion row priced amount at period, moves the cursor onto it, and
 // presses Enter — returning the resulting week-granularity fetch payload.
-// Shared setup for the N3 fallback scenarios below.
 func pushNoRegionDrill(t *testing.T, c *app.Controller, period costs.Period, amount float64) messages.CostsLoaded {
 	t.Helper()
 	_, tasks := c.Apply(app.Action{Kind: app.ActionCostPivot, N: 2}) // REGION pivot
@@ -211,8 +185,7 @@ func TestCostsNoRegion_N3_GranularityFallback_ReplansOnceAtParentGranularity(t *
 		t.Errorf("frame Granularity after fallback = %q, want %q", top.Granularity, costs.GranularityMonth)
 	}
 
-	// The whole point of the fallback is that the data actually renders —
-	// not just a note explaining its absence.
+	// The fallback's data must render, not just a note explaining its absence.
 	c.Handle(messages.CostsLoaded{
 		Query:    monthPayload.Query,
 		Grid:     costs.GridResult{Fetched: true, Records: []costs.Record{fullMetricRecord(newestCol, "Tax", 5207.90)}},

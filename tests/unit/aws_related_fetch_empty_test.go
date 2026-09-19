@@ -1,13 +1,8 @@
 package unit
 
-// aws_related_fetch_empty_test.go — pins the FIX 1 contract: a successfully
-// fetched EMPTY target population must render "(0)", not a blank/unknown row.
-//
-// FetchRelatedTarget (core/aws/related_fetch.go:27), on a cache miss with
-// a registered paginated fetcher, must turn a successful zero-result fetch
-// into a non-nil length-0 slice — never the bare nil that reverse-scan
-// checkers interpret as "the fetch never ran" (UnknownRelated). The no-fetcher
-// path (nil, unchanged) is covered as a control.
+// A successful fetch of an empty target population is a proven zero:
+// FetchRelatedTarget returns a non-nil length-0 slice, because reverse-scan
+// checkers read nil as "the fetch never ran" (UnknownRelated).
 
 import (
 	"context"
@@ -21,10 +16,6 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// TestFetchRelatedTarget_CacheMiss_FetcherSucceeds_ZeroResults verifies that
-// when the registered paginated fetcher runs successfully and finds zero
-// resources, FetchRelatedTarget returns a non-nil length-0 slice (so callers
-// can render a proven-zero "(0)" instead of a blank/unknown row).
 func TestFetchRelatedTarget_CacheMiss_FetcherSucceeds_ZeroResults(t *testing.T) {
 	const target = "test-empty-fetch-target"
 	resource.SetPaginatedForTest(target, func(_ context.Context, _ any, _ string) (resource.FetchResult, error) {
@@ -54,10 +45,8 @@ func TestFetchRelatedTarget_CacheMiss_FetcherSucceeds_ZeroResults(t *testing.T) 
 	}
 }
 
-// TestFetchRelatedTarget_CacheMiss_NoFetcher_StaysNil is the control for FIX 1:
-// when no fetcher is registered at all for the target, FetchRelatedTarget must
-// keep returning nil — the fetch never ran, so "unknown" (blank row) remains
-// correct. This must stay green both before and after the FIX 1 change.
+// With no fetcher registered the fetch never ran, so nil (unknown) is the
+// correct answer.
 func TestFetchRelatedTarget_CacheMiss_NoFetcher_StaysNil(t *testing.T) {
 	resources, truncated, err := awsclient.FetchRelatedTarget(
 		context.Background(), nil, resource.ResourceCache{}, "definitely-unregistered-target-xyz",
@@ -74,12 +63,6 @@ func TestFetchRelatedTarget_CacheMiss_NoFetcher_StaysNil(t *testing.T) {
 	}
 }
 
-// TestRelated_EC2_Alarm_FetchSucceeds_ZeroAlarms_ResolvesToZero verifies the
-// FIX 1 contract propagates through a real reverse-scan consumer: a running
-// EC2 instance whose CloudWatch alarm fetch succeeds with zero alarms must
-// render a proven-zero "(0)" (Resolved, Count 0) — not RelatedUnknown. Real
-// repro: an AWS account with 0 CloudWatch alarms currently shows a blank
-// "CloudWatch Alarms" row instead of "(0)".
 func TestRelated_EC2_Alarm_FetchSucceeds_ZeroAlarms_ResolvesToZero(t *testing.T) {
 	mockFetcher := resource.PaginatedFetcher(func(_ context.Context, _ any, _ string) (resource.FetchResult, error) {
 		return resource.FetchResult{

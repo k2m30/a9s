@@ -15,12 +15,6 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// ---------------------------------------------------------------------------
-// RDS Instance Events fetcher tests (child of RDS Instances)
-// ---------------------------------------------------------------------------
-
-// TestFetchRDSEvents_Basic verifies parsing of 3 events with all fields
-// populated, checking ID, Name, Fields map, and RawStruct type.
 func TestFetchRDSEvents_Basic(t *testing.T) {
 	ts1 := time.Date(2024, 6, 15, 10, 0, 0, 0, time.UTC)
 	ts2 := time.Date(2024, 6, 15, 10, 5, 0, 0, time.UTC)
@@ -72,7 +66,6 @@ func TestFetchRDSEvents_Basic(t *testing.T) {
 	}
 
 	t.Run("event_0_ID", func(t *testing.T) {
-		// ID format: "timestamp/source_identifier"
 		expected := "2024-06-15 10:00/my-db-instance"
 		if result.Resources[0].ID != expected {
 			t.Errorf("ID: expected %q, got %q", expected, result.Resources[0].ID)
@@ -156,7 +149,6 @@ func TestFetchRDSEvents_Basic(t *testing.T) {
 		}
 	})
 
-	// Verify required fields on all events
 	t.Run("required_fields_present", func(t *testing.T) {
 		requiredFields := []string{"timestamp", "event_categories", "message", "source_identifier", "source_type", "source_arn"}
 		for i, r := range result.Resources {
@@ -169,8 +161,6 @@ func TestFetchRDSEvents_Basic(t *testing.T) {
 	})
 }
 
-// TestFetchRDSEvents_Empty verifies that a DB instance with no events
-// returns an empty slice with no error.
 func TestFetchRDSEvents_Empty(t *testing.T) {
 	mock := &mockRDSDescribeEventsClient{
 		output: &rds.DescribeEventsOutput{
@@ -192,7 +182,6 @@ func TestFetchRDSEvents_Empty(t *testing.T) {
 	}
 }
 
-// TestFetchRDSEvents_APIError verifies that API errors are propagated.
 func TestFetchRDSEvents_APIError(t *testing.T) {
 	mock := &mockRDSDescribeEventsClient{
 		err: fmt.Errorf("AWS API error: access denied"),
@@ -212,28 +201,21 @@ func TestFetchRDSEvents_APIError(t *testing.T) {
 	}
 }
 
-// TestFetchRDSEvents_NilOptionalFields verifies that nil Message, nil Date,
-// nil SourceArn produce empty strings without panic.
 func TestFetchRDSEvents_NilOptionalFields(t *testing.T) {
 	mock := &mockRDSDescribeEventsClient{
 		output: &rds.DescribeEventsOutput{
 			Events: []rdstypes.Event{
 				{
-					// Date is nil
-					// Message is nil
-					// SourceArn is nil
-					// SourceIdentifier is nil
 					EventCategories: []string{"notification"},
 					SourceType:      rdstypes.SourceTypeDbInstance,
 				},
 				{
-					// All optional fields nil, including EventCategories
+					// Every optional field nil, EventCategories included.
 				},
 			},
 		},
 	}
 
-	// Should not panic
 	result, err := awsclient.FetchRDSEvents(
 		context.Background(),
 		mock,
@@ -277,8 +259,6 @@ func TestFetchRDSEvents_NilOptionalFields(t *testing.T) {
 	})
 }
 
-// TestFetchRDSEvents_NewlineStripping verifies that \n and \r in Message
-// are replaced with spaces.
 func TestFetchRDSEvents_NewlineStripping(t *testing.T) {
 	ts := time.Date(2024, 6, 15, 10, 0, 0, 0, time.UTC)
 
@@ -320,8 +300,6 @@ func TestFetchRDSEvents_NewlineStripping(t *testing.T) {
 	}
 }
 
-// TestFetchRDSEvents_TimestampFormatting verifies that a known time.Time
-// produces the "2006-01-02 15:04" format in Fields.
 func TestFetchRDSEvents_TimestampFormatting(t *testing.T) {
 	ts := time.Date(2024, 12, 25, 14, 30, 45, 0, time.UTC)
 
@@ -359,8 +337,6 @@ func TestFetchRDSEvents_TimestampFormatting(t *testing.T) {
 	}
 }
 
-// TestFetchRDSEvents_RawStruct verifies that RawStruct preserves the
-// original rdstypes.Event, including all sub-fields.
 func TestFetchRDSEvents_RawStruct(t *testing.T) {
 	ts := time.Date(2024, 6, 15, 12, 30, 0, 0, time.UTC)
 
@@ -434,8 +410,6 @@ func TestFetchRDSEvents_RawStruct(t *testing.T) {
 	})
 }
 
-// TestFetchRDSEvents_EventCategoriesJoined verifies that multiple event
-// categories are joined with ", ".
 func TestFetchRDSEvents_EventCategoriesJoined(t *testing.T) {
 	ts := time.Date(2024, 6, 15, 10, 0, 0, 0, time.UTC)
 
@@ -474,17 +448,9 @@ func TestFetchRDSEvents_EventCategoriesJoined(t *testing.T) {
 	}
 }
 
-// TestFetchRDSEvents_Pagination verifies that paginated responses via Marker
-// are followed and all events collected across multiple pages.
-// TestFetchRDSEvents_Pagination verifies the single-page pagination contract:
-// one API call is made per invocation, resources from that page are returned,
-// and IsTruncated/NextToken (Marker) reflect whether more pages exist. A second
-// call with the continuation token verifies the token is forwarded and the final
-// page sets IsTruncated=false.
 func TestFetchRDSEvents_Pagination(t *testing.T) {
 	ts := time.Date(2024, 6, 15, 10, 0, 0, 0, time.UTC)
 
-	// Page 1: 3 events with Marker indicating more pages exist.
 	page1Mock := &mockRDSDescribeEventsClient{
 		outputs: []*rds.DescribeEventsOutput{
 			{
@@ -516,7 +482,6 @@ func TestFetchRDSEvents_Pagination(t *testing.T) {
 		},
 	}
 
-	// First call: no continuation token — fetches page 1.
 	result1, err := awsclient.FetchRDSEvents(context.Background(), page1Mock, "pag-db", "")
 	if err != nil {
 		t.Fatalf("page 1: expected no error, got %v", err)
@@ -572,11 +537,9 @@ func TestFetchRDSEvents_Pagination(t *testing.T) {
 		}
 	})
 
-	// Page 2: 3 events with no Marker — last page.
 	page2Mock := &mockRDSDescribeEventsClient{
 		outputs: []*rds.DescribeEventsOutput{
 			{
-				// No Marker — last page
 				Events: []rdstypes.Event{
 					{
 						Date:             &ts,
@@ -604,7 +567,6 @@ func TestFetchRDSEvents_Pagination(t *testing.T) {
 		},
 	}
 
-	// Second call: pass continuation token from page 1 to fetch page 2.
 	result2, err := awsclient.FetchRDSEvents(context.Background(), page2Mock, "pag-db", result1.Pagination.NextToken)
 	if err != nil {
 		t.Fatalf("page 2: expected no error, got %v", err)
@@ -635,14 +597,9 @@ func TestFetchRDSEvents_Pagination(t *testing.T) {
 	})
 }
 
-// TestFetchRDSEvents_MaxEventsCap verifies that a single API page of 50 events
-// is returned as-is with correct IsTruncated=true metadata when the API
-// indicates more pages exist. The 200-item cap no longer applies — each call
-// returns one page and the caller drives pagination via continuation tokens.
 func TestFetchRDSEvents_MaxEventsCap(t *testing.T) {
 	ts := time.Date(2024, 6, 15, 12, 0, 0, 0, time.UTC)
 
-	// Build one page of 50 events with a Marker indicating more pages exist.
 	var events []rdstypes.Event
 	for i := range 50 {
 		events = append(events, rdstypes.Event{
@@ -720,8 +677,6 @@ func TestFetchRDSEvents_MaxEventsCap(t *testing.T) {
 	})
 }
 
-// TestDbiEventColumns verifies that DbiEventColumns returns the expected
-// columns with correct keys and widths.
 func TestDbiEventColumns(t *testing.T) {
 	cols := resource.DbiEventColumns()
 
@@ -768,8 +723,6 @@ func TestDbiEventColumns(t *testing.T) {
 
 }
 
-// TestDbiEvents_ChildTypeRegistered verifies that the child type is
-// registered under the correct short name.
 func TestDbiEvents_ChildTypeRegistered(t *testing.T) {
 	td := resource.GetChildType("dbi_events")
 	if td == nil {
@@ -783,9 +736,6 @@ func TestDbiEvents_ChildTypeRegistered(t *testing.T) {
 	}
 }
 
-// TestDbiEvents_PaginatedChildFetcherRegistered verifies that the paginated
-// child fetcher is
-// registered under the correct short name.
 func TestDbiEvents_PaginatedChildFetcherRegistered(t *testing.T) {
 	f := resource.GetPaginatedChildFetcher("dbi_events")
 	if f == nil {
@@ -793,8 +743,6 @@ func TestDbiEvents_PaginatedChildFetcherRegistered(t *testing.T) {
 	}
 }
 
-// TestDbiEvents_ParentHasChildDef verifies that the parent dbi resource
-// type has a child view definition for dbi_events with key "enter".
 func TestDbiEvents_ParentHasChildDef(t *testing.T) {
 	rt := resource.FindResourceType("dbi")
 	if rt == nil {
@@ -826,8 +774,6 @@ func TestDbiEvents_ParentHasChildDef(t *testing.T) {
 	}
 }
 
-// TestDbiEvents_CopyField verifies that the registered child type has
-// CopyField set to "message".
 func TestDbiEvents_CopyField(t *testing.T) {
 	td := resource.GetChildType("dbi_events")
 	if td == nil {
@@ -838,8 +784,6 @@ func TestDbiEvents_CopyField(t *testing.T) {
 	}
 }
 
-// TestFetchRDSEvents_ContinuationToken verifies that a non-empty
-// continuation token is forwarded to the API as Marker.
 func TestFetchRDSEvents_ContinuationToken(t *testing.T) {
 	ts := time.Date(2024, 6, 15, 10, 0, 0, 0, time.UTC)
 
@@ -876,7 +820,6 @@ func TestFetchRDSEvents_ContinuationToken(t *testing.T) {
 	}
 }
 
-// tokenCapturingRDSEventsMock wraps the RDS events mock to capture Marker.
 type tokenCapturingRDSEventsMock struct {
 	inner          *mockRDSDescribeEventsClient
 	capturedMarker *string
@@ -886,5 +829,3 @@ func (m *tokenCapturingRDSEventsMock) DescribeEvents(ctx context.Context, params
 	m.capturedMarker = params.Marker
 	return m.inner.DescribeEvents(ctx, params, optFns...)
 }
-
-// ============================================================================

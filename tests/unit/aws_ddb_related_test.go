@@ -1,17 +1,5 @@
 package unit
 
-// aws_ddb_related_test.go — per-target related-resource checker tests for ddb.
-//
-// One test per §2 target from docs/resources/ddb.md. All tests use the orders-prod
-// fixture as the anchor resource. Each test constructs a ResourceCache with the
-// minimum sibling data needed to verify the checker's discovery logic, then
-// asserts Count and ResourceIDs.
-//
-// Targets covered: alarm, backup, kinesis, kms, lambda, logs, vpce.
-// ct-events: verified via registration smoke test (universal pivot, not custom checker).
-//
-// Forbidden: no calls to ListRecoveryPointsByResource (backup uses cache scan only).
-
 import (
 	"context"
 	"errors"
@@ -31,11 +19,6 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// ---------------------------------------------------------------------------
-// Mocks — DynamoDB Kinesis + Lambda ESM stubs
-// ---------------------------------------------------------------------------
-
-// mockDDBKinesisClient implements DynamoDBDescribeKinesisStreamingDestinationAPI.
 type mockDDBKinesisClient struct {
 	awsclient.DynamoDBAPI
 	destinations []ddbtypes.KinesisDataStreamDestination
@@ -55,7 +38,6 @@ func (m *mockDDBKinesisClient) DescribeKinesisStreamingDestination(
 	}, nil
 }
 
-// mockLambdaESMClient implements LambdaListEventSourceMappingsAPI.
 type mockLambdaESMClient struct {
 	awsclient.LambdaAPI
 	mappings []lambdatypes.EventSourceMappingConfiguration
@@ -77,12 +59,6 @@ func (m *mockLambdaESMClient) ListEventSourceMappings(
 	}, nil
 }
 
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-// ddbOrdersProdResource returns the orders-prod Resource as FetchDynamoDBTablesPage
-// would produce it (RawStruct is *ddbtypes.TableDescription).
 func ddbOrdersProdResource(t *testing.T) resource.Resource {
 	t.Helper()
 	table := findDDBTable(t, fixtures.OrdersProdID)
@@ -98,7 +74,6 @@ func ddbOrdersProdResource(t *testing.T) resource.Resource {
 	return result.Resources[0]
 }
 
-// ddbCheckerByTarget returns the RelatedChecker registered for ddb→target.
 func ddbCheckerByTarget(t *testing.T, target string) resource.RelatedChecker {
 	t.Helper()
 	for _, def := range resource.GetRelated("ddb") {
@@ -110,12 +85,6 @@ func ddbCheckerByTarget(t *testing.T, target string) resource.RelatedChecker {
 	return nil
 }
 
-// ---------------------------------------------------------------------------
-// alarm
-// ---------------------------------------------------------------------------
-
-// TestDDB_Related_Alarm_MatchesByTableNameDimension verifies checkDdbAlarm
-// returns the alarm whose Dimensions contains Name="TableName", Value="orders-prod".
 func TestDDB_Related_Alarm_MatchesByTableNameDimension(t *testing.T) {
 	res := ddbOrdersProdResource(t)
 	checker := ddbCheckerByTarget(t, "alarm")
@@ -156,8 +125,6 @@ func TestDDB_Related_Alarm_MatchesByTableNameDimension(t *testing.T) {
 	}
 }
 
-// TestDDB_Related_Alarm_NonMatchingTableNameValue verifies that an alarm with
-// a different TableName dimension value does NOT match.
 func TestDDB_Related_Alarm_NonMatchingTableNameValue(t *testing.T) {
 	res := ddbOrdersProdResource(t)
 	checker := ddbCheckerByTarget(t, "alarm")
@@ -185,7 +152,6 @@ func TestDDB_Related_Alarm_NonMatchingTableNameValue(t *testing.T) {
 	}
 }
 
-// TestDDB_Related_Alarm_NoDimensions verifies alarm with no Dimensions → Count 0.
 func TestDDB_Related_Alarm_NoDimensions(t *testing.T) {
 	res := ddbOrdersProdResource(t)
 	checker := ddbCheckerByTarget(t, "alarm")
@@ -210,9 +176,6 @@ func TestDDB_Related_Alarm_NoDimensions(t *testing.T) {
 	}
 }
 
-// TestDDB_Related_Alarm_WrongDimensionName_NotCounted verifies that an alarm
-// carrying a dimension name other than "TableName" (even with a matching
-// value by coincidence) is not counted.
 func TestDDB_Related_Alarm_WrongDimensionName_NotCounted(t *testing.T) {
 	res := ddbOrdersProdResource(t)
 	checker := ddbCheckerByTarget(t, "alarm")
@@ -240,15 +203,8 @@ func TestDDB_Related_Alarm_WrongDimensionName_NotCounted(t *testing.T) {
 	}
 }
 
-// TestDDB_Related_Alarm_NilCache_ReturnsUnknown pins the canonical nil-cache
-// contract from docs/related-resources-engine.md §7: a nil alarm cache is
-// not a proven zero and must resolve to UnknownRelated("alarm") — the same
-// contract checkSQSAlarm already honors.
-//
-// checkDdbAlarm (core/aws/ddb_related.go:49-51) currently diverges: it
-// returns relatedResultTrunc("alarm", nil, true) instead — a false
-// proven-zero-with-truncation. This test is expected to FAIL until that
-// divergence is fixed (by hand or by the alarmIDsByDimension extraction).
+// A nil alarm cache is not a proven zero; it resolves to
+// UnknownRelated("alarm") (docs/related-resources-engine.md).
 func TestDDB_Related_Alarm_NilCache_ReturnsUnknown(t *testing.T) {
 	res := ddbOrdersProdResource(t)
 	checker := ddbCheckerByTarget(t, "alarm")
@@ -260,8 +216,6 @@ func TestDDB_Related_Alarm_NilCache_ReturnsUnknown(t *testing.T) {
 	}
 }
 
-// TestDDB_Related_Alarm_Error verifies that a fetch error for the "alarm"
-// target propagates as RelatedError, never a silently resolved count.
 func TestDDB_Related_Alarm_Error(t *testing.T) {
 	res := ddbOrdersProdResource(t)
 	checker := ddbCheckerByTarget(t, "alarm")
@@ -289,10 +243,7 @@ func TestDDB_Related_Alarm_Error(t *testing.T) {
 	}
 }
 
-// TestDDB_Related_Alarm_Truncated_PropagatesTrue verifies that a truncated
-// "alarm" cache page with a real match sets Truncated=true via ddb's own
-// truncatedResultDDB path (checkDdbAlarm's non-passthrough truncation
-// branch) — the match must render "(1+)", not a definitive "(1)".
+// A match on a truncated alarm page is a lower bound, rendered "(1+)".
 func TestDDB_Related_Alarm_Truncated_PropagatesTrue(t *testing.T) {
 	res := ddbOrdersProdResource(t)
 	checker := ddbCheckerByTarget(t, "alarm")
@@ -324,13 +275,6 @@ func TestDDB_Related_Alarm_Truncated_PropagatesTrue(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// backup
-// ---------------------------------------------------------------------------
-
-// TestDDB_Related_Backup_MatchesByARNInResourcesCSV verifies checkDdbBackup
-// returns the plan whose Fields["resources"] CSV contains the table's ARN.
-// The test MUST NOT use a Backup API client — pure cache scan only.
 func TestDDB_Related_Backup_MatchesByARNInResourcesCSV(t *testing.T) {
 	res := ddbOrdersProdResource(t)
 	checker := ddbCheckerByTarget(t, "backup")
@@ -355,7 +299,7 @@ func TestDDB_Related_Backup_MatchesByARNInResourcesCSV(t *testing.T) {
 		},
 	}
 
-	// Explicitly pass nil clients to assert no Backup API call is made.
+	// nil clients: the backup pivot is a pure cache scan.
 	result := checker(context.Background(), nil, res, cache)
 
 	if result.Count() != 1 {
@@ -366,7 +310,6 @@ func TestDDB_Related_Backup_MatchesByARNInResourcesCSV(t *testing.T) {
 	}
 }
 
-// TestDDB_Related_Backup_NoMatch verifies Count=0 when no plan covers this table.
 func TestDDB_Related_Backup_NoMatch(t *testing.T) {
 	res := ddbOrdersProdResource(t)
 	checker := ddbCheckerByTarget(t, "backup")
@@ -389,12 +332,6 @@ func TestDDB_Related_Backup_NoMatch(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// kinesis
-// ---------------------------------------------------------------------------
-
-// TestDDB_Related_Kinesis_OneDestination verifies checkDdbKinesis returns 1
-// when DescribeKinesisStreamingDestination returns one active destination.
 func TestDDB_Related_Kinesis_OneDestination(t *testing.T) {
 	res := ddbOrdersProdResource(t)
 	checker := ddbCheckerByTarget(t, "kinesis")
@@ -425,8 +362,6 @@ func TestDDB_Related_Kinesis_OneDestination(t *testing.T) {
 	}
 }
 
-// TestDDB_Related_Kinesis_EmptyDestinations verifies Count=0 when no streaming
-// destinations are configured.
 func TestDDB_Related_Kinesis_EmptyDestinations(t *testing.T) {
 	res := ddbOrdersProdResource(t)
 	checker := ddbCheckerByTarget(t, "kinesis")
@@ -441,12 +376,6 @@ func TestDDB_Related_Kinesis_EmptyDestinations(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// kms
-// ---------------------------------------------------------------------------
-
-// TestDDB_Related_KMS_ReturnsKeyID verifies checkDdbKMS extracts the key ID
-// from SSEDescription.KMSMasterKeyArn (ARN suffix after last "/").
 func TestDDB_Related_KMS_ReturnsKeyID(t *testing.T) {
 	res := ddbOrdersProdResource(t)
 	checker := ddbCheckerByTarget(t, "kms")
@@ -467,10 +396,8 @@ func TestDDB_Related_KMS_ReturnsKeyID(t *testing.T) {
 	}
 }
 
-// TestDDB_Related_KMS_NilSSEDescription verifies Count=0 when SSEDescription is nil
-// (AWS-owned key — no kms pivot).
+// A nil SSEDescription means an AWS-owned key, which has no kms pivot.
 func TestDDB_Related_KMS_NilSSEDescription(t *testing.T) {
-	// audit-pitr-off: no SSEDescription (no CMK)
 	table := findDDBTable(t, fixtures.AuditPITROffID)
 	listStub := &ddbListStub{names: []string{fixtures.AuditPITROffID}}
 	descStub := &ddbDescribeStub{tables: map[string]*ddbtypes.TableDescription{fixtures.AuditPITROffID: table}}
@@ -485,16 +412,13 @@ func TestDDB_Related_KMS_NilSSEDescription(t *testing.T) {
 	}
 }
 
-// TestDDB_Related_KMS_MalformedARN_NoSlash verifies a malformed KMSMasterKeyArn
-// with no "/" returns Count=0, not Count=-1.
 func TestDDB_Related_KMS_MalformedARN_NoSlash(t *testing.T) {
 	table := &ddbtypes.TableDescription{
 		TableName:   aws.String("inline-malformed-kms"),
 		TableArn:    aws.String("arn:aws:dynamodb:us-east-1:123456789012:table/inline-malformed-kms"),
 		TableStatus: ddbtypes.TableStatusActive,
 		SSEDescription: &ddbtypes.SSEDescription{
-			SSEType: ddbtypes.SSETypeKms,
-			// Malformed: no "/" separator — key ID cannot be extracted.
+			SSEType:         ddbtypes.SSETypeKms,
 			KMSMasterKeyArn: aws.String("malformed-arn-no-slash"),
 		},
 	}
@@ -515,12 +439,6 @@ func TestDDB_Related_KMS_MalformedARN_NoSlash(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// lambda
-// ---------------------------------------------------------------------------
-
-// TestDDB_Related_Lambda_OneMapping verifies checkDdbLambda returns Count=1
-// when LatestStreamArn is set and ListEventSourceMappings returns one mapping.
 func TestDDB_Related_Lambda_OneMapping(t *testing.T) {
 	res := ddbOrdersProdResource(t)
 	checker := ddbCheckerByTarget(t, "lambda")
@@ -540,16 +458,12 @@ func TestDDB_Related_Lambda_OneMapping(t *testing.T) {
 	if len(result.ResourceIDs()) == 0 || result.ResourceIDs()[0] != fixtures.OrdersProdLambdaName {
 		t.Errorf("ResourceIDs = %v, want [%s]", result.ResourceIDs(), fixtures.OrdersProdLambdaName)
 	}
-	// Assert the Lambda client was called (LatestStreamArn is set on orders-prod).
 	if lambdaClient.calls == 0 {
 		t.Errorf("ListEventSourceMappings was not called — LatestStreamArn is set, it must be called")
 	}
 }
 
-// TestDDB_Related_Lambda_NoStream_ZeroCount verifies Count=0 when LatestStreamArn
-// is nil — streams-disabled is not a failure. No API call should be made.
 func TestDDB_Related_Lambda_NoStream_ZeroCount(t *testing.T) {
-	// audit-pitr-off: no stream configured
 	table := findDDBTable(t, fixtures.AuditPITROffID)
 	listStub := &ddbListStub{names: []string{fixtures.AuditPITROffID}}
 	descStub := &ddbDescribeStub{tables: map[string]*ddbtypes.TableDescription{fixtures.AuditPITROffID: table}}
@@ -570,14 +484,9 @@ func TestDDB_Related_Lambda_NoStream_ZeroCount(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// logs
-// ---------------------------------------------------------------------------
-
-// TestDDB_Related_Logs_PrefixMatchOnly verifies checkDdbLogs returns only log
-// groups with the exact prefix /aws/dynamodb/tables/<name>/.
-// Guards against substring traps where a sibling table's name is a prefix of
-// another (e.g. "orders-prod" vs "orders-prod-sessions").
+// A sibling table name can extend this one ("orders-prod" vs
+// "orders-prod-sessions"), so matching is on the full
+// /aws/dynamodb/tables/<name>/ prefix.
 func TestDDB_Related_Logs_PrefixMatchOnly(t *testing.T) {
 	res := ddbOrdersProdResource(t)
 	checker := ddbCheckerByTarget(t, "logs")
@@ -604,8 +513,6 @@ func TestDDB_Related_Logs_PrefixMatchOnly(t *testing.T) {
 	}
 }
 
-// TestDDB_Related_Logs_LambdaDecoy_CountZero verifies /aws/lambda/<name> group
-// does NOT match the DDB log checker.
 func TestDDB_Related_Logs_LambdaDecoy_CountZero(t *testing.T) {
 	res := ddbOrdersProdResource(t)
 	checker := ddbCheckerByTarget(t, "logs")
@@ -625,9 +532,6 @@ func TestDDB_Related_Logs_LambdaDecoy_CountZero(t *testing.T) {
 	}
 }
 
-// TestDDB_Related_Logs_SiblingSubstringTrap_CountZero verifies
-// "/aws/dynamodb/tables/orders-prod-sessions/insights/default" does NOT match
-// when checking "orders-prod". This pins the prefix-match fix.
 func TestDDB_Related_Logs_SiblingSubstringTrap_CountZero(t *testing.T) {
 	res := ddbOrdersProdResource(t)
 	checker := ddbCheckerByTarget(t, "logs")
@@ -647,12 +551,6 @@ func TestDDB_Related_Logs_SiblingSubstringTrap_CountZero(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// vpce
-// ---------------------------------------------------------------------------
-
-// TestDDB_Related_VPCE_GatewayEndpointMatches verifies checkDdbVPCE returns
-// the DDB gateway endpoint and excludes decoys (wrong service, wrong type).
 func TestDDB_Related_VPCE_GatewayEndpointMatches(t *testing.T) {
 	res := ddbOrdersProdResource(t)
 	checker := ddbCheckerByTarget(t, "vpce")
@@ -678,7 +576,7 @@ func TestDDB_Related_VPCE_GatewayEndpointMatches(t *testing.T) {
 		Name: "vpce-ddb-interface-0001",
 		Fields: map[string]string{
 			"service_name": "com.amazonaws.us-east-1.dynamodb",
-			"type":         "Interface", // wrong type — must be Gateway
+			"type":         "Interface",
 		},
 	}
 	cache := resource.ResourceCache{
@@ -697,7 +595,6 @@ func TestDDB_Related_VPCE_GatewayEndpointMatches(t *testing.T) {
 	}
 }
 
-// TestDDB_Related_VPCE_S3ServiceName_CountZero verifies s3 endpoint → Count 0.
 func TestDDB_Related_VPCE_S3ServiceName_CountZero(t *testing.T) {
 	res := ddbOrdersProdResource(t)
 	checker := ddbCheckerByTarget(t, "vpce")
@@ -723,7 +620,6 @@ func TestDDB_Related_VPCE_S3ServiceName_CountZero(t *testing.T) {
 	}
 }
 
-// TestDDB_Related_VPCE_InterfaceType_CountZero verifies Interface-type DDB endpoint → Count 0.
 func TestDDB_Related_VPCE_InterfaceType_CountZero(t *testing.T) {
 	res := ddbOrdersProdResource(t)
 	checker := ddbCheckerByTarget(t, "vpce")
@@ -749,12 +645,6 @@ func TestDDB_Related_VPCE_InterfaceType_CountZero(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// Registration smoke — all §2 targets registered + ct-events universal pivot
-// ---------------------------------------------------------------------------
-
-// TestDDB_Related_RegistrationSmoke verifies GetRelated("ddb") includes all
-// mandatory §2 targets: alarm, backup, kinesis, kms, lambda, logs, vpce.
 func TestDDB_Related_RegistrationSmoke(t *testing.T) {
 	defs := resource.GetRelated("ddb")
 	if len(defs) == 0 {
@@ -774,13 +664,9 @@ func TestDDB_Related_RegistrationSmoke(t *testing.T) {
 	}
 }
 
-// TestDDB_Related_CTEvents_UniversalPivot verifies ct-events is reachable for
-// ddb resources via the universal pivot mechanism. Uses the same pattern as
-// dbi's ct-events test (resource_name field match).
 func TestDDB_Related_CTEvents_UniversalPivot(t *testing.T) {
 	res := ddbOrdersProdResource(t)
 
-	// Find ct-events checker — may be in GetRelated or in the universal set.
 	var checker resource.RelatedChecker
 	for _, def := range resource.GetRelated("ddb") {
 		if def.TargetType == "ct-events" {
@@ -789,11 +675,9 @@ func TestDDB_Related_CTEvents_UniversalPivot(t *testing.T) {
 		}
 	}
 	if checker == nil {
-		// ct-events is a universal pivot — it may be wired separately.
-		// Verify the FetchFilter mechanism is set correctly at minimum.
+		// ct-events is a universal pivot and may be wired outside GetRelated.
 		t.Log("ct-events not in GetRelated(ddb) — verifying universal pivot surface")
 
-		// Build a ct-events cache entry with a matching event.
 		matchingEvent := resource.Resource{
 			ID:   "evt-ddb-001",
 			Name: "evt-ddb-001",
@@ -807,7 +691,6 @@ func TestDDB_Related_CTEvents_UniversalPivot(t *testing.T) {
 			},
 		}
 
-		// Try to find via any universal mechanism.
 		allDefs := resource.GetRelated("ddb")
 		for _, def := range allDefs {
 			if def.TargetType == "ct-events" {
@@ -822,7 +705,6 @@ func TestDDB_Related_CTEvents_UniversalPivot(t *testing.T) {
 		return
 	}
 
-	// If ct-events IS in GetRelated("ddb"), validate it properly.
 	matchingEvent := resource.Resource{
 		ID:   "evt-ddb-001",
 		Name: "evt-ddb-001",
@@ -845,16 +727,6 @@ func TestDDB_Related_CTEvents_UniversalPivot(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// backup — wildcard + NotResources exclusion regression (#296)
-// ---------------------------------------------------------------------------
-
-// TestCheckDdbBackup_WildcardMatchingAndExclusion pins the three matcher paths:
-//   - plan-explicit: exact ARN in Resources — matches orders, not audit-log.
-//   - plan-wildcard: wildcard covers all dynamodb tables — matches both.
-//   - plan-wildcard-excluded: wildcard + NotResources exclusion for audit-log.
-//
-// This test deliberately avoids any Backup API client to assert pure cache scan.
 func TestCheckDdbBackup_WildcardMatchingAndExclusion(t *testing.T) {
 	plans := []resource.Resource{
 		{ID: "plan-explicit", Fields: map[string]string{
@@ -929,7 +801,6 @@ func TestCheckDdbBackup_WildcardMatchingAndExclusion(t *testing.T) {
 	})
 }
 
-// sortStrings sorts a string slice in place (stdlib sort avoids an import of sort).
 func sortStrings(s []string) {
 	for i := 1; i < len(s); i++ {
 		for j := i; j > 0 && s[j] < s[j-1]; j-- {
@@ -938,21 +809,7 @@ func sortStrings(s []string) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// Pin 1 — Truncated cache-scan sets Truncated=true with matches
-//
-// Pre-fix: truncatedResultDDB was NOT called when backupList was truncated AND
-// there were matches — relatedResult was used instead, yielding Truncated=false.
-// Post-fix: truncated+matches → Truncated=true; truncated+no-matches → TruncatedResult.
-// ---------------------------------------------------------------------------
-
-// TestCheckDdbBackup_TruncatedCacheWithMatches_ReturnsTruncated pins the
-// truncated+matches path of checkDdbBackup. The cache has IsTruncated=true and
-// exactly one backup plan whose "resources" CSV contains the table ARN.
-// Pre-fix: result.Truncated==false (uses relatedResult, not truncatedResultDDB).
-// Post-fix: result.Truncated==true AND Count==1 AND ResourceIDs contains the plan.
 func TestCheckDdbBackup_TruncatedCacheWithMatches_ReturnsTruncated(t *testing.T) {
-	// Build a minimal DDB resource with an ARN that the plan covers.
 	res := resource.Resource{
 		ID:   "orders",
 		Name: "orders",
@@ -973,7 +830,7 @@ func TestCheckDdbBackup_TruncatedCacheWithMatches_ReturnsTruncated(t *testing.T)
 	cache := resource.ResourceCache{
 		"backup": resource.ResourceCacheEntry{
 			Resources:   []resource.Resource{matchingPlan},
-			IsTruncated: true, // cache is not complete — later pages may have more matches
+			IsTruncated: true,
 		},
 	}
 
@@ -983,7 +840,6 @@ func TestCheckDdbBackup_TruncatedCacheWithMatches_ReturnsTruncated(t *testing.T)
 	if result.Count() != 1 {
 		t.Errorf("Count = %d, want 1 (one matching plan in truncated cache)", result.Count())
 	}
-	// This is the invariant the fix introduces: truncated+matches → Truncated=true.
 	if !result.Truncated() {
 		t.Errorf("Truncated = false, want true — truncated cache with matches must render as '(N+)' not '(N)'")
 	}
@@ -998,9 +854,6 @@ func TestCheckDdbBackup_TruncatedCacheWithMatches_ReturnsTruncated(t *testing.T)
 	}
 }
 
-// TestCheckDdbBackup_TruncatedCacheNoMatches_ReturnsTruncatedResult pins the
-// truncated+no-matches path (TruncatedResult). The plan in the cache does NOT
-// cover the table ARN; the result must be Count==0 AND Truncated==true.
 func TestCheckDdbBackup_TruncatedCacheNoMatches_ReturnsTruncatedResult(t *testing.T) {
 	res := resource.Resource{
 		ID:   "orders",

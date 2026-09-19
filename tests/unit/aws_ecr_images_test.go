@@ -16,12 +16,6 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// ---------------------------------------------------------------------------
-// ECR Images fetcher tests (child of ECR Repositories)
-// ---------------------------------------------------------------------------
-
-// TestFetchECRImages_Basic verifies parsing of 3 images with tags, all Fields
-// correct, Resource.ID, Name, Status, and RawStruct.
 func TestFetchECRImages_Basic(t *testing.T) {
 	pushedAt1 := time.Date(2024, 6, 15, 10, 0, 0, 0, time.UTC)
 	pushedAt2 := time.Date(2024, 6, 14, 8, 30, 0, 0, time.UTC)
@@ -123,7 +117,6 @@ func TestFetchECRImages_Basic(t *testing.T) {
 		if size == "" {
 			t.Error("Fields[image_size] should not be empty")
 		}
-		// 50 MB — should contain "MB" or similar human-readable format
 		if !strings.Contains(size, "MB") && !strings.Contains(size, "MiB") && !strings.Contains(size, "50") {
 			t.Errorf("Fields[image_size]: expected human-readable ~50MB, got %q", size)
 		}
@@ -179,8 +172,6 @@ func TestFetchECRImages_Basic(t *testing.T) {
 	})
 }
 
-// TestFetchECRImages_Empty verifies that a repository with no images
-// returns an empty slice with no error.
 func TestFetchECRImages_Empty(t *testing.T) {
 	mock := &mockECRDescribeImagesClient{
 		pages: []*ecr.DescribeImagesOutput{
@@ -209,7 +200,6 @@ func TestFetchECRImages_Empty(t *testing.T) {
 	}
 }
 
-// TestFetchECRImages_Error verifies that API errors are propagated.
 func TestFetchECRImages_Error(t *testing.T) {
 	mock := &mockECRDescribeImagesClient{
 		err: fmt.Errorf("AWS API error: access denied"),
@@ -237,17 +227,12 @@ func TestFetchECRImages_Error(t *testing.T) {
 	}
 }
 
-// TestFetchECRImages_NilFields verifies that nil optional fields
-// (ImageDigest, ImageSizeInBytes, ImageScanStatus) do not cause a panic.
 func TestFetchECRImages_NilFields(t *testing.T) {
 	mock := &mockECRDescribeImagesClient{
 		pages: []*ecr.DescribeImagesOutput{
 			{
 				ImageDetails: []ecrtypes.ImageDetail{
 					{
-						// All optional pointer fields are nil
-						// ImageDigest, ImagePushedAt, ImageSizeInBytes,
-						// ImageScanStatus, ImageScanFindingsSummary all nil
 						ImageTags: []string{"latest"},
 					},
 				},
@@ -260,7 +245,6 @@ func TestFetchECRImages_NilFields(t *testing.T) {
 		"repository_uri":  "123456789012.dkr.ecr.us-east-1.amazonaws.com/nil-fields-repo",
 	}
 
-	// Should not panic
 	result, err := awsclient.FetchECRImages(
 		context.Background(),
 		mock,
@@ -304,8 +288,6 @@ func TestFetchECRImages_NilFields(t *testing.T) {
 	})
 }
 
-// TestFetchECRImages_UntaggedImage verifies that an image with no tags
-// produces "<untagged>" for image_tags and Status="terminated".
 func TestFetchECRImages_UntaggedImage(t *testing.T) {
 	pushedAt := time.Date(2024, 6, 15, 10, 0, 0, 0, time.UTC)
 
@@ -315,7 +297,7 @@ func TestFetchECRImages_UntaggedImage(t *testing.T) {
 				ImageDetails: []ecrtypes.ImageDetail{
 					{
 						ImageDigest:      aws.String("sha256:abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890"),
-						ImageTags:        []string{}, // no tags
+						ImageTags:        []string{},
 						ImagePushedAt:    &pushedAt,
 						ImageSizeInBytes: aws.Int64(1024),
 					},
@@ -358,8 +340,6 @@ func TestFetchECRImages_UntaggedImage(t *testing.T) {
 	})
 }
 
-// TestFetchECRImages_DigestShort verifies that "sha256:abcdef123456789..."
-// is truncated to "abcdef123456" (first 12 chars after prefix).
 func TestFetchECRImages_DigestShort(t *testing.T) {
 	pushedAt := time.Date(2024, 6, 15, 10, 0, 0, 0, time.UTC)
 
@@ -403,8 +383,6 @@ func TestFetchECRImages_DigestShort(t *testing.T) {
 	}
 }
 
-// TestFetchECRImages_FindingCounts verifies that CRITICAL:1, HIGH:3 produces
-// "1C 3H" format (sorted by severity).
 func TestFetchECRImages_FindingCounts(t *testing.T) {
 	pushedAt := time.Date(2024, 6, 15, 10, 0, 0, 0, time.UTC)
 
@@ -460,8 +438,6 @@ func TestFetchECRImages_FindingCounts(t *testing.T) {
 	}
 }
 
-// TestFetchECRImages_FindingCountsNil verifies that when there is no scan
-// summary the finding_counts field is empty string.
 func TestFetchECRImages_FindingCountsNil(t *testing.T) {
 	pushedAt := time.Date(2024, 6, 15, 10, 0, 0, 0, time.UTC)
 
@@ -474,7 +450,6 @@ func TestFetchECRImages_FindingCountsNil(t *testing.T) {
 						ImageTags:        []string{"latest"},
 						ImagePushedAt:    &pushedAt,
 						ImageSizeInBytes: aws.Int64(1024),
-						// No scan findings summary
 					},
 				},
 			},
@@ -506,8 +481,6 @@ func TestFetchECRImages_FindingCountsNil(t *testing.T) {
 	}
 }
 
-// TestFetchECRImages_SizeFormatting verifies that image_size uses human-readable
-// formatting via formatBytes.
 func TestFetchECRImages_SizeFormatting(t *testing.T) {
 	pushedAt := time.Date(2024, 6, 15, 10, 0, 0, 0, time.UTC)
 
@@ -558,7 +531,6 @@ func TestFetchECRImages_SizeFormatting(t *testing.T) {
 			}
 
 			size := result.Resources[0].Fields["image_size"]
-			// Accept both "KB"/"MB"/"GB" and "KiB"/"MiB"/"GiB" formats
 			if !strings.Contains(size, tc.contains) && !strings.Contains(size, strings.Replace(tc.contains, "B", "iB", 1)) {
 				t.Errorf("Fields[image_size]: expected to contain %q or %q, got %q",
 					tc.contains, strings.Replace(tc.contains, "B", "iB", 1), size)
@@ -567,11 +539,6 @@ func TestFetchECRImages_SizeFormatting(t *testing.T) {
 	}
 }
 
-// TestFetchECRImages_Pagination verifies the single-page pagination contract:
-// one API call is made per invocation, resources from that page are returned,
-// and IsTruncated/NextToken reflect whether more pages exist. A second call
-// with the continuation token verifies the token is forwarded and the final
-// page sets IsTruncated=false.
 func TestFetchECRImages_Pagination(t *testing.T) {
 	pushedAt := time.Date(2024, 6, 15, 10, 0, 0, 0, time.UTC)
 
@@ -580,7 +547,6 @@ func TestFetchECRImages_Pagination(t *testing.T) {
 		"repository_uri":  "123456789012.dkr.ecr.us-east-1.amazonaws.com/my-repo",
 	}
 
-	// Page 1: 2 images with NextToken indicating more pages exist.
 	page1Mock := &mockECRDescribeImagesClient{
 		pages: []*ecr.DescribeImagesOutput{
 			{
@@ -603,7 +569,6 @@ func TestFetchECRImages_Pagination(t *testing.T) {
 		},
 	}
 
-	// First call: no continuation token — fetches page 1.
 	result1, err := awsclient.FetchECRImages(
 		context.Background(),
 		page1Mock,
@@ -662,11 +627,9 @@ func TestFetchECRImages_Pagination(t *testing.T) {
 		}
 	})
 
-	// Page 2: 1 image with no NextToken — last page.
 	page2Mock := &mockECRDescribeImagesClient{
 		pages: []*ecr.DescribeImagesOutput{
 			{
-				// No NextToken — last page
 				ImageDetails: []ecrtypes.ImageDetail{
 					{
 						ImageDigest:      aws.String("sha256:bbbb001234567890abcdef1234567890abcdef1234567890abcdef1234567890"),
@@ -679,7 +642,6 @@ func TestFetchECRImages_Pagination(t *testing.T) {
 		},
 	}
 
-	// Second call: pass continuation token from page 1 to fetch page 2.
 	result2, err := awsclient.FetchECRImages(
 		context.Background(),
 		page2Mock,
@@ -730,8 +692,6 @@ func TestFetchECRImages_Pagination(t *testing.T) {
 	})
 }
 
-// TestFetchECRImages_ImageURI verifies the image_uri field:
-// Tagged images: "uri:firstTag", Untagged: "uri@sha256:digest".
 func TestFetchECRImages_ImageURI(t *testing.T) {
 	pushedAt := time.Date(2024, 6, 15, 10, 0, 0, 0, time.UTC)
 
@@ -747,7 +707,7 @@ func TestFetchECRImages_ImageURI(t *testing.T) {
 					},
 					{
 						ImageDigest:      aws.String("sha256:bbbbbb1234567890abcdef1234567890abcdef1234567890abcdef1234567890"),
-						ImageTags:        []string{}, // untagged
+						ImageTags:        []string{},
 						ImagePushedAt:    &pushedAt,
 						ImageSizeInBytes: aws.Int64(1024),
 					},
@@ -792,12 +752,6 @@ func TestFetchECRImages_ImageURI(t *testing.T) {
 	})
 }
 
-// TestFetchECRImages_StatusMapping verifies all status conditions:
-// - CRITICAL findings → "failed"
-// - HIGH findings (no critical) → "pending"
-// - Scan FAILED → "failed"
-// - Untagged → "terminated"
-// - Clean → ""
 func TestFetchECRImages_StatusMapping(t *testing.T) {
 	pushedAt := time.Date(2024, 6, 15, 10, 0, 0, 0, time.UTC)
 
@@ -898,8 +852,6 @@ func TestFetchECRImages_StatusMapping(t *testing.T) {
 	}
 }
 
-// TestFetchECRImages_ParentContext verifies that repository_name is read
-// from parentCtx and used in the DescribeImages call.
 func TestFetchECRImages_ParentContext(t *testing.T) {
 	mock := &mockECRDescribeImagesClient{
 		pages: []*ecr.DescribeImagesOutput{
@@ -924,8 +876,6 @@ func TestFetchECRImages_ParentContext(t *testing.T) {
 	// If DescribeImages was called without error, the repository_name was used
 }
 
-// TestFetchECRImages_RawStruct verifies that RawStruct is the original
-// ecrtypes.ImageDetail value.
 func TestFetchECRImages_RawStruct(t *testing.T) {
 	pushedAt := time.Date(2024, 6, 15, 10, 0, 0, 0, time.UTC)
 
@@ -975,8 +925,6 @@ func TestFetchECRImages_RawStruct(t *testing.T) {
 	}
 }
 
-// TestFetchECRImages_RegistrationExists verifies that "ecr_images" is registered
-// as a child resource type.
 func TestFetchECRImages_RegistrationExists(t *testing.T) {
 	td := resource.GetChildType("ecr_images")
 	if td == nil {
@@ -990,12 +938,6 @@ func TestFetchECRImages_RegistrationExists(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// Column definitions test
-// ---------------------------------------------------------------------------
-
-// TestECRImageColumns verifies that ECRImageColumns returns columns with the
-// expected keys, titles, and widths.
 func TestECRImageColumns(t *testing.T) {
 	cols := resource.ECRImageColumns()
 
@@ -1050,9 +992,6 @@ func TestECRImageColumns(t *testing.T) {
 	})
 }
 
-// TestECRImages_PaginatedChildFetcherRegistered verifies that the paginated
-// child fetcher is
-// registered under the correct short name.
 func TestECRImages_PaginatedChildFetcherRegistered(t *testing.T) {
 	f := resource.GetPaginatedChildFetcher("ecr_images")
 	if f == nil {
@@ -1060,8 +999,6 @@ func TestECRImages_PaginatedChildFetcherRegistered(t *testing.T) {
 	}
 }
 
-// TestECRImages_ParentHasChildDef verifies that the parent ecr resource type
-// has a child view definition for ecr_images with key "enter".
 func TestECRImages_ParentHasChildDef(t *testing.T) {
 	rt := resource.FindResourceType("ecr")
 	if rt == nil {
@@ -1091,12 +1028,6 @@ func TestECRImages_ParentHasChildDef(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// Config defaults test
-// ---------------------------------------------------------------------------
-
-// TestConfigDefaultViewDef_ECRImages verifies that the ecr_images view
-// definition has the expected list columns and non-empty detail paths.
 func TestConfigDefaultViewDef_ECRImages(t *testing.T) {
 	vd := config.DefaultViewDef("ecr_images")
 
@@ -1110,7 +1041,6 @@ func TestConfigDefaultViewDef_ECRImages(t *testing.T) {
 		if len(vd.Detail) == 0 {
 			t.Error("expected non-empty Detail paths for ecr_images")
 		}
-		// Check for key detail fields
 		detailStr := strings.Join(config.DetailStringsForTest(vd.Detail), ",")
 		for _, expected := range []string{"ImageDigest", "ImageTags", "ImagePushedAt", "ImageSizeInBytes"} {
 			if !strings.Contains(detailStr, expected) {
@@ -1120,8 +1050,6 @@ func TestConfigDefaultViewDef_ECRImages(t *testing.T) {
 	})
 }
 
-// TestFetchECRImages_ContinuationToken verifies that a non-empty
-// continuation token is forwarded to the API as NextToken.
 func TestFetchECRImages_ContinuationToken(t *testing.T) {
 	pushedAt := time.Date(2024, 3, 22, 10, 0, 0, 0, time.UTC)
 
@@ -1163,7 +1091,6 @@ func TestFetchECRImages_ContinuationToken(t *testing.T) {
 	}
 }
 
-// tokenCapturingECRImagesMock wraps the ECR images mock to capture NextToken.
 type tokenCapturingECRImagesMock struct {
 	inner             *mockECRDescribeImagesClient
 	capturedNextToken *string

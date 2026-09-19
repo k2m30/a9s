@@ -31,8 +31,6 @@ func ecsCheckerByTarget(t *testing.T, target string) resource.RelatedChecker {
 	return nil
 }
 
-// --- Navigable Field Registration ---
-
 func TestNavigableFields_ECS_Registered(t *testing.T) {
 	fields := resource.GetNavigableFields("ecs")
 	if len(fields) == 0 {
@@ -53,8 +51,6 @@ func TestNavigableFields_ECS_Registered(t *testing.T) {
 		}
 	}
 }
-
-// --- ecs-svc checker (Pattern C — cache-based, ClusterArn suffix match) ---
 
 func TestRelated_ECS_ECSService_Found(t *testing.T) {
 	clusterName := "my-cluster"
@@ -133,8 +129,6 @@ func TestRelated_ECS_ECSService_EmptySourceID(t *testing.T) {
 		t.Errorf("Count = %d, want 0 for empty source ID", result.Count())
 	}
 }
-
-// --- alarm checker (Pattern C — cache-based, ClusterName dimension) ---
 
 func TestRelated_ECS_Alarm_Found(t *testing.T) {
 	clusterName := "my-cluster"
@@ -219,8 +213,6 @@ func TestRelated_ECS_Alarm_EmptySourceID(t *testing.T) {
 		t.Errorf("Count = %d, want 0 for empty source ID", result.Count())
 	}
 }
-
-// --- cfn checker (Pattern C — cache-based, aws:cloudformation:stack-name tag) ---
 
 func TestRelated_ECS_CFN_Found(t *testing.T) {
 	cfnRes := resource.Resource{
@@ -316,7 +308,6 @@ func TestRelated_ECS_CFN_EmptySourceID(t *testing.T) {
 	cache := resource.ResourceCache{
 		"cfn": resource.ResourceCacheEntry{Resources: []resource.Resource{cfnRes}},
 	}
-	// No aws:cloudformation:stack-name tag — cluster not created by CFN.
 	source := resource.Resource{
 		ID: "my-cluster",
 		RawStruct: ecstypes.Cluster{
@@ -333,10 +324,6 @@ func TestRelated_ECS_CFN_EmptySourceID(t *testing.T) {
 		t.Errorf("Count = %d, want 0 for no CFN tag", result.Count())
 	}
 }
-
-// ---------------------------------------------------------------------------
-// checkECSASG — ASG with AmazonECSManaged or ClusterName tag
-// ---------------------------------------------------------------------------
 
 func TestRelated_ECS_ASG_MatchByAmazonECSManagedTag(t *testing.T) {
 	tagKey := "AmazonECSManaged"
@@ -434,10 +421,6 @@ func TestRelated_ECS_ASG_NilCache(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// checkECSEC2 — EC2 instances tagged "aws:ecs:cluster-name" or "ClusterName"
-// ---------------------------------------------------------------------------
-
 func TestRelated_ECS_EC2_MatchByECSClusterNameTag(t *testing.T) {
 	ec2Res := resource.Resource{
 		ID: "i-0a1b2c3d4e5f67890",
@@ -528,10 +511,6 @@ func TestRelated_ECS_EC2_NilCache(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// checkECSCTEvents — CloudTrail events that reference this cluster
-// ---------------------------------------------------------------------------
-
 func TestRelated_ECS_CTEvents_Match(t *testing.T) {
 	clusterName := "my-cluster"
 	evRes := resource.Resource{
@@ -605,10 +584,6 @@ func TestRelated_ECS_CTEvents_NilCache(t *testing.T) {
 		t.Errorf("Count = %d, want -1 (nil cache)", result.Count())
 	}
 }
-
-// ---------------------------------------------------------------------------
-// checkECSTasks — ECS tasks whose ClusterArn refers to this cluster
-// ---------------------------------------------------------------------------
 
 func TestRelated_ECS_Tasks_MatchByExactClusterName(t *testing.T) {
 	clusterName := "my-cluster"
@@ -693,10 +668,6 @@ func TestRelated_ECS_Tasks_NilCache(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// checkECSLogs — log groups whose ID contains the cluster name as substring
-// ---------------------------------------------------------------------------
-
 func TestRelated_ECS_Logs_Match(t *testing.T) {
 	logRes := resource.Resource{
 		ID:     "/ecs/my-cluster/app",
@@ -758,12 +729,6 @@ func TestRelated_ECS_Logs_NilCache(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// checkECSKMS — KmsKeyId from ExecuteCommandConfiguration (Pattern F)
-// ---------------------------------------------------------------------------
-
-// TestRelated_ECS_KMS_FoundFullARN verifies that a cluster with a full KMS ARN in
-// Configuration.ExecuteCommandConfiguration.KmsKeyId returns the last segment as ID.
 func TestRelated_ECS_KMS_FoundFullARN(t *testing.T) {
 	source := resource.Resource{
 		ID:   "my-cluster",
@@ -789,8 +754,6 @@ func TestRelated_ECS_KMS_FoundFullARN(t *testing.T) {
 	}
 }
 
-// TestRelated_ECS_KMS_PlainKeyID verifies that a plain key ID (no "/" separator) is
-// returned unchanged.
 func TestRelated_ECS_KMS_PlainKeyID(t *testing.T) {
 	source := resource.Resource{
 		ID:   "my-cluster",
@@ -816,7 +779,6 @@ func TestRelated_ECS_KMS_PlainKeyID(t *testing.T) {
 	}
 }
 
-// TestRelated_ECS_KMS_NilConfiguration verifies Count=0 when Configuration is nil.
 func TestRelated_ECS_KMS_NilConfiguration(t *testing.T) {
 	source := resource.Resource{
 		ID:   "my-cluster",
@@ -835,7 +797,6 @@ func TestRelated_ECS_KMS_NilConfiguration(t *testing.T) {
 	}
 }
 
-// TestRelated_ECS_KMS_EmptyKeyID verifies Count=0 when KmsKeyId is an empty string.
 func TestRelated_ECS_KMS_EmptyKeyID(t *testing.T) {
 	source := resource.Resource{
 		ID:   "my-cluster",
@@ -858,7 +819,6 @@ func TestRelated_ECS_KMS_EmptyKeyID(t *testing.T) {
 	}
 }
 
-// TestRelated_ECS_KMS_WrongRawStruct verifies Count=0 when RawStruct is not an ECS Cluster.
 func TestRelated_ECS_KMS_WrongRawStruct(t *testing.T) {
 	source := resource.Resource{
 		ID:        "my-cluster",

@@ -733,8 +733,6 @@ func TestRelated_CF_Alarm_AlarmWithNoRawStruct(t *testing.T) {
 	}
 }
 
-// --- checkCfLambda: nil client path ---
-
 // TestRelated_CF_Lambda_NilClients: no CloudFront client → State: RelatedUnknown.
 func TestRelated_CF_Lambda_NilClients(t *testing.T) {
 	res := resource.Resource{ID: "E1A2B3C4D5E6F7", Fields: map[string]string{}}
@@ -757,8 +755,6 @@ func TestRelated_CF_Lambda_EmptyDistID(t *testing.T) {
 		t.Errorf("Count = %d, want 0 (empty distribution ID)", result.Count())
 	}
 }
-
-// --- checkCfS3: no origins / wrong struct ---
 
 // TestRelated_CF_S3_NoOrigins: distribution with nil Origins → Count: 0.
 func TestRelated_CF_S3_NoOrigins(t *testing.T) {
@@ -838,8 +834,6 @@ func TestRelated_CF_S3_WrongRawStruct(t *testing.T) {
 	}
 }
 
-// --- checkCfELB: no ELB origins / wrong struct ---
-
 // TestRelated_CF_ELB_NoOrigins: distribution with nil Origins → Count: 0.
 func TestRelated_CF_ELB_NoOrigins(t *testing.T) {
 	res := resource.Resource{
@@ -875,8 +869,6 @@ func TestRelated_CF_ELB_NonELBOriginsOnly(t *testing.T) {
 		t.Errorf("Count = %d, want 0 (non-ELB origin, no cache lookup needed)", result.Count())
 	}
 }
-
-// --- checkCfWAF: empty WebACLId ---
 
 // TestRelated_CF_WAF_EmptyWebACLId: WebACLId is empty string → Count: 0.
 func TestRelated_CF_WAF_EmptyWebACLId(t *testing.T) {

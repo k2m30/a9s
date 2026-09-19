@@ -1,11 +1,5 @@
 package unit
 
-// cache_snapshot_test.go — Tests that buildResourceCacheSnapshot correctly
-// propagates IsTruncated from the internal resourceCacheEntry to the exported
-// ResourceCacheEntry used by related checkers.
-//
-// Phase 1 (#218): ResourceCache type change.
-
 import (
 	"context"
 	"testing"
@@ -19,14 +13,7 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// TestBuildResourceCacheSnapshot_IncludesTruncation verifies that when
-// IsTruncated=true is set in a ResourceCacheEntry passed to a related checker,
-// the checker returns {Count:0, Truncated:true} (relatedResultTrunc —
-// the honest lower bound) when 0 local matches are found, rather than a
-// definitive {Count:0, Truncated:false}.
-//
-// See related.go:34-38 (Truncated semantics) and ValidateRelatedResult.
-// This test covers the IsTruncated propagation path from cache → checker.
+// A truncated cache with no local match is a lower bound, not a definitive zero.
 func TestBuildResourceCacheSnapshot_IncludesTruncation(t *testing.T) {
 	instance := resource.Resource{
 		ID: "i-snap-test",
@@ -36,7 +23,6 @@ func TestBuildResourceCacheSnapshot_IncludesTruncation(t *testing.T) {
 		},
 	}
 
-	// Truncated alarm cache: 1 page loaded, more exist. No alarms for i-snap-test.
 	truncatedCache := resource.ResourceCache{
 		"alarm": resource.ResourceCacheEntry{
 			Resources: []resource.Resource{
@@ -63,9 +49,7 @@ func TestBuildResourceCacheSnapshot_IncludesTruncation(t *testing.T) {
 	}
 }
 
-// TestBuildResourceCacheSnapshot_TruncatedWithMatch_ReturnsMatches verifies that
-// when IsTruncated=true but local matches ARE found, the checker returns those
-// matches (not -1). Truncation only upgrades "0 matches" → unknown.
+// Truncation affects only a zero-match answer; local matches are returned as found.
 func TestBuildResourceCacheSnapshot_TruncatedWithMatch_ReturnsMatches(t *testing.T) {
 	instance := resource.Resource{
 		ID: "i-has-alarm",
@@ -75,7 +59,6 @@ func TestBuildResourceCacheSnapshot_TruncatedWithMatch_ReturnsMatches(t *testing
 		},
 	}
 
-	// Truncated cache with an alarm that DOES match this instance.
 	truncatedCacheWithMatch := resource.ResourceCache{
 		"alarm": resource.ResourceCacheEntry{
 			Resources: []resource.Resource{
@@ -94,7 +77,6 @@ func TestBuildResourceCacheSnapshot_TruncatedWithMatch_ReturnsMatches(t *testing
 	checker := ec2CheckerByTarget(t, "alarm")
 	result := checker(context.Background(), nil, instance, truncatedCacheWithMatch)
 
-	// Found a match — count must be positive even though cache is truncated.
 	if result.Count() < 1 {
 		t.Errorf("alarm checker with truncated cache and 1 local match: want Count>=1, got Count=%d", result.Count())
 	}

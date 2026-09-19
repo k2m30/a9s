@@ -16,10 +16,6 @@ import (
 	"github.com/k2m30/a9s/v3/tests/testdata"
 )
 
-// ---------------------------------------------------------------------------
-// T-NG01 - Test Node Groups three-step fetch (ListClusters -> ListNodegroups -> DescribeNodegroup)
-// ---------------------------------------------------------------------------
-
 func TestFetchNodeGroups_ParsesMultipleClustersAndGroups(t *testing.T) {
 	listClustersMock := &mockEKSListClustersClient{
 		output: &eks.ListClustersOutput{
@@ -106,7 +102,6 @@ func TestFetchNodeGroups_ParsesMultipleClustersAndGroups(t *testing.T) {
 		t.Fatalf("expected 3 resources, got %d", len(resources))
 	}
 
-	// Verify required fields exist on all resources
 	requiredFields := []string{"nodegroup_name", "cluster_name", "status", "instance_types", "desired_size"}
 	for i, r := range resources {
 		for _, key := range requiredFields {
@@ -116,7 +111,6 @@ func TestFetchNodeGroups_ParsesMultipleClustersAndGroups(t *testing.T) {
 		}
 	}
 
-	// Verify first node group (ng-web from cluster-a)
 	r0 := resources[0]
 	// the row id is "<cluster>/<nodegroup>" so a name
 	// reused across clusters keeps its own row; the bare name is Name and
@@ -127,8 +121,6 @@ func TestFetchNodeGroups_ParsesMultipleClustersAndGroups(t *testing.T) {
 	if r0.Name != "ng-web" {
 		t.Errorf("resource[0].Name: expected %q, got %q", "ng-web", r0.Name)
 	}
-	// Post-PR-03c: fetcher no longer writes Status for ACTIVE node groups.
-	// State lives in Fields["status"]; ACTIVE node groups emit no Finding.
 	if len(r0.Findings) != 0 {
 		t.Errorf("resource[0].Findings: got %d, want 0 for ACTIVE node group", len(r0.Findings))
 	}
@@ -148,7 +140,6 @@ func TestFetchNodeGroups_ParsesMultipleClustersAndGroups(t *testing.T) {
 		t.Errorf("resource[0].Fields[\"desired_size\"]: expected %q, got %q", "3", r0.Fields["desired_size"])
 	}
 
-	// Verify second node group (ng-worker from cluster-a) - multiple instance types
 	r1 := resources[1]
 	if r1.Fields["nodegroup_name"] != "ng-worker" {
 		t.Errorf("resource[1].Fields[\"nodegroup_name\"]: expected %q, got %q", "ng-worker", r1.Fields["nodegroup_name"])
@@ -163,7 +154,6 @@ func TestFetchNodeGroups_ParsesMultipleClustersAndGroups(t *testing.T) {
 		t.Errorf("resource[1].Fields[\"desired_size\"]: expected %q, got %q", "5", r1.Fields["desired_size"])
 	}
 
-	// Verify third node group (ng-api from cluster-b) - different cluster, creating status
 	r2 := resources[2]
 	if r2.Fields["nodegroup_name"] != "ng-api" {
 		t.Errorf("resource[2].Fields[\"nodegroup_name\"]: expected %q, got %q", "ng-api", r2.Fields["nodegroup_name"])
@@ -171,8 +161,6 @@ func TestFetchNodeGroups_ParsesMultipleClustersAndGroups(t *testing.T) {
 	if r2.Fields["cluster_name"] != "cluster-b" {
 		t.Errorf("resource[2].Fields[\"cluster_name\"]: expected %q, got %q", "cluster-b", r2.Fields["cluster_name"])
 	}
-	// Post-PR-03c: CREATING is a transitional state — fetcher emits SevWarn Finding,
-	// stops writing Status. State lives in Fields["status"].
 	if r2.Fields["status"] != "CREATING" {
 		t.Errorf("resource[2].Fields[status]: expected %q, got %q", "CREATING", r2.Fields["status"])
 	}
@@ -251,9 +239,8 @@ func TestFetchNodeGroups_DescribeNodegroupError(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected an error, got nil")
 	}
-	// DescribeNodegroup failing for a listed node group does not drop it —
-	// fetchNodeGroupsPage keeps a name-only degraded row (DegradedDetails)
-	// and folds the failure into the composite error instead.
+	// A node group whose DescribeNodegroup fails stays as a name-only degraded
+	// row (DegradedDetails), and the failure joins the composite error.
 	if len(resources) != 1 {
 		t.Fatalf("expected 1 degraded resource on describe failure, got %d resources", len(resources))
 	}
@@ -362,7 +349,6 @@ func TestFetchNodeGroups_RawStructPopulated(t *testing.T) {
 
 	r := resources[0]
 
-	// Verify RawStruct is set and is the correct type
 	if r.RawStruct == nil {
 		t.Fatal("expected RawStruct to be non-nil")
 	}
@@ -399,7 +385,7 @@ func TestFetchNodeGroups_NilScalingConfig(t *testing.T) {
 					ClusterName:   aws.String("cluster-z"),
 					Status:        ekstypes.NodegroupStatusActive,
 					InstanceTypes: []string{"t3.micro"},
-					ScalingConfig: nil, // nil ScalingConfig
+					ScalingConfig: nil,
 				},
 			},
 		},
@@ -419,22 +405,14 @@ func TestFetchNodeGroups_NilScalingConfig(t *testing.T) {
 
 	r := resources[0]
 
-	// When ScalingConfig is nil, desired_size should be empty
 	if r.Fields["desired_size"] != "" {
 		t.Errorf("expected empty desired_size with nil ScalingConfig, got %q", r.Fields["desired_size"])
 	}
 }
 
-// ---------------------------------------------------------------------------
-// T-NG-REAL - Test node groups fetcher with sanitized fixture data
-// (3 node groups from test-cluster-1: gpu CREATE_FAILED, kafka ACTIVE, system ACTIVE)
-// ---------------------------------------------------------------------------
-
 func TestFetchNodeGroups_RealAWSData(t *testing.T) {
 	realNGs := testdata.RealNodeGroups()
 
-	// Build the three-step mock using sanitized data
-	// All 3 node groups belong to the single cluster "test-cluster-1"
 	clusterName := "test-cluster-1"
 
 	listClustersMock := &mockEKSListClustersClient{
@@ -475,7 +453,6 @@ func TestFetchNodeGroups_RealAWSData(t *testing.T) {
 		t.Fatalf("expected no error, got %v", err)
 	}
 
-	// Sanitized data has exactly 3 node groups
 	if len(resources) != 3 {
 		t.Fatalf("expected 3 resources from real data, got %d", len(resources))
 	}
@@ -488,14 +465,11 @@ func TestFetchNodeGroups_RealAWSData(t *testing.T) {
 		byName[r.Fields["nodegroup_name"]] = i
 	}
 
-	// --- Node Group 1: GPU (CREATE_FAILED) ---
 	gpuIdx, ok := byName["gpu-20250101120000000000000001"]
 	if !ok {
 		t.Fatal("missing gpu node group in results")
 	}
 	gpu := resources[gpuIdx]
-	// Post-PR-03c: CREATE_FAILED is a broken state — fetcher emits SevBroken Finding,
-	// stops writing Status. State lives in Fields["status"].
 	if gpu.Fields["status"] != "CREATE_FAILED" {
 		t.Errorf("gpu node group Fields[status]: expected %q, got %q", "CREATE_FAILED", gpu.Fields["status"])
 	}
@@ -518,7 +492,6 @@ func TestFetchNodeGroups_RealAWSData(t *testing.T) {
 		t.Errorf("gpu node group desired_size: expected %q, got %q", "2", gpu.Fields["desired_size"])
 	}
 
-	// Verify RawStruct contains health issues (real CREATE_FAILED data)
 	gpuRaw, ok := gpu.RawStruct.(*ekstypes.Nodegroup)
 	if !ok {
 		t.Fatalf("gpu RawStruct should be *ekstypes.Nodegroup, got %T", gpu.RawStruct)
@@ -533,13 +506,11 @@ func TestFetchNodeGroups_RealAWSData(t *testing.T) {
 		t.Errorf("gpu health issue message should contain VcpuLimitExceeded")
 	}
 
-	// --- Node Group 2: Kafka (ACTIVE, fixed 3/3/3 scaling, NO_SCHEDULE taint) ---
 	kafkaIdx, ok := byName["kafka-20250101120000000000000002"]
 	if !ok {
 		t.Fatal("missing kafka node group in results")
 	}
 	kafka := resources[kafkaIdx]
-	// Post-PR-03c: fetcher no longer writes Status for ACTIVE node groups.
 	if len(kafka.Findings) != 0 {
 		t.Errorf("kafka node group Findings: got %d, want 0 for ACTIVE", len(kafka.Findings))
 	}
@@ -549,8 +520,6 @@ func TestFetchNodeGroups_RealAWSData(t *testing.T) {
 	if kafka.Fields["desired_size"] != "3" {
 		t.Errorf("kafka node group desired_size: expected %q, got %q", "3", kafka.Fields["desired_size"])
 	}
-	// Fixed-size cluster: min=max=desired=3
-	// Verify taint is preserved in RawStruct
 	kafkaRaw, ok := kafka.RawStruct.(*ekstypes.Nodegroup)
 	if !ok {
 		t.Fatalf("kafka RawStruct should be *ekstypes.Nodegroup, got %T", kafka.RawStruct)
@@ -564,18 +533,15 @@ func TestFetchNodeGroups_RealAWSData(t *testing.T) {
 	if kafkaRaw.Taints[0].Effect != ekstypes.TaintEffectNoSchedule {
 		t.Errorf("kafka taint effect: expected NO_SCHEDULE, got %v", kafkaRaw.Taints[0].Effect)
 	}
-	// Kafka health should be clean (empty issues)
 	if kafkaRaw.Health == nil || len(kafkaRaw.Health.Issues) != 0 {
 		t.Errorf("kafka health should have 0 issues, got %v", kafkaRaw.Health)
 	}
 
-	// --- Node Group 3: system (ACTIVE, 2-3x t3.large, karpenter label) ---
 	systemIdx, ok := byName["system-20250101120000000000000003"]
 	if !ok {
 		t.Fatal("missing system node group in results")
 	}
 	system := resources[systemIdx]
-	// Post-PR-03c: fetcher no longer writes Status for ACTIVE node groups.
 	if len(system.Findings) != 0 {
 		t.Errorf("system node group Findings: got %d, want 0 for ACTIVE", len(system.Findings))
 	}
@@ -585,7 +551,6 @@ func TestFetchNodeGroups_RealAWSData(t *testing.T) {
 	if system.Fields["desired_size"] != "2" {
 		t.Errorf("system desired_size: expected %q, got %q", "2", system.Fields["desired_size"])
 	}
-	// system has no taints
 	systemRaw, ok := system.RawStruct.(*ekstypes.Nodegroup)
 	if !ok {
 		t.Fatalf("system RawStruct should be *ekstypes.Nodegroup, got %T", system.RawStruct)
@@ -594,34 +559,23 @@ func TestFetchNodeGroups_RealAWSData(t *testing.T) {
 		t.Errorf("system should have 0 taints, got %d", len(systemRaw.Taints))
 	}
 
-	// --- Cross-cutting assertions for all 3 node groups ---
 	for i, r := range resources {
-		// All belong to the same cluster
 		if r.Fields["cluster_name"] != "test-cluster-1" {
 			t.Errorf("resource[%d].Fields[cluster_name]: expected %q, got %q", i, "test-cluster-1", r.Fields["cluster_name"])
 		}
-		// the id is the cluster-scoped name, the display
-		// name the bare one. The old assertion was ID == Name; it is not to be
-		// restored, since a bare-name id drops a node group whose name another
-		// cluster also uses.
+		// The id is the cluster-scoped name and the display name the bare one: a
+		// bare-name id drops a node group whose name another cluster also uses.
 		if want := "test-cluster-1/" + r.Name; r.ID != want {
 			t.Errorf("resource[%d]: ID (%q) should be %q", i, r.ID, want)
 		}
-		// Required fields present
 		requiredFields := []string{"nodegroup_name", "cluster_name", "status", "instance_types", "desired_size"}
 		for _, key := range requiredFields {
 			if _, ok := r.Fields[key]; !ok {
 				t.Errorf("resource[%d].Fields missing key %q", i, key)
 			}
 		}
-		// RawStruct must be non-nil
 		if r.RawStruct == nil {
 			t.Errorf("resource[%d].RawStruct must not be nil", i)
 		}
-		// All share same Kubernetes version 1.31
-		// All share same release version
-		// All are ON_DEMAND capacity type
-		// All share the same 3 subnets
-		// All have Tag: name = test-cluster-1
 	}
 }

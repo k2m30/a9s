@@ -14,8 +14,6 @@ import (
 	"github.com/k2m30/a9s/v3/internal/tui"
 )
 
-// Reveals bug: detail opened when terminal is narrow, then widened.
-// RELATED column must appear automatically once width is sufficient.
 func TestBugReveal_EC2Detail_AutoShowsRelatedAfterResizeToWide(t *testing.T) {
 	m := newBlessedModel(t, "demo", "us-east-1",
 		tui.WithClients(demo.NewServiceClients()),
@@ -30,7 +28,6 @@ func TestBugReveal_EC2Detail_AutoShowsRelatedAfterResizeToWide(t *testing.T) {
 		}
 	}
 
-	// Start narrow so detail initially has no room for related column.
 	m2, _ := rootApplyMsg(m, tea.WindowSizeMsg{Width: 59, Height: 36})
 	m = m2
 
@@ -53,7 +50,6 @@ func TestBugReveal_EC2Detail_AutoShowsRelatedAfterResizeToWide(t *testing.T) {
 		t.Fatalf("precondition failed: RELATED should not render at width 59; got:\n%s", narrow)
 	}
 
-	// Resize to wide; RELATED should auto-appear without keypress.
 	m2, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 140, Height: 36})
 	m = m2
 	wide := stripANSI(rootViewContent(m))
@@ -62,8 +58,6 @@ func TestBugReveal_EC2Detail_AutoShowsRelatedAfterResizeToWide(t *testing.T) {
 	}
 }
 
-// User choice guard: once RELATED is explicitly hidden with 'r', resizing should
-// not auto-show it again.
 func TestBugReveal_EC2Detail_ResizeDoesNotOverrideExplicitHide(t *testing.T) {
 	m := newBlessedModel(t, "demo", "us-east-1",
 		tui.WithClients(demo.NewServiceClients()),
@@ -100,7 +94,6 @@ func TestBugReveal_EC2Detail_ResizeDoesNotOverrideExplicitHide(t *testing.T) {
 		t.Fatalf("precondition failed: expected RELATED at wide width before explicit toggle; got:\n%s", before)
 	}
 
-	// First r hides the auto-shown column.
 	m2, _ = rootApplyMsg(m, rootKeyPress("r"))
 	m = m2
 	hidden := stripANSI(rootViewContent(m))
@@ -108,7 +101,6 @@ func TestBugReveal_EC2Detail_ResizeDoesNotOverrideExplicitHide(t *testing.T) {
 		t.Fatalf("expected RELATED to be hidden after explicit toggle; got:\n%s", hidden)
 	}
 
-	// Resize around breakpoints; explicit hide must be respected.
 	m2, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 70, Height: 36})
 	m = m2
 	m2, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 140, Height: 36})

@@ -1,5 +1,5 @@
 // fakes_us1_test.go contains fake implementations of AWS service client
-// interfaces used by the US1 batch-1 checker tests. All fakes are in
+// interfaces used by the related-checker tests. All fakes are in
 // package unit_test (external test package) so they do NOT rely on any
 // shared state in mocks_test.go (package unit).
 package unit_test
@@ -22,10 +22,6 @@ import (
 	lambdapkg "github.com/aws/aws-sdk-go-v2/service/lambda"
 	lambdatypes "github.com/aws/aws-sdk-go-v2/service/lambda/types"
 )
-
-// The fake client for EventBridgeAPI now lives in fakes_eventbridge_test.go
-// (fakeEventBridgeAPI) — see that file's header for the one-fake-per-
-// interface convention.
 
 // ---------------------------------------------------------------------------
 // Backup fake — implements BackupAPI

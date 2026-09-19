@@ -1,16 +1,6 @@
 package unit
 
 // enrichment_pipeline_findings_test.go — Behavioral tests for EnrichCodePipelineStatus.
-//
-// Contract assertions (enricher-contract.md):
-//   - Returns EnricherResult.Findings keyed by resource ID (r.ID), with name fallback when ID is empty.
-//   - Severity "!" for all findings.
-//   - Phrase: the catalog's registered phrase for pipeline.stage-failed, with
-//     every failed stage as a supporting row.
-//   - IssueCount = len(Findings).
-//   - Truncated = true when len(resources) > EnrichmentCap.
-//   - Pipelines with no failed stages must NOT appear in Findings.
-//   - Empty resources slice → non-nil empty Findings map.
 
 import (
 	"context"

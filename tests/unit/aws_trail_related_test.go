@@ -12,8 +12,6 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// trailCheckerByTarget retrieves the RelatedChecker for the given targetType
-// and fails the test if the checker is nil or not found.
 func trailCheckerByTarget(t *testing.T, target string) resource.RelatedChecker {
 	t.Helper()
 	for _, def := range resource.GetRelated("trail") {
@@ -28,7 +26,6 @@ func trailCheckerByTarget(t *testing.T, target string) resource.RelatedChecker {
 	return nil
 }
 
-// trailSrcResource returns a canonical test resource for a CloudTrail trail.
 func trailSrcResource() resource.Resource {
 	return resource.Resource{
 		ID:   "my-trail",
@@ -47,10 +44,6 @@ func trailSrcResource() resource.Resource {
 	}
 }
 
-// --- S3 Bucket checker tests ---
-
-// TestRelated_Trail_S3_Match verifies that a trail whose S3BucketName matches
-// a bucket in the s3 cache produces Count=1.
 func TestRelated_Trail_S3_Match(t *testing.T) {
 	s3Res := resource.Resource{
 		ID:   "my-audit-bucket",
@@ -68,8 +61,6 @@ func TestRelated_Trail_S3_Match(t *testing.T) {
 	}
 }
 
-// TestRelated_Trail_S3_NoMatch verifies that a trail whose S3BucketName does
-// not match any bucket in the s3 cache produces Count=0.
 func TestRelated_Trail_S3_NoMatch(t *testing.T) {
 	s3Res := resource.Resource{
 		ID:   "different-bucket",
@@ -87,13 +78,7 @@ func TestRelated_Trail_S3_NoMatch(t *testing.T) {
 	}
 }
 
-// --- Log Groups checker tests ---
-
-// TestRelated_Trail_Logs_Match verifies that a trail with a
-// CloudWatchLogsLogGroupArn whose log group name matches a logs cache entry
-// produces Count=1.
 func TestRelated_Trail_Logs_Match(t *testing.T) {
-	// The log group name extracted from the ARN is "/aws/cloudtrail/my-trail".
 	logRes := resource.Resource{
 		ID:   "/aws/cloudtrail/my-trail",
 		Name: "/aws/cloudtrail/my-trail",
@@ -110,8 +95,6 @@ func TestRelated_Trail_Logs_Match(t *testing.T) {
 	}
 }
 
-// TestRelated_Trail_Logs_NilArn verifies that a trail without a
-// CloudWatchLogsLogGroupArn produces Count=0.
 func TestRelated_Trail_Logs_NilArn(t *testing.T) {
 	res := resource.Resource{
 		ID:   "no-logs-trail",
@@ -122,7 +105,6 @@ func TestRelated_Trail_Logs_NilArn(t *testing.T) {
 		RawStruct: cloudtrailtypes.Trail{
 			Name:         new("no-logs-trail"),
 			S3BucketName: new("some-bucket"),
-			// CloudWatchLogsLogGroupArn intentionally nil
 		},
 	}
 	logRes := resource.Resource{
@@ -141,10 +123,6 @@ func TestRelated_Trail_Logs_NilArn(t *testing.T) {
 	}
 }
 
-// --- SNS Topic checker tests ---
-
-// TestRelated_Trail_SNS_Match verifies that a trail with a SnsTopicARN matching
-// an SNS topic in the cache produces Count=1.
 func TestRelated_Trail_SNS_Match(t *testing.T) {
 	topicARN := "arn:aws:sns:us-east-1:123456789012:cloudtrail-notifications"
 	snsRes := resource.Resource{
@@ -169,8 +147,6 @@ func TestRelated_Trail_SNS_Match(t *testing.T) {
 	}
 }
 
-// TestRelated_Trail_SNS_NilArn verifies that a trail without a SnsTopicARN
-// produces Count=0.
 func TestRelated_Trail_SNS_NilArn(t *testing.T) {
 	res := resource.Resource{
 		ID:   "no-sns-trail",
@@ -181,7 +157,6 @@ func TestRelated_Trail_SNS_NilArn(t *testing.T) {
 		RawStruct: cloudtrailtypes.Trail{
 			Name:         new("no-sns-trail"),
 			S3BucketName: new("some-bucket"),
-			// SnsTopicARN intentionally nil
 		},
 	}
 	topicARN := "arn:aws:sns:us-east-1:123456789012:cloudtrail-notifications"
@@ -204,10 +179,6 @@ func TestRelated_Trail_SNS_NilArn(t *testing.T) {
 	}
 }
 
-// --- KMS Key checker tests ---
-
-// TestRelated_Trail_KMS_Match verifies that a trail with a KmsKeyId matching a
-// KMS key in the cache produces Count=1.
 func TestRelated_Trail_KMS_Match(t *testing.T) {
 	// KMS resources use the bare UUID as their ID.
 	kmsRes := resource.Resource{
@@ -226,10 +197,6 @@ func TestRelated_Trail_KMS_Match(t *testing.T) {
 	}
 }
 
-// --- Nil clients / empty cache test ---
-
-// TestRelated_Trail_NilClients verifies that all checkers return Count=-1 when
-// the cache has no relevant entry and clients is nil (cache miss).
 func TestRelated_Trail_NilClients(t *testing.T) {
 	emptyCache := resource.ResourceCache{}
 	res := trailSrcResource()
@@ -244,10 +211,6 @@ func TestRelated_Trail_NilClients(t *testing.T) {
 	}
 }
 
-// --- NavigableFields test ---
-
-// TestNavigableFields_Trail verifies that the S3BucketName→s3 navigable field
-// is registered for the trail resource type.
 func TestNavigableFields_Trail(t *testing.T) {
 	fields := resource.GetNavigableFields("trail")
 	if len(fields) == 0 {

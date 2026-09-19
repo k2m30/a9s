@@ -1,7 +1,5 @@
 package unit_test
 
-// aws_ami_ng_related_test.go — the AMI→NG related checker.
-//
 // checkAMING matches on Fields["image_id"], which FetchNodeGroups resolves
 // from the nodegroup's custom LaunchTemplate via EC2
 // DescribeLaunchTemplateVersions.
@@ -14,10 +12,6 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// ---------------------------------------------------------------------------
-// Helper: find the AMI→NG checker from the registry
-// ---------------------------------------------------------------------------
-
 func findCheckAMING(t *testing.T) resource.RelatedChecker {
 	t.Helper()
 	for _, def := range resource.GetRelated("ami") {
@@ -28,10 +22,6 @@ func findCheckAMING(t *testing.T) resource.RelatedChecker {
 	t.Fatal("checkAMING not registered under ami→ng")
 	return nil
 }
-
-// ---------------------------------------------------------------------------
-// T-AMI-NG01: Checker matches when NG has Fields["image_id"] == AMI ID
-// ---------------------------------------------------------------------------
 
 func TestCheckAMING_MatchesWhenNGImageIDMatches(t *testing.T) {
 	checker := findCheckAMING(t)
@@ -57,7 +47,7 @@ func TestCheckAMING_MatchesWhenNGImageIDMatches(t *testing.T) {
 						"status":         "ACTIVE",
 						"instance_types": "m5.large",
 						"desired_size":   "2",
-						"image_id":       "ami-xyz", // resoled from custom LaunchTemplate
+						"image_id":       "ami-xyz", // resolved from custom LaunchTemplate
 					},
 				},
 			},
@@ -84,10 +74,6 @@ func TestCheckAMING_MatchesWhenNGImageIDMatches(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// T-AMI-NG02: No match when image_id differs
-// ---------------------------------------------------------------------------
-
 func TestCheckAMING_NoMatchWhenImageIDDiffers(t *testing.T) {
 	checker := findCheckAMING(t)
 
@@ -111,7 +97,7 @@ func TestCheckAMING_NoMatchWhenImageIDDiffers(t *testing.T) {
 						"status":         "ACTIVE",
 						"instance_types": "t3.large",
 						"desired_size":   "3",
-						"image_id":       "ami-other", // different AMI
+						"image_id":       "ami-other",
 					},
 				},
 			},
@@ -131,10 +117,6 @@ func TestCheckAMING_NoMatchWhenImageIDDiffers(t *testing.T) {
 		t.Error("Truncated = true, want false (non-truncated cache — definitive zero)")
 	}
 }
-
-// ---------------------------------------------------------------------------
-// T-AMI-NG03: Truncated=true when cache is truncated and no match found
-// ---------------------------------------------------------------------------
 
 func TestCheckAMING_TruncatedWhenCacheTruncatedAndNoMatch(t *testing.T) {
 	checker := findCheckAMING(t)
@@ -161,7 +143,7 @@ func TestCheckAMING_TruncatedWhenCacheTruncatedAndNoMatch(t *testing.T) {
 						"status":         "ACTIVE",
 						"instance_types": "r5.large",
 						"desired_size":   "5",
-						"image_id":       "ami-other", // different AMI
+						"image_id":       "ami-other",
 					},
 				},
 			},
@@ -184,10 +166,6 @@ func TestCheckAMING_TruncatedWhenCacheTruncatedAndNoMatch(t *testing.T) {
 		t.Errorf("Err = %v, want nil", result.Err())
 	}
 }
-
-// ---------------------------------------------------------------------------
-// T-AMI-NG04: Multiple NGs — only matching ones counted
-// ---------------------------------------------------------------------------
 
 func TestCheckAMING_CountsOnlyMatchingNGs(t *testing.T) {
 	checker := findCheckAMING(t)
@@ -236,7 +214,6 @@ func TestCheckAMING_CountsOnlyMatchingNGs(t *testing.T) {
 	if len(result.ResourceIDs()) != 2 {
 		t.Errorf("ResourceIDs length = %d, want 2; got %v", len(result.ResourceIDs()), result.ResourceIDs())
 	}
-	// Verify both matching nodegroups are present in ResourceIDs
 	found := make(map[string]bool)
 	for _, id := range result.ResourceIDs() {
 		found[id] = true
@@ -248,10 +225,6 @@ func TestCheckAMING_CountsOnlyMatchingNGs(t *testing.T) {
 		t.Error("ResourceIDs missing \"ng-c\"")
 	}
 }
-
-// ---------------------------------------------------------------------------
-// T-AMI-NG05: AMI with empty ID returns Count=0 without touching cache
-// ---------------------------------------------------------------------------
 
 func TestCheckAMING_EmptyAMIIDReturnsZero(t *testing.T) {
 	checker := findCheckAMING(t)

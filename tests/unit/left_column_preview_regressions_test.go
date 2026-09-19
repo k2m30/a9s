@@ -15,10 +15,7 @@ import (
 )
 
 // makePreviewEC2Detail builds a Controller with a ScreenDetail on the stack
-// for the first demo EC2 fixture, ready for previewDetailView — the live
-// replacement for the retired views.NewDetail(...).SetSize(...) chain
-// (DetailModel.View/Update are dead; see
-// specs/022-codebase-cleanup/wave3-map-detail.md).
+// for the first demo EC2 fixture, ready for previewDetailView.
 func makePreviewEC2Detail(t *testing.T, w, h int) *app.Controller {
 	t.Helper()
 	ec2Client := fakes.NewEC2()

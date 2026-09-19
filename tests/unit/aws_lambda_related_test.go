@@ -28,8 +28,6 @@ func lambdaCheckerByTarget(t *testing.T, target string) resource.RelatedChecker 
 	return nil
 }
 
-// --- Navigable Field Registration ---
-
 func TestNavigableFields_Lambda_Registered(t *testing.T) {
 	nav := resource.IsFieldNavigableForTest("lambda", "Role")
 	if nav == nil {
@@ -39,8 +37,6 @@ func TestNavigableFields_Lambda_Registered(t *testing.T) {
 		t.Errorf("Role TargetType = %q, want %q", nav.TargetType, "role")
 	}
 }
-
-// --- IAM Role checker (Pattern C — cache, name extracted from ARN) ---
 
 func TestRelated_Lambda_Role_Found(t *testing.T) {
 	const roleARN = "arn:aws:iam::123456789012:role/my-lambda-role"
@@ -129,8 +125,6 @@ func TestRelated_Lambda_Role_CacheMissNoClients(t *testing.T) {
 		t.Errorf("Count = %d, want -1 (unknown)", result.Count())
 	}
 }
-
-// --- CloudWatch Alarms checker (Pattern C — cache, FunctionName dimension) ---
 
 func TestRelated_Lambda_Alarms_Found(t *testing.T) {
 	const fnName = "my-function"
@@ -229,16 +223,8 @@ func TestRelated_Lambda_Alarms_CacheMissNoClients(t *testing.T) {
 	}
 }
 
-// --- Stub checkers (nil Checker) ---
-
-// ---------------------------------------------------------------------------
-// checkLambdaECR — Pattern F: no API call, reads PackageType + image_uri field
-// ---------------------------------------------------------------------------
-
-// TestRelated_Lambda_ECR_Match verifies that a container-image Lambda with an
-// image URI field returns Count=1 with the repository name.
-// TestRelated_Lambda_ECR_Match verifies the checkLambdaECR mechanism per
-// lambda.md:72: the image URI is only available from GetFunction's
+// TestRelated_Lambda_ECR_Match verifies the checkLambdaECR mechanism:
+// the image URI is only available from GetFunction's
 // Code.ImageUri (ListFunctions/FunctionConfiguration never carries it), so
 // the checker must call GetFunction for this one Image-package function
 // rather than trust a Fields["image_uri"] value the real fetcher never sets.
@@ -297,8 +283,8 @@ func TestRelated_Lambda_ECR_Empty(t *testing.T) {
 }
 
 // TestRelated_Lambda_ECR_NoClientReturnsUnknown verifies that an Image-package
-// function with no live Lambda client available (GetFunction is required per
-// lambda.md:72 — there is no cached fallback) returns Count=-1.
+// function with no live Lambda client available returns Count=-1: the image
+// URI comes only from GetFunction.
 func TestRelated_Lambda_ECR_NoClientReturnsUnknown(t *testing.T) {
 	src := resource.Resource{
 		ID:     "my-function",
@@ -338,7 +324,7 @@ func TestRelated_Lambda_ECR_ImageTypeNoURI(t *testing.T) {
 }
 
 // TestRelated_Lambda_ECR_ImageURIWithDigest: image URI with @sha256 digest suffix
-// is parsed correctly (digest stripped), sourced via GetFunction per lambda.md:72.
+// is parsed correctly (digest stripped), sourced via GetFunction.
 func TestRelated_Lambda_ECR_ImageURIWithDigest(t *testing.T) {
 	src := resource.Resource{
 		ID:     "my-digest-function",
@@ -368,10 +354,6 @@ func TestRelated_Lambda_ECR_ImageURIWithDigest(t *testing.T) {
 		t.Errorf("ResourceIDs = %v, want [my-ecr-repo]", result.ResourceIDs())
 	}
 }
-
-// ---------------------------------------------------------------------------
-// checkLambdaLogs — Pattern C: default log group "/aws/lambda/{name}", custom via LoggingConfig
-// ---------------------------------------------------------------------------
 
 func TestRelated_Lambda_Logs_DefaultLogGroup(t *testing.T) {
 	const fnName = "my-function"
@@ -478,10 +460,6 @@ func TestRelated_Lambda_Logs_EmptyFunctionName(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// checkLambdaSG — Pattern F: reads VpcConfig.SecurityGroupIds
-// ---------------------------------------------------------------------------
-
 func TestRelated_Lambda_SG_VPCFunction(t *testing.T) {
 	src := resource.Resource{
 		ID:   "vpc-function",
@@ -530,10 +508,6 @@ func TestRelated_Lambda_SG_WrongRawStruct(t *testing.T) {
 		t.Errorf("Count = %d, want -1 (wrong RawStruct type)", result.Count())
 	}
 }
-
-// ---------------------------------------------------------------------------
-// checkLambdaVPC — Pattern F: reads VpcConfig.VpcId
-// ---------------------------------------------------------------------------
 
 func TestRelated_Lambda_VPC_VPCFunction(t *testing.T) {
 	src := resource.Resource{
@@ -601,10 +575,6 @@ func TestRelated_Lambda_VPC_WrongRawStruct(t *testing.T) {
 		t.Errorf("Count = %d, want -1 (wrong RawStruct type)", result.Count())
 	}
 }
-
-// ---------------------------------------------------------------------------
-// checkLambdaKMS — Pattern F: reads KMSKeyArn
-// ---------------------------------------------------------------------------
 
 func TestRelated_Lambda_KMS_WithKMSKey(t *testing.T) {
 	src := resource.Resource{
@@ -688,10 +658,6 @@ func TestRelated_Lambda_KMS_KMSKeyNoSlash(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// checkLambdaSQS — nil client path
-// ---------------------------------------------------------------------------
-
 func TestRelated_Lambda_SQS_NilClients(t *testing.T) {
 	src := resource.Resource{
 		ID:   "my-function",
@@ -719,10 +685,6 @@ func TestRelated_Lambda_SQS_EmptyFunctionName(t *testing.T) {
 		t.Errorf("Count = %d, want 0 (empty function name)", result.Count())
 	}
 }
-
-// ---------------------------------------------------------------------------
-// checkLambdaCFN — nil client / no FunctionArn paths
-// ---------------------------------------------------------------------------
 
 func TestRelated_Lambda_CFN_WrongRawStruct(t *testing.T) {
 	src := resource.Resource{
@@ -752,10 +714,6 @@ func TestRelated_Lambda_CFN_NoFunctionArn(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// checkLambdaEBRule — nil client and no ARN/name paths
-// ---------------------------------------------------------------------------
-
 func TestRelated_Lambda_EBRule_WrongRawStruct(t *testing.T) {
 	src := resource.Resource{
 		ID:        "my-function",
@@ -783,10 +741,6 @@ func TestRelated_Lambda_EBRule_EmptyARNAndName(t *testing.T) {
 		t.Errorf("Count = %d, want 0 (no ARN and no name)", result.Count())
 	}
 }
-
-// ---------------------------------------------------------------------------
-// checkLambdaAlarms — truncated cache path
-// ---------------------------------------------------------------------------
 
 func TestRelated_Lambda_Alarms_TruncatedCacheNoMatch(t *testing.T) {
 	const fnName = "my-function"

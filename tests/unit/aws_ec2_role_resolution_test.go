@@ -1,14 +1,6 @@
-// ---------------------------------------------------------------------------
-// checkEC2Role must resolve the ACTUAL IAM role name behind an auto-generated
-// instance profile (EKS/ASG profiles commonly have profile name != role
-// name), not just the profile-ARN's last path segment. Contract:
-//   - cache["role"] fast path: if a role in cache matches the profile-derived
-//     name, return it with zero API calls.
-//   - otherwise one iam:GetInstanceProfile call resolving Roles[].RoleName.
-//   - API error -> State: RelatedError, Err set, no panic.
-//   - zero roles on the profile -> Count:0.
-//
-// ---------------------------------------------------------------------------
+// EKS/ASG instance profiles often carry a name different from their role, so
+// checkEC2Role resolves Roles[].RoleName through iam:GetInstanceProfile unless
+// cache["role"] already holds the profile-derived name.
 package unit_test
 
 import (
@@ -27,9 +19,6 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// ec2RoleCheckerByTarget returns the ec2->role RelatedChecker via the
-// registry, mirroring checkerByTarget (aws_iam_policies_related_test.go)
-// which lives in this same unit_test package.
 func ec2RoleCheckerByTarget(t *testing.T) resource.RelatedChecker {
 	t.Helper()
 	for _, def := range resource.GetRelated("ec2") {
@@ -44,10 +33,6 @@ func ec2RoleCheckerByTarget(t *testing.T) resource.RelatedChecker {
 	return nil
 }
 
-// recordingRoleIAM implements awsclient.IAMAPI's superset by embedding
-// fakeIAMForASG (defined in fakes_asg_eb_related_test.go, same package) and adds
-// a call counter for GetInstanceProfile so tests can assert zero-call fast
-// paths and exactly-one-call resolution paths.
 type recordingRoleIAM struct {
 	fakeIAMForASG
 	calls int
@@ -68,8 +53,6 @@ func ec2InstanceWithProfileARN(arn string) resource.Resource {
 	return resource.Resource{ID: "i-0123456789abcdef0", Name: "i-0123456789abcdef0", RawStruct: inst}
 }
 
-// 1. Auto-generated EKS/ASG profile name != role name: resolves the real
-// role name via exactly one iam:GetInstanceProfile call.
 func TestEC2Role_ResolvesRealRoleName_ViaGetInstanceProfile(t *testing.T) {
 	res := ec2InstanceWithProfileARN("arn:aws:iam::123456789012:instance-profile/eks-test-dev_1234567890123456789")
 
@@ -99,8 +82,6 @@ func TestEC2Role_ResolvesRealRoleName_ViaGetInstanceProfile(t *testing.T) {
 	}
 }
 
-// 2. Fast path: cache["role"] already contains a role whose ID equals the
-// profile-derived name -> zero GetInstanceProfile calls.
 func TestEC2Role_FastPath_CacheHit_ZeroAPICalls(t *testing.T) {
 	res := ec2InstanceWithProfileARN("arn:aws:iam::123456789012:instance-profile/my-shared-name")
 
@@ -133,7 +114,6 @@ func TestEC2Role_FastPath_CacheHit_ZeroAPICalls(t *testing.T) {
 	}
 }
 
-// 3. iam:GetInstanceProfile API error -> State: RelatedError with Err set, no panic.
 func TestEC2Role_GetInstanceProfileError_ReturnsNegativeOneWithErr(t *testing.T) {
 	res := ec2InstanceWithProfileARN("arn:aws:iam::123456789012:instance-profile/eks-test-dev_1234567890123456789")
 
@@ -154,7 +134,6 @@ func TestEC2Role_GetInstanceProfileError_ReturnsNegativeOneWithErr(t *testing.T)
 	}
 }
 
-// 4. Instance profile resolves but has zero roles attached -> Count:0.
 func TestEC2Role_ZeroRolesOnProfile_ReturnsZero(t *testing.T) {
 	res := ec2InstanceWithProfileARN("arn:aws:iam::123456789012:instance-profile/eks-test-dev_1234567890123456789")
 

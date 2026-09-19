@@ -41,7 +41,7 @@ type enumEdge struct {
 }
 
 // ---------------------------------------------------------------------------
-// T036 — EnumeratePaths on simple structs
+// EnumeratePaths on simple structs
 // ---------------------------------------------------------------------------
 
 func TestEnumeratePaths_ScalarStringField(t *testing.T) {
@@ -83,7 +83,7 @@ func TestEnumeratePaths_SliceField(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// T037 — EnumeratePaths edge cases
+// EnumeratePaths edge cases
 // ---------------------------------------------------------------------------
 
 func TestEnumeratePaths_PointerToStruct(t *testing.T) {

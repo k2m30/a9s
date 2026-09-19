@@ -211,8 +211,6 @@ func TestRelated_ACM_CF_EmptyCertARN(t *testing.T) {
 
 // --- acm→apigw: requires GetDomainNames (outside cache budget) ---
 
-// TestRelated_ACM_APIGW_NilClients: real cert RawStruct → State: RelatedUnknown
-// when clients are nil (acm:DescribeCertificate is the source of truth).
 // TestRelated_ACM_APIGW_EmptyInput: empty cert identity → Count: 0.
 func TestRelated_ACM_APIGW_EmptyInput(t *testing.T) {
 	source := resource.Resource{ID: "", Name: ""}
@@ -225,8 +223,6 @@ func TestRelated_ACM_APIGW_EmptyInput(t *testing.T) {
 
 // --- acm→r53: requires per-zone ListResourceRecordSets (outside cache budget) ---
 
-// TestRelated_ACM_R53_NilClients: real cert RawStruct → State: RelatedUnknown
-// when clients are nil (acm:DescribeCertificate is the source of truth).
 // TestRelated_ACM_R53_EmptyInput: empty cert identity → Count: 0.
 func TestRelated_ACM_R53_EmptyInput(t *testing.T) {
 	source := resource.Resource{ID: "", Name: ""}
@@ -244,7 +240,6 @@ func TestRelated_ACM_R53_EmptyCertARNInRawStruct(t *testing.T) {
 		Name: "example.com",
 		RawStruct: acmtypes.CertificateSummary{
 			DomainName: aws.String("example.com"),
-			// CertificateArn intentionally nil
 		},
 	}
 	checker := acmCheckerByTarget(t, "r53")
@@ -254,20 +249,10 @@ func TestRelated_ACM_R53_EmptyCertARNInRawStruct(t *testing.T) {
 	}
 }
 
-// --- checkACMELB: ARN parsing for ALB/NLB and Classic ELB shapes ---
-
-// TestRelated_ACM_ELB_ALBShape: an ALB ARN in InUseBy should produce the load balancer name.
-// Since we cannot mock the ACM API here, we cover the ARN-parsing branches directly
-// by exercising the full checker through a cache-backed path is not possible without
-// a live client. Instead we verify nil-client → -1 with a real CertificateArn,
-// confirming the early-exit path is hit only when ID and Name are both empty.
-// --- checkACMCF: truncated cache → TruncatedResult ---
-
 // TestRelated_ACM_CF_TruncatedCacheNoMatch: a truncated page that matched
 // nothing is a resolved zero carrying the truncation flag, rendered "(0+)".
-// Row 16 settled this against the Unknown reading I briefly pinned here: the
-// page WAS read, so zero-so-far is a fact, and the "+" is what says a later
-// page may add to it.
+// The page was read, so zero-so-far is a fact, and the "+" says a later page
+// may add to it.
 func TestRelated_ACM_CF_TruncatedCacheNoMatch(t *testing.T) {
 	certARN := "arn:aws:acm:us-east-1:111122223333:certificate/abc-123"
 	source := resource.Resource{
@@ -317,7 +302,7 @@ func TestRelated_ACM_CF_NilViewerCertificate(t *testing.T) {
 		ID: "E1NULLVIEWERCERT",
 		RawStruct: cftypes.DistributionSummary{
 			Id:                nil,
-			ViewerCertificate: nil, // no viewer cert
+			ViewerCertificate: nil,
 		},
 	}
 	withViewerCert := resource.Resource{

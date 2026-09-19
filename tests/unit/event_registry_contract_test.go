@@ -14,19 +14,10 @@ package unit
 // no duplicate entries hiding a real gap behind a coincidentally-matching
 // count.
 //
-// Boundary-sealing wave addition: the routing-classification half v2 had
-// deliberately deferred is rebuilt below (TestEventRouting_*), NOT copied
-// from attempt-1 — every citation was verified fresh against the CURRENT
-// core/app/handle.go and core/runtime/orchestrator.go. v2's routing is a
-// single Controller.Handle fold (calling Core.HandleEvent plus its own
-// per-type side channels) rather than attempt-1's TUI-Update()-switch-shaped
-// dispatch, so "neutral-handled" here means reachable from Controller.Handle
-// and/or Core.HandleEvent — the surface web/headless/tests all share —
-// regardless of whatever internal/tui's OWN separate Update() switch
-// additionally does for its own rendering needs (internal/tui keeps a bare
-// *runtime.Core plus, increasingly, an embedded *app.Controller — see
-// messages.CostsLoaded's case in internal/tui/app.go — so a type can be both
-// TUI-handled AND neutral-handled without contradiction).
+// "Neutral-handled" means reachable from Controller.Handle and/or
+// Core.HandleEvent — the surface web, headless and tests all share —
+// regardless of what internal/tui's own Update() switch additionally does for
+// rendering, so a type can be both TUI-handled and neutral-handled.
 
 import (
 	"go/ast"
@@ -42,9 +33,6 @@ import (
 	"github.com/k2m30/a9s/v3/core/runtime/messages"
 )
 
-// ercMessagesDir returns the repo-relative path to core/runtime/messages,
-// following the same filepath.Join("..", "..") repo-root pattern
-// testhelpers_forbidden_test.go uses to locate tests/unit.
 func ercMessagesDir() string {
 	root := filepath.Join("..", "..")
 	return filepath.Join(root, "core", "runtime", "messages")
@@ -91,8 +79,6 @@ func ercScanMarkerReceivers(t *testing.T, dir, methodName string) map[string]boo
 	return found
 }
 
-// ercReceiverBaseName returns the bare type name of a receiver expression,
-// unwrapping a pointer receiver's leading *.
 func ercReceiverBaseName(expr ast.Expr) string {
 	if star, ok := expr.(*ast.StarExpr); ok {
 		expr = star.X
@@ -155,33 +141,18 @@ func ercAssertExhaustive(t *testing.T, label string, declared map[string]bool, s
 	}
 }
 
-// TestEventRegistry_Events_ExhaustiveEnumeration is the exhaustiveness gate
-// for AllEventSamples(): every concrete type declaring isEvent() in
-// core/runtime/messages must have exactly one sample there, and every
-// sampled type must be a real isEvent() declaration.
 func TestEventRegistry_Events_ExhaustiveEnumeration(t *testing.T) {
 	declared := ercScanMarkerReceivers(t, ercMessagesDir(), "isEvent")
 	sampled := ercSampleTypeCounts(messages.AllEventSamples())
 	ercAssertExhaustive(t, "Event", declared, sampled)
 }
 
-// TestEventRegistry_Cmds_ExhaustiveEnumeration is the exhaustiveness gate
-// for AllCmdSamples(): every concrete type declaring isCmd() in
-// core/runtime/messages must have exactly one sample there, and every
-// sampled type must be a real isCmd() declaration.
 func TestEventRegistry_Cmds_ExhaustiveEnumeration(t *testing.T) {
 	declared := ercScanMarkerReceivers(t, ercMessagesDir(), "isCmd")
 	sampled := ercSampleTypeCounts(messages.AllCmdSamples())
 	ercAssertExhaustive(t, "Cmd", declared, sampled)
 }
 
-// TestEventRegistry_ScannerDetectsMarkerType_InIsolatedTempDir is the
-// executable detection proof: it writes a throwaway package messages file
-// containing a canary type with an isEvent() method into a fresh t.TempDir(),
-// points ercScanMarkerReceivers (the exact same helper the gate tests above
-// use) at that directory, and asserts the canary is found — proving the
-// scanner actually parses and matches declarations rather than vacuously
-// passing on an empty or misconfigured directory.
 func TestEventRegistry_ScannerDetectsMarkerType_InIsolatedTempDir(t *testing.T) {
 	dir := t.TempDir()
 	src := `package messages
@@ -201,7 +172,7 @@ func (zzzCanaryEvent) isEvent() {}
 }
 
 // ---------------------------------------------------------------------------
-// Routing classification (boundary-sealing wave).
+// Routing classification.
 // ---------------------------------------------------------------------------
 
 // ercRouteKind classifies where an Event/Cmd type is actually consumed.
@@ -237,10 +208,8 @@ type ercRoute struct {
 	Reason string
 }
 
-// ercEventRoutes classifies every concrete messages.Event type. Verified
-// fresh against core/app/handle.go and core/runtime/orchestrator.go (not
-// copied from attempt-1's table, which predates the single-Controller-fold
-// shape) — see each Reason for the exact citation.
+// ercEventRoutes classifies every concrete messages.Event type; each Reason
+// cites the dispatch site.
 var ercEventRoutes = map[string]ercRoute{
 	"ResourcesLoaded": {ercNeutralHandled,
 		"Controller.Handle (handle.go): handleResourcesLoadedEvent + reapplyCheckerAgainst + autoOpenSingleDetail; " +
@@ -311,13 +280,10 @@ var ercEventRoutes = map[string]ercRoute{
 			"by external modules)"},
 }
 
-// ercCmdRoutes classifies every concrete messages.Cmd type. Unlike Event,
-// every Cmd type is legitimately TUI-only by architecture — Cmd is the
-// runtime-to-adapter directive channel (Navigate, PopView, fetch triggers,
-// …); there is no "neutral" bucket to check against, only "does
-// internal/tui/app.go's Update() switch have a case for it". Verified fresh
-// against internal/tui/app.go's switch (item (d)'s "if tractable" — it is:
-// all 10 map cleanly to one file's switch).
+// ercCmdRoutes classifies every concrete messages.Cmd type. Every Cmd type is
+// TUI-only by architecture — Cmd is the runtime-to-adapter directive channel
+// (Navigate, PopView, fetch triggers, …) — so the only question is whether
+// internal/tui/app.go's Update() switch has a case for it.
 var ercCmdRoutes = map[string]string{
 	"Navigate":        "internal/tui/app.go case messages.Navigate -> m.handleNavigate",
 	"PopView":         "internal/tui/app.go case messages.PopView -> m.popRS",
@@ -331,11 +297,6 @@ var ercCmdRoutes = map[string]string{
 	"RelatedNavigate": "internal/tui/app.go case messages.RelatedNavigate -> m.handleRelatedNavigate",
 }
 
-// TestEventRouting_Classification_SetEqualsDeclaredEvents asserts
-// ercEventRoutes classifies EVERY concrete Event type the AST scan finds —
-// reusing ercScanMarkerReceivers/ercMessagesDir, the same declared-set source
-// the exhaustiveness gate above uses — and nothing extra. A new Event type
-// with no entry here fails the suite instead of silently passing.
 func TestEventRouting_Classification_SetEqualsDeclaredEvents(t *testing.T) {
 	declared := ercScanMarkerReceivers(t, ercMessagesDir(), "isEvent")
 
@@ -362,8 +323,6 @@ func TestEventRouting_Classification_SetEqualsDeclaredEvents(t *testing.T) {
 	}
 }
 
-// TestEventRouting_CmdClassification_SetEqualsDeclaredCmds is the Cmd-side
-// twin of TestEventRouting_Classification_SetEqualsDeclaredEvents.
 func TestEventRouting_CmdClassification_SetEqualsDeclaredCmds(t *testing.T) {
 	declared := ercScanMarkerReceivers(t, ercMessagesDir(), "isCmd")
 
@@ -391,36 +350,19 @@ func TestEventRouting_CmdClassification_SetEqualsDeclaredCmds(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// Executable routing contract: go/parser extraction of the REAL dispatch
-// sites, replacing trust in the hand-maintained ercEventRoutes/ercCmdRoutes
-// citations above. Removing a real case from Controller.Handle,
-// Core.HandleEvent, or internal/tui's Update switch now fails the suite even
-// if the map text is never touched.
+// Executable routing contract: go/parser extraction of the real dispatch
+// sites, so removing a case from Controller.Handle, Core.HandleEvent, or
+// internal/tui's Update switch fails the suite even when the route maps above
+// are untouched.
 //
-// Structure found (verified by reading, then confirmed mechanically by the
-// test below — reported here since the three functions do NOT share one
-// dispatch shape):
-//   - core/app/handle.go's Controller.Handle: a SEQUENCE of
-//     `if msg, ok := ev.(messages.X); ok` type ASSERTIONS — no type-switch
-//     statement at all.
-//   - core/runtime/orchestrator.go's Core.HandleEvent: one genuine
-//     `switch msg := ev.(type) { case messages.X: ... }` type-switch
-//     statement.
-//   - internal/tui/app.go's Model.Update: one genuine type-switch statement,
-//     mixing messages.* cases with non-messages cases (tea.BatchMsg,
-//     tea.QuitMsg, tea.WindowSizeMsg, tea.KeyMsg, tea.PasteMsg) and one
-//     TUI-private bare-identifier case (profilesLoadedMsg) — all filtered
-//     out by ercCollectMessagesCaseNames, which only matches a qualified
-//     `messages.X` selector.
-//
-// ercCollectMessagesCaseNames handles both shapes (and any nested/multiple
-// switches, or multiple scattered assertions) by walking the ENTIRE function
-// body via ast.Inspect rather than assuming a single top-level construct.
+// The three functions have different dispatch shapes:
+//   - Controller.Handle: a sequence of `if msg, ok := ev.(messages.X); ok`
+//     type assertions.
+//   - Core.HandleEvent: one `switch msg := ev.(type)` statement.
+//   - Model.Update: one type switch mixing messages.* cases with tea.* and
+//     TUI-private cases; only qualified `messages.X` selectors are collected.
 // ---------------------------------------------------------------------------
 
-// ercHandleGoPath, ercOrchestratorGoPath, ercTUIAppGoPath are the
-// repo-relative paths to the three files under contract, following the same
-// filepath.Join("..", "..") repo-root pattern ercMessagesDir uses.
 func ercHandleGoPath() string {
 	return filepath.Join("..", "..", "core", "app", "handle.go")
 }
@@ -431,8 +373,6 @@ func ercTUIAppGoPath() string {
 	return filepath.Join("..", "..", "internal", "tui", "app.go")
 }
 
-// ercFindFuncDeclByName parses path and returns the *ast.FuncDecl (function
-// or method, any receiver) named name, or nil if not found.
 func ercFindFuncDeclByName(t *testing.T, path, name string) *ast.FuncDecl {
 	t.Helper()
 	fset := token.NewFileSet()
@@ -467,22 +407,12 @@ func ercSelectorPkgType(expr ast.Expr) (pkgName, typeName string, ok bool) {
 	return ident.Name, sel.Sel.Name, true
 }
 
-// ercCollectMessagesCaseNames walks fn's ENTIRE body via ast.Inspect —
-// deliberately not limited to one top-level construct, so nested or
-// multiple type-switch statements and scattered type-assertion expressions
-// are all found honestly — and returns the set of type names asserted or
-// switched on with a `messages.` qualifier, via either mechanism:
-//
-//   - *ast.TypeSwitchStmt: every case clause's type expression(s)
-//     (`case messages.X, messages.Y:` included — a case clause's List can
-//     hold more than one type).
-//   - *ast.TypeAssertExpr with a non-nil Type (the `v.(messages.X)` form;
-//     the special `v.(type)` switch guard is represented with Type == nil
-//     and is correctly skipped here — it is already covered by the
-//     TypeSwitchStmt branch above).
-//
-// switchCases and assertCases report how many of each mechanism contributed
-// at least one messages.* name, for the "report structure found" pin.
+// ercCollectMessagesCaseNames walks fn's entire body, so nested or multiple
+// type switches and scattered type assertions are all found, and returns the
+// set of type names switched on or asserted with a `messages.` qualifier. A
+// case clause's List can hold more than one type; the `v.(type)` switch guard
+// is a TypeAssertExpr with Type == nil. switchCases and assertCases count how
+// many names each mechanism contributed.
 func ercCollectMessagesCaseNames(fn *ast.FuncDecl) (names map[string]bool, switchCases, assertCases int) {
 	names = make(map[string]bool)
 	ast.Inspect(fn, func(n ast.Node) bool {
@@ -502,7 +432,7 @@ func ercCollectMessagesCaseNames(fn *ast.FuncDecl) (names map[string]bool, switc
 			}
 		case *ast.TypeAssertExpr:
 			if node.Type == nil {
-				return true // the `v.(type)` switch guard itself — not a real assertion
+				return true
 			}
 			if pkg, name, ok := ercSelectorPkgType(node.Type); ok && pkg == "messages" {
 				names[name] = true
@@ -530,14 +460,6 @@ func ercExpectedKind(inHandle, inHandleEvent, inTUI bool) ercRouteKind {
 	return ercUnrouted
 }
 
-// TestEventRouting_ParsedCases_MatchClassificationTwoWay is the executable
-// routing contract: it parses the three REAL dispatch sites and asserts,
-// for every AST-declared Event type (ercScanMarkerReceivers — the same
-// exhaustive declared-set source the enumeration gate above uses), that
-// ercEventRoutes' hand-written Kind matches what the parsed case sets alone
-// imply. A future PR that deletes a case from Controller.Handle,
-// Core.HandleEvent, or internal/tui's Update switch — without touching this
-// file — flips that name's parsed reachability and fails this test.
 func TestEventRouting_ParsedCases_MatchClassificationTwoWay(t *testing.T) {
 	handleFn := ercFindFuncDeclByName(t, ercHandleGoPath(), "Handle")
 	handleEventFn := ercFindFuncDeclByName(t, ercOrchestratorGoPath(), "HandleEvent")

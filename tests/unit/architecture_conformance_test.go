@@ -1,14 +1,8 @@
 package unit
 
-// architecture_conformance_test.go — Executable checks for the architectural
-// contracts called out in docs/architecture.md. Each test pins an invariant
-// that would otherwise drift into tribal knowledge: if a new contributor
-// accidentally reintroduces a hardcoded allowlist, skips registration, or
-// breaks a gen guard, these tests fail.
-//
-// Scope: invariants that span packages or are enforced by convention rather
-// than type system. Tests that live with their feature (e.g. the Wave 2
-// dispatch-order tests in enrich_queue_test.go) are not duplicated here.
+// Executable checks for the architectural contracts in docs/architecture.md:
+// invariants that span packages or are enforced by convention rather than by
+// the type system.
 
 import (
 	"fmt"
@@ -27,10 +21,6 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// ---------------------------------------------------------------------------
-// Registry completeness
-// ---------------------------------------------------------------------------
-
 // TestConformance_EveryResourceTypeHasPaginatedFetcher pins that every
 // top-level resource short name has a PaginatedFetcher registered. A
 // registered type with no fetcher would render as an empty page with no
@@ -43,12 +33,6 @@ func TestConformance_EveryResourceTypeHasPaginatedFetcher(t *testing.T) {
 	}
 }
 
-// TestConformance_EveryCatalogWave2ResolvesThroughAccessor pins the Wave 2
-// contract: every catalog entry whose Wave2 field is non-nil must resolve
-// through awsclient.Wave2EnricherFor. The catalog is now the single source of
-// truth — this conformance variant iterates catalog.All() directly instead of
-// parsing docs/attention-signals.md (the markdown-parsing scaffolding was
-// dropped once the catalog became that source of truth).
 func TestConformance_EveryCatalogWave2ResolvesThroughAccessor(t *testing.T) {
 	entries := catalog.All()
 	if len(entries) == 0 {
@@ -64,14 +48,6 @@ func TestConformance_EveryCatalogWave2ResolvesThroughAccessor(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// Canonical-ID contract surface
-// ---------------------------------------------------------------------------
-
-// ---------------------------------------------------------------------------
-// Stale-result / invalidation guards
-// ---------------------------------------------------------------------------
-
 // TestConformance_Wave2Registry_IsNonEmpty pins that the Wave 2 catalog
 // surface is non-empty. An empty AllWave2 would silently disable every Wave 2
 // background check, since BuildEnrichQueue iterates over it.
@@ -81,34 +57,21 @@ func TestConformance_Wave2Registry_IsNonEmpty(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// No-hardcoded-allowlist guard
-// ---------------------------------------------------------------------------
-
-// hardcodedAllowlistPatterns lists regex patterns that would indicate a new
-// hardcoded supported-type allowlist in dispatch code. The patterns match the
-// slice-literal shapes we actively avoid: []string{"dbi", ...}, []string{"ec2", ...},
-// etc. This is conservative — the allowlist check only scans runtime dispatch
-// code (internal/tui), not tests or fixtures where such literals are fine.
+// hardcodedAllowlistPatterns match slice literals of resource short names in
+// TUI dispatch code (internal/tui); tests and fixtures are not scanned.
 var hardcodedAllowlistPatterns = []*regexp.Regexp{
-	// A slice literal containing a Wave 2 short name in TUI runtime code.
-	// This would indicate someone reintroducing a manual dispatch list.
+	// A slice literal of Wave 2 short names in TUI runtime code is a manual
+	// dispatch list.
 	regexp.MustCompile(`\[\]string\s*\{\s*"(dbi|ebs|cb|tg|pipeline|sfn|glue|rds|ec2|ecs-svc)"[\s,]`),
 }
 
 // allowedTUIFiles lists internal/tui files where a string-literal slice of
 // resource short names is legitimate (test harnesses, non-dispatch helpers).
-// Currently empty — the dispatch code uses awsclient.AllWave2 iteration.
 var allowedTUIFiles = map[string]struct{}{}
 
-// TestConformance_NoHardcodedTypeAllowlist_InTUIDispatch scans internal/tui
-// source files for slice literals of known Wave 2 resource short names. The
-// Wave 2 dispatch contract is "iterate awsclient.AllWave2(), sort by
-// priority" — a hardcoded allowlist in the TUI package would regress the
-// declarative scheduling contract from #277.
-//
-// This is a cheap lexical guard, not a full parse. False positives are
-// handled via allowedTUIFiles.
+// The Wave 2 dispatch contract is "iterate awsclient.AllWave2(), sort by
+// priority". This is a lexical guard, not a parse; false positives go in
+// allowedTUIFiles.
 func TestConformance_NoHardcodedTypeAllowlist_InTUIDispatch(t *testing.T) {
 	root := "../../internal/tui"
 	err := filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
@@ -152,11 +115,6 @@ func min(a, b int) int {
 	}
 	return b
 }
-
-// ---------------------------------------------------------------------------
-// Row-store unification — no parallel per-type row store outside
-// RowStore; no store-row mutation outside the Amend/AmendRows seam.
-// ---------------------------------------------------------------------------
 
 // forbiddenRowStoreShapeFieldPatterns matches STRUCT FIELD declarations shaped
 // like a parallel per-type row map (map[string][]resource.Resource, and the
@@ -215,11 +173,8 @@ var allowedRowStoreShapeFiles = map[string]struct{}{
 	"runtime/tasks.go":              {},
 }
 
-// TestConformance_NoParallelPerTypeRowStore_OutsideRowStore scans every
-// non-test production file under internal/ for a struct field shaped like a
-// parallel per-type row map. RowStore (core/session/rowstore.go) is the sole
-// per-type row store; a new field of either forbidden shape elsewhere would
-// reintroduce the dual-write-drift defect class (D13-D18).
+// RowStore (core/session/rowstore.go) is the sole per-type row store; a field
+// of either forbidden shape elsewhere is a second store that drifts from it.
 func TestConformance_NoParallelPerTypeRowStore_OutsideRowStore(t *testing.T) {
 	for _, root := range confProductionScanRoots {
 		err := filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
@@ -264,8 +219,8 @@ func TestConformance_NoParallelPerTypeRowStore_OutsideRowStore(t *testing.T) {
 	}
 }
 
-// confProductionScanRoots are the two production source roots after the
-// core/ extraction: the relicensable core and the GPL-only TUI adapter.
+// confProductionScanRoots are the production source roots: the relicensable
+// core and the GPL-only TUI adapter.
 var confProductionScanRoots = []string{"../../core", "../../internal"}
 
 var (
@@ -289,8 +244,7 @@ func stripGoComments(src []byte) []byte {
 // own backing array), or (b) wraps the mutation inside an Amend/AmendRows
 // copy-on-write callback, operating on that callback's freshly-copied slice —
 // never a bare RowStore.Snapshot/SnapshotAll result. A file added to this set
-// without satisfying (a) or (b) is the mutate-in-place regression this pin
-// exists to catch.
+// without satisfying (a) or (b) mutates RowStore's backing array in place.
 var rowStoreMutationSeamFiles = map[string]struct{}{
 	"app/list_columns.go":              {}, // read-only Findings[0] access, not a mutation call site
 	"app/list_body.go":                 {}, // applyRowFindings: ListState.Rows direct + AmendRows-wrapped store leg
@@ -302,15 +256,9 @@ var rowStoreMutationSeamFiles = map[string]struct{}{
 	"runtime/handlers_row_enrich.go":   {}, // handleRowEnriched: AmendRows-wrapped one-row fold
 }
 
-// TestConformance_Wave2RowMutators_HaveNoUnvettedCallSites pins the CLOSED
-// set of production files calling ApplyWave2ToRow/applyWave2ToRow. Each
-// entry in rowStoreMutationSeamFiles has been manually verified (see that
-// var's doc comment) to route any RowStore-backed mutation through
-// Amend/AmendRows rather than mutating a bare Snapshot/SnapshotAll result in
-// place. A NEW call site appearing outside this set has not been vetted
-// against that discipline — this test fails loudly instead of silently
-// trusting an unreviewed mutation call site, forcing the same manual
-// verification this file's existing entries already received.
+// rowStoreMutationSeamFiles is a closed set: a new call site of
+// ApplyWave2ToRow/applyWave2ToRow must be checked against the Amend/AmendRows
+// discipline before it is added there.
 func TestConformance_Wave2RowMutators_HaveNoUnvettedCallSites(t *testing.T) {
 	callPattern := regexp.MustCompile(`\bApplyWave2ToRow\s*\(|\bapplyWave2ToRow\s*\(`)
 	defPattern := regexp.MustCompile(`func\s+ApplyWave2ToRow\s*\(|func\s+applyWave2ToRow\s*\(`)
@@ -368,10 +316,6 @@ func TestConformance_Wave2RowMutators_HaveNoUnvettedCallSites(t *testing.T) {
 		}
 	}
 }
-
-// ---------------------------------------------------------------------------
-// A row marked uninspected goes through the recorder
-// ---------------------------------------------------------------------------
 
 // uninspectedSetField is the field only the recorder may write.
 const uninspectedSetField = "TruncatedIDs"
@@ -565,10 +509,8 @@ func TestConformance_UninspectedRowsRecordTheirReason(t *testing.T) {
 	}
 }
 
-// TestConformance_UninspectedGateFollowsTheCall is the gate's own probe. Its
-// predecessor matched the source text `result.TruncatedIDs[x] = true`, so a
-// helper that took the map and wrote an element inside itself never appeared
-// in the pattern and passed — the same hole the discharge gate had.
+// TestConformance_UninspectedGateFollowsTheCall probes the gate: a helper that
+// takes the map and writes an element inside itself must be reported.
 func TestConformance_UninspectedGateFollowsTheCall(t *testing.T) {
 	cases := []struct {
 		name string

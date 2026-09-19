@@ -1,17 +1,5 @@
 package unit_test
 
-// app_cancellation_test.go — tests for app-wide cancellation context (CONCERNS #2/#20).
-//
-// Problem: fetch closures and IAM related-checkers create fresh context.Background()
-// instead of threading a parent context tied to the app/view lifecycle. Closing a
-// detail view or quitting the app cannot cancel in-flight AWS calls.
-//
-// Fix contract:
-//   - tui.New returns a Model with a non-nil, non-cancelled appCtx
-//   - sending tea.QuitMsg cancels appCtx
-//   - no production file may contain context.Background() (replaced by derived ctx)
-//   - IAM checkers that receive a pre-cancelled ctx must not call AWS
-
 import (
 	"context"
 	"os"
@@ -30,13 +18,6 @@ import (
 	tea "charm.land/bubbletea/v2"
 )
 
-// ---------------------------------------------------------------------------
-// TestModel_HasAppContext
-// Given: tui.New is called with empty profile and region
-// When:  we read m.AppContext()
-// Then:  the returned context is non-nil and not yet cancelled
-// ---------------------------------------------------------------------------
-
 func TestModel_HasAppContext(t *testing.T) {
 	t.Parallel()
 	m := newBlessedModel(t, "", "")
@@ -48,13 +29,6 @@ func TestModel_HasAppContext(t *testing.T) {
 		t.Fatalf("AppContext().Err() = %v, want nil (context should be live on construction)", err)
 	}
 }
-
-// ---------------------------------------------------------------------------
-// TestModel_QuitCancelsAppContext
-// Given: a freshly constructed Model
-// When:  tea.QuitMsg{} is sent via Update
-// Then:  m.AppContext().Err() == context.Canceled
-// ---------------------------------------------------------------------------
 
 func TestModel_QuitCancelsAppContext(t *testing.T) {
 	t.Parallel()
@@ -88,19 +62,8 @@ func TestModel_QuitCancelsAppContext(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// TestFetchersUseContextNotBackground
-// Given: the production source files listed below
-// When:  we read each file and count occurrences of "context.Background()"
-// Then:  count == 0 in every file
-//
-// Static pin: the app context is threaded through every fetch site.
-// ---------------------------------------------------------------------------
-
 func TestFetchersUseContextNotBackground(t *testing.T) {
 	t.Parallel()
-	// Files that MUST NOT contain context.Background() after the refactor.
-	// These are the sites identified in CONCERNS #2/#20.
 	files := []string{
 		"core/runtime/fetchers.go",
 		"internal/tui/fetch_adapter.go",
@@ -112,7 +75,6 @@ func TestFetchersUseContextNotBackground(t *testing.T) {
 		"core/aws/client.go",
 	}
 
-	// Locate the module root by walking up from the test binary's working directory.
 	root := findModuleRoot(t)
 
 	pattern := regexp.MustCompile(`context\.Background\(\)`)
@@ -148,7 +110,6 @@ func TestFetchersUseContextNotBackground(t *testing.T) {
 	}
 }
 
-// findModuleRoot walks up from the current directory until it finds a go.mod file.
 func findModuleRoot(t *testing.T) string {
 	t.Helper()
 	dir, err := os.Getwd()
@@ -182,22 +143,6 @@ func itoa(n int) string {
 	}
 	return string(buf[pos:])
 }
-
-// ---------------------------------------------------------------------------
-// TestIAMRelatedChecker_RespectsCancelledContext
-//
-// For each IAM-related checker that accepts a context, build a pre-cancelled
-// context and verify the checker either:
-//   (a) never calls the AWS API, or
-//   (b) passes the cancelled context through to the API (which then returns the error).
-//
-// The cancelObservingIAMClient records the context it received and propagates the
-// cancellation error so that the checkers see a failed call — the key assertion is
-// that gotCtx.Err() == context.Canceled, proving the context was threaded through.
-//
-// Checkers that currently ignore their ctx argument and call context.Background()
-// directly will fail this test because gotCtx will have Err() == nil.
-// ---------------------------------------------------------------------------
 
 // cancelObservingIAMClient implements IAMListEntitiesForPolicyAPI and records
 // the context it was called with.
@@ -241,7 +186,6 @@ func testPolicyCheckerRespectsCancelledContext(t *testing.T, targetType string) 
 	restore := awspkg.SetIAMListEntitiesAPIForTest(mock)
 	defer restore()
 
-	// Pre-cancel the context before the checker even runs.
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 
@@ -256,7 +200,6 @@ func testPolicyCheckerRespectsCancelledContext(t *testing.T, targetType string) 
 	checker := checkerByTarget(t, "policy", targetType)
 	result := checker(ctx, &awspkg.ServiceClients{}, res, resource.ResourceCache{})
 
-	// If the checker called the API, the mock should have received the cancelled ctx.
 	if mock.calls > 0 {
 		if mock.gotCtx == nil {
 			t.Fatalf("policy→%s: mock was called but gotCtx is nil", targetType)
@@ -283,12 +226,9 @@ func testPolicyCheckerRespectsCancelledContext(t *testing.T, targetType string) 
 	}
 }
 
-// ---------------------------------------------------------------------------
-// IAM roles: checkRolePolicy uses c.IAM.ListAttachedRolePolicies with context.Background().
-// We cannot inject a mock via a test helper for roles (no SetIAMRoleAPIForTest exists yet),
-// so we pass nil clients — the nil-clients guard returns Count=-1 before any API call.
-// The real test is TestFetchersUseContextNotBackground which pins the source text.
-// ---------------------------------------------------------------------------
+// Role, user and group checkers have no injectable IAM client, so these tests
+// pass nil clients: the nil-clients guard answers unknown (-1) before any API
+// call.
 
 func TestIAMRelatedChecker_RespectsCancelledContext_RolePolicy(t *testing.T) {
 	t.Parallel()
@@ -298,18 +238,11 @@ func TestIAMRelatedChecker_RespectsCancelledContext_RolePolicy(t *testing.T) {
 	res := resource.Resource{ID: "my-role", Name: "my-role"}
 
 	checker := checkerByTarget(t, "role", "policy")
-	// Pass nil clients: the guard returns -1 without calling AWS.
-	// This confirms the nil-client path is safe with a cancelled context.
 	result := checker(ctx, nil, res, resource.ResourceCache{})
 	if result.State() != domain.RelatedUnknown {
 		t.Errorf("role→policy with nil clients: Count=%d, want -1", result.Count())
 	}
 }
-
-// ---------------------------------------------------------------------------
-// IAM users: checkUserGroup and checkUserPolicy use context.Background() directly.
-// Same pattern: nil clients for the static-pin; source-text check in the Background() test.
-// ---------------------------------------------------------------------------
 
 func TestIAMRelatedChecker_RespectsCancelledContext_UserGroup(t *testing.T) {
 	t.Parallel()
@@ -337,10 +270,6 @@ func TestIAMRelatedChecker_RespectsCancelledContext_UserPolicy(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// IAM groups: checkGroupUser and checkGroupPolicy use context.Background() directly.
-// ---------------------------------------------------------------------------
-
 func TestIAMRelatedChecker_RespectsCancelledContext_GroupUser(t *testing.T) {
 	t.Parallel()
 	ctx, cancel := context.WithCancel(context.Background())
@@ -367,13 +296,6 @@ func TestIAMRelatedChecker_RespectsCancelledContext_GroupPolicy(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// TestModel_Cancel_ZeroValue_DoesNotPanic
-// Given: a zero-value tui.Model{} (appCancel is nil)
-// When:  Cancel() is called
-// Then:  no panic occurs
-// ---------------------------------------------------------------------------
-
 func TestModel_Cancel_ZeroValue_DoesNotPanic(t *testing.T) {
 	t.Parallel()
 	defer func() {
@@ -384,13 +306,6 @@ func TestModel_Cancel_ZeroValue_DoesNotPanic(t *testing.T) {
 	var m tui.Model
 	m.Cancel()
 }
-
-// ---------------------------------------------------------------------------
-// TestModel_Cancel_CancelsAppContext
-// Given: a Model constructed via tui.New with a live appCtx
-// When:  Cancel() is called
-// Then:  AppContext().Done() is closed (context is cancelled)
-// ---------------------------------------------------------------------------
 
 func TestModel_Cancel_CancelsAppContext(t *testing.T) {
 	t.Parallel()
@@ -405,7 +320,6 @@ func TestModel_Cancel_CancelsAppContext(t *testing.T) {
 
 	select {
 	case <-ctx.Done():
-		// expected — context was cancelled
 	default:
 		t.Error("AppContext().Done() not closed after Cancel() — appCancel was not invoked")
 	}

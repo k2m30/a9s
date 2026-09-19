@@ -1,18 +1,15 @@
 package unit
 
-// aws_lt_test.go — fetcher + Wave 2 issue-enrichment tests for EC2 Launch
-// Templates (docs/resources/lt.md §3/§4, docs/resources/lt-impl-plan.md
-// §0/§1).
+// aws_lt_test.go — fetcher and issue-enrichment tests for EC2 Launch
+// Templates (docs/resources/lt.md).
 //
 // lt is an in-fetcher N+1 (DescribeLaunchTemplates + DescribeLaunchTemplate-
-// Versions per template, Versions=["$Default"] — the mwaa/eks/transfer
-// pattern): imdsv1, unencrypted, and details-denied are fetcher-written
-// (Source "wave1"). The deprecated-ami signal alone lives in the separate
-// cache-scan enricher EnrichLTDeprecatedAMI (zero SDK calls, scans the
-// loaded "ami" ResourceCache). RawStruct is *awsclient.LTRaw{Template,
-// DefaultVersion} — the SAME type on healthy AND degraded (details-denied)
-// rows, with DefaultVersion zero-valued on the latter (no second RawStruct
-// shape, unlike transfer's dual-type fallback).
+// Versions per template, Versions=["$Default"]): imdsv1, unencrypted, and
+// details-denied are fetcher-written (Source "wave1"). The deprecated-ami
+// signal alone lives in the cache-scan enricher EnrichLTDeprecatedAMI (zero
+// SDK calls, scans the loaded "ami" ResourceCache). RawStruct is
+// *awsclient.LTRaw{Template, DefaultVersion} — the same type on healthy and
+// degraded (details-denied) rows, with DefaultVersion zero-valued on the latter.
 
 import (
 	"context"
@@ -33,14 +30,10 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// ---------------------------------------------------------------------------
-// Shared helpers
-// ---------------------------------------------------------------------------
-
 // fetchLTDemoPage fetches the shared demo fixture page. The demo set
-// includes the details-denied witness (WarnLTDeniedID), so the fetch is a
-// designed E5 partial success (rows + composite error naming only that
-// fixture); any OTHER error fails the test.
+// includes the details-denied fixture (WarnLTDeniedID), so the fetch returns
+// rows plus a composite error naming only that fixture; any other error
+// fails the test.
 func fetchLTDemoPage(t *testing.T) resource.FetchResult {
 	t.Helper()
 	result, err := awsclient.FetchLaunchTemplatesPage(context.Background(), fakes.NewEC2(), "")
@@ -63,9 +56,8 @@ func mustFindLTResource(t *testing.T, resources []resource.Resource, id string) 
 	return resource.Resource{}
 }
 
-// ltAsRaw asserts RawStruct is the pinned *awsclient.LTRaw pointer shape —
-// the SAME type on healthy and degraded rows (docs/resources/lt-impl-plan.md
-// §0), unlike transfer's dual-type (DescribedServer/ListedServer) fallback.
+// ltAsRaw asserts RawStruct is the *awsclient.LTRaw pointer shape — the same
+// type on healthy and degraded rows.
 func ltAsRaw(t *testing.T, raw any) *awsclient.LTRaw {
 	t.Helper()
 	v, ok := raw.(*awsclient.LTRaw)
@@ -108,12 +100,9 @@ func (f *ltEC2Fake) DescribeLaunchTemplateVersions(
 
 	// Honor params.Versions the way the real EC2 API does — "$Default"
 	// matches only the version flagged DefaultVersion=true; anything else is
-	// matched by exact VersionNumber. Single-version fixtures (every
-	// existing caller) are unaffected: filtering a one-element slice by
-	// "$Default" always keeps that element. This filter is what lets a
-	// multi-version fixture catch a fetcher regression that stops
-	// requesting Versions=["$Default"] and would otherwise silently pick up
-	// whatever version happens to sit at index 0.
+	// matched by exact VersionNumber. A multi-version fixture then catches a
+	// fetcher that reads whatever version sits at index 0 instead of
+	// requesting Versions=["$Default"].
 	wantDefault := false
 	wantNumbers := map[int64]bool{}
 	for _, v := range params.Versions {
@@ -137,10 +126,6 @@ func (f *ltEC2Fake) DescribeLaunchTemplateVersions(
 
 var _ awsclient.EC2API = (*ltEC2Fake)(nil)
 
-// ---------------------------------------------------------------------------
-// healthy_silence
-// ---------------------------------------------------------------------------
-
 func TestFetchLaunchTemplatesPage_HealthySilence(t *testing.T) {
 	result := fetchLTDemoPage(t)
 	r := mustFindLTResource(t, result.Resources, fixtures.ProdWebLTID)
@@ -152,11 +137,6 @@ func TestFetchLaunchTemplatesPage_HealthySilence(t *testing.T) {
 		t.Errorf(`Fields["status"] = %q, want "" (S4 blank on a healthy row)`, r.Fields["status"])
 	}
 }
-
-// ---------------------------------------------------------------------------
-// E7 sanity — Resource.ID is LaunchTemplateId; Fields["name"] is
-// LaunchTemplateName (pinned contract).
-// ---------------------------------------------------------------------------
 
 func TestFetchLaunchTemplatesPage_ResourceIDAndNameMapping(t *testing.T) {
 	result := fetchLTDemoPage(t)
@@ -173,10 +153,6 @@ func TestFetchLaunchTemplatesPage_ResourceIDAndNameMapping(t *testing.T) {
 		t.Errorf("RawStruct.Template.LaunchTemplateId = %q, want %q", aws.ToString(raw.Template.LaunchTemplateId), fixtures.ProdWebLTID)
 	}
 }
-
-// ---------------------------------------------------------------------------
-// imdsv1_explicit
-// ---------------------------------------------------------------------------
 
 func TestFetchLaunchTemplatesPage_IMDSv1Explicit(t *testing.T) {
 	result := fetchLTDemoPage(t)
@@ -201,10 +177,8 @@ func TestFetchLaunchTemplatesPage_IMDSv1Explicit(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// imdsv1_default — the unset-defaults-to-optional trap witness: MetadataOptions
-// nil must fire the SAME finding as HttpTokens=optional explicit.
-// ---------------------------------------------------------------------------
+// MetadataOptions nil defaults to HttpTokens=optional, so it fires the same
+// finding as an explicit optional.
 
 func TestFetchLaunchTemplatesPage_IMDSv1DefaultTrapWitness(t *testing.T) {
 	result := fetchLTDemoPage(t)
@@ -224,10 +198,6 @@ func TestFetchLaunchTemplatesPage_IMDSv1DefaultTrapWitness(t *testing.T) {
 		t.Errorf("Severity = %v, want SevWarn", f.Severity)
 	}
 }
-
-// ---------------------------------------------------------------------------
-// unencrypted_explicit
-// ---------------------------------------------------------------------------
 
 func TestFetchLaunchTemplatesPage_UnencryptedExplicit(t *testing.T) {
 	result := fetchLTDemoPage(t)
@@ -252,11 +222,8 @@ func TestFetchLaunchTemplatesPage_UnencryptedExplicit(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// unencrypted_nil_silent — nil Ebs.Encrypted must NEVER be treated as
-// unencrypted (default-encryption accounts make nil legitimate). No shared
-// demo fixture leaves Encrypted nil, so this is an isolated adversarial case.
-// ---------------------------------------------------------------------------
+// nil Ebs.Encrypted is never treated as unencrypted: default-encryption
+// accounts make nil legitimate.
 
 func TestFetchLaunchTemplatesPage_UnencryptedNilSilent(t *testing.T) {
 	const id = "lt-0nilencrypted0001a"
@@ -308,14 +275,9 @@ func TestFetchLaunchTemplatesPage_UnencryptedNilSilent(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// imdsv1_endpoint_disabled — HttpEndpoint == disabled means the metadata
-// service is unreachable entirely; HttpTokens is moot and must NOT fire the
-// imdsv1 finding regardless of its value (docs/resources/lt.md §3.2). No
-// shared demo fixture disables the endpoint, so this is an isolated
-// adversarial case (mirrors TestFetchLaunchTemplatesPage_UnencryptedNilSilent's
-// ltEC2Fake pattern).
-// ---------------------------------------------------------------------------
+// HttpEndpoint == disabled means the metadata service is unreachable
+// entirely; HttpTokens is moot and does not fire the imdsv1 finding
+// regardless of its value.
 
 func TestFetchLaunchTemplatesPage_IMDSv1_EndpointDisabled_NoFinding(t *testing.T) {
 	const id = "lt-0endpointdisabled01"
@@ -362,10 +324,8 @@ func TestFetchLaunchTemplatesPage_IMDSv1_EndpointDisabled_NoFinding(t *testing.T
 	}
 }
 
-// ---------------------------------------------------------------------------
-// multi_stack — IMDSv1 + unencrypted stack on one template → ordered
-// Findings + "IMDSv1 allowed (+1)" per §4 precedence.
-// ---------------------------------------------------------------------------
+// IMDSv1 and unencrypted on one template produce ordered Findings and
+// "IMDSv1 allowed (+1)".
 
 func TestFetchLaunchTemplatesPage_MultiStackOrdered(t *testing.T) {
 	result := fetchLTDemoPage(t)
@@ -384,13 +344,10 @@ func TestFetchLaunchTemplatesPage_MultiStackOrdered(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// details_denied_rich — a denied DescribeLaunchTemplateVersions keeps the
-// row, built from list fields (Fields["name"], Template.DefaultVersionNumber/
-// LatestVersionNumber), with DefaultVersion zero-valued and the
-// lt.warn.details_denied finding appended carrying lt's own §4 sentence;
-// composite error names the id.
-// ---------------------------------------------------------------------------
+// A denied DescribeLaunchTemplateVersions keeps the row, built from list
+// fields (Fields["name"], Template.DefaultVersionNumber/LatestVersionNumber),
+// with DefaultVersion zero-valued and the lt.warn.details_denied finding
+// appended; the composite error names the id.
 
 func TestFetchLaunchTemplatesPage_DetailsDeniedRich(t *testing.T) {
 	result, err := awsclient.FetchLaunchTemplatesPage(context.Background(), fakes.NewEC2(), "")
@@ -443,10 +400,8 @@ func TestFetchLaunchTemplatesPage_DetailsDeniedRich(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// list_denied_is_error — AccessDenied on DescribeLaunchTemplates must never
-// render as an empty successful result.
-// ---------------------------------------------------------------------------
+// AccessDenied on DescribeLaunchTemplates is an error, never an empty
+// successful result.
 
 func TestFetchLaunchTemplatesPage_ListDeniedIsError(t *testing.T) {
 	fake := &ltEC2Fake{
@@ -467,10 +422,8 @@ func TestFetchLaunchTemplatesPage_ListDeniedIsError(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// partial_describe — E5: 5 listed, 2 DescribeLaunchTemplateVersions fail →
-// 5 rows (2 rich-degraded) + composite error naming both, in "N of M" form.
-// ---------------------------------------------------------------------------
+// 5 listed, 2 DescribeLaunchTemplateVersions fail → 5 rows (2 degraded) and
+// a composite error naming both, in "N of M" form.
 
 func TestFetchLaunchTemplatesPage_PartialDescribe(t *testing.T) {
 	ids := []string{"lt-partial-a", "lt-partial-b", "lt-partial-c", "lt-partial-denied", "lt-partial-missing"}
@@ -532,7 +485,7 @@ func TestFetchLaunchTemplatesPage_PartialDescribe(t *testing.T) {
 	// code) → "details denied"; lt-partial-missing → InvalidLaunchTemplateId.
 	// NotFound (non-auth) → the neutral "details unavailable". A not-found
 	// template must never read as an IAM denial, and EC2 denials do not use
-	// the "AccessDenied" code (docs/resources/lt.md §4; DegradedDetails split).
+	// the "AccessDenied" code.
 	wantPhrase := map[string]string{"lt-partial-denied": "details denied", "lt-partial-missing": "details unavailable"}
 	for _, r := range result.Resources {
 		if phrase, ok := wantPhrase[r.ID]; ok {
@@ -554,14 +507,10 @@ func TestFetchLaunchTemplatesPage_PartialDescribe(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// default_version_selection — DescribeLaunchTemplateVersions can legitimately
-// return more than one version; the fetcher must use the one flagged
-// DefaultVersion=true, never "whichever version happens to be first". The
-// non-default entry here is listed FIRST and is IMDSv1-vulnerable — a
-// fetcher that stopped requesting Versions=["$Default"] (or a naive
-// index-0 read) would surface that finding on the wrong version.
-// ---------------------------------------------------------------------------
+// DescribeLaunchTemplateVersions can return more than one version; the
+// fetcher uses the one flagged DefaultVersion=true. The non-default entry
+// here is listed first and is IMDSv1-vulnerable, so a fetcher that reads
+// index 0 would surface that finding on the wrong version.
 
 func TestFetchLaunchTemplatesPage_UsesDefaultVersionNotFirstListed(t *testing.T) {
 	const id = "lt-0defaultversion001a"
@@ -617,11 +566,7 @@ func TestFetchLaunchTemplatesPage_UsesDefaultVersionNotFirstListed(t *testing.T)
 	}
 }
 
-// ---------------------------------------------------------------------------
-// ssm_ami_no_pivot (fetcher half) — a resolve:ssm: ImageId is a healthy,
-// finding-free template (the related-panel "no pivot" half lives in
-// aws_lt_related_test.go).
-// ---------------------------------------------------------------------------
+// A resolve:ssm: ImageId is a healthy, finding-free template.
 
 func TestFetchLaunchTemplatesPage_SSMAmiReferenceProducesNoFinding(t *testing.T) {
 	result := fetchLTDemoPage(t)
@@ -632,10 +577,7 @@ func TestFetchLaunchTemplatesPage_SSMAmiReferenceProducesNoFinding(t *testing.T)
 	}
 }
 
-// ---------------------------------------------------------------------------
-// wave3_anti — no Wave-3 out-of-scope text anywhere; default != latest with
-// zero references never raises a finding on its own.
-// ---------------------------------------------------------------------------
+// default != latest with zero references never raises a finding on its own.
 
 func TestFetchLaunchTemplatesPage_WaveThreeAntiTests(t *testing.T) {
 	result := fetchLTDemoPage(t)
@@ -652,8 +594,8 @@ func TestFetchLaunchTemplatesPage_WaveThreeAntiTests(t *testing.T) {
 	}
 
 	// default(2) != latest(5), zero SG/BDM/NI references, healthy IMDSv2 —
-	// must not raise a finding on its own (lt.md §3.1: a pending-rollout
-	// latest version is display-only, never an attention signal).
+	// a pending-rollout latest version is display-only, never an attention
+	// signal.
 	const id = "lt-0defaultnelatest01a"
 	fake := &ltEC2Fake{
 		listOut: &ec2.DescribeLaunchTemplatesOutput{
@@ -693,10 +635,8 @@ func TestFetchLaunchTemplatesPage_WaveThreeAntiTests(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// EnrichLTDeprecatedAMI — cache-scan enricher (zero SDK calls, mirrors
-// EnrichRoute53Zone's signature over the loaded "ami" ResourceCache).
-// ---------------------------------------------------------------------------
+// EnrichLTDeprecatedAMI is a cache-scan enricher over the loaded "ami"
+// ResourceCache, with zero SDK calls.
 
 // ltAMICache builds an "ami" ResourceCache entry from the REAL demo AMI
 // fixtures (FetchAMIsPage + fakes.NewEC2()), so the enricher tests exercise

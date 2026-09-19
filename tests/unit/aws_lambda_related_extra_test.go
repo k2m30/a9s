@@ -17,10 +17,8 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// ---------------------------------------------------------------------------
-// fakeLambdaWithESMArns — full LambdaAPI that returns event source mappings
-// with configurable EventSourceArns. Used by DDB/Kinesis/MSK checker tests.
-// ---------------------------------------------------------------------------
+// fakeLambdaWithESMArns is a full LambdaAPI that returns event source mappings
+// with configurable EventSourceArns.
 
 type fakeLambdaWithESMArns struct {
 	eventSourceArns []string
@@ -65,10 +63,6 @@ func lambdaExtraCheckerByTarget(t *testing.T, target string) resource.RelatedChe
 	t.Fatalf("lambda related checker for %s not found", target)
 	return nil
 }
-
-// ---------------------------------------------------------------------------
-// checkLambdaSubnet — Pattern F: reads VpcConfig.SubnetIds
-// ---------------------------------------------------------------------------
 
 func TestRelated_Lambda_Subnet_VPCFunction(t *testing.T) {
 	src := resource.Resource{
@@ -132,7 +126,6 @@ func TestRelated_Lambda_Subnet_EmptySubnetIDs(t *testing.T) {
 	}
 	checker := lambdaExtraCheckerByTarget(t, "subnet")
 	result := checker(context.Background(), nil, src, resource.ResourceCache{})
-	// Empty string subnet ID is skipped; only "subnet-valid" is returned.
 	if result.Count() != 1 {
 		t.Errorf("Count = %d, want 1 (empty subnet ID skipped)", result.Count())
 	}
@@ -140,10 +133,6 @@ func TestRelated_Lambda_Subnet_EmptySubnetIDs(t *testing.T) {
 		t.Errorf("ResourceIDs = %v, want [subnet-valid]", result.ResourceIDs())
 	}
 }
-
-// ---------------------------------------------------------------------------
-// checkLambdaEFS — Pattern F: reads FileSystemConfigs ARNs
-// ---------------------------------------------------------------------------
 
 func TestRelated_Lambda_EFS_WithAccessPoints(t *testing.T) {
 	src := resource.Resource{
@@ -217,10 +206,6 @@ func TestRelated_Lambda_EFS_NilARN(t *testing.T) {
 		t.Errorf("Count = %d, want 0 (nil ARN skipped)", result.Count())
 	}
 }
-
-// ---------------------------------------------------------------------------
-// checkLambdaAPIGW — cache scan (name/tag heuristic)
-// ---------------------------------------------------------------------------
 
 func TestRelated_Lambda_APIGW_MatchByName(t *testing.T) {
 	const fnName = "my-function"
@@ -330,12 +315,8 @@ func TestRelated_Lambda_APIGW_TruncatedCacheNoMatch(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// checkLambdaCF — cache scan (lambda_function_arn field match)
-// ---------------------------------------------------------------------------
-
-// TestRelated_Lambda_CF_MatchByField verifies the checkLambdaCF mechanism per
-// lambda.md:42: the cf fetcher joins DefaultCacheBehavior and
+// TestRelated_Lambda_CF_MatchByField verifies the checkLambdaCF mechanism:
+// the cf fetcher joins DefaultCacheBehavior and
 // CacheBehaviors[] associations into the comma-joined
 // Fields["lambda_function_arns"] (plural), and Lambda@Edge associations
 // always reference a specific published VERSION ARN — never the bare
@@ -432,10 +413,6 @@ func TestRelated_Lambda_CF_NilCache(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// checkLambdaDDB — nil client path only (live API required for full coverage)
-// ---------------------------------------------------------------------------
-
 func TestRelated_Lambda_DDB_NilClients(t *testing.T) {
 	src := resource.Resource{
 		ID:   "my-function",
@@ -450,10 +427,6 @@ func TestRelated_Lambda_DDB_NilClients(t *testing.T) {
 		t.Errorf("Count = %d, want -1 (nil Lambda client)", result.Count())
 	}
 }
-
-// ---------------------------------------------------------------------------
-// checkLambdaCTEvents — cache scan (ResourceName match)
-// ---------------------------------------------------------------------------
 
 func TestRelated_Lambda_CTEvents_MatchByExactName(t *testing.T) {
 	const fnName = "my-function"
@@ -545,12 +518,8 @@ func TestRelated_Lambda_CTEvents_EmptyFunctionName(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// checkLambdaTG — cache scan (target_type=lambda, name/arn match)
-// ---------------------------------------------------------------------------
-
 // TestRelated_Lambda_TG_MatchByFunctionName verifies the checkLambdaTG
-// mechanism per lambda.md:169: for a TG with TargetType==lambda, the checker
+// mechanism: for a TG with TargetType==lambda, the checker
 // must call ELBv2 DescribeTargetHealth and match Targets[].Id==FunctionArn —
 // there is no lambda_function_name field the tg fetcher populates to match
 // on directly.
@@ -659,10 +628,6 @@ func TestRelated_Lambda_TG_NilCache(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// checkLambdaSNS — sns-sub cache scan → topic ARNs
-// ---------------------------------------------------------------------------
-
 func TestRelated_Lambda_SNS_MatchByFnARN(t *testing.T) {
 	const fnARN = "arn:aws:lambda:us-east-1:123:function:my-function"
 	const topicARN = "arn:aws:sns:us-east-1:123:my-topic"
@@ -770,10 +735,6 @@ func TestRelated_Lambda_SNS_NilSubCache(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// checkLambdaSNSSub — sns-sub cache scan (subscription IDs)
-// ---------------------------------------------------------------------------
-
 func TestRelated_Lambda_SNSSub_MatchByFnARN(t *testing.T) {
 	const fnARN = "arn:aws:lambda:us-east-1:123:function:my-function"
 	subRes := resource.Resource{
@@ -844,10 +805,6 @@ func TestRelated_Lambda_SNSSub_NilCache(t *testing.T) {
 		t.Errorf("Count = %d, want -1 (nil cache)", result.Count())
 	}
 }
-
-// ---------------------------------------------------------------------------
-// checkLambdaS3 — s3 cache scan (notification_lambda field)
-// ---------------------------------------------------------------------------
 
 func TestRelated_Lambda_S3_MatchByFnARN(t *testing.T) {
 	const fnARN = "arn:aws:lambda:us-east-1:123:function:my-function"
@@ -946,12 +903,8 @@ func TestRelated_Lambda_S3_NilCache(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// checkLambdaENI — eni cache scan (description contains function name)
-// ---------------------------------------------------------------------------
-
 // TestRelated_Lambda_ENI_MatchByDescription verifies the checkLambdaENI
-// mechanism per lambda.md:84: a match requires BOTH
+// mechanism: a match requires BOTH
 // Fields["requester_id"]=="AWS Lambda VPC ENI" AND a Description prefix of
 // "AWS Lambda VPC ENI-<FunctionName>-" — RequesterId alone is identical
 // across every VPC-attached function's ENIs, so Description is what
@@ -1000,7 +953,7 @@ func TestRelated_Lambda_ENI_NoDescriptionField(t *testing.T) {
 
 // TestRelated_Lambda_ENI_RequesterIdMissingNoMatch verifies that a
 // description-only match without the requester_id gate does not count —
-// requester_id is mandatory per lambda.md:84, not just a hint.
+// requester_id is mandatory, not just a hint.
 func TestRelated_Lambda_ENI_RequesterIdMissingNoMatch(t *testing.T) {
 	const fnName = "my-vpc-function"
 	eniRes := resource.Resource{
@@ -1008,7 +961,6 @@ func TestRelated_Lambda_ENI_RequesterIdMissingNoMatch(t *testing.T) {
 		Name: "eni-ccc333",
 		Fields: map[string]string{
 			"description": "AWS Lambda VPC ENI-my-vpc-function-abcdef",
-			// requester_id intentionally absent/wrong.
 		},
 	}
 	cache := resource.ResourceCache{
@@ -1030,10 +982,6 @@ func TestRelated_Lambda_ENI_NilCache(t *testing.T) {
 		t.Errorf("Count = %d, want -1 (nil cache)", result.Count())
 	}
 }
-
-// ---------------------------------------------------------------------------
-// checkLambdaSecrets — env var scan (arn:aws:secretsmanager: prefix)
-// ---------------------------------------------------------------------------
 
 func TestRelated_Lambda_Secrets_MatchByEnvVar(t *testing.T) {
 	const secretARN = "arn:aws:secretsmanager:us-east-1:123:secret:my-secret-abc"
@@ -1147,10 +1095,6 @@ func TestRelated_Lambda_Secrets_WrongRawStruct(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// checkLambdaSSM — env var scan (slash-prefixed values → SSM parameter names)
-// ---------------------------------------------------------------------------
-
 func TestRelated_Lambda_SSM_MatchByParamID(t *testing.T) {
 	const paramName = "/my/param/db-password"
 	paramRes := resource.Resource{
@@ -1259,10 +1203,6 @@ func TestRelated_Lambda_SSM_WrongRawStruct(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// checkLambdaDDB — event source mapping DynamoDB path
-// ---------------------------------------------------------------------------
-
 // TestRelated_Lambda_DDB_FoundViaDynamoDBStreamARN verifies that checkLambdaDDB
 // extracts the table name from a DynamoDB stream event source mapping ARN.
 func TestRelated_Lambda_DDB_FoundViaDynamoDBStreamARN(t *testing.T) {
@@ -1321,10 +1261,6 @@ func TestRelated_Lambda_DDB_NonDynamoARNIgnored(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// checkLambdaKinesis — event source mapping Kinesis path
-// ---------------------------------------------------------------------------
-
 // TestRelated_Lambda_Kinesis_FoundViaKinesisStreamARN verifies that
 // checkLambdaKinesis extracts the stream name from a Kinesis stream ARN.
 func TestRelated_Lambda_Kinesis_FoundViaKinesisStreamARN(t *testing.T) {
@@ -1382,10 +1318,6 @@ func TestRelated_Lambda_Kinesis_NonKinesisARNIgnored(t *testing.T) {
 		t.Errorf("Count = %d, want 0 (non-Kinesis ARN filtered)", result.Count())
 	}
 }
-
-// ---------------------------------------------------------------------------
-// checkLambdaMSK — event source mapping MSK/Kafka path
-// ---------------------------------------------------------------------------
 
 // TestRelated_Lambda_MSK_FoundViaKafkaARN verifies that checkLambdaMSK extracts
 // the MSK cluster name (last segment) from a Kafka cluster ARN.

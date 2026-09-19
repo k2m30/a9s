@@ -30,8 +30,6 @@ func ngCheckerByTarget(t *testing.T, target string) resource.RelatedChecker {
 	return nil
 }
 
-// --- Navigable Field Registration ---
-
 func TestNavigableFields_NG_Registered(t *testing.T) {
 	expected := map[string]string{
 		"ClusterName": "eks",
@@ -48,8 +46,6 @@ func TestNavigableFields_NG_Registered(t *testing.T) {
 		}
 	}
 }
-
-// --- EKS Cluster checker (Pattern C — cache, ClusterName match) ---
 
 func TestRelated_NG_EKS_Found(t *testing.T) {
 	eksRes := resource.Resource{
@@ -140,8 +136,6 @@ func TestRelated_NG_EKS_CacheMissNoClients(t *testing.T) {
 		t.Errorf("Count = %d, want -1 (unknown)", result.Count())
 	}
 }
-
-// --- IAM Role checker (Pattern C — cache, name extracted from ARN) ---
 
 func TestRelated_NG_Role_Found(t *testing.T) {
 	const roleARN = "arn:aws:iam::123456789012:role/eks-node-role"
@@ -237,8 +231,6 @@ func TestRelated_NG_Role_CacheMissNoClients(t *testing.T) {
 		t.Errorf("Count = %d, want -1 (unknown)", result.Count())
 	}
 }
-
-// --- ASG checker (Pattern C — cache, Resources.AutoScalingGroups[].Name match) ---
 
 func TestRelated_NG_ASG_Found(t *testing.T) {
 	const asgName = "eks-acme-prod-ng-general"
@@ -341,8 +333,6 @@ func TestRelated_NG_ASG_CacheMissNoClients(t *testing.T) {
 	}
 }
 
-// --- AMI checker tests (Pattern A — EC2.DescribeLaunchTemplateVersions) ---
-
 func ngSrcResourceWithLaunchTemplate(ltID, ltVersion string) resource.Resource {
 	return resource.Resource{
 		ID:   "general-pool",
@@ -361,8 +351,6 @@ func ngSrcResourceWithLaunchTemplate(ltID, ltVersion string) resource.Resource {
 	}
 }
 
-// TestRelated_NG_AMI_Match verifies that an AMI ID from the launch template
-// version is returned as Count=1.
 func TestRelated_NG_AMI_Match(t *testing.T) {
 	const ltID = "lt-abc12345"
 	const amiID = "ami-0a1b2c3d4e5f60001"
@@ -392,8 +380,6 @@ func TestRelated_NG_AMI_Match(t *testing.T) {
 	}
 }
 
-// TestRelated_NG_AMI_Empty verifies that a node group without a custom launch
-// template (managed NG) produces Count=0.
 func TestRelated_NG_AMI_Empty(t *testing.T) {
 	res := resource.Resource{
 		ID:     "general-pool",
@@ -416,8 +402,6 @@ func TestRelated_NG_AMI_Empty(t *testing.T) {
 	}
 }
 
-// TestRelated_NG_AMI_WrongRawStruct verifies that a wrong RawStruct type
-// returns Count=-1 (defensive guard).
 func TestRelated_NG_AMI_WrongRawStruct(t *testing.T) {
 	res := resource.Resource{
 		ID:        "general-pool",
@@ -431,13 +415,6 @@ func TestRelated_NG_AMI_WrongRawStruct(t *testing.T) {
 	}
 }
 
-// --- EBS checker tests (Pattern C — ec2 cache join, see aws_ng_ebs_cache_join_test.go) ---
-
-// TestRelated_NG_EBS_Empty verifies that a node group whose nodegroup name
-// cannot be resolved (empty Fields, RawStruct carries no NodegroupName)
-// returns Count=0 via the early-return guard — checkNGEBS no longer touches
-// ASG data at all under the cache-join contract (see
-// aws_ng_ebs_cache_join_test.go for the full cache-join behavior).
 func TestRelated_NG_EBS_Empty(t *testing.T) {
 	res := resource.Resource{
 		ID:     "general-pool",
@@ -445,7 +422,6 @@ func TestRelated_NG_EBS_Empty(t *testing.T) {
 		Fields: map[string]string{},
 		RawStruct: ekstypes.Nodegroup{
 			ClusterName: aws.String("acme-prod"),
-			// No NodegroupName — nodegroup name cannot be resolved.
 		},
 	}
 
@@ -457,12 +433,8 @@ func TestRelated_NG_EBS_Empty(t *testing.T) {
 	}
 }
 
-// TestRelated_NG_EBS_WrongRawStruct verifies that a wrong RawStruct type with
-// no Fields["nodegroup_name"] falls through the same empty-name early return
-// as TestRelated_NG_EBS_Empty — the cache-join contract reads
-// Fields["nodegroup_name"] first and only consults RawStruct as an override,
-// so an unrelated RawStruct type does not force Count=-1 the way the old
-// two-AWS-call implementation's defensive assertStruct guard did.
+// The nodegroup name comes from Fields["nodegroup_name"], with RawStruct only
+// as an override, so an unrelated RawStruct type yields Count=0 rather than -1.
 func TestRelated_NG_EBS_WrongRawStruct(t *testing.T) {
 	res := resource.Resource{
 		ID:        "general-pool",
@@ -476,10 +448,6 @@ func TestRelated_NG_EBS_WrongRawStruct(t *testing.T) {
 	}
 }
 
-// --- Subnet checker tests (Pattern F — direct field read from Nodegroup.Subnets) ---
-
-// TestRelated_NG_Subnet_Match verifies that two subnets in Nodegroup.Subnets
-// produce Count=2 with both IDs in ResourceIDs.
 func TestRelated_NG_Subnet_Match(t *testing.T) {
 	const sub1 = "subnet-0a1b2c3d4e5f60001"
 	const sub2 = "subnet-0a1b2c3d4e5f60002"
@@ -515,8 +483,6 @@ func TestRelated_NG_Subnet_Match(t *testing.T) {
 	}
 }
 
-// TestRelated_NG_Subnet_Empty verifies that a node group with no subnets
-// produces Count=0.
 func TestRelated_NG_Subnet_Empty(t *testing.T) {
 	res := resource.Resource{
 		ID:     "general-pool",
@@ -537,8 +503,6 @@ func TestRelated_NG_Subnet_Empty(t *testing.T) {
 	}
 }
 
-// TestRelated_NG_Subnet_WrongRawStruct verifies that a wrong RawStruct type
-// returns Count=-1 (defensive guard).
 func TestRelated_NG_Subnet_WrongRawStruct(t *testing.T) {
 	res := resource.Resource{
 		ID:        "general-pool",
@@ -552,12 +516,6 @@ func TestRelated_NG_Subnet_WrongRawStruct(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// checkNGSG — RemoteAccessSecurityGroup from RawStruct (Pattern F)
-// ---------------------------------------------------------------------------
-
-// TestRelated_NG_SG_Found verifies that the remote access SG ID is returned
-// when Resources.RemoteAccessSecurityGroup is set.
 func TestRelated_NG_SG_Found(t *testing.T) {
 	res := resource.Resource{
 		ID:   "general-pool",
@@ -581,7 +539,6 @@ func TestRelated_NG_SG_Found(t *testing.T) {
 	}
 }
 
-// TestRelated_NG_SG_NilResources verifies Count=0 when Resources is nil (no remote access SG).
 func TestRelated_NG_SG_NilResources(t *testing.T) {
 	res := resource.Resource{
 		ID:   "general-pool",
@@ -600,7 +557,6 @@ func TestRelated_NG_SG_NilResources(t *testing.T) {
 	}
 }
 
-// TestRelated_NG_SG_EmptyGroupID verifies Count=0 when RemoteAccessSecurityGroup is empty string.
 func TestRelated_NG_SG_EmptyGroupID(t *testing.T) {
 	res := resource.Resource{
 		ID:   "general-pool",
@@ -621,7 +577,6 @@ func TestRelated_NG_SG_EmptyGroupID(t *testing.T) {
 	}
 }
 
-// TestRelated_NG_SG_WrongRawStruct verifies Count=-1 when RawStruct is not an EKS Nodegroup.
 func TestRelated_NG_SG_WrongRawStruct(t *testing.T) {
 	res := resource.Resource{
 		ID:        "general-pool",
@@ -636,12 +591,6 @@ func TestRelated_NG_SG_WrongRawStruct(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// checkNGEC2 — EC2 instances tagged eks:nodegroup-name (Pattern C+tag)
-// ---------------------------------------------------------------------------
-
-// TestRelated_NG_EC2_MatchByNodegroupTag verifies that EC2 instances tagged
-// with "eks:nodegroup-name" matching this node group are returned.
 func TestRelated_NG_EC2_MatchByNodegroupTag(t *testing.T) {
 	const ngName = "general-pool"
 	const clusterName = "prod-cluster"
@@ -684,8 +633,6 @@ func TestRelated_NG_EC2_MatchByNodegroupTag(t *testing.T) {
 	}
 }
 
-// TestRelated_NG_EC2_NoMatchDifferentCluster verifies that instances tagged with
-// the same nodegroup name but a different cluster are excluded.
 func TestRelated_NG_EC2_NoMatchDifferentCluster(t *testing.T) {
 	const ngName = "general-pool"
 
@@ -724,8 +671,6 @@ func TestRelated_NG_EC2_NoMatchDifferentCluster(t *testing.T) {
 	}
 }
 
-// TestRelated_NG_EC2_EmptyNodegroupName verifies Count=0 immediately when
-// the nodegroup name cannot be determined.
 func TestRelated_NG_EC2_EmptyNodegroupName(t *testing.T) {
 	source := resource.Resource{
 		ID:   "",
@@ -744,8 +689,6 @@ func TestRelated_NG_EC2_EmptyNodegroupName(t *testing.T) {
 	}
 }
 
-// TestRelated_NG_EC2_NilCache verifies Count=-1 when the cache has no ec2 entry
-// and clients is nil (cannot fetch).
 func TestRelated_NG_EC2_NilCache(t *testing.T) {
 	source := resource.Resource{
 		ID:   "general-pool",
@@ -766,8 +709,6 @@ func TestRelated_NG_EC2_NilCache(t *testing.T) {
 	}
 }
 
-// TestRelated_NG_EC2_TruncatedCacheNoMatch verifies Truncated=true when
-// cache is truncated and zero matches found.
 func TestRelated_NG_EC2_TruncatedCacheNoMatch(t *testing.T) {
 	const ngName = "general-pool"
 

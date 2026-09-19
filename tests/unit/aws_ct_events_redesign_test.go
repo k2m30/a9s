@@ -1,25 +1,5 @@
 package unit
 
-// Tests for the CloudTrail Events fetcher.
-//
-// Surface:
-//   - aws.ClassifyCTVerb(eventName, eventCategory, eventType string) string
-//   - aws.ExtractCTTarget(parsed map[string]any) string
-//   - FetchCloudTrailEventsPage writes _ct.* keys into Resource.Fields
-//     and sets Resource.Status to "ct-write" or "ct-read"
-//
-// Bug vectors covered:
-//   - Verb classifier maps wrong prefix (e.g. "StopInstances" → "?" instead of "W")
-//   - Resource.Status set to "true"/"false" instead of "ct-write"/"ct-read"
-//   - Verb → Status mapping wrong (e.g. "D" classified as ct-read)
-//   - _ct.* keys absent from Resource.Fields after fetch
-//   - _ct.is_root = "true" for non-Root identity
-//   - _ct.cross_account = "true" when accounts match
-//   - _ct.outcome = "OK" when errorCode is non-empty
-//   - Fetcher reverses LookupEvents newest-first order
-//   - Missing userIdentity panics instead of producing safe defaults
-//   - Unparseable CloudTrailEvent JSON panics instead of graceful fallback
-
 import (
 	"context"
 	"encoding/json"
@@ -35,10 +15,6 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 	"github.com/k2m30/a9s/v3/core/semantics/ctevent"
 )
-
-// ===========================================================================
-// T020Q — Verb classifier: ClassifyCTVerb
-// ===========================================================================
 
 func TestCTVerb_ReadPrefixes(t *testing.T) {
 	cases := []struct {
@@ -183,10 +159,6 @@ func TestCTVerb_Deterministic_SamePrecedenceOrder(t *testing.T) {
 	}
 }
 
-// ===========================================================================
-// T020Q — Fetcher flattening: _ct.* fields written into Resource.Fields
-// ===========================================================================
-
 // buildSyntheticCTEvent constructs a cloudtrailtypes.Event with embedded JSON.
 func buildSyntheticCTEvent(
 	id, eventName, eventSource, username string,
@@ -329,7 +301,6 @@ func TestCTFlatten_OutcomeIsErrorCodeWhenPresent(t *testing.T) {
 }
 
 func TestCTFlatten_IsRootTrue(t *testing.T) {
-	// Root identity: embed JSON with userIdentity.type = "Root"
 	rootJSON := `{"eventVersion":"1.08","userIdentity":{"type":"Root","accountId":"111122223333","arn":"arn:aws:iam::111122223333:root"},"awsRegion":"us-east-1","sourceIPAddress":"1.2.3.4","eventCategory":"Management","eventType":"AwsApiCall","recipientAccountId":"111122223333"}`
 	event := buildSyntheticCTEvent("evt-root-001", "CreateAccessKey", "iam.amazonaws.com", "",
 		false, time.Now(), rootJSON, nil)
@@ -361,7 +332,6 @@ func TestCTFlatten_IsRootFalseForNonRoot(t *testing.T) {
 }
 
 func TestCTFlatten_CrossAccountTrue(t *testing.T) {
-	// Different account IDs → cross_account = "true"
 	ctJSON := buildFullCTEventJSON("111122223333", "444455556666", "1.2.3.4", "us-east-1",
 		"aws-cli/2.0", "AssumedRole", "Management", "AwsApiCall", "")
 	event := buildSyntheticCTEvent("evt-cross-001", "GetObject", "s3.amazonaws.com", "crossuser",
@@ -384,7 +354,6 @@ func TestCTFlatten_CrossAccountTrue(t *testing.T) {
 }
 
 func TestCTFlatten_CrossAccountFalse(t *testing.T) {
-	// Same account → cross_account = "false"
 	ctJSON := buildFullCTEventJSON("111122223333", "111122223333", "1.2.3.4", "us-east-1",
 		"aws-cli/2.0", "AssumedRole", "Management", "AwsApiCall", "")
 	event := buildSyntheticCTEvent("evt-same-acct-001", "ListBuckets", "s3.amazonaws.com", "alice",
@@ -437,10 +406,6 @@ func TestCTFlatten_EventCategoryAndTypeExtracted(t *testing.T) {
 		t.Errorf("_ct.event_type = %q, want AwsApiCall", r.Fields["_ct.event_type"])
 	}
 }
-
-// ===========================================================================
-// T020Q — Resource.Status mapping: ct-write vs ct-read
-// ===========================================================================
 
 func TestCTFlatten_StatusCTAttention_ForVerbW(t *testing.T) {
 	ctJSON := buildFullCTEventJSON("111122223333", "111122223333", "1.2.3.4", "us-east-1",
@@ -550,10 +515,6 @@ func TestCTFlatten_StatusCTInfo_ForVerbQuestionMark(t *testing.T) {
 	}
 }
 
-// ===========================================================================
-// T020Q — Newest-first order preserved
-// ===========================================================================
-
 func TestCTFlatten_NewestFirstOrderPreserved(t *testing.T) {
 	// LookupEvents returns newest first. The fetcher must NOT reverse this order.
 	t1 := time.Date(2026, 3, 28, 15, 0, 0, 0, time.UTC) // newest
@@ -576,7 +537,6 @@ func TestCTFlatten_NewestFirstOrderPreserved(t *testing.T) {
 	if len(result.Resources) != 3 {
 		t.Fatalf("expected 3 resources, got %d", len(result.Resources))
 	}
-	// First resource must be the newest event.
 	if result.Resources[0].ID != "evt-order-01" {
 		t.Errorf("result[0].ID = %q, want evt-order-01 (newest first)", result.Resources[0].ID)
 	}
@@ -585,12 +545,7 @@ func TestCTFlatten_NewestFirstOrderPreserved(t *testing.T) {
 	}
 }
 
-// ===========================================================================
-// T020Q — Edge cases: missing/empty userIdentity, unparseable JSON
-// ===========================================================================
-
 func TestCTFlatten_MissingUserIdentity_ActorIsNotBlank(t *testing.T) {
-	// CloudTrailEvent JSON with no userIdentity field.
 	noIdentityJSON := `{"eventVersion":"1.08","eventName":"GetObject","awsRegion":"us-east-1","sourceIPAddress":"1.2.3.4","eventCategory":"Management","eventType":"AwsApiCall","recipientAccountId":"111122223333"}`
 	event := buildSyntheticCTEvent("evt-noidentity-001", "GetObject", "s3.amazonaws.com", "",
 		true, time.Now(), noIdentityJSON, nil)
@@ -600,7 +555,7 @@ func TestCTFlatten_MissingUserIdentity_ActorIsNotBlank(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	r := result.Resources[0]
-	// Actor must not be blank; data-model says never blank (use "-" as safe default).
+	// The actor is never blank; "-" is the safe default.
 	if r.Fields["_ct.actor"] == "" {
 		t.Error("_ct.actor must not be empty string when userIdentity is missing; use \"-\"")
 	}
@@ -627,7 +582,6 @@ func TestCTFlatten_UnparseableCTEventJSON_NoPanic(t *testing.T) {
 	if len(result.Resources) != 1 {
 		t.Fatalf("expected 1 resource even on bad JSON, got %d", len(result.Resources))
 	}
-	// _ct.target must be "(none)" not blank.
 	if result.Resources[0].Fields["_ct.target"] == "" {
 		t.Error("_ct.target must not be empty on bad JSON; expect \"(none)\"")
 	}
@@ -663,10 +617,6 @@ func TestCTFlatten_NilCTEventPointer_NoPanic(t *testing.T) {
 	}
 }
 
-// ===========================================================================
-// T030Q — TARGET extraction: ExtractCTTarget
-// ===========================================================================
-
 func TestExtractCTTarget_ResourcesArrayNonEmpty_ReturnsFirstResource(t *testing.T) {
 	// When resources[] has entries, the first resource ARN/name is returned.
 	parsed := map[string]any{
@@ -691,7 +641,6 @@ func TestExtractCTTarget_ResourcesArrayNonEmpty_ReturnsFirstResource(t *testing.
 	if got == "" || got == "(none)" {
 		t.Errorf("ExtractCTTarget with resources[] = %q, want first resource ARN/name", got)
 	}
-	// Must not return the second resource.
 	if got == "arn:aws:s3:::second-bucket" || got == "second-bucket" {
 		t.Errorf("ExtractCTTarget returned second resource %q, want first", got)
 	}
@@ -816,20 +765,9 @@ func TestExtractCTTarget_NilInput_ReturnsNoneNeverPanic(t *testing.T) {
 	}
 }
 
-// ===========================================================================
-// T024Q — Demo fixture coverage
-// ===========================================================================
-
-// The actual T024Q tests call FetchCloudTrailEvents via fakes.NewCloudTrail().
-
 func TestCTEventsFixtureCoverage_AllVerbsPresent(t *testing.T) {
 	// The demo fixture for ct-events must contain at least one event for each
 	// verb class: R, W, D, S, I, N.
-	//
-	// Pre-T025C: the fixtures still use old Status values ("true"/"false") and
-	// do not have _ct.* keys. We derive the verb from the event name + category/type
-	// embedded in the CloudTrailEvent JSON.
-	// Post-T025C: we read _ct.verb directly.
 
 	ctClient := fakes.NewCloudTrail()
 	resources, fetchErr := collectAllPages(func(token string) (resource.FetchResult, error) {
@@ -845,14 +783,13 @@ func TestCTEventsFixtureCoverage_AllVerbsPresent(t *testing.T) {
 	}
 
 	for _, r := range resources {
-		// Post-T025C path: read _ct.verb directly.
 		if v, hasCTVerb := r.Fields["_ct.verb"]; hasCTVerb {
 			if _, known := verbBuckets[v]; known {
 				verbBuckets[v] = true
 			}
 			continue
 		}
-		// Pre-T025C path: inspect the embedded CloudTrailEvent JSON.
+		// Rows without _ct.verb: derive it from the embedded CloudTrailEvent JSON.
 		event, ok := r.RawStruct.(cloudtrailtypes.Event)
 		if !ok || event.EventName == nil {
 			continue
@@ -872,7 +809,7 @@ func TestCTEventsFixtureCoverage_AllVerbsPresent(t *testing.T) {
 }
 
 func TestCTEventsFixtureCoverage_AllTargetFallbackCategoriesPresent(t *testing.T) {
-	// The demo fixture must cover each TARGET-fallback category per research D5:
+	// The demo fixture must cover each TARGET-fallback category:
 	//   - standard resources[] (any event with non-empty resources)
 	//   - Insight (eventCategory == Insight)
 	//   - NetworkActivity (eventCategory == NetworkActivity)
@@ -940,11 +877,10 @@ func TestCTEventsFixtureCoverage_AtLeastOneRootEvent(t *testing.T) {
 		t.Fatalf("FetchCloudTrailEvents via CloudTrail fake: err=%v, len=%d", fetchErr, len(resources))
 	}
 	for _, r := range resources {
-		// Post-T025C path.
 		if r.Fields["_ct.is_root"] == "true" {
 			return
 		}
-		// Pre-T025C path: check CloudTrailEvent JSON.
+		// Rows without _ct.is_root: inspect the CloudTrailEvent JSON.
 		event, ok := r.RawStruct.(cloudtrailtypes.Event)
 		if !ok || event.CloudTrailEvent == nil {
 			continue
@@ -965,11 +901,10 @@ func TestCTEventsFixtureCoverage_AtLeastOneErrorCodeEvent(t *testing.T) {
 		t.Fatalf("FetchCloudTrailEvents via CloudTrail fake: err=%v, len=%d", fetchErr, len(resources))
 	}
 	for _, r := range resources {
-		// Post-T025C path.
 		if r.Fields["_ct.error_code"] != "" {
 			return
 		}
-		// Pre-T025C path.
+		// Rows without _ct.error_code: inspect the CloudTrailEvent JSON.
 		event, ok := r.RawStruct.(cloudtrailtypes.Event)
 		if !ok || event.CloudTrailEvent == nil {
 			continue
@@ -990,11 +925,10 @@ func TestCTEventsFixtureCoverage_AtLeastOneCrossAccountEvent(t *testing.T) {
 		t.Fatalf("FetchCloudTrailEvents via CloudTrail fake: err=%v, len=%d", fetchErr, len(resources))
 	}
 	for _, r := range resources {
-		// Post-T025C path.
 		if r.Fields["_ct.cross_account"] == "true" {
 			return
 		}
-		// Pre-T025C path.
+		// Rows without _ct.cross_account: inspect the CloudTrailEvent JSON.
 		event, ok := r.RawStruct.(cloudtrailtypes.Event)
 		if !ok || event.CloudTrailEvent == nil {
 			continue
@@ -1005,10 +939,6 @@ func TestCTEventsFixtureCoverage_AtLeastOneCrossAccountEvent(t *testing.T) {
 	}
 	t.Error("demo ct-events fixture missing at least one cross-account event (accountId != recipientAccountId)")
 }
-
-// ---------------------------------------------------------------------------
-// T024Q helpers: lightweight JSON field extractors for pre-T025C fixture inspection
-// ---------------------------------------------------------------------------
 
 // ctTestParseEventCategoryType parses a CloudTrailEvent JSON string and returns
 // (eventCategory, eventType). Returns ("", "") on nil/empty/parse-error.

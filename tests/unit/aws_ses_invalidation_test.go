@@ -1,16 +1,3 @@
-// aws_ses_invalidation_test.go — Cache-invalidation regression tests for SES.
-//
-// Verifies that InvalidateSESRuleSetCache(clients) correctly clears the per-client
-// receipt-rule-set cache so that the next checker call retries the API.
-//
-// Also contains Pin 2: regression pin verifying that Ctrl+R on a detail view for
-// a ses resource type calls InvalidateSESRuleSetCache, so the next related-panel
-// check re-fetches the receipt-rule-set instead of serving stale cached data.
-//
-// Also contains Pin 3: singleflight coalescing regression pin verifying that N
-// concurrent callers of SESActiveReceiptRuleSetForTest (which delegates to the
-// unexported sesActiveReceiptRuleSet) result in exactly 1 upstream API call when
-// singleflight is in place.
 package unit_test
 
 import (
@@ -32,20 +19,7 @@ import (
 	"github.com/k2m30/a9s/v3/internal/tui"
 )
 
-// TestInvalidateSESRuleSetCache verifies that after a successful
-// DescribeActiveReceiptRuleSet response is cached, calling
-// InvalidateSESRuleSetCache(clients) forces the next request to
-// retry the API call.
-//
-// Behaviour pinned:
-//  1. First checker call: API called (counter = 1), valid rule set returned.
-//  2. Second checker call: cache hit, no new API call (counter still 1).
-//  3. Call InvalidateSESRuleSetCache(clients).
-//  4. Third checker call: cache miss, API called again (counter = 2).
-//  5. Returns same rule-set output (fake always returns the same fixture).
 func TestInvalidateSESRuleSetCache(t *testing.T) {
-	// Build a simple rule set with one global LambdaAction so the checker walk
-	// succeeds and returns Count=1 each time.
 	ruleSetOutput := &ses.DescribeActiveReceiptRuleSetOutput{
 		Rules: []sestypes.ReceiptRule{
 			{
@@ -62,15 +36,11 @@ func TestInvalidateSESRuleSetCache(t *testing.T) {
 
 	v1Mock := &fakeSESV1{
 		responses: []sesV1Response{
-			// Repeated success — always returns the same rule set.
 			{output: ruleSetOutput, err: nil},
 		},
 	}
 
-	// Wire a per-test RuleSets store so the cache works (post-PR-02d the
-	// rule set cache lives on c.RuleSets() rather than a process-global map
-	// keyed by *ServiceClients pointer). Use SetRuleSets because the field
-	// is unexported (CR-flagged race fix).
+	// The rule-set cache lives on c.RuleSets(), so each test wires its own store.
 	clients := &awsclient.ServiceClients{SES: v1Mock}
 	clients.SetRuleSets(session.NewRuleSetStore())
 
@@ -81,7 +51,6 @@ func TestInvalidateSESRuleSetCache(t *testing.T) {
 
 	checker := sesCheckerByTarget(t, "lambda")
 
-	// ---- Call 1: first call; must hit the API. ----
 	result1 := checker(context.Background(), clients, src, resource.ResourceCache{})
 	if result1.Err() != nil {
 		t.Fatalf("call 1: unexpected error: %v", result1.Err())
@@ -93,7 +62,6 @@ func TestInvalidateSESRuleSetCache(t *testing.T) {
 		t.Errorf("after call 1: mock.calls = %d, want 1", v1Mock.calls)
 	}
 
-	// ---- Call 2: cache hit; must NOT call the API again. ----
 	result2 := checker(context.Background(), clients, src, resource.ResourceCache{})
 	if result2.Err() != nil {
 		t.Fatalf("call 2: unexpected error: %v", result2.Err())
@@ -105,13 +73,10 @@ func TestInvalidateSESRuleSetCache(t *testing.T) {
 		t.Errorf("after call 2: mock.calls = %d, want 1 (cache must absorb call 2)", v1Mock.calls)
 	}
 
-	// ---- Invalidate the cache by swapping the store. ----
-	// Post-PR-02d (P2 fix): swap rather than Clear() so in-flight blocked
-	// fetchers can't re-poison the active store. Production code does this
-	// on Ctrl+R for SES detail/list views; the test mirrors that pattern.
+	// Ctrl+R swaps the store rather than clearing it, so an in-flight fetcher
+	// cannot re-poison the active one.
 	clients.SetRuleSets(session.NewRuleSetStore())
 
-	// ---- Call 3: cache miss after invalidation; API must be called again. ----
 	result3 := checker(context.Background(), clients, src, resource.ResourceCache{})
 	if result3.Err() != nil {
 		t.Fatalf("call 3: unexpected error: %v", result3.Err())
@@ -124,26 +89,7 @@ func TestInvalidateSESRuleSetCache(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// PIN 2 — SES cache invalidation on detail-view Ctrl+R
-// ---------------------------------------------------------------------------
-// Pre-fix: handleRefresh in app_handlers_navigate.go did NOT call
-// InvalidateSESRuleSetCache on the detail-view refresh path (only on the
-// resource-list path). This meant Ctrl+R on a detail view for an SES identity
-// served stale receipt-rule-set data from the cache.
-//
-// Post-fix: the detail-view refresh branch also calls InvalidateSESRuleSetCache
-// when rt == "ses". This pin verifies that:
-//   1. A checker call populates the cache (API call counter = 1).
-//   2. A second checker call hits the cache (counter still = 1).
-//   3. The TUI model sends Ctrl+R while on a detail view for "ses".
-//   4. A third checker call re-fetches from the API (counter = 2).
-
-// TestHandleRefresh_SESDetailViewInvalidatesRuleSetCache verifies that Ctrl+R
-// while on a ses-type detail view causes the next ses-lambda checker call to
-// re-fetch from the API, proving that the cache was invalidated.
 func TestHandleRefresh_SESDetailViewInvalidatesRuleSetCache(t *testing.T) {
-	// Build a rule set with one global LambdaAction so the checker returns Count=1.
 	ruleSetOutput := &ses.DescribeActiveReceiptRuleSetOutput{
 		Rules: []sestypes.ReceiptRule{
 			{
@@ -164,9 +110,7 @@ func TestHandleRefresh_SESDetailViewInvalidatesRuleSetCache(t *testing.T) {
 		},
 	}
 
-	// Wire a per-test RuleSets store so the cache works (post-PR-02d the
-	// rule set cache lives on c.RuleSets()). Reuse one *ServiceClients pointer
-	// so that the TUI model and the checker share the same store reference.
+	// The TUI model and the checker share one *ServiceClients, and so one store.
 	clients := &awsclient.ServiceClients{SES: v1Mock}
 	clients.SetRuleSets(session.NewRuleSetStore())
 
@@ -177,7 +121,6 @@ func TestHandleRefresh_SESDetailViewInvalidatesRuleSetCache(t *testing.T) {
 
 	checker := sesCheckerByTarget(t, "lambda")
 
-	// ---- Call 1: seed the cache. ----
 	r1 := checker(context.Background(), clients, src, resource.ResourceCache{})
 	if r1.Count() != 1 {
 		t.Errorf("call 1: Count = %d, want 1", r1.Count())
@@ -186,7 +129,6 @@ func TestHandleRefresh_SESDetailViewInvalidatesRuleSetCache(t *testing.T) {
 		t.Fatalf("pre-condition: expected 1 API call after seeding cache, got %d", v1Mock.calls)
 	}
 
-	// ---- Call 2: cache hit. ----
 	r2 := checker(context.Background(), clients, src, resource.ResourceCache{})
 	if r2.Count() != 1 {
 		t.Errorf("call 2: Count = %d, want 1 (cached)", r2.Count())
@@ -195,13 +137,11 @@ func TestHandleRefresh_SESDetailViewInvalidatesRuleSetCache(t *testing.T) {
 		t.Fatalf("pre-condition: cache miss on call 2, mock.calls = %d, want 1", v1Mock.calls)
 	}
 
-	// applyMsg applies a message to the TUI model and returns the updated model.
 	applyMsg := func(m tui.Model, msg tea.Msg) tui.Model {
 		newM, _ := m.Update(msg)
 		return newM.(tui.Model)
 	}
 
-	// ---- Navigate TUI model to a ses detail view and press Ctrl+R. ----
 	sesRes := resource.Resource{
 		ID:     "any@example.com",
 		Name:   "any@example.com",
@@ -214,23 +154,19 @@ func TestHandleRefresh_SESDetailViewInvalidatesRuleSetCache(t *testing.T) {
 	)
 	m = applyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 40})
 
-	// Wire the pre-supplied clients into m.clients by sending the ClientsReadyMsg
-	// that Init() would normally emit as a command (but we don't run the event loop).
-	// Gen:1 — ConnectGen seeds at 1 (session.New()); this model is never rotated.
+	// Init() emits ClientsReady as a command, and no event loop runs here.
+	// ConnectGen seeds at 1 (session.New()); this model is never rotated.
 	m = applyMsg(m, messages.ClientsReady{Clients: clients, Gen: 1})
 
-	// Push an SES detail view onto the stack.
 	m = applyMsg(m, messages.Navigate{
 		Target:       messages.TargetDetail,
 		ResourceType: "ses",
 		Resource:     &sesRes,
 	})
 
-	// Press Ctrl+R while on the ses detail view — must call InvalidateSESRuleSetCache.
 	m = applyMsg(m, tea.KeyPressMsg{Code: -1, Text: "\x12"})
-	_ = m // model state after refresh is not inspected
+	_ = m
 
-	// ---- Call 3: cache must be invalidated. ----
 	r3 := checker(context.Background(), clients, src, resource.ResourceCache{})
 	if r3.Count() != 1 {
 		t.Errorf("call 3: Count = %d, want 1 (fresh fetch)", r3.Count())
@@ -241,10 +177,9 @@ func TestHandleRefresh_SESDetailViewInvalidatesRuleSetCache(t *testing.T) {
 	}
 }
 
-// blockingSESV1 implements SESV1API but blocks the call inside
-// DescribeActiveReceiptRuleSet until releaseCh is closed. Used to
-// simulate a slow upstream API that doesn't return until after a
-// concurrent refresh has invalidated the cache.
+// blockingSESV1 blocks DescribeActiveReceiptRuleSet until releaseCh is
+// closed: a slow upstream that answers after a concurrent refresh swapped the
+// cache.
 type blockingSESV1 struct {
 	releaseCh chan struct{}
 	enteredCh chan struct{} // closed once the call is in-flight
@@ -268,20 +203,9 @@ func (b *blockingSESV1) DescribeActiveReceiptRuleSet(
 	return b.output, nil
 }
 
-// TestSESRuleSetSwap_LateWriterDoesNotPoisonNewStore pins the P2 fix:
-// when an in-flight DescribeActiveReceiptRuleSet call is blocked, and the
-// caller swaps `c.RuleSets` for a fresh store (the production
-// invalidation pattern from Ctrl+R), the late writer's Set must land on
-// the orphaned old store — NOT on the new active slot. Otherwise the
-// next checker run would see stale Lambda/S3 relationships even after
-// the user explicitly refreshed.
-//
-// Pre-fix behaviour (in-place Clear()): Set lands on the same store and
-// repopulates the active cache → next checker sees stale data.
-//
-// Post-fix behaviour (swap + capture): Set lands on the captured (now
-// orphaned) store → new active store stays empty → next checker fetches
-// fresh.
+// A DescribeActiveReceiptRuleSet that returns after Ctrl+R swapped
+// c.RuleSets writes to the orphaned old store, so the next checker run
+// fetches fresh instead of serving stale Lambda/S3 relationships.
 func TestSESRuleSetSwap_LateWriterDoesNotPoisonNewStore(t *testing.T) {
 	staleOutput := &ses.DescribeActiveReceiptRuleSetOutput{
 		Rules: []sestypes.ReceiptRule{{
@@ -310,57 +234,34 @@ func TestSESRuleSetSwap_LateWriterDoesNotPoisonNewStore(t *testing.T) {
 	}
 	checker := sesCheckerByTarget(t, "lambda")
 
-	// Goroutine A: blocked checker.
 	checkerDone := make(chan struct{})
 	go func() {
 		defer close(checkerDone)
 		_ = checker(context.Background(), clients, src, resource.ResourceCache{})
 	}()
 
-	// Wait for the blocked call to enter the SES API stub.
 	<-v1Mock.enteredCh
 
-	// Capture the OLD store reference so we can verify the late writer
-	// targeted it (not the new one).
 	oldStore := clients.RuleSets()
 
-	// Refresh: swap to a fresh store (production Ctrl+R pattern).
 	clients.SetRuleSets(session.NewRuleSetStore())
 
-	// Release the blocked call. Goroutine A returns and writes its result.
 	close(v1Mock.releaseCh)
 	<-checkerDone
 
-	// Pin: the new active store is empty. The late writer pollute the
-	// orphaned old store, not the new one.
 	if _, ok := clients.RuleSets().Get(); ok {
 		t.Errorf("new RuleSets store has cached entry — late writer poisoned the active slot")
 	}
-	// Confirm the orphaned store DID receive the write (so we know the
-	// fake actually executed Set; otherwise the test could be vacuously
-	// passing).
+	// The write landing on the orphaned store proves the fake ran Set.
 	if _, ok := oldStore.Get(); !ok {
 		t.Errorf("orphaned old store has NO cached entry — late writer didn't fire; test is vacuous")
 	}
 }
 
-// ---------------------------------------------------------------------------
-// PIN 3 — singleflight coalescing of concurrent sesActiveReceiptRuleSet callers
-// ---------------------------------------------------------------------------
-// Two concurrent callers observing a cache miss must not both invoke
-// DescribeActiveReceiptRuleSet: when one succeeds and the sibling transiently
-// fails (throttle / 5xx), the failing checker would return State:
-// RelatedError even though the cache now holds the successful result.
-// singleflight issues exactly one upstream call; all concurrent waiters share
-// the single result.
-//
-// This test calls the unexported sesActiveReceiptRuleSet via the exported
-// test wrapper SESActiveReceiptRuleSetForTest (core/aws/ses_related.go).
+// Concurrent callers that miss the cache share one upstream call: if one
+// succeeded and a sibling transiently failed (throttle / 5xx), the failing
+// checker would report RelatedError while the cache holds the answer.
 
-// atomicBlockingSESV1 is a goroutine-safe SES v1 mock that:
-//   - counts calls atomically
-//   - blocks every DescribeActiveReceiptRuleSet call on releaseCh
-//   - signals inFlightCh when at least one call is in progress
 type atomicBlockingSESV1 struct {
 	calls      atomic.Int32
 	releaseCh  chan struct{}
@@ -380,12 +281,8 @@ func (a *atomicBlockingSESV1) DescribeActiveReceiptRuleSet(
 	return a.output, nil
 }
 
-// Compile-time check: atomicBlockingSESV1 satisfies SESV1API.
 var _ awsclient.SESV1API = (*atomicBlockingSESV1)(nil)
 
-// TestSESActiveReceiptRuleSet_Singleflight_CoalescesConcurrentMisses verifies
-// that N concurrent callers of sesActiveReceiptRuleSet result in exactly 1
-// upstream API invocation when singleflight coalescing is in place.
 func TestSESActiveReceiptRuleSet_Singleflight_CoalescesConcurrentMisses(t *testing.T) {
 	const N = 5
 
@@ -420,11 +317,8 @@ func TestSESActiveReceiptRuleSet_Singleflight_CoalescesConcurrentMisses(t *testi
 	var wg sync.WaitGroup
 	wg.Add(N)
 
-	// started is a hard barrier: each goroutine signals it BEFORE entering
-	// the SES helper, giving us a strong guarantee that all N goroutines have
-	// been scheduled before we release the stub. This eliminates the flaky
-	// 50ms sleep while still being bounded (100 Gosched iterations cap the
-	// wait so a stuck test fails fast instead of hanging the suite).
+	// started is a barrier: each goroutine signals before entering the SES
+	// helper, so all N are scheduled before the stub is released.
 	started := make(chan struct{}, N)
 	for i := range N {
 		go func(idx int) {
@@ -435,11 +329,9 @@ func TestSESActiveReceiptRuleSet_Singleflight_CoalescesConcurrentMisses(t *testi
 		}(i)
 	}
 
-	// Wait for all N goroutines to signal they are about to call.
 	for range N {
 		<-started
 	}
-	// Wait for the leader to enter the blocking stub.
 	<-mock.inFlightCh
 	// Yield repeatedly to give the remaining N-1 goroutines a chance to reach
 	// the singleflight wait point before we release. Bounded at 100 iterations
@@ -448,17 +340,13 @@ func TestSESActiveReceiptRuleSet_Singleflight_CoalescesConcurrentMisses(t *testi
 		runtime.Gosched()
 	}
 
-	// Release all blocked callers.
 	close(mock.releaseCh)
 	wg.Wait()
 
-	// With singleflight, the API must have been called exactly once.
 	if got := mock.calls.Load(); got != 1 {
 		t.Errorf("DescribeActiveReceiptRuleSet called %d times, want 1 — singleflight not coalescing concurrent misses", got)
 	}
 
-	// Every goroutine must have received a non-nil, non-error result with the
-	// expected rule-set name (no caller should see a failure while another succeeded).
 	for i, r := range results {
 		if r.err != nil {
 			t.Errorf("goroutine %d: unexpected error: %v", i, r.err)
@@ -478,21 +366,11 @@ func TestSESActiveReceiptRuleSet_Singleflight_CoalescesConcurrentMisses(t *testi
 	}
 }
 
-// ---------------------------------------------------------------------------
-// PIN 4 — singleflight ctx-coupling: leader cancellation must NOT poison followers
-// ---------------------------------------------------------------------------
-// Bug (post-PR-307): sesActiveReceiptRuleSet passes the caller's ctx directly
-// into the singleflight.Group.Do closure. When the leader's ctx is canceled,
-// the singleflight fetcher aborts with context.Canceled and propagates that
-// error to every follower — even followers whose own ctx was not canceled.
-//
-// Pre-fix behaviour: follower receives errB == context.Canceled (leader's error).
-// Post-fix behaviour: follower receives a successful result despite leader cancellation.
+// The singleflight fetch is detached from the leader's ctx: a canceled
+// leader must not hand context.Canceled to a follower whose own ctx is live.
 
-// ctxAwareSESV1 is a ctx-respecting SES v1 mock used only for PIN 4.
-// It blocks each call on releaseCh OR the call's ctx.Done — whichever fires first.
-// When ctx fires, it returns ctx.Err() so the caller observes cancellation.
-// calls is atomic so concurrent goroutines can increment it safely.
+// ctxAwareSESV1 blocks each call on releaseCh or the call's ctx.Done,
+// whichever fires first, and returns ctx.Err() on cancellation.
 type ctxAwareSESV1 struct {
 	calls      atomic.Int32
 	releaseCh  chan struct{}
@@ -516,24 +394,12 @@ func (c *ctxAwareSESV1) DescribeActiveReceiptRuleSet(
 	}
 }
 
-// Compile-time check: ctxAwareSESV1 satisfies SESV1API.
 var _ awsclient.SESV1API = (*ctxAwareSESV1)(nil)
 
-// TestSESActiveReceiptRuleSet_Singleflight_LeaderCancelDoesNotPoisonFollower
-// pins ctx decoupling in the singleflight.
-//
-// The invariant pinned here is: a follower goroutine with a long-lived ctx
-// must succeed even when the singleflight leader's ctx is canceled before
-// the upstream API call completes.
-//
-// Call count: 1 or 2 upstream calls are both correct — the fetcher may
-// detach from the leader's ctx so the single in-flight call completes for
-// everyone (1 call), or retry with a context-independent ctx when the
-// leader's ctx fires (2 calls). Only the follower-success invariant is
-// pinned.
-//
-// Leader outcome (errA) is not asserted: the leader may receive
-// context.Canceled or a successful result shared from a background retry.
+// Either 1 or 2 upstream calls is correct: the fetcher may detach from the
+// leader's ctx so the one in-flight call completes for everyone, or retry
+// with a context-independent ctx when the leader's ctx fires. The leader may
+// receive context.Canceled or a result shared from a background retry.
 func TestSESActiveReceiptRuleSet_Singleflight_LeaderCancelDoesNotPoisonFollower(t *testing.T) {
 	ruleSetOutput := &ses.DescribeActiveReceiptRuleSetOutput{
 		Rules: []sestypes.ReceiptRule{
@@ -568,7 +434,6 @@ func TestSESActiveReceiptRuleSet_Singleflight_LeaderCancelDoesNotPoisonFollower(
 	)
 	wg.Add(2)
 
-	// Goroutine A — the leader. Its ctx will be canceled while the API is blocking.
 	ctxA, cancelA := context.WithCancel(context.Background())
 	go func() {
 		defer wg.Done()
@@ -576,15 +441,11 @@ func TestSESActiveReceiptRuleSet_Singleflight_LeaderCancelDoesNotPoisonFollower(
 		resA = result{out: out, err: err}
 	}()
 
-	// Wait for goroutine A to enter the blocking stub.
 	<-mock.inFlightCh
-	// A is now inside the fetcher closure inside singleflight.Do. A few yields
-	// for paranoia (singleflight bookkeeping after fetcher invocation).
 	for range 10 {
 		runtime.Gosched()
 	}
 
-	// Goroutine B — the follower. Uses a long-lived context (never canceled).
 	// bStarted is closed immediately before B calls the helper, giving us a
 	// deterministic signal that B has been scheduled.
 	bStarted := make(chan struct{})
@@ -595,41 +456,30 @@ func TestSESActiveReceiptRuleSet_Singleflight_LeaderCancelDoesNotPoisonFollower(
 		resB = result{out: out, err: err}
 	}()
 
-	// Wait for B to start, then yield aggressively to let it reach the
-	// singleflight DoChan wait point before we cancel A.
-	// 100 yields matches PIN 3's barrier idiom; bounded so a stuck test
-	// fails fast rather than hanging the suite indefinitely.
+	// Bounded yields let B reach the singleflight wait point before A is
+	// canceled; a stuck test fails fast instead of hanging the suite.
 	<-bStarted
 	for range 100 {
 		runtime.Gosched()
 	}
 
-	// Cancel the leader's ctx. This is the trigger that exposes the bug:
-	// a naive singleflight implementation propagates ctxA's error to B.
+	// A singleflight coupled to the leader's ctx would hand ctxA's error to B.
 	cancelA()
 
-	// Release the mock — any continuing detached fetch (Fix 1: WithoutCancel)
-	// finishes the work for B. wg.Wait() below ensures both goroutines finish
-	// before we check results, so no sleep is needed after cancelA.
+	// Any detached fetch finishes the work for B; wg.Wait() orders both
+	// goroutines before the checks.
 	close(mock.releaseCh)
 
-	// Wait for both goroutines to finish.
 	wg.Wait()
 
-	// ---- REGRESSION PIN (follower must succeed) ----
-
-	// errB must be nil: the follower's context was never canceled.
-	// Pre-fix failure: errB == context.Canceled (poisoned by leader).
 	if resB.err != nil {
 		t.Errorf("follower errB = %v, want nil — follower's ctx was not canceled; leader cancellation must not propagate to follower", resB.err)
 	}
 
-	// outB must be non-nil when errB is nil.
 	if resB.out == nil {
 		t.Errorf("follower outB = nil, want non-nil successful result")
 	}
 
-	// outB must carry the expected fixture data (not a zero-value struct).
 	if resB.out != nil {
 		if len(resB.out.Rules) == 0 {
 			t.Errorf("follower outB.Rules is empty, want at least 1 rule")
@@ -638,36 +488,19 @@ func TestSESActiveReceiptRuleSet_Singleflight_LeaderCancelDoesNotPoisonFollower(
 		}
 	}
 
-	// call count must be 1 or 2 — see comment above for rationale.
-	// Fewer than 1 is impossible; more than 2 suggests an unbounded retry loop.
+	// More than 2 calls means an unbounded retry loop.
 	if got := mock.calls.Load(); got < 1 || got > 2 {
 		t.Errorf("DescribeActiveReceiptRuleSet called %d times, want 1 or 2 (coalesced or detached re-fetch)", got)
 	}
 
-	// leader outcome intentionally not asserted — see package-level comment.
 	_ = resA
 }
 
-// ---------------------------------------------------------------------------
-// PIN 5 — nil result must NOT be cached as a successful entry
-// ---------------------------------------------------------------------------
-// Regression introduced in the GetOrFetch refactor (PR-307): GetOrFetch calls
-// s.Set(v) whenever err == nil, even when v == nil. This stores (ruleSet=nil,
-// ok=true). Subsequent Get() calls return (nil, true) and the fetcher is
-// never invoked again — the nil result is sticky.
-//
-// AWS SES DescribeActiveReceiptRuleSet legitimately returns (nil, nil) when
-// no rule set is active, so this regression is reachable in production.
-//
-// Pre-fix expected failure mode: mock.calls == 1 after the second call
-// (the nil was cached on the first call; the fetcher is never invoked again).
-//
-// Post-fix expected pass mode: mock.calls == 2 (the nil result was not cached;
-// the fetcher is invoked on the second call too).
+// AWS SES DescribeActiveReceiptRuleSet returns (nil, nil) when no rule set is
+// active. That answer is not cached, so the next call fetches again.
 
 // nilReturnSESV1 is a minimal SESV1API mock that always returns (nil, nil)
 // — emulating an AWS account with no active SES receipt rule set.
-// calls is an atomic counter so the test can assert exact invocation count.
 type nilReturnSESV1 struct {
 	calls atomic.Int32
 }
@@ -681,14 +514,8 @@ func (n *nilReturnSESV1) DescribeActiveReceiptRuleSet(
 	return nil, nil
 }
 
-// Compile-time check: nilReturnSESV1 satisfies SESV1API.
 var _ awsclient.SESV1API = (*nilReturnSESV1)(nil)
 
-// TestSESActiveReceiptRuleSet_NilResultIsNotCached is the regression pin for the
-// nil-caching bug in GetOrFetch.
-//
-// The invariant pinned: when the AWS API returns (nil, nil), the store must NOT
-// record a successful cache entry. The next call must invoke the fetcher again.
 func TestSESActiveReceiptRuleSet_NilResultIsNotCached(t *testing.T) {
 	mock := &nilReturnSESV1{}
 
@@ -697,7 +524,6 @@ func TestSESActiveReceiptRuleSet_NilResultIsNotCached(t *testing.T) {
 
 	ctx := context.Background()
 
-	// ---- Call 1: fetcher returns (nil, nil). ----
 	out1, err1 := awsclient.SESActiveReceiptRuleSetForTest(ctx, clients)
 	if err1 != nil {
 		t.Fatalf("call 1: unexpected error: %v", err1)
@@ -709,7 +535,6 @@ func TestSESActiveReceiptRuleSet_NilResultIsNotCached(t *testing.T) {
 		t.Fatalf("after call 1: mock.calls = %d, want 1", got)
 	}
 
-	// ---- Call 2: nil must NOT have been cached — fetcher must be called again. ----
 	out2, err2 := awsclient.SESActiveReceiptRuleSetForTest(ctx, clients)
 	if err2 != nil {
 		t.Fatalf("call 2: unexpected error: %v", err2)
@@ -717,7 +542,6 @@ func TestSESActiveReceiptRuleSet_NilResultIsNotCached(t *testing.T) {
 	if out2 != nil {
 		t.Fatalf("call 2: expected nil output, got %v", out2)
 	}
-	// A nil result is not sticky: the second call reaches the mock.
 	if got := mock.calls.Load(); got != 2 {
 		t.Errorf("mock.calls = %d, want 2 — nil result was cached as a success (sticky nil regression)", got)
 	}

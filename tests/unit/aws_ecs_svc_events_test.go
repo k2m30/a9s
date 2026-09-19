@@ -15,12 +15,6 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// ---------------------------------------------------------------------------
-// ECS Service Events fetcher tests (child of ECS Services)
-// ---------------------------------------------------------------------------
-
-// TestFetchEcsSvcEvents_Basic verifies parsing of 3 service events with known
-// timestamps and messages, checking ID, Name, Status, all Fields, and RawStruct.
 func TestFetchEcsSvcEvents_Basic(t *testing.T) {
 	ts1 := time.Date(2024, 3, 22, 10, 0, 0, 0, time.UTC)
 	ts2 := time.Date(2024, 3, 22, 10, 5, 0, 0, time.UTC)
@@ -112,7 +106,6 @@ func TestFetchEcsSvcEvents_Basic(t *testing.T) {
 		}
 	})
 
-	// Verify required fields on all events
 	t.Run("required_fields_present", func(t *testing.T) {
 		requiredFields := []string{"timestamp", "message"}
 		for i, r := range resources {
@@ -125,8 +118,6 @@ func TestFetchEcsSvcEvents_Basic(t *testing.T) {
 	})
 }
 
-// TestFetchEcsSvcEvents_Empty verifies that a service with no events
-// returns an empty slice with no error.
 func TestFetchEcsSvcEvents_Empty(t *testing.T) {
 	mock := &mockECSDescribeServicesClient{
 		output: &ecs.DescribeServicesOutput{
@@ -154,7 +145,6 @@ func TestFetchEcsSvcEvents_Empty(t *testing.T) {
 	}
 }
 
-// TestFetchEcsSvcEvents_APIError verifies that API errors are propagated.
 func TestFetchEcsSvcEvents_APIError(t *testing.T) {
 	mock := &mockECSDescribeServicesClient{
 		err: fmt.Errorf("AWS API error: access denied"),
@@ -175,8 +165,6 @@ func TestFetchEcsSvcEvents_APIError(t *testing.T) {
 	}
 }
 
-// TestFetchEcsSvcEvents_NewlineStripping verifies that messages with
-// newlines get cleaned.
 func TestFetchEcsSvcEvents_NewlineStripping(t *testing.T) {
 	ts := time.Date(2024, 3, 22, 10, 0, 0, 0, time.UTC)
 
@@ -219,8 +207,6 @@ func TestFetchEcsSvcEvents_NewlineStripping(t *testing.T) {
 	}
 }
 
-// TestFetchEcsSvcEvents_NilFields verifies that nil CreatedAt and nil Message
-// do not cause a panic.
 func TestFetchEcsSvcEvents_NilFields(t *testing.T) {
 	mock := &mockECSDescribeServicesClient{
 		output: &ecs.DescribeServicesOutput{
@@ -229,19 +215,15 @@ func TestFetchEcsSvcEvents_NilFields(t *testing.T) {
 					ServiceName: aws.String("nil-svc"),
 					Events: []ecstypes.ServiceEvent{
 						{
-							// All fields nil except Id
 							Id: aws.String("evt-nil"),
 						},
-						{
-							// Completely nil
-						},
+						{},
 					},
 				},
 			},
 		},
 	}
 
-	// Should not panic
 	result_svcevt, err := awsclient.FetchEcsSvcEvents(
 		context.Background(),
 		mock,
@@ -271,8 +253,6 @@ func TestFetchEcsSvcEvents_NilFields(t *testing.T) {
 	})
 }
 
-// TestFetchEcsSvcEvents_RawStruct verifies that RawStruct preserves the
-// original ecstypes.ServiceEvent, including all sub-fields.
 func TestFetchEcsSvcEvents_RawStruct(t *testing.T) {
 	ts := time.Date(2024, 3, 22, 12, 30, 0, 0, time.UTC)
 
@@ -338,8 +318,6 @@ func TestFetchEcsSvcEvents_RawStruct(t *testing.T) {
 	})
 }
 
-// TestEcsSvcEventColumns verifies that EcsSvcEventColumns returns the expected
-// columns with correct keys.
 func TestEcsSvcEventColumns(t *testing.T) {
 	cols := resource.EcsSvcEventColumns()
 
@@ -376,8 +354,6 @@ func TestEcsSvcEventColumns(t *testing.T) {
 	})
 }
 
-// TestEcsSvcEvents_ChildTypeRegistered verifies that the child type is
-// registered under the correct short name.
 func TestEcsSvcEvents_ChildTypeRegistered(t *testing.T) {
 	td := resource.GetChildType("ecs_svc_events")
 	if td == nil {
@@ -391,8 +367,6 @@ func TestEcsSvcEvents_ChildTypeRegistered(t *testing.T) {
 	}
 }
 
-// TestEcsSvcEvents_ChildFetcherRegistered verifies that the child fetcher is
-// registered under the correct short name.
 func TestEcsSvcEvents_ChildFetcherRegistered(t *testing.T) {
 	f := resource.GetPaginatedChildFetcher("ecs_svc_events")
 	if f == nil {
@@ -400,8 +374,6 @@ func TestEcsSvcEvents_ChildFetcherRegistered(t *testing.T) {
 	}
 }
 
-// TestEcsSvcEvents_ParentHasChildDef verifies that the parent ecs-svc resource
-// type has a child view definition for ecs_svc_events with key "e".
 func TestEcsSvcEvents_ParentHasChildDef(t *testing.T) {
 	rt := resource.FindResourceType("ecs-svc")
 	if rt == nil {

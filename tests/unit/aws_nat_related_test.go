@@ -26,8 +26,6 @@ func natCheckerByTarget(t *testing.T, target string) resource.RelatedChecker {
 	return nil
 }
 
-// --- Navigable Field Registration ---
-
 func TestNavigableFields_NAT_Registered(t *testing.T) {
 	expected := map[string]string{
 		"VpcId":                            "vpc",
@@ -45,8 +43,6 @@ func TestNavigableFields_NAT_Registered(t *testing.T) {
 		}
 	}
 }
-
-// --- VPC checker (Pattern F — reads VpcId from RawStruct, then cache lookup) ---
 
 func TestRelated_NAT_VPC_Found(t *testing.T) {
 	const natID = "nat-0aaa111111111111a"
@@ -117,7 +113,6 @@ func TestRelated_NAT_VPC_NotFound(t *testing.T) {
 		},
 	}
 
-	// Cache contains a different VPC — not the one our NAT belongs to.
 	otherVPC := resource.Resource{
 		ID:   otherVPCID,
 		Name: "other-vpc",
@@ -163,8 +158,6 @@ func TestRelated_NAT_VPC_CacheMissNoClients(t *testing.T) {
 		t.Errorf("Count = %d, want 1 (event-derived, no fetch)", result.Count())
 	}
 }
-
-// --- Subnet checker (Pattern F — reads SubnetId from RawStruct, then cache lookup) ---
 
 func TestRelated_NAT_Subnet_Found(t *testing.T) {
 	const natID = "nat-0aaa111111111111a"
@@ -232,7 +225,6 @@ func TestRelated_NAT_Subnet_NotFound(t *testing.T) {
 		},
 	}
 
-	// Cache contains a different subnet.
 	otherSubnet := resource.Resource{
 		ID:   otherSubnetID,
 		Name: "other-subnet",
@@ -278,8 +270,6 @@ func TestRelated_NAT_Subnet_CacheMissNoClients(t *testing.T) {
 		t.Errorf("Count = %d, want 1 (event-derived, no fetch)", result.Count())
 	}
 }
-
-// --- Route Tables checker (Pattern C — cache, Routes.NatGatewayId matches NAT ID) ---
 
 func TestRelated_NAT_RTB_Found(t *testing.T) {
 	const natID = "nat-0aaa111111111111a"
@@ -339,7 +329,6 @@ func TestRelated_NAT_RTB_NotFound(t *testing.T) {
 	const natID = "nat-0aaa111111111111a"
 	const otherNATID = "nat-0bbb222222222222b"
 
-	// RTB routes point to a different NAT, not our NAT.
 	rtbRes := resource.Resource{
 		ID:   "rtb-0ddd444444444444d",
 		Name: "staging-main",

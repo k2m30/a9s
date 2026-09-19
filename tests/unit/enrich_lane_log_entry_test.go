@@ -3,12 +3,10 @@ package unit
 // enrich_lane_log_entry_test.go — a failed enrichment is on the `!` log
 // screen, once.
 //
-// This is a lock, not a fix. The entry is there today: the enrich lane's
-// FlashIntent is re-emitted as messages.Flash by the plural applyIntents path
-// (internal/tui/app_dispatch.go:56), and Core.HandleFlash appends the history
-// entry for an error flash (core/runtime/handlers.go:127). A handler that also
-// appended the line itself would write it twice, which is what this pins
-// against — the failure mode is a second entry, not a missing one.
+// The enrich lane's FlashIntent is re-emitted as messages.Flash by the plural
+// applyIntents path (internal/tui/app_dispatch.go), and Core.HandleFlash
+// appends the history entry for an error flash (core/runtime/handlers.go). A
+// handler that also appended the line itself would write it twice.
 
 import (
 	"errors"

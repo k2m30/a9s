@@ -5,7 +5,7 @@ package unit
 // These are property tests — they catch structural bugs that no single
 // per-entry test can catch:
 //
-//  1. Every entry in the §1.3 sensitive-reads allowlist must classify as
+//  1. Every entry in the sensitive-reads allowlist must classify as
 //     verb=R. An entry that classifies as W or D is dead weight because
 //     the verb-path already escalates those to ct-attention/ct-danger.
 //
@@ -26,16 +26,11 @@ import (
 )
 
 // TestSensitiveReads_AreReadVerbs is a cross-cutting invariant: every entry
-// in the §1.3 sensitive-reads allowlist must classify as verb=R via
+// in the sensitive-reads allowlist must classify as verb=R via
 // ClassifyCTVerb. If an entry classifies as W or D, the allowlist entry is
 // redundant — verb classification already escalates W→ct-attention and
 // D→ct-danger. The redundant entry adds noise without changing behavior and
 // should be removed from isSensitiveRead.
-//
-// This test would have caught the original 4 redundant entries
-// (ExportTableToPointInTime, CopyDBSnapshot, CreateSnapshot,
-// ModifySnapshotAttribute) before they were flagged by code review.
-//
 // The allowlist here is an intentional copy of the one in
 // TestCTSeverity_AllowlistEntries_AreSensitiveAttention. Keeping them
 // separate ensures one test catches a bug the other cannot: a refactor

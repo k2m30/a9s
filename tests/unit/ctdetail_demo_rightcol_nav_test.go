@@ -1,15 +1,5 @@
 package unit_test
 
-// ctdetail_demo_rightcol_nav_test.go — right-column navigation dispatch tests.
-//
-// For each of the 9 demo ct-events fixtures (Cases A–I), this file tests that:
-//   - pressing Tab focuses the right column (when actionable rows exist)
-//   - pressing Enter on the correct row dispatches messages.RelatedNavigate
-//   - the RelatedNavigateMsg.TargetType matches the expected group
-//   - each RelatedID in the message resolves to a real demo fixture
-//
-// All tests here need rewrite onto the cold-cache harness (T047-T049, Phase 5 rewrite).
-
 import (
 	"testing"
 

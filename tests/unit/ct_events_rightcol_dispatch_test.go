@@ -1,8 +1,5 @@
 package unit_test
 
-// ct_events_rightcol_dispatch_test.go — Layer 3 dispatch tests for the
-// ct-events right-column row activation path.
-//
 // Assertion definitions:
 //
 //	D1: An actionable typed row (Count>0, ResourceIDs non-empty) dispatches at
@@ -13,34 +10,14 @@ package unit_test
 //
 //	D3: A pivot row (State: RelatedDeferred, FetchFilter non-empty,
 //	    ResourceIDs empty) dispatches a KindFetchFiltered task carrying the
-//	    SAME FetchFilter. This catches the actionability guard bug where
-//	    len(resourceIDs)>0 was checked instead of len(fetchFilter)>0.
+//	    SAME FetchFilter.
 //
 // Scope: all demo ct-events fixtures × all 17 registered RelatedDef groups.
-// The test uses demo.GetResources("ct-events") — no hardcoded event IDs.
 //
-// Retargeted (wave3 detail-family cleanup, specs/022-codebase-cleanup) off
-// views.NewDetail(...).Update(tea.KeyEnter) (dead: DetailModel.Update/View)
-// onto the live Controller.Apply/Snapshot seam: ApplyDetailRelatedResultForResource
-// injects one real checker result per subtest, ActionRelatedSelect activates
-// the row, and the returned []runtime.TaskRequest replaces the old
-// messages.RelatedNavigate assertions.
-//
-// Fidelity note: the old test asserted directly on a dispatched
-// messages.RelatedNavigate{TargetType, RelatedIDs, FetchFilter, SourceResource}.
-// The live controller path does not return that message — actionable
-// navigation applies synchronously to controller state (screen push, list
-// seeding) and only surfaces as []runtime.TaskRequest when a fetch is still
-// needed. ViewState (Snapshot()) exposes no resource-type/ID field for the
-// newly-pushed screen, so "landed on the correct target screen" is not
-// independently observable from this package. The proxy used here — every
-// controller in this file is fresh (newTestController, empty RowStore), so
-// relatedFetchTasks/HandleRelatedNavigate can never take the cache-hit
-// (NavigationKindDetail / already-covered-IDs) branch — is unconditionally
-// true given that setup: D1/D3 tasks are guaranteed non-empty precisely
-// because nothing is pre-cached. TargetType is verified via
-// TaskRequest.Key.Scope (set to ev.TargetType at every task construction
-// site in core/runtime/handlers_related.go and core/app/navigate.go).
+// Every controller here is fresh (newTestController, empty RowStore), so
+// HandleRelatedNavigate never takes the cache-hit branch and D1/D3 always
+// dispatch a fetch task. ViewState exposes no resource type for the pushed
+// screen; TargetType is checked via TaskRequest.Key.Scope.
 
 import (
 	"context"
@@ -81,9 +58,9 @@ func sampleCTFixtures(all []resource.Resource) []resource.Resource {
 	return []resource.Resource{all[0], all[len(all)/2], all[len(all)-1]}
 }
 
-// buildCTEventsRightColController builds a fresh controller (empty RowStore —
-// see the file header's fidelity note) with a ct-events resource pushed to
-// ScreenDetail and all related rows initialised to Loading.
+// buildCTEventsRightColController builds a fresh controller (empty RowStore)
+// with a ct-events resource pushed to ScreenDetail and all related rows
+// initialised to Loading.
 func buildCTEventsRightColController(t *testing.T, fixture resource.Resource) *app.Controller {
 	t.Helper()
 	c := newTestController(t)
@@ -109,19 +86,8 @@ func ctRelatedRowIndex(related []app.RelatedBlock, displayName string) int {
 	return -1
 }
 
-// ---------------------------------------------------------------------------
-// TestCtEventsRightColumnDispatch
-// ---------------------------------------------------------------------------
-
 // TestCtEventsRightColumnDispatch iterates all demo ct-events fixtures × all
 // 17 registered RelatedDef groups and asserts the dispatch invariants D1, D2, D3.
-//
-// For each (fixture, group) pair:
-//  1. Build a fresh Controller with that fixture on ScreenDetail.
-//  2. Deliver the real checker result for that group only via
-//     ApplyDetailRelatedResultForResource (other rows stay Loading).
-//  3. Focus the right column and call ActionRelatedSelect on that row's index.
-//  4. Inspect the returned []runtime.TaskRequest.
 func TestCtEventsRightColumnDispatch(t *testing.T) {
 	allFixtures := loadAllCTFixtures(t)
 
@@ -141,9 +107,7 @@ func TestCtEventsRightColumnDispatch(t *testing.T) {
 
 	for _, fixture := range fixtures {
 		t.Run(fixture.ID, func(t *testing.T) {
-			// Get all real checker results for this fixture.
 			allResults := ctEventsRealCheckerResults(fixture, cache)
-			// Build a map targetType → result for O(1) lookup.
 			resultByType := make(map[string]resource.RelatedCheckResult, len(allResults))
 			for _, r := range allResults {
 				resultByType[r.TargetType()] = r
@@ -153,22 +117,16 @@ func TestCtEventsRightColumnDispatch(t *testing.T) {
 				t.Run(def.TargetType, func(t *testing.T) {
 					label := fmt.Sprintf("event=%s group=%s", fixture.ID, def.TargetType)
 
-					// Determine which result to inject for this specific group.
 					result, hasResult := resultByType[def.TargetType]
 					if !hasResult {
-						// Demo checker returned no result for this group — skip.
 						return
 					}
 
-					// Classify the result.
 					isPivot := result.State() == domain.RelatedDeferred
-					// Row 6 made a third case reachable here: Unknown, which has
-					// Count 0 and no FetchFilter like a not-actionable row but
-					// is the opposite of one — nothing has answered the
-					// question yet, so selecting it must dispatch the work that
-					// does. It dispatches a related-check re-run scoped to the
-					// ct-events row rather than a fetch scoped to the target,
-					// so it is neither D1/D3 nor D2 and gets its own branch.
+					// Unknown has Count 0 and no FetchFilter like a not-actionable row, but
+					// nothing has answered yet: selecting it dispatches a related-check
+					// re-run scoped to the ct-events row, not a fetch scoped to the target,
+					// so it is neither D1/D3 nor D2.
 					isUnknown := result.State() == domain.RelatedUnknown
 					isNotActionable := !isUnknown &&
 						result.Count() == 0 && len(result.FetchFilter()) == 0
@@ -193,8 +151,8 @@ func TestCtEventsRightColumnDispatch(t *testing.T) {
 						// entirely from Body.Detail.Related by isSelfPivotZeroDetailRow
 						// (detail_cursor.go) — there is no row to select, which is a
 						// stronger form of "dispatches nothing" than the D2 assertion
-						// below. When the row IS present (non-self-pivot Count=0 case),
-						// activate it and assert zero tasks as before.
+						// below. When the row is present (non-self-pivot Count=0 case),
+						// selecting it dispatches zero tasks.
 						if idx < 0 {
 							return
 						}
@@ -220,10 +178,8 @@ func TestCtEventsRightColumnDispatch(t *testing.T) {
 						return
 					}
 
-					// D1/D3: an actionable row (typed hit or pivot) must dispatch at
-					// least one fetch task scoped to this def's TargetType — see the
-					// file header's fidelity note for why this is unconditionally
-					// true given a fresh, empty-RowStore controller.
+					// D1/D3: an actionable row (typed hit or pivot) dispatches at least one
+					// fetch task scoped to this def's TargetType.
 					if len(tasks) == 0 {
 						t.Errorf("D1/D3 FAIL: actionable row (Count=%d, State=%v, FetchFilter=%v) dispatched 0 tasks — %s",
 							result.Count(), result.State(), result.FetchFilter(), label)
@@ -238,9 +194,7 @@ func TestCtEventsRightColumnDispatch(t *testing.T) {
 					if isPivot {
 						// D3: pivot row (State: RelatedDeferred, FetchFilter non-empty,
 						// ResourceIDs empty) must dispatch a KindFetchFiltered task
-						// carrying the SAME FetchFilter — the actionability guard bug
-						// regression this test was written for (len(resourceIDs)>0 was
-						// checked instead of len(fetchFilter)>0).
+						// carrying the SAME FetchFilter.
 						found := false
 						for _, task := range tasks {
 							payload, ok := task.Payload.(runtime.FetchFilteredPayload)
@@ -264,10 +218,6 @@ func TestCtEventsRightColumnDispatch(t *testing.T) {
 		})
 	}
 }
-
-// ---------------------------------------------------------------------------
-// TestCtEventsRightColumnDispatch_LoadingRowNotActionable
-// ---------------------------------------------------------------------------
 
 // TestCtEventsRightColumnDispatch_LoadingRowNotActionable verifies that loading
 // rows (no result delivered) do NOT dispatch any task when ActionRelatedSelect

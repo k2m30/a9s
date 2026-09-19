@@ -1,14 +1,5 @@
 package unit
 
-// aws_dbi_related_test.go — per-target related-resource checker tests for dbi.
-//
-// One test per §2 target. All tests use the prod-dbi-1 fixture as the anchor
-// resource. Each test constructs a ResourceCache with the minimum sibling data
-// needed to verify the checker's discovery logic, then asserts Count and
-// ResourceIDs.
-//
-// Nil-RawStruct tests verify each checker returns the correct error sentinel.
-
 import (
 	"context"
 	"testing"
@@ -28,10 +19,6 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
 // dbiProdResource builds the prod-dbi-1 Resource by running it through the
 // fetcher so RawStruct is typed rdstypes.DBInstance.
 func dbiProdResource(t *testing.T) resource.Resource {
@@ -48,7 +35,6 @@ func dbiProdResource(t *testing.T) resource.Resource {
 	return result.Resources[0]
 }
 
-// dbiAuroraResource builds the prod-dbi-aurora-1 Resource.
 func dbiAuroraResource(t *testing.T) resource.Resource {
 	t.Helper()
 	inst := findDBI(t, fixtures.ProdDbiAuroraID)
@@ -60,7 +46,6 @@ func dbiAuroraResource(t *testing.T) resource.Resource {
 	return result.Resources[0]
 }
 
-// dbiCheckerByTarget returns the RelatedChecker registered for a given target type.
 func dbiCheckerByTarget(t *testing.T, target string) resource.RelatedChecker {
 	t.Helper()
 	for _, def := range resource.GetRelated("dbi") {
@@ -72,12 +57,6 @@ func dbiCheckerByTarget(t *testing.T, target string) resource.RelatedChecker {
 	return nil
 }
 
-// ---------------------------------------------------------------------------
-// sg
-// ---------------------------------------------------------------------------
-
-// TestDBI_Related_SG_ReturnsVpcSecurityGroupIDs verifies checkDbiSG returns
-// the SG IDs from VpcSecurityGroups.
 func TestDBI_Related_SG_ReturnsVpcSecurityGroupIDs(t *testing.T) {
 	res := dbiProdResource(t)
 	checker := dbiCheckerByTarget(t, "sg")
@@ -98,7 +77,6 @@ func TestDBI_Related_SG_ReturnsVpcSecurityGroupIDs(t *testing.T) {
 	}
 }
 
-// TestDBI_Related_SG_NilRawStruct verifies nil RawStruct returns Count=-1.
 func TestDBI_Related_SG_NilRawStruct(t *testing.T) {
 	res := resource.Resource{ID: "x", RawStruct: nil}
 	checker := dbiCheckerByTarget(t, "sg")
@@ -108,12 +86,6 @@ func TestDBI_Related_SG_NilRawStruct(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// kms
-// ---------------------------------------------------------------------------
-
-// TestDBI_Related_KMS_ReturnsKeyUUID verifies checkDbiKMS extracts the UUID
-// suffix from the KmsKeyId ARN.
 func TestDBI_Related_KMS_ReturnsKeyUUID(t *testing.T) {
 	res := dbiProdResource(t)
 	checker := dbiCheckerByTarget(t, "kms")
@@ -134,7 +106,6 @@ func TestDBI_Related_KMS_ReturnsKeyUUID(t *testing.T) {
 	}
 }
 
-// TestDBI_Related_KMS_UnencryptedInstance verifies Count=0 when KmsKeyId is nil.
 func TestDBI_Related_KMS_UnencryptedInstance(t *testing.T) {
 	inst := findDBI(t, fixtures.WarnDbiUnencryptedID)
 	mock := &fakeRDSDescribeDBInstances{Output: &rds.DescribeDBInstancesOutput{DBInstances: []rdstypes.DBInstance{inst}}}
@@ -151,12 +122,6 @@ func TestDBI_Related_KMS_UnencryptedInstance(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// subnet
-// ---------------------------------------------------------------------------
-
-// TestDBI_Related_Subnets_ReturnsBothSubnetIDs verifies checkDbiSubnets returns
-// both subnet IDs from the DBSubnetGroup.
 func TestDBI_Related_Subnets_ReturnsBothSubnetIDs(t *testing.T) {
 	res := dbiProdResource(t)
 	checker := dbiCheckerByTarget(t, "subnet")
@@ -176,11 +141,6 @@ func TestDBI_Related_Subnets_ReturnsBothSubnetIDs(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// vpc
-// ---------------------------------------------------------------------------
-
-// TestDBI_Related_VPC_ReturnsVpcID verifies checkDbiVPC returns the VPC ID.
 func TestDBI_Related_VPC_ReturnsVpcID(t *testing.T) {
 	res := dbiProdResource(t)
 	checker := dbiCheckerByTarget(t, "vpc")
@@ -201,13 +161,6 @@ func TestDBI_Related_VPC_ReturnsVpcID(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// alarm
-// ---------------------------------------------------------------------------
-
-// TestDBI_Related_Alarm_MatchesByDBInstanceIdentifierDimension verifies
-// checkDbiAlarm scans the alarm cache and matches on the DBInstanceIdentifier
-// dimension.
 func TestDBI_Related_Alarm_MatchesByDBInstanceIdentifierDimension(t *testing.T) {
 	res := dbiProdResource(t)
 	checker := dbiCheckerByTarget(t, "alarm")
@@ -248,16 +201,8 @@ func TestDBI_Related_Alarm_MatchesByDBInstanceIdentifierDimension(t *testing.T) 
 	}
 }
 
-// TestDBI_Related_Alarm_NilCache_ReturnsUnknown pins the canonical nil-cache
-// contract from docs/related-resources-engine.md §7: a nil alarm cache
-// (alarm cache not loaded — relatedResourcesFor's alarmList comes back nil,
-// not a real empty slice) is not a proven zero — it must resolve to
-// UnknownRelated("alarm"), the same contract checkSQSAlarm already honors.
-//
-// checkDbiAlarm (core/aws/dbi_related.go:90-92) currently diverges: it
-// returns relatedResultTrunc("alarm", nil, true) instead — a false
-// proven-zero-with-truncation. This test is expected to FAIL until that
-// divergence is fixed (by hand or by the alarmIDsByDimension extraction).
+// A nil alarm cache is not a proven zero; it resolves to
+// UnknownRelated("alarm") (docs/related-resources-engine.md).
 func TestDBI_Related_Alarm_NilCache_ReturnsUnknown(t *testing.T) {
 	res := dbiProdResource(t)
 	checker := dbiCheckerByTarget(t, "alarm")
@@ -269,12 +214,6 @@ func TestDBI_Related_Alarm_NilCache_ReturnsUnknown(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// dbi-snap
-// ---------------------------------------------------------------------------
-
-// TestDBI_Related_DBISnap_MatchesByDBInstanceIdentifier verifies
-// checkDbiDBISnap finds snapshots whose DBInstanceIdentifier matches res.ID.
 func TestDBI_Related_DBISnap_MatchesByDBInstanceIdentifier(t *testing.T) {
 	res := dbiProdResource(t)
 	checker := dbiCheckerByTarget(t, "dbi-snap")
@@ -306,12 +245,6 @@ func TestDBI_Related_DBISnap_MatchesByDBInstanceIdentifier(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// logs
-// ---------------------------------------------------------------------------
-
-// TestDBI_Related_Logs_MatchesByRDSNamingConvention verifies checkDBILogs
-// returns log groups matching /aws/rds/instance/{id}/{export-type}.
 func TestDBI_Related_Logs_MatchesByRDSNamingConvention(t *testing.T) {
 	res := dbiProdResource(t)
 	checker := dbiCheckerByTarget(t, "logs")
@@ -332,12 +265,6 @@ func TestDBI_Related_Logs_MatchesByRDSNamingConvention(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// secrets
-// ---------------------------------------------------------------------------
-
-// TestDBI_Related_Secrets_MatchesByMasterUserSecretARN verifies checkDbiSecrets
-// matches the cached secret whose ARN equals MasterUserSecret.SecretArn.
 func TestDBI_Related_Secrets_MatchesByMasterUserSecretARN(t *testing.T) {
 	res := dbiProdResource(t)
 	checker := dbiCheckerByTarget(t, "secrets")
@@ -376,16 +303,13 @@ func TestDBI_Related_Secrets_MatchesByMasterUserSecretARN(t *testing.T) {
 	}
 }
 
-// TestDBI_Related_Secrets_NoMasterUserSecret verifies Count=0 when
-// MasterUserSecret is nil (classic password-auth instance). Constructs a
-// minimal inline fixture because the production Aurora fixture now carries a
-// MasterUserSecret (required so the Aurora dbi graph-root covers every
-// related pivot — see scenario_dbi_visual_test.go).
+// The Aurora fixture carries a MasterUserSecret so the Aurora dbi graph root
+// covers every related pivot (scenario_dbi_visual_test.go), hence the inline
+// fixture here.
 func TestDBI_Related_Secrets_NoMasterUserSecret(t *testing.T) {
 	raw := rdstypes.DBInstance{
 		DBInstanceIdentifier: aws.String("classic-password-auth-dbi"),
 		Engine:               aws.String("postgres"),
-		// MasterUserSecret intentionally nil.
 	}
 	res := resource.Resource{
 		ID:        "classic-password-auth-dbi",
@@ -401,12 +325,6 @@ func TestDBI_Related_Secrets_NoMasterUserSecret(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// dbc
-// ---------------------------------------------------------------------------
-
-// TestDBI_Related_DBC_Aurora_ReturnsClusterID verifies checkDbiDBC returns the
-// Aurora cluster ID when DBClusterIdentifier is set.
 func TestDBI_Related_DBC_Aurora_ReturnsClusterID(t *testing.T) {
 	res := dbiAuroraResource(t)
 	checker := dbiCheckerByTarget(t, "dbc")
@@ -428,8 +346,6 @@ func TestDBI_Related_DBC_Aurora_ReturnsClusterID(t *testing.T) {
 	}
 }
 
-// TestDBI_Related_DBC_NonAurora_ReturnsZero verifies checkDbiDBC returns
-// Count=0 for a non-Aurora instance (no DBClusterIdentifier).
 func TestDBI_Related_DBC_NonAurora_ReturnsZero(t *testing.T) {
 	res := dbiProdResource(t)
 	checker := dbiCheckerByTarget(t, "dbc")
@@ -441,12 +357,6 @@ func TestDBI_Related_DBC_NonAurora_ReturnsZero(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// role
-// ---------------------------------------------------------------------------
-
-// TestDBI_Related_Role_ReturnsAssociatedAndMonitoringRoles verifies
-// checkDbiRole returns both AssociatedRoles and MonitoringRoleArn role names.
 func TestDBI_Related_Role_ReturnsAssociatedAndMonitoringRoles(t *testing.T) {
 	res := dbiProdResource(t)
 	checker := dbiCheckerByTarget(t, "role")
@@ -477,11 +387,6 @@ func TestDBI_Related_Role_ReturnsAssociatedAndMonitoringRoles(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// eni
-// ---------------------------------------------------------------------------
-
-// mockEC2ENIClient implements EC2API for ENI-checker tests.
 type mockEC2ENIClient struct {
 	awsclient.EC2API
 	output *ec2svc.DescribeNetworkInterfacesOutput
@@ -499,8 +404,6 @@ func (m *mockEC2ENIClient) DescribeNetworkInterfaces(
 	return m.output, nil
 }
 
-// TestDBI_Related_ENI_ReturnsNetworkInterfaceID verifies checkDbiENI calls
-// DescribeNetworkInterfaces and returns the ENI IDs.
 func TestDBI_Related_ENI_ReturnsNetworkInterfaceID(t *testing.T) {
 	res := dbiProdResource(t)
 	checker := dbiCheckerByTarget(t, "eni")
@@ -524,7 +427,6 @@ func TestDBI_Related_ENI_ReturnsNetworkInterfaceID(t *testing.T) {
 	}
 }
 
-// TestDBI_Related_ENI_NilEC2Client verifies Count=-1 when EC2 client is nil.
 func TestDBI_Related_ENI_NilEC2Client(t *testing.T) {
 	res := dbiProdResource(t)
 	checker := dbiCheckerByTarget(t, "eni")
@@ -537,13 +439,6 @@ func TestDBI_Related_ENI_NilEC2Client(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// ct-events
-// ---------------------------------------------------------------------------
-
-// TestDBI_Related_CTEvents_MatchesByResourceName verifies checkDbiCTEvents
-// scans the ct-events cache for events where fields["resource_name"] matches
-// res.ID and sets FetchFilter["ResourceName"] = res.ID.
 func TestDBI_Related_CTEvents_MatchesByResourceName(t *testing.T) {
 	res := dbiProdResource(t)
 	checker := dbiCheckerByTarget(t, "ct-events")
@@ -603,8 +498,6 @@ func TestDBI_Related_CTEvents_MatchesByResourceName(t *testing.T) {
 	}
 }
 
-// TestDBI_Related_CTEvents_NoMatchEmptyCache verifies Count=-1 when cache is
-// empty and no clients are available (cache miss).
 func TestDBI_Related_CTEvents_NoMatchEmptyCache(t *testing.T) {
 	res := dbiProdResource(t)
 	checker := dbiCheckerByTarget(t, "ct-events")

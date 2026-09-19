@@ -1,36 +1,5 @@
 package unit_test
 
-// ct_events_demo_cache_lookup_test.go — Bug E regression tests.
-//
-// Bug E: checkCtEventsUser, checkCtEventsRole, and other cache-reading checkers
-// return Count=-1 in demo mode because ctEventsRelatedResources → FetchRelatedTarget
-// short-circuits on nil clients when the cache is a miss.
-//
-// Exact bug flow:
-//  1. In demo mode, def.Checker is called with nil clients and a partial cache
-//     (m.ResourceCache may not yet contain iam-user/role if those lists haven't
-//     been loaded).
-//  2. FetchRelatedTarget: cache miss → calls paginated fetcher with nil clients.
-//  3. Paginated fetcher fails (nil clients) → error.
-//  4. ctEventsRelatedResources sees the error, sees clients is not *ServiceClients,
-//     returns nil, false, nil  ← the short-circuit.
-//  5. Checker sees nil resourceList → returns Count=-1.
-//
-// Expected fix: when clients is nil (demo mode), the checker should
-// populate the cache from demo.GetResources before falling through to the fetcher,
-// OR FetchRelatedTarget should tolerate nil clients without erroring.
-//
-// Test approach:
-//   - Pass an EMPTY cache (cache miss for the target type) and nil clients.
-//   - The checker should return Count>=0 (0 if no match, >0 if matched) when the
-//     target demos exist. Currently it returns Count=-1 (bug).
-//
-// Specifically:
-//   - Case K (e-e1f2a3b4, AttachUserPolicy, alice.johnson): checkCtEventsUser
-//     with empty cache + nil clients must NOT return Count=-1.
-//   - AssumedRole events: checkCtEventsRole with empty cache + nil clients must
-//     NOT return Count=-1.
-
 import (
 	"context"
 	"strings"
@@ -42,21 +11,6 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// ---------------------------------------------------------------------------
-// TestCtEventsCheckersResolveFromDemoCache — Bug E regression
-// ---------------------------------------------------------------------------
-
-// TestCtEventsCheckersResolveFromDemoCache verifies that cache-backed checkers
-// called with nil clients and an EMPTY cache do NOT return Count=-1.
-//
-// An empty cache simulates the real demo-mode scenario where ct-events detail is
-// opened before iam-user/role resource lists have been loaded into m.ResourceCache.
-// The short-circuit in ctEventsRelatedResources returns nil on nil clients + error,
-// which causes the checker to return Count=-1 (Bug E).
-//
-// The expected behavior is that the checker returns a definitive Count (0 or >0),
-// not Count=-1, so the right column does not show the "unknown" state for a row
-// that should have resolved.
 func TestCtEventsCheckersResolveFromDemoCache(t *testing.T) {
 	ctClient := fakes.NewCloudTrail()
 	fixtures, fetchErr := collectAllPages(func(token string) (resource.FetchResult, error) {
@@ -71,9 +25,6 @@ func TestCtEventsCheckersResolveFromDemoCache(t *testing.T) {
 		t.Fatal("resource.GetRelated(\"ct-events\") returned no defs — SetRelatedForTest not called?")
 	}
 
-	// Identify cache-backed target types (NeedsTargetCache == true, not self-pivot).
-	// These are the types whose checkers call ctEventsRelatedResources and hit Bug E
-	// when the cache is empty and clients is nil.
 	cacheBackedTypes := make(map[string]bool)
 	for _, def := range defs {
 		if def.NeedsTargetCache && def.TargetType != "ct-events" {
@@ -85,8 +36,7 @@ func TestCtEventsCheckersResolveFromDemoCache(t *testing.T) {
 		t.Skip("no NeedsTargetCache defs registered for ct-events — Bug E test is vacuous")
 	}
 
-	// Use an EMPTY cache to simulate the demo scenario where target resource lists
-	// haven't been loaded yet. This is the condition that triggers Bug E.
+	// Target resource lists have not loaded yet.
 	emptyCache := make(resource.ResourceCache)
 
 	for _, fixture := range fixtures {
@@ -98,19 +48,13 @@ func TestCtEventsCheckersResolveFromDemoCache(t *testing.T) {
 					continue
 				}
 
-				// New fixture events (evt-*) are designed for the generic
-				// ct-events→resource related panel. Their cache-backed typed
-				// checker returning -1 with empty cache is expected.
+				// evt-* fixture events serve the generic ct-events->resource related
+				// panel; their cache-backed typed checker stays unresolved with an empty
+				// cache.
 				if strings.HasPrefix(fixture.ID, "evt-") {
 					continue
 				}
 
-				// Bug E: cache-backed checker with nil clients + EMPTY cache returns
-				// State: RelatedUnknown (short-circuit fires). The fix should make it
-				// return a resolved Count=0 (no match) instead of Unknown.
-				//
-				// We assert State != RelatedUnknown here. Currently this fails because
-				// the short-circuit in ctEventsRelatedResources returns nil resourceList.
 				if result.State() == domain.RelatedUnknown && len(result.FetchFilter()) == 0 && result.Err() == nil {
 					t.Errorf("Bug E: event=%s targetType=%s: checker returned State: RelatedUnknown with nil clients"+
 						" and empty cache — short-circuit ignores nil error from failed paginated fetcher."+
@@ -122,16 +66,6 @@ func TestCtEventsCheckersResolveFromDemoCache(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// TestCtEventsCheckersResolveFromDemoCache_CaseKUserChecker — pinned regression
-// ---------------------------------------------------------------------------
-
-// TestCtEventsCheckersResolveFromDemoCache_CaseKUserChecker pins the exact failure
-// for Case K (e-e1f2a3b4, AttachUserPolicy, alice.johnson).
-//
-// With an empty cache and nil clients, checkCtEventsUser must NOT return Count=-1.
-// Bug E: the short-circuit in ctEventsRelatedResources returns nil resourceList
-// when clients is not *ServiceClients and FetchRelatedTarget errored.
 func TestCtEventsCheckersResolveFromDemoCache_CaseKUserChecker(t *testing.T) {
 	ctClient := fakes.NewCloudTrail()
 	fixtures, fetchErr := collectAllPages(func(token string) (resource.FetchResult, error) {
@@ -158,7 +92,7 @@ func TestCtEventsCheckersResolveFromDemoCache_CaseKUserChecker(t *testing.T) {
 		t.Fatalf("Case K fixture user field=%q, want \"alice.johnson\"", caseK.Fields["user"])
 	}
 
-	// Empty cache — simulates the bug condition (iam-user not yet loaded).
+	// iam-user not yet loaded.
 	emptyCache := make(resource.ResourceCache)
 
 	allResults := ctEventsRealCheckerResults(caseK, emptyCache)
@@ -186,14 +120,6 @@ func TestCtEventsCheckersResolveFromDemoCache_CaseKUserChecker(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// TestCtEventsCheckersResolveFromDemoCache_RoleCheckerAssumedRoleEvents — pinned regression
-// ---------------------------------------------------------------------------
-
-// TestCtEventsCheckersResolveFromDemoCache_RoleCheckerAssumedRoleEvents verifies that
-// checkCtEventsRole called with nil clients + empty cache does NOT return Count=-1
-// for AssumedRole events.
-//
 // AssumedRole events are identified by a non-empty role_name field.
 // A role id in an event body is a claim about the past; with no list to
 // confirm it against, Unknown is the only honest answer, and a confident 0
@@ -207,7 +133,6 @@ func TestCtEventsCheckersResolveFromDemoCache_RoleCheckerAssumedRoleEvents(t *te
 		t.Fatalf("demo ct-events fixtures missing (err=%v, len=%d)", fetchErr, len(fixtures))
 	}
 
-	// Empty cache — triggers the bug path.
 	emptyCache := make(resource.ResourceCache)
 
 	type bugECase struct {

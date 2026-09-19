@@ -12,10 +12,6 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// ---------------------------------------------------------------------------
-// SNS Topics fetcher tests
-// ---------------------------------------------------------------------------
-
 func TestFetchSNSTopics_ParsesMultipleTopics(t *testing.T) {
 	mock := &fakeSNSListTopics{
 		Output: &sns.ListTopicsOutput{
@@ -41,7 +37,6 @@ func TestFetchSNSTopics_ParsesMultipleTopics(t *testing.T) {
 		t.Fatalf("expected 2 resources, got %d", len(resources))
 	}
 
-	// Verify required fields exist
 	requiredFields := []string{"topic_arn", "display_name"}
 	for i, r := range resources {
 		for _, key := range requiredFields {
@@ -51,7 +46,6 @@ func TestFetchSNSTopics_ParsesMultipleTopics(t *testing.T) {
 		}
 	}
 
-	// Verify first topic
 	r0 := resources[0]
 	if r0.ID != "arn:aws:sns:us-east-1:123456789012:my-alerts-topic" {
 		t.Errorf("resource[0].ID: expected %q, got %q", "arn:aws:sns:us-east-1:123456789012:my-alerts-topic", r0.ID)
@@ -67,7 +61,6 @@ func TestFetchSNSTopics_ParsesMultipleTopics(t *testing.T) {
 		t.Errorf("resource[0].Fields[\"display_name\"]: expected %q, got %q", "my-alerts-topic", r0.Fields["display_name"])
 	}
 
-	// Verify second topic
 	r1 := resources[1]
 	if r1.ID != "arn:aws:sns:us-east-1:123456789012:prod-notifications" {
 		t.Errorf("resource[1].ID: expected %q, got %q", "arn:aws:sns:us-east-1:123456789012:prod-notifications", r1.ID)

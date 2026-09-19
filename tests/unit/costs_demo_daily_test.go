@@ -1,20 +1,12 @@
-// costs_demo_daily_test.go — Cost Explorer week/day zoom over the demo
-// transport: the demo CE handler (core/demo/costs_handlers.go) honours the
-// request's Granularity, so a DAILY GetCostAndUsage request returns one
-// bucket per day, never month-sized buckets (or nothing, once TimePeriod
-// narrows to a sub-month range).
+// The demo CE handler (core/demo/costs_handlers.go) honours the request's
+// Granularity: a DAILY GetCostAndUsage request returns one bucket per day.
 //
-// Reuses newDemoCostsClient from costs_demo_test.go for the real
-// *costexplorer.Client-over-demo-transport construction; queries here build
-// their own costs.Query literals rather than demoCostsQuery, since that
-// helper's wide "cover the whole 13-month history" Range is the wrong shape
-// for the narrow month/week ranges these tests need.
+// Queries here build their own costs.Query literals: demoCostsQuery's
+// 13-month Range is the wrong shape for narrow month/week ranges.
 //
-// core/demo/fixtures/costs.go's month generation is relative to
-// fixtures.CostsAnchorMonth (computed from "now" at process start), so every
-// month literal below is derived from that exported anchor (and from
-// fixtures.CostsGrowthMonth for the growth-story-specific case) via
-// costsDemoDailyMonth.
+// core/demo/fixtures/costs.go generates months relative to
+// fixtures.CostsAnchorMonth, computed from "now" at process start, so every
+// month here derives from that anchor via costsDemoDailyMonth.
 package unit_test
 
 import (
@@ -46,11 +38,6 @@ func costsDemoDailyMonth(t *testing.T, monthsBeforeAnchor int) time.Time {
 	}
 	return anchor.AddDate(0, -monthsBeforeAnchor, 0)
 }
-
-// ---------------------------------------------------------------------------
-// DAILY SERVICE-grouped fetch over one closed month: one bucket per day,
-// each service's daily amounts summing to its monthly fixture amount.
-// ---------------------------------------------------------------------------
 
 func TestCostsDemoDaily_ServiceGrouped_DailyBucketsSumToMonthlyFixtureAmount(t *testing.T) {
 	client := newDemoCostsClient()
@@ -118,11 +105,6 @@ func TestCostsDemoDaily_ServiceGrouped_DailyBucketsSumToMonthlyFixtureAmount(t *
 	}
 }
 
-// ---------------------------------------------------------------------------
-// DAILY USAGE_TYPE-grouped fetch, growth service, partial mid-month range:
-// returns exactly those days.
-// ---------------------------------------------------------------------------
-
 func TestCostsDemoDaily_UsageTypeGrouped_PartialRangeReturnsExactlyThoseDays(t *testing.T) {
 	client := newDemoCostsClient()
 
@@ -168,10 +150,6 @@ func TestCostsDemoDaily_UsageTypeGrouped_PartialRangeReturnsExactlyThoseDays(t *
 		t.Errorf("DAILY partial-range fetch: got %d distinct day periods, want exactly %d — got=%v want=%v", len(gotDays), len(wantDays), gotDays, wantDays)
 	}
 }
-
-// ---------------------------------------------------------------------------
-// Determinism: two identical DAILY fetches return identical records.
-// ---------------------------------------------------------------------------
 
 func TestCostsDemoDaily_TwoIdenticalFetches_ReturnIdenticalRecords(t *testing.T) {
 	client := newDemoCostsClient()

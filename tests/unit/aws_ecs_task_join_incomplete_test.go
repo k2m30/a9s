@@ -1,26 +1,9 @@
 package unit
 
-// aws_ecs_task_join_incomplete_test.go — Regression pins for ECS task definition
-// join failure behaviour in FetchECSTasksPage (via fetchECSTasksPageWithJoin)
-// and checkEFSECSTask.
-//
-// OLD behaviour (bug):
-//   When DescribeTaskDefinition returned a non-ClientException error, the fetcher
-//   set Pagination.IsTruncated=true, which caused the TUI to show "m: load more"
-//   and hid the real resource list.
-//
-// NEW behaviour (fix):
-//   The fetcher sets Fields["task_def_join_error"]="true" on the affected task
-//   and keeps Pagination.IsTruncated=false. The reverse-scan checker
-//   (checkEFSECSTask) sets result.Truncated=true when any task carries that
-//   field, surfacing an honest "~0" instead of a silently wrong "0".
-//
-// Tests A and B exercise the fetcher via the registered paginated closure
-// (resource.GetPaginatedFetcher("ecs-task")) with a mock ECSAPI whose
-// DescribeTaskDefinition returns an error (Test A) or success (Test B).
-//
-// Test C exercises checkEFSECSTask directly via resource.GetRelated("efs")
-// with a hand-crafted ResourceCache.
+// A failed DescribeTaskDefinition join marks the task with
+// Fields["task_def_join_error"]="true" and leaves the page untruncated;
+// checkEFSECSTask turns such a task into Truncated=true, an honest lower bound
+// instead of a confident zero.
 
 import (
 	"context"
@@ -34,11 +17,6 @@ import (
 	awsclient "github.com/k2m30/a9s/v3/core/aws"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
-
-// ---------------------------------------------------------------------------
-// fullECSAPI — a complete ECSAPI mock. Only the methods relevant to a given
-// test are overridden via function fields; the rest return empty success.
-// ---------------------------------------------------------------------------
 
 type fullECSAPI struct {
 	listClustersFn    func(*ecs.ListClustersInput) (*ecs.ListClustersOutput, error)
@@ -75,8 +53,6 @@ func (f *fullECSAPI) DescribeTaskDefinition(_ context.Context, in *ecs.DescribeT
 	return &ecs.DescribeTaskDefinitionOutput{TaskDefinition: &ecstypes.TaskDefinition{}}, nil
 }
 
-// Stubs for methods not used by the ECS task fetcher.
-
 func (f *fullECSAPI) DescribeClusters(_ context.Context, _ *ecs.DescribeClustersInput, _ ...func(*ecs.Options)) (*ecs.DescribeClustersOutput, error) {
 	return &ecs.DescribeClustersOutput{}, nil
 }
@@ -89,12 +65,10 @@ func (f *fullECSAPI) DescribeServices(_ context.Context, _ *ecs.DescribeServices
 	return &ecs.DescribeServicesOutput{}, nil
 }
 
-// Compile-time: fullECSAPI satisfies ECSAPI.
 var _ awsclient.ECSAPI = (*fullECSAPI)(nil)
 
-// ecsTaskPaginatedFetcher returns the registered paginated fetcher for "ecs-task".
-// This is the production path that calls fetchECSTasksPageWithJoin (which includes
-// the DescribeTaskDefinition join).
+// The registered paginated fetcher is the path that joins
+// DescribeTaskDefinition.
 func ecsTaskPaginatedFetcher(t *testing.T) resource.PaginatedFetcher {
 	t.Helper()
 	f := resource.GetPaginatedFetcher("ecs-task")
@@ -110,11 +84,6 @@ const (
 	testTaskDefARN = "arn:aws:ecs:us-east-1:123456789012:task-definition/test-app:1"
 )
 
-// buildECSTaskMockAPI returns a fully-wired fullECSAPI where:
-//   - ListClusters returns one cluster.
-//   - ListTasks returns one task ARN.
-//   - DescribeTasks returns one task with a TaskDefinitionArn.
-//   - DescribeTaskDefinition behaviour is controlled by the describeTaskDefFn param.
 func buildECSTaskMockAPI(describeTaskDefFn func(*ecs.DescribeTaskDefinitionInput) (*ecs.DescribeTaskDefinitionOutput, error)) *fullECSAPI {
 	return &fullECSAPI{
 		listClustersFn: func(_ *ecs.ListClustersInput) (*ecs.ListClustersOutput, error) {
@@ -146,12 +115,6 @@ func buildECSTaskMockAPI(describeTaskDefFn func(*ecs.DescribeTaskDefinitionInput
 	}
 }
 
-// TestFetchECSTasksPage_JoinFailure_SetsTaskDefJoinErrorField verifies that when
-// DescribeTaskDefinition returns a non-ClientException error:
-//   - The fetcher does NOT propagate the error (returns the task resource).
-//   - Fields["task_def_join_error"] == "true" on the affected task.
-//   - Pagination.IsTruncated == false  (KEY regression pin — was true before fix).
-//   - Pagination.NextToken == ""
 func TestFetchECSTasksPage_JoinFailure_SetsTaskDefJoinErrorField(t *testing.T) {
 	mock := buildECSTaskMockAPI(func(_ *ecs.DescribeTaskDefinitionInput) (*ecs.DescribeTaskDefinitionOutput, error) {
 		return nil, &smithy.GenericAPIError{Code: "AccessDenied", Message: "denied"}
@@ -170,7 +133,6 @@ func TestFetchECSTasksPage_JoinFailure_SetsTaskDefJoinErrorField(t *testing.T) {
 
 	task := result.Resources[0]
 
-	// KEY regression pin: before the fix this was IsTruncated=true.
 	if result.Pagination == nil {
 		t.Fatal("Pagination must not be nil")
 	}
@@ -183,19 +145,16 @@ func TestFetchECSTasksPage_JoinFailure_SetsTaskDefJoinErrorField(t *testing.T) {
 		t.Errorf("NextToken must be empty on join failure (no pagination in play); got %q", result.Pagination.NextToken)
 	}
 
-	// The join error must be recorded on the task itself.
 	if task.Fields["task_def_join_error"] != "true" {
 		t.Errorf("Fields[task_def_join_error]: want %q, got %q", "true", task.Fields["task_def_join_error"])
 	}
 }
 
-// TestFetchECSTasksPage_JoinSucceeds_NoErrorField verifies the happy path:
-// when DescribeTaskDefinition succeeds, no error field is set and IsTruncated=false.
 func TestFetchECSTasksPage_JoinSucceeds_NoErrorField(t *testing.T) {
 	mock := buildECSTaskMockAPI(func(_ *ecs.DescribeTaskDefinitionInput) (*ecs.DescribeTaskDefinitionOutput, error) {
 		return &ecs.DescribeTaskDefinitionOutput{
 			TaskDefinition: &ecstypes.TaskDefinition{
-				Volumes: []ecstypes.Volume{}, // no EFS volumes
+				Volumes: []ecstypes.Volume{},
 			},
 		}, nil
 	})
@@ -224,20 +183,7 @@ func TestFetchECSTasksPage_JoinSucceeds_NoErrorField(t *testing.T) {
 	}
 }
 
-// TestCheckEFSECSTask_JoinIncompleteTask_MarksTruncated verifies that the
-// checkEFSECSTask checker (accessed via resource.GetRelated("efs")) returns
-// Truncated=true when any task in the cache carries Fields["task_def_join_error"]="true".
-//
-// Setup:
-//   - Source EFS resource ID: "fs-bar" (does not match any task's efs_file_system_ids).
-//   - Cache "ecs-task" entry has two tasks:
-//     task1: efs_file_system_ids="fs-foo" (no join error, does not match source).
-//     task2: task_def_join_error="true"   (join incomplete, no efs ids).
-//   - Expected result: Count==0 (no match), Truncated==true (join incomplete).
-//
-// This proves the zero is truncated (honest lower bound), not definitive.
 func TestCheckEFSECSTask_JoinIncompleteTask_MarksTruncated(t *testing.T) {
-	// Locate the efs→ecs-task checker via the registered related defs.
 	var checker resource.RelatedChecker
 	for _, def := range resource.GetRelated("efs") {
 		if def.TargetType == "ecs-task" {
@@ -254,12 +200,10 @@ func TestCheckEFSECSTask_JoinIncompleteTask_MarksTruncated(t *testing.T) {
 		Name: "fs-bar",
 	}
 
-	// task1: has efs ids, but for a different FS — does not match source "fs-bar".
 	task1 := resource.Resource{
 		ID:     "task-with-ids-001",
 		Fields: map[string]string{"efs_file_system_ids": "fs-foo"},
 	}
-	// task2: join failed — efs ids unknown, marks result as truncated.
 	task2 := resource.Resource{
 		ID:     "task-join-fail-002",
 		Fields: map[string]string{"task_def_join_error": "true"},

@@ -14,10 +14,6 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// ---------------------------------------------------------------------------
-// T060 - Test SecretsManager ListSecrets response parsing
-// ---------------------------------------------------------------------------
-
 func TestFetchSecrets_ParsesMultipleSecrets(t *testing.T) {
 	lastAccessed := time.Date(2025, 3, 10, 0, 0, 0, 0, time.UTC)
 	lastChanged := time.Date(2025, 2, 20, 14, 30, 0, 0, time.UTC)
@@ -54,7 +50,6 @@ func TestFetchSecrets_ParsesMultipleSecrets(t *testing.T) {
 		t.Fatalf("expected 2 resources, got %d", len(resources))
 	}
 
-	// Verify required fields exist
 	requiredFields := []string{"secret_name", "description", "last_accessed", "last_changed", "rotation_enabled"}
 	for i, r := range resources {
 		for _, key := range requiredFields {
@@ -64,7 +59,6 @@ func TestFetchSecrets_ParsesMultipleSecrets(t *testing.T) {
 		}
 	}
 
-	// Verify first secret
 	r0 := resources[0]
 	if r0.ID != "prod/database/password" {
 		t.Errorf("resource[0].ID: expected %q, got %q", "prod/database/password", r0.ID)
@@ -82,7 +76,6 @@ func TestFetchSecrets_ParsesMultipleSecrets(t *testing.T) {
 		t.Errorf("resource[0].Fields[\"rotation_enabled\"]: expected %q, got %q", "Yes", r0.Fields["rotation_enabled"])
 	}
 
-	// Verify dates are formatted correctly
 	if r0.Fields["last_accessed"] != "2025-03-10" {
 		t.Errorf("resource[0].Fields[\"last_accessed\"] = %q, want %q", r0.Fields["last_accessed"], "2025-03-10")
 	}
@@ -90,7 +83,6 @@ func TestFetchSecrets_ParsesMultipleSecrets(t *testing.T) {
 		t.Errorf("resource[0].Fields[\"last_changed\"] = %q, want %q", r0.Fields["last_changed"], "2025-02-20")
 	}
 
-	// Verify second secret
 	r1 := resources[1]
 	if r1.ID != "staging/api-key" {
 		t.Errorf("resource[1].ID: expected %q, got %q", "staging/api-key", r1.ID)
@@ -134,10 +126,6 @@ func TestFetchSecrets_EmptyResponse(t *testing.T) {
 		t.Errorf("expected 0 resources, got %d", len(resources))
 	}
 }
-
-// ---------------------------------------------------------------------------
-// T043 - Test GetSecretValue (RevealSecret)
-// ---------------------------------------------------------------------------
 
 func TestRevealSecret_ReturnsSecretString(t *testing.T) {
 	mock := &mockSecretsManagerGetSecretValueClient{

@@ -6,9 +6,9 @@ package unit
 // Children) rather than one hand-written test per enricher. Any FUTURE
 // detail enricher gets this coverage automatically, with zero new test code.
 //
-// Frozen contract every enricher (core/aws/*_detail_enrichment.go,
+// Contract every enricher (core/aws/*_detail_enrichment.go,
 // core/aws/detail_enrich_engine.go, core/aws/transfer_children.go) must
-// honor, pinned here:
+// honor:
 //   - garbage `clients any` (not a *DetailEnrichmentCtx) → non-nil error
 //     containing "detail-enrichment context", resource unchanged, no panic
 //   - nil typed (*DetailEnrichmentCtx)(nil) → same
@@ -26,17 +26,11 @@ package unit
 //     core/aws/detail_enrich_engine.go). The one documented exception is the
 //     off-engine transfer_agreements (core/aws/transfer_children.go), which
 //     hand-rolls the identical RawStruct==nil guard inline rather than
-//     through core/aws/detail_enrich_engine.go and still returns a plain nil
+//     through core/aws/detail_enrich_engine.go and returns a plain nil
 //     — see nilRawStructNilErrOverrides below for the one-line table entry
 //     this axis needs if a future enricher legitimately diverges either way.
 //   - registry count sanity: at least 9 enrichers registered (catches a
 //     catalog rewire silently dropping registrations)
-//
-// A parallel refactor is migrating individual enrichers onto a shared
-// generic engine (core/aws/detail_enrich_engine.go) — these guard behaviors
-// are the frozen contract that refactor must preserve, so this test is
-// written against the observable contract, not any specific enricher's
-// internals.
 
 import (
 	"context"
@@ -82,12 +76,6 @@ func discoverDetailEnricherShortNames(t *testing.T) []string {
 // enricher whose wording legitimately differs from the uniform
 // "detail-enrichment context" guard. An empty map entry value means "any
 // non-nil error, no substring check".
-//
-// Verified empirically: every currently registered enricher, including
-// transfer_agreements (core/aws/transfer_children.go), uses the uniform
-// fmt.Errorf("invalid detail-enrichment context") wording — this map starts
-// empty. It exists so a future divergent enricher is a one-line table entry
-// here, not a special case in the test logic below.
 var enricherCtxErrOverrides = map[string]string{}
 
 const uniformCtxErrSubstring = "detail-enrichment context"
@@ -100,16 +88,11 @@ func expectedCtxErrSubstring(shortName string) string {
 }
 
 // nilRawStructNilErrOverrides holds the set of shortNames whose nil-RawStruct
-// skip returns a plain nil error rather than the uniform
-// awsclient.ErrDetailEnrichSkipped sentinel every engine-based enricher
-// returns. Verified empirically: transfer_agreements
-// (core/aws/transfer_children.go) is the one currently registered enricher
-// that is off-engine — it hand-rolls the identical RawStruct==nil guard
-// inline instead of routing through core/aws/detail_enrich_engine.go's
-// enrichDetail, so it never gained the sentinel when that engine started
-// returning it. This map exists so a future divergent enricher (in either
-// direction) is a one-line table entry here, not a special case in the test
-// logic below.
+// skip returns a plain nil error rather than the awsclient.ErrDetailEnrichSkipped
+// sentinel every engine-based enricher returns. transfer_agreements
+// (core/aws/transfer_children.go) is off-engine: it hand-rolls the
+// RawStruct==nil guard inline instead of routing through
+// core/aws/detail_enrich_engine.go's enrichDetail.
 var nilRawStructNilErrOverrides = map[string]bool{
 	"transfer_agreements": true,
 }
@@ -213,13 +196,12 @@ func TestDetailEnricherContract(t *testing.T) {
 			})
 		})
 
-		// The two subtests below pin engine validation order (#261
-		// boundary-sealing wave, item c): a nil RawStruct with a nil Clients
-		// must still hit the RawStruct-nil skip before the Clients-nil check
-		// (a pre-connect open of a disk-cache-seeded row has a non-nil
+		// Engine validation order: a nil RawStruct with a nil Clients must
+		// hit the RawStruct-nil skip before the Clients-nil check (a
+		// pre-connect open of a disk-cache-seeded row has a non-nil
 		// *DetailEnrichmentCtx but a nil Clients), while a non-nil RawStruct
-		// with a nil Clients must still error — Clients is required once
-		// there is real work to do.
+		// with a nil Clients must error — Clients is required once there is
+		// real work to do.
 		t.Run(shortName+"/nil_raw_struct_nil_clients", func(t *testing.T) {
 			runGuarded(t, func(t *testing.T) {
 				ctx := &awsclient.DetailEnrichmentCtx{

@@ -1,18 +1,12 @@
 package unit_test
 
 // aws_lt_related_test.go — related-resource checker tests for lt (EC2 Launch
-// Templates) (docs/resources/lt.md §2, docs/resources/lt-impl-plan.md §1
-// "related_targets"). Checkers live in core/aws/lt_related.go.
+// Templates, docs/resources/lt.md). Checkers live in core/aws/lt_related.go.
 //
-// 5 pivots are Pattern F via *awsclient.LTRaw (ami, kms, sg, subnet — read a
-// field on the $Default version, no API call). 3 are cache cross-ref
-// (asg, ng, ec2 — scan the sibling ResourceCache, zero extra AWS calls).
-// ct-events is the universal ctEventsCheckerFor("lt") pivot. role/eks are
-// explicitly excluded per docs/resources/lt.md §2.
-//
-// checkerByTarget is shared package-scope test tooling, defined in
-// aws_iam_policies_related_test.go. collectAllPages is shared package-scope
-// test tooling, defined in helpers_external_test.go.
+// ami, kms, sg and subnet read a field on the $Default version through
+// *awsclient.LTRaw, with no API call. asg, ng and ec2 scan the sibling
+// ResourceCache, with zero extra AWS calls. ct-events is the universal
+// ctEventsCheckerFor("lt") pivot.
 
 import (
 	"context"
@@ -33,8 +27,8 @@ import (
 
 // ltResourceByID fetches the real demo page via FetchLaunchTemplatesPage and
 // returns the Resource with the given id, failing the test if absent. The
-// demo set includes the details-denied witness (WarnLTDeniedID), so the
-// fetch legitimately returns rows + a composite error (E5 partial success).
+// demo set includes the details-denied fixture (WarnLTDeniedID), so the fetch
+// legitimately returns rows + a composite error.
 func ltResourceByID(t *testing.T, id string) resource.Resource {
 	t.Helper()
 	result, err := awsclient.FetchLaunchTemplatesPage(context.Background(), fakes.NewEC2(), "")
@@ -51,9 +45,8 @@ func ltResourceByID(t *testing.T, id string) resource.Resource {
 }
 
 // ltSiblingCache builds asg/ec2/ng ResourceCache entries from the REAL demo
-// fixtures (the actual shipped fixture graph — asg.go/ec2.go/eks.go — rather
-// than a synthetic stand-in), so the graph-root count tests validate the
-// real cross-references confirmed in docs/resources/lt-impl-plan.md §2.
+// fixtures (asg.go/ec2.go/eks.go) rather than a synthetic stand-in, so the
+// graph-root count tests validate the real cross-references.
 func ltSiblingCache(t *testing.T) resource.ResourceCache {
 	t.Helper()
 	ctx := context.Background()
@@ -87,18 +80,10 @@ func ltSiblingCache(t *testing.T) resource.ResourceCache {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// Registration
-// ---------------------------------------------------------------------------
-
-// TestRelated_LT_Registered pins the 8-target pivot SET from
-// docs/resources/lt.md §2 (ami, asg, ec2, kms, ng, sg, subnet, ct-events) and
-// that every one has a working, non-nil Checker. It deliberately does NOT
-// pin exact DisplayName strings: docs/related-resources.md's generated table
-// shows the wording is not uniform across resource types even for the SAME
-// target (e.g. ec2's own registrations use "AMI"/"EKS Node Groups", other
-// types use "AMIs"/"Node Groups") — DisplayName is per-registration free
-// text, not a canonicalized value this suite enforces elsewhere.
+// TestRelated_LT_Registered pins the 8-target pivot set (ami, asg, ec2, kms,
+// ng, sg, subnet, ct-events) and that every one has a working, non-nil
+// Checker. DisplayName is per-registration free text, not uniform across
+// resource types even for the same target.
 func TestRelated_LT_Registered(t *testing.T) {
 	defs := resource.GetRelated("lt")
 	if len(defs) == 0 {
@@ -142,10 +127,6 @@ func TestRelated_LT_ExcludedTargetsNotRegistered(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// Pattern F graph-root counts (prod-web-lt): ami 1, kms 1, sg 2.
-// ---------------------------------------------------------------------------
-
 func TestRelated_LT_GraphRootPatternF(t *testing.T) {
 	res := ltResourceByID(t, fixtures.ProdWebLTID)
 
@@ -170,11 +151,6 @@ func TestRelated_LT_GraphRootPatternF(t *testing.T) {
 		})
 	}
 }
-
-// ---------------------------------------------------------------------------
-// Cache cross-ref graph-root counts (prod-web-lt): asg 2, ec2 2 — against the
-// REAL asg.go/ec2.go fixture cross-references.
-// ---------------------------------------------------------------------------
 
 func TestRelated_LT_GraphRootCacheCrossRef(t *testing.T) {
 	res := ltResourceByID(t, fixtures.ProdWebLTID)
@@ -201,10 +177,8 @@ func TestRelated_LT_GraphRootCacheCrossRef(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// eks-node-lt root: ng 1, subnet 1, sg 1 (NetworkInterfaces[] union — no
-// top-level SecurityGroupIds/subnet fields on this fixture).
-// ---------------------------------------------------------------------------
+// eks-node-lt carries its subnet and security group only under
+// NetworkInterfaces[], with no top-level SecurityGroupIds/subnet fields.
 
 func TestRelated_LT_EKSNodeRootCounts(t *testing.T) {
 	res := ltResourceByID(t, fixtures.EKSNodeLTID)
@@ -245,10 +219,7 @@ func TestRelated_LT_EKSNodeRootCounts(t *testing.T) {
 	})
 }
 
-// ---------------------------------------------------------------------------
-// ssm_ami_no_pivot (related half) — a resolve:ssm: ImageId never resolves to
-// an ami pivot (fetcher-side "no finding" half lives in aws_lt_test.go).
-// ---------------------------------------------------------------------------
+// A resolve:ssm: ImageId never resolves to an ami pivot.
 
 func TestRelated_LT_SSMReferenceNoAMIPivot(t *testing.T) {
 	res := ltResourceByID(t, fixtures.SSMAmiLTID)
@@ -262,17 +233,11 @@ func TestRelated_LT_SSMReferenceNoAMIPivot(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// truncated_cache_unknown — checkLTEC2 reads the sibling "ec2" cache
-// directly (ltCachedEC2Instances), mirroring ng_related.go's
-// ngCachedEC2Instances tri-state contract verbatim (lt_related.go's own
-// header comment; see TestRelated_NG_EC2_TruncatedCacheNoMatch for the
-// established precedent): cache ABSENT → RelatedUnknown ("?"); cache PRESENT
-// and typed, even if truncated, is trusted enough to scan — a truncated
-// cache with zero visible matches resolves to Count=0 with Truncated=true
-// ("0+", not "?"), since the type-assertion success already confirms a real
-// loaded ec2 list, not a disk-seeded stand-in.
-// ---------------------------------------------------------------------------
+// checkLTEC2 reads the sibling "ec2" cache directly (ltCachedEC2Instances)
+// with ngCachedEC2Instances's tri-state contract: cache ABSENT →
+// RelatedUnknown ("?"); cache PRESENT and typed, even if truncated, is
+// scanned — a truncated cache with zero visible matches resolves to Count=0
+// with Truncated=true ("0+", not "?").
 
 func TestRelated_LT_EC2_TruncatedCacheResolvedNotUnknown(t *testing.T) {
 	res := ltResourceByID(t, fixtures.ProdWebLTID)
@@ -308,12 +273,10 @@ func TestRelated_LT_EC2_AbsentCacheUnknown(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
 // asg via MixedInstancesPolicy.LaunchTemplate.Overrides[] only — the
 // per-instance-type override path, distinct from the top-level
 // LaunchTemplate/MixedInstancesPolicy.LaunchTemplate.LaunchTemplateSpecification
-// fields already covered by the graph-root fixtures.
-// ---------------------------------------------------------------------------
+// fields.
 
 func TestRelated_LT_ASG_ViaOverridesOnly(t *testing.T) {
 	res := ltResourceByID(t, fixtures.ProdWebLTID)
@@ -362,11 +325,9 @@ func TestRelated_LT_ASG_ViaOverridesOnly(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// Degraded row (warn-lt-denied): Pattern-F pivots must resolve cleanly to 0
-// against a zero-valued DefaultVersion — never Unknown (RawStruct type
-// assertion still succeeds, it's the SAME *LTRaw type), never a panic.
-// ---------------------------------------------------------------------------
+// Degraded row (warn-lt-denied): field-driven pivots resolve cleanly to 0
+// against a zero-valued DefaultVersion — never Unknown (the RawStruct is the
+// same *LTRaw type), never a panic.
 
 func TestRelated_LT_DegradedRow_PatternFPivotsCleanZero(t *testing.T) {
 	res := ltResourceByID(t, fixtures.WarnLTDeniedID)
@@ -385,10 +346,8 @@ func TestRelated_LT_DegradedRow_PatternFPivotsCleanZero(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// ct-events — universal ctEventsCheckerFor("lt") pivot: deferred, server-side
-// FetchFilter, drillable.
-// ---------------------------------------------------------------------------
+// ct-events is the universal ctEventsCheckerFor("lt") pivot: deferred,
+// server-side FetchFilter, drillable.
 
 func TestRelated_LT_CtEvents_Drillable(t *testing.T) {
 	res := ltResourceByID(t, fixtures.ProdWebLTID)

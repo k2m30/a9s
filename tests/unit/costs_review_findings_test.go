@@ -1,25 +1,6 @@
-// costs_review_findings_test.go — Cost Explorer: 7 contract pins.
-// Contract: specs/021-cost-explorer/data-model.md (Filter with NotEquals),
-// spec.md FR-011/FR-016/FR-017.
-//
-// package unit (not unit_test): finding #3 needs the full TUI Model
-// (newRootSizedModel/rootApplyMsg/assertStackInSync, all package-unit-only)
-// alongside the six headless-Controller/Store/aws-layer findings, and Go
-// permits only one package per file — everything here lives in package unit
-// with small locally-prefixed (review*) helpers mirroring costs_state_test.go/
-// costs_interaction_test.go's unit_test helpers, to avoid implying they are
-// the same functions across packages.
-//
-// Surface:
-//   - costs.Filter.NotEquals map[Dimension][]string (#5).
-//   - messages.CostsLoaded.Gen domain.Gen (#7) with the
-//     GenStamp()/GenAspect()/AcceptZeroGen() methods and the messages.IsStale
-//     guard in handle.go's CostsLoaded case, following the IdentityError
-//     precedent.
-//   - core/costs/store.go (#1), core/runtime/executor.go's KindFetchCosts
-//     case (#2), internal/tui/app_input.go's generic Esc path (#3),
-//     core/app/costs_state.go (#4, #6), core/aws/costs.go's
-//     buildFilterExpression (#5).
+// The review*-prefixed helpers mirror costs_state_test.go and
+// costs_interaction_test.go's package unit_test helpers under local names, so
+// they do not read as the same functions across packages.
 package unit
 
 import (
@@ -48,12 +29,10 @@ var reviewNow = time.Date(2026, time.July, 15, 12, 0, 0, 0, time.UTC)
 // shared controller builder for isolated-cache tests; use it unless the
 // test needs reviewCostsControllerNoIsolation below.
 
-// reviewCostsControllerNoIsolation is the same construction as
-// newCostsScreenController, minus the A9S_CONFIG_FOLDER isolation — for tests
-// (#4, #6) that must control the on-disk cache path themselves BEFORE
-// construction (pre-seeding a stale cache, or reading back a persisted one).
-// Kept separate: this contract (caller controls isolation) cannot collapse
-// into the shared helper without losing that property.
+// reviewCostsControllerNoIsolation is newCostsScreenController without the
+// A9S_CONFIG_FOLDER isolation, for tests that control the on-disk cache path
+// before construction (pre-seeding a stale cache, or reading back a persisted
+// one).
 func reviewCostsControllerNoIsolation(t *testing.T, now time.Time) *app.Controller {
 	t.Helper()
 	s := session.New()
@@ -118,11 +97,6 @@ func reviewFindFetchCostsTask(tasks []runtime.TaskRequest) (runtime.FetchCostsPa
 	return runtime.FetchCostsPayload{}, false
 }
 
-// ===========================================================================
-// #1 (P1) — Store.Lookup must return records whose native period falls
-// INSIDE a requested display bucket, not merely at an exact key match.
-// ===========================================================================
-
 func TestCostsReview_F1_StoreLookup_ReturnsRecordsWhoseNativePeriodFallsInsideRequestedBucket(t *testing.T) {
 	t.Setenv("A9S_CONFIG_FOLDER", t.TempDir())
 
@@ -177,11 +151,6 @@ func TestCostsReview_F1_StoreLookup_ReturnsRecordsWhoseNativePeriodFallsInsideRe
 		}
 	})
 }
-
-// ===========================================================================
-// #2 (P1) — a RESOURCE_ID-grouped KindFetchCosts task must call
-// GetCostAndUsageWithResources, not GetCostAndUsage.
-// ===========================================================================
 
 type reviewRecordingCostsAPI struct {
 	calledPlain         bool
@@ -263,11 +232,6 @@ func TestCostsReview_F2_KindFetchCosts_RoutesByGroupBy(t *testing.T) {
 	}
 }
 
-// ===========================================================================
-// #3 (P1) — Esc on a drilled costs screen must pop only the drill frame,
-// keeping the TUI rendererState stack in sync with the controller.
-// ===========================================================================
-
 func TestCostsReview_F3_EscAtDrillDepth_PopsOnlyDrillFrame_TUIStackStaysSynced(t *testing.T) {
 	tui.Version = "1.0.2"
 	m := newRootSizedModel()
@@ -275,14 +239,10 @@ func TestCostsReview_F3_EscAtDrillDepth_PopsOnlyDrillFrame_TUIStackStaysSynced(t
 	m, _ = rootApplyMsg(m, messages.Navigate{Target: messages.TargetCosts})
 	assertStackInSync(t, m, "after navigating to costs")
 
-	// Enter is a no-op while its shape is still awaited (drilling into an
-	// invisible row is never correct) — a real session always has the
-	// CostsLoaded delivery in between. The TUI navigates via time.Now()
-	// (no injected clock at this layer), so the seeded record's period
-	// anchors to the real current month — CacheKey matching (what
-	// ApplyCostsLoaded actually checks) never depends on Range/window per
-	// data-model.md, only the delivered record's own Period needs to land
-	// inside the real window for a visible row to appear at the cursor.
+	// Enter is a no-op while its shape is still awaited, so the CostsLoaded
+	// delivery comes first. The TUI navigates via time.Now(), so the seeded
+	// record's period anchors to the real current month to land inside the real
+	// window.
 	now := time.Now()
 	start := time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, time.UTC)
 	period := costs.Period{Start: start.Format("2006-01-02"), End: start.AddDate(0, 1, 0).Format("2006-01-02")}
@@ -298,11 +258,9 @@ func TestCostsReview_F3_EscAtDrillDepth_PopsOnlyDrillFrame_TUIStackStaysSynced(t
 	m, _ = rootApplyMsg(m, rootSpecialKey(tea.KeyEnter))
 	assertStackInSync(t, m, "after drilling one level (still ScreenCosts)")
 
-	// Esc at drill depth 2 must pop ONLY the drill frame — ActionBack leaves
-	// the controller's ScreenCosts on top, so the TUI's costs rendererState
-	// must also stay on top. The generic Esc path (popRSWithCtrlPop)
-	// unconditionally pops the TUI stack regardless of what ActionBack
-	// actually did on the controller side, desyncing the two here.
+	// Esc at drill depth 2 pops only the drill frame: ActionBack leaves the
+	// controller's ScreenCosts on top, so the TUI's costs rendererState stays on
+	// top too.
 	m, _ = rootApplyMsg(m, rootSpecialKey(tea.KeyEscape))
 	assertStackInSync(t, m, "after Esc at drill depth 2 (must still be on ScreenCosts)")
 	if plain := stripANSI(rootViewContent(m)); strings.Contains(plain, "resource-types") {
@@ -317,11 +275,6 @@ func TestCostsReview_F3_EscAtDrillDepth_PopsOnlyDrillFrame_TUIStackStaysSynced(t
 		t.Errorf("Esc at the root frame should return to the main menu, got:\n%s", plain)
 	}
 }
-
-// ===========================================================================
-// #4 (P2) — a stale (TTL-expired) open period must trigger a refetch and
-// never render as current data.
-// ===========================================================================
 
 func TestCostsReview_F4_StaleOpenPeriod_TriggersRefetch_NeverRenderedAsCurrent(t *testing.T) {
 	t.Setenv("A9S_CONFIG_FOLDER", t.TempDir())
@@ -353,14 +306,9 @@ func TestCostsReview_F4_StaleOpenPeriod_TriggersRefetch_NeverRenderedAsCurrent(t
 	}
 }
 
-// TestCostsReview_F4_VisibleWindow_MissingClosedPeriod_TriggersRefetch_NeverRenderedAsSilentZero
-// closes the follow-up nuance an external reviewer found in the landed #4
-// fix: ensureCostsShapeFetched only inspects Store.Lookup's missing periods
-// for OPEN-period staleness, so a visible window whose OPEN period is fresh
-// but which is missing an entirely-uncached CLOSED period (a corrupt/
-// partial cache, or a future window-widening regression once Phase 3 drill
-// re-windowing lands) silently renders that column instead of refetching —
-// a latent FR-017 hole.
+// A visible window whose open period is fresh but which is missing an
+// uncached closed period (a corrupt or partial cache) must refetch, not render
+// that column.
 func TestCostsReview_F4_VisibleWindow_MissingClosedPeriod_TriggersRefetch_NeverRenderedAsSilentZero(t *testing.T) {
 	t.Setenv("A9S_CONFIG_FOLDER", t.TempDir())
 
@@ -406,10 +354,8 @@ func TestCostsReview_F4_VisibleWindow_MissingClosedPeriod_TriggersRefetch_NeverR
 	}
 }
 
-// TestCostsReview_F4_VisibleWindow_FullyCovered_NoFetchTask is the control:
-// a window where every period — closed and the fresh open one — is already
-// cached must render instantly, with no fetch. Must not regress into
-// "always refetch", which would defeat caching entirely.
+// A fully cached window renders with no fetch; always refetching would defeat
+// caching.
 func TestCostsReview_F4_VisibleWindow_FullyCovered_NoFetchTask(t *testing.T) {
 	t.Setenv("A9S_CONFIG_FOLDER", t.TempDir())
 
@@ -421,10 +367,8 @@ func TestCostsReview_F4_VisibleWindow_FullyCovered_NoFetchTask(t *testing.T) {
 		recs = append(recs, reviewFullMetricRecord(p, "Amazon EC2", 1000.0+float64(i)))
 	}
 	seed.Merge(reviewBaseServiceQuery(), recs, reviewNow) // fresh — every period, closed and open, covered
-	// Also seed a fresh anomaly slot (screen.PlanFetch's Grid/Anomalies
-	// freshness derive independently now) so "zero fetch tasks" holds
-	// unconditionally, not just for the grid half. covered is the window
-	// under test.
+	// A fresh anomaly slot keeps "zero fetch tasks" true for the anomaly half too:
+	// Grid and Anomalies freshness derive independently.
 	seed.PutAnomalies(nil, reviewNow, costs.Period{Start: window[0].Start, End: window[len(window)-1].End})
 	if err := seed.Save(); err != nil {
 		t.Fatalf("seeding on-disk cost cache: %v", err)
@@ -441,12 +385,6 @@ func TestCostsReview_F4_VisibleWindow_FullyCovered_NoFetchTask(t *testing.T) {
 		t.Error("a fully-covered visible window emitted an unnecessary KindFetchCosts TaskRequest")
 	}
 }
-
-// ===========================================================================
-// #5 (P2) — the unblended metric's query filter must EXCLUDE RECORD_TYPE in
-// {Tax, Credit, Refund} via Filter.NotEquals, and buildFilterExpression must
-// map NotEquals to a CE Not-expression.
-// ===========================================================================
 
 func TestCostsReview_F5_UnblendedMetric_FilterExcludesTaxCreditRefund_ViaNotEquals(t *testing.T) {
 	c := newCostsScreenController(t, reviewNow)
@@ -520,11 +458,6 @@ func TestCostsReview_F5_BuildFilterExpression_MapsNotEqualsToCENotExpression(t *
 	}
 }
 
-// ===========================================================================
-// #6 (P2) — a successful CostsLoaded merge must persist to the on-disk cost
-// cache, not just live in the in-memory Store for the screen's lifetime.
-// ===========================================================================
-
 func TestCostsReview_F6_SuccessfulMerge_PersistsToDiskCache(t *testing.T) {
 	t.Setenv("A9S_CONFIG_FOLDER", t.TempDir())
 
@@ -550,11 +483,6 @@ func TestCostsReview_F6_SuccessfulMerge_PersistsToDiskCache(t *testing.T) {
 	}
 }
 
-// ===========================================================================
-// #7 (P2) — CostsLoaded must carry a staleness stamp; a stale result
-// arriving after a profile switch must be dropped.
-// ===========================================================================
-
 func TestCostsReview_F7_StaleCostsLoaded_DroppedAfterProfileSwitch(t *testing.T) {
 	t.Setenv("A9S_CONFIG_FOLDER", t.TempDir())
 	s := session.New()
@@ -566,11 +494,8 @@ func TestCostsReview_F7_StaleCostsLoaded_DroppedAfterProfileSwitch(t *testing.T)
 	c.ApplyIntents([]runtime.UIIntent{runtime.PushScreen{ID: runtime.ScreenCosts}})
 	c.EnsureCostsState(reviewNow)
 
-	// First Rotate: ConnectGen becomes non-zero (it starts at 0 — a Gen=0
-	// stamp is never stale per the AcceptZeroGen convention, so a genuine
-	// staleness test needs a non-zero captured gen). Mirrors
-	// generation_stamping_fetch_test.go's established two-Rotate pattern for
-	// ConnectGen-stamped events (IdentityError/IdentityLoaded).
+	// ConnectGen starts at 0 and a Gen=0 stamp is never stale (AcceptZeroGen), so
+	// the first Rotate gives the fetch a non-zero gen to go stale.
 	s.Rotate()
 	staleGen := s.ConnectGen
 	if staleGen == 0 {
@@ -600,36 +525,14 @@ func TestCostsReview_F7_StaleCostsLoaded_DroppedAfterProfileSwitch(t *testing.T)
 	}
 }
 
-// ===========================================================================
-// Live-verified gap (tmux proof) — Enter on a resource row in the costs
-// screen emits KindFetchByIDDetail (round8 item 3's pin, green at the
-// Controller.Apply level) but the SCREEN NEVER CHANGES at the TUI layer.
-// Traced precisely: internal/tui/app_costs.go's handleCostsKeyMsg dispatches
-// EVERY task returned by ActionSelect through the generic m.executeTaskCmd —
-// for KindFetchByIDDetail that fetches (ExecuteTask returns ResourcesLoaded)
-// but never navigates. internal/tui/runtime_adapter_related.go:342-350
-// special-cases the SAME task kind for the related panel: it routes to
-// m.fetchByIDDetail(targetType, id) instead of executeTaskCmd, and THAT
-// function (internal/tui/fetch_adapter.go:78) is the one that actually
-// produces messages.Navigate{Target: TargetDetail, ...} on success. The
-// costs key router has no equivalent translation, so the resource-drill
-// Enter silently stays on the costs screen even though the fetch itself
-// succeeds.
-//
-// Seam reused: TestApp_008_RelatedNavigate_SingleID_CacheMiss_AutoOpensDetail
-// (related_navigate_count_spec008_test.go) pins fetchByIDDetail's effect via
-// the rendered view content after the message round-trip — StripANSI(view)
-// containing "detail --" plus the target's own identifying string, and NOT
-// containing any remaining costs-screen marker. This test follows the same
-// idiom, driven through the costs screen's own TUI key path (mirrors F3's
-// rootApplyMsg/rootSpecialKey drive) instead of the related panel's.
-// ===========================================================================
+// Enter on a resource row emits KindFetchByIDDetail, which the TUI must route
+// to m.fetchByIDDetail (internal/tui/fetch_adapter.go), the function that
+// produces messages.Navigate{Target: TargetDetail} on success, as the related
+// panel does; the generic executeTaskCmd fetches without navigating.
 
 // newCostsDemoModel mirrors related_navigate_count_spec008_test.go's
-// newRelatedDemoModel — a demo-clients-backed root model, needed here (unlike
-// F3's plain newRootSizedModel) because this test's fix path calls the REAL
-// registered EC2 FetchByIDs helper against m.core.Clients(), which must
-// resolve to demo fixture data, not an unconnected/nil client.
+// newRelatedDemoModel: a demo-clients-backed root model, so the registered EC2
+// FetchByIDs helper resolves against demo fixture data.
 func newCostsDemoModel(t *testing.T) tui.Model {
 	t.Helper()
 	m := newBlessedModel(t, "demo", "us-east-1",
@@ -689,9 +592,7 @@ func TestCostsReview_ResourceRowEnter_TUI_NavigatesToEC2Detail_NotStuckOnCostsSc
 		t.Fatalf("precondition: the RESOURCE_ID row for %s is not visible before the final Enter — the delivered records did not land in the drilled grid:\n%s", demoEC2InstanceID, before)
 	}
 
-	// Enter on the RESOURCE_ID row — the seam under test. This emits
-	// KindFetchByIDDetail (round8 item 3, already green); the bug is what
-	// happens to that task afterward at the TUI layer.
+	// Enter on the RESOURCE_ID row emits KindFetchByIDDetail.
 	m, cmd = rootApplyMsg(m, rootSpecialKey(tea.KeyEnter))
 	if cmd != nil {
 		if follow := cmd(); follow != nil {

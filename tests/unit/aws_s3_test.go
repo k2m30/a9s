@@ -1,15 +1,5 @@
 package unit
 
-// aws_s3_test.go — Fetcher tests for the s3 resource type.
-//
-// Covered assertions:
-//   - Resource.Issues is always nil/empty (spec has no Wave 1 signals — U7f).
-//   - Identity fields are populated from ListBuckets output (spec §1).
-//   - notification_lambda / notification_sns / notification_sqs are populated
-//     by FetchS3BucketsPageWithNotifications (required by related-panel checkers).
-//   - Bucket with no notification config returns empty (not absent) field keys.
-//   - Empty bucket list returns zero resources without error.
-
 import (
 	"context"
 	"strings"
@@ -26,14 +16,6 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// ---------------------------------------------------------------------------
-// U7f — Resource.Issues is always nil/empty (no Wave 1 signals for s3).
-// ---------------------------------------------------------------------------
-
-// TestS3_FetcherResourceIssues_AlwaysEmpty verifies that every bucket produced
-// by FetchS3Buckets has no Wave 1 issues populated (spec §3.1 = no Wave 1
-// signals for s3). This guards against accidentally wiring a classification
-// that would produce Issues != nil.
 func TestS3_FetcherResourceIssues_AlwaysEmpty(t *testing.T) {
 	fake := fakes.NewS3()
 	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
@@ -52,13 +34,6 @@ func TestS3_FetcherResourceIssues_AlwaysEmpty(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// spec §1 — Identity field mapping.
-// ---------------------------------------------------------------------------
-
-// TestS3_FetcherIdentityFields_HealthyBucket verifies that the healthy-bucket
-// fixture produces the expected identity fields (name, creation_date)
-// matching spec §1. This catches mapping regressions.
 func TestS3_FetcherIdentityFields_HealthyBucket(t *testing.T) {
 	fake := fakes.NewS3()
 	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
@@ -75,7 +50,6 @@ func TestS3_FetcherIdentityFields_HealthyBucket(t *testing.T) {
 		}
 		found = true
 
-		// ID and Name must equal the bucket name (spec §1).
 		if r.ID != fixtures.HealthyBucketName {
 			t.Errorf("Resource.ID = %q, want %q", r.ID, fixtures.HealthyBucketName)
 		}
@@ -83,14 +57,10 @@ func TestS3_FetcherIdentityFields_HealthyBucket(t *testing.T) {
 			t.Errorf("Resource.Name = %q, want %q", r.Name, fixtures.HealthyBucketName)
 		}
 
-		// Fields["name"] must match the bucket name. bucket_name was a second
-		// key carrying the same string and nothing read it (aws5 row 1); do not
-		// restore the pair.
 		if r.Fields["name"] != fixtures.HealthyBucketName {
 			t.Errorf("Fields[name] = %q, want %q", r.Fields["name"], fixtures.HealthyBucketName)
 		}
 
-		// Fields["creation_date"] must be a non-empty formatted date string.
 		if r.Fields["creation_date"] == "" {
 			t.Errorf("Fields[creation_date] is empty for %q; expected a formatted date", r.ID)
 		}
@@ -102,14 +72,6 @@ func TestS3_FetcherIdentityFields_HealthyBucket(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// Notification fields — required for related-panel checkers.
-// ---------------------------------------------------------------------------
-
-// TestS3_FetcherWithNotifications_PopulatesLambdaField verifies that
-// FetchS3BucketsPageWithNotifications populates Fields["notification_lambda"]
-// with the Lambda function ARN from the healthy bucket's notification config.
-// The field is consumed by checkS3Lambda to derive related-panel counts.
 func TestS3_FetcherWithNotifications_PopulatesLambdaField(t *testing.T) {
 	fake := fakes.NewS3()
 	result, err := awsclient.FetchS3BucketsPageWithNotifications(
@@ -143,9 +105,6 @@ func TestS3_FetcherWithNotifications_PopulatesLambdaField(t *testing.T) {
 	}
 }
 
-// TestS3_FetcherWithNotifications_PopulatesSNSField verifies that
-// FetchS3BucketsPageWithNotifications populates Fields["notification_sns"]
-// with the SNS topic ARN from the healthy bucket's notification config.
 func TestS3_FetcherWithNotifications_PopulatesSNSField(t *testing.T) {
 	fake := fakes.NewS3()
 	result, err := awsclient.FetchS3BucketsPageWithNotifications(
@@ -179,9 +138,6 @@ func TestS3_FetcherWithNotifications_PopulatesSNSField(t *testing.T) {
 	}
 }
 
-// TestS3_FetcherWithNotifications_PopulatesSQSField verifies that
-// FetchS3BucketsPageWithNotifications populates Fields["notification_sqs"]
-// with the SQS queue ARN from the healthy bucket's notification config.
 func TestS3_FetcherWithNotifications_PopulatesSQSField(t *testing.T) {
 	fake := fakes.NewS3()
 	result, err := awsclient.FetchS3BucketsPageWithNotifications(
@@ -215,9 +171,6 @@ func TestS3_FetcherWithNotifications_PopulatesSQSField(t *testing.T) {
 	}
 }
 
-// TestS3_FetcherWithNotifications_AbsentBucket_EmptyFields verifies that a
-// bucket with no notification configuration has empty (not absent) notification
-// field values, so downstream checkers don't crash on missing map lookups.
 func TestS3_FetcherWithNotifications_AbsentBucket_EmptyFields(t *testing.T) {
 	listMock := &fakeS3ListBuckets{
 		Output: &s3.ListBucketsOutput{
@@ -257,10 +210,8 @@ func TestS3_FetcherWithNotifications_AbsentBucket_EmptyFields(t *testing.T) {
 }
 
 // S3BucketNotificationFake implements S3GetBucketNotificationConfigurationAPI
-// with a caller-supplied result. Exported so tests/unit_test package files
-// (which cannot share unexported identifiers with this package) can reuse it
-// instead of defining their own copy — see helpers_uncovered_test.go's
-// mockS3GetBucketNotificationClient alias.
+// with a caller-supplied result. It is exported for the unit_test package,
+// which cannot share unexported identifiers with this one.
 type S3BucketNotificationFake struct {
 	Output *s3.GetBucketNotificationConfigurationOutput
 	Err    error
@@ -274,12 +225,6 @@ func (f *S3BucketNotificationFake) GetBucketNotificationConfiguration(
 	return f.Output, f.Err
 }
 
-// ---------------------------------------------------------------------------
-// Edge-case: empty bucket list.
-// ---------------------------------------------------------------------------
-
-// TestS3_FetcherPage_EmptyBucketList verifies that FetchS3BucketsPage handles
-// an empty ListBuckets response without error and returns zero resources.
 func TestS3_FetcherPage_EmptyBucketList(t *testing.T) {
 	mock := &fakeS3ListBuckets{
 		Output: &s3.ListBucketsOutput{Buckets: nil},

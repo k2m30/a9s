@@ -13,10 +13,6 @@ import (
 	"github.com/k2m30/a9s/v3/internal/tui"
 )
 
-// TestCostsClockSeam_BothLanesOpenOnThePinnedMonth pins the clock and opens
-// the Cost Explorer down each lane's own navigation path — the headless
-// Controller's :costs command and the TUI Model's Navigate message.
-//
 // Both lanes seed the costs window from app.Now(). The window is the one
 // piece of the screen a wall-clock read decides, so a lane that called
 // time.Now() directly would open on the machine's month while the other
@@ -40,7 +36,6 @@ func TestCostsClockSeam_BothLanesOpenOnThePinnedMonth(t *testing.T) {
 		wantYears[m[2:4]] = true
 	}
 
-	// --- headless lane: the :costs command ---
 	c := newTestController(t)
 
 	vs, _ := c.Apply(app.Action{Kind: app.ActionCommand, Arg: "costs"})
@@ -65,7 +60,6 @@ func TestCostsClockSeam_BothLanesOpenOnThePinnedMonth(t *testing.T) {
 	}
 	newest := cols[len(cols)-1].Label
 
-	// --- TUI lane: the Navigate message ---
 	tui.Version = "test"
 	m := newBlessedModel(t, "costs-clock-seam", "us-east-1", tui.WithNoCache(true))
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 40})

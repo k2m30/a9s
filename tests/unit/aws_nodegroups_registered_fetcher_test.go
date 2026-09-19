@@ -1,13 +1,5 @@
 package unit
 
-// aws_nodegroups_registered_fetcher_test.go — Tests for the registered paginated fetcher
-// for "ng" (resource.GetPaginatedFetcher("ng")), which is the path used by the live app
-// via internal/tui/app_fetchers.go.
-//
-// These tests are DISTINCT from aws_nodegroups_image_id_test.go, which only exercises
-// the standalone FetchNodeGroups helper. This file targets the closure registered in
-// core/aws/ng.go via resource.SetPaginatedForTest("ng", ...).
-
 import (
 	"context"
 	"fmt"
@@ -29,14 +21,7 @@ import (
 	_ "github.com/k2m30/a9s/v3/core/aws"
 )
 
-// ---------------------------------------------------------------------------
-// Minimal EKSAPI fake for registered-fetcher tests
-// ---------------------------------------------------------------------------
-
-// ngTestEKSFake implements awsclient.EKSAPI with programmable per-cluster, per-nodegroup
-// responses for the three operations the registered "ng" fetcher calls.
 type ngTestEKSFake struct {
-	// clusters returned by ListClusters
 	clusters []string
 	// nodegroups keyed by cluster name
 	nodegroups map[string][]string
@@ -57,7 +42,6 @@ func (f *ngTestEKSFake) DescribeCluster(
 	input *eks.DescribeClusterInput,
 	_ ...func(*eks.Options),
 ) (*eks.DescribeClusterOutput, error) {
-	// Not called by the registered "ng" fetcher; return a stub.
 	name := aws.ToString(input.Name)
 	return &eks.DescribeClusterOutput{
 		Cluster: &ekstypes.Cluster{Name: aws.String(name)},
@@ -84,23 +68,13 @@ func (f *ngTestEKSFake) DescribeNodegroup(
 	return &eks.DescribeNodegroupOutput{Nodegroup: ng}, nil
 }
 
-// ---------------------------------------------------------------------------
-// Minimal EC2API fake for registered-fetcher tests
-//
-// We embed *fakes.EC2Fake (which satisfies the full EC2API) and override
-// DescribeLaunchTemplateVersions to return test-controlled data.
-// ---------------------------------------------------------------------------
-
-// ngTestEC2Fake wraps fakes.EC2Fake and overrides DescribeLaunchTemplateVersions.
 type ngTestEC2Fake struct {
 	*fakes.EC2Fake
 	// ltOutputs keyed by "<launchTemplateId>:<version>"
 	ltOutputs map[string]*ec2.DescribeLaunchTemplateVersionsOutput
-	// ltErr, if non-nil, is returned for every DescribeLaunchTemplateVersions call.
-	ltErr error
+	ltErr     error
 }
 
-// DescribeLaunchTemplateVersions overrides the embedded EC2Fake method.
 func (f *ngTestEC2Fake) DescribeLaunchTemplateVersions(
 	_ context.Context,
 	input *ec2.DescribeLaunchTemplateVersionsInput,
@@ -124,24 +98,12 @@ func (f *ngTestEC2Fake) DescribeLaunchTemplateVersions(
 	return &ec2.DescribeLaunchTemplateVersionsOutput{}, nil
 }
 
-// ---------------------------------------------------------------------------
-// Helper: build ServiceClients for registered-fetcher tests
-// ---------------------------------------------------------------------------
-
 func newNGTestClients(eksFake *ngTestEKSFake, ec2Fake *ngTestEC2Fake) *awsclient.ServiceClients {
 	return &awsclient.ServiceClients{
 		EKS: eksFake,
 		EC2: ec2Fake,
 	}
 }
-
-// ---------------------------------------------------------------------------
-// TestRegisteredNGFetcher_ResolvesImageIDFromCustomLaunchTemplate
-//
-// Verifies that the registered "ng" paginated fetcher (the path used by the
-// live app) populates Fields["image_id"] for a nodegroup with a custom
-// LaunchTemplate, and leaves Fields["image_id"] == "" for one without.
-// ---------------------------------------------------------------------------
 
 func TestRegisteredNGFetcher_ResolvesImageIDFromCustomLaunchTemplate(t *testing.T) {
 	pf := resource.GetPaginatedFetcher("ng")
@@ -166,7 +128,6 @@ func TestRegisteredNGFetcher_ResolvesImageIDFromCustomLaunchTemplate(t *testing.
 				ScalingConfig: &ekstypes.NodegroupScalingConfig{
 					DesiredSize: &desiredCustom,
 				},
-				// Custom LaunchTemplate — registered fetcher must call resolveNGImageID.
 				LaunchTemplate: &ekstypes.LaunchTemplateSpecification{
 					Id:      aws.String("lt-100"),
 					Version: aws.String("3"),
@@ -180,7 +141,6 @@ func TestRegisteredNGFetcher_ResolvesImageIDFromCustomLaunchTemplate(t *testing.
 				ScalingConfig: &ekstypes.NodegroupScalingConfig{
 					DesiredSize: &desiredDefault,
 				},
-				// No custom LaunchTemplate — image_id must remain "".
 				LaunchTemplate: nil,
 			},
 		},
@@ -217,7 +177,6 @@ func TestRegisteredNGFetcher_ResolvesImageIDFromCustomLaunchTemplate(t *testing.
 		byName[r.Name] = r
 	}
 
-	// ng-custom: must have image_id resolved from the custom launch template.
 	custom, ok := byName["ng-custom"]
 	if !ok {
 		t.Fatal("resource 'ng-custom' not found in fetcher output")
@@ -226,7 +185,6 @@ func TestRegisteredNGFetcher_ResolvesImageIDFromCustomLaunchTemplate(t *testing.
 		t.Errorf("ng-custom Fields[\"image_id\"]: expected \"ami-xyz\", got %q", got)
 	}
 
-	// ng-default: nil LaunchTemplate → image_id must be "".
 	defaultNG, ok := byName["ng-default"]
 	if !ok {
 		t.Fatal("resource 'ng-default' not found in fetcher output")
@@ -235,7 +193,6 @@ func TestRegisteredNGFetcher_ResolvesImageIDFromCustomLaunchTemplate(t *testing.
 		t.Errorf("ng-default Fields[\"image_id\"]: expected \"\", got %q", got)
 	}
 
-	// resource.GetFieldKeys("ng") must include "image_id".
 	keys := resource.GetFieldKeys("ng")
 	found := false
 	for _, k := range keys {
@@ -248,13 +205,6 @@ func TestRegisteredNGFetcher_ResolvesImageIDFromCustomLaunchTemplate(t *testing.
 		t.Errorf("resource.GetFieldKeys(\"ng\") does not contain \"image_id\"; got: %v", keys)
 	}
 }
-
-// ---------------------------------------------------------------------------
-// TestRegisteredNGFetcher_ImageIDEmptyWhenLaunchTemplateResolveFails
-//
-// Verifies that the registered "ng" fetcher emits the nodegroup even when
-// DescribeLaunchTemplateVersions returns an error, leaving Fields["image_id"] == "".
-// ---------------------------------------------------------------------------
 
 func TestRegisteredNGFetcher_ImageIDEmptyWhenLaunchTemplateResolveFails(t *testing.T) {
 	pf := resource.GetPaginatedFetcher("ng")
@@ -286,7 +236,6 @@ func TestRegisteredNGFetcher_ImageIDEmptyWhenLaunchTemplateResolveFails(t *testi
 		},
 	}
 
-	// EC2 fake returns an error for every DescribeLaunchTemplateVersions call.
 	ec2Fake := &ngTestEC2Fake{
 		EC2Fake: fakes.NewEC2(),
 		ltErr:   errNGTestLTNotFound,
@@ -295,9 +244,8 @@ func TestRegisteredNGFetcher_ImageIDEmptyWhenLaunchTemplateResolveFails(t *testi
 	sc := newNGTestClients(eksFake, ec2Fake)
 
 	result, err := pf(context.Background(), sc, "")
-	// A refused DescribeLaunchTemplateVersions is recorded rather than
-	// swallowed (its sibling is in aws_nodegroups_image_id_test.go). The fetch
-	// is still non-fatal — the node group is emitted, asserted below.
+	// A refused DescribeLaunchTemplateVersions is recorded in the error
+	// aggregate. The failure is non-fatal: the node group is still emitted.
 	if err == nil {
 		t.Fatal("the refused launch-template read is not carried out of the fetcher, so the blank " +
 			"image_id below reads as a node group whose template declares no image")
@@ -315,19 +263,12 @@ func TestRegisteredNGFetcher_ImageIDEmptyWhenLaunchTemplateResolveFails(t *testi
 	}
 }
 
-// errNGTestLTNotFound is a sentinel error used in TestRegisteredNGFetcher_ImageIDEmptyWhenLaunchTemplateResolveFails.
-// Defined at package level to avoid repetition.
 var errNGTestLTNotFound = fmt.Errorf("EC2 API error: launch template not found")
 
-// TestRegisteredNGFetcher_NilNodegroup_KeepsDegradedRow pins the shared
-// degraded-row contract (DegradedDetails) on the registered "ng" fetcher: a
-// node group the list names but the describe cannot deliver is KEPT as a
-// name-only degraded row and the failure aggregates into the composite
-// error. A nil body is a NON-auth failure → the neutral `details unavailable`
-// row (an AccessDeniedException would instead render `details denied` — the
-// two facts no longer share a phrase). There is deliberately NO demo witness
-// for either ng degraded finding (see knownUnwitnessedFindings) — this test
-// is the nil-body (unavailable) coverage.
+// A node group the list names but the describe cannot deliver stays as a
+// name-only degraded row, and its failure joins the composite error. A nil
+// body is a non-auth failure, so the row reads `details unavailable`; an
+// AccessDeniedException reads `details denied`.
 func TestRegisteredNGFetcher_NilNodegroup_KeepsDegradedRow(t *testing.T) {
 	pf := resource.GetPaginatedFetcher("ng")
 	if pf == nil {
@@ -345,7 +286,6 @@ func TestRegisteredNGFetcher_NilNodegroup_KeepsDegradedRow(t *testing.T) {
 				ClusterName:   aws.String("prod"),
 				Status:        ekstypes.NodegroupStatusActive,
 			},
-			// "prod/ng-ghost" absent → DescribeNodegroup returns nil body.
 		},
 	}
 	sc := newNGTestClients(eksFake, &ngTestEC2Fake{EC2Fake: fakes.NewEC2()})

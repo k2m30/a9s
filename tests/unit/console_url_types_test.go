@@ -1,16 +1,9 @@
-// console_url_types_test.go — per-type contract for catalog.ResourceTypeDef.
-// ConsoleURL (spec: console-url-spec.md, per-type builder table). Covers all
-// 70 top-level catalog types: a completeness gate (every type except
-// ct-events has a non-nil builder), a table-driven expected-URL test per
-// type driven by the shared demo fixtures, the aurora/docdb and
-// REGIONAL/CLOUDFRONT branch cases, nil-safety for RawStruct-dependent
-// builders, and hostile-input percent-encoding.
+// Per-type contract for catalog.ResourceTypeDef.ConsoleURL.
 //
-// Expected URLs are built from the spec's literal per-type URL shape plus
-// the fixture's own real ID/Name/Fields values captured via the type's real
-// Wave-1 Fetcher (drainDemoFixtures, shared with qa_demo_pivot_coverage_test.go
-// and qa_demo_state_coverage_test.go) — never by calling consolelink helpers,
-// so a broken builder cannot pass by tautology.
+// Expected URLs are built from each type's literal URL shape plus the
+// fixture's own ID/Name/Fields values captured via the type's real Wave-1
+// Fetcher — never by calling consolelink helpers, so a broken builder cannot
+// pass by tautology.
 package unit_test
 
 import (
@@ -27,8 +20,6 @@ import (
 )
 
 const consoleTestAccountID = "123456789012"
-
-// ─── Shared helpers ──────────────────────────────────────────────────────────
 
 // consoleURLTypeDef returns the installed catalog entry for shortName,
 // failing loudly if the type is not registered.
@@ -68,8 +59,6 @@ func consoleURLRowByID(t *testing.T, rows []resource.Resource, id string) resour
 	return resource.Resource{}
 }
 
-// ─── Completeness: every top-level type except ct-events has a builder ─────
-
 func TestConsoleURL_RegisteredForEveryTopLevelType_ExceptCtEvents(t *testing.T) {
 	for _, td := range resource.AllResourceTypes() {
 		if td.ShortName == "ct-events" {
@@ -84,10 +73,8 @@ func TestConsoleURL_RegisteredForEveryTopLevelType_ExceptCtEvents(t *testing.T) 
 	}
 }
 
-// ─── Per-type expected-URL table ────────────────────────────────────────────
-
 type consoleURLCase struct {
-	name      string // subtest name
+	name      string
 	shortName string
 	pickID    string // fixture row ID to select; "" means use rows[0]
 	want      func(r resource.Resource) string
@@ -258,7 +245,7 @@ func TestConsoleURL_PerType(t *testing.T) {
 			},
 		},
 		{
-			// No ?region= param at all — as emitted (spec's documented gap).
+			// The transfer console URL carries no ?region= param.
 			name: "transfer", shortName: "transfer", pickID: "broken-transfer-start-failed",
 			want: func(row resource.Resource) string {
 				return fmt.Sprintf("https://%s.console.aws.amazon.com/transfer/home#/servers/%s", r, row.ID)
@@ -271,14 +258,12 @@ func TestConsoleURL_PerType(t *testing.T) {
 			},
 		},
 		{
-			// docdb branch: RS docdbtypes.DBCluster.
 			name: "dbc (docdb)", shortName: "dbc", pickID: "acme-docdb-prod",
 			want: func(row resource.Resource) string {
 				return fmt.Sprintf("https://%s.console.aws.amazon.com/docdb/home?region=%s#cluster-details/%s", r, r, url.PathEscape(row.ID))
 			},
 		},
 		{
-			// aurora branch: RS rdstypes.DBCluster, Engine != neptune-prefixed.
 			name: "dbc (aurora)", shortName: "dbc", pickID: "prod-aurora-cluster",
 			want: func(row resource.Resource) string {
 				return fmt.Sprintf("https://%s.console.aws.amazon.com/rds/home?region=%s#database:id=%s;is-cluster=true", r, r, url.PathEscape(row.ID))
@@ -452,10 +437,9 @@ func TestConsoleURL_PerType(t *testing.T) {
 			},
 		},
 		{
-			// HTTP protocol -> the non-REST ("else") branch. The REST branch
-			// has no demo fixture witness (all demo apigw rows are HTTP or
-			// WEBSOCKET) — see TestConsoleURL_Apigw_RestProtocolBranch below
-			// for a synthetic-row test of that branch.
+			// HTTP protocol takes the non-REST branch; no demo apigw row is REST, so
+			// TestConsoleURL_Apigw_RestProtocolBranch covers that branch with a
+			// synthetic row.
 			name: "apigw (HTTP, else branch)", shortName: "apigw", pickID: "abc123def4",
 			want: func(row resource.Resource) string {
 				return fmt.Sprintf("https://%s.console.aws.amazon.com/apigateway/main/api-detail?api=%s&region=%s", r, row.ID, r)
@@ -590,10 +574,6 @@ func TestConsoleURL_PerType(t *testing.T) {
 	}
 }
 
-// ─── waf: REGIONAL vs CLOUDFRONT branch (region is NOT us-east-1, to prove
-// the CLOUDFRONT branch truly hardcodes us-east-1 rather than merely
-// echoing back whatever region happened to be passed in) ───────────────────
-
 func TestConsoleURL_Waf_RegionalUsesGivenRegion(t *testing.T) {
 	clients := demo.NewServiceClients()
 	rows := consoleURLRows(t, clients, "waf")
@@ -614,8 +594,8 @@ func TestConsoleURL_Waf_CloudfrontForcesUsEast1RegardlessOfSessionRegion(t *test
 	row := consoleURLRowByID(t, rows, "a1b2c3d4-5678-90ab-cdef-222222222222") // acme-cloudfront-waf, scope=CLOUDFRONT
 
 	td := consoleURLTypeDef(t, "waf")
-	// Session region is eu-west-1 — the CLOUDFRONT branch must still force
-	// us-east-1 in both host and query, per spec.
+	// The CLOUDFRONT branch forces us-east-1 in both host and query whatever the
+	// session region.
 	got := td.ConsoleURL(row, "eu-west-1", consoleTestAccountID)
 	want := fmt.Sprintf("https://us-east-1.console.aws.amazon.com/wafv2-pro/protections/%s/%s?panel=protectionPackHome&region=us-east-1&scope=global",
 		url.PathEscape(row.Name), row.ID)
@@ -624,17 +604,8 @@ func TestConsoleURL_Waf_CloudfrontForcesUsEast1RegardlessOfSessionRegion(t *test
 	}
 }
 
-// ─── apigw: REST protocol branch (no demo fixture reaches it — synthetic row) ─
-
-// ─── dbc: neptune engine prefix has its own console home, never RDS and
-// never the GoView ARN-resolver fallback (no per-cluster deep link exists
-// for Neptune — the switch's neptune case ignores r.ID entirely) ───────────
-
-// TestConsoleURL_Dbc_NeptuneEngine_UsesNeptuneHome pins the third branch of
-// dbc's engine-prefix switch (core/aws/catalog_databases.go): an engine
-// value starting with "neptune" must resolve to the Neptune console home,
-// not fall through to the default RDS-cluster branch (which the aurora case
-// above already proves is the non-docdb/non-neptune default).
+// An engine value starting with "neptune" resolves to the Neptune console home
+// (core/aws/catalog_databases.go); Neptune has no per-cluster deep link.
 func TestConsoleURL_Dbc_NeptuneEngine_UsesNeptuneHome(t *testing.T) {
 	td := consoleURLTypeDef(t, "dbc")
 	row := domain.Resource{
@@ -649,13 +620,9 @@ func TestConsoleURL_Dbc_NeptuneEngine_UsesNeptuneHome(t *testing.T) {
 	}
 }
 
-// TestConsoleURL_Dbc_NeptuneEngine_IgnoresIDAndNeverGoViewFallback proves two
-// things at once: (1) the neptune branch does not thread r.ID into the URL
-// at all (unlike docdb/rds), so a different ID still produces the identical
-// console-home URL; (2) td.ConsoleURL wins outright over consolelink.Resolve's
-// GoView(arn) fallback even when Fields["arn"] is populated — Resolve only
-// ever falls back to GoView when td.ConsoleURL itself returns "", and the
-// neptune branch never does.
+// The neptune branch never threads r.ID into the URL, and consolelink.Resolve
+// falls back to GoView(arn) only when td.ConsoleURL returns "", so a populated
+// Fields["arn"] never reaches the fallback.
 func TestConsoleURL_Dbc_NeptuneEngine_IgnoresIDAndNeverGoViewFallback(t *testing.T) {
 	td := consoleURLTypeDef(t, "dbc")
 	row := domain.Resource{
@@ -693,8 +660,6 @@ func TestConsoleURL_Apigw_RestProtocolBranch(t *testing.T) {
 	}
 }
 
-// ─── codeartifact: AccountFromARN fallback when domain_owner is absent ──────
-
 func TestConsoleURL_Codeartifact_AccountFallsBackToARNWhenDomainOwnerMissing(t *testing.T) {
 	td := consoleURLTypeDef(t, "codeartifact")
 	row := domain.Resource{
@@ -704,7 +669,6 @@ func TestConsoleURL_Codeartifact_AccountFallsBackToARNWhenDomainOwnerMissing(t *
 			"repo_name":   "acme-terraform",
 			"domain_name": "acme-artifacts",
 			"arn":         "arn:aws:codeartifact:us-east-1:987654321098:repository/acme-artifacts/acme-terraform",
-			// domain_owner deliberately absent.
 		},
 	}
 	got := td.ConsoleURL(row, "us-east-1", consoleTestAccountID)
@@ -713,8 +677,6 @@ func TestConsoleURL_Codeartifact_AccountFallsBackToARNWhenDomainOwnerMissing(t *
 		t.Errorf("codeartifact AccountFromARN-fallback ConsoleURL = %q, want %q", got, want)
 	}
 }
-
-// ─── Nil-safety for RawStruct-dependent builders ────────────────────────────
 
 func consoleURLNoPanic(t *testing.T, shortName string, r domain.Resource) string {
 	t.Helper()
@@ -727,13 +689,9 @@ func consoleURLNoPanic(t *testing.T, shortName string, r domain.Resource) string
 	return td.ConsoleURL(r, "us-east-1", consoleTestAccountID)
 }
 
-// TestConsoleURL_NilSafety_MissingFieldsReturnsEmpty covers the negative
-// half of the RawStruct-to-Fields migration contract: ecs-svc, elb, cfn, and
-// eb all now read their identifying ARN from r.Fields (RawStruct doesn't
-// survive the on-disk cache, so Fields is the single truth source) instead
-// of a RawStruct type assertion. A Resource missing the required Fields key
-// (nil RawStruct here too, since neither is consulted for identity anymore)
-// must still return "" and never panic.
+// RawStruct does not survive the on-disk cache, so ecs-svc, elb, cfn and eb
+// read their identifying ARN from r.Fields; a Resource missing that key must
+// return "" and never panic.
 func TestConsoleURL_NilSafety_MissingFieldsReturnsEmpty(t *testing.T) {
 	cases := []struct {
 		shortName string
@@ -751,11 +709,8 @@ func TestConsoleURL_NilSafety_MissingFieldsReturnsEmpty(t *testing.T) {
 	}
 }
 
-// TestConsoleURL_NilSafety_PopulatedFieldsResolvesWithNilRawStruct covers the
-// positive half of the same contract: since RawStruct doesn't survive the
-// on-disk cache, a cache-loaded Resource always has RawStruct == nil — the
-// whole point of the migration is that ConsoleURL must still resolve for
-// such a row as long as its Fields carry the identifying ARN.
+// A cache-loaded Resource always has RawStruct == nil, so ConsoleURL must
+// resolve from Fields alone.
 func TestConsoleURL_NilSafety_PopulatedFieldsResolvesWithNilRawStruct(t *testing.T) {
 	cases := []struct {
 		shortName string
@@ -771,13 +726,7 @@ func TestConsoleURL_NilSafety_PopulatedFieldsResolvesWithNilRawStruct(t *testing
 				url.QueryEscape("arn:aws:ecs:us-east-1:123456789012:service/my-cluster/my-svc") + "&region=us-east-1",
 		},
 		{
-			// elb reads Fields["load_balancer_arn"], not "arn" — that
-			// duplicate key was deliberately removed for a single truth
-			// source (core/aws/elb.go / catalog_networking.go). This is
-			// also the exact shape an old cached row carries: it was
-			// written before "arn" ever existed, so a resolver that
-			// depended on "arn" would silently break every pre-existing
-			// cache file.
+			// elb reads Fields["load_balancer_arn"]; an elb row carries no "arn" key.
 			shortName: "elb",
 			resource: domain.Resource{ID: "elb-cached", RawStruct: nil, Fields: map[string]string{
 				"load_balancer_arn": "arn:aws:elasticloadbalancing:us-east-1:123456789012:loadbalancer/app/my-lb/abc123",
@@ -809,8 +758,6 @@ func TestConsoleURL_NilSafety_PopulatedFieldsResolvesWithNilRawStruct(t *testing
 		}
 	}
 }
-
-// ─── Hostile-input encoding: spaces, unicode, slashes ───────────────────────
 
 func TestConsoleURL_HostileInput_AlarmNameEncoding(t *testing.T) {
 	td := consoleURLTypeDef(t, "alarm")
@@ -844,14 +791,9 @@ func TestConsoleURL_HostileInput_SecretsNameEncoding(t *testing.T) {
 	}
 }
 
-// ─── Incomplete-row hardening ───────────────────────────────────────────────
-//
-// A related-panel stub/ID-only resource (no StubCreator registered for its
-// type) carries just ID+Type — Name and Fields are zero-valued.
-// waf/codeartifact/dbc's builders guard explicitly and return "" rather than
-// guess a URL (dbc defaulting to the RDS console for an empty engine) or
-// build an empty path segment (waf/codeartifact with an empty
-// Name/domain_name).
+// A related-panel stub for a type with no StubCreator carries just ID+Type.
+// The waf, codeartifact and dbc builders return "" for it rather than guess a
+// URL or build an empty path segment.
 
 func TestConsoleURL_IncompleteRow_Waf_EmptyNameOrScopeReturnsEmpty(t *testing.T) {
 	td := consoleURLTypeDef(t, "waf")
@@ -872,9 +814,8 @@ func TestConsoleURL_IncompleteRow_Waf_EmptyNameOrScopeReturnsEmpty(t *testing.T)
 
 func TestConsoleURL_IncompleteRow_Codeartifact_EmptyDomainNameReturnsEmpty(t *testing.T) {
 	td := consoleURLTypeDef(t, "codeartifact")
-	// domain_owner and arn are present (account resolves fine) — only
-	// domain_name is missing, which must not build a URL with an empty path
-	// segment ("d/123456789012//r/my-repo").
+	// An empty domain_name must not build a URL with an empty path segment
+	// ("d/123456789012//r/my-repo").
 	row := domain.Resource{ID: "my-repo", Fields: map[string]string{
 		"domain_owner": "123456789012",
 		"domain_name":  "",
@@ -886,23 +827,15 @@ func TestConsoleURL_IncompleteRow_Codeartifact_EmptyDomainNameReturnsEmpty(t *te
 
 func TestConsoleURL_IncompleteRow_Dbc_EmptyEngineNeverGuessesRDS(t *testing.T) {
 	td := consoleURLTypeDef(t, "dbc")
-	// Before the guard, an empty engine fell through the switch's default
-	// case and produced an RDS-console URL for a resource that might not
-	// even be an RDS cluster (docdb/neptune both prefix-match "engine").
+	// docdb and neptune both prefix-match "engine", so an empty engine cannot
+	// default to the RDS console.
 	row := domain.Resource{ID: "acme-docdb-prod", Fields: map[string]string{"engine": ""}}
 	if got := td.ConsoleURL(row, "us-east-1", consoleTestAccountID); got != "" {
 		t.Errorf("dbc empty engine: ConsoleURL = %q, want \"\" (must never guess the RDS console)", got)
 	}
 }
 
-// ─── elb cache-restored shape ───────────────────────────────────────────────
-
-// TestConsoleURL_Elb_CacheRestoredShape_LoadBalancerArnOnlyResolves proves
-// the exact row shape an on-disk cache file written before this feature
-// carries: Fields["load_balancer_arn"] only, no "arn" key (that duplicate
-// was deliberately deleted for a single truth source — see
-// core/aws/elb.go). A resolver that regressed to reading Fields["arn"]
-// would silently break ConsoleURL for every already-cached elb row.
+// A cached elb row carries Fields["load_balancer_arn"] and no "arn" key.
 func TestConsoleURL_Elb_CacheRestoredShape_LoadBalancerArnOnlyResolves(t *testing.T) {
 	td := consoleURLTypeDef(t, "elb")
 	arn := "arn:aws:elasticloadbalancing:us-east-1:123456789012:loadbalancer/app/cached-lb/9876543210"
@@ -918,22 +851,10 @@ func TestConsoleURL_Elb_CacheRestoredShape_LoadBalancerArnOnlyResolves(t *testin
 	}
 }
 
-// ─── Related-panel wiring: stub rows never yield a malformed URL ───────────
-
-// TestConsoleURL_RelatedPanelStub_FieldHungryTypeYieldsNoLink is the lighter-
-// weight equivalent of driving full related-panel focus state through the
-// TUI (build a detail view, run related checks, focus the right column,
-// press "o") to reach handleOpenConsole's consoleTargetFromRelatedRow path.
-// Chose this over the full TUI drive: neither waf nor dbc registers a
-// StubCreator (confirmed via core/aws/catalog_security.go /
-// catalog_databases.go), so consoleTargetFromRelatedRow's fallback for a
-// single-ID related row is exactly domain.Resource{ID: id, Type: targetType}
-// — a bare stub with no Name and no Fields. Driving consolelink.Resolve
-// directly on that exact shape exercises the identical call
-// handleOpenConsole makes (ConsoleURL, then the Fields["arn"]/GoView
-// fallback) without needing related-checker fakes, right-column focus
-// state, or a live detail screen — the TUI scaffolding would only add
-// indirection around this same call, not additional coverage.
+// Neither waf nor dbc registers a StubCreator, so consoleTargetFromRelatedRow's
+// row for a single-ID related pivot is domain.Resource{ID: id, Type:
+// targetType}; consolelink.Resolve on that shape is the call
+// handleOpenConsole makes.
 func TestConsoleURL_RelatedPanelStub_FieldHungryTypeYieldsNoLink(t *testing.T) {
 	cases := []struct {
 		shortName string

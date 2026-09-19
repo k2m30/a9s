@@ -1,22 +1,3 @@
-// attention_details_survival_test.go — regression pins for the Wave-2
-// AttentionDetails-drop defect: structured detail rows under a resource's
-// Attention section were silently dropped in two lanes:
-//
-//  1. Controller re-apply (core/app/list_body.go's applyResourcesLoaded):
-//     when a fresh (findings-less) ResourcesLoaded result replaces a screen's
-//     rows, the re-apply-from-enrichment-store step
-//     (c.listEnrichmentFindings/c.listEnrichmentDetails ->
-//     c.applyRowFindings) must re-attach BOTH the stored Wave-2 finding AND
-//     its companion AttentionDetail rows onto the surviving RowStore-backed
-//     cache entry — not just the finding.
-//  2. Probe-lane carry (core/runtime/wave2_carry.go's
-//     carryWave2ForResources): when a fresh bare Wave-1 availability-probe
-//     result lacks its own Wave-2 finding for a resource ID, the prior
-//     RowStore row's wave2-sourced Finding AND its matching AttentionDetails
-//     entry must both carry forward — not the finding alone.
-//
-// Both pins are hermetic: A9S_CONFIG_FOLDER redirected to t.TempDir(), no AWS
-// credentials, no network. Fake profile/region/resource IDs only.
 package unit_test
 
 import (
@@ -32,18 +13,9 @@ import (
 	"github.com/k2m30/a9s/v3/core/session"
 )
 
-// ────────────────────────────────────────────────────────────────────────────
-// Pin (a) — Controller re-apply lane: applyResourcesLoaded's
-// listEnrichmentDetails re-apply step must survive a fresh-fetch replace.
-//
-// Readback seam: Core.ResourceCache(shortName) — the exported,
-// RowStore-backed cache entry that applyRowFindings' c.core.AmendRows writes
-// into (core/app/list_body.go's applyRowFindings). ListRow (the
-// Snapshot().Body.List projection) carries no AttentionDetails field, so the
-// in-memory RowStore-backed cache is the correct (and only) exported seam for
-// this assertion: AttentionDetails is in-memory-only (never on
-// cache.Row/TypeFile).
-// ────────────────────────────────────────────────────────────────────────────
+// ListRow carries no AttentionDetails field, so Core.ResourceCache is the only
+// exported seam that exposes them; AttentionDetails are in-memory only (never
+// on cache.Row/TypeFile).
 
 const (
 	attnSurvivalProfile = "attn-survival-prof"
@@ -99,9 +71,6 @@ func TestControllerReapply_AttentionDetails_SurviveFreshFetchReplace(t *testing.
 		Source:   "wave2:" + attnSurvivalType,
 	}
 
-	// --- Step 1: initial fetch carries the resource WITHOUT its own Wave-2
-	// finding yet (the real Wave-1 fetcher shape — Wave-2 lands separately via
-	// enrichment). ---
 	initial := []resource.Resource{
 		attnResource("dbi-instance-a", "available"),
 		attnResource("dbi-instance-b", "available"),
@@ -110,8 +79,6 @@ func TestControllerReapply_AttentionDetails_SurviveFreshFetchReplace(t *testing.
 		t.Fatalf("initial ResourcesLoaded delivery: %v", err)
 	}
 
-	// --- Step 2: apply Wave-2 enrichment state carrying BOTH the finding and
-	// its AttentionDetail rows for dbi-instance-a. ---
 	details := map[string]map[domain.FindingCode]domain.AttentionDetail{
 		"dbi-instance-a": {
 			wave2Finding.Code: {
@@ -125,19 +92,10 @@ func TestControllerReapply_AttentionDetails_SurviveFreshFetchReplace(t *testing.
 		"dbi-instance-a": {wave2Finding},
 	}, details)
 
-	// ApplyEnrichmentState alone only populates the controller's own
-	// enrichmentStore/enrichmentDetails maps (core/app/list_filter.go) —
-	// it does not itself touch the RowStore-backed cache entry. The
-	// RowStore-backed row only picks up the finding/details on the NEXT
-	// ResourcesLoaded delivery, via applyResourcesLoaded's
-	// re-apply-from-enrichment-store step. That is exactly the lane under
-	// test below, so there is deliberately no RowStore assertion here.
+	// ApplyEnrichmentState only fills the controller's enrichment maps; the
+	// RowStore-backed row picks up the finding and details on the next
+	// ResourcesLoaded delivery.
 
-	// --- Step 3: a fresh fetch REPLACES the screen's rows, arriving
-	// findings-less (the common cold-boot / periodic-verify shape — Wave-1
-	// hasn't changed, Wave-2 hasn't re-run this cycle). applyResourcesLoaded's
-	// re-apply-from-enrichment-store step must re-attach both the finding AND
-	// its AttentionDetails onto the RowStore-backed cache entry. ---
 	fresh := []resource.Resource{
 		attnResource("dbi-instance-a", "available"),
 		attnResource("dbi-instance-b", "available"),
@@ -171,8 +129,6 @@ func TestControllerReapply_AttentionDetails_SurviveFreshFetchReplace(t *testing.
 		t.Errorf("post-replace dbi-instance-a.AttentionDetails[%q].Rows[0] = %+v, want {Label:Action Value:system-update Tier:~}", wave2Finding.Code, gotRow)
 	}
 
-	// Sanity: the OTHER resource (never enriched) must not have acquired
-	// AttentionDetails from anywhere.
 	rowB, ok := findDomainResource(entry.Resources, "dbi-instance-b")
 	if !ok {
 		t.Fatal("Core.ResourceCache after fresh-fetch replace missing dbi-instance-b")
@@ -206,18 +162,6 @@ func findDomainResource(rows []domain.Resource, id string) (domain.Resource, boo
 	return domain.Resource{}, false
 }
 
-// ────────────────────────────────────────────────────────────────────────────
-// Pin (b) — probe-lane carry: carryWave2ForResources (core/runtime/
-// wave2_carry.go) must carry AttentionDetails alongside the Wave-2 Finding
-// it already carries. Mirrors
-// TestHandleAvailabilityChecked_Wave2Carry_ProbeResourcesKeepFindingAndStatus
-// in runtime_wave2_carry_test.go (same harness: newSaveCacheRegressionCore,
-// RowStore.Observe seed, HandleEvent(messages.AvailabilityChecked{...})
-// delivery, RowStore.Snapshot readback), extended with AttentionDetails
-// assertions on both the carried and the NOT-carried (fresh Wave-2 data of
-// its own) cases.
-// ────────────────────────────────────────────────────────────────────────────
-
 func TestHandleAvailabilityChecked_Wave2Carry_AttentionDetailsSurviveWithFinding(t *testing.T) {
 	t.Setenv("A9S_CONFIG_FOLDER", t.TempDir())
 	c := newSaveCacheRegressionCore(t, false)
@@ -246,11 +190,8 @@ func TestHandleAvailabilityChecked_Wave2Carry_AttentionDetailsSurviveWithFinding
 			},
 		},
 	}
-	// s3-bucket-y already carries its OWN fresh Wave-2 finding + details this
-	// cycle — its data must NOT be clobbered by anything carried from a prior
-	// cycle (there is nothing prior for this ID, but this guards against a
-	// carry step that indiscriminately overwrites instead of only backfilling
-	// rows missing their own Wave-2 entry).
+	// s3-bucket-y carries its own fresh Wave-2 finding and details; the carry only
+	// backfills rows missing their own Wave-2 entry.
 	freshOwnDetailCode := domain.FindingCode("s3-encryption-disabled")
 
 	c.Session().RowStore.Observe("s3", []resource.Resource{enrichedRow}, &resource.PaginationMeta{IsTruncated: false}, session.OriginProbe, false)

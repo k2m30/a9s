@@ -31,7 +31,6 @@ func TestCTDetailSummarizeEC2_RunInstances_AllFieldsEmitted(t *testing.T) {
 		emittedKeys[r.Key] = r
 	}
 
-	// Non-navigable fields must be present and not marked navigable.
 	nonNavFields := []string{"instanceType", "keyName"}
 	for _, field := range nonNavFields {
 		r, ok := emittedKeys[field]
@@ -222,10 +221,10 @@ func TestCTDetailSummarizeEC2_UnknownEvent(t *testing.T) {
 	}
 }
 
-// TestCTDetailSummarizeEC2_RequestSection_NestedMapsRenderCompactJSON is a regression
-// test for the REQUEST-section fmt.Sprintf("%v", ...) bug: nested-map field values
-// (e.g. resourcesSet, tagSet) must render as compact JSON via jsonyaml.CompactValue,
-// not Go's default %v map dump (which surfaces as the literal substring "map[").
+// TestCTDetailSummarizeEC2_RequestSection_NestedMapsRenderCompactJSON: nested-map
+// field values (e.g. resourcesSet, tagSet) render as compact JSON via
+// jsonyaml.CompactValue, not Go's default %v map dump (the literal substring
+// "map[").
 func TestCTDetailSummarizeEC2_RequestSection_NestedMapsRenderCompactJSON(t *testing.T) {
 	params := map[string]any{
 		"resourcesSet": map[string]any{
@@ -275,9 +274,9 @@ func TestCTDetailSummarizeEC2_RequestSection_NestedMapsRenderCompactJSON(t *test
 	}
 }
 
-// TestCTDetailSummarizeEC2_RequestSection_PrimitiveSliceStaysBracketJoined is a guard
-// against over-fixing the nested-map bug: a slice of primitives (no maps inside) must
-// keep rendering as the existing bracket-joined form, not get routed through compact JSON.
+// TestCTDetailSummarizeEC2_RequestSection_PrimitiveSliceStaysBracketJoined: a slice
+// of primitives (no maps inside) renders bracket-joined, not through compact
+// JSON.
 func TestCTDetailSummarizeEC2_RequestSection_PrimitiveSliceStaysBracketJoined(t *testing.T) {
 	params := map[string]any{
 		"genericList": []any{"a", "b"},

@@ -1,9 +1,5 @@
 package unit
 
-// codex2_session_findings_test.go — one cache directory name per
-// profile/region pair, no lane that answers "clean" for a call that failed,
-// one policy parser, one AWS error-code table.
-
 import (
 	"context"
 	"errors"
@@ -30,12 +26,9 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// ─── Finding 2 — EncodePathElem leaves a boundary hyphen ────────────────────
-
-// TestEncodePathElem_BoundaryHyphenCannotCollide pins injectivity at the one
-// place the "--" joiner can be forged: a trailing hyphen on the profile or a
-// leading hyphen on the region. Both pairs would otherwise join to
-// "team---us-east-1" and share one cache directory.
+// The "--" joiner can be forged by a trailing hyphen on the profile or a
+// leading hyphen on the region: both pairs would join to "team---us-east-1"
+// and share one cache directory.
 func TestEncodePathElem_BoundaryHyphenCannotCollide(t *testing.T) {
 	root := t.TempDir()
 	a := cache.DirIn(root, "team-", "us-east-1")
@@ -47,9 +40,8 @@ func TestEncodePathElem_BoundaryHyphenCannotCollide(t *testing.T) {
 	}
 }
 
-// TestEncodePathElem_OrdinaryNamesPassThroughUnchanged pins the other half of
-// the rule: an ordinary profile and region keep the directory name (and so
-// the cache content) they already have on disk.
+// An ordinary profile and region keep the directory name, and so the cache
+// content, already on disk.
 func TestEncodePathElem_OrdinaryNamesPassThroughUnchanged(t *testing.T) {
 	root := t.TempDir()
 	for _, tc := range [][2]string{
@@ -64,16 +56,12 @@ func TestEncodePathElem_OrdinaryNamesPassThroughUnchanged(t *testing.T) {
 	}
 }
 
-// ─── Finding 1 — the legacy sanitized-dir fallback is non-injective ─────────
-
-// TestLoadDirIn_TransformedPairNeverInheritsALegacyDirectory pins finding 1:
-// profile "team/a" sanitizes to "team_a", which is also the encoded name of
-// the DIFFERENT profile "team_a". Reading the legacy directory hands one
+// Profile "team/a" sanitizes to "team_a", which is also the encoded name of the
+// different profile "team_a"; reading the sanitized directory would hand one
 // pair's cached rows to another.
 func TestLoadDirIn_TransformedPairNeverInheritsALegacyDirectory(t *testing.T) {
 	root := t.TempDir()
 
-	// The legacy directory, written as profile "team_a" — a real, different pair.
 	owner := cache.LoadDirIn(root, "team_a", "us-east-1")
 	owner.Put("ec2", cache.TypeFile{HasResources: true, Count: 7, Exact: true, SavedAt: time.Now()})
 	if err := owner.SaveType("ec2"); err != nil {
@@ -88,8 +76,6 @@ func TestLoadDirIn_TransformedPairNeverInheritsALegacyDirectory(t *testing.T) {
 			"team/a", "team_a", tf.Count)
 	}
 }
-
-// ─── Finding 3 — a denied inline-policy call renders the role clean ─────────
 
 type codex2RoleFake struct {
 	roles     []iamtypes.Role
@@ -152,10 +138,9 @@ func codex2Role(name string) iamtypes.Role {
 	}
 }
 
-// TestIAMRoles_DeniedListRolePoliciesIsNotAnEmptyScan pins finding 3: the
-// role's inline policies were never read, so the role's policy-derived facts
-// are unknown and the page carries a partial error. The old code returned an
-// empty scan, which renders the role inspected and clean.
+// A refused ListRolePolicies leaves the role's policy-derived facts unknown, so
+// the page carries a partial error instead of an empty scan that renders the
+// role inspected and clean.
 func TestIAMRoles_DeniedListRolePoliciesIsNotAnEmptyScan(t *testing.T) {
 	fake := &codex2RoleFake{
 		roles:   []iamtypes.Role{codex2Role("acme-deploy-role")},
@@ -176,9 +161,8 @@ func TestIAMRoles_DeniedListRolePoliciesIsNotAnEmptyScan(t *testing.T) {
 	}
 }
 
-// TestIAMRoles_DeniedGetRolePolicyIsNotAPartialScan pins the sibling case:
-// one of two GetRolePolicy calls is refused, so the resource list a9s built
-// is incomplete and must not read as the role's whole policy surface.
+// One of two GetRolePolicy calls refused leaves the resource list incomplete;
+// it must not read as the role's whole policy surface.
 func TestIAMRoles_DeniedGetRolePolicyIsNotAPartialScan(t *testing.T) {
 	fake := &codex2RoleFake{
 		roles:    []iamtypes.Role{codex2Role("acme-deploy-role")},
@@ -200,8 +184,6 @@ func TestIAMRoles_DeniedGetRolePolicyIsNotAPartialScan(t *testing.T) {
 	}
 }
 
-// TestIAMRoles_ReadableInlinePoliciesStillReportPrivEsc is the negative
-// control: nothing failed, so the scan is complete and the finding lands.
 func TestIAMRoles_ReadableInlinePoliciesStillReportPrivEsc(t *testing.T) {
 	fake := &codex2RoleFake{
 		roles:    []iamtypes.Role{codex2Role("acme-deploy-role")},
@@ -230,8 +212,6 @@ func codex2HasCode(fs []domain.Finding, code domain.FindingCode) bool {
 	return false
 }
 
-// ─── Finding 4 — a cut account-wide walk leaves a sighted row unanswered ────
-
 type codex2BackupFake struct {
 	awsclient.BackupAPI
 	page  []backuptypes.BackupJob
@@ -245,9 +225,8 @@ func (f *codex2BackupFake) ListBackupJobs(_ context.Context, _ *backup.ListBacku
 	return &backup.ListBackupJobsOutput{BackupJobs: f.page, NextToken: aws.String("more")}, nil
 }
 
-// TestBackupJobs_CutWalkLeavesASightedPlanUninspected pins finding 4: a plan
-// seen on page 1 with a healthy job is NOT answered when the walk is cut —
-// its failed job may sit on a page nobody read.
+// A plan seen on page 1 with a healthy job is not answered when the walk is
+// cut: its failed job may sit on a page nobody read.
 func TestBackupJobs_CutWalkLeavesASightedPlanUninspected(t *testing.T) {
 	const planID = "acme-render-plan-0000-1111-2222-333333333333"
 	now := time.Now()
@@ -272,8 +251,6 @@ func TestBackupJobs_CutWalkLeavesASightedPlanUninspected(t *testing.T) {
 	}
 }
 
-// TestBackupJobs_CompletedWalkAnswersEveryPlan is the negative control: a
-// walk that reached the last page answers for every plan on screen.
 func TestBackupJobs_CompletedWalkAnswersEveryPlan(t *testing.T) {
 	const planID = "acme-render-plan-0000-1111-2222-333333333333"
 	now := time.Now()
@@ -302,8 +279,6 @@ func (f *codex2BackupOnePageFake) ListBackupJobs(_ context.Context, _ *backup.Li
 	return &backup.ListBackupJobsOutput{BackupJobs: f.jobs}, nil
 }
 
-// ─── Finding 5 — the public-snapshot cap sets only the aggregate flag ───────
-
 type codex2SnapFake struct {
 	awsclient.EC2API
 	public []ec2types.Snapshot
@@ -320,8 +295,7 @@ func (f *codex2SnapFake) DescribeSnapshots(_ context.Context, in *ec2.DescribeSn
 	return &ec2.DescribeSnapshotsOutput{}, nil
 }
 
-// TestEBSSnapPublic_CutWalkMarksTheUnansweredSnapshot pins finding 5: the
-// public-snapshot walk stopped at its cap, so a snapshot the walked pages
+// When the public-snapshot walk stops at its cap, a snapshot the walked pages
 // never named is unknown, not private.
 func TestEBSSnapPublic_CutWalkMarksTheUnansweredSnapshot(t *testing.T) {
 	snap := pw1Snapshot("snap-0unanswered0aa1", "vol-0aaaa1111bbbb2222")
@@ -347,8 +321,6 @@ func TestEBSSnapPublic_CutWalkMarksTheUnansweredSnapshot(t *testing.T) {
 	}
 }
 
-// ─── Finding 6 — a second, array-only admin detector ────────────────────────
-
 type codex2PolicyFake struct {
 	awsclient.IAMAPI
 	doc string
@@ -368,10 +340,7 @@ func (f *codex2PolicyFake) GetPolicyVersion(_ context.Context, _ *iam.GetPolicyV
 	}}, nil
 }
 
-// TestIAMPolicyAdmin_SingleObjectStatementIsAdmin pins finding 6: AWS accepts
-// a bare Statement object as well as an array. The local detector read only
-// the array form, so an admin policy written the other legal way was missed
-// by the very check iampolicy.Document.IsAdmin already answers.
+// AWS accepts a bare Statement object as well as an array.
 func TestIAMPolicyAdmin_SingleObjectStatementIsAdmin(t *testing.T) {
 	const arn = "arn:aws:iam::123456789012:policy/acme-admin"
 	const doc = `{"Version":"2012-10-17","Statement":{"Effect":"Allow","Action":"*","Resource":"*"}}`
@@ -389,10 +358,7 @@ func TestIAMPolicyAdmin_SingleObjectStatementIsAdmin(t *testing.T) {
 	}
 }
 
-// ─── Finding 7 — the vpce full-access finding ignores Resource ──────────────
-
-// TestVPCEPolicyOpen_BucketScopedWildcardIsNotFullAccess pins finding 7: a
-// wildcard principal and a wildcard action confined to ONE bucket is not the
+// A wildcard principal and a wildcard action confined to one bucket is not the
 // unrestricted default policy AWS attaches to a new endpoint.
 func TestVPCEPolicyOpen_BucketScopedWildcardIsNotFullAccess(t *testing.T) {
 	const doc = `{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":"*","Action":"*","Resource":["arn:aws:s3:::acme-reports","arn:aws:s3:::acme-reports/*"]}]}`
@@ -406,11 +372,8 @@ func TestVPCEPolicyOpen_BucketScopedWildcardIsNotFullAccess(t *testing.T) {
 	}
 }
 
-// ─── Finding 8 — PowerUserAccess is not administrator-equivalent ────────────
-
-// TestAdminManagedPolicySet_ExcludesPowerUserAccess pins finding 8: AWS's own
-// definition of PowerUserAccess excludes IAM, Organizations and Account
-// management, so a principal holding only it is not an administrator.
+// AWS's own definition of PowerUserAccess excludes IAM, Organizations and
+// Account management, so a principal holding only it is not an administrator.
 func TestAdminManagedPolicySet_ExcludesPowerUserAccess(t *testing.T) {
 	powerUser := []iamtypes.AttachedPolicy{{
 		PolicyName: aws.String("PowerUserAccess"),
@@ -430,15 +393,11 @@ func TestAdminManagedPolicySet_ExcludesPowerUserAccess(t *testing.T) {
 	}
 }
 
-// ─── Finding 9 — two AWS error-code lists ───────────────────────────────────
-
 func codex2APIErr(code string) error {
 	return &smithy.GenericAPIError{Code: code, Message: "synthetic " + code}
 }
 
-// TestErrClass_ReadsTheSameCodeTableAsTheRetryClassifier pins finding 9:
-// SlowDown is retryable in ClassifyAWSError but classified as a generic error
-// by ErrClass, and UnauthorizedOperation is EC2's spelling of access denied.
+// UnauthorizedOperation is EC2's spelling of access denied.
 func TestErrClass_ReadsTheSameCodeTableAsTheRetryClassifier(t *testing.T) {
 	for _, tc := range []struct{ code, want string }{
 		{"SlowDown", awsclient.ClassThrottled},
@@ -463,8 +422,7 @@ func TestErrClass_ReadsTheSameCodeTableAsTheRetryClassifier(t *testing.T) {
 	}
 }
 
-// TestErrClass_RetryClassifierAgreesOnSlowDown pins the other reader of the
-// one table: a class of "throttled" and a retryable verdict are the same fact.
+// A class of "throttled" and a retryable verdict are the same fact.
 func TestErrClass_RetryClassifierAgreesOnSlowDown(t *testing.T) {
 	for _, code := range []string{"SlowDown", "Throttling", "ThrottlingException", "TooManyRequestsException", "RequestLimitExceeded"} {
 		_, _, retryable := awsclient.ClassifyAWSError(codex2APIErr(code))
@@ -480,9 +438,6 @@ func TestErrClass_RetryClassifierAgreesOnSlowDown(t *testing.T) {
 	}
 }
 
-// TestSweepTitle_AllDeniedReadsAsAccessDenied pins the operator-facing end of
-// the same table: an account-wide sweep in which every probe was refused with
-// EC2's spelling says "access denied", not "error".
 func TestSweepTitle_AllDeniedReadsAsAccessDenied(t *testing.T) {
 	word := awsclient.RowWord(awsclient.ErrClass(codex2APIErr("UnauthorizedOperation")))
 	if got := awsclient.SweepTitleForWord(word); got != "sweep: access denied" {
@@ -490,11 +445,9 @@ func TestSweepTitle_AllDeniedReadsAsAccessDenied(t *testing.T) {
 	}
 }
 
-// ─── Finding 10 — the overlap script's branch→file name is non-injective ────
-
-// TestTaskFileOverlapScript_DistinctBranchesGetDistinctFiles pins finding 10:
-// "task/a_b" and "task_a/b" both map to "task_a_b", so one branch's file list
-// overwrites the other's and the clash rule reports PASS on a real overlap.
+// "task/a_b" and "task_a/b" must map to distinct files, or one branch's file
+// list overwrites the other's and the clash rule reports PASS on a real
+// overlap.
 func TestTaskFileOverlapScript_DistinctBranchesGetDistinctFiles(t *testing.T) {
 	if _, err := exec.LookPath("git"); err != nil {
 		t.Skip("git not available")
@@ -561,11 +514,8 @@ func TestTaskFileOverlapScript_DistinctBranchesGetDistinctFiles(t *testing.T) {
 	}
 }
 
-// ─── the title fallback ranges over a map with case-duplicate keys ───
-
-// TestExtractCellValue_CaseDuplicateFieldKeysAreDeterministic: two Fields
-// keys differing only by case both satisfy the EqualFold match, so the cell
-// must not depend on which key Go's map iteration reaches first.
+// Two Fields keys differing only by case both satisfy the EqualFold match, so
+// the cell must not depend on Go's map iteration order.
 func TestExtractCellValue_CaseDuplicateFieldKeysAreDeterministic(t *testing.T) {
 	col := app.ColumnDef{Title: "Time"}
 	r := resource.Resource{

@@ -12,10 +12,6 @@ import (
 )
 
 // TestRelated_APIGW_Registered verifies all related defs are registered with correct checker presence.
-// waf was removed along with its registration (checkApigwWAF was hardcoded
-// to State: RelatedUnknown for any real fixture); see
-// qa_demo_pivot_coverage_test.go's knownDisconnectedPivots terminal-state
-// comment for the burn-down precedent this deletion follows.
 func TestRelated_APIGW_Registered(t *testing.T) {
 	defs := resource.GetRelated("apigw")
 	if len(defs) == 0 {
@@ -198,13 +194,6 @@ func TestRelated_APIGW_Lambda_EmptyInput(t *testing.T) {
 		t.Errorf("Count = %d, want 0 (empty API id)", result.Count())
 	}
 }
-
-// apigw:waf (checkApigwWAF) was removed along with its registration: it was
-// hardcoded to State: RelatedUnknown whenever res.ID != "" (i.e. always, for any real
-// fixture) — Web ACL associations are only resolvable from the WAF side via
-// ListResourcesForWebACL, outside this checker's call budget. See
-// qa_demo_pivot_coverage_test.go's knownDisconnectedPivots terminal-state
-// comment for the burn-down precedent this deletion follows.
 
 // ---------------------------------------------------------------------------
 // checkApigwKMS tests (Pattern C: GetIntegrations + GetFunction per Lambda).

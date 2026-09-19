@@ -8,8 +8,6 @@ import (
 	"github.com/k2m30/a9s/v3/core/semantics/ctevent"
 )
 
-// ---------- helpers ----------
-
 func sectionNames(sections []ctevent.Section) []string {
 	names := make([]string, len(sections))
 	for i, s := range sections {
@@ -66,8 +64,6 @@ func minimalEvent() *ctevent.Event {
 	}
 }
 
-// ---------- 1. Section ordering ----------
-
 func TestCTDetailBuildSections_SectionOrdering_SuccessfulApiCall(t *testing.T) {
 	event := minimalEvent()
 	event.RequestParameters = map[string]any{"filter": "running"}
@@ -80,14 +76,12 @@ func TestCTDetailBuildSections_SectionOrdering_SuccessfulApiCall(t *testing.T) {
 	}
 
 	names := sectionNames(sections)
-	// Must not contain ERROR (no errorCode)
 	for _, n := range names {
 		if n == ctevent.SectionError {
 			t.Errorf("unexpected ERROR section when errorCode is empty; got sections: %v", names)
 		}
 	}
 
-	// Ordering of present sections: ACTOR before ACTION before CONTEXT
 	order := map[string]int{}
 	for i, n := range names {
 		order[n] = i
@@ -121,27 +115,23 @@ func TestCTDetailBuildSections_SectionOrdering_WithError(t *testing.T) {
 		order[n] = i
 	}
 
-	// ERROR must be present
 	errIdx, errOK := order[ctevent.SectionError]
 	if !errOK {
 		t.Fatalf("ERROR section missing when errorCode is set; got: %v", names)
 	}
 
-	// ERROR must come after CONTEXT
 	if ctxIdx, ctxOK := order[ctevent.SectionContext]; ctxOK {
 		if errIdx <= ctxIdx {
 			t.Errorf("ERROR (idx %d) must come after CONTEXT (idx %d); got sections: %v", errIdx, ctxIdx, names)
 		}
 	}
 
-	// ERROR must come before REQUEST (if present)
 	if reqIdx, reqOK := order[ctevent.SectionRequest]; reqOK {
 		if errIdx >= reqIdx {
 			t.Errorf("ERROR (idx %d) must come before REQUEST (idx %d); got sections: %v", errIdx, reqIdx, names)
 		}
 	}
 
-	// ERROR must come before RESPONSE (if present)
 	if respIdx, respOK := order[ctevent.SectionResponse]; respOK {
 		if errIdx >= respIdx {
 			t.Errorf("ERROR (idx %d) must come before RESPONSE (idx %d); got sections: %v", errIdx, respIdx, names)
@@ -150,7 +140,6 @@ func TestCTDetailBuildSections_SectionOrdering_WithError(t *testing.T) {
 }
 
 func TestCTDetailBuildSections_SectionOrdering_FullOrder(t *testing.T) {
-	// Build an event that should produce all 7 sections.
 	event := minimalEvent()
 	event.ErrorCode = "SomeError"
 	event.ErrorMessage = "some error message"
@@ -163,7 +152,6 @@ func TestCTDetailBuildSections_SectionOrdering_FullOrder(t *testing.T) {
 		t.Fatal("BuildSections returned nil")
 	}
 
-	// Define canonical order and check any present sections follow it.
 	canonicalOrder := []string{
 		ctevent.SectionActor,
 		ctevent.SectionAction,
@@ -191,8 +179,6 @@ func TestCTDetailBuildSections_SectionOrdering_FullOrder(t *testing.T) {
 	}
 }
 
-// ---------- 2. ERROR hoist position ----------
-
 func TestCTDetailBuildSections_ErrorHoist_OnlyWhenErrorCodeSet(t *testing.T) {
 	t.Run("no error code - no ERROR section", func(t *testing.T) {
 		event := minimalEvent()
@@ -217,14 +203,11 @@ func TestCTDetailBuildSections_ErrorHoist_OnlyWhenErrorCodeSet(t *testing.T) {
 		if !ok {
 			t.Fatal("ERROR section missing when errorCode is set")
 		}
-		// Must have errorCode row
 		if _, rowOK := findRow(errSec.Rows, "errorCode"); !rowOK {
 			t.Error("ERROR section missing errorCode row")
 		}
 	})
 }
-
-// ---------- 3. Empty section omission ----------
 
 func TestCTDetailBuildSections_EmptySectionOmission_NoResponseElements(t *testing.T) {
 	event := minimalEvent()
@@ -261,14 +244,12 @@ func TestCTDetailBuildSections_EmptySectionOmission_NoRequest(t *testing.T) {
 	if sections == nil {
 		t.Fatal("BuildSections returned nil")
 	}
-	// With no requestParameters there's nothing to summarize → REQUEST omitted
 	if _, ok := findSection(sections, ctevent.SectionRequest); ok {
 		t.Error("REQUEST section present when requestParameters is nil")
 	}
 }
 
 func TestCTDetailBuildSections_NonNilReturn(t *testing.T) {
-	// Even a completely empty/degenerate event must return non-nil.
 	event := &ctevent.Event{
 		EventID:       "e-degenerate",
 		EventCategory: "Management",
@@ -279,8 +260,6 @@ func TestCTDetailBuildSections_NonNilReturn(t *testing.T) {
 		t.Fatal("BuildSections must return non-nil slice (contract: possibly empty, never nil)")
 	}
 }
-
-// ---------- 4. Insight events omit ACTOR ----------
 
 func TestCTDetailBuildSections_InsightOmitsActor(t *testing.T) {
 	event := &ctevent.Event{
@@ -294,7 +273,7 @@ func TestCTDetailBuildSections_InsightOmitsActor(t *testing.T) {
 		AccountID:          "999999999999",
 		RecipientAccountID: "999999999999",
 		Verb:               "R",
-		// No UserIdentity ARN → should produce no ACTOR
+		// Insight events carry no userIdentity ARN.
 		UserIdentity: ctevent.UserIdentity{},
 		InsightDetails: &ctevent.InsightDetails{
 			State:       "Start",
@@ -313,14 +292,11 @@ func TestCTDetailBuildSections_InsightOmitsActor(t *testing.T) {
 		t.Error("Insight event MUST NOT have ACTOR section")
 	}
 
-	// Must start with ACTION
 	if len(sections) == 0 || sections[0].Name != ctevent.SectionAction {
 		names := sectionNames(sections)
 		t.Errorf("Insight event must start with ACTION; got sections: %v", names)
 	}
 }
-
-// ---------- 5. AwsServiceEvent emits Service row in ACTOR ----------
 
 func TestCTDetailBuildSections_AwsServiceEvent_ServiceRowInActor(t *testing.T) {
 	event := &ctevent.Event{
@@ -359,13 +335,10 @@ func TestCTDetailBuildSections_AwsServiceEvent_ServiceRowInActor(t *testing.T) {
 		t.Error("Service row value must be non-empty")
 	}
 
-	// Must NOT have a Principal row (no ARN)
 	if _, principalOK := findRow(actorSec.Rows, "Principal"); principalOK {
 		t.Error("AwsServiceEvent ACTOR must not have a Principal row when no ARN is present")
 	}
 }
-
-// ---------- 6. Event row carries Severity ----------
 
 func TestCTDetailBuildSections_EventRowSeverity(t *testing.T) {
 	cases := []struct {
@@ -404,7 +377,6 @@ func TestCTDetailBuildSections_EventRowSeverity(t *testing.T) {
 }
 
 func TestCTDetailBuildSections_OnlyEventRowHasSeverity(t *testing.T) {
-	// Test all three severity tiers — no other row may have non-empty Severity.
 	statuses := []string{"ct-info", "ct-attention", "ct-danger"}
 
 	for _, status := range statuses {
@@ -434,8 +406,6 @@ func TestCTDetailBuildSections_OnlyEventRowHasSeverity(t *testing.T) {
 		})
 	}
 }
-
-// ---------- 7. Cross-account row in CONTEXT ----------
 
 func TestCTDetailBuildSections_CrossAccount_RecipientRowPresent(t *testing.T) {
 	event := minimalEvent()
@@ -485,8 +455,6 @@ func TestCTDetailBuildSections_CrossAccount_NoRecipientRowWhenSameAccount(t *tes
 		t.Error("CONTEXT must NOT contain Recipient row when accountId == recipientAccountId")
 	}
 }
-
-// ---------- 8. MFA row only when true ----------
 
 func TestCTDetailBuildSections_MFARow_OnlyWhenTrue(t *testing.T) {
 	t.Run("mfa true - row present", func(t *testing.T) {
@@ -555,10 +523,7 @@ func TestCTDetailBuildSections_MFARow_OnlyWhenTrue(t *testing.T) {
 	})
 }
 
-// ---------- 9. Drop-boring-defaults ----------
-
 func TestCTDetailBuildSections_DroppedBoringKeys(t *testing.T) {
-	// These keys must never appear in any section regardless of input.
 	neverKeys := []string{"Verb", "Read only", "Identity type", "Source"}
 
 	event := minimalEvent()
@@ -600,8 +565,6 @@ func TestCTDetailBuildSections_NoStandaloneAccountRow(t *testing.T) {
 		}
 	}
 }
-
-// ---------- 10. Wireframe cases A–I ----------
 
 func TestCTDetailBuildSections_WireframeCases(t *testing.T) {
 	type sectionCheck struct {
@@ -935,26 +898,22 @@ func TestCTDetailBuildSections_WireframeCases(t *testing.T) {
 
 			names := sectionNames(sections)
 
-			// Check expected sections are present
 			for _, exp := range tc.expectSections {
 				if _, ok := findSection(sections, exp); !ok {
 					t.Errorf("expected section %s not found; got sections: %v", exp, names)
 				}
 			}
 
-			// Check sections that must NOT be present
 			for _, no := range tc.noSections {
 				if _, ok := findSection(sections, no); ok {
 					t.Errorf("section %s must not be present; got sections: %v", no, names)
 				}
 			}
 
-			// Check first section
 			if tc.firstSection != "" && len(sections) > 0 && sections[0].Name != tc.firstSection {
 				t.Errorf("first section = %q; want %q; got sections: %v", sections[0].Name, tc.firstSection, names)
 			}
 
-			// Check specific rows
 			for _, chk := range tc.checks {
 				sec, ok := findSection(sections, chk.sectionName)
 				if !ok {
@@ -978,7 +937,6 @@ func TestCTDetailBuildSections_WireframeCases(t *testing.T) {
 				}
 			}
 
-			// For all cases: verify only ACTION/Event row has Severity set
 			for _, sec := range sections {
 				for _, row := range sec.Rows {
 					isEventRow := sec.Name == ctevent.SectionAction && strings.Contains(row.Key, "Event")
@@ -988,7 +946,6 @@ func TestCTDetailBuildSections_WireframeCases(t *testing.T) {
 				}
 			}
 
-			// For cases with errorCode: verify ERROR comes after CONTEXT and before REQUEST/RESPONSE
 			if tc.event.ErrorCode != "" {
 				order := map[string]int{}
 				for i, n := range names {
@@ -1010,17 +967,8 @@ func TestCTDetailBuildSections_WireframeCases(t *testing.T) {
 	}
 }
 
-// ---------- Regression: ERROR hoist position (FR-005 / design §2.5) ----------
-
-// TestCTDetailBuildSections_Regression_ErrorHoistPosition is a named regression
-// guard for the ERROR section hoist contract: ERROR must always sit after CONTEXT
-// and before REQUEST/RESPONSE.  The name anchors future changes to FR-005 so that
-// if TestCTDetailBuildSections_SectionOrdering_WithError is ever refactored away,
-// this explicit contract survives.
 func TestCTDetailBuildSections_Regression_ErrorHoistPosition(t *testing.T) {
 	t.Run("RequestPresent", func(t *testing.T) {
-		// Event with ErrorCode set, non-empty requestParameters (non-TARGET keys
-		// survive de-dup so REQUEST section is produced), and non-nil responseElements.
 		event := minimalEvent()
 		event.ErrorCode = "AccessDenied"
 		event.ErrorMessage = "User is not authorized"
@@ -1074,9 +1022,6 @@ func TestCTDetailBuildSections_Regression_ErrorHoistPosition(t *testing.T) {
 	})
 
 	t.Run("RequestAbsent", func(t *testing.T) {
-		// Event with ErrorCode set, nil requestParameters, nil responseElements.
-		// REQUEST and RESPONSE must both be omitted; ERROR must be the last section
-		// and must still come after CONTEXT.
 		event := minimalEvent()
 		event.ErrorCode = "NoSuchBucket"
 		event.ErrorMessage = "The specified bucket does not exist"
@@ -1108,7 +1053,6 @@ func TestCTDetailBuildSections_Regression_ErrorHoistPosition(t *testing.T) {
 				errIdx, ctxIdx, names)
 		}
 
-		// REQUEST and RESPONSE must be absent (nil inputs → empty rows → omitted).
 		if _, reqOK := pos[ctevent.SectionRequest]; reqOK {
 			t.Errorf("regression: REQUEST section present despite nil requestParameters; sections: %v", names)
 		}
@@ -1116,7 +1060,6 @@ func TestCTDetailBuildSections_Regression_ErrorHoistPosition(t *testing.T) {
 			t.Errorf("regression: RESPONSE section present despite nil responseElements; sections: %v", names)
 		}
 
-		// ERROR must be the last section.
 		wantLastIdx := len(sections) - 1
 		if errIdx != wantLastIdx {
 			t.Errorf("regression FR-005: ERROR (idx %d) must be last section (idx %d) when REQUEST+RESPONSE absent; sections: %v",
@@ -1125,13 +1068,9 @@ func TestCTDetailBuildSections_Regression_ErrorHoistPosition(t *testing.T) {
 	})
 }
 
-// ---------- Event row value format ----------
-
 func TestCTDetailBuildSections_EventRowValue_ServiceColonEventName(t *testing.T) {
-	// ACTION Event: row value should be "<service>:<eventName>" format
 	event := minimalEvent()
 	// ec2.amazonaws.com → service prefix "ec2", event "DescribeInstances"
-	// expected value contains "ec2" and "DescribeInstances"
 
 	sections := ctevent.BuildSections(event)
 	if sections == nil {
@@ -1156,16 +1095,9 @@ func TestCTDetailBuildSections_EventRowValue_ServiceColonEventName(t *testing.T)
 	}
 }
 
-// ---------- Principal row: value + navigability by ARN type ----------
-
-// TestCTDetailBuildSections_PrincipalRow_NavigabilityByARNType is the live-seam
-// replacement for views_detail_ct_events_test.go's TestDetailViewCTEvents_
-// ActorPrincipalRow and TestDetailViewCTEvents_NavigatePrincipalRow
-// (022-codebase-cleanup wave 3, DetailModel cluster): both drove the dead
-// DetailModel.View()/Update() to indirectly probe buildActorRows' Principal
-// row. This asserts the same contract directly against BuildSections'
-// output — the Principal row's Value (full ARN), IsNavigable, TargetType,
-// and NavID (bare navigable name) per ARN shape.
+// TestCTDetailBuildSections_PrincipalRow_NavigabilityByARNType checks the
+// Principal row's Value (full ARN), IsNavigable, TargetType and NavID (bare
+// navigable name) per ARN shape.
 func TestCTDetailBuildSections_PrincipalRow_NavigabilityByARNType(t *testing.T) {
 	cases := []struct {
 		name          string
@@ -1228,11 +1160,6 @@ func TestCTDetailBuildSections_PrincipalRow_NavigabilityByARNType(t *testing.T) 
 	}
 }
 
-// ---------- Context rows: Region + Source IP values ----------
-
-// TestCTDetailBuildSections_ContextRows_RegionAndSourceIP is the live-seam
-// replacement for views_detail_ct_events_test.go's
-// TestDetailViewCTEvents_ContextRows.
 func TestCTDetailBuildSections_ContextRows_RegionAndSourceIP(t *testing.T) {
 	event := minimalEvent()
 	event.AWSRegion = "ap-southeast-2"

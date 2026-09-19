@@ -20,30 +20,8 @@ func defaultEC2RelatedDefs() []resource.RelatedDef {
 	return append([]resource.RelatedDef(nil), resource.GetRelated("ec2")...)
 }
 
-// TestBug_AllZeroRelatedRows_DoNotAllowRightColumnFocus and
-// TestBug_FirstToggleRelated_HidesAutoShownColumn (dead views.DetailModel
-// Update/View) removed — 022-codebase-cleanup wave 3, DetailModel cluster.
-// No port needed: right-column focus/toggle mechanics are covered on the
-// live controller path by app_related_cursor_skip_test.go and
-// app_related_focus_entry_test.go (cursor-skip/Tab-focus-entry), and the
-// actionability decision itself by TestIsRelatedActionable_Table
-// (rightcolumn_actionable_test.go) against resource.IsRelatedActionable —
-// isActionableRow in rightcolumn.go is a thin wrapper over that same table.
-//
-// TestBug_RightColumnFilter_SlashFiltersAndEscapeClears WAS also dropped in
-// that same cleanup with the same "covered elsewhere" claim, but nothing
-// else in the suite actually drives ActionSetFilter against a detail
-// screen's related panel end to end — app_related_cursor_skip_test.go only
-// covers dimmed-row cursor-skip, not filtering. Ported below directly
-// against the live Controller + RenderDetail seam (rightcolumn_test.go's
-// helpers, same package).
-
-// TestBug_RightColumnFilter_SlashFiltersAndEscapeClears verifies that
-// ActionSetFilter narrows the related panel to matching DisplayNames (the
-// production effect of the '/' key while the panel is focused — see
-// core/app/detail_cursor.go's ActionSetFilter case), and that clearing the
-// filter (Arg="", the effect of Escape via rs.rightCol.Update in
-// internal/tui/app_stack.go) restores every row.
+// ActionSetFilter is the '/' key's effect while the related panel is focused;
+// Arg "" is Escape's.
 func TestBug_RightColumnFilter_SlashFiltersAndEscapeClears(t *testing.T) {
 	replaceEC2Related(t, []resource.RelatedDef{
 		{TargetType: "tg", DisplayName: "Target Groups", Checker: noopChecker},
@@ -72,10 +50,6 @@ func TestBug_RightColumnFilter_SlashFiltersAndEscapeClears(t *testing.T) {
 	}
 }
 
-// TestBug_EC2DefaultDetail_ShowsAttachedEBSVolumeIDs is the live-seam
-// replacement for the dead-View()-driven original: verifies the live
-// RenderDetail path extracts a nested BlockDeviceMappings[].Ebs.VolumeId
-// from RawStruct via the ec2 view config.
 func TestBug_EC2DefaultDetail_ShowsAttachedEBSVolumeIDs(t *testing.T) {
 	ensureNoColor(t)
 
@@ -107,11 +81,6 @@ func TestBug_EC2DefaultRelatedDefinitions_IncludeEBSVolumes(t *testing.T) {
 	t.Fatal("EC2 related definitions should include EBS volumes")
 }
 
-// TestBug_AMIDetail_ShowsUsefulImageMetadata is the live-seam replacement for
-// the dead-View()-driven original: verifies the live RenderDetail path
-// extracts AMI's uncommon nested fields (Hypervisor, SriovNetSupport,
-// ImageOwnerAlias, BlockDeviceMappings[].Ebs.SnapshotId) via the ami view
-// config.
 func TestBug_AMIDetail_ShowsUsefulImageMetadata(t *testing.T) {
 	ensureNoColor(t)
 

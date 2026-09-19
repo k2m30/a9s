@@ -1,13 +1,8 @@
-// list_one_apply_point_test.go — one apply point, one stale decision, one
-// population decision.
-//
-//  4. The list view does not apply list results; a second apply point is
-//     exactly what the request sequence forbids.
-//  5. A superseded result is rejected once, by its sequence, on every lane,
-//     before the runtime's row-store write, so a superseded page never
-//     reaches the shared store.
-//  6. A seed never reports itself complete while holding fewer rows than the
-//     population its source knows.
+// The list view does not apply list results: the controller is the one apply
+// point, where the request sequence is checked. A superseded result is
+// rejected once, by its sequence, on every lane, before the runtime's
+// row-store write. A seed never reports itself complete while holding fewer
+// rows than the population its source knows.
 package unit
 
 import (
@@ -22,10 +17,6 @@ import (
 	"github.com/k2m30/a9s/v3/internal/tui/keys"
 	"github.com/k2m30/a9s/v3/internal/tui/views"
 )
-
-// ───────────────────────────────────────────────────────────────────────────
-// 4. The list view is not an apply point
-// ───────────────────────────────────────────────────────────────────────────
 
 // TestListView_DoesNotApplyResourcesLoaded pins that handing a list result
 // straight to the view changes nothing. Every list result reaches the screen
@@ -53,10 +44,6 @@ func TestListView_DoesNotApplyResourcesLoaded(t *testing.T) {
 		t.Fatalf("the list view applied a result on its own: %d rows landed on the screen, want 0", got)
 	}
 }
-
-// ───────────────────────────────────────────────────────────────────────────
-// 5. A superseded result is rejected on every lane, by its sequence alone
-// ───────────────────────────────────────────────────────────────────────────
 
 // TestListFetch_SupersededResultNeverReachesRowStore drives the headless lane,
 // where Controller.Handle runs the runtime's row-store write before its own
@@ -99,11 +86,9 @@ func TestListFetch_SupersededResultNeverReachesRowStore(t *testing.T) {
 	}
 }
 
-// TestListFetch_CtrlRResetWinsOverAnExactScreen is the case the content
-// heuristic got wrong and the sequence gets right: a list paged to an exact
-// total, then refreshed. The refresh legitimately replays page 1 — smaller,
-// still truncated, every ID already on screen — which is precisely the shape
-// the heuristic called stale. It is the newest request, so it wins.
+// A list paged to an exact total, then refreshed: the refresh legitimately
+// replays page 1 — smaller, still truncated, every ID already on screen. It is
+// the newest request by sequence, so it wins.
 func TestListFetch_CtrlRResetWinsOverAnExactScreen(t *testing.T) {
 	ctrl, _ := newDetailParityHeadlessController(t)
 
@@ -133,10 +118,6 @@ func TestListFetch_CtrlRResetWinsOverAnExactScreen(t *testing.T) {
 		t.Fatalf("after Ctrl+R the list holds %d rows, want the refresh's 3 — the reset was discarded as a stale subset", got)
 	}
 }
-
-// ───────────────────────────────────────────────────────────────────────────
-// 6. A seed never claims to be complete while it is short of the population
-// ───────────────────────────────────────────────────────────────────────────
 
 // TestListSeed_RowStoreBranchReportsTruncatedBelowPopulation covers the seed
 // branch that reads the session's own retained rows. A counts-only observation

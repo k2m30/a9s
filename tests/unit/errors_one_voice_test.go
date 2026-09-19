@@ -60,9 +60,9 @@ func TestCauseOf_ReadsTheErrorsFields(t *testing.T) {
 	})
 
 	t.Run("a message that spells RequestID keeps its words", func(t *testing.T) {
-		// A real modeled message can name a parameter called RequestID. A
-		// substring scan of the formatted chain truncated the message here;
-		// reading the message field cannot.
+		// A real modeled message can name a parameter called RequestID; a
+		// substring scan of the formatted chain would truncate it, reading the
+		// message field cannot.
 		const msg = "The parameter RequestID is required for this operation"
 		cause := awsclient.CauseOf(apiErrWithMessage("ValidationException", msg))
 		if !strings.Contains(cause, msg) {
@@ -79,10 +79,9 @@ func TestCauseOf_ReadsTheErrorsFields(t *testing.T) {
 	})
 }
 
-// TestCauseOf_EdgeCasesTheFieldsHandle pins two cases the field read has to
-// answer for itself, both found by probing the rewrite: an API error whose
-// code is empty is still a failure and must not render as none, and a message
-// that spans lines must not carry its newlines onto a one-line surface.
+// TestCauseOf_EdgeCasesTheFieldsHandle: an API error whose code is empty is
+// still a failure and must not render as none, and a message that spans lines
+// must not carry its newlines onto a one-line surface.
 func TestCauseOf_EdgeCasesTheFieldsHandle(t *testing.T) {
 	if got := awsclient.ErrClass(apiErrWithMessage("", "something broke")); got == "" {
 		t.Error("ErrClass of a coded-less API error is empty — an empty class means no failure at all, and the menu row would show its alias as if the call had worked")
@@ -257,7 +256,7 @@ func TestErrorHistory_OneShapeForEveryFailedCall(t *testing.T) {
 
 // TestCostsDrillRefusalNote_ReadsTheSharedMessage: the costs footer note
 // reads the API error's message through the same helper every other surface
-// uses, instead of its own errors.As extraction.
+// uses.
 func TestCostsDrillRefusalNote_ReadsTheSharedMessage(t *testing.T) {
 	const msg = "Resource-level data granularity is an opt-in only feature"
 	err := fmt.Errorf("%w: %w", awsclient.ErrCostsAccessDenied,
@@ -275,9 +274,8 @@ func TestCostsDrillRefusalNote_ReadsTheSharedMessage(t *testing.T) {
 }
 
 // TestAPIErrorHandler_SpeaksTheCause: the API error handler reads the cause
-// through the one formatter rather than building "[code] message" out of
-// the classifier's raw message, so a denial puts the cause on the flash and
-// in the error log, not the encoded authorization blob. One formatter, one
+// through the one formatter, so a denial puts the cause on the flash and in
+// the error log, not the encoded authorization blob. One formatter, one
 // sentence, both surfaces.
 func TestAPIErrorHandler_SpeaksTheCause(t *testing.T) {
 	c, core := newTestControllerAndCore(t)
@@ -331,9 +329,8 @@ func TestProbeBanner_SpeaksTheCauseNotTheClass(t *testing.T) {
 	}
 }
 
-// TestPrefetchBanner_SpeaksTheCause pins the third shape the widened sweep
-// found in the same file: the hard prefetch failure flashed the error's raw
-// text while the soft one, six lines below, went through the formatter.
+// TestPrefetchBanner_SpeaksTheCause: the hard prefetch failure flash goes
+// through the formatter, the same as the soft one.
 func TestPrefetchBanner_SpeaksTheCause(t *testing.T) {
 	denial := apiErrWithMessage("UnauthorizedOperation",
 		"You are not authorized to perform: ec2:DescribeInstances. Encoded authorization failure message: bV9lbmNvZGVkX21lc3NhZ2VfYmxvYg")
@@ -441,10 +438,9 @@ func TestResourceHandlers_SpeakThroughTheOneFormatter(t *testing.T) {
 		}
 	})
 
-	// The two hand-built sentences were byte-identical to the formatter's for
-	// an error the class says nothing extra about; the copies were only ever
-	// invisible because no region-gap error had reached them. Drive one and
-	// the difference shows.
+	// For an error the class says nothing extra about, a hand-built sentence
+	// matches the formatter's byte for byte; only a region-gap error tells
+	// them apart.
 	t.Run("a region gap through these sites names the region", func(t *testing.T) {
 		got := drive(t, func(core *runtime.Core) []runtime.UIIntent {
 			in, _ := core.HandleRelatedCheckResult(runtime.RelatedCheckResultEvent{
@@ -481,11 +477,11 @@ func TestRevealFailure_SpeaksTheCause(t *testing.T) {
 	}
 }
 
-// TestFailureLine_EmptySubjectLeavesNoDanglingSeparator pins what probing row
-// 6 found: three call sites build their subject as a prefix plus a type, and
-// the type can be empty — an unregistered fetch, a detail enrichment with no
-// type on its event, a related result with no target. The sentence read
-// "fetch : connection reset", a colon with nothing in front of it.
+// TestFailureLine_EmptySubjectLeavesNoDanglingSeparator: three call sites
+// build their subject as a prefix plus a type, and the type can be empty — an
+// unregistered fetch, a detail enrichment with no type on its event, a related
+// result with no target. The line must not read "fetch : connection reset", a
+// colon with nothing in front of it.
 func TestFailureLine_EmptySubjectLeavesNoDanglingSeparator(t *testing.T) {
 	c, core := newTestControllerAndCore(t)
 	intents, _ := core.HandleResourcesLoaded(runtime.ResourcesLoadedEvent{

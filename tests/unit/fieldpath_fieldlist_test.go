@@ -25,7 +25,7 @@ type testEC2State struct {
 }
 
 // ---------------------------------------------------------------------------
-// T002 — ExtractFieldList tests
+// ExtractFieldList tests
 // ---------------------------------------------------------------------------
 
 // TestExtractFieldList_ScalarField verifies that a scalar pointer field is
@@ -92,7 +92,6 @@ func TestExtractFieldList_StructField(t *testing.T) {
 		t.Fatal("expected at least 1 FieldItem for struct field, got 0")
 	}
 
-	// First item must be the header.
 	header := items[0]
 	if header.Path != "State" {
 		t.Errorf("header Path: expected %q, got %q", "State", header.Path)
@@ -104,7 +103,6 @@ func TestExtractFieldList_StructField(t *testing.T) {
 		t.Errorf("header Value: expected empty string, got %q", header.Value)
 	}
 
-	// Remaining items should be sub-fields.
 	if len(items) < 2 {
 		t.Fatalf("expected at least 2 FieldItems (header + sub-fields) for struct, got %d", len(items))
 	}
@@ -225,7 +223,6 @@ func TestExtractFieldList_MultiplePaths(t *testing.T) {
 		t.Errorf("order: VpcId (idx=%d) must come before InstanceType (idx=%d)", vpcIdx, typeIdx)
 	}
 
-	// Spot-check values.
 	for _, it := range items {
 		switch it.Path {
 		case "VpcId":

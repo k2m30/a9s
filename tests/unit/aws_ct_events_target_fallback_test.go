@@ -1,19 +1,8 @@
 package unit
 
-// Tests for Bug P2: _ct.target must fall back to LookupEvents event.Resources
-// when the embedded CloudTrailEvent JSON has no resources[] (or is nil).
-//
-// The broken code at core/aws/ct_events.go:224 calls:
-//   target := ExtractCTTarget(parsed)
-// and uses ONLY the parsed JSON. When the JSON blob is absent or has an empty
-// resources[] array, ExtractCTTarget returns "(none)" — but the LookupEvents
-// response also carries event.Resources which may have the target.
-//
-// The fix: after ExtractCTTarget returns "(none)", check event.Resources for a
-// non-empty ResourceName and use it.
-//
-// Tests CT-TF1..CT-TF4: CT-TF1 and CT-TF2 currently FAIL (return "(none)").
-// CT-TF3 and CT-TF4 are regression guards (currently PASS).
+// _ct.target falls back to LookupEvents event.Resources when the embedded
+// CloudTrailEvent JSON has no resources[] (or is nil); JSON resources[] wins
+// when present.
 
 import (
 	"context"
@@ -46,12 +35,6 @@ func buildCTEventForTargetFallback(
 	}
 }
 
-// ===========================================================================
-// CT-TF1: nil CloudTrailEvent + populated event.Resources → use LookupEvents value
-// Currently FAILS: target is "(none)" because parseCTEventJSON(nil) returns empty
-// map, ExtractCTTarget returns "(none)", and event.Resources is never checked.
-// ===========================================================================
-
 func TestCTTargetFallback_NilJSON_UsesSDKResources(t *testing.T) {
 	sdkResources := []cloudtrailtypes.Resource{
 		{
@@ -70,7 +53,6 @@ func TestCTTargetFallback_NilJSON_UsesSDKResources(t *testing.T) {
 	}
 	target := result.Resources[0].Fields["_ct.target"]
 	if target == "(none)" {
-		// Bug: ct_events.go:224 ignores event.Resources when JSON is nil
 		t.Errorf("_ct.target = %q; expected non-(none) value from event.Resources (arn:aws:s3:::demo-bucket); "+
 			"bug at ct_events.go:224 — ExtractCTTarget(parsed) never falls back to event.Resources", target)
 	}
@@ -78,12 +60,6 @@ func TestCTTargetFallback_NilJSON_UsesSDKResources(t *testing.T) {
 		t.Errorf("_ct.target is empty; expected arn:aws:s3:::demo-bucket from LookupEvents event.Resources")
 	}
 }
-
-// ===========================================================================
-// CT-TF2: JSON with empty resources[] + populated event.Resources → use LookupEvents value
-// Currently FAILS: ExtractCTTarget sees resources:[] → falls through to "(none)",
-// and event.Resources is never checked.
-// ===========================================================================
 
 func TestCTTargetFallback_EmptyJSONResources_UsesSDKResources(t *testing.T) {
 	// JSON has "resources": [] — an explicit empty array, not absent.
@@ -107,22 +83,15 @@ func TestCTTargetFallback_EmptyJSONResources_UsesSDKResources(t *testing.T) {
 	}
 	target := result.Resources[0].Fields["_ct.target"]
 	if target == "(none)" {
-		// Bug: ExtractCTTarget sees empty resources[] → falls through, event.Resources never consulted
 		t.Errorf("_ct.target = %q; expected value from event.Resources when JSON resources[] is empty; "+
 			"bug at ct_events.go:224", target)
 	}
 }
 
-// ===========================================================================
-// CT-TF3: JSON resources[] populated wins over event.Resources (regression guard)
-// JSON value must win. Currently PASSES — this is a guard against over-correction.
-// ===========================================================================
+// JSON resources[] wins over event.Resources.
 
 func TestCTTargetFallback_JSONResourcesWin_RegressionGuard(t *testing.T) {
-	// JSON has a concrete resource entry.
-	// Note: _ct.target stores the ARN-stripped value (FormatCTTarget runs at fetch time, §5).
-	// The assertion verifies JSON resources[] wins over event.Resources — the discriminating
-	// factor is the source (JSON="json-wins-bucket" vs SDK="sdk-resource-bucket"), not raw ARN.
+	// _ct.target stores the ARN-stripped value: FormatCTTarget runs at fetch time.
 	jsonWithResource := `{"eventVersion":"1.08","userIdentity":{"type":"AssumedRole","accountId":"111122223333"}` +
 		`,"eventTime":"2026-03-28T14:00:00Z","eventSource":"s3.amazonaws.com","eventName":"GetObject"` +
 		`,"awsRegion":"us-east-1","sourceIPAddress":"1.2.3.4","userAgent":"aws-cli/2.0"` +
@@ -144,8 +113,6 @@ func TestCTTargetFallback_JSONResourcesWin_RegressionGuard(t *testing.T) {
 		t.Fatalf("FetchCloudTrailEventsPage error: %v", err)
 	}
 	target := result.Resources[0].Fields["_ct.target"]
-	// FormatCTTarget strips "arn:aws:s3:::json-wins-bucket" → "json-wins-bucket" (same-account S3 ARN).
-	// The key assertion: JSON resources[] wins over event.Resources (sdk-resource-bucket must NOT appear).
 	if target != "json-wins-bucket" {
 		t.Errorf("_ct.target = %q; expected \"json-wins-bucket\" (ARN stripped per §5 from JSON resources[]); "+
 			"JSON resources[] must win over event.Resources (would yield \"sdk-resource-bucket\")", target)
@@ -154,11 +121,6 @@ func TestCTTargetFallback_JSONResourcesWin_RegressionGuard(t *testing.T) {
 		t.Errorf("_ct.target = %q; SDK event.Resources must NOT win when JSON resources[] is populated", target)
 	}
 }
-
-// ===========================================================================
-// CT-TF4: Both JSON resources[] and event.Resources are empty → "(none)" (regression guard)
-// Currently PASSES.
-// ===========================================================================
 
 func TestCTTargetFallback_BothEmpty_IsNone_RegressionGuard(t *testing.T) {
 	emptyJSON := `{"eventVersion":"1.08","userIdentity":{"type":"AssumedRole","accountId":"111122223333"}` +
@@ -182,13 +144,8 @@ func TestCTTargetFallback_BothEmpty_IsNone_RegressionGuard(t *testing.T) {
 	}
 }
 
-// ===========================================================================
-// §4 per-event-name fallback table tests.
-//
-// Each test embeds requestParameters in the CloudTrailEvent JSON and asserts
-// that _ct.target resolves to the expected value via the fallback table
+// Per-event-name fallback table: _ct.target resolves from requestParameters
 // (ExtractCTTarget / buildCTResource).
-// ===========================================================================
 
 // buildCTEventWithRequestParams constructs a cloudtrailtypes.Event whose
 // CloudTrailEvent JSON contains the given requestParameters JSON object.
@@ -213,10 +170,9 @@ func buildCTEventWithRequestParams(id, eventName, eventSource, requestParamsJSON
 	}
 }
 
-// TestCTTargetFallback_DescribeInstances_WithItems — §4: DescribeInstances with
+// TestCTTargetFallback_DescribeInstances_WithItems — DescribeInstances with
 // instancesSet.items populated → "i-abc,i-def".
 func TestCTTargetFallback_DescribeInstances_WithItems(t *testing.T) {
-	// Spec: §4 — DescribeInstances, instancesSet.items[*].instanceId joined ","
 	event := buildCTEventWithRequestParams(
 		"tf-di-01", "DescribeInstances", "ec2.amazonaws.com",
 		`{"instancesSet":{"items":[{"instanceId":"i-abc"},{"instanceId":"i-def"}]}}`,
@@ -231,9 +187,8 @@ func TestCTTargetFallback_DescribeInstances_WithItems(t *testing.T) {
 	}
 }
 
-// TestCTTargetFallback_DescribeInstances_EmptyItems — §4: empty instancesSet.items → "(all)".
+// TestCTTargetFallback_DescribeInstances_EmptyItems — empty instancesSet.items → "(all)".
 func TestCTTargetFallback_DescribeInstances_EmptyItems(t *testing.T) {
-	// Spec: §4 — DescribeInstances with empty items list → "(all)"
 	event := buildCTEventWithRequestParams(
 		"tf-di-02", "DescribeInstances", "ec2.amazonaws.com",
 		`{"instancesSet":{"items":[]}}`,
@@ -248,9 +203,8 @@ func TestCTTargetFallback_DescribeInstances_EmptyItems(t *testing.T) {
 	}
 }
 
-// TestCTTargetFallback_UpdateInstanceInformation — §4: instanceId field.
+// TestCTTargetFallback_UpdateInstanceInformation — instanceId field.
 func TestCTTargetFallback_UpdateInstanceInformation(t *testing.T) {
-	// Spec: §4 — UpdateInstanceInformation → requestParameters.instanceId
 	event := buildCTEventWithRequestParams(
 		"tf-uii-01", "UpdateInstanceInformation", "ssm.amazonaws.com",
 		`{"instanceId":"i-123"}`,
@@ -265,9 +219,8 @@ func TestCTTargetFallback_UpdateInstanceInformation(t *testing.T) {
 	}
 }
 
-// TestCTTargetFallback_GetParameter — §4: single SSM parameter name.
+// TestCTTargetFallback_GetParameter — single SSM parameter name.
 func TestCTTargetFallback_GetParameter(t *testing.T) {
-	// Spec: §4 — GetParameter → requestParameters.name
 	event := buildCTEventWithRequestParams(
 		"tf-gp-01", "GetParameter", "ssm.amazonaws.com",
 		`{"name":"/foo/bar"}`,
@@ -282,9 +235,8 @@ func TestCTTargetFallback_GetParameter(t *testing.T) {
 	}
 }
 
-// TestCTTargetFallback_GetParameters — §4: multiple SSM parameter names joined.
+// TestCTTargetFallback_GetParameters — multiple SSM parameter names joined.
 func TestCTTargetFallback_GetParameters(t *testing.T) {
-	// Spec: §4 — GetParameters → requestParameters.names[] joined ","
 	event := buildCTEventWithRequestParams(
 		"tf-gps-01", "GetParameters", "ssm.amazonaws.com",
 		`{"names":["/a","/b"]}`,
@@ -299,9 +251,8 @@ func TestCTTargetFallback_GetParameters(t *testing.T) {
 	}
 }
 
-// TestCTTargetFallback_GetSecretValue — §4: secretId field.
+// TestCTTargetFallback_GetSecretValue — secretId field.
 func TestCTTargetFallback_GetSecretValue(t *testing.T) {
-	// Spec: §4 — GetSecretValue → requestParameters.secretId
 	event := buildCTEventWithRequestParams(
 		"tf-gsv-01", "GetSecretValue", "secretsmanager.amazonaws.com",
 		`{"secretId":"prod/db"}`,
@@ -316,9 +267,8 @@ func TestCTTargetFallback_GetSecretValue(t *testing.T) {
 	}
 }
 
-// TestCTTargetFallback_Decrypt_WithKeyID — §4: keyId present → use it.
+// TestCTTargetFallback_Decrypt_WithKeyID — keyId present → use it.
 func TestCTTargetFallback_Decrypt_WithKeyID(t *testing.T) {
-	// Spec: §4 — Decrypt → requestParameters.keyId
 	event := buildCTEventWithRequestParams(
 		"tf-dec-01", "Decrypt", "kms.amazonaws.com",
 		`{"keyId":"alias/foo"}`,
@@ -333,9 +283,8 @@ func TestCTTargetFallback_Decrypt_WithKeyID(t *testing.T) {
 	}
 }
 
-// TestCTTargetFallback_Decrypt_NoKeyID — §4: no keyId → "(by alias)".
+// TestCTTargetFallback_Decrypt_NoKeyID — no keyId → "(by alias)".
 func TestCTTargetFallback_Decrypt_NoKeyID(t *testing.T) {
-	// Spec: §4 — Decrypt with absent keyId → "(by alias)"
 	event := buildCTEventWithRequestParams(
 		"tf-dec-02", "Decrypt", "kms.amazonaws.com",
 		`{"encryptionContext":{"aws:s3:arn":"arn:aws:s3:::mybucket"}}`,
@@ -350,9 +299,8 @@ func TestCTTargetFallback_Decrypt_NoKeyID(t *testing.T) {
 	}
 }
 
-// TestCTTargetFallback_AssumeRole — §4: roleArn stripped per §5.
+// TestCTTargetFallback_AssumeRole — roleArn, ARN-stripped.
 func TestCTTargetFallback_AssumeRole(t *testing.T) {
-	// Spec: §4 — AssumeRole* → requestParameters.roleArn, then strip ARN per §5
 	// arn:aws:iam::123456789012:role/Admin → "role/Admin" (same-account strip)
 	event := buildCTEventWithRequestParams(
 		"tf-ar-01", "AssumeRole", "sts.amazonaws.com",
@@ -368,9 +316,8 @@ func TestCTTargetFallback_AssumeRole(t *testing.T) {
 	}
 }
 
-// TestCTTargetFallback_BatchGetImage — §4: repositoryName field.
+// TestCTTargetFallback_BatchGetImage — repositoryName field.
 func TestCTTargetFallback_BatchGetImage(t *testing.T) {
-	// Spec: §4 — BatchGetImage → requestParameters.repositoryName
 	event := buildCTEventWithRequestParams(
 		"tf-bgi-01", "BatchGetImage", "ecr.amazonaws.com",
 		`{"repositoryName":"myrepo","imageIds":[{"imageTag":"latest"}]}`,
@@ -385,9 +332,8 @@ func TestCTTargetFallback_BatchGetImage(t *testing.T) {
 	}
 }
 
-// TestCTTargetFallback_ListBuckets — §4: ListBuckets has no target → "(none)".
+// TestCTTargetFallback_ListBuckets — ListBuckets has no target → "(none)".
 func TestCTTargetFallback_ListBuckets(t *testing.T) {
-	// Spec: §4 — ListBuckets → "(none)" literal (there is no target)
 	event := buildCTEventWithRequestParams(
 		"tf-lb-01", "ListBuckets", "s3.amazonaws.com",
 		`null`,
@@ -402,9 +348,8 @@ func TestCTTargetFallback_ListBuckets(t *testing.T) {
 	}
 }
 
-// TestCTTargetFallback_CatchAll_AnyKeyMatchingID — §4 catch-all: scan for *Id/*Name/*Arn key.
+// TestCTTargetFallback_CatchAll_AnyKeyMatchingID — catch-all: scan for *Id/*Name/*Arn key.
 func TestCTTargetFallback_CatchAll_AnyKeyMatchingID(t *testing.T) {
-	// Spec: §4 catch-all — scan requestParameters for any key matching *Id/*Name/*Arn
 	// FrobnicateThingy has requestParameters.thingyId → "t-1"
 	event := buildCTEventWithRequestParams(
 		"tf-ca-01", "FrobnicateThingy", "example.amazonaws.com",

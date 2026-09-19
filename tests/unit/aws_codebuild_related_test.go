@@ -1,4 +1,3 @@
-// aws_codebuild_related_test.go contains unit tests for CodeBuild related-resource checkers.
 package unit_test
 
 import (
@@ -152,10 +151,9 @@ func TestRelated_Cb_Pipeline_PartialFailure_RendersInflatedTruncated(t *testing.
 	fakeCp := newFakeCodePipelineWithDeclarations(map[string]*cptypes.PipelineDeclaration{
 		"matching-pipeline-1": pipelineDeclarationWithCodeBuildAction("matching-pipeline-1", projectName),
 		"matching-pipeline-2": pipelineDeclarationWithCodeBuildAction("matching-pipeline-2", projectName),
-		// "failing-pipeline-1"/"-2" deliberately absent: GetPipeline for a
-		// name missing from declarationsByName returns an empty output (no
-		// Pipeline field), which pipelineGetDeclaration now reports as an
-		// error instead of a silent nil.
+		// "failing-pipeline-1"/"-2" are absent from declarationsByName, so
+		// GetPipeline returns an empty output (no Pipeline field), which
+		// pipelineGetDeclaration reports as an error.
 	})
 	clients := &awsclient.ServiceClients{CodePipeline: fakeCp}
 
@@ -218,8 +216,7 @@ func TestRelated_Cb_Pipeline_AllFail_UnknownRelated(t *testing.T) {
 
 // TestRelated_Cb_Pipeline_AllSucceed_ExactCountSurvives is the positive
 // control: when every GetPipeline call in the loop succeeds, the exact count
-// must survive untouched — guarding against an over-broad fix that marks
-// every scan unknown/truncated regardless of whether any lookup failed.
+// must survive untouched.
 func TestRelated_Cb_Pipeline_AllSucceed_ExactCountSurvives(t *testing.T) {
 	const projectName = "my-build-project"
 

@@ -4,9 +4,7 @@
 //
 // The phrase row reaches the renderer carrying the finding's raw wording as
 // its label and the glyph-and-capital display form as its value. Only the
-// display form is painted; there is no flag that turns it into "raw phrase:
-// display form", since nothing in the app takes a plain-text copy of the
-// screen through this renderer.
+// display form is painted.
 package unit
 
 import (

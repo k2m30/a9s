@@ -22,16 +22,10 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// ---------------------------------------------------------------------------
-// Color-signal regression suite.
-//
-// Wave-1 fetchers do not write Resource.Status, so child types whose
-// ResourceTypeDef has no Color func (cb_builds, cfn_resources, glue_runs,
-// log_events, lambda_invocation_logs, role_policies) get their per-row colour
-// from wave1 domain.Findings plus Color: colorAnyFindingOrHealthy on each
-// catalog entry; the tests below pin both halves so a regression fails loudly
-// instead of silently rendering FAILED rows green.
-// ---------------------------------------------------------------------------
+// Child types whose ResourceTypeDef has no Color func (cb_builds,
+// cfn_resources, glue_runs, log_events, lambda_invocation_logs, role_policies)
+// take their row colour from wave-1 domain.Findings through
+// Color: colorAnyFindingOrHealthy on each catalog entry.
 
 func fetchOneCBBuild(t *testing.T, status cbtypes.StatusType) resource.Resource {
 	t.Helper()

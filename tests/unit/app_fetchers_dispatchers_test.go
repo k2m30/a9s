@@ -1,33 +1,5 @@
 package unit
 
-// app_fetchers_dispatchers_test.go — behavioral tests for zero-hit functions in
-// internal/tui/app_fetchers.go (wave 2 coverage restoration).
-//
-// Functions targeted (all were at 0% before this file):
-//   - fetchResourcesFiltered
-//   - fetchChildResources
-//   - fetchMoreResources (FetchFilter branch, parentCtx branch, no-fetcher fallback)
-//   - fetchIdentity
-//   - fetchProfiles (pure, no clients needed)
-//   - fetchRevealValue
-//   - isMissingRegionError
-//   - probeResourceAvailability
-//   - saveAvailabilityCache (noCache=true short-circuit, nil entries)
-//   - demoPrefetchCounts
-//   - refreshResourceListWithEnrichmentRerun
-//
-// Explicitly left alone (defensive guards indistinguishable from other guards,
-// or require real AWS config):
-//   - connectAWS — requires aws credentials / config files, not unit-testable
-//   - loadAvailabilityCache — covered at the cache.Load level in availability_cache_test.go;
-//     the method body's entry path requires plumbing through Model which mirrors the same logic
-//
-// Approach: execute the returned tea.Cmd closure and assert on the message type
-// and key fields. All models use nil clients (no AWS connection) so we test
-// the guard branches without external dependencies. Where we need success paths,
-// we register temporary fetchers/reveal-fetchers that return synthetic data and
-// restore them in t.Cleanup.
-
 import (
 	"context"
 	"errors"
@@ -42,18 +14,9 @@ import (
 	"github.com/k2m30/a9s/v3/internal/tui"
 )
 
-// ────────────────────────────────────────────────────────────────────────────
-// fetchResourcesFiltered
-// ────────────────────────────────────────────────────────────────────────────
-
-// TestFetchResourcesFiltered_NilClients_ViaRelatedNavigate verifies that when
-// the model has no AWS clients and a RelatedNavigateMsg with FetchFilter arrives,
-// the fetchResourcesFiltered cmd returns APIErrorMsg{"not initialized"}.
-//
-// ct-events is the only type with a registered FilteredPaginatedFetcher.
-// RelatedNavigateMsg{TargetType:"ct-events", FetchFilter:{...}} routes through
-// handleRelatedNavigate → NavigationKindFilteredList + FetchFilter branch →
-// m.fetchResourcesFiltered("ct-events", filter).
+// ct-events has a registered FilteredPaginatedFetcher: a RelatedNavigateMsg
+// with FetchFilter routes through handleRelatedNavigate's
+// NavigationKindFilteredList branch to m.fetchResourcesFiltered.
 func TestFetchResourcesFiltered_NilClients_ViaRelatedNavigate(t *testing.T) {
 	withTuiVersion(t, "test")
 	m := newRootSizedModel() // clients == nil
@@ -66,7 +29,6 @@ func TestFetchResourcesFiltered_NilClients_ViaRelatedNavigate(t *testing.T) {
 		ResourceType: "ec2",
 	})
 
-	// Send RelatedNavigateMsg with FetchFilter for ct-events (has filtered fetcher).
 	_, cmd := rootApplyMsg(m, messages.RelatedNavigate{
 		TargetType: "ct-events",
 		FetchFilter: map[string]string{
@@ -79,7 +41,6 @@ func TestFetchResourcesFiltered_NilClients_ViaRelatedNavigate(t *testing.T) {
 	if cmd == nil {
 		t.Fatal("RelatedNavigateMsg with FetchFilter should return a cmd batch")
 	}
-	// Execute — with nil clients the fetchResourcesFiltered cmd returns APIErrorMsg.
 	msg := cmd()
 	switch v := msg.(type) {
 	case messages.APIError:
@@ -87,7 +48,6 @@ func TestFetchResourcesFiltered_NilClients_ViaRelatedNavigate(t *testing.T) {
 			t.Errorf("APIErrorMsg.Err = %q, want 'not initialized'", v.Err.Error())
 		}
 	case tea.BatchMsg:
-		// Batch of initCmd + fetchResourcesFiltered cmd — find the APIErrorMsg.
 		found := false
 		for _, sub := range v {
 			if sub == nil {
@@ -108,8 +68,6 @@ func TestFetchResourcesFiltered_NilClients_ViaRelatedNavigate(t *testing.T) {
 	}
 }
 
-// TestFetchResourcesFiltered_NoFetcher verifies that when no filtered fetcher is
-// registered the command falls through to the no-fetcher error path.
 func TestFetchResourcesFiltered_NoFetcher(t *testing.T) {
 	withTuiVersion(t, "test")
 	m := newRootSizedModel()
@@ -137,12 +95,6 @@ func TestFetchResourcesFiltered_NoFetcher(t *testing.T) {
 	}
 }
 
-// ────────────────────────────────────────────────────────────────────────────
-// fetchChildResources — nil clients
-// ────────────────────────────────────────────────────────────────────────────
-
-// TestFetchChildResources_NilClients verifies that fetchChildResources with nil
-// clients returns APIErrorMsg carrying the child type name.
 func TestFetchChildResources_NilClients(t *testing.T) {
 	withTuiVersion(t, "test")
 	m := newRootSizedModel() // clients == nil
@@ -171,7 +123,6 @@ func TestFetchChildResources_NilClients(t *testing.T) {
 	if cmd == nil {
 		t.Fatal("EnterChildViewMsg should return a cmd")
 	}
-	// The batch contains the child fetch cmd; extract it.
 	msg := extractMsg(t, cmd, func(m tea.Msg) bool {
 		_, ok := m.(messages.APIError)
 		return ok
@@ -188,24 +139,18 @@ func TestFetchChildResources_NilClients(t *testing.T) {
 	}
 }
 
-// TestFetchChildResources_UnknownChildType verifies that when no paginated child
-// fetcher is registered, an APIErrorMsg is returned with "unsupported child type".
 func TestFetchChildResources_UnknownChildType(t *testing.T) {
 	withTuiVersion(t, "test")
 	m := newRootSizedModel()
 
-	// Use the existing "unknown child type" path tested in tui_root_test.go —
-	// here we specifically test the "unsupported child type" message in
-	// fetchChildResources (when child type IS registered but has no fetcher).
-	// The FlashMsg path already covers the case where the child type def is absent
-	// entirely; this covers the internal fetcher-absent path.
+	// A registered child type with no paginated child fetcher reaches the
+	// "unsupported child type" message inside fetchChildResources.
 	const noFetcherChild = "test_child_no_fetcher"
 	resource.SetChildTypeForTest(resource.ResourceTypeDef{
 		Name:      "Test Child No Fetcher",
 		ShortName: noFetcherChild,
 		Columns:   []resource.Column{{Key: "id", Title: "ID", Width: 20}},
 	})
-	// Do NOT register a paginated child fetcher — leave it absent.
 	t.Cleanup(func() {
 		resource.CleanupChildTypeForTest(noFetcherChild)
 	})
@@ -233,14 +178,10 @@ func TestFetchChildResources_UnknownChildType(t *testing.T) {
 	}
 }
 
-// TestFetchChildResources_PartialSuccess_ReturnsResourcesLoadedWithErr pins the
-// contract-alignment fix: fetchChildResources must follow the same
-// partial-success rule as its siblings in this file (fetchResources,
-// fetchResourcesFiltered, fetchMoreResources — fetch_adapter.go lines 44, 63,
-// 146: `if err != nil && len(res.Resources) == 0 { return APIError }`, else
-// ResourcesLoaded carrying both Resources and Err). Today fetchChildResources
-// (fetch_adapter.go:119-121) hard-fails on any err != nil regardless of
-// len(Resources), dropping partial rows behind a bare APIError — RED.
+// fetchChildResources follows the partial-success rule of fetchResources,
+// fetchResourcesFiltered and fetchMoreResources (fetch_adapter.go): an error
+// with no rows is an APIError; an error with rows is a ResourcesLoaded carrying
+// both Resources and Err.
 func TestFetchChildResources_PartialSuccess_ReturnsResourcesLoadedWithErr(t *testing.T) {
 	withTuiVersion(t, "test")
 	clients := demo.NewServiceClients()
@@ -302,13 +243,6 @@ func TestFetchChildResources_PartialSuccess_ReturnsResourcesLoadedWithErr(t *tes
 	}
 }
 
-// ────────────────────────────────────────────────────────────────────────────
-// fetchMoreResources — parentCtx branch
-// ────────────────────────────────────────────────────────────────────────────
-
-// TestFetchMoreResources_ParentCtxBranch_NilClients verifies that when
-// LoadMoreMsg carries a non-empty ParentContext and no FetchFilter, the
-// parentCtx branch is taken and returns APIErrorMsg (nil clients).
 func TestFetchMoreResources_ParentCtxBranch_NilClients(t *testing.T) {
 	withTuiVersion(t, "test")
 	m := newRootSizedModel()
@@ -346,18 +280,14 @@ func TestFetchMoreResources_ParentCtxBranch_NilClients(t *testing.T) {
 	}
 }
 
-// TestFetchMoreResources_NoFetcherFallback verifies that when none of the
-// three fetcher paths succeed, APIErrorMsg contains "no paginated fetcher".
 func TestFetchMoreResources_NoFetcherFallback(t *testing.T) {
 	withTuiVersion(t, "test")
 	m := newRootSizedModel()
 
-	// Use a type name with no registered fetchers at all.
 	const ghostType = "test_more_ghost_xyz"
 	_, cmd := rootApplyMsg(m, messages.LoadMore{
 		ResourceType:      ghostType,
 		ContinuationToken: "tok",
-		// No FetchFilter, no ParentContext
 	})
 	if cmd == nil {
 		t.Fatal("LoadMoreMsg should return a cmd")
@@ -373,31 +303,18 @@ func TestFetchMoreResources_NoFetcherFallback(t *testing.T) {
 	}
 }
 
-// ────────────────────────────────────────────────────────────────────────────
-// fetchIdentity
-// ────────────────────────────────────────────────────────────────────────────
-
-// TestFetchIdentity_NilClients verifies that with nil clients the command
-// returns IdentityErrorMsg (not a panic).
-// ────────────────────────────────────────────────────────────────────────────
-// fetchProfiles
-// ────────────────────────────────────────────────────────────────────────────
-
-// TestFetchProfiles_ReturnsMsg verifies that the fetchProfiles cmd returns a
-// message (either profilesLoadedMsg or FlashMsg{IsError}) without panicking.
-// We don't control the AWS config on CI, so we only assert no panic + known types.
+// The machine's AWS config is not controlled, so only the message type is
+// checked.
 func TestFetchProfiles_ReturnsMsg(t *testing.T) {
 	withTuiVersion(t, "test")
 	m := newRootSizedModel()
 
-	// Navigate to the profile selector to trigger fetchProfiles.
 	_, cmd := rootApplyMsg(m, messages.Navigate{Target: messages.TargetProfile})
 	if cmd == nil {
 		t.Fatal("navigating to profile selector should return a cmd (fetchProfiles)")
 	}
 	msg := cmd()
 	// Acceptable: profilesLoadedMsg (internal type, not exported) or FlashMsg.
-	// We just verify it doesn't panic and is a known type.
 	switch msg.(type) {
 	case messages.Flash:
 		// No profiles found or error — acceptable in CI environments
@@ -408,17 +325,11 @@ func TestFetchProfiles_ReturnsMsg(t *testing.T) {
 	}
 }
 
-// ────────────────────────────────────────────────────────────────────────────
-// fetchRevealValue
-// ────────────────────────────────────────────────────────────────────────────
-
-// TestFetchRevealValue_NilClients verifies nil clients returns FlashMsg{IsError}.
 func TestFetchRevealValue_NilClients(t *testing.T) {
 	withTuiVersion(t, "test")
 	m := newRootSizedModel()
 
-	// Navigate to a resource list and load resources, then press 'x' to trigger
-	// reveal. We use "secrets" which has a reveal fetcher, so the lookup passes.
+	// "secrets" has a reveal fetcher, so the lookup passes.
 	m, _ = rootApplyMsg(m, messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "secrets",
@@ -429,7 +340,6 @@ func TestFetchRevealValue_NilClients(t *testing.T) {
 			{ID: "my-secret-arn", Name: "my-secret"},
 		},
 	})
-	// Press 'x' to trigger reveal.
 	_, cmd := rootApplyMsg(m, rootKeyPress("x"))
 	if cmd == nil {
 		// x key on the list — the cmd might not be set if no fetcher. Acceptable.
@@ -453,14 +363,11 @@ func TestFetchRevealValue_NilClients(t *testing.T) {
 	}
 }
 
-// TestFetchRevealValue_NoRevealFetcher verifies that a type without a reveal
-// fetcher returns no cmd (the handler bails early at HasRevealFetcher).
-// ec2 has a paginated fetcher but no reveal fetcher — pressing 'x' should
-// not dispatch any cmd or should return a FlashMsg{IsError}.
+// ec2 has no reveal fetcher: handleReveal bails early at HasRevealFetcher, so
+// 'x' dispatches nothing or flashes an error.
 func TestFetchRevealValue_NoRevealFetcher(t *testing.T) {
 	withTuiVersion(t, "test")
 
-	// ec2 is registered with a paginated fetcher but no reveal fetcher.
 	if resource.HasRevealFetcher("ec2") {
 		t.Skip("ec2 unexpectedly has a reveal fetcher — test precondition failed")
 	}
@@ -476,7 +383,6 @@ func TestFetchRevealValue_NoRevealFetcher(t *testing.T) {
 			{ID: "i-0abc111", Name: "web-server-1", Fields: map[string]string{"State": "running"}},
 		},
 	})
-	// Press 'x' — handleReveal bails early when HasRevealFetcher is false.
 	_, cmd := rootApplyMsg(m, rootKeyPress("x"))
 	// Either nil (bail-early) or FlashMsg{IsError} is acceptable.
 	if cmd == nil {
@@ -491,31 +397,11 @@ func TestFetchRevealValue_NoRevealFetcher(t *testing.T) {
 	// Any other message type is also acceptable — not a failure.
 }
 
-// ────────────────────────────────────────────────────────────────────────────
-// isMissingRegionError — pure string function
-// ────────────────────────────────────────────────────────────────────────────
-
-// TestIsMissingRegionError exercises the pure helper directly via the indirect
-// path: connectAWS is the only caller and is not unit-testable, but we can
-// reach isMissingRegionError through the exported isMissingRegionErrorForTest
-// seam if one exists. Since there is no seam, we verify the behavior by
-// confirming that known-region-error strings are recognised.
-//
-// The function is in package tui (unexported). We test it via the integration
-// point: sending a ProfileSelectedMsg without real AWS config to trigger
-// connectAWS, which internally calls isMissingRegionError on the returned err.
-// We just assert no panic.
-// ────────────────────────────────────────────────────────────────────────────
-// probeResourceAvailability — nil clients
-// ────────────────────────────────────────────────────────────────────────────
-
-// TestProbeResourceAvailability_NilClients pins: with nil clients, an
-// AvailabilityCacheLoadedMsg must NOT dispatch any probe cmds at all —
-// dispatching them would run every probe against a nil transport and fail
-// hard, permanently losing that probe for the session. Instead,
-// Session.AvailSweepPending is latched, and the next successful ClientsReady
-// drains the first batch (fireNextAvailabilityProbes(4)) once a real
-// transport exists.
+// With nil clients an AvailabilityCacheLoadedMsg dispatches no probe cmds:
+// they would run against a nil transport, fail hard, and lose that probe for
+// the session. Session.AvailSweepPending is latched instead, and the next
+// successful ClientsReady drains the first batch
+// (fireNextAvailabilityProbes(4)).
 func TestProbeResourceAvailability_NilClients(t *testing.T) {
 	withTuiVersion(t, "test")
 	m := newRootSizedModel() // clients == nil
@@ -532,18 +418,8 @@ func TestProbeResourceAvailability_NilClients(t *testing.T) {
 	}
 }
 
-// ────────────────────────────────────────────────────────────────────────────
-// saveAvailabilityCache
-// ────────────────────────────────────────────────────────────────────────────
-
-// TestSaveAvailabilityCache_NoCacheMode verifies that with noCache=true the
-// method returns nil (no cache write). saveAvailabilityCache is triggered
-// when all availability checks complete (handleAvailabilityChecked all-done path).
-// We simulate a complete probe cycle using the demo clients so the menu
-// accumulates availability entries, then trigger the all-done path.
 func TestSaveAvailabilityCache_NoCacheMode(t *testing.T) {
 	withTuiVersion(t, "test")
-	// noCache=true: saveAvailabilityCache returns nil immediately.
 	m := newBlessedModel(t, demo.DemoProfile, demo.DemoRegion,
 		tui.WithClients(demo.NewServiceClients()),
 		tui.WithNoCache(true),
@@ -561,24 +437,11 @@ func TestSaveAvailabilityCache_NoCacheMode(t *testing.T) {
 		Count:        3,
 		Gen:          m.Core().Session().AvailabilityGen,
 	})
-	// With noCache=true, saveAvailabilityCache returns nil.
-	// No panic is the key assertion.
 	if cmd != nil {
 		_ = cmd() //nolint:ineffassign,staticcheck // verifying no panic
 	}
 }
 
-// TestSaveAvailabilityCache_WithCacheAndEntries verifies that saveAvailabilityCache
-// executes the cache-write cmd without panicking when the model has availability
-// entries (noCache=false, normal operation). We trigger the all-done path through
-// the full probe cycle with demo clients.
-// ────────────────────────────────────────────────────────────────────────────
-// demoPrefetchCounts
-// ────────────────────────────────────────────────────────────────────────────
-
-// TestDemoPrefetchCounts_ViaClientReady verifies that demoPrefetchCounts is
-// invoked and returns AvailabilityPrefetchedMsg when ClientsReadyMsg arrives
-// in noCache mode. We use demo clients so all registered fetchers succeed.
 func TestDemoPrefetchCounts_ViaClientReady(t *testing.T) {
 	withTuiVersion(t, "test")
 	clients := demo.NewServiceClients()
@@ -600,7 +463,6 @@ func TestDemoPrefetchCounts_ViaClientReady(t *testing.T) {
 		t.Fatal("ClientsReadyMsg with noCache=true and valid clients should return demoPrefetchCounts cmd")
 	}
 	msg := cmd()
-	// demoPrefetchCounts returns AvailabilityPrefetchedMsg.
 	prefetched, ok := msg.(messages.AvailabilityPrefetched)
 	if !ok {
 		// May be a tea.BatchMsg wrapping it.
@@ -625,8 +487,6 @@ func TestDemoPrefetchCounts_ViaClientReady(t *testing.T) {
 	}
 }
 
-// TestDemoPrefetchCounts_AvailabilityPrefetchedHandler verifies that
-// AvailabilityPrefetchedMsg with the correct gen updates the model without panic.
 func TestDemoPrefetchCounts_AvailabilityPrefetchedHandler(t *testing.T) {
 	withTuiVersion(t, "test")
 	m := newRootSizedModel()
@@ -640,30 +500,18 @@ func TestDemoPrefetchCounts_AvailabilityPrefetchedHandler(t *testing.T) {
 		Gen:         m.Core().Session().AvailabilityGen,
 		Resources:   map[string][]resource.Resource{},
 	})
-	// Handler should not crash.
 	if cmd != nil {
 		_ = cmd() //nolint:ineffassign,staticcheck // verifying no panic
 	}
 }
 
-// ────────────────────────────────────────────────────────────────────────────
-// refreshResourceListWithEnrichmentRerun
-// ────────────────────────────────────────────────────────────────────────────
-
-// TestRefreshResourceListWithEnrichmentRerun_StampsTypeGen verifies that the
-// wrapper stamps TypeGen onto the inner ResourcesLoadedMsg.
-//
-// Observable contract: after Ctrl+R on a resource list, the next
-// ResourcesLoadedMsg processed by the model carries TypeGen > 0 and triggers
-// a probeEnrichment cmd (verified by the non-nil returned cmd in the
-// enrichment dispatch tests). This test checks the TypeGen-stamping behavior
-// via the enrichment dispatch pipeline.
+// Ctrl+R on a resource list stamps TypeGen onto the inner ResourcesLoadedMsg,
+// which triggers a probeEnrichment cmd.
 func TestRefreshResourceListWithEnrichmentRerun_StampsTypeGen(t *testing.T) {
 	withTuiVersion(t, "test")
 	m := newRootSizedModel()
 	m = navigateToEC2List(m)
 
-	// Ctrl+R triggers refreshResourceListWithEnrichmentRerun for the active list.
 	_, refreshCmd := rootApplyMsg(m, ctrlRKeyMsg())
 	if refreshCmd == nil {
 		t.Fatal("Ctrl+R should return a refresh cmd")
@@ -674,7 +522,6 @@ func TestRefreshResourceListWithEnrichmentRerun_StampsTypeGen(t *testing.T) {
 	msg := refreshCmd()
 	switch v := msg.(type) {
 	case messages.ResourcesLoaded:
-		// TypeGen must be non-zero — the wrapper stamps it.
 		if v.TypeGen == 0 {
 			t.Errorf("refreshResourceListWithEnrichmentRerun: TypeGen = 0, want > 0")
 		}
@@ -686,10 +533,6 @@ func TestRefreshResourceListWithEnrichmentRerun_StampsTypeGen(t *testing.T) {
 	}
 }
 
-// TestRefreshResourceListWithEnrichmentRerun_PassthroughNonLoaded verifies that
-// non-ResourcesLoadedMsg messages are passed through unchanged by the wrapper.
-// This is exercised indirectly: if the inner cmd returns an APIErrorMsg, the
-// wrapper returns it as-is (no TypeGen stamping).
 func TestRefreshResourceListWithEnrichmentRerun_PassthroughAPIError(t *testing.T) {
 	withTuiVersion(t, "test")
 	m := newRootSizedModel() // nil clients → inner fetchResources returns APIErrorMsg
@@ -704,7 +547,6 @@ func TestRefreshResourceListWithEnrichmentRerun_PassthroughAPIError(t *testing.T
 	// The wrapper must not swallow or modify it.
 	apiErr, ok := msg.(messages.APIError)
 	if ok {
-		// Verify the ResourceType is correctly propagated.
 		if apiErr.ResourceType != "ec2" {
 			t.Errorf("APIErrorMsg.ResourceType = %q, want ec2", apiErr.ResourceType)
 		}
@@ -718,33 +560,10 @@ func TestRefreshResourceListWithEnrichmentRerun_PassthroughAPIError(t *testing.T
 	t.Logf("wrapper passthrough returned %T — acceptable", msg)
 }
 
-// ────────────────────────────────────────────────────────────────────────────
-// TestFetchAdapter_CapturesGenAtDispatchTime
-// ────────────────────────────────────────────────────────────────────────────
-
-// TestFetchAdapter_CapturesGenAtDispatchTime verifies that fetchResources,
-// fetchIdentity, and fetchRevealValue capture the generation counter
-// SYNCHRONOUSLY at the call site — not lazily inside the goroutine closure.
-//
-// This is the critical correctness property: if gen is captured inside the
-// closure, a concurrent Rotate() that bumps the counter before the goroutine
-// runs would cause the message to carry the POST-rotate gen, bypassing the
-// stale guard entirely (the guard would see stamp==current and pass it).
-//
-// Test shape (mirrors connectAWS precedent at fetch_adapter.go:160-171):
-//  1. Capture the generation at dispatch time into dispatchGen.
-//  2. Build the tea.Cmd via the test-accessor (which internally calls the
-//     unexported fetch function with a fixed gen parameter).
-//  3. Rotate the session so the current gen no longer equals dispatchGen.
-//  4. Execute the cmd closure (synchronously — returns immediately with
-//     nil-clients error or ResourcesLoaded{Gen: dispatchGen}).
-//  5. Assert that the returned message carries Gen == dispatchGen, not the
-//     post-rotate gen.
-//
-// Test accessors (internal/tui/app_accessors.go):
-//   - FetchResourcesCmdForTest(resourceType string, gen domain.Gen) tea.Cmd
-//   - FetchIdentityCmdForTest(gen domain.Gen) tea.Cmd
-//   - FetchRevealValueCmdForTest(resourceType, resourceID string, gen domain.Gen) tea.Cmd
+// fetchResources, fetchIdentity and fetchRevealValue capture the generation
+// counter synchronously at the call site, not inside the closure: a Rotate()
+// that bumps the counter before the goroutine runs would otherwise stamp the
+// message with the post-rotate gen, and it would pass the stale guard.
 func TestFetchAdapter_CapturesGenAtDispatchTime(t *testing.T) {
 	withTuiVersion(t, "test")
 
@@ -752,7 +571,6 @@ func TestFetchAdapter_CapturesGenAtDispatchTime(t *testing.T) {
 		m := newRootSizedModel()
 		dispatchGen := m.Core().Session().AvailabilityGen
 
-		// Build the cmd at dispatch time with the captured gen.
 		cmd := m.FetchResourcesCmdForTest("ec2", dispatchGen)
 
 		// Rotate AFTER dispatch: the closure must carry dispatchGen, not the new gen.

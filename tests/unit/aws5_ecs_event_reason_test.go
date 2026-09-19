@@ -1,11 +1,8 @@
 package unit
 
-// aws5_ecs_event_reason_test.go — the ECS service event keeps AWS's own reason.
-//
-// The enricher matched "unable to place" and reported the fixed phrase "unable
-// to place task", throwing the rest of the message away. The rest is the whole
-// diagnosis: insufficient capacity, no matching ports, not enough memory. The
-// phrase stays a9s's; AWS's sentence becomes a row under it.
+// The ECS service event keeps AWS's own reason. The rest of the message is the
+// whole diagnosis (insufficient capacity, no matching ports, not enough
+// memory), so the phrase stays a9s's and AWS's sentence becomes a row under it.
 
 import (
 	"context"
@@ -57,7 +54,6 @@ func aws5RowValue(rows []domain.DetailRow, label string) string {
 	return ""
 }
 
-// TestECSSvc_PlacementEventKeepsAWSReason pins the row this task is about.
 // "unable to place task" alone is a scheduler problem with no cause; the
 // operator needs to know whether it is memory, ports or capacity before they
 // can act, and only AWS's sentence says which.
@@ -79,8 +75,8 @@ func TestECSSvc_PlacementEventKeepsAWSReason(t *testing.T) {
 	}
 }
 
-// TestECSSvc_ELBEventKeepsAWSReason is the sibling: the load balancer branch
-// keeps its message too, and AWS puts the failing health check codes in it.
+// The load balancer branch keeps its message too, and AWS puts the failing
+// health check codes in it.
 //
 // The phrase reads "load balancer" rather than "ELB": the words on the row
 // are a9s's to choose, and the bare acronym fails the machine-style gate on a
@@ -93,15 +89,14 @@ func TestECSSvc_ELBEventKeepsAWSReason(t *testing.T) {
 		t.Errorf("Event row = %q, want %q", got, "load balancer health checks failed")
 	}
 	// AWS wraps this one in "(reason …)", which under a row already labelled
-	// Reason says the word twice; the demo witness put it on screen.
+	// Reason would say the word twice.
 	if got := aws5RowValue(rows, "Reason"); got != "Health checks failed with these codes: [502]" {
 		t.Errorf("Reason row = %q, want AWS's sentence without its own \"(reason …)\" wrapper", got)
 	}
 }
 
-// TestECSSvc_EventWithNoMarkerKeepsItsWholeMessage pins the fallback: AWS
-// wording a9s has not seen must not lose its reason the way the fixed phrase
-// did. The whole message is the reason when AWS introduces it with nothing.
+// AWS wording a9s has not seen keeps its reason: the whole message is the
+// reason when AWS introduces it with nothing.
 func TestECSSvc_EventWithNoMarkerKeepsItsWholeMessage(t *testing.T) {
 	const msg = "(service acme-checkout-svc) was unable to place a task; the cluster has no registered container instances."
 	if reason := aws5RowValue(aws5ECSEventRows(t, msg), "Reason"); reason != msg {
@@ -109,8 +104,7 @@ func TestECSSvc_EventWithNoMarkerKeepsItsWholeMessage(t *testing.T) {
 	}
 }
 
-// TestECSSvc_EventWithNothingAfterTheMarkerAddsNoRow pins what a probe found:
-// a message that ends at the marker has no reason to show, and an empty row
+// A message that ends at the marker has no reason to show, and an empty row
 // renders as a blank line under the phrase.
 func TestECSSvc_EventWithNothingAfterTheMarkerAddsNoRow(t *testing.T) {
 	rows := aws5ECSEventRows(t, "(service acme-checkout-svc) was unable to place a task because ")
@@ -123,8 +117,6 @@ func TestECSSvc_EventWithNothingAfterTheMarkerAddsNoRow(t *testing.T) {
 		t.Errorf("Event row = %q, want it kept regardless", got)
 	}
 }
-
-// ── One row shape for all three signals ───────────────────────────────────
 
 // aws5ECSDeploymentRows drives EnrichECSServices over one service whose only
 // deployment failed, and returns the rows the finding grew.
@@ -154,11 +146,8 @@ func aws5ECSDeploymentRows(t *testing.T, rolloutReason string) []domain.DetailRo
 	return res.AttentionDetails[svc][d3CodeECSDeployFailed].Rows
 }
 
-// TestECSSvc_RolloutFailureUsesTheRowShape pins one shape for all three of
-// this finding's signals. The two event signals put a9s's phrase on one row
-// and AWS's reason on the row under it; the rollout signal crammed both into
-// one value with a colon, so the same fact was shaped two ways inside one
-// function.
+// All three of this finding's signals share one shape: a9s's phrase on one row
+// and AWS's reason on the row under it.
 func TestECSSvc_RolloutFailureUsesTheRowShape(t *testing.T) {
 	const reason = "ECS deployment circuit breaker: task failed to start."
 	rows := aws5ECSDeploymentRows(t, reason)

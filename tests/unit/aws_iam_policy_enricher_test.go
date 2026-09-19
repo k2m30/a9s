@@ -1,15 +1,5 @@
 package unit
 
-// aws_iam_policy_enricher_test.go — Behavioral tests for EnrichIAMPolicy.
-//
-// Contract:
-//   - GetPolicy + GetPolicyVersion called once per customer-managed policy.
-//   - Policy ARN is extracted from r.RawStruct (iamtypes.Policy.Arn).
-//   - Policy document Effect=Allow with specific (non-wildcard) actions → 0 findings.
-//   - Policy document Effect=Allow, Action="*", Resource="*" → 1 finding sev "!" (admin star).
-//   - Policy with ARN prefix arn:aws:iam::aws:policy/ (AWS-managed) → skipped, 0 findings.
-//   - clients.IAM == nil → 0 findings, no error.
-
 import (
 	"context"
 	"net/url"
@@ -79,7 +69,6 @@ func (f *iamPolicyFake) GetPolicyVersion(
 	return out, nil
 }
 
-// Compile-time check: iamPolicyFake satisfies IAMAPI.
 var _ awsclient.IAMAPI = (*iamPolicyFake)(nil)
 
 // pathEncodeDoc path-encodes a policy document string matching the encoding
@@ -242,7 +231,6 @@ func TestEnrichIAMPolicy_AWSManagedSkipped(t *testing.T) {
 			DefaultVersionId: aws.String("v1"),
 		},
 	}
-	// Even if the fake has an admin-star document, the enricher should skip it.
 	fake := &iamPolicyFake{
 		getPolicyResults: map[string]*iam.GetPolicyOutput{
 			iamAWSManagedARN: iamPolicyGetPolicyOutput(iamAWSManagedARN, "v1"),

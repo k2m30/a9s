@@ -1,17 +1,5 @@
 package unit
 
-// catalog_install_test.go — aws.Install() + catalog.SetTypes behaviors.
-//
-// Coverage:
-//   1. Smoke: aws.Install() → catalog.FindAny("ec2") non-nil
-//   2. Idempotence: double-Install does not panic, count stable
-//   3. SetTypes panics on second call with different slice
-//   4. catalog.Find panics before SetTypes (sub-process)
-//   5. 12-type golden parity (one per category)
-//   6. Fetcher/Related/Navigable/Wave2 are zero for all types
-//   6b. FieldKeys/FieldAliases/FetchByIDs/FilteredFetcher/
-//       IssueEnricherFieldKeys/ChildFetcher are zero for all types
-
 import (
 	"context"
 	"os"
@@ -25,7 +13,6 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// Test 1 — Smoke: Install() makes catalog.FindAny("ec2") return a non-nil entry.
 func TestCatalogInstall_Smoke_EC2NonNil(t *testing.T) {
 	got := catalog.FindAny("ec2")
 	if got == nil {
@@ -33,8 +20,6 @@ func TestCatalogInstall_Smoke_EC2NonNil(t *testing.T) {
 	}
 }
 
-// Test 2 — Idempotence: calling Install() a second time must not panic and
-// must leave catalog.All() count unchanged.
 func TestCatalogInstall_Idempotent(t *testing.T) {
 	before := len(catalog.All())
 	if before == 0 {
@@ -47,9 +32,6 @@ func TestCatalogInstall_Idempotent(t *testing.T) {
 	}
 }
 
-// Test 3 — Defensive guard: catalog.SetTypes must panic (or return an error
-// captured as a panic) when called a second time with a different slice.
-// This guards against accidental double-install with divergent data.
 func TestCatalogSetTypes_PanicsOnDifferentSlice(t *testing.T) {
 	defer func() {
 		if r := recover(); r == nil {
@@ -61,14 +43,9 @@ func TestCatalogSetTypes_PanicsOnDifferentSlice(t *testing.T) {
 	})
 }
 
-// Test 3b — Defensive guard: catalog.SetTypes must panic when a RelatedDef
-// declares an empty TargetType (validateRelatedDefs, catalog.go) — a
-// dangling related pivot would otherwise render as a dimmed, non-navigable
-// "(0)" with no evidence behind it. validateRelatedDefs runs before SetTypes
-// touches any global, so the already-installed catalog (from TestMain's
-// aws.Install()) must survive the rejected call byte-for-byte — a
-// panicking install path leaving corrupted global state behind is exactly
-// the class of bug this branch's isolation fix closed elsewhere.
+// An empty RelatedDef.TargetType would render as a dimmed, non-navigable
+// "(0)" pivot. validateRelatedDefs runs before SetTypes touches any global,
+// so the catalog installed by TestMain must survive the rejected call.
 func TestCatalogSetTypes_PanicsOnEmptyRelatedTargetType(t *testing.T) {
 	before := len(catalog.All())
 
@@ -104,11 +81,6 @@ func TestCatalogSetTypes_PanicsOnEmptyRelatedTargetType(t *testing.T) {
 	}
 }
 
-// Test 3c — Same guard, child-catalog path: catalog.SetChildTypes must
-// panic on an empty RelatedDef.TargetType, and the already-installed child
-// catalog (aws.Install()'s SetChildTypes call) must survive untouched —
-// same rationale and same isolation requirement as
-// TestCatalogSetTypes_PanicsOnEmptyRelatedTargetType above.
 func TestCatalogSetChildTypes_PanicsOnEmptyRelatedTargetType(t *testing.T) {
 	before := len(catalog.AllChildren())
 
@@ -144,13 +116,10 @@ func TestCatalogSetChildTypes_PanicsOnEmptyRelatedTargetType(t *testing.T) {
 	}
 }
 
-// Test 4 — Panic-before-SetTypes: catalog.Find must panic with a clear message
-// when called before aws.Install() (i.e., before SetTypes). Exercised via
-// sub-process so the panic does not abort this binary's test run.
+// Runs in a sub-process so the panic does not abort this test binary.
 func TestCatalogFind_PanicsBeforeSetTypes(t *testing.T) {
 	if os.Getenv("TEST_CATALOG_PANIC") == "1" {
-		// Running in the sub-process. TEST_SKIP_INSTALL=1 was set by the
-		// parent so TestMain skipped aws.Install(). Calling Find now must panic.
+		// TEST_SKIP_INSTALL=1 from the parent makes TestMain skip aws.Install().
 		catalog.FindAny("ec2")
 		os.Exit(0) // unreachable when panic fires correctly
 	}
@@ -171,16 +140,13 @@ func TestCatalogFind_PanicsBeforeSetTypes(t *testing.T) {
 	}
 }
 
-// goldenEntry is the expected identity for one representative type per category.
 type goldenEntry struct {
-	findKey   string // key passed to catalog.Find
-	shortName string // expected ShortName on the returned entry
-	name      string // expected Name
-	category  string // expected Category
+	findKey   string
+	shortName string
+	name      string
+	category  string
 }
 
-// Test 5 — Golden parity: one representative per each of the 12 categories must
-// return the same Name/ShortName/Category values it had before the refactor.
 func TestCatalogInstall_GoldenParity(t *testing.T) {
 	golden := []goldenEntry{
 		{"ec2", "ec2", "EC2 Instances", "COMPUTE"},
@@ -219,13 +185,8 @@ func TestCatalogInstall_GoldenParity(t *testing.T) {
 	}
 }
 
-// Test 6 — every entry with a non-nil Fetcher must also carry FieldKeys +
-// (Related OR Navigable) so partial scaffolds don't slip into main.
-//
-// Wave2 in catalog without Fetcher in catalog is allowed for a type whose
-// Fetcher lives in a legacy init(): when the Wave2 field is non-nil but
-// Fetcher is nil, the type must still have a fetcher reachable via
-// resource.GetPaginatedFetcher (populated by the file's package init()).
+// A type with Wave2 set and no catalog Fetcher must still be reachable
+// through resource.GetPaginatedFetcher, populated by a package init().
 func TestCatalogInstall_AS795_MigrationShape(t *testing.T) {
 	all := catalog.All()
 	if len(all) == 0 {
@@ -237,9 +198,6 @@ func TestCatalogInstall_AS795_MigrationShape(t *testing.T) {
 				t.Errorf("type %q: FieldKeys populated without Fetcher — partial migration?", rt.ShortName)
 			}
 			if rt.Wave2 != nil {
-				// Wave2 may be in catalog while Fetcher is still in
-				// legacy init(). Require the legacy fetcher to be present so
-				// the type is still reachable in the running app.
 				if resource.GetPaginatedFetcher(rt.ShortName) == nil {
 					t.Errorf("type %q: Wave2 in catalog and no Fetcher anywhere (catalog or legacy) — type is unreachable", rt.ShortName)
 				}

@@ -1,9 +1,7 @@
 package unit
 
-// aws_kms_fetch_by_ids_test.go — pin tests for FetchKMSKeysByIDs
-// (core/aws/kms.go:166). Production code is already correct;
-// these tests prevent regressions in the bypass-filter, alias-lookup,
-// and per-ID error-swallow behaviour.
+// aws_kms_fetch_by_ids_test.go — pins FetchKMSKeysByIDs's bypass-filter,
+// alias-lookup and per-ID error behaviour.
 
 import (
 	"context"
@@ -58,10 +56,6 @@ func (f *fakeKMSByIDs) GetKeyPolicy(_ context.Context, _ *kms.GetKeyPolicyInput,
 	return &kms.GetKeyPolicyOutput{}, nil
 }
 
-// ---------------------------------------------------------------------------
-// Test A — empty / nil input makes no API calls
-// ---------------------------------------------------------------------------
-
 func TestFetchKMSKeysByIDs_EmptyInput_NoAPICall(t *testing.T) {
 	fake := &fakeKMSByIDs{}
 	c := &awsclient.ServiceClients{KMS: fake}
@@ -80,10 +74,6 @@ func TestFetchKMSKeysByIDs_EmptyInput_NoAPICall(t *testing.T) {
 		}
 	}
 }
-
-// ---------------------------------------------------------------------------
-// Test B — two keys returned with correct alias and field shape
-// ---------------------------------------------------------------------------
 
 func TestFetchKMSKeysByIDs_ReturnsResourcesWithAliasAndFieldShape(t *testing.T) {
 	aliasMap := map[string]string{
@@ -126,7 +116,6 @@ func TestFetchKMSKeysByIDs_ReturnsResourcesWithAliasAndFieldShape(t *testing.T) 
 	}
 
 	c := &awsclient.ServiceClients{KMS: fake}
-	// Include an empty string — it must be skipped.
 	result, err := awsclient.FetchKMSKeysByIDs(context.Background(), c, []string{"key-aws-managed-001", "", "key-customer-002"})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -165,10 +154,8 @@ func TestFetchKMSKeysByIDs_ReturnsResourcesWithAliasAndFieldShape(t *testing.T) 
 	}
 }
 
-// ---------------------------------------------------------------------------
-// Test C — DescribeKey failure for one key surfaces composite error; partial
-//          results (the good key) are still returned.
-// ---------------------------------------------------------------------------
+// A DescribeKey failure for one key surfaces a composite error; the good key
+// is still returned.
 
 func TestFetchKMSKeysByIDs_DescribeKeyFailure_SurfacesComposite(t *testing.T) {
 	fake := &fakeKMSByIDs{
@@ -191,7 +178,6 @@ func TestFetchKMSKeysByIDs_DescribeKeyFailure_SurfacesComposite(t *testing.T) {
 	c := &awsclient.ServiceClients{KMS: fake}
 	result, err := awsclient.FetchKMSKeysByIDs(context.Background(), c, []string{"key-ok-001", "key-bad-002"})
 
-	// Partial success: the good key must be present.
 	if len(result) != 1 {
 		t.Fatalf("expected 1 partial result (good key preserved), got %d", len(result))
 	}
@@ -199,8 +185,6 @@ func TestFetchKMSKeysByIDs_DescribeKeyFailure_SurfacesComposite(t *testing.T) {
 		t.Errorf("expected resource ID %q, got %q", "key-ok-001", result[0].ID)
 	}
 
-	// Error must be non-nil and contain the N-of-M count, the failed ID, and the
-	// injected error substring.
 	if err == nil {
 		t.Fatal("expected non-nil composite error for per-ID DescribeKey failure")
 	}
@@ -212,10 +196,8 @@ func TestFetchKMSKeysByIDs_DescribeKeyFailure_SurfacesComposite(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// Test D — ListAliases failure is a soft fallback; key data still returned,
-//          but error is surfaced (operator informed of missing aliases).
-// ---------------------------------------------------------------------------
+// A ListAliases failure is a soft fallback: key data is still returned and the
+// error is surfaced so the operator knows aliases are missing.
 
 func TestFetchKMSKeysByIDs_ListAliasesFailure_SoftFallbackButSurfaced(t *testing.T) {
 	fake := &fakeKMSByIDs{
@@ -236,19 +218,16 @@ func TestFetchKMSKeysByIDs_ListAliasesFailure_SoftFallbackButSurfaced(t *testing
 	c := &awsclient.ServiceClients{KMS: fake}
 	result, err := awsclient.FetchKMSKeysByIDs(context.Background(), c, []string{"key-no-alias-001"})
 
-	// Soft fallback: the key is still returned even though alias lookup failed.
 	if len(result) != 1 {
 		t.Fatalf("expected 1 resource (soft fallback preserves key data), got %d", len(result))
 	}
 	if result[0].ID != "key-no-alias-001" {
 		t.Errorf("expected resource ID %q, got %q", "key-no-alias-001", result[0].ID)
 	}
-	// Alias column must be empty (no alias map built).
 	if result[0].Fields["alias"] != "" {
 		t.Errorf("Fields[alias] should be empty when ListAliases fails; got %q", result[0].Fields["alias"])
 	}
 
-	// Error must be non-nil and name both "ListAliases" and the injected error text.
 	if err == nil {
 		t.Fatal("expected non-nil error surfacing the ListAliases failure")
 	}

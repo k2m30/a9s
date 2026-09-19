@@ -1,14 +1,5 @@
 package unit
 
-// lazy_add_orchestration_edges_test.go — pin tests for the lazy-add path in
-// handleRelatedCheckStarted (internal/tui/app_related.go).
-//
-// Gap 2: missingFromCache dedup-within-input (the seen-map that strips repeated
-//         IDs before calling FetchByIDs — app_related.go:394-401).
-//
-// Gap 3: FetchByIDs error swallowed — the RelatedCheckResultMsg is still
-//         delivered with LazyAddedResources==nil and the checker's Count intact.
-
 import (
 	"context"
 	"errors"
@@ -45,23 +36,13 @@ func collectRelatedResult(t *testing.T, batchCmd tea.Cmd) (messages.RelatedCheck
 	return messages.RelatedCheckResult{}, false
 }
 
-// ---------------------------------------------------------------------------
-// Gap 2 — missingFromCache deduplicates repeated IDs before calling FetchByIDs
-// ---------------------------------------------------------------------------
-
-// TestLazyAdd_MissingFromCache_DedupsRepeatedIDsInChecker verifies that when a
-// checker emits duplicate ResourceIDs (e.g. ["idA","idA","idB","idB","idA"]),
-// the FetchByIDs call receives the deduplicated, first-appearance-ordered slice
-// (["idA","idB"]) rather than the raw repeated list.
-//
-// This covers the seen-map branch in missingFromCache (app_related.go:394-401).
+// FetchByIDs receives the related IDs deduplicated in first-appearance order.
 func TestLazyAdd_MissingFromCache_DedupsRepeatedIDsInChecker(t *testing.T) {
 	const (
 		srcType    = "test-lazy-dedup-source"
 		targetType = "test-lazy-dedup-target"
 	)
 
-	// capturedIDs stores the exact ids slice FetchByIDs was called with.
 	var capturedIDs []string
 	var capturedOnce atomic.Bool
 
@@ -70,10 +51,7 @@ func TestLazyAdd_MissingFromCache_DedupsRepeatedIDsInChecker(t *testing.T) {
 			TargetType:       targetType,
 			DisplayName:      "Dedup Test Target",
 			NeedsTargetCache: false,
-			// KnownRelated dedupes ids internally (domain.KnownRelated), so a
-			// checker cannot return duplicate ResourceIDs and Count is always
-			// len(uniqueIDs); this feeds the 2 unique IDs and does not exercise
-			// missingFromCache's own dedup.
+			// KnownRelated dedupes ids itself, so Count is len(uniqueIDs).
 			Checker: func(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
 				return resource.KnownRelated(targetType, []string{"idA", "idA", "idB", "idB", "idA"}, false)
 			},
@@ -86,7 +64,6 @@ func TestLazyAdd_MissingFromCache_DedupsRepeatedIDsInChecker(t *testing.T) {
 			copy(cp, ids)
 			capturedIDs = cp
 		}
-		// Return a resource per id so lazyAdded is non-empty (triggers merge path).
 		var out []resource.Resource
 		for _, id := range ids {
 			out = append(out, resource.Resource{ID: id, Name: id})
@@ -114,15 +91,10 @@ func TestLazyAdd_MissingFromCache_DedupsRepeatedIDsInChecker(t *testing.T) {
 	if !found {
 		t.Fatal("no RelatedCheckResultMsg received")
 	}
-	// Count is now derived (len of deduped IDs) rather than an independently
-	// settable field — the original "must pass through unchanged" premise
-	// (Count:3 alongside a 5-element, 2-unique ResourceIDs list) is no longer
-	// expressible; see the NOTE on the checker above.
 	if resultMsg.Result.Count() != 2 {
 		t.Errorf("Result.Count: got %d, want 2", resultMsg.Result.Count())
 	}
 
-	// The dedup assertion — this is the core of Gap 2.
 	if !capturedOnce.Load() {
 		t.Fatal("FetchByIDs was not called — lazy-add path was not exercised")
 	}
@@ -138,19 +110,8 @@ func TestLazyAdd_MissingFromCache_DedupsRepeatedIDsInChecker(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// Gap 3 — FetchByIDs error swallowed; checker result still delivered
-// ---------------------------------------------------------------------------
-
-// TestLazyAdd_FetchByIDsErrorSwallowed_ChecksResultStillDelivered verifies
-// that when the registered FetchByIDs returns an error, the orchestrator:
-//   - Does NOT propagate the error (no panic, no hang).
-//   - Still delivers the RelatedCheckResultMsg with the checker's Count intact.
-//   - Sets LazyAddedResources to nil (no partial data written).
-//   - Leaves CachedPages nil (NeedsTargetCache=false avoids prefetch).
-//
-// Covers the `if extra, err := ff(ctx, m.clients, missing); err == nil` guard
-// in handleRelatedCheckStarted (app_related.go:121).
+// A FetchByIDs error still delivers the checker result with its Count, and
+// with no lazy-added resources.
 func TestLazyAdd_FetchByIDsErrorSwallowed_ChecksResultStillDelivered(t *testing.T) {
 	const (
 		srcType    = "test-lazy-error-source"
@@ -193,17 +154,14 @@ func TestLazyAdd_FetchByIDsErrorSwallowed_ChecksResultStillDelivered(t *testing.
 		t.Fatal("no RelatedCheckResultMsg received — error may have leaked out instead of being swallowed")
 	}
 
-	// Checker's original count must survive the FetchByIDs error.
 	if resultMsg.Result.Count() != 1 {
 		t.Errorf("Result.Count: got %d, want 1 (checker result must survive FetchByIDs error)", resultMsg.Result.Count())
 	}
 
-	// No partial lazy data should appear.
 	if resultMsg.LazyAddedResources != nil {
 		t.Errorf("LazyAddedResources should be nil when FetchByIDs errors; got %v", resultMsg.LazyAddedResources)
 	}
 
-	// No prefetch happened (NeedsTargetCache=false).
 	if resultMsg.CachedPages != nil {
 		t.Errorf("CachedPages should be nil (NeedsTargetCache=false); got %v", resultMsg.CachedPages)
 	}

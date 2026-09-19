@@ -50,8 +50,8 @@ func catalogFinding(t *testing.T, shortName string, code domain.FindingCode) dom
 }
 
 // longUnwrappedValue is a plain field value wider than the panel. It is the
-// control: the wrap toggle owns ordinary values, and a fix that wraps the
-// Attention sentence must not start wrapping these too.
+// control: the wrap toggle owns ordinary values, and wrapping the Attention
+// sentence must not wrap these.
 var longUnwrappedValue = "arn:aws:iam::123456789012:role/service-role/" +
 	strings.Repeat("very-long-path-segment-", 8) + "tail-token"
 
@@ -166,9 +166,9 @@ func TestDetailAttention_SentenceRendersInFullInTheTUIAtNormalWidth(t *testing.T
 }
 
 // The control. An ordinary field value wider than the panel keeps the wrap
-// toggle's behaviour: it stays one row in the body and is cut on screen. A
-// fix that wraps everything would make the toggle meaningless and would
-// reflow every ARN and policy document on the screen.
+// toggle's behaviour: it stays one row in the body and is cut on screen.
+// Wrapping everything would make the toggle meaningless and would reflow
+// every ARN and policy document on the screen.
 func TestDetailAttention_OrdinaryFieldValueStillObeysTheWrapToggle(t *testing.T) {
 	f := catalogFinding(t, "role", "role.trust.confused-deputy")
 	body := detailBodyWithFinding(t, "role", f, wrapPanelWidth)

@@ -12,13 +12,6 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// ═══════════════════════════════════════════════════════════════════════════
-// AppendRelated and BuildCloudTrailFilter unit tests
-// Issue #247: CloudTrail Events related view
-// ═══════════════════════════════════════════════════════════════════════════
-
-// TestAppendRelated_AddsToExisting verifies that AppendRelated appends a new
-// entry to an existing RelatedDef slice without replacing it.
 func TestAppendRelated_AddsToExisting(t *testing.T) {
 	resource.SetRelatedForTest("test_append", []resource.RelatedDef{
 		{TargetType: "vpc", DisplayName: "VPCs", Checker: resource.NoopCheckerForTest},
@@ -40,8 +33,6 @@ func TestAppendRelated_AddsToExisting(t *testing.T) {
 	}
 }
 
-// TestAppendRelated_CreatesNew verifies that AppendRelated creates a new entry
-// when no prior registration exists for the short name.
 func TestAppendRelated_CreatesNew(t *testing.T) {
 	t.Cleanup(func() { resource.CleanupRelatedForTest("test_append_new") })
 
@@ -60,8 +51,6 @@ func TestAppendRelated_CreatesNew(t *testing.T) {
 	}
 }
 
-// TestAppendRelated_NoDuplicate verifies that calling AppendRelated twice with
-// the same TargetType does not create a duplicate entry.
 func TestAppendRelated_NoDuplicate(t *testing.T) {
 	resource.SetRelatedForTest("test_append_dedup", []resource.RelatedDef{
 		{TargetType: "ct-events", DisplayName: "CloudTrail Events", Checker: resource.NoopCheckerForTest},
@@ -223,7 +212,7 @@ func TestAllResourceTypesHaveCloudTrailRelated(t *testing.T) {
 }
 
 // TestEC2StillHasCloudTrailRelated verifies that EC2 has a ct-events entry
-// and still has all of its other related entries (>= 9 total).
+// alongside all of its other related entries (>= 9 total).
 func TestEC2StillHasCloudTrailRelated(t *testing.T) {
 	related := resource.GetRelated("ec2")
 	if related == nil {
@@ -249,7 +238,7 @@ func TestEC2StillHasCloudTrailRelated(t *testing.T) {
 }
 
 // TestIAMUserStillHasCloudTrailRelated verifies that iam-user has a ct-events
-// entry and still has its iam-group and policy entries (>= 3 total).
+// entry alongside its iam-group and policy entries (>= 3 total).
 func TestIAMUserStillHasCloudTrailRelated(t *testing.T) {
 	related := resource.GetRelated("iam-user")
 	if related == nil {
@@ -270,10 +259,6 @@ func TestIAMUserStillHasCloudTrailRelated(t *testing.T) {
 		t.Errorf("iam-user related defs length = %d, want >= 3 (iam-group + policy entries must still be present)", len(related))
 	}
 }
-
-// ---------------------------------------------------------------------------
-// Demo-mode filter construction: ARN-based resource types
-// ---------------------------------------------------------------------------
 
 // TestCloudTrailFilter_DemoMode_Lambda verifies that BuildCloudTrailFilter for
 // a lambda resource produces a ResourceName filter containing the full ARN.

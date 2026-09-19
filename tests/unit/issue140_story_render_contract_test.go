@@ -17,11 +17,7 @@ import (
 	"github.com/k2m30/a9s/v3/tests/unit/tuitest"
 )
 
-// docs/qa/ec2-related-navigation-stories.md — render-contract style coverage
-// for key EC2 QA stories. The initial-detail and counts-arrive stories are
-// covered by issue140_scenarios_golden_test.go's golden scenarios
-// ec2_001_initial_detail / ec2_020_counts_arrived on the live tui.New() root
-// path.
+// Render-contract coverage for docs/qa/ec2-related-navigation-stories.md.
 
 func TestIssue140_Story_EC2_017_UnderlineVisibilityOnNavigableRow(t *testing.T) {
 	tuitest.ForceColor(t)
@@ -128,9 +124,7 @@ func TestIssue140_Story_EC2_023_ToggleRightColumnRenderContract(t *testing.T) {
 
 // issue140SetupRightColumnFocus registers a 4-def "tg/asg/alarm/cfn" related
 // set for ec2, opens the detail screen for previewEC2Resource, delivers the
-// given counts, then presses Tab (right-column focus) and Enter — the live
-// replacement for the retired views.NewDetail(...).Update(RelatedCheckResult)
-// .Update(KeyTab).Update(KeyEnter) chain shared by EC2-021/EC2-033.
+// given counts, then presses Tab (right-column focus) and Enter.
 func issue140SetupRightColumnFocus(t *testing.T, counts map[string]int) (m tui.Model, cmd tea.Cmd) {
 	t.Helper()
 	oldDefs := append([]resource.RelatedDef(nil), resource.GetRelated("ec2")...)
@@ -227,16 +221,16 @@ func TestIssue140_Story_EC2_033_DimRowsAreSkippedInRightColumn(t *testing.T) {
 	if cmd == nil {
 		t.Fatalf("EC2-033: Enter on right column should navigate to first non-dim row")
 	}
-	// See EC2-021 above: one more drain round-trip is needed for the
-	// TitleSuffix breadcrumb to actually render (not just "Loading...").
+	// As above, one more drain round-trip renders the TitleSuffix breadcrumb
+	// rather than "Loading...".
 	m, cmd = previewApplyMsg(m, cmd())
 	if cmd != nil {
 		m, _ = previewApplyMsg(m, cmd())
 	}
 
 	view := previewView(m)
-	// Same collision risk as EC2-021 above: require the source-scoped title
-	// breadcrumb plus proof the RELATED panel is gone, not a bare name match.
+	// As above, require the source-scoped title breadcrumb plus proof the
+	// RELATED panel is gone, not a bare name match.
 	wantSuffix := runtime.RelatedTitleSuffix(previewEC2Resource())
 	if !strings.Contains(view, wantSuffix) {
 		t.Errorf("EC2-033: cursor should skip dim rows and land on alarm, showing title suffix %q; got:\n%s", wantSuffix, view)
@@ -244,9 +238,8 @@ func TestIssue140_Story_EC2_033_DimRowsAreSkippedInRightColumn(t *testing.T) {
 	if strings.Contains(view, "RELATED") {
 		t.Errorf("EC2-033: navigating to alarm should leave the EC2 detail's RELATED panel behind; got:\n%s", view)
 	}
-	// Destination-type proof, same reasoning as EC2-021: the suffix format
-	// is identical for every child type, so also require alarm's own
-	// frame-title marker (alarm DOES have a catalog ListTitle override,
+	// The suffix format is identical for every child type, so also require
+	// alarm's own frame-title marker (alarm's catalog ListTitle override,
 	// core/aws/catalog_monitoring.go: ListTitle "alarms").
 	if wantMarker := relatedNavListTitleMarker(t, "alarm"); !strings.Contains(view, wantMarker) {
 		t.Errorf("EC2-033: expected destination frame-title marker %q for alarm; got:\n%s", wantMarker, view)

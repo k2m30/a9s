@@ -13,13 +13,6 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// ---------------------------------------------------------------------------
-// SNS Topic Subscriptions fetcher tests (child of SNS Topics)
-// ---------------------------------------------------------------------------
-
-// TestFetchSNSTopicSubscriptions_Basic verifies parsing of 3 subscriptions
-// (email confirmed, https confirmed, sqs pending), checking ID, Name, Fields,
-// and RawStruct.
 func TestFetchSNSTopicSubscriptions_Basic(t *testing.T) {
 	topicArn := "arn:aws:sns:us-east-1:123456789012:my-topic"
 	mock := &mockSNSListSubscriptionsByTopicClient{
@@ -135,8 +128,6 @@ func TestFetchSNSTopicSubscriptions_Basic(t *testing.T) {
 	})
 }
 
-// TestFetchSNSTopicSubscriptions_Empty verifies that an empty response returns
-// an empty slice with no error.
 func TestFetchSNSTopicSubscriptions_Empty(t *testing.T) {
 	mock := &mockSNSListSubscriptionsByTopicClient{
 		outputs: []*sns.ListSubscriptionsByTopicOutput{
@@ -157,8 +148,6 @@ func TestFetchSNSTopicSubscriptions_Empty(t *testing.T) {
 	}
 }
 
-// TestFetchSNSTopicSubscriptions_APIError verifies that API errors are
-// propagated correctly.
 func TestFetchSNSTopicSubscriptions_APIError(t *testing.T) {
 	mock := &mockSNSListSubscriptionsByTopicClient{
 		err: fmt.Errorf("AWS API error: throttling exception"),
@@ -175,9 +164,6 @@ func TestFetchSNSTopicSubscriptions_APIError(t *testing.T) {
 	}
 }
 
-// TestFetchSNSTopicSubscriptions_NilOptionalFields verifies that a subscription
-// with nil Protocol, Endpoint, and Owner does not panic and produces empty
-// strings for those fields.
 func TestFetchSNSTopicSubscriptions_NilOptionalFields(t *testing.T) {
 	mock := &mockSNSListSubscriptionsByTopicClient{
 		outputs: []*sns.ListSubscriptionsByTopicOutput{
@@ -186,7 +172,6 @@ func TestFetchSNSTopicSubscriptions_NilOptionalFields(t *testing.T) {
 					{
 						SubscriptionArn: aws.String("arn:aws:sns:us-east-1:123456789012:topic:sub-nil"),
 						TopicArn:        aws.String("arn:aws:sns:us-east-1:123456789012:topic"),
-						// Protocol, Endpoint, Owner are all nil
 					},
 				},
 			},
@@ -225,8 +210,6 @@ func TestFetchSNSTopicSubscriptions_NilOptionalFields(t *testing.T) {
 	})
 }
 
-// TestFetchSNSTopicSubscriptions_ConfirmationStatus verifies the "Confirmed"
-// vs "PendingConfirmation" logic based on SubscriptionArn value.
 func TestFetchSNSTopicSubscriptions_ConfirmationStatus(t *testing.T) {
 	mock := &mockSNSListSubscriptionsByTopicClient{
 		outputs: []*sns.ListSubscriptionsByTopicOutput{
@@ -281,17 +264,9 @@ func TestFetchSNSTopicSubscriptions_ConfirmationStatus(t *testing.T) {
 	})
 }
 
-// TestFetchSNSTopicSubscriptions_Pagination verifies that paginated responses
-// via NextToken are followed and all subscriptions collected across pages.
-// TestFetchSNSTopicSubscriptions_Pagination verifies the single-page pagination
-// contract: one API call is made per invocation, resources from that page are
-// returned, and IsTruncated/NextToken reflect whether more pages exist. A second
-// call with the continuation token verifies the token is forwarded and the final
-// page sets IsTruncated=false.
 func TestFetchSNSTopicSubscriptions_Pagination(t *testing.T) {
 	topicArn := "arn:aws:sns:us-east-1:123456789012:paginated-topic"
 
-	// Page 1: 2 subscriptions with NextToken indicating more pages exist.
 	page1Mock := &mockSNSListSubscriptionsByTopicClient{
 		outputs: []*sns.ListSubscriptionsByTopicOutput{
 			{
@@ -316,7 +291,6 @@ func TestFetchSNSTopicSubscriptions_Pagination(t *testing.T) {
 		},
 	}
 
-	// First call: no continuation token — fetches page 1.
 	result1, err := awsclient.FetchSNSTopicSubscriptions(context.Background(), page1Mock, topicArn, "")
 	if err != nil {
 		t.Fatalf("page 1: expected no error, got %v", err)
@@ -361,7 +335,6 @@ func TestFetchSNSTopicSubscriptions_Pagination(t *testing.T) {
 		}
 	})
 
-	// Page 2: 1 subscription with no NextToken — last page.
 	page2Mock := &mockSNSListSubscriptionsByTopicClient{
 		outputs: []*sns.ListSubscriptionsByTopicOutput{
 			{
@@ -378,7 +351,6 @@ func TestFetchSNSTopicSubscriptions_Pagination(t *testing.T) {
 		},
 	}
 
-	// Second call: pass continuation token from page 1 to fetch page 2.
 	result2, err := awsclient.FetchSNSTopicSubscriptions(context.Background(), page2Mock, topicArn, result1.Pagination.NextToken)
 	if err != nil {
 		t.Fatalf("page 2: expected no error, got %v", err)
@@ -406,9 +378,8 @@ func TestFetchSNSTopicSubscriptions_Pagination(t *testing.T) {
 	})
 }
 
-// TestFetchSNSTopicSubscriptions_PendingIDFormat verifies that pending
-// subscriptions get a composed ID instead of the literal
-// "PendingConfirmation" string.
+// A pending subscription's SubscriptionArn is the literal "PendingConfirmation",
+// so its ID is composed.
 //
 // The key carries the topic ARN: both subscription surfaces key a stateless
 // row through snsSubRowID, and the account-wide list spans every topic — the
@@ -464,8 +435,6 @@ func TestFetchSNSTopicSubscriptions_PendingIDFormat(t *testing.T) {
 	})
 }
 
-// TestSnsSubscriptionColumns verifies that SnsSubscriptionColumns returns
-// the expected 4 columns with correct keys and widths.
 func TestSnsSubscriptionColumns(t *testing.T) {
 	cols := resource.SnsSubscriptionColumns()
 
@@ -512,8 +481,6 @@ func TestSnsSubscriptionColumns(t *testing.T) {
 
 }
 
-// TestSnsSubscriptions_ChildTypeRegistered verifies that
-// resource.GetChildType("sns_subscriptions") returns a valid child type.
 func TestSnsSubscriptions_ChildTypeRegistered(t *testing.T) {
 	td := resource.GetChildType("sns_subscriptions")
 	if td == nil {
@@ -527,8 +494,6 @@ func TestSnsSubscriptions_ChildTypeRegistered(t *testing.T) {
 	}
 }
 
-// TestSnsSubscriptions_ChildFetcherRegistered verifies that
-// resource.GetPaginatedChildFetcher("sns_subscriptions") is non-nil.
 func TestSnsSubscriptions_PaginatedChildFetcherRegistered(t *testing.T) {
 	f := resource.GetPaginatedChildFetcher("sns_subscriptions")
 	if f == nil {
@@ -536,9 +501,6 @@ func TestSnsSubscriptions_PaginatedChildFetcherRegistered(t *testing.T) {
 	}
 }
 
-// TestSnsSubscriptions_ParentHasChildDef verifies that the sns parent resource
-// type has a child view definition for sns_subscriptions with key "enter" and
-// ContextKeys containing {"topic_arn": "ID"}.
 func TestSnsSubscriptions_ParentHasChildDef(t *testing.T) {
 	rt := resource.FindResourceType("sns")
 	if rt == nil {
@@ -565,8 +527,6 @@ func TestSnsSubscriptions_ParentHasChildDef(t *testing.T) {
 	}
 }
 
-// TestSnsSubscriptions_CopyField verifies that the sns_subscriptions child
-// type has CopyField set to "endpoint".
 func TestSnsSubscriptions_CopyField(t *testing.T) {
 	td := resource.GetChildType("sns_subscriptions")
 	if td == nil {
@@ -577,8 +537,6 @@ func TestSnsSubscriptions_CopyField(t *testing.T) {
 	}
 }
 
-// TestFetchSNSTopicSubscriptions_ContinuationToken verifies that a non-empty
-// continuation token is forwarded to the API as NextToken.
 func TestFetchSNSTopicSubscriptions_ContinuationToken(t *testing.T) {
 	wrapper := &tokenCapturingSNSSubsMock{
 		inner: &mockSNSListSubscriptionsByTopicClient{
@@ -614,7 +572,6 @@ func TestFetchSNSTopicSubscriptions_ContinuationToken(t *testing.T) {
 	}
 }
 
-// tokenCapturingSNSSubsMock wraps the SNS subscriptions mock to capture NextToken.
 type tokenCapturingSNSSubsMock struct {
 	inner             *mockSNSListSubscriptionsByTopicClient
 	capturedNextToken *string
@@ -624,5 +581,3 @@ func (m *tokenCapturingSNSSubsMock) ListSubscriptionsByTopic(ctx context.Context
 	m.capturedNextToken = params.NextToken
 	return m.inner.ListSubscriptionsByTopic(ctx, params, optFns...)
 }
-
-// ============================================================================

@@ -1,6 +1,3 @@
-// aws_efs_related_wave2_test.go — coverage wave 2 for efs_related.go checkers.
-// Covers: checkEFSSG (0%), checkEFSSubnet (0%).
-// Both checkers scan the ENI cache and filter by Description containing fsID.
 package unit_test
 
 import (
@@ -14,10 +11,6 @@ import (
 	_ "github.com/k2m30/a9s/v3/core/aws"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
-
-// ---------------------------------------------------------------------------
-// helpers
-// ---------------------------------------------------------------------------
 
 func efsENIWithSGAndSubnet(fsID, eniID, sgID, subnetID string) resource.Resource {
 	return resource.Resource{
@@ -45,10 +38,6 @@ func efsSourceResourceWithRaw(fsID string) resource.Resource {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// checkEFSSG — Pattern C: ENI cache scan, Description contains fsID → sg IDs
-// ---------------------------------------------------------------------------
-
 func TestRelated_EFS_SG_MatchesSGsFromMountTargetENI(t *testing.T) {
 	const fsID = "fs-0a1b2c3d4e5f60001"
 	const sgID = "sg-0aaa111111111111a"
@@ -73,7 +62,6 @@ func TestRelated_EFS_SG_NoMatchWhenENIBelongsToDifferentFS(t *testing.T) {
 	const fsID = "fs-0a1b2c3d4e5f60001"
 	const otherFSID = "fs-0zzzzzzzzzzzzzzzz"
 
-	// ENI description references a different FS.
 	eniRes := efsENIWithSGAndSubnet(otherFSID, "eni-0zzz", "sg-0zzz", "subnet-0zzz")
 	cache := resource.ResourceCache{
 		"eni": resource.ResourceCacheEntry{Resources: []resource.Resource{eniRes}},
@@ -87,7 +75,6 @@ func TestRelated_EFS_SG_NoMatchWhenENIBelongsToDifferentFS(t *testing.T) {
 	}
 }
 
-// Edge: two mount-target ENIs for same FS, same SG — SG deduplicated in result.
 func TestRelated_EFS_SG_DeduplicatesSGsAcrossMultipleENIs(t *testing.T) {
 	const fsID = "fs-0a1b2c3d4e5f60001"
 	const sharedSGID = "sg-0shared111111111"
@@ -111,10 +98,6 @@ func TestRelated_EFS_SG_DeduplicatesSGsAcrossMultipleENIs(t *testing.T) {
 		t.Errorf("ResourceIDs = %v, want [%s]", result.ResourceIDs(), sharedSGID)
 	}
 }
-
-// ---------------------------------------------------------------------------
-// checkEFSSubnet — Pattern C: ENI cache scan, Description contains fsID → subnet IDs
-// ---------------------------------------------------------------------------
 
 func TestRelated_EFS_Subnet_MatchesSubnetsFromMountTargetENI(t *testing.T) {
 	const fsID = "fs-0a1b2c3d4e5f60002"
@@ -153,7 +136,6 @@ func TestRelated_EFS_Subnet_NoMatchWhenENIBelongsToDifferentFS(t *testing.T) {
 	}
 }
 
-// Edge: multiple ENIs in different subnets for the same FS — all subnets returned.
 func TestRelated_EFS_Subnet_MultipleSubnetsFromDifferentAZENIs(t *testing.T) {
 	const fsID = "fs-0a1b2c3d4e5f60002"
 	const subnet1 = "subnet-0az1111111111a"

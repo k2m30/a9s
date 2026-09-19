@@ -1,7 +1,6 @@
 package unit
 
-// codex2_round4_test.go — MarkSkipped owns the vanished-resource race, so
-// every wave-2 enricher gets it without a site edit.
+// MarkSkipped owns the vanished-resource race for every wave-2 enricher.
 
 import (
 	"context"
@@ -80,10 +79,6 @@ func (f *codex2VanishFake) ListAttachedRolePolicies(_ context.Context, in *iam.L
 	return &iam.ListAttachedRolePoliciesOutput{}, nil
 }
 
-// TestEnrichIAMRoleLastUsed_VanishedRoleIsARace drives one of the five IAM
-// sites end to end through the registered enricher: the role's row is
-// uninspected and the composite error is empty, because nothing failed — the
-// role simply stopped existing.
 func TestEnrichIAMRoleLastUsed_VanishedRoleIsARace(t *testing.T) {
 	fake := &codex2VanishFake{gone: map[string]bool{"acme-gone-role": true}}
 	res, err := awsclient.EnrichIAMRoleLastUsed(context.Background(),
@@ -105,8 +100,6 @@ func TestEnrichIAMRoleLastUsed_VanishedRoleIsARace(t *testing.T) {
 	}
 }
 
-// TestEnrichIAMRoleLastUsed_RefusedRoleIsStillAFailure is the negative
-// control on the same lane: the guard must not swallow a denial.
 func TestEnrichIAMRoleLastUsed_RefusedRoleIsStillAFailure(t *testing.T) {
 	fake := &codex2VanishFake{denied: map[string]bool{"acme-denied-role": true}}
 	res, err := awsclient.EnrichIAMRoleLastUsed(context.Background(),

@@ -1,14 +1,14 @@
-// app_cache_wave_regressions_test.go — three core/app invariants.
+// Three core/app invariants:
 //
-//  1. Non-destructive refresh (C8): ActionRefresh over a list with rows
-//     already on screen must keep Loading=false/Rows intact immediately
-//     after Apply (only the empty-list case blanks to the Loading shell).
-//  2. Truncated disk seed shows N+ (C1/C5): a warm list open seeded from a
-//     disk cache TypeFile whose Count is a truncated lower bound must render
-//     the "N+" title / HasPagination=true BEFORE any refetch lands.
-//  3. Badge (S1): a row whose ONLY finding is a non-badge Wave-2 "~"
-//     (SevWarn) finding does not count in listIssueCount/GetListIssueCount,
-//     so the list frame title matches the menu badge's unifiedIssueCount.
+//  1. ActionRefresh over a list with rows on screen keeps Loading=false and
+//     Rows intact in the returned ViewState; only an empty list blanks to the
+//     Loading shell.
+//  2. A warm list open seeded from a disk cache TypeFile whose Count is a
+//     truncated lower bound renders the "N+" title and HasPagination=true
+//     before any refetch lands.
+//  3. A row whose only finding is a non-badge Wave-2 "~" (SevWarn) finding
+//     does not count in listIssueCount/GetListIssueCount, so the list frame
+//     title matches the menu badge's unifiedIssueCount.
 package unit_test
 
 import (
@@ -22,19 +22,10 @@ import (
 	"github.com/k2m30/a9s/v3/core/runtime"
 )
 
-// ────────────────────────────────────────────────────────────────────────────
-// Test 7 — non-destructive refresh (C8)
-// ────────────────────────────────────────────────────────────────────────────
-
-// TestActionRefresh_ListWithRows_StaysNonDestructive pins C8: applying
-// ActionRefresh over a list screen that already has rows on it must NOT
-// blank Loading=true/Rows=nil in the immediately-returned ViewState — the
-// cached content stays visible under the Refreshing marker while the
-// refetch runs, and any prior LastFetchError is cleared. Cache invalidation
-// (DeleteResourceCache) still happens so the refetch is a genuine re-fetch,
-// not a served-from-cache no-op — this test does not assert on that
-// invalidation directly (it is a session-cache-internal side effect with no
-// public read seam), only on the RENDERED non-destructive contract.
+// The cached content stays visible under the Refreshing marker while the
+// refetch runs, and a prior LastFetchError is cleared. ActionRefresh still
+// invalidates the session cache (DeleteResourceCache), so the refetch is a
+// genuine re-fetch.
 func TestActionRefresh_ListWithRows_StaysNonDestructive(t *testing.T) {
 	_, ctrl := newLiveWebStyleController(t, "", "us-east-1")
 
@@ -66,10 +57,6 @@ func TestActionRefresh_ListWithRows_StaysNonDestructive(t *testing.T) {
 	}
 }
 
-// TestActionRefresh_EmptyList_StillShowsLoading pins the non-regression half
-// of C8: a list screen with ZERO rows (nothing to keep under a marker) must
-// still show the Loading shell on ActionRefresh — there was never any
-// content for the refreshing marker to sit under.
 func TestActionRefresh_EmptyList_StillShowsLoading(t *testing.T) {
 	_, ctrl := newLiveWebStyleController(t, "", "us-east-1")
 
@@ -94,21 +81,11 @@ func TestActionRefresh_EmptyList_StillShowsLoading(t *testing.T) {
 	}
 }
 
-// ────────────────────────────────────────────────────────────────────────────
-// Test 8 — truncated disk seed shows N+ before any refetch lands
-// ────────────────────────────────────────────────────────────────────────────
-
-// TestWarmListOpen_TruncatedDiskSeed_ShowsNPlus_BeforeRefetch pins C1/C5's
-// "show what you know" contract for a TRUNCATED disk observation: a disk
-// cache TypeFile persisted with Count=50 and Exact=false (a truncated first
-// page from a prior session) must, once loaded via the real
-// AvailabilityCacheLoaded seam and the type's list opened, render "50+" in
-// the frame title and HasPagination=true — BEFORE any live refetch task has
-// executed. This is the disk-cache-seeded counterpart to the
-// already-covered in-session ProbeTruncated seeding path
-// (core/app/navigate.go's NavigateKindPushResourceList branch): here the
-// truncation signal must survive a full cold load-from-disk round trip via
-// AvailabilityCacheLoaded, not just a same-session probe.
+// A disk TypeFile persisted with Count=50 and Exact=false (a truncated first
+// page from a prior session), loaded via AvailabilityCacheLoaded, renders
+// "50+" and HasPagination=true on list open before any live refetch runs: the
+// truncation signal survives a cold load from disk, not only a same-session
+// probe (core/app/navigate.go's NavigateKindPushResourceList branch).
 func TestWarmListOpen_TruncatedDiskSeed_ShowsNPlus_BeforeRefetch(t *testing.T) {
 	t.Setenv("A9S_CONFIG_FOLDER", t.TempDir())
 	const profile, region = "npluswarm-prof", "us-east-1"
@@ -156,24 +133,16 @@ func TestWarmListOpen_TruncatedDiskSeed_ShowsNPlus_BeforeRefetch(t *testing.T) {
 		t.Errorf("ListFrameTitle() = %q, want it to contain %q — C1/C5: a truncated disk observation must render the lower-bound suffix immediately on warm open", title, "50+")
 	}
 
-	// Non-regression: HasPagination must have Truncated (not something
-	// stronger, like a full false positive of "load more" being disabled)
-	// disabled — pagination.HasMore mirrors ls.HasPagination in buildListBody.
+	// pagination.HasMore mirrors ls.HasPagination in buildListBody.
 	if !lb.Pagination.HasMore {
 		t.Error("ListBody.Pagination.HasMore = false, want true — the truncated disk seed must also surface as a load-more-eligible pagination state")
 	}
 }
 
-// ────────────────────────────────────────────────────────────────────────────
-// Test 10 — S1 badge fallback: color-issue row with only a non-badge finding
-// ────────────────────────────────────────────────────────────────────────────
-
-// TestGetListIssueCount_ColorIssueRow_OnlyNonBadgeFinding_NotCounted: a row
-// whose ONLY finding is a non-badge Wave-2 "~" (SevWarn) must NOT bump the
-// issue count: per docs/attention-signals.md S1 "~ findings do not bump", and
-// colorEC2 is colorFromAnyFinding-only (it does not read Fields["state"]), so
-// once runtime.Wave1Only strips the lone Wave-2 warn no issue signal remains.
-// The list frame title then matches the menu badge's unifiedIssueCount.
+// Per docs/attention-signals.md, "~" findings do not bump the issue count.
+// colorEC2 derives color from findings only, so once runtime.Wave1Only strips
+// the lone Wave-2 warn no issue signal remains, and the list frame title
+// matches the menu badge's unifiedIssueCount.
 func TestGetListIssueCount_LoneWave2Warn_NotCounted(t *testing.T) {
 	_, ctrl := newLiveWebStyleController(t, "", "us-east-1")
 

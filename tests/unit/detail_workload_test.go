@@ -1,19 +1,17 @@
 package unit
 
 // detail_workload_test.go — workload indivisibility for every Controller
-// entry point that begins a detail operation (#261 boundary-sealing wave):
-// Core.DetailOperationTasks is deleted; core/app.beginDetailWorkloadLocked
-// is now the single builder every such entry point routes through, returning
-// the COMPLETE workload (enrich + related, where both are registered) as one
-// slice callers append wholesale — no per-half selective discard. The related
-// half is omitted only when a cache replay populated the panel in the same
-// call (D6: no re-fan-out over cached data).
+// entry point that begins a detail operation:
+// core/app.beginDetailWorkloadLocked is the single builder every such entry
+// point routes through, returning the complete workload (enrich + related,
+// where both are registered) as one slice callers append wholesale. The
+// related half is left out only when a cache replay populated the panel in
+// the same call, so cached data is not fanned out again.
 //
-// Fixture: "ec2" (resource.GetDetailEnricher + resource.GetRelated both
-// non-empty — 1 detail enricher, 19 related defs, verified empirically) is
-// the source type for every test. "cfn" (EC2's related target on the
-// CloudFormation stack pivot) is itself both enricher- and related-registered,
-// used by the openRelatedDetail test.
+// Fixture: "ec2" (a detail enricher and related defs both registered) is the
+// source type for every test. "cfn" (EC2's related target on the
+// CloudFormation stack pivot) is itself both enricher- and
+// related-registered, used by the openRelatedDetail test.
 //
 // Every entry point is driven through the exported Controller/Apply surface
 // (app.Controller.Apply / .Handle) — never by calling the internal builder
@@ -182,8 +180,8 @@ func TestDetailWorkload_BackToDetail_BothTasksSameOp(t *testing.T) {
 // RelatedEnterResolveInPlace — re-dispatching the source's own workload
 // rather than navigating. Driven via ActionRelatedSelect (the web click
 // path, actions_nav.go's handleActionRelatedSelect); the keyboard
-// equivalent (handleActionSelect's related-focus branch) is the identical
-// shape and not independently covered here.
+// equivalent (handleActionSelect's related-focus branch) has the identical
+// shape.
 func TestDetailWorkload_RelatedRowRetry_BothTasksSameOp(t *testing.T) {
 	c := newTestController(t)
 	const id = "i-workload0000005"
@@ -197,15 +195,14 @@ func TestDetailWorkload_RelatedRowRetry_BothTasksSameOp(t *testing.T) {
 	assertCompleteWorkload(t, tasks)
 }
 
-// TestDetailWorkload_RelatedRowRetry_ForceRelated_CompleteButStaleCache_StillDispatchesRelatedCheck
-// pins #261's forceRelated pin (item c's companion): a resolve-in-place
-// retry (ActionRelatedSelect on a RelatedUnknown row) must still dispatch
-// KindRelatedCheck even when relatedCacheCoverage would otherwise read the
-// cache as COMPLETE (every def already has an entry, seeded stale here) —
-// forceRelated's RelatedCacheDelete is deliberately NOT made redundant by
-// PatchRelatedCache's idempotent-per-def replace (item c): a duplicate-free
-// cache can still be fully populated and stale, and only the delete forces
-// relatedCacheCoverage to read "incomplete" again.
+// TestDetailWorkload_RelatedRowRetry_ForceRelated_CompleteButStaleCache_StillDispatchesRelatedCheck:
+// a resolve-in-place retry (ActionRelatedSelect on a RelatedUnknown row) must
+// dispatch KindRelatedCheck even when relatedCacheCoverage would otherwise
+// read the cache as complete (every def already has an entry, seeded stale
+// here). PatchRelatedCache's idempotent-per-def replace keeps the cache
+// duplicate-free, but a duplicate-free cache can still be fully populated and
+// stale; only forceRelated's RelatedCacheDelete makes relatedCacheCoverage
+// read "incomplete" again.
 func TestDetailWorkload_RelatedRowRetry_ForceRelated_CompleteButStaleCache_StillDispatchesRelatedCheck(t *testing.T) {
 	c, core := newDetailParityHeadlessController(t)
 	const id = "i-workload0000015"
@@ -213,10 +210,9 @@ func TestDetailWorkload_RelatedRowRetry_ForceRelated_CompleteButStaleCache_Still
 
 	def0, idx0 := workloadRelatedDefByTarget(t, "cfn")
 
-	// Seed COMPLETE coverage for every ec2 def (including "cfn" itself) with
+	// Seed complete coverage for every ec2 def (including "cfn" itself) with
 	// stale values — relatedCacheCoverage alone would read this as complete
-	// and suppress KindRelatedCheck (item b), regardless of item c's
-	// duplicate-free replace fix.
+	// and suppress KindRelatedCheck.
 	defs := resource.GetRelated(workloadSrcType)
 	results := make([]runtime.RelatedCacheResult, 0, len(defs))
 	for _, d := range defs {
@@ -286,7 +282,7 @@ func TestDetailWorkload_OpenRelatedDetail_BothTasksSameOp(t *testing.T) {
 // for a resource whose related cache already holds an entry for EVERY def
 // resource.GetRelated(ec2) registers must NOT dispatch a new
 // KindRelatedCheck (the cached rows are replayed directly into the panel
-// instead — D6), while KindEnrichDetail must still be present, carrying a
+// instead), while KindEnrichDetail must still be present, carrying a
 // genuinely fresh (non-zero) op ID. Partial coverage (some but not all defs
 // cached) is a DIFFERENT contract — see
 // TestDetailWorkload_CacheReplay_PartialCoverage_RelatedStillDispatched.
@@ -393,17 +389,12 @@ func TestDetailWorkload_CacheReplay_PartialCoverage_RelatedStillDispatched(t *te
 	}
 }
 
-// ---------------------------------------------------------------------------
-// YAML/JSON direct-open cache-replay suppression: beginDetailWorkloadLocked's
-// suppression decision (relatedCacheCoverage) is screen-independent — a
-// YAML/JSON-only open has no detail panel to merge into, but must still
-// suppress KindRelatedCheck on complete coverage exactly like the
-// plain-detail path above
-// (TestDetailWorkload_CacheReplay_CompleteCoverage_.../_PartialCoverage_...).
-// A replay that bailed out whenever topDetailState() was nil — always true
-// under a YAML/JSON screen — would re-run the ENTIRE related fan-out against
-// AWS on every such open regardless of cache completeness.
-// ---------------------------------------------------------------------------
+// beginDetailWorkloadLocked's suppression decision (relatedCacheCoverage) is
+// screen-independent: a YAML/JSON-only open has no detail panel to merge
+// into, but still suppresses KindRelatedCheck on complete coverage like the
+// plain-detail path. A replay gated on topDetailState() — always nil under a
+// YAML/JSON screen — would re-run the entire related fan-out against AWS on
+// every such open.
 
 func TestDetailWorkload_YAMLOpen_CompleteCoverage_RelatedOmitted(t *testing.T) {
 	c, core := newDetailParityHeadlessController(t)
@@ -521,18 +512,15 @@ func TestDetailWorkload_RelatedPanelToggle(t *testing.T) {
 	assertCompleteWorkload(t, onTasks)
 }
 
-// ---------------------------------------------------------------------------
-// Sticky-refresh contract (boundary-sealing wave): an explicit Ctrl+R
-// refresh is a demand on the RESOURCE, not on the one DetailOperation that
-// happened to carry it (core/app/navigate.go's beginDetailWorkloadLocked doc
-// comment). A non-refresh successor operation for the same resource,
-// beginning before the refresh's own enrichment result has folded, inherits
-// SkipCache=true from session.PendingDetailRefresh — otherwise a
-// panel-toggle or related-row retry fired mid-refresh would silently
-// downgrade back to cached (pre-refresh) enrichment. The pending demand is
-// cleared only by foldEnrichDetailResultLocked's success path (an error
-// fold returns before reaching the clear), and by Session.Rotate().
-// ---------------------------------------------------------------------------
+// Sticky refresh: an explicit Ctrl+R refresh is a demand on the RESOURCE,
+// not on the one DetailOperation that carried it (core/app/navigate.go's
+// beginDetailWorkloadLocked doc comment). A non-refresh successor operation
+// for the same resource, beginning before the refresh's own enrichment result
+// has folded, inherits SkipCache=true from session.PendingDetailRefresh —
+// otherwise a panel-toggle or related-row retry fired mid-refresh would
+// silently downgrade back to cached (pre-refresh) enrichment. The pending
+// demand is cleared only by foldEnrichDetailResultLocked's success path (an
+// error fold returns before reaching the clear), and by Session.Rotate().
 
 // mintSuccessorWorkload seeds a fresh RelatedUnknown row for id's "cfn"
 // related def and fires ActionRelatedSelect on it — resource.RelatedEnter
@@ -572,7 +560,7 @@ func enrichSkipCache(t *testing.T, tasks []runtime.TaskRequest) bool {
 	return payload.DetailCtx.SkipCache
 }
 
-// TestStickyRefresh_SuccessorInheritsSkipCacheWhilePending covers (i): Ctrl+R
+// TestStickyRefresh_SuccessorInheritsSkipCacheWhilePending: Ctrl+R
 // begins a refresh operation N (its own enrich task's SkipCache is true, the
 // existing per-op contract); a successor operation N+1 minted before N's
 // enrichment result folds (mintSuccessorWorkload's resolve-in-place retry)
@@ -594,7 +582,7 @@ func TestStickyRefresh_SuccessorInheritsSkipCacheWhilePending(t *testing.T) {
 	}
 }
 
-// TestStickyRefresh_SuccessfulFoldAtOpGreaterOrEqualClearsIt covers (ii): once
+// TestStickyRefresh_SuccessfulFoldAtOpGreaterOrEqualClearsIt: once
 // an EnrichDetailResult for this resource folds successfully (Err == nil) at
 // an operation ID >= the refresh op, the NEXT non-refresh workload for the
 // same resource must have SkipCache=false again — the pending demand is
@@ -629,7 +617,7 @@ func TestStickyRefresh_SuccessfulFoldAtOpGreaterOrEqualClearsIt(t *testing.T) {
 	}
 }
 
-// TestStickyRefresh_ErrorFoldDoesNotClearIt covers (iii): an EnrichDetailResult
+// TestStickyRefresh_ErrorFoldDoesNotClearIt: an EnrichDetailResult
 // fold with a non-nil Err must NOT clear the pending refresh — the next
 // successor workload still inherits SkipCache=true, since the refresh demand
 // was never actually satisfied (foldEnrichDetailResultLocked returns before
@@ -658,7 +646,7 @@ func TestStickyRefresh_ErrorFoldDoesNotClearIt(t *testing.T) {
 	}
 }
 
-// TestStickyRefresh_DifferentResourceUnaffected covers (iv): resource A's
+// TestStickyRefresh_DifferentResourceUnaffected: resource A's
 // pending refresh must never leak onto a DIFFERENT resource B's (same type,
 // different ID) workload — the pending-refresh map is keyed by the full
 // resource identity (runtime.RelatedCacheKey: type+ID), not by type alone.
@@ -685,7 +673,7 @@ func TestStickyRefresh_DifferentResourceUnaffected(t *testing.T) {
 	}
 }
 
-// TestStickyRefresh_RotateClearsIt covers (v): Session.Rotate() (profile/
+// TestStickyRefresh_RotateClearsIt: Session.Rotate() (profile/
 // region switch) must clear every recorded pending refresh — a successor
 // workload for the same resource after Rotate must not carry SkipCache=true
 // forward into the new session.
@@ -733,21 +721,13 @@ func TestStickyRefresh_EnricherlessTypeDoesNotArmIt(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// regenerateTextScreenLocked stack-wide regeneration: open YAML, open JSON
-// on top of it — a newer DetailOperation begins for the JSON open,
-// invalidating the YAML operation's own in-flight enrich result, so only the
-// JSON operation's result ever folds. regenerateTextScreenLocked regenerates
-// EVERY stacked YAML/JSON screen whose (ResourceType, ResourceID) matches,
-// not only c.stack[len(c.stack)-1], so popping back to the buried YAML
-// screen does not reveal it permanently unenriched.
-//
-// ActionBack (core/app/actions_nav.go, handleActionBack): its re-dispatch
-// branch only fires for c.topDetailState() (a revealed ScreenDetail);
-// nothing analogous exists for a revealed text screen. Regeneration alone
-// suffices: a revealed YAML/JSON screen already shows enriched content from
-// the stack-wide fold, with no new task dispatch on the pop.
-// ---------------------------------------------------------------------------
+// regenerateTextScreenLocked regenerates every stacked YAML/JSON screen whose
+// (ResourceType, ResourceID) matches, not only the top one. Opening JSON on
+// top of YAML begins a newer DetailOperation that invalidates the YAML
+// operation's in-flight enrich result, so only the JSON operation's result
+// folds; popping back to the buried YAML screen must still reveal it
+// enriched. ActionBack re-dispatches only for a revealed ScreenDetail, so the
+// stack-wide fold is what enriches a revealed text screen.
 
 func TestDetailState_RegenerateTextScreen_StackedYAMLBeneathJSON_BothRegenerateOnEnrich(t *testing.T) {
 	c := newTestController(t)
@@ -795,9 +775,9 @@ func TestDetailState_RegenerateTextScreen_StackedYAMLBeneathJSON_BothRegenerateO
 	}
 }
 
-// TestDetailState_RegenerateTextScreen_SingleYAMLScreen_RegressionGuard pins
-// the original single-screen contract unchanged: no stacking, just a plain
-// YAML open, must still regenerate on its own operation's enrichment result.
+// TestDetailState_RegenerateTextScreen_SingleYAMLScreen_RegressionGuard: a
+// plain YAML open, with no stacking, regenerates on its own operation's
+// enrichment result.
 func TestDetailState_RegenerateTextScreen_SingleYAMLScreen_RegressionGuard(t *testing.T) {
 	c := newTestController(t)
 	const id = "i-workload0000017"

@@ -1,7 +1,6 @@
 package unit_test
 
-// aws6_ambiguous_error_code_test.go — an ambiguous error code is not a fact on
-// its own.
+// An ambiguous error code is not a fact on its own.
 //
 // Most services answer a deleted resource with a code that says so and says
 // nothing else: ResourceNotFoundException, NoSuchBucket, NoSuchHostedZone. Three
@@ -15,9 +14,9 @@ package unit_test
 // wrong while nothing was in fact inspected. That is the one thing the partial
 // answer machinery exists to prevent.
 //
-// The rule pinned here: for these three codes, code plus the service's
-// not-found message shape classifies as not-found; the same code with any other
-// message does not, and is reported as a failure.
+// For these three codes, code plus the service's not-found message shape
+// classifies as not-found; the same code with any other message does not, and
+// is reported as a failure.
 
 import (
 	"testing"
@@ -130,12 +129,9 @@ func TestMarkSkippedReportsAMalformedRequest(t *testing.T) {
 	}
 }
 
-// TestUnambiguousCodesStillClassifyOnCodeAlone is the guard against fixing the
-// three ambiguous codes by giving every code a message rule.
-//
 // A code that only ever means "gone" carries the whole fact; requiring a
-// message shape from it would make classification depend on wording AWS is free
-// to reword, and every service would break the day it did.
+// message shape from it would make classification depend on wording AWS is
+// free to reword.
 func TestUnambiguousCodesStillClassifyOnCodeAlone(t *testing.T) {
 	unambiguous := []string{
 		"ResourceNotFoundException",

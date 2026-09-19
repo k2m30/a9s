@@ -1,14 +1,8 @@
 package unit
 
-// app_error_surfacing_test.go — coverage for the new FlashMsg wiring on:
-//   - handleEnrichmentChecked (EnrichmentCheckedMsg.Err != nil)
-//   - handleAvailabilityPrefetched (AvailabilityPrefetchedMsg.PrefetchErr != nil)
-//
-// Each test dispatches the relevant Msg with a non-nil error, executes the
-// returned tea.Cmd (batch-walked to find the flash), and asserts that a
-// messages.Flash with IsError=true is emitted containing the expected
-// prefix + injected error substring. These are regression pins for the
-// "never silent skip" contract at the app level.
+// handleEnrichmentChecked and handleAvailabilityPrefetched surface a non-nil
+// error as a messages.Flash with IsError=true; an error is never skipped
+// silently.
 
 import (
 	"errors"
@@ -49,9 +43,6 @@ func findFlashInWalk(msg tea.Msg) (messages.Flash, bool) {
 	return messages.Flash{}, false
 }
 
-// TestEnrichmentCheckedMsg_ErrorEmitsFlash pins that a valid-gen enrichment
-// result with Err != nil surfaces as a FlashMsg{IsError:true} — before the
-// fix the error branch silently dropped through to nil cmd.
 func TestEnrichmentCheckedMsg_ErrorEmitsFlash(t *testing.T) {
 	m := newTestModel(t)
 	errMsg := messages.EnrichmentChecked{
@@ -75,9 +66,6 @@ func TestEnrichmentCheckedMsg_ErrorEmitsFlash(t *testing.T) {
 	}
 }
 
-// TestAvailabilityPrefetchedMsg_PrefetchErrEmitsFlash pins that a synchronous
-// availability prefetch with PrefetchErr != nil surfaces as FlashMsg. Before
-// the fix, per-type fetcher errors silently vanished from the menu state.
 func TestAvailabilityPrefetchedMsg_PrefetchErrEmitsFlash(t *testing.T) {
 	m := newTestModel(t)
 	errMsg := messages.AvailabilityPrefetched{
@@ -107,8 +95,6 @@ func TestAvailabilityPrefetchedMsg_PrefetchErrEmitsFlash(t *testing.T) {
 	}
 }
 
-// TestAvailabilityPrefetchedMsg_NilPrefetchErrNoFlash pins the symmetric case:
-// a clean prefetch (PrefetchErr == nil) must NOT emit an error FlashMsg.
 func TestAvailabilityPrefetchedMsg_NilPrefetchErrNoFlash(t *testing.T) {
 	m := newTestModel(t)
 	cleanMsg := messages.AvailabilityPrefetched{
@@ -120,7 +106,6 @@ func TestAvailabilityPrefetchedMsg_NilPrefetchErrNoFlash(t *testing.T) {
 		// Stamp the live AvailabilityGen — the staleness guard
 		// drops zero-stamped prefetches (AcceptZeroGen=false).
 		Gen: m.Core().Session().AvailabilityGen,
-		// PrefetchErr left nil — happy path.
 	}
 
 	_, cmd := m.Update(cleanMsg)
@@ -129,8 +114,6 @@ func TestAvailabilityPrefetchedMsg_NilPrefetchErrNoFlash(t *testing.T) {
 	}
 }
 
-// TestEnrichmentCheckedMsg_NilErrNoFlash is the symmetric happy-path pin for
-// the enrichment handler.
 func TestEnrichmentCheckedMsg_NilErrNoFlash(t *testing.T) {
 	m := newTestModel(t)
 	okMsg := messages.EnrichmentChecked{

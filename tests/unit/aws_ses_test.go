@@ -1,18 +1,3 @@
-// aws_ses_test.go — Fetcher tests for FetchSESIdentities and FetchSESIdentitiesPage.
-//
-// Contract assertions:
-//   - Fields["identity_name"], Fields["identity_type"], Fields["sending_enabled"],
-//     Fields["verification_status"] are populated from the raw IdentityInfo struct.
-//   - Fields["verification_status"] is the raw SDK enum string (e.g. "SUCCESS").
-//   - Status is the computed human-readable phrase from computeSESStatusAndIssues.
-//     Healthy identities (SUCCESS + sending enabled) → Status = "".
-//   - Issues slice mirrors the computed phrase(s).
-//   - RawStruct is set to the sesv2types.IdentityInfo value on every resource.
-//   - ID and Name both equal the identity name.
-//   - Empty API response → 0 resources, no error.
-//   - API error → error propagated.
-//   - Truncated when NextToken present; not truncated when absent.
-//   - Fixture-based: all 8 fixture identities map expected human-readable Status values.
 package unit
 
 import (
@@ -28,13 +13,6 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// ---------------------------------------------------------------------------
-// Field-mapping tests
-// ---------------------------------------------------------------------------
-
-// TestFetchSESIdentitiesPage_DomainIdentityFieldMapping verifies that a DOMAIN
-// identity is mapped to all four field-map keys with exact values.
-// Fields["verification_status"] is the raw enum string; Status is "".
 func TestFetchSESIdentitiesPage_DomainIdentityFieldMapping(t *testing.T) {
 	mock := &mockSESv2Client{
 		output: &sesv2.ListEmailIdentitiesOutput{
@@ -64,7 +42,6 @@ func TestFetchSESIdentitiesPage_DomainIdentityFieldMapping(t *testing.T) {
 	if r.Name != "acme-corp.com" {
 		t.Errorf("Name = %q, want %q", r.Name, "acme-corp.com")
 	}
-	// Healthy identity (SUCCESS + sending enabled): no findings, empty status field
 	if len(r.Findings) != 0 {
 		t.Errorf("Findings = %v, want empty for healthy identity", r.Findings)
 	}
@@ -82,7 +59,6 @@ func TestFetchSESIdentitiesPage_DomainIdentityFieldMapping(t *testing.T) {
 	if r.Fields["sending_enabled"] != "true" {
 		t.Errorf("Fields[sending_enabled] = %q, want %q", r.Fields["sending_enabled"], "true")
 	}
-	// Fields["verification_status"] is the raw SDK enum.
 	if r.Fields["verification_status"] != "SUCCESS" {
 		t.Errorf("Fields[verification_status] = %q, want %q", r.Fields["verification_status"], "SUCCESS")
 	}
@@ -91,9 +67,6 @@ func TestFetchSESIdentitiesPage_DomainIdentityFieldMapping(t *testing.T) {
 	}
 }
 
-// TestFetchSESIdentitiesPage_EmailAddressIdentityFieldMapping verifies that an
-// EMAIL_ADDRESS identity maps identity_type and sending_enabled correctly.
-// A PENDING identity produces a non-empty Status phrase.
 func TestFetchSESIdentitiesPage_EmailAddressIdentityFieldMapping(t *testing.T) {
 	mock := &mockSESv2Client{
 		output: &sesv2.ListEmailIdentitiesOutput{
@@ -121,47 +94,32 @@ func TestFetchSESIdentitiesPage_EmailAddressIdentityFieldMapping(t *testing.T) {
 		t.Errorf("ID = %q, want %q", r.ID, "noreply@acme-corp.com")
 	}
 	// The Type column renders this field verbatim and an operator reads a
-	// column, not an SDK enum constant (qa_ses_test.go pins the same).
+	// column, not an SDK enum constant.
 	if r.Fields["identity_type"] != "email address" {
 		t.Errorf("Fields[identity_type] = %q, want %q", r.Fields["identity_type"], "email address")
 	}
 	if r.Fields["sending_enabled"] != "false" {
 		t.Errorf("Fields[sending_enabled] = %q, want %q", r.Fields["sending_enabled"], "false")
 	}
-	// PENDING + sending disabled → multiple findings; status field is the top phrase.
 	if r.Fields["status"] == "" {
 		t.Error("Fields[status] = empty, want non-empty (PENDING + sending disabled identity)")
 	}
-	// Fields["verification_status"] is the raw SDK enum.
 	if r.Fields["verification_status"] != "PENDING" {
 		t.Errorf("Fields[verification_status] = %q, want %q", r.Fields["verification_status"], "PENDING")
 	}
 }
 
-// ---------------------------------------------------------------------------
-// Status phrase mapping — human-readable, not raw enum
-// ---------------------------------------------------------------------------
-
-// TestFetchSESIdentitiesPage_StatusPhraseMapping verifies the human-readable
-// Status phrase for each verification status that produces a non-empty phrase.
-// Healthy identities (SUCCESS + sending enabled) produce Status = "".
 func TestFetchSESIdentitiesPage_StatusPhraseMapping(t *testing.T) {
 	cases := []struct {
 		status         sesv2types.VerificationStatus
 		sendingEnabled bool
 		wantStatus     string
 	}{
-		// Healthy: SUCCESS + enabled → empty Status
 		{sesv2types.VerificationStatusSuccess, true, ""},
-		// PENDING verification
 		{sesv2types.VerificationStatusPending, true, "pending verification"},
-		// FAILED verification
 		{sesv2types.VerificationStatusFailed, true, "verification failed"},
-		// TEMPORARY_FAILURE
 		{sesv2types.VerificationStatusTemporaryFailure, true, "verify: temp failure"},
-		// NOT_STARTED
 		{sesv2types.VerificationStatusNotStarted, true, "verification not started"},
-		// Verified but sending disabled
 		{sesv2types.VerificationStatusSuccess, false, "sending disabled"},
 	}
 
@@ -199,9 +157,6 @@ func TestFetchSESIdentitiesPage_StatusPhraseMapping(t *testing.T) {
 	}
 }
 
-// TestFetchSESIdentitiesPage_MultipleIssuesSuffixBumped verifies that an identity
-// with FAILED verification AND sending disabled produces a Status phrase with the
-// "(+N)" suffix. The suffix is built by sesTopPhrase in the fetcher.
 func TestFetchSESIdentitiesPage_MultipleIssuesSuffixBumped(t *testing.T) {
 	mock := &mockSESv2Client{
 		output: &sesv2.ListEmailIdentitiesOutput{
@@ -224,24 +179,15 @@ func TestFetchSESIdentitiesPage_MultipleIssuesSuffixBumped(t *testing.T) {
 		t.Fatalf("expected 1 resource, got %d", len(result.Resources))
 	}
 	r := result.Resources[0]
-	// FAILED + sending-disabled → top phrase is "verification failed (+1)"
 	expected := "verification failed (+1)"
 	if r.Fields["status"] != expected {
 		t.Errorf("Fields[status] = %q, want %q (multi-finding suffix)", r.Fields["status"], expected)
 	}
-	// Findings slice contains both.
 	if len(r.Findings) != 2 {
 		t.Errorf("Findings = %v, want 2 entries", r.Findings)
 	}
 }
 
-// ---------------------------------------------------------------------------
-// Issues slice
-// ---------------------------------------------------------------------------
-
-// TestFetchSESIdentitiesPage_HealthyIdentityHasNilIssues verifies that a healthy
-// identity (SUCCESS + enabled) produces a nil or empty Issues slice (not an empty
-// string entry).
 func TestFetchSESIdentitiesPage_HealthyIdentityHasNilIssues(t *testing.T) {
 	mock := &mockSESv2Client{
 		output: &sesv2.ListEmailIdentitiesOutput{
@@ -266,12 +212,6 @@ func TestFetchSESIdentitiesPage_HealthyIdentityHasNilIssues(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// Pagination tests
-// ---------------------------------------------------------------------------
-
-// TestFetchSESIdentitiesPage_NotTruncatedWhenNoNextToken verifies that when
-// ListEmailIdentities returns no NextToken, the result is not truncated.
 func TestFetchSESIdentitiesPage_NotTruncatedWhenNoNextToken(t *testing.T) {
 	mock := &mockSESv2Client{
 		output: &sesv2.ListEmailIdentitiesOutput{
@@ -301,8 +241,6 @@ func TestFetchSESIdentitiesPage_NotTruncatedWhenNoNextToken(t *testing.T) {
 	}
 }
 
-// TestFetchSESIdentitiesPage_TruncatedWhenNextTokenPresent verifies that when
-// ListEmailIdentities returns a NextToken, IsTruncated=true and NextToken is set.
 func TestFetchSESIdentitiesPage_TruncatedWhenNextTokenPresent(t *testing.T) {
 	mock := &mockSESv2Client{
 		output: &sesv2.ListEmailIdentitiesOutput{
@@ -333,12 +271,6 @@ func TestFetchSESIdentitiesPage_TruncatedWhenNextTokenPresent(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// Edge cases
-// ---------------------------------------------------------------------------
-
-// TestFetchSESIdentitiesPage_EmptyResponseReturnsZeroResources verifies that
-// an empty identity list returns 0 resources and no error.
 func TestFetchSESIdentitiesPage_EmptyResponseReturnsZeroResources(t *testing.T) {
 	mock := &mockSESv2Client{
 		output: &sesv2.ListEmailIdentitiesOutput{
@@ -355,8 +287,6 @@ func TestFetchSESIdentitiesPage_EmptyResponseReturnsZeroResources(t *testing.T) 
 	}
 }
 
-// TestFetchSESIdentitiesPage_NilIdentityNameUsesEmptyString verifies that an
-// identity with nil IdentityName produces a resource with ID and Name = "".
 func TestFetchSESIdentitiesPage_NilIdentityNameUsesEmptyString(t *testing.T) {
 	mock := &mockSESv2Client{
 		output: &sesv2.ListEmailIdentitiesOutput{
@@ -386,8 +316,6 @@ func TestFetchSESIdentitiesPage_NilIdentityNameUsesEmptyString(t *testing.T) {
 	}
 }
 
-// TestFetchSESIdentitiesPage_APIErrorPropagated verifies that an API error is
-// returned without panic and without resources.
 func TestFetchSESIdentitiesPage_APIErrorPropagated(t *testing.T) {
 	mock := &mockSESv2Client{
 		err: &MockAPIError{Code: "TooManyRequestsException", Message: "rate limit exceeded"},
@@ -399,8 +327,6 @@ func TestFetchSESIdentitiesPage_APIErrorPropagated(t *testing.T) {
 	}
 }
 
-// TestFetchSESIdentitiesPage_ContinuationTokenAccepted verifies that a non-empty
-// continuation token does not cause an error (the page function does not reject it).
 func TestFetchSESIdentitiesPage_ContinuationTokenAccepted(t *testing.T) {
 	mock := &mockSESv2Client{
 		output: &sesv2.ListEmailIdentitiesOutput{
@@ -414,12 +340,6 @@ func TestFetchSESIdentitiesPage_ContinuationTokenAccepted(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// FetchSESIdentities (multi-page aggregator)
-// ---------------------------------------------------------------------------
-
-// TestFetchSESIdentities_NilEmailIdentitiesSliceReturnsZero verifies that when
-// the API returns nil EmailIdentities, the result is 0 resources without error.
 func TestFetchSESIdentities_NilEmailIdentitiesSliceReturnsZero(t *testing.T) {
 	mock := &mockSESv2Client{
 		output: &sesv2.ListEmailIdentitiesOutput{
@@ -438,13 +358,6 @@ func TestFetchSESIdentities_NilEmailIdentitiesSliceReturnsZero(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// Fixture-based tests
-// ---------------------------------------------------------------------------
-
-// TestFetchSESIdentitiesPage_FixtureGraphRootIsHealthy verifies that the graph-root
-// identity (SESGraphRootIdentity = "acme-corp.com") maps to Status = "" (healthy)
-// with identity_type = "DOMAIN" and sending_enabled = "true".
 func TestFetchSESIdentitiesPage_FixtureGraphRootIsHealthy(t *testing.T) {
 	f := fixtures.NewSESFixtures()
 	mock := &mockSESv2Client{
@@ -464,7 +377,6 @@ func TestFetchSESIdentitiesPage_FixtureGraphRootIsHealthy(t *testing.T) {
 			continue
 		}
 		found = true
-		// Graph-root is SUCCESS + sending enabled → no findings, empty status field
 		if len(r.Findings) != 0 {
 			t.Errorf("graph-root Findings = %v, want empty (healthy)", r.Findings)
 		}
@@ -487,9 +399,6 @@ func TestFetchSESIdentitiesPage_FixtureGraphRootIsHealthy(t *testing.T) {
 	}
 }
 
-// TestFetchSESIdentitiesPage_FixtureBrokenIdentitiesHaveFindings verifies
-// that the fixture contains identities with non-empty Findings, covering
-// the broken/warning categories.
 func TestFetchSESIdentitiesPage_FixtureBrokenIdentitiesHaveFindings(t *testing.T) {
 	f := fixtures.NewSESFixtures()
 	mock := &mockSESv2Client{
@@ -503,7 +412,6 @@ func TestFetchSESIdentitiesPage_FixtureBrokenIdentitiesHaveFindings(t *testing.T
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	// Count resources with non-empty Findings.
 	var nonEmpty int
 	for _, r := range result.Resources {
 		if len(r.Findings) > 0 {
@@ -515,8 +423,6 @@ func TestFetchSESIdentitiesPage_FixtureBrokenIdentitiesHaveFindings(t *testing.T
 	}
 }
 
-// TestFetchSESIdentitiesPage_FixtureMultiIssueIdentityHasSuffix verifies that
-// "broken.acme-corp.com" (FAILED + sending-disabled) maps to Status "verification failed (+1)".
 func TestFetchSESIdentitiesPage_FixtureMultiIssueIdentityHasSuffix(t *testing.T) {
 	f := fixtures.NewSESFixtures()
 	mock := &mockSESv2Client{

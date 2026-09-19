@@ -1,7 +1,6 @@
 package unit_test
 
-// aws6_fake_models_only_real_errors_test.go — a fake refuses only where the
-// real operation refuses.
+// A fake refuses only where the real operation refuses.
 //
 // The rule that every fake is honest about a key it does not hold is per
 // OPERATION, not per service. A read whose API models a not-found error answers
@@ -80,9 +79,9 @@ func TestRegisteredAlarmStillAnswersItsHistory(t *testing.T) {
 	}
 }
 
-// TestNoFakeRefusalUsesCloudWatchResourceNotFound is the class check. Once the
-// history call stops answering it, no fake refusal spells not-found that way,
-// and the code has no reader left to keep it in the one error table for.
+// CloudWatch models ResourceNotFound only on its dashboard and
+// anomaly-detector operations, and no read a9s makes is one of them, so no fake
+// refusal spells not-found that way.
 func TestNoFakeRefusalUsesCloudWatchResourceNotFound(t *testing.T) {
 	for _, pin := range fakeNotFoundPins() {
 		if pin.wantCode != "ResourceNotFound" {
@@ -93,8 +92,8 @@ func TestNoFakeRefusalUsesCloudWatchResourceNotFound(t *testing.T) {
 			pin.name, pin.wantCode)
 	}
 
-	// And the table entry goes with its last reader: a code no operation
-	// answers is a branch nothing reaches.
+	// A code no operation answers is a branch nothing reaches, so the error table
+	// leaves it unclassified.
 	if awsclient.ErrCodeIs(cloudWatchResourceNotFoundProbe(), "ResourceNotFound") &&
 		awsclient.IsNotFoundErr(cloudWatchResourceNotFoundProbe()) {
 		t.Error("\"ResourceNotFound\" is still classified as not-found while no a9s read receives it; " +

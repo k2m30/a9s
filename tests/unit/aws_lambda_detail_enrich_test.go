@@ -1,20 +1,9 @@
 package unit
 
-// aws_lambda_detail_enrich_test.go — coverage for enrichLambda
+// aws_lambda_detail_enrich_test.go — enrichLambda
 // (core/aws/lambda_detail_enrichment.go), the on-demand detail enricher
-// registered for the "lambda" resource type (#261).
-//
-// Covers:
-//   - wrong clients type / nil DetailEnrichmentCtx / nil Clients → error
-//     (lambda has no DetailDocs dependency — uncached, per the contract)
-//   - wrong RawStruct type → error
-//   - missing function name and ARN → error
-//   - FunctionName preferred over FunctionArn when both are present
-//   - success: GetFunction's Configuration replaces the embedded list-level
-//     config (State/StateReason/LastUpdateStatus land there); Code/Concurrency attached
-//   - out.Configuration == nil leaves the original list-level config in place
-//   - FunctionEnriched re-enrichment path accepted as RawStruct
-//   - API error propagated
+// registered for the "lambda" resource type. lambda has no DetailDocs
+// dependency; its detail enrichment is uncached.
 
 import (
 	"context"
@@ -27,10 +16,6 @@ import (
 	awsclient "github.com/k2m30/a9s/v3/core/aws"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
-
-// ---------------------------------------------------------------------------
-// enrichLambdaFake — narrow LambdaAPI fake with a call counter
-// ---------------------------------------------------------------------------
 
 type enrichLambdaFake struct {
 	getFunctionFn    func(*lambda.GetFunctionInput) (*lambda.GetFunctionOutput, error)
@@ -56,10 +41,6 @@ func (f *enrichLambdaFake) ListTags(_ context.Context, _ *lambda.ListTagsInput, 
 }
 
 var _ awsclient.LambdaAPI = (*enrichLambdaFake)(nil)
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
 
 func lambdaEnricher(t *testing.T) resource.DetailEnricher {
 	t.Helper()
@@ -98,10 +79,6 @@ func makeLambdaRes(name, arn string) resource.Resource {
 	return resource.Resource{ID: arn, RawStruct: makeLambdaCfg(name, arn)}
 }
 
-// ---------------------------------------------------------------------------
-// Tests: invalid context
-// ---------------------------------------------------------------------------
-
 func TestEnrichLambda_WrongClientsType_ReturnsError(t *testing.T) {
 	enricher := lambdaEnricher(t)
 	res := makeLambdaRes(lambdaTestName, lambdaTestArn)
@@ -133,10 +110,6 @@ func TestEnrichLambda_NilClients_ReturnsError(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// Tests: bad RawStruct / missing name+ARN
-// ---------------------------------------------------------------------------
-
 func TestEnrichLambda_WrongRawStructType_ReturnsError(t *testing.T) {
 	enricher := lambdaEnricher(t)
 	res := resource.Resource{ID: lambdaTestArn, RawStruct: "not-a-function"}
@@ -156,10 +129,6 @@ func TestEnrichLambda_NoNameOrArn_ReturnsError(t *testing.T) {
 		t.Fatal("expected error for function with no name or ARN, got nil")
 	}
 }
-
-// ---------------------------------------------------------------------------
-// Tests: success — Configuration replaces embedded, Code/Concurrency attached
-// ---------------------------------------------------------------------------
 
 func TestEnrichLambda_Success_ConfigurationReplacedCodeAndConcurrencyAttached(t *testing.T) {
 	fake := &enrichLambdaFake{
@@ -282,10 +251,6 @@ func TestEnrichLambda_FallsBackToArn_WhenNameEmpty(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// Tests: re-enrichment path
-// ---------------------------------------------------------------------------
-
 func TestEnrichLambda_FunctionEnrichedRawStruct_Accepted(t *testing.T) {
 	fake := &enrichLambdaFake{
 		getFunctionFn: func(_ *lambda.GetFunctionInput) (*lambda.GetFunctionOutput, error) {
@@ -318,10 +283,6 @@ func TestEnrichLambda_FunctionEnrichedRawStruct_Accepted(t *testing.T) {
 		t.Errorf("enriched.State = %v, want Active", enriched.State)
 	}
 }
-
-// ---------------------------------------------------------------------------
-// Tests: API error propagation
-// ---------------------------------------------------------------------------
 
 func TestEnrichLambda_APIError_Propagated(t *testing.T) {
 	fake := &enrichLambdaFake{

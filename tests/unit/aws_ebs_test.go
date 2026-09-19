@@ -16,10 +16,6 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// ---------------------------------------------------------------------------
-// EBS Volume fetcher tests
-// ---------------------------------------------------------------------------
-
 func TestFetchEBSVolumes_ParsesMultipleVolumes(t *testing.T) {
 	createTime := time.Date(2025, 3, 10, 14, 0, 0, 0, time.UTC)
 
@@ -68,7 +64,6 @@ func TestFetchEBSVolumes_ParsesMultipleVolumes(t *testing.T) {
 		t.Fatalf("expected 2 resources, got %d", len(resources))
 	}
 
-	// Verify first volume (in-use, with Name tag, with attachment)
 	r0 := resources[0]
 	if r0.ID != "vol-111aabbcc" {
 		t.Errorf("resource[0].ID: expected %q, got %q", "vol-111aabbcc", r0.ID)
@@ -76,13 +71,11 @@ func TestFetchEBSVolumes_ParsesMultipleVolumes(t *testing.T) {
 	if r0.Name != "prod-data-vol" {
 		t.Errorf("resource[0].Name: expected %q, got %q", "prod-data-vol", r0.Name)
 	}
-	// Post-fold contract: in-use state is healthy → no Status, no Finding.
 	if len(r0.Findings) != 0 {
 		t.Errorf("resource[0].Findings: expected 0 for in-use volume, got %d", len(r0.Findings))
 	}
 
-	// Verify second volume (available, no Name tag, no attachment, created
-	// 2025-03-10 — well past the 7-day orphan-age threshold at test run time).
+	// Created 2025-03-10, past the 7-day orphan-age threshold.
 	r1 := resources[1]
 	if r1.ID != "vol-222ddeeff" {
 		t.Errorf("resource[1].ID: expected %q, got %q", "vol-222ddeeff", r1.ID)
@@ -90,9 +83,8 @@ func TestFetchEBSVolumes_ParsesMultipleVolumes(t *testing.T) {
 	if r1.Name != "" {
 		t.Errorf("resource[1].Name: expected empty string (no Name tag), got %q", r1.Name)
 	}
-	// Post-fold contract (3018ae98): an unattached "available" volume older
-	// than ebsOrphanAge (7 days) emits a CodeEBSOrphanUnattached SevWarn
-	// finding so the Status cell / Attention block explain the yellow row.
+	// An unattached "available" volume older than ebsOrphanAge (7 days) emits a
+	// CodeEBSOrphanUnattached SevWarn finding, which explains the yellow row.
 	if len(r1.Findings) != 1 {
 		t.Fatalf("resource[1].Findings: expected 1 orphan finding for aged unattached volume, got %d: %+v", len(r1.Findings), r1.Findings)
 	}
@@ -184,7 +176,6 @@ func TestFetchEBSVolumes_FieldExtraction(t *testing.T) {
 
 	r := resources[0]
 
-	// Verify all FieldKeys are present and have exact values
 	if r.Fields["volume_id"] != "vol-111aabbcc" {
 		t.Errorf("Fields[\"volume_id\"]: expected %q, got %q", "vol-111aabbcc", r.Fields["volume_id"])
 	}

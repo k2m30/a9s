@@ -12,8 +12,6 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// subnetCheckerByTarget retrieves the RelatedChecker for the given targetType
-// and fails the test if the checker is nil or not found.
 func subnetCheckerByTarget(t *testing.T, target string) resource.RelatedChecker {
 	t.Helper()
 	for _, def := range resource.GetRelated("subnet") {
@@ -28,7 +26,6 @@ func subnetCheckerByTarget(t *testing.T, target string) resource.RelatedChecker 
 	return nil
 }
 
-// subnetSrcResource returns a canonical test resource for subnet-abc123.
 func subnetSrcResource() resource.Resource {
 	return resource.Resource{
 		ID:   "subnet-abc123",
@@ -43,8 +40,6 @@ func subnetSrcResource() resource.Resource {
 		},
 	}
 }
-
-// --- EC2 Instances checker tests ---
 
 func TestRelated_Subnet_EC2_Match(t *testing.T) {
 	res := subnetSrcResource()
@@ -90,8 +85,6 @@ func TestRelated_Subnet_EC2_NoMatch(t *testing.T) {
 	}
 }
 
-// --- ENI checker tests ---
-
 func TestRelated_Subnet_ENI_Match(t *testing.T) {
 	res := subnetSrcResource()
 	cache := resource.ResourceCache{
@@ -113,8 +106,6 @@ func TestRelated_Subnet_ENI_Match(t *testing.T) {
 	}
 }
 
-// --- NAT Gateway checker tests ---
-
 func TestRelated_Subnet_NAT_Match(t *testing.T) {
 	res := subnetSrcResource()
 	cache := resource.ResourceCache{
@@ -135,8 +126,6 @@ func TestRelated_Subnet_NAT_Match(t *testing.T) {
 		t.Errorf("Count = %d, want 1", result.Count())
 	}
 }
-
-// --- ELB checker tests ---
 
 func TestRelated_Subnet_ELB_Match(t *testing.T) {
 	res := subnetSrcResource()
@@ -184,8 +173,6 @@ func TestRelated_Subnet_ELB_NoMatch(t *testing.T) {
 	}
 }
 
-// --- Nil clients / empty cache tests ---
-
 func TestRelated_Subnet_NilClients(t *testing.T) {
 	res := subnetSrcResource()
 	emptyCache := resource.ResourceCache{}
@@ -198,8 +185,6 @@ func TestRelated_Subnet_NilClients(t *testing.T) {
 		}
 	}
 }
-
-// --- RTB checker tests ---
 
 func TestRelated_Subnet_RTB_ExplicitAssoc(t *testing.T) {
 	res := subnetSrcResource()
@@ -269,8 +254,6 @@ func TestRelated_Subnet_RTB_NoMatch(t *testing.T) {
 	}
 }
 
-// --- CFN checker tests ---
-
 func TestRelated_Subnet_CFN_HasTag(t *testing.T) {
 	res := resource.Resource{
 		ID:     "subnet-abc123",
@@ -308,8 +291,6 @@ func TestRelated_Subnet_CFN_NoTag(t *testing.T) {
 	}
 }
 
-// --- NavigableFields test ---
-
 func TestNavigableFields_Subnet(t *testing.T) {
 	fields := resource.GetNavigableFields("subnet")
 	found := false
@@ -324,9 +305,6 @@ func TestNavigableFields_Subnet(t *testing.T) {
 	}
 }
 
-// --- VPC checker tests ---
-
-// TestRelated_Subnet_VPC_Found: subnet with vpc_id in Fields returns the VPC.
 func TestRelated_Subnet_VPC_Found(t *testing.T) {
 	res := subnetSrcResource()
 	checker := subnetCheckerByTarget(t, "vpc")
@@ -340,7 +318,6 @@ func TestRelated_Subnet_VPC_Found(t *testing.T) {
 	}
 }
 
-// TestRelated_Subnet_VPC_NoVPCID: subnet with missing vpc_id returns Count:0.
 func TestRelated_Subnet_VPC_NoVPCID(t *testing.T) {
 	res := resource.Resource{
 		ID:     "subnet-abc123",
@@ -354,13 +331,8 @@ func TestRelated_Subnet_VPC_NoVPCID(t *testing.T) {
 	}
 }
 
-// --- ASG checker tests ---
-
-// TestRelated_Subnet_ASG_Match: an ASG whose vpc_zone_identifier contains this
-// subnet ID (comma-separated) produces Count:1.
 func TestRelated_Subnet_ASG_Match(t *testing.T) {
 	res := subnetSrcResource()
-	// vpc_zone_identifier contains our subnet plus a second subnet.
 	asgRes := resource.Resource{
 		ID:   "my-asg",
 		Name: "my-asg",
@@ -383,8 +355,6 @@ func TestRelated_Subnet_ASG_Match(t *testing.T) {
 	}
 }
 
-// TestRelated_Subnet_ASG_NoMatch: an ASG whose vpc_zone_identifier does not
-// include this subnet produces Count:0.
 func TestRelated_Subnet_ASG_NoMatch(t *testing.T) {
 	res := subnetSrcResource()
 	asgRes := resource.Resource{
@@ -405,8 +375,6 @@ func TestRelated_Subnet_ASG_NoMatch(t *testing.T) {
 	}
 }
 
-// TestRelated_Subnet_ASG_SubnetsFieldFallback: ASG with no vpc_zone_identifier
-// but a "subnets" field containing the subnet ID matches.
 func TestRelated_Subnet_ASG_SubnetsFieldFallback(t *testing.T) {
 	res := subnetSrcResource()
 	asgRes := resource.Resource{
@@ -430,12 +398,6 @@ func TestRelated_Subnet_ASG_SubnetsFieldFallback(t *testing.T) {
 	}
 }
 
-// --- EKS checker tests ---
-// checkSubnetEFS is a genuine stub (unconditionally State: RelatedUnknown for non-empty ID);
-// it is intentionally not tested.
-
-// TestRelated_Subnet_EKS_Match: an EKS cluster whose "subnets" field contains
-// this subnet ID produces Count:1.
 func TestRelated_Subnet_EKS_Match(t *testing.T) {
 	res := subnetSrcResource()
 	eksRes := resource.Resource{
@@ -460,8 +422,6 @@ func TestRelated_Subnet_EKS_Match(t *testing.T) {
 	}
 }
 
-// TestRelated_Subnet_EKS_SubnetIDsFieldFallback: EKS cluster with no "subnets"
-// but a "subnet_ids" field containing the subnet ID also matches.
 func TestRelated_Subnet_EKS_SubnetIDsFieldFallback(t *testing.T) {
 	res := subnetSrcResource()
 	eksRes := resource.Resource{
@@ -482,8 +442,6 @@ func TestRelated_Subnet_EKS_SubnetIDsFieldFallback(t *testing.T) {
 	}
 }
 
-// TestRelated_Subnet_EKS_NoMatch: an EKS cluster whose subnets field does not
-// contain this subnet produces Count:0.
 func TestRelated_Subnet_EKS_NoMatch(t *testing.T) {
 	res := subnetSrcResource()
 	eksRes := resource.Resource{
@@ -504,10 +462,6 @@ func TestRelated_Subnet_EKS_NoMatch(t *testing.T) {
 	}
 }
 
-// --- VPCE checker tests ---
-
-// TestRelated_Subnet_VPCE_Match: a VPC endpoint whose SubnetIds includes this
-// subnet produces Count:1.
 func TestRelated_Subnet_VPCE_Match(t *testing.T) {
 	res := subnetSrcResource()
 	vpceRes := resource.Resource{
@@ -533,8 +487,6 @@ func TestRelated_Subnet_VPCE_Match(t *testing.T) {
 	}
 }
 
-// TestRelated_Subnet_VPCE_NoMatch: a VPC endpoint whose SubnetIds does not
-// include this subnet produces Count:0.
 func TestRelated_Subnet_VPCE_NoMatch(t *testing.T) {
 	res := subnetSrcResource()
 	vpceRes := resource.Resource{
@@ -555,8 +507,6 @@ func TestRelated_Subnet_VPCE_NoMatch(t *testing.T) {
 	}
 }
 
-// TestRelated_Subnet_VPCE_WrongRawStruct: a VPCE resource with no
-// RawStruct of the expected type is skipped (no panic, Count:0).
 func TestRelated_Subnet_VPCE_WrongRawStruct(t *testing.T) {
 	res := subnetSrcResource()
 	vpceRes := resource.Resource{
@@ -574,5 +524,3 @@ func TestRelated_Subnet_VPCE_WrongRawStruct(t *testing.T) {
 		t.Errorf("Count = %d, want 0 (wrong RawStruct type skipped)", result.Count())
 	}
 }
-
-// --- Demo checker test ---

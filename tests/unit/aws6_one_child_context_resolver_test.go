@@ -1,21 +1,9 @@
 package unit_test
 
-// aws6_one_child_context_resolver_test.go — one resolver for a child view's
-// parent context.
-//
 // resource.ResolveChildContext is the single place a ChildViewDef's ContextKeys
 // become the map handed to a ChildFetcher. It understands four sources: "ID",
 // "Name", "@parent.<key>" for a grandparent's context, and any other string as
 // a Fields key.
-//
-// The controller's own drill path keeps a copy of that switch, and the copy is
-// missing the "@parent." case. A one-level drill never notices, because nothing
-// above it has a context to inherit. A second-level drill does: the S3 object
-// browser's folder-into-folder step reads its bucket from "@parent.bucket", and
-// the copy resolves that to Fields["@parent.bucket"], which no row carries.
-//
-// The pin drives the controller's real drill and compares against the resolver,
-// so the expectation cannot drift from what the resolver actually does.
 
 import (
 	"sort"
@@ -133,10 +121,8 @@ func TestFileRowDoesNotDrill(t *testing.T) {
 			files[0].ID)
 	}
 
-	// Without this the test above passes on a path that opens NOTHING, which
-	// is what it does today: the same listing's prefix row must drill, so
-	// "no fetch" means the condition rejected the row and not that the drill
-	// is broken for everything.
+	// The same listing's prefix row must drill, so "no fetch" above means the
+	// condition rejected the row and not that the drill is broken for everything.
 	c2 := openDemoBucketObjectList(t, bucket, folders)
 	_, folderTasks := c2.Apply(app.Action{Kind: app.ActionChildView, Arg: "enter"})
 	if _, ok := childFetchPayload(folderTasks); !ok {
@@ -255,8 +241,7 @@ func openDemoBucketObjectList(t *testing.T, bucket string, rows []resource.Resou
 	c := newVisibilityListController(t, "s3")
 	c.ApplyResourcesLoaded("s3", only, nil, false)
 
-	// The first drill: bucket → its object listing. This one needs no
-	// grandparent, which is why the missing source never showed up here.
+	// The first drill, bucket → its object listing, needs no grandparent.
 	if _, tasks := c.Apply(app.Action{Kind: app.ActionChildView, Arg: "enter"}); len(tasks) == 0 {
 		t.Fatalf("drilling into bucket %q dispatched no child fetch", bucket)
 	}

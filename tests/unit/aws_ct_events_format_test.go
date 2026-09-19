@@ -1,8 +1,5 @@
 package unit
 
-// Tests for §3 (FormatCTTimestamp) and §5 (FormatCTTarget) format helpers in
-// core/aws/ct_events.go.
-
 import (
 	"testing"
 
@@ -10,10 +7,7 @@ import (
 	"github.com/k2m30/a9s/v3/core/semantics/ctevent"
 )
 
-// ===========================================================================
-// §3: FormatCTTimestamp
-// Format: "Jan 02 15:04:05" — fixed 15 characters, zero-padded day.
-// ===========================================================================
+// FormatCTTimestamp: "Jan 02 15:04:05" — fixed 15 characters, zero-padded day.
 
 func TestFormatCTTimestamp(t *testing.T) {
 	cases := []struct {
@@ -31,17 +25,13 @@ func TestFormatCTTimestamp(t *testing.T) {
 		if got != c.want {
 			t.Errorf("FormatCTTimestamp(%q) = %q, want %q", c.rfc3339, got, c.want)
 		}
-		// Non-empty inputs must produce exactly 15 characters per §3.
 		if c.rfc3339 != "" && len(got) != 15 {
 			t.Errorf("FormatCTTimestamp(%q) = %q (len %d), want exactly 15 chars per §3", c.rfc3339, got, len(got))
 		}
 	}
 }
 
-// ===========================================================================
-// §5: FormatCTTarget
-// Strips ARN noise. Cross-account exception retains account ID inline.
-// ===========================================================================
+// FormatCTTarget strips ARN noise; a cross-account ARN keeps its account ID inline.
 
 func TestFormatCTTarget(t *testing.T) {
 	const localAccount = "123456789012"
@@ -62,9 +52,7 @@ func TestFormatCTTarget(t *testing.T) {
 		{"arn:aws:iam::999988887777:role/Admin", "999988887777:role/Admin"},
 		// S3 cross-account bucket ARN — no account segment, always strip regardless of "cross".
 		{"arn:aws:s3:::shared-bucket", "shared-bucket"},
-		// Not an ARN — passthrough unchanged.
 		{"not-an-arn", "not-an-arn"},
-		// Empty — return empty.
 		{"", ""},
 	}
 

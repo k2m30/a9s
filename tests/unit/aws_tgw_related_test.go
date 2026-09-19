@@ -13,8 +13,6 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// tgwCheckerByTarget retrieves the RelatedChecker for the given targetType
-// and fails the test if the checker is nil or not found.
 func tgwCheckerByTarget(t *testing.T, target string) resource.RelatedChecker {
 	t.Helper()
 	for _, def := range resource.GetRelated("tgw") {
@@ -31,7 +29,6 @@ func tgwCheckerByTarget(t *testing.T, target string) resource.RelatedChecker {
 
 const tgwTestID = "tgw-abc123"
 
-// tgwSrcResource returns a canonical test resource for a TGW.
 func tgwSrcResource() resource.Resource {
 	return resource.Resource{
 		ID:   tgwTestID,
@@ -45,10 +42,6 @@ func tgwSrcResource() resource.Resource {
 	}
 }
 
-// --- RTB checker tests (Pattern C — reverse cache lookup) ---
-
-// TestRelated_TGW_RTB_Match verifies that an RTB whose route has a
-// TransitGatewayId matching the source TGW is counted.
 func TestRelated_TGW_RTB_Match(t *testing.T) {
 	res := tgwSrcResource()
 	cache := resource.ResourceCache{
@@ -72,8 +65,6 @@ func TestRelated_TGW_RTB_Match(t *testing.T) {
 	}
 }
 
-// TestRelated_TGW_RTB_NoMatch verifies that RTBs whose routes point to a
-// different TGW produce Count=0.
 func TestRelated_TGW_RTB_NoMatch(t *testing.T) {
 	res := tgwSrcResource()
 	cache := resource.ResourceCache{
@@ -97,8 +88,6 @@ func TestRelated_TGW_RTB_NoMatch(t *testing.T) {
 	}
 }
 
-// TestRelated_TGW_NilClients verifies that the RTB checker returns Count=-1
-// when the cache has no rtb entry (cache miss / nil clients).
 func TestRelated_TGW_NilClients(t *testing.T) {
 	res := tgwSrcResource()
 	emptyCache := resource.ResourceCache{}
@@ -111,10 +100,6 @@ func TestRelated_TGW_NilClients(t *testing.T) {
 	}
 }
 
-// --- VPC checker nil-clients test ---
-
-// TestRelated_TGW_VPC_NilClients verifies that the vpc checker returns
-// State: RelatedUnknown when clients are nil (DescribeTransitGatewayVpcAttachments cannot be called).
 func TestRelated_TGW_VPC_NilClients(t *testing.T) {
 	res := tgwSrcResource()
 	checker := tgwCheckerByTarget(t, "vpc")
@@ -124,15 +109,6 @@ func TestRelated_TGW_VPC_NilClients(t *testing.T) {
 	}
 }
 
-// TestRelated_TGW_CFN_HasTag and TestRelated_TGW_CFN_NoTag were deleted:
-// tgw→cfn is in the Explicitly excluded list (unanimous sometimes — tag-heuristic only).
-// See docs/related-resources.md "Explicitly excluded" section.
-
-// --- VPC checker tests (Pattern A — direct API call) ---
-
-// tgwVpcAttachmentsFake implements awsclient.EC2API for tgw→vpc checker testing.
-// It embeds the interface and overrides only DescribeTransitGatewayVpcAttachments
-// so test callers can seed a per-TGW-id response.
 type tgwVpcAttachmentsFake struct {
 	awsclient.EC2API
 	results map[string][]ec2types.TransitGatewayVpcAttachment
@@ -161,11 +137,8 @@ func (f *tgwVpcAttachmentsFake) DescribeTransitGatewayVpcAttachments(
 	}, nil
 }
 
-// Compile-time check: the fake satisfies the aggregate EC2API interface.
 var _ awsclient.EC2API = (*tgwVpcAttachmentsFake)(nil)
 
-// TestRelated_TGW_VPC_Match verifies that two distinct VpcIds returned by the
-// fake produce Count=2 with both ids in ResourceIDs.
 func TestRelated_TGW_VPC_Match(t *testing.T) {
 	fake := &tgwVpcAttachmentsFake{
 		results: map[string][]ec2types.TransitGatewayVpcAttachment{
@@ -196,17 +169,14 @@ func TestRelated_TGW_VPC_Match(t *testing.T) {
 			t.Errorf("ResourceIDs missing %q; got %v", want, result.ResourceIDs())
 		}
 	}
-	// Guard against an error slipping through while Count still looks right.
 	if result.Err() != nil {
 		t.Errorf("unexpected Err: %v", result.Err())
 	}
 }
 
-// TestRelated_TGW_VPC_Empty verifies that zero attachments produce Count=0.
 func TestRelated_TGW_VPC_Empty(t *testing.T) {
 	fake := &tgwVpcAttachmentsFake{
 		results: map[string][]ec2types.TransitGatewayVpcAttachment{
-			// Empty slice for this TGW id — valid, explicit "no attachments" response.
 			tgwTestID: {},
 		},
 	}
@@ -224,12 +194,9 @@ func TestRelated_TGW_VPC_Empty(t *testing.T) {
 	}
 }
 
-// TestRelated_TGW_VPC_WrongRawStruct verifies the checker returns Count=-1
-// when RawStruct is not ec2types.TransitGateway (defensive guard).
 func TestRelated_TGW_VPC_WrongRawStruct(t *testing.T) {
 	res := resource.Resource{
-		ID: tgwTestID,
-		// Intentionally wrong type — a VPC struct, not a TransitGateway.
+		ID:        tgwTestID,
 		RawStruct: ec2types.Vpc{VpcId: aws.String("vpc-wrong")},
 	}
 
@@ -241,14 +208,9 @@ func TestRelated_TGW_VPC_WrongRawStruct(t *testing.T) {
 	}
 }
 
-// --- Role checker tests (Pattern A — iam:GetRole for the TGW service-linked role) ---
-
 const tgwSLRName = "AWSServiceRoleForVPCTransitGateway"
 const tgwSLRARN = "arn:aws:iam::123456789012:role/aws-service-role/transitgateway.amazonaws.com/AWSServiceRoleForVPCTransitGateway"
 
-// TestRelated_TGW_Role_Match verifies that a GetRole response with a valid ARN
-// produces Count=1 with the role's name in ResourceIDs.
-//
 // Role rows are keyed by role name, and the ARN is read through the role
 // resolver.
 func TestRelated_TGW_Role_Match(t *testing.T) {
@@ -270,8 +232,8 @@ func TestRelated_TGW_Role_Match(t *testing.T) {
 	}
 }
 
-// TestRelated_TGW_Role_Empty verifies that a NoSuchEntity error from GetRole
-// produces Count=0 (the SLR does not exist in this account).
+// GetRole's NoSuchEntity means the service-linked role does not exist in
+// this account.
 func TestRelated_TGW_Role_Empty(t *testing.T) {
 	fake := newFakeIAMWithNoSuchEntityRole()
 	clients := &awsclient.ServiceClients{IAM: fake}
@@ -288,8 +250,6 @@ func TestRelated_TGW_Role_Empty(t *testing.T) {
 	}
 }
 
-// TestRelated_TGW_Role_NilClients verifies that nil clients produces Count=-1
-// (checker cannot call iam:GetRole without a client).
 func TestRelated_TGW_Role_NilClients(t *testing.T) {
 	res := tgwSrcResource()
 
@@ -301,10 +261,6 @@ func TestRelated_TGW_Role_NilClients(t *testing.T) {
 	}
 }
 
-// --- Subnet checker tests (Pattern A — ec2:DescribeTransitGatewayVpcAttachments) ---
-
-// TestRelated_TGW_Subnet_Match verifies that two attachments each carrying one
-// subnet produce Count=2 with both subnet IDs in ResourceIDs.
 func TestRelated_TGW_Subnet_Match(t *testing.T) {
 	const sub1 = "subnet-0a1b2c3d4e5f60001"
 	const sub2 = "subnet-0a1b2c3d4e5f60002"
@@ -340,8 +296,6 @@ func TestRelated_TGW_Subnet_Match(t *testing.T) {
 	}
 }
 
-// TestRelated_TGW_Subnet_Empty verifies that attachments with no SubnetIds
-// produce Count=0.
 func TestRelated_TGW_Subnet_Empty(t *testing.T) {
 	fake := &tgwVpcAttachmentsFake{
 		results: map[string][]ec2types.TransitGatewayVpcAttachment{
@@ -364,8 +318,6 @@ func TestRelated_TGW_Subnet_Empty(t *testing.T) {
 	}
 }
 
-// TestRelated_TGW_Subnet_NilClients verifies that nil clients produces Count=-1
-// (checker cannot call DescribeTransitGatewayVpcAttachments without a client).
 func TestRelated_TGW_Subnet_NilClients(t *testing.T) {
 	res := tgwSrcResource()
 

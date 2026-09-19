@@ -74,10 +74,6 @@ func TestPeriod_Closed(t *testing.T) {
 	}
 }
 
-// TestQuery_Validate died with Query.Validate() itself (closure-wave
-// deletion) — the two-GroupBy-dim-max constraint it pinned is no longer
-// enforced at that seam.
-
 func TestQuery_CacheKey_DeterministicAcrossMapIterationOrder(t *testing.T) {
 	q := costs.Query{
 		Granularity: "DAILY",
@@ -137,8 +133,7 @@ func TestQuery_CacheKey_VariesByShapeNotByRange(t *testing.T) {
 		t.Errorf("CacheKey() unchanged after Filter changed: %q", k)
 	}
 
-	// Range only affects which periods a cached CacheKey covers, not the
-	// key itself (data-model.md: "period range is stored per-record").
+	// Range only affects which periods a cached CacheKey covers, not the key.
 	rangeChanged := base
 	rangeChanged.Range = costs.Period{Start: "2020-01-01", End: "2021-01-01"}
 	if k := rangeChanged.CacheKey(); k != baseKey {

@@ -1,13 +1,3 @@
-// coverage_live_gaps_test.go — black-box tests for live, production-reachable
-// exported/semi-exported surface that carried low coverage: handleCostsKeyMsg
-// and handleDetailKeyMsg (driven through the real key-routing chain via
-// tui.Model.Update), WithActiveTheme, ActiveDetailResource, RawYAML,
-// RawYAMLFromResource, SetReapplyChecker, the RELATED panel's Enter-navigate
-// route, and Controller.ApplyDetailRelatedResultForResource's
-// DefDisplayName-omitted fallback and filtered-set cursor movement.
-//
-// Reuses the chain* helpers from ec2_stories_nav_chains_test.go (same package)
-// for navigation into a live EC2 detail screen.
 package unit_test
 
 import (
@@ -30,10 +20,6 @@ import (
 	"github.com/k2m30/a9s/v3/tests/unit/tuitest"
 )
 
-// ---------------------------------------------------------------------------
-// Local helpers
-// ---------------------------------------------------------------------------
-
 // livegapStep sends msg through tui.Model.Update and type-asserts the result
 // back to tui.Model.
 func livegapStep(m tui.Model, msg tea.Msg) (tui.Model, tea.Cmd) {
@@ -51,13 +37,9 @@ func livegapSpecialKey(code rune) tea.KeyPressMsg {
 }
 
 // livegapModel builds a sized, isolated tui.Model (its own A9S_CONFIG_FOLDER)
-// wired with real demo fake clients (demo.NewServiceClients(), the same
-// shared demo-fake harness newChainDemoModel/newPreviewDemoModel use) rather
-// than a clientless model. A clientless model never sets ClientsReady, so any
-// live path gated on it (costs data fetch, resource lookups) would silently
-// go unexercised by every test built on this helper; wiring real (fake, in-
-// process) clients closes that gap while staying fully hermetic — no network
-// calls, no real AWS credentials.
+// wired with in-process demo fake clients (demo.NewServiceClients()): a
+// clientless model never sets ClientsReady, so paths gated on it (costs data
+// fetch, resource lookups) would never run.
 func livegapModel(t *testing.T) tui.Model {
 	t.Helper()
 	t.Setenv("A9S_CONFIG_FOLDER", t.TempDir())
@@ -74,12 +56,10 @@ func livegapModel(t *testing.T) tui.Model {
 
 // livegapThemesModel is livegapModel plus a themes/ directory pre-populated
 // with the given theme file names, for driving the theme selector. activeTheme
-// == "" omits WithActiveTheme so the default takes effect. Also wired with
-// real demo fake clients (see livegapModel's doc comment) instead of a
-// clientless model; both call expressions keep literal tui.WithNoCache(true)/
-// tui.WithIsDemo(true) arguments (rather than building the option slice
-// dynamically) to match the construction-discipline gate's literal-detection
-// exemption (qa_controller_construction_discipline_test.go).
+// == "" omits WithActiveTheme so the default takes effect. The literal
+// tui.WithNoCache(true)/tui.WithIsDemo(true) arguments match the
+// construction-discipline gate's literal-detection exemption
+// (qa_controller_construction_discipline_test.go).
 func livegapThemesModel(t *testing.T, activeTheme string, themeFiles ...string) tui.Model {
 	t.Helper()
 	dir := t.TempDir()
@@ -114,10 +94,6 @@ func livegapThemesModel(t *testing.T, activeTheme string, themeFiles ...string) 
 	m, _ = livegapStep(m, tea.WindowSizeMsg{Width: 120, Height: 30})
 	return m
 }
-
-// ---------------------------------------------------------------------------
-// handleCostsKeyMsg (app_costs.go)
-// ---------------------------------------------------------------------------
 
 // wantCostsFrameTitle asserts the exact "Costs: by <pivot> · <metric> ·
 // <granularity>" breadcrumb (costsFrameTitle, core/app/costs_body.go) appears
@@ -186,10 +162,6 @@ func TestLiveGap_HandleCostsKeyMsg_MovementKeysOnEmptyGrid_NoCrash(t *testing.T)
 		t.Errorf("costs screen should still be rendered after movement keys on an empty grid, got:\n%s", plain)
 	}
 }
-
-// ---------------------------------------------------------------------------
-// handleDetailKeyMsg (app_stack.go)
-// ---------------------------------------------------------------------------
 
 func TestLiveGap_HandleDetailKeyMsg_YAMLKey_NavigatesToYAMLTarget(t *testing.T) {
 	m := newChainDemoModel(t)
@@ -273,10 +245,6 @@ func TestLiveGap_HandleDetailKeyMsg_EscapeWithActiveSearch_ClearsSearchWithoutPo
 	}
 }
 
-// ---------------------------------------------------------------------------
-// WithActiveTheme (app_options.go)
-// ---------------------------------------------------------------------------
-
 func TestLiveGap_WithActiveTheme_MarksNamedThemeAsCurrentInSelector(t *testing.T) {
 	m := livegapThemesModel(t, "dracula.yaml", "tokyo-night.yaml", "dracula.yaml")
 	m, _ = livegapStep(m, messages.Navigate{Target: messages.TargetTheme})
@@ -319,10 +287,6 @@ func TestLiveGap_WithActiveTheme_DefaultsToTokyoNightWhenOptionOmitted(t *testin
 	}
 }
 
-// ---------------------------------------------------------------------------
-// ActiveDetailResource (app_accessors.go)
-// ---------------------------------------------------------------------------
-
 func TestLiveGap_ActiveDetailResource_ReturnsResourceOnDetailScreen(t *testing.T) {
 	m := newChainDemoModel(t)
 	m = chainNavigateToEC2Detail(t, m)
@@ -344,19 +308,11 @@ func TestLiveGap_ActiveDetailResource_FalseWhenNotOnDetailScreen(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// RawYAML / RawYAMLFromResource (detail_render.go / transient.go)
-// ---------------------------------------------------------------------------
-
 type livegapRawStruct struct {
 	Name string
 	N    int
 }
 
-// TestLiveGap_RawYAML_MarshalsFieldsWhenNoRawStruct is the live-seam
-// replacement for the retired views.NewDetail(...).RawYAML() call: the
-// Fields-only (no RawStruct) case isn't covered by the RawYAMLFromResource
-// tests below, so it's ported onto that construction-free function instead.
 func TestLiveGap_RawYAML_MarshalsFieldsWhenNoRawStruct(t *testing.T) {
 	res := resource.Resource{ID: "res-2", Fields: map[string]string{"Alpha": "one"}}
 
@@ -383,10 +339,6 @@ func TestLiveGap_RawYAMLFromResource_EmptyWhenNoDataAtAll(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// SetReapplyChecker (resourcelist_helpers.go)
-// ---------------------------------------------------------------------------
-
 // livegapReapplyResources are the two rows fed to the checker/list body — IDs
 // match the checker's own filter below ("i-match" survives, "i-other" is
 // dropped) and carry realistic ec2 Fields (mirrors ec2TestResources,
@@ -411,8 +363,7 @@ func livegapReapplyResources() []resource.Resource {
 // livegapRenderVisibleList renders the top list screen's current ListBody
 // through the real production RenderList seam (views.NewTransientResourceList
 // + RenderList, mirrored from renderListRaw in phase03_view_reads_test.go),
-// stripped of ANSI — the "what the user sees" surface findings #2/#7/#15
-// require instead of asserting on internal Controller state.
+// stripped of ANSI.
 func livegapRenderVisibleList(t *testing.T, ctrl *app.Controller, td resource.ResourceTypeDef) string {
 	t.Helper()
 	lb := ctrl.Snapshot().Body.List
@@ -470,12 +421,9 @@ func TestLiveGap_SetReapplyChecker_RegistersCheckerAndActivatesZeroMatchFilter(t
 	}
 }
 
-// TestLiveGap_SetReapplyChecker_NilCheckerLeavesRelatedIDSetUntouched first
-// activates a real related-ID filter (only i-match passes) so the assertion
-// below can distinguish "nil is a no-op" from "nil silently clears the
-// active filter" — both resources start visible before any filter, so
-// asserting on that unfiltered state would pass even if the nil setter
-// wrongly cleared ls.RelatedIDSet.
+// A related-ID filter (only i-match passes) is active first: both resources
+// are visible before any filter, so only a filtered state shows whether a
+// nil setter cleared ls.RelatedIDSet.
 func TestLiveGap_SetReapplyChecker_NilCheckerLeavesRelatedIDSetUntouched(t *testing.T) {
 	td := resource.FindResourceType("ec2")
 	if td == nil {
@@ -515,19 +463,6 @@ func TestLiveGap_SetReapplyChecker_NilCheckerLeavesRelatedIDSetUntouched(t *test
 		t.Errorf("SetReapplyChecker(nil, ...) must not clear the active related-ID filter (i-other should stay hidden), got:\n%s", got)
 	}
 }
-
-// ---------------------------------------------------------------------------
-// handleDetailKeyMsg's right-column Enter path (app_stack.go:376-421):
-// SelectedRelatedRow feeding messages.RelatedNavigate. RightColumnModel's
-// SelectedTypeName/rows/View were removed (rightcolumn.go's row-fact store
-// is dead — see internal/tui/views/coverage_topup_whitebox_test.go); row
-// facts now live in core/app's DetailState and the Enter key reads them via
-// Controller.SelectedRelatedRow (already unit-tested directly in
-// core/app/controller_selected_related_test.go), but no test previously
-// drove the actual key-press route from a focused, actionable related row to
-// the resulting messages.RelatedNavigate cmd through the real
-// tui.Model.Update chain.
-// ---------------------------------------------------------------------------
 
 func TestLiveGap_HandleDetailKeyMsg_RelatedPanelEnter_OnActionableRow_NavigatesUsingControllerRow(t *testing.T) {
 	m := newChainDemoModel(t)
@@ -573,30 +508,11 @@ func TestLiveGap_HandleDetailKeyMsg_RelatedPanelEnter_OnActionableRow_NavigatesU
 	}
 }
 
-// ---------------------------------------------------------------------------
-// handleDetailKeyMsg's right-column Up/Down/Enter routing while the RELATED
-// panel's filter is active (app_stack.go's right-column block in
-// handleDetailKeyMsg). Down must move DetailState.RelatedCursor while
-// filtering (not RightColumnModel's widget-local cursor, which
-// RenderDetail/SelectedRelatedRow never read). Enter's contract is the
-// product's deliberate, list-filter-matching convention, pinned as the
-// authority by
-// TestDemoScenarioHarness_DetailRelatedAndYAMLSearch
-// (tests/integration/scripted_scenario_smoke_test.go): the FIRST Enter while
-// filtering only CONFIRMS the filter text and stays on the detail screen —
-// it must NOT navigate. Only a SECOND, no-longer-filtering Enter navigates,
-// to the row under the (post-confirm) cursor. The widget legitimately owns
-// filter TEXT input (typing/backspace/Escape — pinned by the six
-// TestTopUp_RightColumn_Update_FilterMode_* tests in
-// coverage_topup_whitebox_test.go); non-filtering Up/Down/Enter routing is
-// already covered above by
-// TestLiveGap_HandleDetailKeyMsg_RelatedPanelEnter_OnActionableRow_NavigatesUsingControllerRow,
-// and non-filtering ActionMoveDown/Up's cursor-skip logic itself
-// (core/app/detail_cursor.go's applyDetailActions) is pinned headless by
-// TestRelatedCursor_MoveDown_SkipsDimmedRow (app_related_cursor_skip_test.go)
-// and TestRelatedCursor_MoveDown_LandsOnTruncatedResultRow
-// (tui_related_dim_parity_test.go).
-// ---------------------------------------------------------------------------
+// While the RELATED filter is active, Down moves DetailState.RelatedCursor.
+// The first Enter only confirms the filter text and stays on the detail
+// screen (the list-filter convention, also driven by
+// TestDemoScenarioHarness_DetailRelatedAndYAMLSearch); a second Enter
+// navigates to the row under the cursor.
 
 // relatedFilterGapModel builds an EC2 detail with two RELATED rows
 // ("Target Groups" and "Auto Scaling Groups") resolved to a single
@@ -634,14 +550,6 @@ func relatedFilterGapModel(t *testing.T, extraKeys ...tea.KeyMsg) tui.Model {
 	return m
 }
 
-// TestLiveGap_HandleDetailKeyMsg_RelatedPanelFilterMode_EnterConfirmsFilterWithoutNavigating
-// asserts the FIRST Enter while filtering: no messages.RelatedNavigate cmd,
-// and — after letting any cmd it did return run (mirroring how the real
-// bubbletea runtime would auto-continue it) — the detail screen is still
-// showing the source EC2 resource, matching
-// TestDemoScenarioHarness_DetailRelatedAndYAMLSearch's ConfirmInput() step,
-// which stays on the detail view and asserts the (still-filtered) related
-// row text, never a navigated-away list/detail.
 func TestLiveGap_HandleDetailKeyMsg_RelatedPanelFilterMode_EnterConfirmsFilterWithoutNavigating(t *testing.T) {
 	m := relatedFilterGapModel(t)
 
@@ -664,18 +572,8 @@ func TestLiveGap_HandleDetailKeyMsg_RelatedPanelFilterMode_EnterConfirmsFilterWi
 	}
 }
 
-// TestLiveGap_HandleDetailKeyMsg_RelatedPanelFilterMode_SecondEnterNavigatesToSurvivingCursorRow
-// is the confirm-then-navigate half of the same contract: after a first
-// Enter confirms the filter (see the test above — its returned cmd is
-// deliberately NOT executed here, to isolate whether the cursor SURVIVES the
-// confirm from whether that first Enter also, incorrectly, tries to
-// navigate), a SECOND Enter — no longer filtering — navigates to whichever
-// row the cursor points at. This also guards the ActionSetFilter reset trap
-// (core/app/detail_cursor.go's ActionSetFilter case unconditionally resets
-// DetailState.RelatedCursor to 0 whenever it runs, including the confirm
-// sync): a Down press before the confirm must survive it, landing the
-// second Enter on the SECOND filtered match ("Auto Scaling Groups"), not
-// silently back on the first ("Target Groups").
+// The first Enter's cmd is not run here, so the test isolates cursor
+// survival across the confirm from navigation by the first Enter.
 func TestLiveGap_HandleDetailKeyMsg_RelatedPanelFilterMode_SecondEnterNavigatesToSurvivingCursorRow(t *testing.T) {
 	cases := []struct {
 		name           string
@@ -719,13 +617,9 @@ func TestLiveGap_HandleDetailKeyMsg_RelatedPanelFilterMode_SecondEnterNavigatesT
 	}
 }
 
-// ---------------------------------------------------------------------------
-// Controller.ApplyDetailRelatedResultForResource's DefDisplayName-omitted
-// fallback (core/app/handle.go's mergeDetailRelatedRow): production always
-// sets DefDisplayName, so this branch only fires for callers (or messages)
-// that omit it — it must refuse to bind when the TargetType is ambiguous
-// across rows, and bind when exactly one row carries that TargetType.
-// ---------------------------------------------------------------------------
+// Production always sets DefDisplayName; without it, mergeDetailRelatedRow
+// (core/app/handle.go) binds by TargetType only when exactly one row
+// carries it.
 
 func TestLiveGap_ApplyDetailRelatedResultForResource_AmbiguousTargetTypeWithoutDisplayName_NoBind(t *testing.T) {
 	res := resource.Resource{ID: "evt-livegap-ambiguous-0001", Name: "evt-livegap-ambiguous-0001"}
@@ -784,12 +678,6 @@ func TestLiveGap_ApplyDetailRelatedResultForResource_UnambiguousTargetTypeFallba
 		t.Errorf("row.Count = %d, want 7", rb.Count)
 	}
 }
-
-// ---------------------------------------------------------------------------
-// Related-panel cursor movement within a filtered (narrowed) row set
-// (core/app/detail_cursor.go's ActionMoveDown/Up + visibleRelatedRowCount /
-// visibleRelatedRowAt honoring ds.RelatedFilter).
-// ---------------------------------------------------------------------------
 
 func TestLiveGap_RelatedCursor_FilterMode_UpDown_MoveWithinFilteredSet(t *testing.T) {
 	res := resource.Resource{ID: "i-livegap-filtercursor-0001", Name: "i-livegap-filtercursor-0001"}

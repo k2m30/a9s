@@ -1,20 +1,3 @@
-// aws_ses_related_fixture_test.go — Fixture-based related-panel checker tests for SES.
-//
-// These tests use NewSESFixtures() canonical constants to verify that the SES
-// related-panel checkers produce correct counts when driven by the demo graph-root
-// identity "acme-corp.com" and its wired event destinations.
-//
-// Contract assertions:
-//   - checkSESEbRule with graph-root identity (config set = SESConfigSetName) →
-//     Count>0 (rules on the "default" bus from EventBridge fixture).
-//     Returned IDs are rule NAMES, not ARNs. No ID starts with "arn:".
-//   - checkSESSns with graph-root identity → Count=1 (one SnsDestination).
-//   - checkSESS3 with valid sesv2types.IdentityInfo RawStruct → Count=0
-//     (SES v1 API unavailable; valid RawStruct means unknown/0, not -1).
-//   - checkSESLambda: returned IDs are function NAMES, not full ARNs.
-//   - Non-graph-root identity (no config set) → Count=0 for eb-rule/sns.
-//   - Empty identity ID → Count=0 (all config-set-dependent checkers).
-//   - nil clients (wrong type) → Count=-1 for checkers that need API access.
 package unit_test
 
 import (
@@ -35,8 +18,6 @@ import (
 	"github.com/k2m30/a9s/v3/core/session"
 )
 
-// sesCheckerByTarget returns the RelatedChecker for the given target type registered
-// under "ses". It fails the test immediately if the checker is not found.
 func sesCheckerByTarget(t *testing.T, target string) resource.RelatedChecker {
 	t.Helper()
 	for _, def := range resource.GetRelated("ses") {
@@ -51,9 +32,6 @@ func sesCheckerByTarget(t *testing.T, target string) resource.RelatedChecker {
 	return nil
 }
 
-// sesFixtureSrcIdentity builds a resource.Resource from the canonical SES fixture
-// for the given identity name. Sets RawStruct to sesv2types.IdentityInfo so that
-// checkers that call assertStruct receive the correct type.
 func sesFixtureSrcIdentity(identityName string) resource.Resource {
 	return resource.Resource{
 		ID:   identityName,
@@ -69,8 +47,6 @@ func sesFixtureSrcIdentity(identityName string) resource.Resource {
 	}
 }
 
-// sesFixtureClients returns a *ServiceClients whose SESv2 fake is wired with the
-// canonical fixture event destinations for the graph-root identity.
 func sesFixtureClients() *awsclient.ServiceClients {
 	f := fixtures.NewSESFixtures()
 	return &awsclient.ServiceClients{
@@ -90,8 +66,6 @@ func newFakeSESv2FromFixture(f *fixtures.SESFixtures) *fakeSESv2Checker {
 	)
 }
 
-// ebRuleCache builds a ResourceCache with "eb-rule" entries from the EventBridge
-// fixture (rules on the "default" bus).
 func ebRuleCache() resource.ResourceCache {
 	f := fixtures.NewEventBridgeFixtures()
 	var resources []resource.Resource
@@ -117,8 +91,6 @@ func ebRuleCache() resource.ResourceCache {
 	}
 }
 
-// ebRuleNamesOnDefaultBus returns the set of rule names in the EventBridge fixture
-// that are on the "default" bus. Used to validate eb-rule checker output.
 func ebRuleNamesOnDefaultBus() map[string]struct{} {
 	f := fixtures.NewEventBridgeFixtures()
 	names := make(map[string]struct{})
@@ -130,14 +102,6 @@ func ebRuleNamesOnDefaultBus() map[string]struct{} {
 	return names
 }
 
-// ---------------------------------------------------------------------------
-// checkSESEbRule — fixture-based (new semantic: bus-name → rule names)
-// ---------------------------------------------------------------------------
-
-// TestRelated_SES_EbRule_FixtureGraphRootReturnsRuleNames verifies that the
-// graph-root identity wired to SESConfigSetName returns rule NAMEs (not bus ARNs)
-// for the "eb-rule" pivot. The fixture EventBridge bus is "default"; all rules on
-// that bus should be returned.
 func TestRelated_SES_EbRule_FixtureGraphRootReturnsRuleNames(t *testing.T) {
 	clients := sesFixtureClients()
 	src := sesFixtureSrcIdentity(fixtures.SESGraphRootIdentity)
@@ -155,26 +119,20 @@ func TestRelated_SES_EbRule_FixtureGraphRootReturnsRuleNames(t *testing.T) {
 
 	knownNames := ebRuleNamesOnDefaultBus()
 	for _, id := range result.ResourceIDs() {
-		// Guard: no returned ID may be an ARN — that is the regression we're fixing.
 		if len(id) >= 4 && id[:4] == "arn:" {
 			t.Errorf("ResourceID %q starts with 'arn:' — checker must return rule names, not ARNs", id)
 		}
-		// Every returned ID must be a recognised rule name from the fixture.
 		if _, ok := knownNames[id]; !ok {
 			t.Errorf("ResourceID %q is not a known EventBridge rule name from the fixture (known: %v)", id, knownNames)
 		}
 	}
 }
 
-// TestRelated_SES_EbRule_ScopeLimitedToBusName verifies that only rules whose
-// event_bus matches the bus name extracted from the SES EventBridgeDestination ARN
-// are returned. Rules on a different bus must be excluded.
 func TestRelated_SES_EbRule_ScopeLimitedToBusName(t *testing.T) {
 	// SES fixture ships to "default" bus.
 	clients := sesFixtureClients()
 	src := sesFixtureSrcIdentity(fixtures.SESGraphRootIdentity)
 
-	// Build a synthetic cache: rules on "default" bus AND rules on "custom-bus".
 	cache := resource.ResourceCache{
 		"eb-rule": resource.ResourceCacheEntry{
 			Resources: []resource.Resource{
@@ -192,14 +150,12 @@ func TestRelated_SES_EbRule_ScopeLimitedToBusName(t *testing.T) {
 		t.Errorf("unexpected error: %v", result.Err())
 	}
 
-	// "rule-on-custom" must NOT appear — it is on a different bus.
 	for _, id := range result.ResourceIDs() {
 		if id == "rule-on-custom" {
 			t.Errorf("ResourceIDs = %v, must NOT contain 'rule-on-custom' (wrong bus)", result.ResourceIDs())
 		}
 	}
 
-	// "rule-on-default" and "another-default-rule" MUST appear.
 	wantIDs := []string{"rule-on-default", "another-default-rule"}
 	for _, want := range wantIDs {
 		found := false
@@ -215,11 +171,8 @@ func TestRelated_SES_EbRule_ScopeLimitedToBusName(t *testing.T) {
 	}
 }
 
-// TestRelated_SES_EbRule_NonGraphRootIdentityReturnsZero verifies that an identity
-// without a config set (not the graph-root) returns Count=0 for eb-rule.
 func TestRelated_SES_EbRule_NonGraphRootIdentityReturnsZero(t *testing.T) {
 	clients := sesFixtureClients()
-	// Use a non-graph-root identity — the fake will return empty config set name.
 	src := sesFixtureSrcIdentity("noreply@acme-corp.com")
 
 	checker := sesCheckerByTarget(t, "eb-rule")
@@ -230,8 +183,6 @@ func TestRelated_SES_EbRule_NonGraphRootIdentityReturnsZero(t *testing.T) {
 	}
 }
 
-// TestRelated_SES_EbRule_EmptyIDReturnsZero verifies that an empty identity ID
-// short-circuits to Count=0.
 func TestRelated_SES_EbRule_EmptyIDReturnsZero(t *testing.T) {
 	clients := sesFixtureClients()
 	src := resource.Resource{ID: ""}
@@ -244,10 +195,8 @@ func TestRelated_SES_EbRule_EmptyIDReturnsZero(t *testing.T) {
 	}
 }
 
-// TestRelated_SES_EbRule_NilClientsReturnsZero verifies that nil clients returns
-// Count=0 for the eb-rule checker. Unlike some other checkers, eb-rule cannot
-// return -1 for nil clients: without SESv2 there are no bus names to look up,
-// so the result is definitively empty rather than an error.
+// Without SESv2 there is no bus name to look up, so eb-rule answers an empty
+// list rather than unknown.
 func TestRelated_SES_EbRule_NilClientsReturnsZero(t *testing.T) {
 	src := sesFixtureSrcIdentity(fixtures.SESGraphRootIdentity)
 
@@ -259,12 +208,6 @@ func TestRelated_SES_EbRule_NilClientsReturnsZero(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// checkSESSns — fixture-based
-// ---------------------------------------------------------------------------
-
-// TestRelated_SES_Sns_FixtureGraphRootMatchesOne verifies that the graph-root
-// identity produces Count=1 for sns (the fixture has one SnsDestination).
 func TestRelated_SES_Sns_FixtureGraphRootMatchesOne(t *testing.T) {
 	clients := sesFixtureClients()
 	src := sesFixtureSrcIdentity(fixtures.SESGraphRootIdentity)
@@ -280,8 +223,6 @@ func TestRelated_SES_Sns_FixtureGraphRootMatchesOne(t *testing.T) {
 	}
 }
 
-// TestRelated_SES_Sns_NonGraphRootIdentityReturnsZero verifies Count=0 for
-// an identity without a config set.
 func TestRelated_SES_Sns_NonGraphRootIdentityReturnsZero(t *testing.T) {
 	clients := sesFixtureClients()
 	src := sesFixtureSrcIdentity("suppressed@acme-corp.com")
@@ -294,7 +235,6 @@ func TestRelated_SES_Sns_NonGraphRootIdentityReturnsZero(t *testing.T) {
 	}
 }
 
-// TestRelated_SES_Sns_EmptyIDReturnsZero verifies Count=0 for an empty identity ID.
 func TestRelated_SES_Sns_EmptyIDReturnsZero(t *testing.T) {
 	clients := sesFixtureClients()
 	src := resource.Resource{ID: ""}
@@ -307,8 +247,6 @@ func TestRelated_SES_Sns_EmptyIDReturnsZero(t *testing.T) {
 	}
 }
 
-// TestRelated_SES_Sns_NilClientsReturnsNegOne verifies that nil clients returns
-// Count=-1 for checkSESSns.
 func TestRelated_SES_Sns_NilClientsReturnsNegOne(t *testing.T) {
 	src := sesFixtureSrcIdentity(fixtures.SESGraphRootIdentity)
 
@@ -320,15 +258,9 @@ func TestRelated_SES_Sns_NilClientsReturnsNegOne(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// checkSESS3 — valid clients with no SES v1 configured returns 0
-// ---------------------------------------------------------------------------
-
-// TestRelated_SES_S3_NoSESv1ClientReturnsZero verifies that checkSESS3 returns
-// Count=0 when the ServiceClients has no SES v1 client (c.SES == nil).
-// This is the operator-honest case: pure outbound SES account — no receipt rule set.
+// No SES v1 client means a pure outbound SES account with no receipt rule
+// set, which answers zero.
 func TestRelated_SES_S3_NoSESv1ClientReturnsZero(t *testing.T) {
-	// sesFixtureClients() only has SESv2 wired; c.SES == nil.
 	clients := sesFixtureClients()
 	src := sesFixtureSrcIdentity(fixtures.SESGraphRootIdentity)
 
@@ -343,8 +275,6 @@ func TestRelated_SES_S3_NoSESv1ClientReturnsZero(t *testing.T) {
 	}
 }
 
-// TestRelated_SES_S3_NilClientsReturnsNegOne verifies that nil clients (wrong type
-// assertion) returns Count=-1 — distinguishable from operator-honest 0.
 func TestRelated_SES_S3_NilClientsReturnsNegOne(t *testing.T) {
 	src := sesFixtureSrcIdentity(fixtures.SESGraphRootIdentity)
 
@@ -356,11 +286,8 @@ func TestRelated_SES_S3_NilClientsReturnsNegOne(t *testing.T) {
 	}
 }
 
-// TestRelated_SES_S3_FixtureAllIdentitiesWithNoSESv1ReturnZero verifies that
-// checkSESS3 returns Count=0 (not -1) for every fixture identity when c.SES == nil.
 func TestRelated_SES_S3_FixtureAllIdentitiesWithNoSESv1ReturnZero(t *testing.T) {
 	f := fixtures.NewSESFixtures()
-	// sesFixtureClients() has SESv2 but no SES v1 — simulates pure outbound account.
 	clients := sesFixtureClients()
 	checker := sesCheckerByTarget(t, "s3")
 
@@ -381,13 +308,7 @@ func TestRelated_SES_S3_FixtureAllIdentitiesWithNoSESv1ReturnZero(t *testing.T) 
 	}
 }
 
-// ---------------------------------------------------------------------------
-// checkSESLambda — returned IDs must be function NAMES, not full ARNs
-// ---------------------------------------------------------------------------
-
-// TestRelated_SES_Lambda_ValidRawStructReturnsZero verifies that checkSESLambda
-// returns Count=0 for a valid sesv2types.IdentityInfo RawStruct (not -1).
-// The SES v1 receipt-rule LambdaAction path is unavailable in SESv2 SDK.
+// Receipt-rule LambdaActions exist only in the SES v1 API, not SESv2.
 func TestRelated_SES_Lambda_ValidRawStructReturnsZero(t *testing.T) {
 	clients := sesFixtureClients()
 	src := sesFixtureSrcIdentity(fixtures.SESGraphRootIdentity)
@@ -400,7 +321,6 @@ func TestRelated_SES_Lambda_ValidRawStructReturnsZero(t *testing.T) {
 	}
 }
 
-// TestRelated_SES_Lambda_EmptyIDReturnsZero verifies Count=0 for empty identity ID.
 func TestRelated_SES_Lambda_EmptyIDReturnsZero(t *testing.T) {
 	clients := sesFixtureClients()
 	src := resource.Resource{ID: ""}
@@ -413,13 +333,6 @@ func TestRelated_SES_Lambda_EmptyIDReturnsZero(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// R53 — fixture-based supplementary tests using SESGraphRootIdentity constants
-// ---------------------------------------------------------------------------
-
-// TestRelated_SES_R53_FixtureGraphRootMatchesAcmeCorp verifies that the graph-root
-// domain identity "acme-corp.com" resolves against the R53 zone "acme-corp.com."
-// using the fixture constant SESGraphRootIdentity.
 func TestRelated_SES_R53_FixtureGraphRootMatchesAcmeCorp(t *testing.T) {
 	zoneRes := resource.Resource{
 		ID:   "/hostedzone/ZFIXTURE",
@@ -441,9 +354,7 @@ func TestRelated_SES_R53_FixtureGraphRootMatchesAcmeCorp(t *testing.T) {
 	}
 }
 
-// TestRelated_SES_R53_EmailIdentityExtractsDomain verifies that an EMAIL_ADDRESS
-// identity in the format "user@acme-corp.com" resolves to the parent domain zone
-// "acme-corp.com." — domain is extracted after "@".
+// An EMAIL_ADDRESS identity's zone is the domain after "@".
 func TestRelated_SES_R53_EmailIdentityExtractsDomain(t *testing.T) {
 	zoneRes := resource.Resource{
 		ID:   "/hostedzone/ZFIXTURE",
@@ -469,12 +380,6 @@ func TestRelated_SES_R53_EmailIdentityExtractsDomain(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// SES v1 mock — used by Target #2 and Target #3 tests below.
-// Implements SESV1API (single method: DescribeActiveReceiptRuleSet).
-// ---------------------------------------------------------------------------
-
-// fakeSESV1 implements awsclient.SESV1API for receipt-rule-set tests.
 type fakeSESV1 struct {
 	calls int
 	// responses is a slice of (output, error) pairs returned in order.
@@ -500,31 +405,24 @@ func (f *fakeSESV1) DescribeActiveReceiptRuleSet(
 	return f.responses[idx].output, f.responses[idx].err
 }
 
-// Compile-time check: fakeSESV1 satisfies SESV1API.
 var _ awsclient.SESV1API = (*fakeSESV1)(nil)
 
-// sesV1Clients returns a *awsclient.ServiceClients with the given SESV1API
-// wired plus a fresh per-test session.RuleSetStore. Post-PR-02d the SES
-// rule-set cache lives on c.RuleSets() (per-Session) rather than a process-wide
-// map keyed by *ServiceClients pointer, so each test gets an isolated store
-// without needing fresh pointers.
+// sesV1Clients wires v1 with a fresh session.RuleSetStore, so each test's
+// rule-set cache is isolated.
 func sesV1Clients(v1 awsclient.SESV1API) *awsclient.ServiceClients {
 	c := &awsclient.ServiceClients{SES: v1}
 	c.SetRuleSets(session.NewRuleSetStore())
 	return c
 }
 
-// sesLambdaARN returns a plausible Lambda ARN string for test data.
 func sesLambdaARN(name string) string {
 	return "arn:aws:lambda:us-east-1:123456789012:function:" + name
 }
 
-// sesBucketName returns a plausible S3 bucket name for test data.
 func sesBucketName(name string) string {
 	return "ses-inbound-" + name
 }
 
-// buildReceiptRule builds a sestypes.ReceiptRule with optional recipients and Lambda action.
 func buildLambdaReceiptRule(name string, recipients []string, lambdaARN string) sestypes.ReceiptRule {
 	return sestypes.ReceiptRule{
 		Name:       aws.String(name),
@@ -535,7 +433,6 @@ func buildLambdaReceiptRule(name string, recipients []string, lambdaARN string) 
 	}
 }
 
-// buildS3ReceiptRule builds a sestypes.ReceiptRule with optional recipients and S3 action.
 func buildS3ReceiptRule(name string, recipients []string, bucketName string) sestypes.ReceiptRule {
 	return sestypes.ReceiptRule{
 		Name:       aws.String(name),
@@ -546,20 +443,9 @@ func buildS3ReceiptRule(name string, recipients []string, bucketName string) ses
 	}
 }
 
-// ---------------------------------------------------------------------------
-// Target #2 — checkSESLambda must return function NAMES, not ARNs
-//
-// Problem: old code returned full Lambda ARNs from LambdaAction.FunctionArn.
-// New code extracts the function name (last segment after "function:") so IDs
-// match the lambda fetcher's resource IDs. Recipient scoping is also applied.
-// ---------------------------------------------------------------------------
+// Lambda IDs are function names (the segment after "function:"), matching
+// the lambda fetcher's row IDs.
 
-// TestCheckSESLambda_ScopesByRecipient verifies that checkSESLambda returns only
-// the Lambda function NAMEs (not ARNs) whose recipient filter includes the queried
-// identity.
-// Rule A (global): empty Recipients → always matches.
-// Rule B: Recipients=["support@acme.com"] → matches support@acme.com.
-// Rule C: Recipients=["sales.acme.com"] → matches sales.acme.com domain.
 func TestCheckSESLambda_ScopesByRecipient(t *testing.T) {
 	ruleSetOutput := &ses.DescribeActiveReceiptRuleSetOutput{
 		Rules: []sestypes.ReceiptRule{
@@ -620,9 +506,8 @@ func TestCheckSESLambda_ScopesByRecipient(t *testing.T) {
 	for _, st := range subtests {
 		st := st
 		t.Run(st.name, func(t *testing.T) {
-			// Fresh pointer per subtest: each ServiceClients instance carries its own
-			// in-function rule-set cache (swap-not-clear contract from PR-02d), so
-			// a new pointer starts with no cached entry.
+			// Each ServiceClients carries its own rule-set cache, so a fresh one starts
+			// empty.
 			clients := sesV1Clients(&fakeSESV1{
 				responses: []sesV1Response{{output: ruleSetOutput, err: nil}},
 			})
@@ -630,7 +515,6 @@ func TestCheckSESLambda_ScopesByRecipient(t *testing.T) {
 			if result.Err() != nil {
 				t.Fatalf("unexpected error: %v", result.Err())
 			}
-			// Verify all expected function NAMES are present (not ARNs).
 			for _, wantName := range st.wantNames {
 				found := false
 				for _, id := range result.ResourceIDs() {
@@ -643,7 +527,6 @@ func TestCheckSESLambda_ScopesByRecipient(t *testing.T) {
 					t.Errorf("ResourceIDs = %v, want to contain function name %q (not ARN)", result.ResourceIDs(), wantName)
 				}
 			}
-			// Verify unwanted name is absent.
 			if st.unwantedName != "" {
 				for _, id := range result.ResourceIDs() {
 					if id == st.unwantedName {
@@ -651,13 +534,11 @@ func TestCheckSESLambda_ScopesByRecipient(t *testing.T) {
 					}
 				}
 			}
-			// No returned ID may be an ARN — guards against regression.
 			for _, id := range result.ResourceIDs() {
 				if len(id) >= 4 && id[:4] == "arn:" {
 					t.Errorf("ResourceIDs contains ARN %q — checker must return function names only", id)
 				}
 			}
-			// Count must equal len(wantNames).
 			if result.Count() != len(st.wantNames) {
 				t.Errorf("Count = %d, want %d", result.Count(), len(st.wantNames))
 			}
@@ -665,8 +546,6 @@ func TestCheckSESLambda_ScopesByRecipient(t *testing.T) {
 	}
 }
 
-// TestCheckSESLambda_ExtractsFunctionNameFromARN verifies that a single LambdaAction
-// with a full ARN is returned as the bare function name (last segment after "function:").
 func TestCheckSESLambda_ExtractsFunctionNameFromARN(t *testing.T) {
 	ruleSetOutput := &ses.DescribeActiveReceiptRuleSetOutput{
 		Rules: []sestypes.ReceiptRule{
@@ -703,11 +582,6 @@ func TestCheckSESLambda_ExtractsFunctionNameFromARN(t *testing.T) {
 		t.Errorf("ResourceIDs = %v, want [\"billing-webhook\"] (bare function name, not ARN)", result.ResourceIDs())
 	}
 }
-
-// ---------------------------------------------------------------------------
-// TestCheckSESS3_ScopesByRecipient is the mirror of TestCheckSESLambda_ScopesByRecipient
-// using S3Action.BucketName instead of LambdaAction.FunctionArn.
-// ---------------------------------------------------------------------------
 
 func TestCheckSESS3_ScopesByRecipient(t *testing.T) {
 	ruleSetOutput := &ses.DescribeActiveReceiptRuleSetOutput{
@@ -767,9 +641,8 @@ func TestCheckSESS3_ScopesByRecipient(t *testing.T) {
 	for _, st := range subtests {
 		st := st
 		t.Run(st.name, func(t *testing.T) {
-			// Fresh pointer per subtest: each ServiceClients instance carries its own
-			// in-function rule-set cache (swap-not-clear contract from PR-02d), so
-			// a new pointer guarantees no state leaks between subtests.
+			// Each ServiceClients carries its own rule-set cache, so a fresh one starts
+			// empty.
 			clients := sesV1Clients(&fakeSESV1{
 				responses: []sesV1Response{{output: ruleSetOutput, err: nil}},
 			})
@@ -803,36 +676,24 @@ func TestCheckSESS3_ScopesByRecipient(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// Target #3 — sesActiveReceiptRuleSet sync.Once must not cache errors
-//
-// sync.Once would freeze both success and error: a transient error on the
-// first call would prevent all subsequent calls from ever succeeding, even
-// after the upstream API recovers. The guard seals only on success.
-// ---------------------------------------------------------------------------
+// The active receipt rule set is sealed only on success: a transient error on
+// the first call must not block later calls once the API recovers.
 
-// TestSESActiveReceiptRuleSet_RetriesAfterTransientError verifies that:
-//   - First checkSESLambda call with an erroring SES v1 API → Count=-1.
-//   - Second call on the SAME *ServiceClients → Count=1 (error retried, rule fetched).
-//   - Third call → Count=1, but mock call counter is 2 (success sealed, no 3rd API call).
 func TestSESActiveReceiptRuleSet_RetriesAfterTransientError(t *testing.T) {
-	// One Lambda rule in the rule set.
 	ruleSetOutput := &ses.DescribeActiveReceiptRuleSetOutput{
 		Rules: []sestypes.ReceiptRule{
 			buildLambdaReceiptRule("inbound", nil, sesLambdaARN("inbound-handler")),
 		},
 	}
 
-	// fakeSESV1 with two responses: first is a transient error, second is success.
 	v1Mock := &fakeSESV1{
 		responses: []sesV1Response{
 			{output: nil, err: errors.New("ses: temporary connection error")},
 			{output: ruleSetOutput, err: nil},
 		},
 	}
-	// Use a fixed *ServiceClients pointer for all three calls — the in-function
-	// rule-set cache is keyed by pointer identity (swap-not-clear contract from
-	// PR-02d), so the same pointer is required for retry deduplication to work.
+	// The rule-set cache is keyed by the ServiceClients, so all three calls
+	// share one.
 	clients := sesV1Clients(v1Mock)
 
 	src := resource.Resource{
@@ -842,14 +703,11 @@ func TestSESActiveReceiptRuleSet_RetriesAfterTransientError(t *testing.T) {
 
 	checker := sesCheckerByTarget(t, "lambda")
 
-	// Call 1: expect error (State: RelatedError) — transient API failure.
 	result1 := checker(context.Background(), clients, src, resource.ResourceCache{})
 	if result1.State() != domain.RelatedError {
 		t.Errorf("call 1: State = %v, want RelatedError (transient API error)", result1.State())
 	}
 
-	// Call 2: expect success (Count=1) — error must NOT be cached by sync.Once.
-	// This is the regression pin: current code freezes the error so Count stays -1.
 	result2 := checker(context.Background(), clients, src, resource.ResourceCache{})
 	if result2.Count() != 1 {
 		t.Errorf("call 2: Count = %d, want 1 (error should not be cached — must retry after transient failure)", result2.Count())
@@ -858,33 +716,15 @@ func TestSESActiveReceiptRuleSet_RetriesAfterTransientError(t *testing.T) {
 		t.Errorf("call 2: unexpected error: %v", result2.Err())
 	}
 
-	// Call 3: success is memoized — no additional API call.
 	result3 := checker(context.Background(), clients, src, resource.ResourceCache{})
 	if result3.Count() != 1 {
 		t.Errorf("call 3: Count = %d, want 1 (success cached from call 2)", result3.Count())
 	}
-	// The mock was called exactly twice: once for the error, once for the success.
-	// A third API call would indicate the success is NOT being cached.
 	if v1Mock.calls != 2 {
 		t.Errorf("mock.calls = %d, want 2 (success must be memoized — call 3 must not hit the API again)", v1Mock.calls)
 	}
 }
 
-// ---------------------------------------------------------------------------
-// Pin 1 (SES mirror) — Truncated cache-scan sets Truncated=true with matches
-//
-// Mirrors the DDB pin for SES checkers that do cache-scanning with truncation
-// tracking: checkSESR53 and checkSESEbRule.
-// Pre-fix: truncatedResultSES was NOT called on truncated+matches — relatedResult
-// was used instead, yielding Truncated=false.
-// Post-fix: truncated+matches → Truncated=true.
-// ---------------------------------------------------------------------------
-
-// TestCheckSESR53_TruncatedCacheWithMatches_ReturnsTruncated pins the
-// truncated+matches path of checkSESR53. The r53 cache has IsTruncated=true
-// and a zone whose name matches the identity domain.
-// Pre-fix: result.Truncated==false.
-// Post-fix: result.Truncated==true AND Count==1.
 func TestCheckSESR53_TruncatedCacheWithMatches_ReturnsTruncated(t *testing.T) {
 	// DOMAIN identity: domain is used as-is.
 	src := resource.Resource{
@@ -911,7 +751,7 @@ func TestCheckSESR53_TruncatedCacheWithMatches_ReturnsTruncated(t *testing.T) {
 	if result.Count() != 1 {
 		t.Errorf("Count = %d, want 1 (one matching zone in truncated r53 cache)", result.Count())
 	}
-	// Truncated+matches → must be Truncated=true so UI renders "(1+)" not "(1)".
+	// Truncated with matches renders "(1+)", not "(1)".
 	if !result.Truncated() {
 		t.Errorf("Truncated = false, want true — truncated r53 cache with matches must be truncated")
 	}
@@ -926,9 +766,6 @@ func TestCheckSESR53_TruncatedCacheWithMatches_ReturnsTruncated(t *testing.T) {
 	}
 }
 
-// TestCheckSESR53_TruncatedCacheNoMatches_ReturnsTruncatedResult pins the
-// truncated+no-matches path of checkSESR53. No zone matches the domain; the
-// result must be Count==0 AND Truncated==true.
 func TestCheckSESR53_TruncatedCacheNoMatches_ReturnsTruncatedResult(t *testing.T) {
 	src := resource.Resource{
 		ID:   "acme-corp.com",
@@ -959,16 +796,10 @@ func TestCheckSESR53_TruncatedCacheNoMatches_ReturnsTruncatedResult(t *testing.T
 	}
 }
 
-// TestCheckSESEbRule_TruncatedCacheWithMatches_ReturnsTruncated pins the
-// truncated+matches path of checkSESEbRule. The eb-rule cache has IsTruncated=true
-// and a rule on the expected bus name.
-// Pre-fix: result.Truncated==false.
-// Post-fix: result.Truncated==true AND Count==1.
 func TestCheckSESEbRule_TruncatedCacheWithMatches_ReturnsTruncated(t *testing.T) {
 	clients := sesFixtureClients()
 	src := sesFixtureSrcIdentity(fixtures.SESGraphRootIdentity)
 
-	// One rule on the "default" bus — but the cache is declared truncated.
 	cache := resource.ResourceCache{
 		"eb-rule": resource.ResourceCacheEntry{
 			Resources: []resource.Resource{
@@ -989,13 +820,10 @@ func TestCheckSESEbRule_TruncatedCacheWithMatches_ReturnsTruncated(t *testing.T)
 	}
 }
 
-// TestCheckSESEbRule_TruncatedCacheNoMatches_ReturnsTruncatedResult pins the
-// truncated+no-matches path of checkSESEbRule.
 func TestCheckSESEbRule_TruncatedCacheNoMatches_ReturnsTruncatedResult(t *testing.T) {
 	clients := sesFixtureClients()
 	src := sesFixtureSrcIdentity(fixtures.SESGraphRootIdentity)
 
-	// A rule on the wrong bus — cannot match the SES identity's EventBridge bus.
 	cache := resource.ResourceCache{
 		"eb-rule": resource.ResourceCacheEntry{
 			Resources: []resource.Resource{

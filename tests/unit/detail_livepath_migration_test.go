@@ -1,56 +1,9 @@
-// detail_livepath_migration_test.go — coverage-preservation migration ahead
-// of deleting internal/tui/views/detail.go's dead DetailModel.Update key/
-// message handling (the live path is app_stack.go's handleDetailKeyMsg +
-// controller.Apply). Re-pins three behaviors that were previously exercised
-// ONLY through that dead path, on the live app.Controller path instead, so
-// the dead-path tests can be deleted later without losing coverage:
-//
-//  1. EC2-008 — the field-cursor skip loop in applyDetailActions
-//     (core/app/detail_cursor.go ActionMoveDown) never lands FieldCursor
-//     on a section-header or spacer row while advancing through interior
-//     rows. Previously pinned only via DetailModel.Update
-//     (detail_cursor_stable_test.go uses a header-free resource;
-//     detail_controller_scroll_follow_test.go also uses a header-free
-//     resource, so neither exercises the skip branch).
-//
-//     NOTE: a full sweep including ActionMoveUp back up to the very first
-//     field surfaced a separate, previously-unknown boundary bug — when the
-//     topmost field item (index 0) is itself an IsSection row, the skip
-//     loop's `ds.FieldCursor > 0` guard never re-checks index 0 once the
-//     cursor reaches it, so the cursor can end up parked on the header. That
-//     is outside this migration's scope (only ActionMoveDown was asked for)
-//     and is NOT covered by this file — flagged separately to the architect
-//     rather than papered over here.
-//
-//  2. #280 — mergeDetailRelatedRow (core/app/handle.go), reached live via
-//     Controller.ApplyDetailRelatedResultForResource, matches a
-//     RelatedCheckResult to a related row by DefDisplayName so that
-//     resource types with multiple related-defs sharing one TargetType
-//     (ct-events has 4 self-pivot rows all targeting "ct-events") each
-//     resolve independently instead of colliding. Previously pinned only via
-//     views.DetailModel.Update in related_cache_replay_selfpivot_test.go — a
-//     message path RelatedCheckResult never reaches in the live app (the TUI
-//     adapter routes it to Controller, not DetailModel.Update; see
-//     internal/tui/runtime_adapter_resources.go handleRelatedCheckResult).
-//
-//  3. ct-events pivot dispatch content — selecting an actionable
-//     RelatedDeferred+FetchFilter pivot row (e.g. a ct-events self-pivot by
-//     Username/AccessKeyId/EventName/EventId; Count is not authoritative for
-//     RelatedDeferred, only State+FetchFilter drive it) must dispatch a
-//     runtime.KindFetchFiltered task carrying the row's FetchFilter, while a
-//     resolved-zero row must dispatch nothing. Previously pinned only via
-//     DetailModel.Update + tea.Cmd execution in
-//     ct_events_rightcol_dispatch_test.go's D3/D2 assertions. The live
-//     equivalent is Controller.Apply(ActionRelatedSelect) ->
-//     handleActionRelatedSelect -> dispatchRelatedNavigate
-//     (core/app/actions_nav.go, core/app/navigate.go).
+// detail_livepath_migration_test.go — detail behaviours on the live
+// app.Controller path (handleDetailKeyMsg + controller.Apply).
 //
 // Each test seeds controller state directly (newDetailController,
-// Controller.ApplyDetailRelated) rather than replaying real AWS fixtures, so
-// these tests are independent of the ct-events checkers/demo fixtures and of
-// the dead-path test files they replace — they must keep passing after those
-// files are deleted. The blank import of core/aws below is required for
-// that independence: it registers ct-events' RelatedDefs and its
+// Controller.ApplyDetailRelated) rather than replaying AWS fixtures. The blank
+// import of core/aws below registers ct-events' RelatedDefs and its
 // FilteredPaginatedFetcher in the catalog, which resource.GetRelated and
 // resource.GetFilteredPaginatedFetcher read from.
 package unit_test
@@ -65,10 +18,6 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 	"github.com/k2m30/a9s/v3/core/runtime"
 )
-
-// ---------------------------------------------------------------------------
-// 1. EC2-008 — field-cursor skip over section headers/spacers.
-// ---------------------------------------------------------------------------
 
 // TestDetailController_MoveDown_SkipsSectionHeadersAndSpacers pins that
 // repeatedly applying ActionMoveDown on a resource whose field-item list has
@@ -124,10 +73,6 @@ func TestDetailController_MoveDown_SkipsSectionHeadersAndSpacers(t *testing.T) {
 		}
 	}
 }
-
-// ---------------------------------------------------------------------------
-// 2. #280 — DefDisplayName-keyed related-row merge.
-// ---------------------------------------------------------------------------
 
 // TestDetailController_ApplyDetailRelatedResultForResource_CtEventsSelfPivots_ResolveByDefDisplayName
 // pins that when every ct-events self-pivot row (TargetType == "ct-events")
@@ -196,31 +141,23 @@ func TestDetailController_ApplyDetailRelatedResultForResource_CtEventsSelfPivots
 	}
 }
 
-// ---------------------------------------------------------------------------
-// 3. ct-events pivot dispatch content.
-// ---------------------------------------------------------------------------
-
 // TestDetailController_ActionRelatedSelect_DeferredPivotWithFetchFilter_DispatchesFetchFilteredTask
 // pins that selecting an actionable RelatedDeferred pivot row with a
 // non-empty FetchFilter (the ct-events pivot shape — e.g. "same Username")
 // dispatches a runtime.KindFetchFiltered task scoped to the row's TargetType,
 // carrying the row's FetchFilter verbatim via runtime.FetchFilteredPayload.
-// This is the live-path replacement for ct_events_rightcol_dispatch_test.go's
-// D3 assertion (the actionability guard bug where len(resourceIDs)>0 was
-// checked instead of len(fetchFilter)>0).
 //
 // TargetType is "ct-events" because it is the only resource type with a
 // registered FilteredPaginatedFetcher (resolve_related_navigate_test.go's
 // TestResolveRelatedNavigate_FetchFilterHonoredForCtEvents), which
 // ResolveRelatedNavigate requires to route FetchFilter into
 // NavigationKindFilteredList. The source detail's own ResourceType is
-// deliberately "ec2", not "ct-events": a same-type ("self") pivot with
-// Count==0 is suppressed from the visible related list entirely by
-// isSelfPivotZeroDetailRow (core/app/detail_cursor.go) regardless of
-// State, and Count is not meaningful for RelatedDeferred rows (task58 forbids
-// the old Count==-1 sentinel), so a cross-type pivot is the only way to keep
-// this row visible and selectable at Arg "0" without reintroducing a banned
-// sentinel literal.
+// "ec2", not "ct-events": a same-type ("self") pivot with Count==0 is
+// suppressed from the visible related list entirely by
+// isSelfPivotZeroDetailRow (core/app/detail_cursor.go) regardless of State,
+// and Count is not meaningful for RelatedDeferred rows, so a cross-type pivot
+// is the only way to keep this row visible and selectable at Arg "0" without
+// a Count sentinel.
 func TestDetailController_ActionRelatedSelect_DeferredPivotWithFetchFilter_DispatchesFetchFilteredTask(t *testing.T) {
 	res := resource.Resource{ID: "i-livepath-dispatch-0001", Name: "i-livepath-dispatch-0001"}
 	c := newDetailController(t, res, "ec2")
@@ -264,11 +201,10 @@ func TestDetailController_ActionRelatedSelect_DeferredPivotWithFetchFilter_Dispa
 	}
 }
 
-// TestDetailController_ActionRelatedSelect_ResolvedZeroRow_DispatchesNoTask
-// pairs with the pivot-dispatch pin above: a resolved row with Count==0 is
-// never actionable (resource.IsRelatedActionable), so ActionRelatedSelect on
-// it must dispatch nothing. Live-path replacement for
-// ct_events_rightcol_dispatch_test.go's D2 assertion.
+// TestDetailController_ActionRelatedSelect_ResolvedZeroRow_DispatchesNoTask:
+// a resolved row with Count==0 is never actionable
+// (resource.IsRelatedActionable), so ActionRelatedSelect on it must dispatch
+// nothing.
 func TestDetailController_ActionRelatedSelect_ResolvedZeroRow_DispatchesNoTask(t *testing.T) {
 	res := resource.Resource{ID: "evt-livepath-dispatch-0002", Name: "evt-livepath-dispatch-0002"}
 	c := newDetailController(t, res, "ct-events")

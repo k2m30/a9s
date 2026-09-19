@@ -23,10 +23,6 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// ===========================================================================
-// Security Groups — EC2 DescribeSecurityGroups (NextToken)
-// ===========================================================================
-
 type mockSGPaginatedClient struct {
 	outputs []*ec2.DescribeSecurityGroupsOutput
 	inputs  []*ec2.DescribeSecurityGroupsInput
@@ -109,10 +105,6 @@ func TestFetchSecurityGroups_Pagination(t *testing.T) {
 		}
 	})
 }
-
-// ===========================================================================
-// Subnets — EC2 DescribeSubnets (NextToken)
-// ===========================================================================
 
 type mockSubnetPaginatedClient struct {
 	outputs []*ec2.DescribeSubnetsOutput
@@ -221,10 +213,6 @@ func TestFetchSubnets_Pagination(t *testing.T) {
 	})
 }
 
-// ===========================================================================
-// VPCs — EC2 DescribeVpcs (NextToken)
-// ===========================================================================
-
 type mockVPCPaginatedClient struct {
 	outputs []*ec2.DescribeVpcsOutput
 	inputs  []*ec2.DescribeVpcsInput
@@ -310,10 +298,6 @@ func TestFetchVPCs_Pagination(t *testing.T) {
 		}
 	})
 }
-
-// ===========================================================================
-// VPC Endpoints — EC2 DescribeVpcEndpoints (NextToken)
-// ===========================================================================
 
 type mockVPCEPaginatedClient struct {
 	outputs []*ec2.DescribeVpcEndpointsOutput
@@ -401,10 +385,6 @@ func TestFetchVPCEndpoints_Pagination(t *testing.T) {
 	})
 }
 
-// ===========================================================================
-// NAT Gateways — EC2 DescribeNatGateways (NextToken)
-// ===========================================================================
-
 type mockNATPaginatedClient struct {
 	outputs []*ec2.DescribeNatGatewaysOutput
 	inputs  []*ec2.DescribeNatGatewaysInput
@@ -490,10 +470,6 @@ func TestFetchNatGateways_Pagination(t *testing.T) {
 		}
 	})
 }
-
-// ===========================================================================
-// Internet Gateways — EC2 DescribeInternetGateways (NextToken)
-// ===========================================================================
 
 type mockIGWPaginatedClient struct {
 	outputs []*ec2.DescribeInternetGatewaysOutput
@@ -581,10 +557,6 @@ func TestFetchInternetGateways_Pagination(t *testing.T) {
 	})
 }
 
-// ===========================================================================
-// ENI — EC2 DescribeNetworkInterfaces (NextToken)
-// ===========================================================================
-
 type mockENIPaginatedClient struct {
 	outputs []*ec2.DescribeNetworkInterfacesOutput
 	inputs  []*ec2.DescribeNetworkInterfacesInput
@@ -670,10 +642,6 @@ func TestFetchNetworkInterfaces_Pagination(t *testing.T) {
 		}
 	})
 }
-
-// ===========================================================================
-// Route Tables — EC2 DescribeRouteTables (NextToken)
-// ===========================================================================
 
 type mockRTBPaginatedClient struct {
 	outputs []*ec2.DescribeRouteTablesOutput
@@ -761,10 +729,6 @@ func TestFetchRouteTables_Pagination(t *testing.T) {
 	})
 }
 
-// ===========================================================================
-// Transit Gateways — EC2 DescribeTransitGateways (NextToken)
-// ===========================================================================
-
 type mockTGWPaginatedClient struct {
 	outputs []*ec2.DescribeTransitGatewaysOutput
 	inputs  []*ec2.DescribeTransitGatewaysInput
@@ -850,10 +814,6 @@ func TestFetchTransitGateways_Pagination(t *testing.T) {
 		}
 	})
 }
-
-// ===========================================================================
-// ELB — ELBv2 DescribeLoadBalancers (Marker/NextMarker)
-// ===========================================================================
 
 type mockELBPaginatedClient struct {
 	outputs []*elbv2.DescribeLoadBalancersOutput
@@ -965,10 +925,6 @@ func TestFetchLoadBalancers_Pagination(t *testing.T) {
 	})
 }
 
-// ===========================================================================
-// Target Groups — ELBv2 DescribeTargetGroups (Marker/NextMarker)
-// ===========================================================================
-
 type mockTGPaginatedClient struct {
 	outputs []*elbv2.DescribeTargetGroupsOutput
 	inputs  []*elbv2.DescribeTargetGroupsInput
@@ -1055,10 +1011,6 @@ func TestFetchTargetGroups_Pagination(t *testing.T) {
 	})
 }
 
-// ===========================================================================
-// Redis — ElastiCache DescribeReplicationGroups (Marker)
-// ===========================================================================
-
 type mockRedisPaginatedClient struct {
 	outputs []*elasticache.DescribeReplicationGroupsOutput
 	inputs  []*elasticache.DescribeReplicationGroupsInput
@@ -1141,10 +1093,6 @@ func TestFetchRedis_Pagination(t *testing.T) {
 	})
 }
 
-// ===========================================================================
-// DocumentDB — DocDB DescribeDBClusters (Marker)
-// ===========================================================================
-
 func TestFetchDocDBClusters_Pagination(t *testing.T) {
 	mock := &fakeDocDBDescribeDBClusters{
 		Pages: []*docdb.DescribeDBClustersOutput{
@@ -1206,10 +1154,6 @@ func TestFetchDocDBClusters_Pagination(t *testing.T) {
 		}
 	})
 }
-
-// ===========================================================================
-// DB Cluster Snapshots — DocDB DescribeDBClusterSnapshots (Marker)
-// ===========================================================================
 
 func TestFetchDocDBClusterSnapshots_Pagination(t *testing.T) {
 	mock := &fakeDocDBDescribeDBClusterSnapshots{
@@ -1273,10 +1217,6 @@ func TestFetchDocDBClusterSnapshots_Pagination(t *testing.T) {
 	})
 }
 
-// ===========================================================================
-// DB Instance Snapshots — RDS DescribeDBSnapshots (Marker)
-// ===========================================================================
-
 func TestFetchDBISnapshots_Pagination(t *testing.T) {
 	mock := &fakeRDSDescribeDBSnapshots{
 		Pages: []*rds.DescribeDBSnapshotsOutput{
@@ -1338,10 +1278,6 @@ func TestFetchDBISnapshots_Pagination(t *testing.T) {
 		}
 	})
 }
-
-// ===========================================================================
-// Redshift — Redshift DescribeClusters (Marker)
-// ===========================================================================
 
 type mockRedshiftPaginatedClient struct {
 	outputs []*redshift.DescribeClustersOutput
@@ -1451,17 +1387,6 @@ func TestFetchRedshiftClusters_Pagination(t *testing.T) {
 		}
 	})
 }
-
-// ===========================================================================
-// EIP — EC2 DescribeAddresses (no pagination — single call, skip test)
-// Note: DescribeAddresses does NOT support pagination in the AWS API.
-// The output has no NextToken. This is intentional — EIP is excluded from
-// this file's fetchers.
-// ===========================================================================
-
-// ---------------------------------------------------------------------------
-// Error propagation tests for this file's paginated fetchers
-// ---------------------------------------------------------------------------
 
 func TestNetworkingPagination_ErrorPropagation(t *testing.T) {
 	testErr := fmt.Errorf("test API error")

@@ -33,10 +33,6 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// ===========================================================================
-// 1. CloudFormation — DescribeStacks (NextToken)
-// ===========================================================================
-
 type mockCFNPaginatedClient struct {
 	outputs []*cloudformation.DescribeStacksOutput
 	inputs  []*cloudformation.DescribeStacksInput
@@ -126,10 +122,6 @@ func TestFetchCloudFormationStacks_Pagination(t *testing.T) {
 	})
 }
 
-// ===========================================================================
-// 2. CloudWatch Alarms — DescribeAlarms (NextToken)
-// ===========================================================================
-
 func TestFetchCloudWatchAlarms_Pagination(t *testing.T) {
 	mock := &fakeCloudWatchDescribeAlarms{
 		Pages: []*cloudwatch.DescribeAlarmsOutput{
@@ -194,10 +186,6 @@ func TestFetchCloudWatchAlarms_Pagination(t *testing.T) {
 		}
 	})
 }
-
-// ===========================================================================
-// 3. Auto Scaling Groups — DescribeAutoScalingGroups (NextToken)
-// ===========================================================================
 
 type mockASGPaginatedClient struct {
 	outputs []*autoscaling.DescribeAutoScalingGroupsOutput
@@ -288,10 +276,6 @@ func TestFetchAutoScalingGroups_Pagination(t *testing.T) {
 	})
 }
 
-// ===========================================================================
-// 4. ACM Certificates — ListCertificates (NextToken)
-// ===========================================================================
-
 func TestFetchACMCertificates_Pagination(t *testing.T) {
 	mock := &fakeACMListCertificates{
 		Pages: []*acm.ListCertificatesOutput{
@@ -356,10 +340,6 @@ func TestFetchACMCertificates_Pagination(t *testing.T) {
 		}
 	})
 }
-
-// ===========================================================================
-// 5. ECR Repositories — DescribeRepositories (NextToken)
-// ===========================================================================
 
 type mockECRPaginatedClient struct {
 	outputs []*ecr.DescribeRepositoriesOutput
@@ -450,10 +430,6 @@ func TestFetchECRRepositories_Pagination(t *testing.T) {
 	})
 }
 
-// ===========================================================================
-// 6. EventBridge Rules — ListRules (NextToken)
-// ===========================================================================
-
 func TestFetchEventBridgeRules_Pagination(t *testing.T) {
 	mock := &fakeEventBridgeListRules{
 		Pages: []*eventbridge.ListRulesOutput{
@@ -518,10 +494,6 @@ func TestFetchEventBridgeRules_Pagination(t *testing.T) {
 		}
 	})
 }
-
-// ===========================================================================
-// 7. Secrets Manager — ListSecrets (NextToken)
-// ===========================================================================
 
 type mockSecretsPaginatedClient struct {
 	outputs []*secretsmanager.ListSecretsOutput
@@ -612,13 +584,6 @@ func TestFetchSecrets_Pagination(t *testing.T) {
 	})
 }
 
-// ===========================================================================
-// 8. Step Functions — ListStateMachines (NextToken)
-// ===========================================================================
-// The fake client for this operation now lives in fakes_sfn_test.go
-// (fakeSFNListStateMachines) — see that file's header for the one-fake-per-
-// interface convention.
-
 func TestFetchStepFunctions_Pagination(t *testing.T) {
 	mock := &fakeSFNListStateMachines{
 		Pages: []*sfn.ListStateMachinesOutput{
@@ -683,10 +648,6 @@ func TestFetchStepFunctions_Pagination(t *testing.T) {
 		}
 	})
 }
-
-// ===========================================================================
-// 9. SSM Parameters — DescribeParameters (NextToken)
-// ===========================================================================
 
 type mockSSMPaginatedClient struct {
 	outputs []*ssm.DescribeParametersOutput
@@ -776,10 +737,6 @@ func TestFetchSSMParameters_Pagination(t *testing.T) {
 		}
 	})
 }
-
-// ===========================================================================
-// 10. Route53 Hosted Zones — ListHostedZones (Marker/IsTruncated/NextMarker)
-// ===========================================================================
 
 type mockR53PaginatedClient struct {
 	outputs []*route53.ListHostedZonesOutput
@@ -887,10 +844,6 @@ func TestFetchHostedZones_Pagination(t *testing.T) {
 	})
 }
 
-// ===========================================================================
-// 11. CloudFront Distributions — ListDistributions (Marker/NextMarker/IsTruncated)
-// ===========================================================================
-
 func TestFetchCloudFrontDistributions_Pagination(t *testing.T) {
 	mock := &fakeCloudFrontListDistributions{
 		Pages: []*cloudfront.ListDistributionsOutput{
@@ -983,7 +936,5 @@ func TestFetchCloudFrontDistributions_Pagination(t *testing.T) {
 	})
 }
 
-// ===========================================================================
-// Suppress unused import warnings — fmt is used in error messages
-// ===========================================================================
+// Keeps fmt imported when no other use remains.
 var _ = fmt.Sprintf

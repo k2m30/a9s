@@ -16,12 +16,6 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// ---------------------------------------------------------------------------
-// SFN Executions fetcher tests (child of Step Functions)
-// ---------------------------------------------------------------------------
-
-// TestFetchSFNExecutions_Basic verifies parsing of 1 execution with all fields
-// populated, checking Resource.ID, Name, Status, all Fields keys, and RawStruct.
 func TestFetchSFNExecutions_Basic(t *testing.T) {
 	startTs := time.Date(2024, 6, 15, 10, 0, 0, 0, time.UTC)
 	stopTs := time.Date(2024, 6, 15, 10, 2, 47, 0, time.UTC)
@@ -188,7 +182,6 @@ func TestFetchSFNExecutions_Basic(t *testing.T) {
 		}
 	})
 
-	// Verify all expected fields are present
 	t.Run("required_fields_present", func(t *testing.T) {
 		requiredFields := []string{
 			"execution_arn", "name", "status", "start_date", "stop_date",
@@ -204,8 +197,6 @@ func TestFetchSFNExecutions_Basic(t *testing.T) {
 	})
 }
 
-// TestFetchSFNExecutions_Empty verifies that a state machine with no executions
-// returns an empty slice with no error.
 func TestFetchSFNExecutions_Empty(t *testing.T) {
 	mock := &mockSFNListExecutionsClient{
 		output: &sfn.ListExecutionsOutput{
@@ -231,7 +222,6 @@ func TestFetchSFNExecutions_Empty(t *testing.T) {
 	}
 }
 
-// TestFetchSFNExecutions_APIError verifies that API errors are propagated.
 func TestFetchSFNExecutions_APIError(t *testing.T) {
 	mock := &mockSFNListExecutionsClient{
 		err: fmt.Errorf("AWS API error: access denied"),
@@ -255,9 +245,6 @@ func TestFetchSFNExecutions_APIError(t *testing.T) {
 	}
 }
 
-// TestFetchSFNExecutions_NilFields verifies that nil optional fields
-// (StopDate, MapRunArn, StateMachineAliasArn, StateMachineVersionArn,
-// ItemCount, RedriveCount, RedriveDate) do not cause a panic.
 func TestFetchSFNExecutions_NilFields(t *testing.T) {
 	startTs := time.Date(2024, 6, 15, 10, 0, 0, 0, time.UTC)
 
@@ -270,9 +257,6 @@ func TestFetchSFNExecutions_NilFields(t *testing.T) {
 					StartDate:       &startTs,
 					StateMachineArn: aws.String("arn:aws:states:us-east-1:123456789012:stateMachine:sm"),
 					Status:          sfntypes.ExecutionStatusRunning,
-					// All optional fields are nil:
-					// StopDate, MapRunArn, StateMachineAliasArn,
-					// StateMachineVersionArn, ItemCount, RedriveCount, RedriveDate
 				},
 			},
 		},
@@ -282,7 +266,6 @@ func TestFetchSFNExecutions_NilFields(t *testing.T) {
 		"state_machine_arn": "arn:aws:states:us-east-1:123456789012:stateMachine:sm",
 	}
 
-	// Should not panic
 	result, err := awsclient.FetchSFNExecutions(
 		context.Background(),
 		mock,
@@ -354,13 +337,6 @@ func TestFetchSFNExecutions_NilFields(t *testing.T) {
 	})
 }
 
-// TestFetchSFNExecutions_Pagination verifies that paginated responses via
-// NextToken are followed and all executions collected across multiple pages.
-// TestFetchSFNExecutions_Pagination verifies the single-page pagination contract:
-// one API call is made per invocation, resources from that page are returned,
-// and IsTruncated/NextToken reflect whether more pages exist. A second call
-// with the continuation token verifies the token is forwarded and the final
-// page sets IsTruncated=false.
 func TestFetchSFNExecutions_Pagination(t *testing.T) {
 	startTs := time.Date(2024, 6, 15, 10, 0, 0, 0, time.UTC)
 	stopTs := time.Date(2024, 6, 15, 10, 5, 0, 0, time.UTC)
@@ -369,7 +345,6 @@ func TestFetchSFNExecutions_Pagination(t *testing.T) {
 		"state_machine_arn": "arn:aws:states:us-east-1:123456789012:stateMachine:sm",
 	}
 
-	// Page 1: 3 executions with NextToken indicating more pages exist.
 	page1Mock := &mockSFNListExecutionsClient{
 		outputs: []*sfn.ListExecutionsOutput{
 			{
@@ -403,7 +378,6 @@ func TestFetchSFNExecutions_Pagination(t *testing.T) {
 		},
 	}
 
-	// First call: no continuation token — fetches page 1.
 	result1, err := awsclient.FetchSFNExecutions(context.Background(), page1Mock, parentCtx, "")
 	if err != nil {
 		t.Fatalf("page 1: expected no error, got %v", err)
@@ -467,11 +441,9 @@ func TestFetchSFNExecutions_Pagination(t *testing.T) {
 		}
 	})
 
-	// Page 2: 2 executions with no NextToken — last page.
 	page2Mock := &mockSFNListExecutionsClient{
 		outputs: []*sfn.ListExecutionsOutput{
 			{
-				// No NextToken — last page
 				Executions: []sfntypes.ExecutionListItem{
 					{
 						ExecutionArn:    aws.String("arn:aws:states:us-east-1:123456789012:execution:sm:exec-p2-1"),
@@ -494,7 +466,6 @@ func TestFetchSFNExecutions_Pagination(t *testing.T) {
 		},
 	}
 
-	// Second call: pass continuation token from page 1 to fetch page 2.
 	result2, err := awsclient.FetchSFNExecutions(context.Background(), page2Mock, parentCtx, result1.Pagination.NextToken)
 	if err != nil {
 		t.Fatalf("page 2: expected no error, got %v", err)
@@ -525,15 +496,10 @@ func TestFetchSFNExecutions_Pagination(t *testing.T) {
 	})
 }
 
-// TestFetchSFNExecutions_MaxCap verifies that a single API page of 50
-// executions is returned as-is with correct IsTruncated=true metadata when the
-// API indicates more pages exist. The 200-item cap no longer applies — each
-// call returns one page and the caller drives pagination via continuation tokens.
 func TestFetchSFNExecutions_MaxCap(t *testing.T) {
 	startTs := time.Date(2024, 6, 15, 12, 0, 0, 0, time.UTC)
 	stopTs := time.Date(2024, 6, 15, 12, 5, 0, 0, time.UTC)
 
-	// Build one page of 50 executions with a NextToken indicating more pages exist.
 	var executions []sfntypes.ExecutionListItem
 	for i := range 50 {
 		executions = append(executions, sfntypes.ExecutionListItem{
@@ -607,8 +573,6 @@ func TestFetchSFNExecutions_MaxCap(t *testing.T) {
 	})
 }
 
-// TestFetchSFNExecutions_DurationComputed verifies that a SUCCEEDED execution
-// with known StartDate/StopDate produces a correctly formatted duration string.
 func TestFetchSFNExecutions_DurationComputed(t *testing.T) {
 	startTs := time.Date(2024, 6, 15, 10, 0, 0, 0, time.UTC)
 	stopTs := time.Date(2024, 6, 15, 10, 2, 47, 0, time.UTC) // 2m 47s
@@ -663,8 +627,6 @@ func TestFetchSFNExecutions_DurationComputed(t *testing.T) {
 	})
 }
 
-// TestFetchSFNExecutions_DurationRunning verifies that a RUNNING execution
-// with nil StopDate produces a duration string starting with "~".
 func TestFetchSFNExecutions_DurationRunning(t *testing.T) {
 	startTs := time.Date(2024, 6, 15, 10, 0, 0, 0, time.UTC)
 
@@ -709,8 +671,6 @@ func TestFetchSFNExecutions_DurationRunning(t *testing.T) {
 	})
 }
 
-// TestFetchSFNExecutions_StatusPreserved verifies that the Status field
-// preserves the uppercase SFN status values.
 func TestFetchSFNExecutions_StatusPreserved(t *testing.T) {
 	startTs := time.Date(2024, 6, 15, 10, 0, 0, 0, time.UTC)
 	stopTs := time.Date(2024, 6, 15, 10, 5, 0, 0, time.UTC)
@@ -768,12 +728,6 @@ func TestFetchSFNExecutions_StatusPreserved(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// Registration tests
-// ---------------------------------------------------------------------------
-
-// TestSFNExecutionColumns verifies that SFNExecutionColumns returns the expected
-// columns with correct keys, titles, and widths.
 func TestSFNExecutionColumns(t *testing.T) {
 	cols := resource.SFNExecutionColumns()
 
@@ -820,8 +774,6 @@ func TestSFNExecutionColumns(t *testing.T) {
 
 }
 
-// TestSFNExecutions_ChildTypeRegistered verifies that the child type is
-// registered under the correct short name.
 func TestSFNExecutions_ChildTypeRegistered(t *testing.T) {
 	td := resource.GetChildType("sfn_executions")
 	if td == nil {
@@ -835,9 +787,6 @@ func TestSFNExecutions_ChildTypeRegistered(t *testing.T) {
 	}
 }
 
-// TestSFNExecutions_PaginatedChildFetcherRegistered verifies that the paginated
-// child fetcher is
-// registered under the correct short name.
 func TestSFNExecutions_PaginatedChildFetcherRegistered(t *testing.T) {
 	f := resource.GetPaginatedChildFetcher("sfn_executions")
 	if f == nil {
@@ -845,8 +794,6 @@ func TestSFNExecutions_PaginatedChildFetcherRegistered(t *testing.T) {
 	}
 }
 
-// TestSFNExecutions_ParentHasChildDef verifies that the parent sfn resource
-// type has a child view definition for sfn_executions with key "enter".
 func TestSFNExecutions_ParentHasChildDef(t *testing.T) {
 	rt := resource.FindResourceType("sfn")
 	if rt == nil {
@@ -876,8 +823,6 @@ func TestSFNExecutions_ParentHasChildDef(t *testing.T) {
 	}
 }
 
-// TestSFNExecutions_DrillCondition_BlocksExpress verifies that the DrillCondition
-// on the SFN child def blocks Express state machines and allows Standard ones.
 func TestSFNExecutions_DrillCondition_BlocksExpress(t *testing.T) {
 	rt := resource.FindResourceType("sfn")
 	if rt == nil {
@@ -937,8 +882,6 @@ func TestSFNExecutions_DrillCondition_BlocksExpress(t *testing.T) {
 	})
 }
 
-// TestSFNExecutions_DrillBlockMessage verifies that the SFN child def has a
-// non-empty DrillBlockMessage containing "Express".
 func TestSFNExecutions_DrillBlockMessage(t *testing.T) {
 	rt := resource.FindResourceType("sfn")
 	if rt == nil {
@@ -964,12 +907,6 @@ func TestSFNExecutions_DrillBlockMessage(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// formatHumanDuration tests
-// ---------------------------------------------------------------------------
-
-// TestFormatHumanDuration verifies the duration formatting helper for various
-// durations: seconds only, minutes+seconds, hours+minutes, days+hours.
 func TestFormatHumanDuration(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -996,14 +933,7 @@ func TestFormatHumanDuration(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// Config defaults test
-// ---------------------------------------------------------------------------
-
-// TestConfigDefaultViewDef_SFNExecutions verifies that the sfn_executions
-// view definition has the expected list columns and detail paths.
 func TestConfigDefaultViewDef_SFNExecutions(t *testing.T) {
-	// This import is used indirectly through the config package
 	vd := config.DefaultViewDef("sfn_executions")
 
 	t.Run("list_columns", func(t *testing.T) {
@@ -1016,7 +946,6 @@ func TestConfigDefaultViewDef_SFNExecutions(t *testing.T) {
 		if len(vd.Detail) == 0 {
 			t.Error("expected non-empty Detail paths for sfn_executions")
 		}
-		// Check for key detail fields
 		detailStr := strings.Join(config.DetailStringsForTest(vd.Detail), ",")
 		for _, expected := range []string{"ExecutionArn", "Name", "Status", "StartDate", "StopDate"} {
 			if !strings.Contains(detailStr, expected) {
@@ -1026,8 +955,6 @@ func TestConfigDefaultViewDef_SFNExecutions(t *testing.T) {
 	})
 }
 
-// TestFetchSFNExecutions_ContinuationToken verifies that a non-empty
-// continuation token is forwarded to the API as NextToken.
 func TestFetchSFNExecutions_ContinuationToken(t *testing.T) {
 	startTs := time.Date(2024, 6, 15, 10, 0, 0, 0, time.UTC)
 
@@ -1068,7 +995,6 @@ func TestFetchSFNExecutions_ContinuationToken(t *testing.T) {
 	}
 }
 
-// tokenCapturingSFNExecutionsMock wraps the SFN ListExecutions mock to capture NextToken.
 type tokenCapturingSFNExecutionsMock struct {
 	inner             *mockSFNListExecutionsClient
 	capturedNextToken *string

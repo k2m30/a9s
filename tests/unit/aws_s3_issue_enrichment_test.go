@@ -1,21 +1,5 @@
 package unit
 
-// aws_s3_issue_enrichment_test.go — Wave 2 enricher tests for s3.
-//
-// Tests drive aws.EnrichS3Posture and assert the
-// docs/attention-signals.md `s3` Wave 2 contract:
-//   - Severity == "~" (SevWarn) for ALL PAB-missing cases. s3 Wave 2 has NO
-//     Broken tier — "!"/SevBroken must never appear on a PAB finding.
-//   - Summary == "public access block incomplete" verbatim, always (U11 stable phrase).
-//   - Summary never contains the Row detail values (U11 Summary≠Rows separation).
-//   - Rows carry the per-case structured detail.
-//   - FieldUpdates[bucket]["status"] == "public access block incomplete" (NOT "public_access").
-//   - Healthy bucket (all four flags true) emits no finding and no field update.
-//   - Unknown API error (non-NoSuchPublicAccessBlock) emits no finding but sets
-//     TruncatedIDs[bucket] = true.
-//   - Nil S3 client returns empty result gracefully.
-//   - S1 badge: IssueCount equals the number of buckets with "~" findings.
-
 import (
 	"context"
 	"fmt"
@@ -32,10 +16,6 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// ---------------------------------------------------------------------------
-// mock — implements awsclient.S3GetPublicAccessBlockAPI
-// ---------------------------------------------------------------------------
-
 // s3PABFake dispatches GetPublicAccessBlock per bucket from a pre-built map.
 // Semantics mirror fixtures.S3Fixtures.PublicAccessBlockConfigs:
 //   - key present, non-nil value → return that output (may carry nil inner config).
@@ -43,16 +23,13 @@ import (
 //   - key absent                 → return empty output (all flags nil/false).
 //   - "error-bucket"             → return a generic AccessDenied error.
 type s3PABFake struct {
-	// configs maps bucket name → GetPublicAccessBlockOutput.
 	// A nil *s3.GetPublicAccessBlockOutput signals NoSuchPublicAccessBlockConfiguration.
-	configs map[string]*s3.GetPublicAccessBlockOutput
-	// errorBuckets is a set of bucket names for which a generic error is returned.
+	configs      map[string]*s3.GetPublicAccessBlockOutput
 	errorBuckets map[string]bool
 	// codedErrors maps bucket name → smithy error code (e.g. "NoSuchBucket",
 	// "NotFound", "AccessDenied"); GetPublicAccessBlock returns
 	// &smithy.GenericAPIError{Code: code} for that bucket. Takes priority over
-	// errorBuckets/configs, so a single fake pins the full 404 taxonomy
-	// alongside the hardcoded-AccessDenied path.
+	// errorBuckets/configs.
 	codedErrors map[string]string
 	// rawErrors maps bucket name → a caller-supplied error returned verbatim,
 	// bypassing smithy.APIError entirely (e.g. a plain network error). Takes
@@ -80,11 +57,9 @@ func (f *s3PABFake) GetPublicAccessBlock(
 	}
 	cfg, ok := f.configs[bucket]
 	if !ok {
-		// No entry → return empty output (all flags absent).
 		return &s3.GetPublicAccessBlockOutput{}, nil
 	}
 	if cfg == nil {
-		// Explicit nil → NoSuchPublicAccessBlockConfiguration.
 		return nil, &smithy.GenericAPIError{
 			Code:    "NoSuchPublicAccessBlockConfiguration",
 			Message: "The public access block configuration was not found",
@@ -93,20 +68,8 @@ func (f *s3PABFake) GetPublicAccessBlock(
 	return cfg, nil
 }
 
-// s3PABFake also needs ListBuckets to satisfy awsclient.S3API if needed.
-// We only use it as S3GetPublicAccessBlockAPI — no other methods needed.
-
-// s3ClientWithPAB wraps s3PABFake into a ServiceClients-compatible S3 field.
-// Because EnrichS3Posture accepts *ServiceClients and calls
-// clients.S3.GetPublicAccessBlock directly, we need an object that implements
-// both S3API (for the S3 field type) and our fake logic.
-//
-// The simplest approach: use the production S3Fake from fakes/ for the list
-// path, but for enrichment tests we construct an inline resource.Resource
-// slice directly (no fetcher call). So s3PABFake only needs the PAB method.
-//
-// We make s3PABFake satisfy awsclient.S3API by embedding the minimal missing
-// methods as stubs. The ServiceClients.S3 field is typed awsclient.S3API.
+// ListBuckets and the other S3API methods are stubs: the enrichment tests
+// build resources directly and call only GetPublicAccessBlock.
 func (f *s3PABFake) ListBuckets(_ context.Context, _ *s3.ListBucketsInput, _ ...func(*s3.Options)) (*s3.ListBucketsOutput, error) {
 	return &s3.ListBucketsOutput{}, nil
 }
@@ -119,11 +82,6 @@ func (f *s3PABFake) GetBucketNotificationConfiguration(_ context.Context, _ *s3.
 	return &s3.GetBucketNotificationConfigurationOutput{}, nil
 }
 
-// ---------------------------------------------------------------------------
-// helpers
-// ---------------------------------------------------------------------------
-
-// pabResource builds a minimal resource.Resource for PAB enrichment tests.
 func pabResource(name string) resource.Resource {
 	return resource.Resource{
 		ID:     name,
@@ -132,14 +90,9 @@ func pabResource(name string) resource.Resource {
 	}
 }
 
-// assertFindingShape is a shared assertion helper for the stable finding contract.
-// It fails the test if the finding at key does not have the expected severity
-// and the verbatim stable Phrase.
-//
-// s3 Wave 2 PAB findings are always "~" (SevWarn) — docs/attention-signals.md
-// `s3` Wave 2 has no Broken tier for this signal (account-level PAB may still
-// override, so a missing/partial bucket-level PAB block is never certain
-// public exposure).
+// s3 PAB findings are always "~" (SevWarn): account-level PAB may still
+// override, so a missing or partial bucket-level block is never certain
+// public exposure.
 func assertFindingShape(t *testing.T, findings map[string][]domain.Finding, key string) domain.Finding {
 	t.Helper()
 	fs, ok := findings[key]
@@ -157,7 +110,6 @@ func assertFindingShape(t *testing.T, findings map[string][]domain.Finding, key 
 	return f
 }
 
-// rowMap converts a DetailRow slice to a label→value map for easy assertion.
 func rowMap(rows []domain.DetailRow) map[string]string {
 	m := make(map[string]string, len(rows))
 	for _, r := range rows {
@@ -166,12 +118,6 @@ func rowMap(rows []domain.DetailRow) map[string]string {
 	return m
 }
 
-// ---------------------------------------------------------------------------
-// Tests
-// ---------------------------------------------------------------------------
-
-// TestS3_Enrich_HealthyBucket_NoFinding verifies that a bucket with all four
-// PAB flags set to true emits no finding and no FieldUpdate (U1, U6).
 func TestS3_Enrich_HealthyBucket_NoFinding(t *testing.T) {
 	fake := &s3PABFake{
 		configs: map[string]*s3.GetPublicAccessBlockOutput{
@@ -201,10 +147,6 @@ func TestS3_Enrich_HealthyBucket_NoFinding(t *testing.T) {
 	}
 }
 
-// TestS3_Enrich_NoPAB_Configuration verifies the no-PAB case:
-// GetPublicAccessBlock returns NoSuchPublicAccessBlockConfiguration.
-// Expects Severity "!", stable Summary, Rows with "no public access block
-// configuration" Status and "may still apply" Account-level PAB row (U4, U11).
 func TestS3_Enrich_NoPAB_Configuration(t *testing.T) {
 	fake := &s3PABFake{
 		configs: map[string]*s3.GetPublicAccessBlockOutput{
@@ -221,12 +163,10 @@ func TestS3_Enrich_NoPAB_Configuration(t *testing.T) {
 
 	finding := assertFindingShape(t, result.Findings, "a9s-demo-nopab")
 
-	// U11: Phrase must NOT embed the row-level detail string.
 	if strings.Contains(finding.Phrase, "no public access block configuration") {
 		t.Errorf("Phrase must not embed Row content; got %q", finding.Phrase)
 	}
 
-	// Rows must carry the detail.
 	rows := rowMap(result.AttentionDetails["a9s-demo-nopab"][finding.Code].Rows)
 	if rows["Status"] != "no public access block configuration" {
 		t.Errorf("Rows[Status] = %q, want %q", rows["Status"], "no public access block configuration")
@@ -235,7 +175,6 @@ func TestS3_Enrich_NoPAB_Configuration(t *testing.T) {
 		t.Errorf("Rows[Account-level PAB] = %q, want %q", rows["Account-level PAB"], "may still apply")
 	}
 
-	// FieldUpdates must use the "status" key (NOT "public_access").
 	updates, ok := result.FieldUpdates["a9s-demo-nopab"]
 	if !ok {
 		t.Fatal("FieldUpdates missing entry for a9s-demo-nopab")
@@ -248,9 +187,6 @@ func TestS3_Enrich_NoPAB_Configuration(t *testing.T) {
 	}
 }
 
-// TestS3_Enrich_PartialPAB_SingleFlagFalse verifies that a bucket with one
-// PAB flag false (BlockPublicAcls=false, others true) emits a "!" finding
-// with stable Summary and the false-flag row (spec §4 partial case).
 func TestS3_Enrich_PartialPAB_SingleFlagFalse(t *testing.T) {
 	fake := &s3PABFake{
 		configs: map[string]*s3.GetPublicAccessBlockOutput{
@@ -274,7 +210,6 @@ func TestS3_Enrich_PartialPAB_SingleFlagFalse(t *testing.T) {
 
 	finding := assertFindingShape(t, result.Findings, "a9s-demo-partial-pab")
 
-	// U11: Phrase must not contain flag names or values.
 	if strings.Contains(finding.Phrase, "BlockPublicAcls") || strings.Contains(finding.Phrase, "false") {
 		t.Errorf("Phrase must not embed Row content; got %q", finding.Phrase)
 	}
@@ -301,9 +236,6 @@ func TestS3_Enrich_PartialPAB_SingleFlagFalse(t *testing.T) {
 	}
 }
 
-// TestS3_Enrich_PartialPAB_MultipleFlagsFalse verifies that a bucket with two
-// PAB flags false both appear as separate Rows (spec §4 multi-false case).
-// Summary must remain identical to the single-flag case — stable phrase (U11).
 func TestS3_Enrich_PartialPAB_MultipleFlagsFalse(t *testing.T) {
 	fake := &s3PABFake{
 		configs: map[string]*s3.GetPublicAccessBlockOutput{
@@ -327,12 +259,10 @@ func TestS3_Enrich_PartialPAB_MultipleFlagsFalse(t *testing.T) {
 
 	finding := assertFindingShape(t, result.Findings, "a9s-demo-multifail-pab")
 
-	// Phrase must be stable — same phrase even when multiple flags are false.
 	const wantPhrase = "public access block incomplete"
 	if finding.Phrase != wantPhrase {
 		t.Errorf("Phrase = %q, want %q (must be stable across instances)", finding.Phrase, wantPhrase)
 	}
-	// Phrase must not contain flag names.
 	if strings.Contains(finding.Phrase, "BlockPublicAcls") || strings.Contains(finding.Phrase, "BlockPublicPolicy") {
 		t.Errorf("Phrase must not embed Row content; got %q", finding.Phrase)
 	}
@@ -352,16 +282,10 @@ func TestS3_Enrich_PartialPAB_MultipleFlagsFalse(t *testing.T) {
 	}
 }
 
-// TestS3_Enrich_NilPABConfiguration_TreatedAsNoPAB verifies that a bucket
-// whose GetPublicAccessBlock returns a non-nil output but nil inner
-// PublicAccessBlockConfiguration is treated equivalently to the no-PAB case
-// (spec §4, bucket-nil-pab-cfg fixture). Same finding shape: Severity "!",
-// stable Summary, detail in Rows.
 func TestS3_Enrich_NilPABConfiguration_TreatedAsNoPAB(t *testing.T) {
 	fake := &s3PABFake{
 		configs: map[string]*s3.GetPublicAccessBlockOutput{
 			"a9s-demo-nilcfg": {
-				// Non-nil output, nil inner config — the "nil-cfg" case.
 				PublicAccessBlockConfiguration: nil,
 			},
 		},
@@ -376,7 +300,6 @@ func TestS3_Enrich_NilPABConfiguration_TreatedAsNoPAB(t *testing.T) {
 
 	finding := assertFindingShape(t, result.Findings, "a9s-demo-nilcfg")
 
-	// Must not embed row detail in Phrase.
 	if strings.Contains(finding.Phrase, "no public access block configuration") {
 		t.Errorf("Phrase must not embed Row content; got %q", finding.Phrase)
 	}
@@ -390,12 +313,9 @@ func TestS3_Enrich_NilPABConfiguration_TreatedAsNoPAB(t *testing.T) {
 	}
 }
 
-// TestS3_Enrich_UnknownAPIError_NoFinding verifies that when GetPublicAccessBlock
-// returns a generic non-NoSuchPublicAccessBlockConfiguration error (e.g.
-// AccessDenied), the enricher:
-//  1. emits NO finding (data is incomplete — cannot claim PAB is missing),
-//  2. marks the bucket in TruncatedIDs (per-row `?` marker),
-//  3. returns a composite error via AggregateFailures so the error log (!) surfaces it.
+// An error other than NoSuchPublicAccessBlockConfiguration leaves the data
+// incomplete: no finding, the bucket marked in TruncatedIDs, and the failure
+// in the composite error.
 func TestS3_Enrich_UnknownAPIError_NoFinding(t *testing.T) {
 	fake := &s3PABFake{
 		configs:      map[string]*s3.GetPublicAccessBlockOutput{},
@@ -426,8 +346,6 @@ func TestS3_Enrich_UnknownAPIError_NoFinding(t *testing.T) {
 	}
 }
 
-// TestS3_Enrich_NilS3Client_GracefulEmpty verifies that nil S3 client returns
-// an empty result without error (degraded gracefully).
 func TestS3_Enrich_NilS3Client_GracefulEmpty(t *testing.T) {
 	clients := &awsclient.ServiceClients{S3: nil}
 	result, err := awsclient.EnrichS3Posture(context.Background(), clients, nil, nil)
@@ -442,16 +360,9 @@ func TestS3_Enrich_NilS3Client_GracefulEmpty(t *testing.T) {
 	}
 }
 
-// TestS3_Enrich_IssueCount_FourBuckets verifies that IssueCount equals the
-// number of "~" findings across the four spec fixtures (U6 reconciliation:
-// 4 is the correct count from the fixture file — no-pab, partial-pab,
-// multi-false-pab, nil-pab-cfg). The healthy bucket must NOT contribute, and
-// none of the four PAB-issue findings may be "!" (SevBroken) — s3 Wave 2 has
-// no Broken tier.
 func TestS3_Enrich_IssueCount_FourBuckets(t *testing.T) {
 	fake := &s3PABFake{
 		configs: map[string]*s3.GetPublicAccessBlockOutput{
-			// Healthy: all flags true → no finding.
 			"a9s-demo-healthy": {
 				PublicAccessBlockConfiguration: &s3types.PublicAccessBlockConfiguration{
 					BlockPublicAcls:       aws.Bool(true),
@@ -460,9 +371,7 @@ func TestS3_Enrich_IssueCount_FourBuckets(t *testing.T) {
 					RestrictPublicBuckets: aws.Bool(true),
 				},
 			},
-			// no-pab: NoSuchPublicAccessBlockConfiguration.
 			"a9s-demo-nopab": nil,
-			// partial-pab: one flag false.
 			"a9s-demo-partial-pab": {
 				PublicAccessBlockConfiguration: &s3types.PublicAccessBlockConfiguration{
 					BlockPublicAcls:       aws.Bool(false),
@@ -471,7 +380,6 @@ func TestS3_Enrich_IssueCount_FourBuckets(t *testing.T) {
 					RestrictPublicBuckets: aws.Bool(true),
 				},
 			},
-			// multi-false-pab: two flags false.
 			"a9s-demo-multifail-pab": {
 				PublicAccessBlockConfiguration: &s3types.PublicAccessBlockConfiguration{
 					BlockPublicAcls:       aws.Bool(false),
@@ -480,7 +388,6 @@ func TestS3_Enrich_IssueCount_FourBuckets(t *testing.T) {
 					RestrictPublicBuckets: aws.Bool(true),
 				},
 			},
-			// nil-pab-cfg: non-nil output, nil inner config.
 			"a9s-demo-nilcfg": {
 				PublicAccessBlockConfiguration: nil,
 			},
@@ -500,7 +407,6 @@ func TestS3_Enrich_IssueCount_FourBuckets(t *testing.T) {
 		t.Fatalf("EnrichS3Posture error: %v", err)
 	}
 
-	// Count SevWarn findings manually to decouple from IssueCount field name choices.
 	tildeCount := 0
 	bangCount := 0
 	for _, fs := range result.Findings {
@@ -521,18 +427,14 @@ func TestS3_Enrich_IssueCount_FourBuckets(t *testing.T) {
 		t.Errorf("expected 0 '!' findings — s3 Wave 2 PAB findings have no Broken tier, got %d", bangCount)
 	}
 
-	// Healthy bucket must not appear in Findings.
 	if _, ok := result.Findings["a9s-demo-healthy"]; ok {
 		t.Error("healthy bucket must not have a finding")
 	}
 }
 
-// TestS3_Enrich_NeverEmitsBrokenSeverity is a dedicated regression guard for
-// docs/attention-signals.md `s3` Wave 2: "GetPublicAccessBlock per bucket:
-// NoSuchPublicAccessBlockConfiguration error or any flag false -> Warning."
-// There is no Broken tier for this signal — a missing/partial bucket-level
-// PAB block is a risk, not a certainty (account-level PAB may still apply),
-// so it must never paint a row red.
+// docs/attention-signals.md: a missing or partial bucket-level PAB block is
+// a risk, not a certainty (account-level PAB may still apply), so it never
+// paints a row red.
 func TestS3_Enrich_NeverEmitsBrokenSeverity(t *testing.T) {
 	fake := &s3PABFake{
 		configs: map[string]*s3.GetPublicAccessBlockOutput{
@@ -568,9 +470,6 @@ func TestS3_Enrich_NeverEmitsBrokenSeverity(t *testing.T) {
 	}
 }
 
-// TestS3_Enrich_U11_SummaryStable_NeverContainsRowValues drives the U11
-// invariant: for every "!" finding, Summary must not contain any of the
-// values present in that finding's Rows.
 func TestS3_Enrich_U11_SummaryStable_NeverContainsRowValues(t *testing.T) {
 	fake := &s3PABFake{
 		configs: map[string]*s3.GetPublicAccessBlockOutput{
@@ -621,19 +520,12 @@ func TestS3_Enrich_U11_SummaryStable_NeverContainsRowValues(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// Issue #456 — 404 taxonomy: on the pinned SDK (s3 v1.102.1) GetPublicAccessBlock
-// has NO modeled errors, so every failure surfaces as smithy.GenericAPIError
-// with the body's Code verbatim. A bucket deleted between ListBuckets and
-// enrichment yields Code "NoSuchBucket" (confirmed empirically); an
-// empty-body 404 synthesizes Code "NotFound". Both must classify as a
-// silent truncation — same as the existing cross-region branch — never a
-// false "public access block incomplete" finding on a bucket that no longer
-// exists.
-// ---------------------------------------------------------------------------
+// On the pinned SDK (s3 v1.102.1) GetPublicAccessBlock has no modeled
+// errors, so every failure is a smithy.GenericAPIError carrying the body's
+// Code verbatim. A bucket deleted after ListBuckets yields "NoSuchBucket" and
+// an empty-body 404 "NotFound": both are a silent truncation, never a
+// "public access block incomplete" finding.
 
-// TestS3_Enrich_NoSuchBucket_SilentTruncation_NoFinding pins the
-// deleted-bucket case: GetPublicAccessBlock returns Code "NoSuchBucket".
 func TestS3_Enrich_NoSuchBucket_SilentTruncation_NoFinding(t *testing.T) {
 	const deletedBucket = "deleted-bucket"
 	fake := &s3PABFake{
@@ -663,9 +555,6 @@ func TestS3_Enrich_NoSuchBucket_SilentTruncation_NoFinding(t *testing.T) {
 	}
 }
 
-// TestS3_Enrich_NotFound_SilentTruncation_NoFinding pins the empty-body-404
-// shape: GetPublicAccessBlock returns Code "NotFound" (the code the AWS SDK
-// synthesizes when the HTTP response body is empty on a 404).
 func TestS3_Enrich_NotFound_SilentTruncation_NoFinding(t *testing.T) {
 	const deletedBucket = "gone-empty-body-bucket"
 	fake := &s3PABFake{
@@ -692,11 +581,6 @@ func TestS3_Enrich_NotFound_SilentTruncation_NoFinding(t *testing.T) {
 	}
 }
 
-// TestS3_Enrich_NonNotFoundErrors_StillAggregate is the negative-space guard
-// for the 404-taxonomy fix: an AccessDenied GenericAPIError and a plain
-// non-smithy error (e.g. a network failure) must NOT be swallowed by the new
-// NoSuchBucket/NotFound silent-truncation branch — both must still surface
-// via the failure aggregate exactly as before.
 func TestS3_Enrich_NonNotFoundErrors_StillAggregate(t *testing.T) {
 	cases := []struct {
 		name   string

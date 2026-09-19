@@ -14,10 +14,6 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// ---------------------------------------------------------------------------
-// T071 - Test IAM ListRoles response parsing
-// ---------------------------------------------------------------------------
-
 func TestFetchIAMRoles_ParsesMultipleRoles(t *testing.T) {
 	createDate := time.Date(2024, 6, 1, 9, 0, 0, 0, time.UTC)
 
@@ -57,7 +53,6 @@ func TestFetchIAMRoles_ParsesMultipleRoles(t *testing.T) {
 		t.Fatalf("expected 2 resources, got %d", len(resources))
 	}
 
-	// Verify required fields exist
 	requiredFields := []string{"role_name", "role_id", "path", "create_date", "description"}
 	for i, r := range resources {
 		for _, key := range requiredFields {
@@ -67,7 +62,6 @@ func TestFetchIAMRoles_ParsesMultipleRoles(t *testing.T) {
 		}
 	}
 
-	// Verify first role
 	r0 := resources[0]
 	if r0.ID != "prod-app-role" {
 		t.Errorf("resource[0].ID: expected %q, got %q", "prod-app-role", r0.ID)
@@ -91,7 +85,6 @@ func TestFetchIAMRoles_ParsesMultipleRoles(t *testing.T) {
 		t.Error("resource[0].Fields[\"create_date\"] should not be empty")
 	}
 
-	// Verify second role
 	r1 := resources[1]
 	if r1.ID != "staging-deploy-role" {
 		t.Errorf("resource[1].ID: expected %q, got %q", "staging-deploy-role", r1.ID)

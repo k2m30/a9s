@@ -1,23 +1,5 @@
 package unit
 
-// aws_enrichment_ecs_cfn_elb_eb_test.go — Behavioral tests for the ECS, CFN,
-// ELB, and EB enrichers.
-//
-// Enrichers covered:
-//   - EnrichECSServices      (line 1715)
-//   - EnrichECSTasks         (line 1957)
-//   - EnrichECSClusters      (line 1860)
-//   - EnrichCFNStackEvents   (line 2876)
-//   - EnrichELBAttributes    (line 2267)
-//   - EnrichCFNCombined      (line 2956)
-//   - EnrichEBEnvironmentHealth (line 2209)
-//
-// Per enricher: happy-path (findings emitted), truncation (API error), no-issue.
-// All fakes embed the aggregate interface and override only the method under test.
-//
-// Note: Redis has no Wave-2 enricher — spec §3.2 explicitly has no Wave-2 signals.
-// EnrichRedisReplicationGroup tests were removed post-phase-7.
-
 import (
 	"context"
 	"errors"
@@ -41,24 +23,17 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// =============================================================================
-// ECS fakes — shared by ECSServices, ECSClusters, ECSTasks
-// =============================================================================
-
 // fakeECSEnricher embeds ECSAPI and overrides DescribeServices, DescribeClusters,
-// and DescribeTasks for Wave-3 tests.
+// and DescribeTasks.
 type fakeECSEnricher struct {
 	awsclient.ECSAPI
 
-	// DescribeServices
 	descSvcOut *ecs.DescribeServicesOutput
 	descSvcErr error
 
-	// DescribeClusters
 	descClustersOut *ecs.DescribeClustersOutput
 	descClustersErr error
 
-	// DescribeTasks
 	descTasksOut *ecs.DescribeTasksOutput
 	descTasksErr error
 }
@@ -105,12 +80,7 @@ func (f *fakeECSEnricher) DescribeTasks(
 	return &ecs.DescribeTasksOutput{}, nil
 }
 
-// Compile-time check: fakeECSEnricher satisfies ECSAPI.
 var _ awsclient.ECSAPI = (*fakeECSEnricher)(nil)
-
-// =============================================================================
-// EnrichECSServices
-// =============================================================================
 
 // TestEnrichECSServices_StuckServiceEmitsBangFinding verifies that a service
 // with desired > running and no in-progress deployment produces a "!" finding
@@ -338,10 +308,6 @@ func TestEnrichECSServices_RecentEventUnableToPlaceEmitsFinding(t *testing.T) {
 	}
 }
 
-// =============================================================================
-// EnrichECSClusters
-// =============================================================================
-
 // TestEnrichECSClusters_PendingTasksEmitsFinding verifies that a cluster with
 // pendingTasksCount > 0 produces a "~" finding.
 func TestEnrichECSClusters_PendingTasksEmitsFinding(t *testing.T) {
@@ -499,10 +465,6 @@ func TestEnrichECSClusters_HealthyClusterNoFinding(t *testing.T) {
 		t.Errorf("expected no findings for healthy cluster; got %v", result.Findings)
 	}
 }
-
-// =============================================================================
-// EnrichECSTasks
-// =============================================================================
 
 // TestEnrichECSTasks_TaskFailedToStartEmitsFinding verifies that StopCode
 // TaskFailedToStart produces a "!" finding.
@@ -705,16 +667,11 @@ func TestEnrichECSTasks_HealthyTaskNoFinding(t *testing.T) {
 	}
 }
 
-// =============================================================================
-// CFN fake
-// =============================================================================
-
 // fakeCFNEnricher embeds CFNAPI and overrides DescribeStackEvents and
 // DescribeStacks for EnrichCFNStackEvents and EnrichCFNCombined.
 type fakeCFNEnricher struct {
 	awsclient.CFNAPI
 
-	// DescribeStackEvents
 	stackEvents    []cfntypes.StackEvent
 	stackEventsErr error
 
@@ -748,12 +705,7 @@ func (f *fakeCFNEnricher) DescribeStacks(
 	return &cfnsvc.DescribeStacksOutput{}, nil
 }
 
-// Compile-time check.
 var _ awsclient.CFNAPI = (*fakeCFNEnricher)(nil)
-
-// =============================================================================
-// EnrichCFNStackEvents
-// =============================================================================
 
 // TestEnrichCFNStackEvents_FailedEventEmitsBangFinding verifies that a stack
 // event with a _FAILED status produces a "!" finding.
@@ -870,10 +822,6 @@ func TestEnrichCFNStackEvents_NoFailedEventsNoFinding(t *testing.T) {
 	}
 }
 
-// =============================================================================
-// ELB fake
-// =============================================================================
-
 // fakeELBEnricher embeds ELBv2API and overrides DescribeLoadBalancerAttributes.
 type fakeELBEnricher struct {
 	awsclient.ELBv2API
@@ -907,12 +855,7 @@ func (f *fakeELBEnricher) DescribeListeners(
 	return &elbv2svc.DescribeListenersOutput{}, nil
 }
 
-// Compile-time check.
 var _ awsclient.ELBv2API = (*fakeELBEnricher)(nil)
-
-// =============================================================================
-// EnrichELBAttributes
-// =============================================================================
 
 // TestEnrichELBAttributes_BothMisconfigurations_TildeFinding: a load balancer
 // missing both deletion protection and access logging produces only a "~"
@@ -993,8 +936,8 @@ func TestEnrichELBAttributes_APIErrorMarksRowTruncatedIDNotBadge(t *testing.T) {
 	resources := []resource.Resource{{ID: lbName, Name: lbName, Fields: map[string]string{"load_balancer_arn": lbARN}}}
 
 	result, err := awsclient.EnrichELBAttributes(context.Background(), clients, resources, nil)
-	// Per-resource errors now aggregate into a composite; assert surface but do
-	// not require its absence (E1-E6 contract).
+	// Per-resource errors aggregate into a composite error; this case asserts
+	// only the truncation marks.
 	_ = err
 	if result.Truncated {
 		t.Error("Truncated must stay false: elb only emits \"~\" findings, so a DescribeLoadBalancerAttributes API error marks the row via TruncatedIDs, never the aggregate issue badge")
@@ -1028,10 +971,6 @@ func TestEnrichELBAttributes_WellConfiguredLB_NoFinding(t *testing.T) {
 	}
 }
 
-// =============================================================================
-// EnrichEBEnvironmentHealth
-// =============================================================================
-
 // fakeEBHealthEnricher embeds ElasticBeanstalkAPI and overrides
 // DescribeEnvironmentHealth.
 type fakeEBHealthEnricher struct {
@@ -1058,7 +997,6 @@ func (f *fakeEBHealthEnricher) DescribeEnvironmentHealth(
 	}, nil
 }
 
-// Compile-time check.
 var _ awsclient.ElasticBeanstalkAPI = (*fakeEBHealthEnricher)(nil)
 
 // TestEnrichEBEnvironmentHealth_CausesEmitsTildeFinding verifies that a non-empty
@@ -1169,10 +1107,6 @@ func TestEnrichEBEnvironmentHealth_NoCauses_NoFinding(t *testing.T) {
 	}
 }
 
-// =============================================================================
-// EnrichCFNCombined
-// =============================================================================
-
 // TestEnrichCFNCombined_EventsAndDriftMerged verifies that when a stack has
 // both a _FAILED event AND is DRIFTED, the combined result contains the "!"
 // finding from events (events win over drift on conflict) and IssueCount > 0.
@@ -1212,7 +1146,6 @@ func TestEnrichCFNCombined_EventsAndDriftMerged(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	// Combined result must have at least one finding.
 	if len(result.Findings) == 0 {
 		t.Fatal("expected findings in combined result; got none")
 	}
@@ -1297,12 +1230,11 @@ func TestEnrichCFNCombined_NilClient_ReturnsEmpty(t *testing.T) {
 	}
 }
 
-// DescribeConfigurationSettings is the stub half of a partial test double: this fake embeds
-// ElasticBeanstalkAPI as a nil interface and implements only the calls the enricher
-// under test made when it was written. The enricher now also calls
-// DescribeConfigurationSettings, and the promoted nil method panics rather than returning
-// anything. An empty output keeps this fake's own scenario unchanged —
-// no managed-updates, health-reporting or log-streaming posture is asserted here.
+// DescribeConfigurationSettings returns an empty output: this fake embeds
+// ElasticBeanstalkAPI as a nil interface, whose promoted methods panic, and the
+// enricher calls DescribeConfigurationSettings. The empty output leaves
+// managed-updates, health-reporting and log-streaming posture out of this
+// fake's scenario.
 func (f *fakeEBHealthEnricher) DescribeConfigurationSettings(_ context.Context, _ *elasticbeanstalk.DescribeConfigurationSettingsInput, _ ...func(*elasticbeanstalk.Options)) (*elasticbeanstalk.DescribeConfigurationSettingsOutput, error) {
 	return &elasticbeanstalk.DescribeConfigurationSettingsOutput{}, nil
 }

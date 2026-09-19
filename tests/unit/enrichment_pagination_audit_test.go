@@ -7,16 +7,6 @@ package unit
 // at EnrichmentCap pages to avoid unbounded API calls. The structural
 // meta-test (AST walk of *_issue_enrichment.go files) flags an enricher that
 // calls a paginated API without a loop.
-//
-// # Covered enrichers
-//
-//   - EnrichBackupJobs            (backup.ListBackupJobs   — NextToken)
-//   - EnrichEC2InstanceStatus     (ec2.DescribeInstanceStatus — NextToken)
-//   - EnrichEBSVolumeStatus       (ec2.DescribeVolumeStatus  — NextToken)
-//
-// ASG / TGW / VPCFlowLogs use per-resource DescribeXxx calls keyed by resource
-// ID and are capped at EnrichmentCap resources — not account-wide scans. They
-// are out of scope for this file.
 
 import (
 	"context"
@@ -39,10 +29,6 @@ import (
 	awsclient "github.com/k2m30/a9s/v3/core/aws"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
-
-// ---------------------------------------------------------------------------
-// Fake: backup client (ListBackupJobs with NextToken pagination)
-// ---------------------------------------------------------------------------
 
 // backupPaginatedFake implements BackupAPI, serving ordered pages for
 // ListBackupJobs calls. Each successive call (regardless of NextToken value)
@@ -72,12 +58,7 @@ func (f *backupPaginatedFake) ListBackupJobs(
 	return f.pages[idx], nil
 }
 
-// Compile-time check.
 var _ awsclient.BackupAPI = (*backupPaginatedFake)(nil)
-
-// ---------------------------------------------------------------------------
-// Fake: EC2 client (DescribeInstanceStatus + DescribeVolumeStatus with NextToken)
-// ---------------------------------------------------------------------------
 
 // ec2PaginatedFake implements EC2API, serving ordered pages for
 // DescribeInstanceStatus and DescribeVolumeStatus calls independently.
@@ -121,12 +102,7 @@ func (f *ec2PaginatedFake) DescribeVolumeStatus(
 	return f.volumeStatusPages[idx], nil
 }
 
-// Compile-time check.
 var _ awsclient.EC2API = (*ec2PaginatedFake)(nil)
-
-// ---------------------------------------------------------------------------
-// Helpers — test resource builders
-// ---------------------------------------------------------------------------
 
 // backupResources builds minimal resource.Resource slices for backup tests.
 // BackupJobs is account-wide, so resources is unused by the enricher — we pass
@@ -195,22 +171,9 @@ func makeVolumeStatus(volumeID string, statusVal string) ec2types.VolumeStatusIt
 	}
 }
 
-// ---------------------------------------------------------------------------
-// TestEnrichBackupJobs_PaginatesListBackupJobs
-// ---------------------------------------------------------------------------
-
 // TestEnrichBackupJobs_PaginatesListBackupJobs verifies that EnrichBackupJobs
 // follows NextToken across two pages of ListBackupJobs results.
-//
-// Contract:
-//   - Page 1: 10 jobs (5 COMPLETED, 5 FAILED) with NextToken="t1"
-//   - Page 2: 5 jobs (all COMPLETED) with NextToken=nil
-//   - ListBackupJobs called exactly twice
-//   - Findings from page 2 are not dropped (no duplicated plan IDs so all
-//     failed jobs on page 1 produce findings)
-//   - result.Truncated == false (both pages consumed)
 func TestEnrichBackupJobs_PaginatesListBackupJobs(t *testing.T) {
-	// Build page 1: 5 failed jobs (distinct plan IDs) + 5 completed jobs.
 	p1Jobs := make([]backuptypes.BackupJob, 0, 10)
 	for i := range 5 {
 		p1Jobs = append(p1Jobs,
@@ -248,7 +211,6 @@ func TestEnrichBackupJobs_PaginatesListBackupJobs(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	// ListBackupJobs must have been called twice.
 	if fake.callCount != 2 {
 		t.Errorf("ListBackupJobs called %d times, want 2 (one per page)", fake.callCount)
 	}
@@ -264,7 +226,6 @@ func TestEnrichBackupJobs_PaginatesListBackupJobs(t *testing.T) {
 		t.Errorf("len(result.Findings) = %d, want %d", len(result.Findings), wantFindings)
 	}
 
-	// Each failed plan must have a finding.
 	for i := range 5 {
 		key := fmt.Sprintf("plan-failed-%d", i)
 		if _, ok := result.Findings[key]; !ok {
@@ -281,15 +242,10 @@ func TestEnrichBackupJobs_PaginatesListBackupJobs(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// TestEnrichBackupJobs_CapsAtEnrichmentCap
-// ---------------------------------------------------------------------------
-
 // TestEnrichBackupJobs_CapsAtEnrichmentCap verifies that when ListBackupJobs
 // always returns NextToken (simulating an enormous account), the enricher
 // stops after EnrichmentCap pages and sets result.Truncated = true.
 func TestEnrichBackupJobs_CapsAtEnrichmentCap(t *testing.T) {
-	// Build EnrichmentCap+2 pages, each with NextToken always set.
 	pages := make([]*backupsdk.ListBackupJobsOutput, awsclient.EnrichmentCap+2)
 	for i := range pages {
 		// Use a unique plan ID per page so jobs don't de-duplicate.
@@ -312,32 +268,19 @@ func TestEnrichBackupJobs_CapsAtEnrichmentCap(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	// Must stop at EnrichmentCap pages — not go on indefinitely.
 	if fake.callCount > awsclient.EnrichmentCap {
 		t.Errorf("ListBackupJobs called %d times, want at most %d (EnrichmentCap)", fake.callCount, awsclient.EnrichmentCap)
 	}
 
-	// result.Truncated must signal that the walk was cut short.
 	if !result.Truncated {
 		t.Errorf("result.Truncated = false, want true (walk capped at EnrichmentCap pages)")
 	}
 }
 
-// ---------------------------------------------------------------------------
-// TestEnrichEC2InstanceStatus_PaginatesDescribeInstanceStatus
-// ---------------------------------------------------------------------------
-
 // TestEnrichEC2InstanceStatus_PaginatesDescribeInstanceStatus verifies that
 // EnrichEC2InstanceStatus follows NextToken across two pages and processes
 // all instance statuses (including those only on page 2).
-//
-// Contract:
-//   - Page 1: 3 instances (2 impaired, 1 ok-ish) with NextToken="p1"
-//   - Page 2: 2 instances (1 impaired, 1 ok) with NextToken=nil
-//   - DescribeInstanceStatus called exactly twice
-//   - Findings from page 2 are not dropped
 func TestEnrichEC2InstanceStatus_PaginatesDescribeInstanceStatus(t *testing.T) {
-	// Instance IDs spread across two pages.
 	p1Impaired := []string{"i-aaa001", "i-aaa002"}
 	p2Impaired := []string{"i-bbb001"}
 
@@ -366,7 +309,6 @@ func TestEnrichEC2InstanceStatus_PaginatesDescribeInstanceStatus(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	// DescribeInstanceStatus must have been called twice.
 	if fake.instanceStatusCallCount != 2 {
 		t.Errorf("DescribeInstanceStatus called %d times, want 2 (one per page)", fake.instanceStatusCallCount)
 	}
@@ -376,7 +318,6 @@ func TestEnrichEC2InstanceStatus_PaginatesDescribeInstanceStatus(t *testing.T) {
 		t.Errorf("result.Truncated = true, want false (both pages consumed)")
 	}
 
-	// All impaired instances (page 1 + page 2) must have findings.
 	wantFindings := len(p1Impaired) + len(p2Impaired)
 	if len(result.Findings) != wantFindings {
 		t.Errorf("len(result.Findings) = %d, want %d (impaired from both pages)", len(result.Findings), wantFindings)
@@ -393,10 +334,6 @@ func TestEnrichEC2InstanceStatus_PaginatesDescribeInstanceStatus(t *testing.T) {
 		}
 	}
 }
-
-// ---------------------------------------------------------------------------
-// TestEnrichEC2InstanceStatus_CapsAtEnrichmentCap
-// ---------------------------------------------------------------------------
 
 // TestEnrichEC2InstanceStatus_CapsAtEnrichmentCap verifies that when
 // DescribeInstanceStatus always returns NextToken the enricher stops after
@@ -429,19 +366,9 @@ func TestEnrichEC2InstanceStatus_CapsAtEnrichmentCap(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// TestEnrichEBSVolumeStatus_PaginatesDescribeVolumeStatus
-// ---------------------------------------------------------------------------
-
 // TestEnrichEBSVolumeStatus_PaginatesDescribeVolumeStatus verifies that
 // EnrichEBSVolumeStatus follows NextToken across two pages and processes
 // all volume statuses (including those only on page 2).
-//
-// Contract:
-//   - Page 1: 3 volumes (2 degraded, 1 ok) with NextToken="v1"
-//   - Page 2: 2 volumes (1 degraded, 1 ok) with NextToken=nil
-//   - DescribeVolumeStatus called exactly twice
-//   - Findings from page 2 are not dropped
 func TestEnrichEBSVolumeStatus_PaginatesDescribeVolumeStatus(t *testing.T) {
 	p1Degraded := []string{"vol-aaa001", "vol-aaa002"}
 	p2Degraded := []string{"vol-bbb001"}
@@ -470,7 +397,6 @@ func TestEnrichEBSVolumeStatus_PaginatesDescribeVolumeStatus(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	// DescribeVolumeStatus must have been called twice.
 	if fake.volumeStatusCallCount != 2 {
 		t.Errorf("DescribeVolumeStatus called %d times, want 2 (one per page)", fake.volumeStatusCallCount)
 	}
@@ -480,7 +406,6 @@ func TestEnrichEBSVolumeStatus_PaginatesDescribeVolumeStatus(t *testing.T) {
 		t.Errorf("result.Truncated = true, want false (both pages consumed)")
 	}
 
-	// All degraded volumes (page 1 + page 2) must have findings.
 	wantFindings := len(p1Degraded) + len(p2Degraded)
 	if len(result.Findings) != wantFindings {
 		t.Errorf("len(result.Findings) = %d, want %d (degraded from both pages)", len(result.Findings), wantFindings)
@@ -497,10 +422,6 @@ func TestEnrichEBSVolumeStatus_PaginatesDescribeVolumeStatus(t *testing.T) {
 		}
 	}
 }
-
-// ---------------------------------------------------------------------------
-// TestEnrichEBSVolumeStatus_CapsAtEnrichmentCap
-// ---------------------------------------------------------------------------
 
 // TestEnrichEBSVolumeStatus_CapsAtEnrichmentCap verifies that when
 // DescribeVolumeStatus always returns NextToken the enricher stops after
@@ -532,10 +453,6 @@ func TestEnrichEBSVolumeStatus_CapsAtEnrichmentCap(t *testing.T) {
 		t.Errorf("result.Truncated = false, want true (walk capped at EnrichmentCap pages)")
 	}
 }
-
-// ---------------------------------------------------------------------------
-// TestNoSingleCallListAPIEnrichers (meta-test / structural audit)
-// ---------------------------------------------------------------------------
 
 // nonPaginatedAPIs is the allowlist of AWS API calls that are legitimately
 // non-paginated (account-wide singletons, GetXxx operations, etc.).
@@ -634,10 +551,7 @@ var nonPaginatedAPIs = []string{
 	// ListResourcesForWebACL — WAFv2 returns all associated resource ARNs in
 	// a single response (no NextToken in output); not a paginated operation.
 	"ListResourcesForWebACL",
-	// The seven below were surfaced once the audit began walking the
-	// unexported helpers the enrichers delegate to, not only the exported
-	// Enrich* entry points. Each output struct was read off the SDK version
-	// this module pins.
+	// Each output struct below was read off the SDK version this module pins.
 	//
 	// DescribeDBClusterSnapshotAttributes — one snapshot's attribute list.
 	// rds.DescribeDBClusterSnapshotAttributesOutput carries only
@@ -662,11 +576,10 @@ var nonPaginatedAPIs = []string{
 	"DescribeDBEngineVersions",
 }
 
-// paginationBurnDown is the list of call sites the per-call-site audit already
-// finds unpaginated. They are carried rather than failing, so this gate goes
-// red only on a NEW one; each entry is a finding routed to the batch that owns
-// the enricher. Deleting an entry that is no longer found is enforced below,
-// so the list cannot outlive the work.
+// paginationBurnDown is the list of call sites the per-call-site audit finds
+// unpaginated and carries rather than failing, so this gate goes red only on
+// a new one. A carried entry the audit stops finding must be deleted (enforced
+// below), so the list cannot outlive the work.
 //
 // Key shape: "<file>:<Enrich func>:<SDK operation>".
 var paginationBurnDown = map[string]bool{}
@@ -707,7 +620,6 @@ func TestNoSingleCallListAPIEnrichers(t *testing.T) {
 		t.Fatal("filepath.Glob returned zero matches for core/aws/*_issue_enrichment.go — check repo layout")
 	}
 
-	// Build a skip-set from nonPaginatedAPIs for O(1) lookup.
 	skipSet := make(map[string]bool, len(nonPaginatedAPIs))
 	for _, op := range nonPaginatedAPIs {
 		skipSet[op] = true
@@ -818,10 +730,6 @@ func seenBurnDownKey(carried []string, key string) bool {
 	}
 	return false
 }
-
-// ---------------------------------------------------------------------------
-// AST helpers for TestNoSingleCallListAPIEnrichers
-// ---------------------------------------------------------------------------
 
 // callSite records the operation name and source position of a detected call,
 // and whether that call is the one being paginated.

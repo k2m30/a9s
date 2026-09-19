@@ -11,14 +11,13 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// d1_messaging_classifier_test.go covers the three classifiers that came off
-// the raw-enum shape last: eb-rule, kinesis and msk. Two things have to hold.
-// A row that carries findings is coloured by the worst of them, not the first
-// one in the slice. A row built without findings is coloured by the type's own
-// predicate over its raw field, so the bare-Fields path and the fetcher agree
-// instead of holding the same mapping twice.
+// d1_messaging_classifier_test.go covers the eb-rule, kinesis and msk
+// classifiers. A row that carries findings is coloured by the worst of them,
+// not the first one in the slice. A row built without findings is coloured by
+// the type's own predicate over its raw field, so the bare-Fields path and the
+// fetcher agree.
 
-// d1MessagingTypes are the three short names row 8 moved.
+// d1MessagingTypes are the three short names under test.
 var d1MessagingTypes = []string{"eb-rule", "kinesis", "msk"} //nolint:gochecknoglobals // test-only list
 
 // A classifier that returned the first finding instead of the worst would read
@@ -45,14 +44,9 @@ func TestD1_MessagingWarnThenBrokenReadsAsBroken(t *testing.T) {
 	}
 }
 
-// The bare-Fields path now runs the type's predicate. Every state the old
-// switches enumerated has to land on the colour it landed on before, or the
-// removal of those switches changed behaviour instead of removing a duplicate.
-//
-// eb-rule and kinesis have their own tables (qa_eb_rule_color_test.go,
-// qa_kinesis_color_test.go) covering every case theirs enumerated, and both
-// pass unchanged. What is left here is msk, which had no table at all, and the
-// one eb-rule state its table omits.
+// The bare-Fields path runs the type's predicate. eb-rule and kinesis have
+// their own tables (qa_eb_rule_color_test.go, qa_kinesis_color_test.go); this
+// table covers msk and the one eb-rule state the eb-rule table omits.
 func TestD1_MessagingBareFieldsMatchesThePredicate(t *testing.T) {
 	cases := []struct {
 		short string
@@ -70,9 +64,7 @@ func TestD1_MessagingBareFieldsMatchesThePredicate(t *testing.T) {
 		{"msk", "state", "HEALING", resource.ColorWarning},
 		{"msk", "state", "FAILED", resource.ColorBroken},
 		{"msk", "state", "", resource.ColorHealthy},
-		// A cluster being torn down was Healthy under the old switch, which had
-		// no DELETING case. The predicate has always reported it, so moving the
-		// classifier onto the predicate surfaced a state the switch swallowed.
+		// A cluster being torn down (DELETING) is reported by the predicate.
 		{"msk", "state", "DELETING", resource.ColorWarning},
 	}
 

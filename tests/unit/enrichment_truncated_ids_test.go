@@ -12,22 +12,6 @@ package unit
 // regardless of TruncatedIDs: a coverage gap in informational-only data never
 // lower-bounds the issue badge (see core/aws/issue_enrichment.go
 // IssueEnricherResult.Truncated godoc).
-//
-// Tests use existing fake infrastructure from aws_iam_group_enricher_test.go
-// and aws_eventbridge_pagination_test.go (same package unit).
-//
-// Tests:
-//   1. TestEnrichIAMGroup_TruncatedIDsPopulatedOnPerResourceErrorNotBadge:
-//      GetGroup errors on the second group → TruncatedIDs["second-group"] == true,
-//      TruncatedIDs["first-group"] == false (first succeeded), Truncated == false
-//      (iam-group is "~"-only — the gap never lower-bounds the issue badge).
-//   2. TestEnrichEventBridgeRuleTargets_CapHitIsCountedNotUninspected:
-//      NextToken always set → after PerParentPageCap pages, Truncated == true
-//      but TruncatedIDs[ruleID] == false: the cap is reported on the count.
-//      (eb-rule can emit SevBroken findings, so its Truncated follows IssueCount
-//      lower-bound rules independently of this file's iam-group case.)
-//   3. TestEnricher_TruncatedIDs_IsSubsetOfResourceIDs:
-//      Every key in TruncatedIDs must have been in the input resource IDs. No phantom keys.
 
 import (
 	"context"
@@ -43,10 +27,6 @@ import (
 
 	awsclient "github.com/k2m30/a9s/v3/core/aws"
 )
-
-// ---------------------------------------------------------------------------
-// Error-on-second-call IAM fake
-// ---------------------------------------------------------------------------
 
 // iamGroupErrorOnSecondFake returns a successful GetGroup for the first group
 // and an error for the second. Used to trigger per-resource truncation.
@@ -113,12 +93,7 @@ func (f *iamGroupErrorOnSecondFake) ListGroupPolicies(
 	return &iam.ListGroupPoliciesOutput{PolicyNames: []string{}}, nil
 }
 
-// Compile-time check.
 var _ awsclient.IAMAPI = (*iamGroupErrorOnSecondFake)(nil)
-
-// ---------------------------------------------------------------------------
-// Test 1: per-resource error → TruncatedIDs populated
-// ---------------------------------------------------------------------------
 
 // TestEnrichIAMGroup_TruncatedIDsPopulatedOnPerResourceErrorNotBadge verifies
 // that when GetGroup returns an error for a specific group,
@@ -158,7 +133,6 @@ func TestEnrichIAMGroup_TruncatedIDsPopulatedOnPerResourceErrorNotBadge(t *testi
 		t.Error("Truncated must stay false when a per-resource API call errors — the gap is signalled via TruncatedIDs, not the badge")
 	}
 
-	// TruncatedIDs must carry a true entry for the failing group.
 	if result.TruncatedIDs == nil {
 		t.Fatal("TruncatedIDs must not be nil when a per-resource error occurs")
 	}
@@ -171,10 +145,6 @@ func TestEnrichIAMGroup_TruncatedIDsPopulatedOnPerResourceErrorNotBadge(t *testi
 		t.Errorf("TruncatedIDs[%q] = true, want false (GetGroup succeeded)", firstGroup)
 	}
 }
-
-// ---------------------------------------------------------------------------
-// Test 2: pagination cap hit → TruncatedIDs populated for the capped rule
-// ---------------------------------------------------------------------------
 
 // TestEnrichEventBridgeRuleTargets_CapHitIsCountedNotUninspected verifies what
 // a page cap on a per-parent COUNTING walk records: the aggregate Truncated
@@ -190,7 +160,6 @@ func TestEnrichEventBridgeRuleTargets_CapHitIsCountedNotUninspected(t *testing.T
 
 	fake := newEBPaginatedFake()
 
-	// Build PerParentPageCap+2 pages, all with NextToken set.
 	pages := make([]*eventbridge.ListTargetsByRuleOutput, awsclient.PerParentPageCap+2)
 	for i := range pages {
 		pages[i] = &eventbridge.ListTargetsByRuleOutput{
@@ -213,13 +182,11 @@ func TestEnrichEventBridgeRuleTargets_CapHitIsCountedNotUninspected(t *testing.T
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	// Verify pagination was capped.
 	calls := fake.callsFor(ruleName)
 	if calls != awsclient.PerParentPageCap {
 		t.Errorf("ListTargetsByRule called %d times, want %d (PerParentPageCap)", calls, awsclient.PerParentPageCap)
 	}
 
-	// Global Truncated must be true.
 	if !result.Truncated {
 		t.Error("Truncated must be true when pagination cap is hit")
 	}
@@ -234,17 +201,11 @@ func TestEnrichEventBridgeRuleTargets_CapHitIsCountedNotUninspected(t *testing.T
 	}
 }
 
-// ---------------------------------------------------------------------------
-// Test 3: every key in TruncatedIDs must be in input resource IDs
-// ---------------------------------------------------------------------------
-
 // TestEnricher_TruncatedIDs_IsSubsetOfResourceIDs asserts the invariant that
 // no key in TruncatedIDs is a phantom — every key must correspond to an ID in
 // the input resources slice (or be the empty string, which no enricher should
 // produce). This guards against enrichers accidentally keying on derived strings
 // (ARNs, service names) instead of resource.Resource.ID.
-//
-// We exercise EnrichIAMGroup with a controlled truncation scenario.
 func TestEnricher_TruncatedIDs_IsSubsetOfResourceIDs(t *testing.T) {
 	const firstGroup = "team-alpha"
 	const secondGroup = "team-beta"
@@ -270,13 +231,11 @@ func TestEnricher_TruncatedIDs_IsSubsetOfResourceIDs(t *testing.T) {
 		t.Fatal("the simulated GetGroup failure must reach the operator through the composite error")
 	}
 
-	// Build the input ID set.
 	inputIDs := make(map[string]bool, len(resources))
 	for _, r := range resources {
 		inputIDs[r.ID] = true
 	}
 
-	// Every key in TruncatedIDs must be in the input ID set.
 	for id := range result.TruncatedIDs {
 		if id == "" {
 			t.Error("TruncatedIDs contains an empty-string key — enricher must key by resource.Resource.ID")

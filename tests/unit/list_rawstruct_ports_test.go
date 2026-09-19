@@ -1,25 +1,3 @@
-// list_rawstruct_ports_test.go — live-seam port for
-// qa_list_rawstruct_test.go + qa_list_rawstruct_child_views_test.go
-// (specs/022-codebase-cleanup/wave3-status.md: "RawStruct-over-Fields
-// precedence + Humanize column flag pins — UNIQUE, exist nowhere else; port
-// before any deletion.").
-//
-// Both legacy files drive views.NewResourceList(...).Update(...).View() —
-// dead code in production (the controller/ViewState render path is the only
-// live consumer of core/app/list_columns.go's ExtractCellValue,
-// exactly as list_ports_test.go's header already documents for the
-// filter/checker-carry/marker-col pins). This file re-pins every RawStruct/
-// Humanize assertion the two legacy files made, driven instead through the
-// live seam: Controller.ApplyResourcesLoaded -> buildListBody ->
-// extractListCells -> ExtractCellValue, read back via
-// Snapshot().Body.List.Rows[i].Cells.
-//
-// Assertion style is deliberately unchanged from the legacy files
-// (substring-contains, not exact per-cell equality): the legacy tests never
-// pinned column indices, only that a RawStruct/Humanize value reaches SOME
-// rendered cell. Joining Cells (not the full View()) is strictly tighter
-// than the original — no borders/help-text/header chrome to coincidentally
-// match — while preserving every original pass/fail case.
 package unit_test
 
 import (
@@ -52,16 +30,8 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// ---------------------------------------------------------------------------
-// Helpers (distinctly named — openListController already exists in
-// list_ports_test.go and is reused directly for top-level types).
-// ---------------------------------------------------------------------------
-
 // wave3RowCellsJoined applies resources to c under typeName and returns the
-// first row's Cells joined with "|" — the live-path equivalent of the legacy
-// files' `strings.Contains(view, ...)` target string, but sourced from the
-// exact data RenderList consumes (ListBody.Rows[i].Cells), not a full
-// re-rendered frame.
+// first row's Cells joined with "|".
 func wave3RowCellsJoined(t *testing.T, c *app.Controller, typeName string, resources []resource.Resource) string {
 	t.Helper()
 	c.ApplyResourcesLoaded(typeName, resources, nil, false)
@@ -73,24 +43,13 @@ func wave3RowCellsJoined(t *testing.T, c *app.Controller, typeName string, resou
 }
 
 // wave3ChildListController builds a Controller pre-navigated to a
-// ScreenChildList for a resource.GetChildType-registered shortName —
-// child types (log_streams, tg_health, ecs_svc_events, ...) never appear in
-// the main catalog/menu, so they cannot go through openListController's
-// ActionCommand navigation. Mirrors PushChildListScreen's own doc: "used by
-// NewChildResourceList to ensure topListState() is non-nil before Patch*
-// calls" — the same construction the live child-list code path uses.
+// ScreenChildList for a child shortName. Child types are not menu entries, so
+// they cannot go through openListController's ActionCommand navigation.
 //
-// SetViewConfig(configForType(shortName)) matters here, not just cosmetics:
-// resolveListColumnsForBuild only takes the vc-sourced (Key-less, Path-based)
-// column list when vc != nil. With vc == nil it falls back to the child
-// type's own td.Columns, which — like several catalog ResourceTypeDefs —
-// sets Key on columns the default view config deliberately leaves Key-less
-// so RawStruct/Path wins. Skipping SetViewConfig here would silently swap
-// every child type onto the wrong (Fields-priority) column layout and
-// produce false passes/failures unrelated to the behavior under test — the
-// exact class of harness bug this file's own TestWave3ListRawStruct_
-// AllTypes_OverridesFields caught for "lambda"/"sg"/"ecs"/"ses" during
-// development.
+// SetViewConfig(configForType(shortName)) is required: with vc == nil,
+// resolveListColumnsForBuild falls back to the child type's own td.Columns,
+// which set Key on columns the default view config leaves Key-less so that
+// RawStruct/Path wins.
 func wave3ChildListController(t *testing.T, shortName string) *app.Controller {
 	t.Helper()
 	td := resource.GetChildType(shortName)
@@ -104,15 +63,8 @@ func wave3ChildListController(t *testing.T, shortName string) *app.Controller {
 	return c
 }
 
-// openListControllerWithConfig mirrors openListController but injects a
-// caller-supplied *config.ViewsConfig via SetViewConfig before navigating —
-// SetViewConfig's own doc requires it be called "before the first
-// Snapshot()", so it must run before Apply(ActionCommand), which is the
-// first Apply/Snapshot call in the sequence. Every AllTypes/OverridesFields/
-// standalone-type test in this file uses configForType(shortName) here
-// (never nil) to exactly replicate the legacy harness's `cfg :=
-// configForType(shortName)` — see wave3ChildListController's doc for why a
-// nil vc silently swaps some types onto the wrong column layout.
+// openListControllerWithConfig mirrors openListController but injects cfg
+// via SetViewConfig, which must run before the first Snapshot().
 func openListControllerWithConfig(t *testing.T, shortName string, cfg *config.ViewsConfig) *app.Controller {
 	t.Helper()
 	c := newTestController(t)
@@ -120,13 +72,6 @@ func openListControllerWithConfig(t *testing.T, shortName string, cfg *config.Vi
 	c.Apply(app.Action{Kind: app.ActionCommand, Arg: shortName})
 	return c
 }
-
-// ===========================================================================
-// 1. TestListRawStruct_AllTypes — port of TestQA_ListRawStruct_AllTypes.
-// Subsumes the legacy file's 7 individual per-type tests (EC2/RDS/Redis/
-// DocDB/EKS/Secrets/S3), which that file's own table comment says are
-// "already covered individually above, included for completeness".
-// ===========================================================================
 
 func TestListRawStruct_AllTypes(t *testing.T) {
 	tests := []struct {
@@ -173,12 +118,10 @@ func TestListRawStruct_AllTypes(t *testing.T) {
 		{"iam-group", realisticIAMGroup(), []string{"developers", "AGPAEXAMPLEGROUPID"}},
 		{"cf", realisticCFDistribution(), []string{"E1A2B3C4D5E6F7", "d1234abcdef.cloudfront.net", "deployed"}},
 		{"r53", realisticR53Zone(), []string{"/hostedzone/Z1234567890ABC", "example.com."}},
-		// apigw's API ID, Protocol and Endpoint columns read mapped fields,
-		// not RawStruct paths: the list merges the REST (v1) and HTTP (v2)
-		// lanes, whose SDK structs share no field names, and only the mapped
-		// keys answer for both. Name and Description still resolve through a
-		// RawStruct path, so the case pins the rule on the cells that still
-		// exercise it — the ses precedent below, not a weakened rule.
+		// apigw's API ID, Protocol and Endpoint columns read mapped fields, not
+		// RawStruct paths: the list merges the REST (v1) and HTTP (v2) lanes, whose
+		// SDK structs share no field names, and only the mapped keys answer for both.
+		// Name and Description still resolve through a RawStruct path.
 		{"apigw", realisticAPIGW(), []string{"prod-api", "Production REST API"}},
 		{"ecr", realisticECR(), []string{"my-app", "123456789012.dkr.ecr.us-east-1.amazonaws.com/my-app"}},
 		{"efs", realisticEFS(), []string{"fs-0abc1234def56789a"}},
@@ -189,20 +132,14 @@ func TestListRawStruct_AllTypes(t *testing.T) {
 		{"waf", realisticWAF(), []string{"prod-waf-acl", "a1b2c3d4-5678-90ab-cdef-EXAMPLE11111"}},
 		{"glue", realisticGlueJob(), []string{"etl-daily-job", "4.0", "G.2X"}},
 		{"eb", realisticEB(), []string{"prod-api-env", "my-web-app", "ready"}},
-		// Six cells above name a value in the readable form rather than the
-		// SDK constant — tg's protocol, ecs-svc's launch type, ssm's and
-		// sfn's type, pipeline's type, msk's cluster type — because each of
-		// those fields is declared on its type
-		// (ResourceTypeDef.HumanizeFields). The rule this table pins is
-		// unchanged: those words are on screen only because the column read
-		// the field off RawStruct, and a column that stopped reading it
-		// renders nothing at all.
+		// Six cells above name a value in readable form rather than the SDK
+		// constant — tg's protocol, ecs-svc's launch type, ssm's and sfn's type,
+		// pipeline's type, msk's cluster type — because each field is declared in
+		// ResourceTypeDef.HumanizeFields. Those words reach the screen only because
+		// the column read the field off RawStruct.
 		//
-		// ses's Identity column takes a RawStruct path (.a9s/views/ses.yaml:
-		// path: IdentityName). Its Type column reads the mapped
-		// identity_type field, because the rendered column shows words and
-		// not the SDK enum, so the example is a cell that still exercises
-		// the rule.
+		// ses's Identity column takes a RawStruct path (.a9s/views/ses.yaml: path:
+		// IdentityName); its Type column reads the mapped identity_type field.
 		{"ses", realisticSESIdentity(), []string{"example.com"}},
 		{"redshift", realisticRedshift(), []string{"analytics-cluster", "dc2.large"}},
 		{"trail", realisticTrail(), []string{"org-trail", "cloudtrail-logs-bucket"}},
@@ -229,17 +166,10 @@ func TestListRawStruct_AllTypes(t *testing.T) {
 	}
 }
 
-// ===========================================================================
-// 2. TestListRawStruct_AllTypes_OverridesFields: the view owns which
-// columns there are and in what order, the catalog owns what each cell
-// reads, on every path. So for a title both declare, the cell reads the
-// Fields key the catalog names, which is ExtractCellValue's documented
-// precedence and the only thing that makes a warm-cache row render like a
-// live one: a stored value under a catalog-declared key is what the cell
-// shows, even when RawStruct disagrees. RawStruct reads are pinned by
-// TestListRawStruct_AllTypes above, which covers every type in the same
-// table.
-// ===========================================================================
+// The view owns which columns exist and their order; the catalog owns what
+// each cell reads. For a title both declare, the cell reads the catalog's
+// Fields key (ExtractCellValue's precedence), so a warm-cache row renders
+// like a live one even when RawStruct disagrees.
 
 func TestListRawStruct_AllTypes_OverridesFields(t *testing.T) {
 	tests := []struct {
@@ -328,21 +258,16 @@ func TestListRawStruct_AllTypes_OverridesFields(t *testing.T) {
 			[]string{"/hostedzone/Z1234567890ABC", "example.com."},
 		},
 		{
-			// api_id is deliberately absent from wrongFields: the API ID
-			// column reads that field by key (the v1/v2 lanes share no SDK
-			// field names), so Fields is SUPPOSED to win there. Name still
-			// resolves through a RawStruct path and is the cell this case
-			// pins.
+			// The API ID column reads api_id by key (the v1/v2 lanes share no SDK
+			// field names), so Name is the RawStruct cell this case checks.
 			"apigw",
 			realisticAPIGW(),
 			map[string]string{"name": "WRONG-NAME"},
 			[]string{"prod-api"},
 		},
 		{
-			// identity_type is deliberately absent from wrongFields: the Type
-			// column reads that field by key now, so Fields is SUPPOSED to
-			// win there. Identity still resolves through a RawStruct path and
-			// is the cell this case pins.
+			// The Type column reads identity_type by key, so Identity is the
+			// RawStruct cell this case checks.
 			"ses",
 			realisticSESIdentity(),
 			map[string]string{"identity_name": "WRONG-NAME"},
@@ -358,9 +283,8 @@ func TestListRawStruct_AllTypes_OverridesFields(t *testing.T) {
 
 			td := resource.FindResourceType(tc.shortName)
 			cols := resource.ResolveListColumnCascade(nil, tc.shortName, td)
-			// IsStatusColumn takes the RESOLVED key — every caller has already
-			// defaulted it, and the callee defaulting again would be a fourth
-			// copy of the same "" means "state".
+			// IsStatusColumn takes the resolved key; callers have already defaulted
+			// "" to "state".
 			lifecycleKey := "state"
 			if td != nil {
 				lifecycleKey = td.StatusKey()
@@ -380,10 +304,9 @@ func TestListRawStruct_AllTypes_OverridesFields(t *testing.T) {
 					continue
 				}
 				if config.IsStatusColumn(key, lifecycleKey) {
-					// The documented exception this test always carried: a
-					// status column answers from findings and the lifecycle
-					// key through the humanizer, so the stored value reaches
-					// the screen reworded rather than verbatim.
+					// A status column answers from findings and the lifecycle key through the
+					// humanizer, so the stored value reaches the screen reworded rather than
+					// verbatim.
 					continue
 				}
 				if !strings.Contains(joined, stored) {
@@ -396,17 +319,9 @@ func TestListRawStruct_AllTypes_OverridesFields(t *testing.T) {
 	}
 }
 
-// ===========================================================================
-// 3. TestListRawStruct_WithProductionViewsYAML validates against the real
-// on-disk .a9s/views/ config (config.LoadFromDirs), not the built-in
-// config.DefaultConfig() every other test in this file uses — a genuine
-// drift guard between the generated YAML and the Go defaults it's generated
-// from (go run ./cmd/viewsgen/). A column whose title the catalog also
-// declares carries the catalog's Key on this path as on every other, so a
-// stored Fields value under that key is what the cell shows; the subtests
-// below feed no stale Fields value and pin only that the RawStruct path
-// still reaches the cell.
-// ===========================================================================
+// Validates against the on-disk .a9s/views/ config (config.LoadFromDirs)
+// rather than config.DefaultConfig(): a drift guard between the generated
+// YAML and the Go defaults it is generated from (go run ./cmd/viewsgen/).
 
 func TestListRawStruct_WithProductionViewsYAML(t *testing.T) {
 	cfg, err := config.LoadFromDirs([]string{filepath.Join("..", "..", ".a9s", "views")})
@@ -438,12 +353,10 @@ func TestListRawStruct_WithProductionViewsYAML(t *testing.T) {
 		}
 	})
 
-	// The regression row 16 fixed lived in this file's subject: the catalog
-	// column was already keyed to the mapped field, but the GENERATED YAML
-	// still carried a RawStruct path to the SDK enum, and the YAML wins. Only
-	// a render through the on-disk views directory sees that — every other
-	// test in this file builds its config from the Go defaults, which were
-	// never wrong.
+	// The generated YAML wins over the catalog column, so a YAML column still
+	// carrying a RawStruct path to the SDK enum shows the enum even when the
+	// catalog keys the mapped field. Only a render through the on-disk views
+	// directory sees that.
 	t.Run("SES", func(t *testing.T) {
 		ident := sesv2types.IdentityInfo{
 			IdentityName:   new("acme-corp.com"),
@@ -552,11 +465,6 @@ func TestListRawStruct_WithProductionViewsYAML(t *testing.T) {
 	})
 }
 
-// ===========================================================================
-// 4. TestListRawStruct_FieldsFallbackWhenNoRawStruct — port of
-// TestQA_ListRawStruct_FieldsFallbackWhenNoRawStruct.
-// ===========================================================================
-
 func TestListRawStruct_FieldsFallbackWhenNoRawStruct(t *testing.T) {
 	c := openListControllerWithConfig(t, "ec2", configForType("ec2"))
 	res := resource.Resource{
@@ -575,23 +483,12 @@ func TestListRawStruct_FieldsFallbackWhenNoRawStruct(t *testing.T) {
 	}
 }
 
-// ===========================================================================
-// 4a. TestListRawStruct_HumanizeColumn_FieldsFallbackWhenNoRawStruct —
-// a humanized, Path-only (Key-less) column must still route through
-// domain.HumanizeStatusPhrase when RawStruct is nil and the raw AWS enum is
-// only reachable via the title-match Fields fallback (a cache-warm row:
-// RawStruct stripped, value materialized into Fields). "transfer"'s Endpoint/
-// Identity Provider columns (core/config/defaults_networking.go) are real,
-// registered Key-less/Path-based columns their type declares as humanized —
-// the title-match loop (list_columns.go's ExtractCellValue) looks them up by
-// their OWN title-derived key ("endpoint", "identity_provider"), which is
-// what a Fields-only (RawStruct-stripped) row must carry for that fallback to
-// find them at all.
-//
-// The negative case is the Server ID cell, which no declaration names and
-// which must stay verbatim because it is an identifier; transfer's domain is
-// a declared humanized field and reads as words.
-// ===========================================================================
+// A humanized, Key-less, Path-based column still routes through
+// domain.HumanizeStatusPhrase when RawStruct is nil and the raw enum is
+// reachable only through the title-match Fields fallback (a cache-warm row).
+// transfer's Endpoint and Identity Provider columns are looked up by their
+// title-derived keys ("endpoint", "identity_provider"). The Server ID cell is
+// an identifier no declaration names, so it stays verbatim.
 
 func TestListRawStruct_HumanizeColumn_FieldsFallbackWhenNoRawStruct(t *testing.T) {
 	c := openListControllerWithConfig(t, "transfer", configForType("transfer"))
@@ -629,11 +526,6 @@ func TestListRawStruct_HumanizeColumn_FieldsFallbackWhenNoRawStruct(t *testing.T
 		t.Errorf(`transfer row cells should show the server id verbatim — no declaration names it, got: %q`, joined)
 	}
 }
-
-// ===========================================================================
-// 5. Standalone top-level types NOT covered by the AllTypes table: SQS
-// (string RawStruct), EBS volume/snapshot, AMI, CloudTrail events.
-// ===========================================================================
 
 func TestListRawStruct_SQS_StringRawStruct(t *testing.T) {
 	c := openListControllerWithConfig(t, "sqs", configForType("sqs"))
@@ -751,12 +643,6 @@ func TestListRawStruct_CloudTrailEvent(t *testing.T) {
 		t.Errorf("CloudTrail Event row cells should contain actor 'admin' from _ct.actor field, got: %q", joined)
 	}
 }
-
-// ===========================================================================
-// 6. TestListRawStruct_ChildViews — table-driven port of the 22 child
-// list-view tests in qa_list_rawstruct_child_views_test.go. None of these
-// shortNames appear in the AllTypes table above — every one is unique.
-// ===========================================================================
 
 func TestListRawStruct_ChildViews(t *testing.T) {
 	ts := testTime
@@ -1083,18 +969,9 @@ func TestListRawStruct_ChildViews(t *testing.T) {
 	}
 }
 
-// ===========================================================================
-// 2. TestListRawStruct_S3ObjectSort_UsesNumericByteOrder: s3_objects's
-// default view config sets {Key:"size", SortKey:"size_raw"} on the Size
-// column (core/config/defaults_databases.go), so the sort reads the byte
-// count the fetcher stored — not the display string ("1 KB" vs "900 B"),
-// which would sort lexicographically wrong ('1' < '9') — and not the AWS
-// struct, which the warm-cache frame does not have; the rows below carry
-// the stored byte count the way the fetcher writes it. Neither
-// core/app/list_test.go's TestListSort_* (Name-only) nor this file's
-// AllTypes/OverridesFields cases (cell VALUE, not sort ORDER) cover a
-// sort-key-driven numeric sort.
-// ===========================================================================
+// s3_objects's Size column sorts by SortKey size_raw, the byte count the
+// fetcher stores: the display string ("1 KB" vs "900 B") sorts wrong
+// lexicographically, and a warm-cache frame has no AWS struct.
 
 func TestListRawStruct_S3ObjectSort_UsesNumericByteOrder(t *testing.T) {
 	objects := []resource.Resource{
@@ -1131,7 +1008,6 @@ func TestListRawStruct_S3ObjectSort_UsesNumericByteOrder(t *testing.T) {
 		}
 	}
 
-	// Toggle to descending.
 	c.Apply(app.Action{Kind: app.ActionSort, Arg: "size"})
 	lb = *c.Snapshot().Body.List
 	gotDesc := []string{lb.Rows[0].ResourceID, lb.Rows[1].ResourceID, lb.Rows[2].ResourceID}

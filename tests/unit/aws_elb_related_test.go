@@ -27,8 +27,6 @@ func elbCheckerByTarget(t *testing.T, target string) resource.RelatedChecker {
 	return nil
 }
 
-// --- Navigable Field Registration ---
-
 func TestNavigableFields_ELB_Registered(t *testing.T) {
 	expected := map[string]string{
 		"VpcId":                      "vpc",
@@ -46,8 +44,6 @@ func TestNavigableFields_ELB_Registered(t *testing.T) {
 		}
 	}
 }
-
-// --- Target Groups checker (Pattern C — cache, LoadBalancerArns match) ---
 
 func TestRelated_ELB_TG_Found(t *testing.T) {
 	const elbARN = "arn:aws:elasticloadbalancing:us-east-1:123456789012:loadbalancer/app/test-lb/abcdef1234567890"
@@ -160,7 +156,6 @@ func TestRelated_ELB_TG_EmptyARN(t *testing.T) {
 	cache := resource.ResourceCache{
 		"tg": resource.ResourceCacheEntry{Resources: []resource.Resource{tgRes}},
 	}
-	// Source has empty load_balancer_arn — should match nothing.
 	source := resource.Resource{
 		ID:   "",
 		Name: "",
@@ -179,8 +174,6 @@ func TestRelated_ELB_TG_EmptyARN(t *testing.T) {
 		t.Errorf("Count = %d, want 0 for empty ARN", result.Count())
 	}
 }
-
-// --- CloudWatch Alarms checker (Pattern C — cache, LoadBalancer dimension) ---
 
 func TestRelated_ELB_Alarms_Found(t *testing.T) {
 	// ELB ARN suffix is used as the dimension value for "LoadBalancer" dimension.
@@ -282,7 +275,7 @@ func TestRelated_ELB_Alarms_CacheMissNoClients(t *testing.T) {
 	}
 }
 
-// --- elb→cfn: requires DescribeTags per ELB (outside cache budget) ---
+// elb→cfn requires DescribeTags per ELB, outside the cache budget.
 
 // TestRelated_ELB_CFN_Unknown: valid ELB → State: RelatedUnknown (tags not in DescribeLoadBalancers).
 func TestRelated_ELB_CFN_Unknown(t *testing.T) {
@@ -303,7 +296,6 @@ func TestRelated_ELB_CFN_Unknown(t *testing.T) {
 	}
 }
 
-// TestRelated_ELB_CFN_EmptyInput: no identity → Count: 0.
 func TestRelated_ELB_CFN_EmptyInput(t *testing.T) {
 	source := resource.Resource{ID: "", Fields: map[string]string{}}
 	checker := elbCheckerByTarget(t, "cfn")
@@ -312,10 +304,3 @@ func TestRelated_ELB_CFN_EmptyInput(t *testing.T) {
 		t.Errorf("Count = %d, want 0 (empty identity)", result.Count())
 	}
 }
-
-// elb:r53 (checkELBR53) was removed along with its registration: it was
-// hardcoded to State: RelatedUnknown whenever Fields["dns_name"] != "" (i.e. always, for
-// any real ELB), with no AWS API path to resolve which R53 records alias to
-// the LB's DNS name from cache alone. See qa_demo_pivot_coverage_test.go's
-// knownDisconnectedPivots terminal-state comment for the burn-down
-// precedent this deletion follows.

@@ -15,10 +15,6 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// ---------------------------------------------------------------------------
-// CFN Stack Events fetcher tests (child of CloudFormation Stacks)
-// ---------------------------------------------------------------------------
-
 // TestFetchCfnEvents_Basic verifies parsing of 3 stack events with known
 // timestamps, statuses, and reasons, checking ID, Name, Status, all Fields,
 // and RawStruct.
@@ -152,7 +148,6 @@ func TestFetchCfnEvents_Basic(t *testing.T) {
 		}
 	})
 
-	// Verify required fields on all events
 	t.Run("required_fields_present", func(t *testing.T) {
 		requiredFields := []string{"timestamp", "logical_resource_id", "resource_type", "resource_status", "resource_status_reason"}
 		for i, r := range resources {
@@ -217,18 +212,13 @@ func TestFetchCfnEvents_NilOptionalFields(t *testing.T) {
 		output: &cloudformation.DescribeStackEventsOutput{
 			StackEvents: []cfntypes.StackEvent{
 				{
-					EventId:   aws.String("evt-nil-001"),
-					StackId:   aws.String("arn:aws:cloudformation:us-east-1:123456789012:stack/nil-stack/guid"),
-					StackName: aws.String("nil-stack"),
-					Timestamp: &ts,
-					// ResourceStatusReason is nil
-					// PhysicalResourceId is nil
-					// LogicalResourceId is nil
-					// ResourceType is nil
+					EventId:        aws.String("evt-nil-001"),
+					StackId:        aws.String("arn:aws:cloudformation:us-east-1:123456789012:stack/nil-stack/guid"),
+					StackName:      aws.String("nil-stack"),
+					Timestamp:      &ts,
 					ResourceStatus: cfntypes.ResourceStatusCreateComplete,
 				},
 				{
-					// EventId is nil too
 					StackId:   aws.String("arn:aws:cloudformation:us-east-1:123456789012:stack/nil-stack/guid"),
 					StackName: aws.String("nil-stack"),
 					Timestamp: &ts,
@@ -237,7 +227,6 @@ func TestFetchCfnEvents_NilOptionalFields(t *testing.T) {
 		},
 	}
 
-	// Should not panic
 	result, err := awsclient.FetchCfnEvents(
 		context.Background(),
 		mock,
@@ -262,7 +251,6 @@ func TestFetchCfnEvents_NilOptionalFields(t *testing.T) {
 
 	t.Run("nil_LogicalResourceId", func(t *testing.T) {
 		r := resources[0]
-		// Should not panic, should be empty string
 		_ = r.Fields["logical_resource_id"]
 	})
 }
@@ -526,7 +514,6 @@ func TestCfnEvents_ParentHasChildDef(t *testing.T) {
 func TestFetchCfnEvents_Pagination(t *testing.T) {
 	ts := time.Date(2024, 3, 22, 10, 0, 0, 0, time.UTC)
 
-	// Page 1: 3 items with NextToken indicating more pages exist.
 	page1Mock := &mockCFNDescribeStackEventsClient{
 		output: &cloudformation.DescribeStackEventsOutput{
 			NextToken: aws.String("page2-token"),
@@ -559,7 +546,6 @@ func TestFetchCfnEvents_Pagination(t *testing.T) {
 		},
 	}
 
-	// First call: no continuation token — fetches page 1.
 	result1, err := awsclient.FetchCfnEvents(
 		context.Background(),
 		page1Mock,
@@ -632,10 +618,8 @@ func TestFetchCfnEvents_Pagination(t *testing.T) {
 		}
 	})
 
-	// Page 2: 3 items with no NextToken — last page.
 	page2Mock := &mockCFNDescribeStackEventsClient{
 		output: &cloudformation.DescribeStackEventsOutput{
-			// No NextToken — last page
 			StackEvents: []cfntypes.StackEvent{
 				{
 					EventId:           aws.String("evt-p2-1"),
@@ -665,7 +649,6 @@ func TestFetchCfnEvents_Pagination(t *testing.T) {
 		},
 	}
 
-	// Second call: pass continuation token from page 1 to fetch page 2.
 	result2, err := awsclient.FetchCfnEvents(
 		context.Background(),
 		page2Mock,
@@ -721,12 +704,10 @@ func TestFetchCfnEvents_Pagination(t *testing.T) {
 
 // TestFetchCfnEvents_MaxCap verifies that a single API page of 50 items is
 // returned as-is with correct IsTruncated=true metadata when the API indicates
-// more pages exist. The 200-item cap no longer applies — each call returns one
-// page and the caller drives pagination via continuation tokens.
+// more pages exist; each call returns one page and the caller drives pagination via continuation tokens.
 func TestFetchCfnEvents_MaxCap(t *testing.T) {
 	ts := time.Date(2024, 6, 15, 12, 0, 0, 0, time.UTC)
 
-	// Build one page of 50 events with a NextToken indicating more pages exist.
 	var events []cfntypes.StackEvent
 	for i := range 50 {
 		events = append(events, cfntypes.StackEvent{

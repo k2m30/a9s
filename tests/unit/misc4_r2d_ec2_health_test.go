@@ -5,12 +5,10 @@ package unit_test
 // misc4_r2d_ec2_health_test.go — every running demo instance has a
 // DescribeInstanceStatus entry.
 //
-// The Health cell is read off DescribeInstanceStatus. A running instance the
-// fixture leaves out of that response renders a blank Health cell, which
-// reads as "a9s did not check" rather than "AWS says nothing is wrong" — and
-// nothing in the fixture file says a row was left out on purpose. This gate
-// covers the whole demo ec2 list, so the next instance appended cannot
-// reintroduce it.
+// The Health cell is read off DescribeInstanceStatus. A running instance
+// missing from that response renders a blank Health cell, which reads as "a9s
+// did not check" rather than "AWS says nothing is wrong". This gate covers
+// the whole demo ec2 list.
 
 import (
 	"context"

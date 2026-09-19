@@ -1,22 +1,18 @@
 // SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
 
-// codex9_sweep_starts_test.go — the start-up availability sweep must run to
-// completion whichever of the two start-up legs lands first.
+// The start-up availability sweep must run to completion whichever of the two
+// start-up legs lands first.
 //
 // A live start fires the disk-cache seed and the AWS connect concurrently
 // (tui.Model.Init's tea.Batch), so their arrival order is a race decided by
-// local disk I/O against a network handshake. Both orders are production
-// orders, so both must leave the operator with the same menu: every
-// registered type probed, every row counted, and the "[verifying k/N]"
-// counter gone from the frame title once the last probe answers. A sweep
-// that stalls at "[verifying 0/N]" for the whole session is the defect these
-// pins exist to catch.
+// local disk I/O against a network handshake. Both orders must leave the
+// operator with the same menu: every registered type probed, every row
+// counted, and the "[verifying k/N]" counter gone from the frame title once
+// the last probe answers.
 //
-// Both tests drive the real tui.Model.Update seam, then run every tea.Cmd the
-// model returns and feed the resulting messages back, exactly as the Bubble
-// Tea event loop would — the probe dispatch under test lives entirely inside
-// those returned commands, so a pin that only inspected state after Update
-// would not see it at all.
+// The probe dispatch lives entirely inside the tea.Cmds Update returns, so the
+// tests run every returned command and feed its messages back, as the Bubble
+// Tea event loop would.
 package unit
 
 import (
@@ -104,11 +100,8 @@ func TestSweepStarts_SeedBeforeConnect(t *testing.T) {
 	c9AssertSweepFinished(t, m, "seed before connect")
 }
 
-// TestSweepStarts_ConnectBeforeSeed pins the winning race as the control: the
-// connect settles first, so the seed handler itself finds a live transport and
-// fires the first probe batch on its own path. This ordering works today and
-// must keep working — it is what makes the other ordering's failure a
-// difference between the two legs rather than a broken harness.
+// The connect settles first, so the seed handler finds a live transport and
+// fires the first probe batch on its own path.
 func TestSweepStarts_ConnectBeforeSeed(t *testing.T) {
 	m, connect := newC9Model(t)
 

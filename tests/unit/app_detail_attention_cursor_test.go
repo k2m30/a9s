@@ -1,15 +1,11 @@
-// app_detail_attention_cursor_test.go — the cursor must stay on the same
-// logical field when the Attention block changes size under it.
-//
-// Both pins here are the same class: the FieldCursor delta in
-// applyFindingToState (core/app/detail_state.go) needs the size of the block
-// the user is actually looking at, and a second walk of the entries can
-// disagree with the render — an unsorted walk while the renderer sorts "!"
-// before "~" picks the wrong "last entry" and drops the trailing spacer from
-// its count, and session state may already have moved under it.
-// buildAttentionSectionDetail reports the size it emitted, snapshot() records
-// it with the identity of the row under the cursor, and the relocation reads
-// that record, so there is no second walk left to disagree.
+// The cursor stays on the same logical field when the Attention block changes
+// size under it. The FieldCursor delta in applyFindingToState
+// (core/app/detail_state.go) needs the size of the block the user is looking
+// at: buildAttentionSectionDetail reports the size it emitted, and snapshot()
+// records it with the identity of the row under the cursor, which the
+// relocation reads. The renderer sorts "!" before "~", and session state can
+// move before the controller applies an intent, so a second walk of the
+// entries could disagree with the render.
 package unit_test
 
 import (
@@ -25,9 +21,7 @@ import (
 
 // newAttentionCursorController builds a Controller with a ScreenDetail pushed
 // for res/resourceType, ready to drive FieldCursor via ActionMoveBottom and
-// inspect Snapshot().Body.Detail. Mirrors newDetailController in
-// detail_render_parity_test.go (same package, kept local to avoid a
-// cross-file rename dependency on that helper's visibility).
+// inspect Snapshot().Body.Detail.
 func newAttentionCursorController(t *testing.T, res resource.Resource, resourceType string) *app.Controller {
 	t.Helper()
 	t.Setenv("A9S_CONFIG_FOLDER", t.TempDir())
@@ -54,19 +48,9 @@ func fieldRowAt(t *testing.T, body *app.DetailBody, idx int) app.FieldRow {
 	return body.Fields[idx]
 }
 
-// TestApplyDetailFinding_CursorStaysOnSameFieldAcrossMixedSeverityAttentionSort
-// pins Finding A. Repro:
-//
-//  1. Seed a detail whose Attention has a "~" (warning) finding WITH Detail
-//     text (wave-1, so it's present before any enrichment), plus a content
-//     field after it.
-//  2. Move FieldCursor to the bottom — lands on the last real content field
-//     row (identified by its Key, not its index).
-//  3. Apply a wave-2 "!" (broken) finding that is BARE (no Detail, no rows) —
-//     this is the finding that gets appended LAST in unsorted order but
-//     sorts FIRST ("!" before "~") when rendered.
-//  4. Assert the cursor still points at the SAME logical field row (same Key)
-//     after the enrichment lands — not shifted by a prepend-size off-by-one.
+// A bare Wave-2 "!" finding is appended after a Wave-1 "~" finding in
+// ds.Findings but sorts before it when rendered; a cursor on the last content
+// field stays on the same Key.
 func TestApplyDetailFinding_CursorStaysOnSameFieldAcrossMixedSeverityAttentionSort(t *testing.T) {
 	res := resource.Resource{
 		ID:   "i-0aaa111111111111a",
@@ -141,20 +125,11 @@ func TestApplyDetailFinding_CursorStaysOnSameFieldAcrossMixedSeverityAttentionSo
 	}
 }
 
-// TestApplyDetailFinding_CursorStaysOnSameFieldWhenNotInspectedMarkArrivesToo
-// pins Finding B. The Attention block's size stopped being a function of
-// ds.Findings alone when the "not inspected" entry landed: it now also depends
-// on the session truncated-ID set, which Core.handleEnrichmentChecked writes
-// BEFORE the controller applies the intent. A prepend size recomputed inside
-// applyFindingToState therefore describes a layout that was never rendered —
-// it already includes the not-inspected entry while ds.Findings is still the
-// pre-enrichment set — so the "was the cursor inside the old block?" test
-// wrongly says yes and resets the cursor to the Attention header.
-//
-// Repro (from the round-2 probe): open a detail on a clean row, move the
-// cursor onto a content field, then deliver ONE EnrichmentChecked carrying
-// both a finding and a TruncatedIDs entry for that row. The cursor must still
-// point at the same logical field.
+// The Attention block's size depends on the session truncated-ID set as well
+// as ds.Findings, and Core.handleEnrichmentChecked writes that set before the
+// controller applies the intent. One EnrichmentChecked carrying both a finding
+// and a TruncatedIDs entry for the row keeps the cursor on the same logical
+// field.
 func TestApplyDetailFinding_CursorStaysOnSameFieldWhenNotInspectedMarkArrivesToo(t *testing.T) {
 	c, core := newTestControllerAndCore(t)
 	c.Apply(app.Action{Kind: app.ActionCommand, Arg: "ec2"})

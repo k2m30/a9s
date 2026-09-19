@@ -2,9 +2,8 @@
 
 package unit
 
-// aws3_partial_failure_vocabulary_test.go — a resource that refused more
-// than one check says so, and a walk stopped by a failed page names the page
-// as a page rather than posing as a resource id.
+// A resource that refused more than one check says so, and a walk stopped by
+// a failed page names the page as a page rather than posing as a resource id.
 
 import (
 	"context"
@@ -46,9 +45,8 @@ func (f *s3TwoDenialsFake) GetObjectLockConfiguration(_ context.Context, _ *s3.G
 	return &s3.GetObjectLockConfigurationOutput{}, nil
 }
 
-// TestS3BucketDeniedTwoChecksNamesBoth pins that a bucket refused two
-// different actions reports both. Keeping only the first told the operator to
-// grant one permission, after which the bucket would fail again on the second.
+// Reporting only the first denial would send the operator to grant one
+// permission, after which the bucket fails again on the second.
 func TestS3BucketDeniedTwoChecksNamesBoth(t *testing.T) {
 	clients := &awsclient.ServiceClients{S3: &s3TwoDenialsFake{}}
 	rows := []resource.Resource{{ID: "acme-logs", Name: "acme-logs", Fields: map[string]string{"name": "acme-logs"}}}

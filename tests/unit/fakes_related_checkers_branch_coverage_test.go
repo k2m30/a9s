@@ -90,7 +90,6 @@ func (f *fakeGlueWithTags) GetTags(_ context.Context, _ *glue.GetTagsInput, _ ..
 	return &glue.GetTagsOutput{Tags: f.tags}, nil
 }
 
-// Compile-time checks.
 var _ awsclient.GlueAPI = (*fakeGlueWithTags)(nil)
 var _ awsclient.GlueGetTagsAPI = (*fakeGlueWithTags)(nil)
 
@@ -122,7 +121,6 @@ func (f *fakeGlueWithSecurityConfig) GetSecurityConfiguration(_ context.Context,
 	return &glue.GetSecurityConfigurationOutput{}, nil
 }
 
-// Compile-time checks.
 var _ awsclient.GlueAPI = (*fakeGlueWithSecurityConfig)(nil)
 var _ awsclient.GlueGetSecurityConfigurationAPI = (*fakeGlueWithSecurityConfig)(nil)
 
@@ -186,5 +184,4 @@ func (f *fakeLambdaWithESM) ListTags(_ context.Context, _ *lambdapkg.ListTagsInp
 	return &lambdapkg.ListTagsOutput{}, nil
 }
 
-// Compile-time check.
 var _ awsclient.LambdaAPI = (*fakeLambdaWithESM)(nil)

@@ -1,10 +1,8 @@
 package unit_test
 
 // detail_navigable_test.go — tests for resource.IsFieldNavigableForTest, the
-// resource-package predicate the live buildDetailFieldItems/RenderDetail
-// path uses — see tests/unit/detail_ports_test.go's header comment item 7.
-// RenderDetail's rendering/Enter-key coverage is in detail_ports_test.go and
-// detail_livepath_migration_test.go.
+// resource-package predicate the live buildDetailFieldItems/RenderDetail path
+// uses.
 
 import (
 	"testing"

@@ -1,15 +1,7 @@
-// console_url_child_types_test.go — per-child-type contract for
-// catalog.ResourceTypeDef.ConsoleURL across all 29 child types (the closure
-// wave: parent-context Fields enriched in child fetchers, ConsoleURL wired
-// per child type, mirroring the top-level table in console_url_types_test.go
-// but for resource.GetChildType/AllChildTypes instead of
-// catalog.Find/resource.AllResourceTypes).
+// Per-child-type contract for catalog.ResourceTypeDef.ConsoleURL.
 //
-// Synthetic resource.Resource literals only, per this wave's dispatch
-// ("synthetic data only") — every child ConsoleURL builder reads only
-// r.ID/r.Fields, never RawStruct, so a hand-built Fields map exercises the
-// exact same code path a real fixture would without needing a ChildFetcher +
-// parentCtx drive.
+// Every child ConsoleURL builder reads only r.ID/r.Fields, never RawStruct, so
+// a hand-built Fields map exercises the same code path a real fixture would.
 package unit_test
 
 import (
@@ -31,8 +23,6 @@ func childConsoleURLTypeDef(t *testing.T, shortName string) resource.ResourceTyp
 	return *td
 }
 
-// ─── Completeness: every child type has a non-nil ConsoleURL builder ───────
-
 func TestConsoleURL_RegisteredForEveryChildType(t *testing.T) {
 	types := resource.AllChildTypes()
 	if len(types) == 0 {
@@ -45,10 +35,8 @@ func TestConsoleURL_RegisteredForEveryChildType(t *testing.T) {
 	}
 }
 
-// ─── Per-type expected-URL table (verified-shape families) ─────────────────
-
 type childConsoleURLCase struct {
-	name      string // subtest name
+	name      string
 	shortName string
 	id        string
 	fields    map[string]string
@@ -60,12 +48,10 @@ func TestConsoleURL_ChildPerType(t *testing.T) {
 	r := demo.DemoRegion // "us-east-1"
 
 	cases := []childConsoleURLCase{
-		// CW-logs-shaped families (share cloudWatchLogStreamConsoleURL) —
-		// each entry proves the type wires the RIGHT Fields keys into the
-		// shared helper (field names differ: stream_name vs log_stream vs
-		// log_stream_name) and that "/" in both group and stream percent-
-		// encodes to %2F (never left raw, which would break the console's
-		// own path-segment parsing).
+		// The CW-logs-shaped families share cloudWatchLogStreamConsoleURL under
+		// different Fields keys (stream_name, log_stream, log_stream_name); a "/" in
+		// group or stream must encode to %2F, or the console's path-segment parsing
+		// breaks.
 		{
 			name: "log_streams", shortName: "log_streams",
 			fields: map[string]string{"log_group": "/aws/lambda/acme-api", "stream_name": "2026/07/20/[$LATEST]abc123def456"},
@@ -97,28 +83,24 @@ func TestConsoleURL_ChildPerType(t *testing.T) {
 			want:   "https://" + r + ".console.aws.amazon.com/cloudwatch/home?region=" + r + "#logsV2:log-groups/log-group/%2Faws%2Fcodebuild%2Facme-api-build/log-events/abc123-def456",
 		},
 
-		// asg_activities → ASG view=activity
 		{
 			name: "asg_activities", shortName: "asg_activities",
 			fields: map[string]string{"asg_name": "acme-web-prod-asg"},
 			want:   "https://" + r + ".console.aws.amazon.com/ec2/home?region=" + r + "#AutoScalingGroupDetails:id=acme-web-prod-asg;view=activity",
 		},
 
-		// ecr_images → repo page
 		{
 			name: "ecr_images", shortName: "ecr_images",
 			fields: map[string]string{"repository_name": "acme/web-app"},
 			want:   "https://" + r + ".console.aws.amazon.com/ecr/repositories/acme%2Fweb-app/?region=" + r,
 		},
 
-		// ecs_tasks child → ecs/v2/redirect
 		{
 			name: "ecs_tasks", shortName: "ecs_tasks",
 			fields: map[string]string{"task_arn": "arn:aws:ecs:us-east-1:123456789012:task/acme-cluster/1a2b3c4d5e6f7g8h"},
 			want:   "https://" + r + ".console.aws.amazon.com/ecs/v2/redirect?arn=arn%3Aaws%3Aecs%3Aus-east-1%3A123456789012%3Atask%2Facme-cluster%2F1a2b3c4d5e6f7g8h&region=" + r,
 		},
 
-		// elb_listeners + elb_listener_rules → ARN fragments (raw r.ID, no escape)
 		{
 			name: "elb_listeners", shortName: "elb_listeners",
 			id:   "arn:aws:elasticloadbalancing:us-east-1:123456789012:listener/app/acme-web-alb/1234567890abcdef/abcdef1234567890",
@@ -130,35 +112,30 @@ func TestConsoleURL_ChildPerType(t *testing.T) {
 			want: "https://" + r + ".console.aws.amazon.com/ec2/home?region=" + r + "#ListenerRuleDetails:ruleArn=arn:aws:elasticloadbalancing:us-east-1:123456789012:listener-rule/app/acme-web-alb/1234567890abcdef/abcdef1234567890/1111222233334444",
 		},
 
-		// tg_health → tg page
 		{
 			name: "tg_health", shortName: "tg_health",
 			fields: map[string]string{"target_group_arn": "arn:aws:elasticloadbalancing:us-east-1:123456789012:targetgroup/acme-web-tg/abcdef1234567890"},
 			want:   "https://" + r + ".console.aws.amazon.com/ec2/home?region=" + r + "#TargetGroup:targetGroupArn=arn:aws:elasticloadbalancing:us-east-1:123456789012:targetgroup/acme-web-tg/abcdef1234567890",
 		},
 
-		// transfer_agreements → server page
 		{
 			name: "transfer_agreements", shortName: "transfer_agreements",
 			fields: map[string]string{"server_id": "s-0a1b2c3d4e5f60001"},
 			want:   "https://" + r + ".console.aws.amazon.com/transfer/home#/servers/s-0a1b2c3d4e5f60001",
 		},
 
-		// dbi_events → db page
 		{
 			name: "dbi_events", shortName: "dbi_events",
 			fields: map[string]string{"source_identifier": "acme-prod-db"},
 			want:   "https://" + r + ".console.aws.amazon.com/rds/home?region=" + r + "#database:id=acme-prod-db;is-cluster=false",
 		},
 
-		// alarm_history → alarm page
 		{
 			name: "alarm_history", shortName: "alarm_history",
 			fields: map[string]string{"alarm_name": "acme-cpu-high"},
 			want:   "https://" + r + ".console.aws.amazon.com/cloudwatch/home?region=" + r + "#alarmsV2:alarm/acme-cpu-high",
 		},
 
-		// eb_rule_targets → rule page, both the named-bus and default-bus branches
 		{
 			name: "eb_rule_targets (named bus)", shortName: "eb_rule_targets",
 			fields: map[string]string{"rule_name": "acme-order-created-rule", "event_bus": "acme-orders-bus"},
@@ -170,7 +147,6 @@ func TestConsoleURL_ChildPerType(t *testing.T) {
 			want:   "https://" + r + ".console.aws.amazon.com/events/home?region=" + r + "#/eventbus/default/rules/acme-order-created-rule",
 		},
 
-		// sfn_executions + sfn_execution_history → execution ARN fragment (raw, shared shape)
 		{
 			name: "sfn_executions", shortName: "sfn_executions",
 			fields: map[string]string{"execution_arn": "arn:aws:states:us-east-1:123456789012:execution:acme-order-workflow:9f8e7d6c-1234-5678-90ab-cdef12345678"},
@@ -182,21 +158,18 @@ func TestConsoleURL_ChildPerType(t *testing.T) {
 			want:   "https://" + r + ".console.aws.amazon.com/states/home?region=" + r + "#/executions/details/arn:aws:states:us-east-1:123456789012:execution:acme-order-workflow:9f8e7d6c-1234-5678-90ab-cdef12345678",
 		},
 
-		// sns_subscriptions child → subscription page
 		{
 			name: "sns_subscriptions", shortName: "sns_subscriptions",
 			fields: map[string]string{"subscription_arn": "arn:aws:sns:us-east-1:123456789012:acme-orders-topic:1a2b3c4d-5e6f-7g8h-9i0j-k1l2m3n4o5p6"},
 			want:   "https://" + r + ".console.aws.amazon.com/sns/v3/home?region=" + r + "#/subscription/arn:aws:sns:us-east-1:123456789012:acme-orders-topic:1a2b3c4d-5e6f-7g8h-9i0j-k1l2m3n4o5p6",
 		},
 
-		// iam_group_members → user page (Global, no region subdomain)
 		{
 			name: "iam_group_members", shortName: "iam_group_members",
 			fields: map[string]string{"user_name": "jane.doe"},
 			want:   "https://console.aws.amazon.com/iam/home#/users/details/jane.doe",
 		},
 
-		// role_policies → policy-or-role page (Global): policy_arn wins when present.
 		{
 			name: "role_policies (policy_arn)", shortName: "role_policies",
 			fields: map[string]string{"policy_arn": "arn:aws:iam::123456789012:policy/acme-readonly-policy", "role_name": "acme-ec2-instance-role"},
@@ -208,15 +181,12 @@ func TestConsoleURL_ChildPerType(t *testing.T) {
 			want:   "https://console.aws.amazon.com/iam/home#/roles/details/acme-ec2-instance-role",
 		},
 
-		// r53_records → zone page (Global, /hostedzone/ prefix stripped)
 		{
 			name: "r53_records", shortName: "r53_records",
 			fields: map[string]string{"zone_id": "/hostedzone/Z1D633PJN98FT9"},
 			want:   "https://console.aws.amazon.com/route53/v2/hostedzones#ListRecordSets/Z1D633PJN98FT9",
 		},
 
-		// cb_builds → codesuite build path with account: account resolved from
-		// build_arn when present, taking precedence over the passed accountID.
 		{
 			name: "cb_builds (account from build_arn)", shortName: "cb_builds",
 			fields: map[string]string{
@@ -228,33 +198,29 @@ func TestConsoleURL_ChildPerType(t *testing.T) {
 		},
 		{
 			name: "cb_builds (account fallback to passed accountID)", shortName: "cb_builds",
-			fields:    map[string]string{"build_id": "acme-api-build:abc123de-4567-8901-fabc-def012345678"}, // build_arn absent
+			fields:    map[string]string{"build_id": "acme-api-build:abc123de-4567-8901-fabc-def012345678"},
 			accountID: "999988887777",
 			want:      "https://" + r + ".console.aws.amazon.com/codesuite/codebuild/999988887777/projects/acme-api-build/build/acme-api-build:abc123de-4567-8901-fabc-def012345678",
 		},
 
-		// pipeline_stages → pipeline view
 		{
 			name: "pipeline_stages", shortName: "pipeline_stages",
 			fields: map[string]string{"pipeline_name": "acme-web-deploy-pipeline"},
 			want:   "https://" + r + ".console.aws.amazon.com/codesuite/codepipeline/pipelines/acme-web-deploy-pipeline/view?region=" + r,
 		},
 
-		// glue_runs → job page
 		{
 			name: "glue_runs", shortName: "glue_runs",
 			fields: map[string]string{"job_name": "acme-etl-job"},
 			want:   "https://" + r + ".console.aws.amazon.com/gluestudio/home?region=" + r + "#/editor/job/acme-etl-job",
 		},
 
-		// s3_objects → s3/object?prefix= (Global)
 		{
 			name: "s3_objects", shortName: "s3_objects",
 			fields: map[string]string{"bucket": "acme-prod-data-lake", "key": "raw/2026/07/20/events.parquet"},
 			want:   "https://console.aws.amazon.com/s3/object/acme-prod-data-lake?prefix=raw%2F2026%2F07%2F20%2Fevents.parquet",
 		},
 
-		// cfn_events / cfn_resources → stacks/events|resources?stackId= (raw ARN)
 		{
 			name: "cfn_events", shortName: "cfn_events",
 			fields: map[string]string{"stack_arn": "arn:aws:cloudformation:us-east-1:123456789012:stack/acme-web-stack/1a2b3c4d-5678-90ab-cdef-111122223333"},
@@ -282,11 +248,8 @@ func TestConsoleURL_ChildPerType(t *testing.T) {
 	}
 }
 
-// ─── Hardening: an incomplete row (missing the parent-context Field the
-// builder needs) must return "", never a malformed/partial URL. One case
-// per parent-context family — mirrors the top-level incomplete-row pins in
-// console_url_types_test.go (waf/codeartifact/dbc).
-// ─────────────────────────────────────────────────────────────────────────
+// An incomplete row, missing the parent-context Field its builder needs,
+// returns "", never a malformed or partial URL.
 
 func TestConsoleURL_Child_IncompleteRow_ReturnsEmpty(t *testing.T) {
 	r := demo.DemoRegion

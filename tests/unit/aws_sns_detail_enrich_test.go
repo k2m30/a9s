@@ -1,20 +1,5 @@
 package unit
 
-// aws_sns_detail_enrich_test.go — coverage for enrichSns
-// (core/aws/sns_detail_enrichment.go), the on-demand detail enricher
-// registered for the "sns" resource type (#261).
-//
-// Covers:
-//   - wrong clients type / nil DetailEnrichmentCtx / nil Clients → error
-//     (sns has no DetailDocs dependency — uncached, per the contract)
-//   - wrong RawStruct type → error
-//   - missing TopicArn → error
-//   - success: JSON-object attribute values (Policy) parsed to structured data;
-//     plain string attributes (DisplayName) kept as-is
-//   - a JSON-looking but malformed attribute value falls back to the raw string
-//   - TopicEnriched re-enrichment path accepted as RawStruct
-//   - API error propagated
-
 import (
 	"context"
 	"testing"
@@ -26,10 +11,6 @@ import (
 	awsclient "github.com/k2m30/a9s/v3/core/aws"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
-
-// ---------------------------------------------------------------------------
-// enrichSnsFake — narrow SNSAPI fake with a call counter
-// ---------------------------------------------------------------------------
 
 type enrichSnsFake struct {
 	getAttrsFn    func(*sns.GetTopicAttributesInput) (*sns.GetTopicAttributesOutput, error)
@@ -55,10 +36,6 @@ func (f *enrichSnsFake) GetSubscriptionAttributes(_ context.Context, _ *sns.GetS
 }
 
 var _ awsclient.SNSAPI = (*enrichSnsFake)(nil)
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
 
 func snsEnricher(t *testing.T) resource.DetailEnricher {
 	t.Helper()
@@ -88,10 +65,6 @@ func makeSnsTopic(arn string) snstypes.Topic {
 func makeSnsRes(arn string) resource.Resource {
 	return resource.Resource{ID: arn, RawStruct: makeSnsTopic(arn)}
 }
-
-// ---------------------------------------------------------------------------
-// Tests: invalid context
-// ---------------------------------------------------------------------------
 
 func TestEnrichSns_WrongClientsType_ReturnsError(t *testing.T) {
 	enricher := snsEnricher(t)
@@ -124,10 +97,6 @@ func TestEnrichSns_NilClients_ReturnsError(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// Tests: bad RawStruct / missing ARN
-// ---------------------------------------------------------------------------
-
 func TestEnrichSns_WrongRawStructType_ReturnsError(t *testing.T) {
 	enricher := snsEnricher(t)
 	res := resource.Resource{ID: snsTestArn, RawStruct: "not-a-topic"}
@@ -147,10 +116,6 @@ func TestEnrichSns_EmptyTopicArn_ReturnsError(t *testing.T) {
 		t.Fatal("expected error for topic with no ARN, got nil")
 	}
 }
-
-// ---------------------------------------------------------------------------
-// Tests: success — JSON-object attribute parsed, plain attribute kept as string
-// ---------------------------------------------------------------------------
 
 func TestEnrichSns_Success_JSONAttributeParsedPlainAttributeKept(t *testing.T) {
 	fake := &enrichSnsFake{
@@ -230,10 +195,6 @@ func TestEnrichSns_MalformedJSONLookingAttribute_KeptAsRawString(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// Tests: re-enrichment path
-// ---------------------------------------------------------------------------
-
 func TestEnrichSns_TopicEnrichedRawStruct_Accepted(t *testing.T) {
 	fake := &enrichSnsFake{
 		getAttrsFn: func(_ *sns.GetTopicAttributesInput) (*sns.GetTopicAttributesOutput, error) {
@@ -265,10 +226,6 @@ func TestEnrichSns_TopicEnrichedRawStruct_Accepted(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// Tests: API error propagation
-// ---------------------------------------------------------------------------
-
 func TestEnrichSns_APIError_Propagated(t *testing.T) {
 	fake := &enrichSnsFake{
 		getAttrsFn: func(_ *sns.GetTopicAttributesInput) (*sns.GetTopicAttributesOutput, error) {
@@ -284,12 +241,9 @@ func TestEnrichSns_APIError_Propagated(t *testing.T) {
 	}
 }
 
-// TestEnrichSns_WhitespacePrefixedJSONAttribute_StillParsed pins that leading
-// whitespace — legal JSON, and present in real SNS policies — does not defeat
-// the object/array shape test that decides whether an attribute is structured.
-// The guard exists so scalar attributes ("3", a display name) stay strings
-// instead of being retyped by a JSON parse, so this also pins that a
-// whitespace-padded scalar is still left alone.
+// Leading whitespace is legal JSON and present in real SNS policies; the
+// object/array shape test still classifies such a value as structured, and a
+// whitespace-padded scalar stays a string.
 func TestEnrichSns_WhitespacePrefixedJSONAttribute_StillParsed(t *testing.T) {
 	fake := &enrichSnsFake{
 		getAttrsFn: func(_ *sns.GetTopicAttributesInput) (*sns.GetTopicAttributesOutput, error) {

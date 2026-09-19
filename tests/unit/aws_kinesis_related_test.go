@@ -28,16 +28,12 @@ func kinesisCheckerByTarget(t *testing.T, target string) resource.RelatedChecker
 	return nil
 }
 
-// --- Navigable Fields ---
-
 func TestNavigableFields_Kinesis_None(t *testing.T) {
 	nav := resource.IsFieldNavigableForTest("kinesis", "StreamName")
 	if nav != nil {
 		t.Errorf("expected no navigable fields for kinesis, but StreamName resolved to %v", nav)
 	}
 }
-
-// --- CloudWatch Alarms checker (Pattern C — cache, StreamName dimension) ---
 
 func TestRelated_Kinesis_Alarms_Found(t *testing.T) {
 	const streamName = "clickstream-ingest"
@@ -123,10 +119,6 @@ func TestRelated_Kinesis_Alarms_CacheMissNoClients(t *testing.T) {
 		t.Errorf("Count = %d, want -1 (unknown)", result.Count())
 	}
 }
-
-// --- checkKinesisLambda (checker-owned lambda:ListEventSourceMappings call
-// filtered by EventSourceArn=<StreamARN>, mapped against the lambda cache —
-// spec docs/resources/kinesis.md §lambda L59-62) ---
 
 func TestRelated_Kinesis_Lambda_Found(t *testing.T) {
 	const streamARN = "arn:aws:kinesis:us-east-1:123456789012:stream/clickstream-ingest"
@@ -235,8 +227,6 @@ func TestRelated_Kinesis_Lambda_CacheMissNoClients(t *testing.T) {
 	}
 }
 
-// --- kinesis→cfn: undeterminable without ListTagsForStream, returns State: RelatedUnknown ---
-
 func TestRelated_Kinesis_CFN_Unknown(t *testing.T) {
 	source := resource.Resource{
 		ID:   "clickstream-ingest",
@@ -251,10 +241,6 @@ func TestRelated_Kinesis_CFN_Unknown(t *testing.T) {
 		t.Errorf("TargetType = %q, want %q", result.TargetType(), "cfn")
 	}
 }
-
-// ---------------------------------------------------------------------------
-// kinesis→ddb (Pattern C+reverse: cache["ddb"] scan, DescribeKinesisStreamingDestination)
-// ---------------------------------------------------------------------------
 
 // kinesisSourceResource builds a Kinesis stream resource used as the parent.
 func kinesisSourceResource(streamName, streamARN string) resource.Resource {
@@ -396,7 +382,7 @@ func TestRelated_Kinesis_DDB_NoClient(t *testing.T) {
 }
 
 // TestRelated_Kinesis_DDB_FetchFilter verifies that the checker does NOT populate
-// FetchFilter — reverse-scan checkers must not set FetchFilter (Fix 3).
+// FetchFilter — reverse-scan checkers must not set FetchFilter.
 func TestRelated_Kinesis_DDB_FetchFilter(t *testing.T) {
 	const streamARN = "arn:aws:kinesis:us-east-1:123456789012:stream/clickstream-ingest"
 
@@ -414,10 +400,6 @@ func TestRelated_Kinesis_DDB_FetchFilter(t *testing.T) {
 		t.Errorf("FetchFilter = %v, want empty (reverse-scan checkers must not set FetchFilter)", result.FetchFilter())
 	}
 }
-
-// ---------------------------------------------------------------------------
-// checkKinesisCFN — ListTagsForStream + cfn cache lookup
-// ---------------------------------------------------------------------------
 
 // TestRelated_Kinesis_CFN_FoundViaTags verifies that when the stream has the
 // aws:cloudformation:stack-name tag and the matching stack is in the cfn cache,
@@ -492,10 +474,6 @@ func TestRelated_Kinesis_CFN_NoTag(t *testing.T) {
 		t.Errorf("Count = %d, want 0 (no cfn tag on stream)", result.Count())
 	}
 }
-
-// ---------------------------------------------------------------------------
-// checkKinesisKMS — DescribeStreamSummary → KeyId extraction
-// ---------------------------------------------------------------------------
 
 // TestRelated_Kinesis_KMS_Present verifies that a stream with KMS encryption
 // has its KeyId extracted and returned as Count=1. "alias/aws/kinesis/mrk-abc1234"

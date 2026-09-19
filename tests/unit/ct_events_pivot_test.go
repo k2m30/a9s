@@ -1,27 +1,5 @@
 package unit
 
-// ct_events_pivot_test.go — Regression pins for Issue 6 (P2):
-// BuildCTEventsPivotChecker factory function does not exist yet.
-//
-// Bug / gap: every ct-events related checker (checkDbcCTEvents,
-// checkDbcSnapCTEvents, checkIAMUserCtEvents, checkECSTaskCTEvents …)
-// duplicates the same pattern:
-//   1. Extract the resource ID.
-//   2. Fetch ct-events from cache (or first page on cache miss).
-//   3. Iterate events, matching via typed cloudtrailtypes.Event.Resources[]
-//      (authoritative) with a Fields["resource_name"] text fallback.
-//   4. Return Count=-1 when cache is truncated or errored; Count=N otherwise.
-//
-// The fix introduces a BuildCTEventsPivotChecker factory in core/aws that
-// parameterizes this pattern so future resource types can register a ct-events
-// pivot checker without copy-paste.
-//
-// These tests COMPILE-FAIL today because awsclient.BuildCTEventsPivotChecker
-// and awsclient.CTEventsPivotConfig do not exist yet.
-//
-// Test strategy: build a checker via the factory, supply minimal resource +
-// cache objects, and assert on the returned RelatedCheckResult.Count.
-
 import (
 	"context"
 	"testing"
@@ -83,15 +61,9 @@ func ctPivotSrcResource(id string) resource.Resource {
 	return resource.Resource{ID: id, Name: id}
 }
 
-// ---------------------------------------------------------------------------
-// Tests — COMPILE-FAIL today: BuildCTEventsPivotChecker does not exist.
-// ---------------------------------------------------------------------------
-
 // TestBuildCTEventsPivotChecker_EmptyID_ReturnsZero verifies that when the
 // IDExtractor returns an empty string (resource has no usable identifier),
 // the checker returns Count=0 immediately without scanning the cache.
-//
-// COMPILE-FAIL today: awsclient.BuildCTEventsPivotChecker undefined.
 func TestBuildCTEventsPivotChecker_EmptyID_ReturnsZero(t *testing.T) {
 	checker := awsclient.BuildCTEventsPivotChecker(awsclient.CTEventsPivotConfig{
 		IDExtractor: func(_ resource.Resource) string { return "" },
@@ -115,8 +87,6 @@ func TestBuildCTEventsPivotChecker_EmptyID_ReturnsZero(t *testing.T) {
 // TestBuildCTEventsPivotChecker_TypedEventMatches verifies that when the
 // ct-events cache contains an event whose typed RawStruct.Resources[].ResourceName
 // matches the extracted ID, that event is counted.
-//
-// COMPILE-FAIL today: awsclient.BuildCTEventsPivotChecker undefined.
 func TestBuildCTEventsPivotChecker_TypedEventMatches(t *testing.T) {
 	const snapID = "my-snap-001"
 
@@ -147,8 +117,6 @@ func TestBuildCTEventsPivotChecker_TypedEventMatches(t *testing.T) {
 // TestBuildCTEventsPivotChecker_TextFallback_NoTypedStruct verifies that when
 // an event resource has no typed RawStruct (only Fields["resource_name"]),
 // the text-fallback branch correctly matches the event.
-//
-// COMPILE-FAIL today: awsclient.BuildCTEventsPivotChecker undefined.
 func TestBuildCTEventsPivotChecker_TextFallback_NoTypedStruct(t *testing.T) {
 	const snapID = "text-fallback-snap"
 
@@ -172,11 +140,8 @@ func TestBuildCTEventsPivotChecker_TextFallback_NoTypedStruct(t *testing.T) {
 	}
 }
 
-// TestBuildCTEventsPivotChecker_Truncated_ReturnsMinusOne verifies that when
-// the ct-events cache is truncated (IsTruncated=true), the checker returns
-// Count=-1 regardless of matching events in the visible window.
-//
-// COMPILE-FAIL today: awsclient.BuildCTEventsPivotChecker undefined.
+// A truncated ct-events cache is a partial window: the checker defers to a
+// server-side filtered fetch.
 func TestBuildCTEventsPivotChecker_Truncated_ReturnsMinusOne(t *testing.T) {
 	const snapID = "trunc-snap"
 
@@ -184,7 +149,6 @@ func TestBuildCTEventsPivotChecker_Truncated_ReturnsMinusOne(t *testing.T) {
 		IDExtractor: func(r resource.Resource) string { return r.ID },
 	})
 
-	// Cache contains a matching event but is truncated.
 	matchEvent := ctPivotBuildEvent("event-trunc-001", snapID)
 	cache := ctPivotCacheWith([]resource.Resource{matchEvent}, true /* truncated */)
 	res := ctPivotSrcResource(snapID)
@@ -212,7 +176,6 @@ func TestBuildCTEventsPivotChecker_NilCacheList_ReturnsMinusOne(t *testing.T) {
 	})
 
 	res := ctPivotSrcResource("some-resource")
-	// Cache has no ct-events entry at all.
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
 	if result.State() != domain.RelatedError {
@@ -228,14 +191,6 @@ func TestBuildCTEventsPivotChecker_NilCacheList_ReturnsMinusOne(t *testing.T) {
 // TestBuildCTEventsPivotChecker_CacheError_ReturnsMinusOne verifies that when
 // the registered ct-events fetcher returns an error (cache miss + fetch error),
 // the checker returns State: RelatedError with the error propagated.
-//
-// Note: this test exercises the error path by passing a non-nil clients object
-// that is NOT a *ServiceClients (wrong type). Empty cache forces
-// FetchRelatedTarget to fall through to the real registered ct-events
-// fetcher (unlike a target with no fetcher, which would no-op); the
-// wrong-typed clients value causes that live fetcher call to fail, so
-// FetchRelatedTarget returns a non-nil error and the checker surfaces it via
-// resource.ErrorRelated.
 func TestBuildCTEventsPivotChecker_CacheError_ReturnsMinusOne(t *testing.T) {
 	checker := awsclient.BuildCTEventsPivotChecker(awsclient.CTEventsPivotConfig{
 		IDExtractor: func(r resource.Resource) string { return r.ID },
@@ -259,11 +214,6 @@ func TestBuildCTEventsPivotChecker_CacheError_ReturnsMinusOne(t *testing.T) {
 // checker produces the expected matching result for the dbc-snap use case:
 // IDExtractor = res.ID (snapshot identifier), matching against event
 // Resources[].ResourceName.
-//
-// This test exercises the full factory-to-behavior path for the dbc-snap
-// scenario and acts as an integration pin for the factory's design contract.
-//
-// COMPILE-FAIL today: awsclient.BuildCTEventsPivotChecker undefined.
 func TestBuildCTEventsPivotChecker_Wired_DbcSnap(t *testing.T) {
 	const snapID = "rds:acme-prod-cluster-2026-04-01"
 

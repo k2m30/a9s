@@ -14,12 +14,6 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// ---------------------------------------------------------------------------
-// EventBridge Rule Targets fetcher tests (child of EventBridge Rules)
-// ---------------------------------------------------------------------------
-
-// TestFetchEventBridgeRuleTargets_Basic verifies parsing of 2 targets
-// (Lambda + SQS), checking ID, Name, all Fields, and RawStruct.
 func TestFetchEventBridgeRuleTargets_Basic(t *testing.T) {
 	mock := &mockEventBridgeListTargetsClient{
 		output: &eventbridge.ListTargetsByRuleOutput{
@@ -59,7 +53,6 @@ func TestFetchEventBridgeRuleTargets_Basic(t *testing.T) {
 		t.Fatalf("expected 2 resources, got %d", len(resources))
 	}
 
-	// Verify first target (Lambda)
 	r0 := resources[0]
 	t.Run("ID_is_target_id", func(t *testing.T) {
 		if r0.ID != "lambda-target-1" {
@@ -106,7 +99,6 @@ func TestFetchEventBridgeRuleTargets_Basic(t *testing.T) {
 		}
 	})
 
-	// Verify second target (SQS)
 	r1 := resources[1]
 	t.Run("SQS_resource_type_name", func(t *testing.T) {
 		if r1.Fields["resource_type_name"] != "SQS: processing-queue" {
@@ -134,7 +126,6 @@ func TestFetchEventBridgeRuleTargets_Basic(t *testing.T) {
 		}
 	})
 
-	// Verify required fields are present
 	t.Run("required_fields_present", func(t *testing.T) {
 		requiredFields := []string{"target_id", "target_arn", "role_arn", "resource_type_name", "input_summary"}
 		for i, r := range resources {
@@ -147,8 +138,6 @@ func TestFetchEventBridgeRuleTargets_Basic(t *testing.T) {
 	})
 }
 
-// TestFetchEventBridgeRuleTargets_Empty verifies that a rule with no targets
-// returns an empty slice with no error.
 func TestFetchEventBridgeRuleTargets_Empty(t *testing.T) {
 	mock := &mockEventBridgeListTargetsClient{
 		output: &eventbridge.ListTargetsByRuleOutput{
@@ -175,7 +164,6 @@ func TestFetchEventBridgeRuleTargets_Empty(t *testing.T) {
 	}
 }
 
-// TestFetchEventBridgeRuleTargets_APIError verifies that API errors are propagated.
 func TestFetchEventBridgeRuleTargets_APIError(t *testing.T) {
 	mock := &mockEventBridgeListTargetsClient{
 		err: fmt.Errorf("AWS API error: access denied"),
@@ -203,15 +191,11 @@ func TestFetchEventBridgeRuleTargets_APIError(t *testing.T) {
 	}
 }
 
-// TestFetchEventBridgeRuleTargets_NilFields verifies that nil optional fields
-// (Id, Arn, RoleArn are *string) do not cause a panic and produce empty strings.
 func TestFetchEventBridgeRuleTargets_NilFields(t *testing.T) {
 	mock := &mockEventBridgeListTargetsClient{
 		output: &eventbridge.ListTargetsByRuleOutput{
 			Targets: []ebtypes.Target{
-				{
-					// All *string fields nil
-				},
+				{},
 			},
 		},
 	}
@@ -221,7 +205,6 @@ func TestFetchEventBridgeRuleTargets_NilFields(t *testing.T) {
 		"event_bus": "default",
 	}
 
-	// Should not panic
 	result, err := awsclient.FetchEventBridgeRuleTargets(
 		context.Background(),
 		mock,
@@ -264,8 +247,6 @@ func TestFetchEventBridgeRuleTargets_NilFields(t *testing.T) {
 	})
 }
 
-// TestFetchEventBridgeRuleTargets_RawStruct verifies that RawStruct preserves
-// the original ebtypes.Target, including all sub-fields.
 func TestFetchEventBridgeRuleTargets_RawStruct(t *testing.T) {
 	mock := &mockEventBridgeListTargetsClient{
 		output: &eventbridge.ListTargetsByRuleOutput{
@@ -335,12 +316,6 @@ func TestFetchEventBridgeRuleTargets_RawStruct(t *testing.T) {
 	})
 }
 
-// ---------------------------------------------------------------------------
-// ArnToResourceName helper tests
-// ---------------------------------------------------------------------------
-
-// TestArnToResourceName is a table-driven test covering all ARN parsing examples
-// from the architect spec, plus edge cases.
 func TestArnToResourceName(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -404,12 +379,6 @@ func TestArnToResourceName(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// ComputeInputSummary helper tests
-// ---------------------------------------------------------------------------
-
-// TestComputeInputSummary is a table-driven test covering all input summary
-// priority cases from the architect spec.
 func TestComputeInputSummary(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -471,12 +440,6 @@ func TestComputeInputSummary(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// Registration tests
-// ---------------------------------------------------------------------------
-
-// TestEventBridgeRuleTargets_RegistrationExists verifies that "eb_rule_targets"
-// is registered as a child resource type.
 func TestEventBridgeRuleTargets_RegistrationExists(t *testing.T) {
 	td := resource.GetChildType("eb_rule_targets")
 	if td == nil {
@@ -490,8 +453,6 @@ func TestEventBridgeRuleTargets_RegistrationExists(t *testing.T) {
 	}
 }
 
-// TestEventBridgeRuleTargets_PaginatedChildFetcherRegistered verifies that the
-// paginated child fetcher is registered.
 func TestEventBridgeRuleTargets_PaginatedChildFetcherRegistered(t *testing.T) {
 	f := resource.GetPaginatedChildFetcher("eb_rule_targets")
 	if f == nil {
@@ -502,5 +463,3 @@ func TestEventBridgeRuleTargets_PaginatedChildFetcherRegistered(t *testing.T) {
 // Ensure imports are used.
 var _ = fmt.Sprintf
 var _ = strings.Contains
-
-// ============================================================================

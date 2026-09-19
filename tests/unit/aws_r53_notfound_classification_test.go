@@ -1,17 +1,10 @@
 package unit
 
-// aws_r53_notfound_classification_test.go — a hosted zone
-// deleted between ListHostedZones and enrichment must not spam the r53
-// failure aggregate. GetHostedZone on a deleted zone can surface either as
-// the typed *route53/types.NoSuchHostedZone error or as the generic
-// smithy.GenericAPIError{Code: "NoSuchHostedZone"} shape (depending on
-// whether the SDK's response deserializer matched a modeled shape) — both
-// must classify as a silent truncation: TruncatedIDs[id]=true, no aggregate
-// entry, composite error nil when it is the only failure. A different error
-// code (e.g. AccessDenied) must still aggregate exactly as before.
-//
-// Reuses r53GetHostedZoneFake / r53ZoneResources / r53ZoneID1 / r53ZoneID2
-// from aws_r53_enricher_test.go (same package unit).
+// GetHostedZone on a zone deleted after ListHostedZones surfaces as either the
+// typed *route53/types.NoSuchHostedZone or a
+// smithy.GenericAPIError{Code: "NoSuchHostedZone"}, depending on whether the
+// SDK's deserializer matched a modeled shape. Both are a silent truncation,
+// not an aggregated failure.
 
 import (
 	"context"
@@ -25,8 +18,6 @@ import (
 	awsclient "github.com/k2m30/a9s/v3/core/aws"
 )
 
-// TestEnrichRoute53Zone_TypedNoSuchHostedZone_SilentTruncation pins the
-// typed-error shape: GetHostedZone returns *route53types.NoSuchHostedZone.
 func TestEnrichRoute53Zone_TypedNoSuchHostedZone_SilentTruncation(t *testing.T) {
 	fake := &r53GetHostedZoneFake{
 		errByID: map[string]error{
@@ -48,9 +39,6 @@ func TestEnrichRoute53Zone_TypedNoSuchHostedZone_SilentTruncation(t *testing.T) 
 	}
 }
 
-// TestEnrichRoute53Zone_GenericNoSuchHostedZone_SilentTruncation pins the
-// alternate shape: GetHostedZone returns a smithy.GenericAPIError carrying
-// the same Code, rather than the typed route53types.NoSuchHostedZone.
 func TestEnrichRoute53Zone_GenericNoSuchHostedZone_SilentTruncation(t *testing.T) {
 	fake := &r53GetHostedZoneFake{
 		errByID: map[string]error{
@@ -72,9 +60,6 @@ func TestEnrichRoute53Zone_GenericNoSuchHostedZone_SilentTruncation(t *testing.T
 	}
 }
 
-// TestEnrichRoute53Zone_AccessDenied_StillAggregates is the negative-space
-// guard: a different error code must not be swallowed by the new
-// NoSuchHostedZone silent-truncation branch.
 func TestEnrichRoute53Zone_AccessDenied_StillAggregates(t *testing.T) {
 	fake := &r53GetHostedZoneFake{
 		errByID: map[string]error{

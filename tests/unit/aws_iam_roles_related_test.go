@@ -30,8 +30,6 @@ func roleCheckerByTarget(t *testing.T, target string) resource.RelatedChecker {
 	return nil
 }
 
-// --- Lambda checker (reverse-lookup: search lambda cache, ARN last segment) ---
-
 func TestRelated_Role_Lambda_Found(t *testing.T) {
 	source := resource.Resource{
 		ID:   "acme-lambda-execution",
@@ -147,8 +145,6 @@ func TestRelated_Role_Lambda_EmptyID(t *testing.T) {
 	}
 }
 
-// --- Glue checker (reverse-lookup: search glue cache, direct name match) ---
-
 func TestRelated_Role_Glue_Found(t *testing.T) {
 	source := resource.Resource{
 		ID:   "acme-glue-role",
@@ -234,8 +230,6 @@ func TestRelated_Role_Glue_CacheMissNoClients(t *testing.T) {
 		t.Errorf("Count = %d, want -1 (unknown)", result.Count())
 	}
 }
-
-// --- Node Group checker (reverse-lookup: search ng cache, ARN last segment) ---
 
 func TestRelated_Role_NG_Found(t *testing.T) {
 	source := resource.Resource{
@@ -323,8 +317,6 @@ func TestRelated_Role_NG_CacheMissNoClients(t *testing.T) {
 	}
 }
 
-// --- Policy checker (IAM API: ListAttachedRolePolicies) ---
-
 func TestRelated_Role_Policy_NonNil(t *testing.T) {
 	checker := roleCheckerByTarget(t, "policy")
 	// checkerByTarget fatals if checker is nil — reaching here means it's non-nil.
@@ -362,14 +354,11 @@ func TestRelated_Role_Policy_EmptyRoleName(t *testing.T) {
 	}
 
 	checker := roleCheckerByTarget(t, "policy")
-	// With nil clients it must return -1, not panic.
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 	if result.State() != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (nil clients)", result.Count())
 	}
 }
-
-// --- EC2 checker (Pattern C: scan EC2 cache for matching IamInstanceProfile ARN) ---
 
 // TestRelated_Role_EC2_Found verifies that an EC2 instance whose
 // IamInstanceProfile ARN contains "/"+roleName is counted.
@@ -492,7 +481,6 @@ func TestRelated_Role_EC2_CacheMiss(t *testing.T) {
 	}
 
 	checker := roleCheckerByTarget(t, "ec2")
-	// Empty cache — no "ec2" entry at all.
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
 	if result.State() != domain.RelatedUnknown {
@@ -533,8 +521,6 @@ func TestRelated_Role_EC2_InstanceNoProfile(t *testing.T) {
 		t.Errorf("Count = %d, want 0 (no profile on instance)", result.Count())
 	}
 }
-
-// --- EKS checker (reverse-lookup: search eks cluster cache for RoleArn match) ---
 
 // TestRelated_Role_EKS_Found: an EKS cluster whose RoleArn matches the role ARN
 // (full ARN match) produces Count:1.
@@ -644,8 +630,6 @@ func TestRelated_Role_EKS_NotFound(t *testing.T) {
 	}
 }
 
-// --- IamGroup checker (trust policy parse — offline, 0 API calls) ---
-
 // TestRelated_Role_IamGroup_Found: a trust policy with a Principal.AWS ARN
 // containing ":group/" yields the group name as a resource ID.
 func TestRelated_Role_IamGroup_Found(t *testing.T) {
@@ -739,8 +723,6 @@ func TestRelated_Role_IamGroup_NoGroupPrincipal(t *testing.T) {
 	}
 }
 
-// --- IamUser checker (trust policy parse — offline, 0 API calls) ---
-
 // TestRelated_Role_IamUser_Found: a trust policy with a Principal.AWS ARN
 // containing ":user/" yields the user name as a resource ID.
 func TestRelated_Role_IamUser_Found(t *testing.T) {
@@ -823,5 +805,3 @@ func TestRelated_Role_IamUser_InvalidJSON(t *testing.T) {
 		t.Errorf("unexpected error: %v", result.Err())
 	}
 }
-
-// --- Demo checker ---

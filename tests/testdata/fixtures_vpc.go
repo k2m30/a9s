@@ -6,9 +6,6 @@ import (
 )
 
 // RealVPCs returns sanitized VPC data based on real AWS structure.
-// Account: 123456789012 (sanitized)
-// Region: us-east-1
-// Total VPCs: 2
 func RealVPCs() []ec2types.Vpc {
 	return []ec2types.Vpc{
 		{

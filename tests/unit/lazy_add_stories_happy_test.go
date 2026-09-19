@@ -1,13 +1,5 @@
 package unit
 
-// lazy_add_stories_happy_test.go — orchestration pin tests for
-// Section A (LA-001..LA-004) and Section I (LA-080..LA-082) of
-// tests/stories/lazy_add.md.
-//
-// Pattern: synthetic source + target types with unique "test-<la-id>-*" short
-// names; t.Cleanup unregisters every Register* call so tests are isolated.
-// Mirrors the style of lazy_add_orchestration_edges_test.go.
-
 import (
 	"context"
 	"sync/atomic"
@@ -19,13 +11,6 @@ import (
 	"github.com/k2m30/a9s/v3/core/runtime/messages"
 )
 
-// ---------------------------------------------------------------------------
-// LA-001 — KMS drill shows AWS-managed key used by RDS
-// ---------------------------------------------------------------------------
-
-// Test_LA_001_KMSDrillAWSManagedKey verifies that a checker emitting an
-// AWS-managed KMS key UUID (alias aws/rds) causes FetchByIDs to be called and
-// the lazy-added resource carries the correct alias field.
 func Test_LA_001_KMSDrillAWSManagedKey(t *testing.T) {
 	const (
 		srcType    = "test-la001-rds-src"
@@ -100,12 +85,6 @@ func Test_LA_001_KMSDrillAWSManagedKey(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// LA-002 — AMI drill shows public marketplace AMI used by EC2
-// ---------------------------------------------------------------------------
-
-// Test_LA_002_AMIDrillPublicAMI verifies that a checker emitting a public AMI
-// ID (owner: amazon) causes lazy-add to surface it with the expected fields.
 func Test_LA_002_AMIDrillPublicAMI(t *testing.T) {
 	const (
 		srcType    = "test-la002-ec2-src"
@@ -180,12 +159,6 @@ func Test_LA_002_AMIDrillPublicAMI(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// LA-003 — EBS-snapshot drill shows shared snapshot used by EBS volume
-// ---------------------------------------------------------------------------
-
-// Test_LA_003_EBSSnapDrillSharedSnapshot verifies that a checker emitting a
-// shared snapshot ID (foreign account owner) causes lazy-add to surface it.
 func Test_LA_003_EBSSnapDrillSharedSnapshot(t *testing.T) {
 	const (
 		srcType    = "test-la003-ebs-src"
@@ -255,13 +228,6 @@ func Test_LA_003_EBSSnapDrillSharedSnapshot(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// LA-004 — IAM-policy drill shows AWS-managed policy attached to role
-// ---------------------------------------------------------------------------
-
-// Test_LA_004_IAMPolicyDrillAWSManaged verifies that a checker emitting an
-// AWS-managed policy ARN causes lazy-add to surface it with the correct
-// policy_type and policy_name fields.
 func Test_LA_004_IAMPolicyDrillAWSManaged(t *testing.T) {
 	const (
 		srcType    = "test-la004-role-src"
@@ -332,25 +298,12 @@ func Test_LA_004_IAMPolicyDrillAWSManaged(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// LA-080 — Demo mode baseline
-// ---------------------------------------------------------------------------
-
-// Test_LA_080_DemoModeBaseline is skipped: demo-mode drill-through is exercised
-// end-to-end by tests/integration/scenario_*.go. Synthetic unit coverage for
-// the orchestration contract is pinned by LA-001..LA-004, LA-010..LA-012.
 func Test_LA_080_DemoModeBaseline(t *testing.T) {
 	t.Skip("demo-mode drill-through is exercised end-to-end by tests/integration/scenario_*.go. Synthetic unit coverage for the orchestration contract is pinned by LA-001..LA-004, LA-010..LA-012.")
 }
 
-// ---------------------------------------------------------------------------
-// LA-081 — Cold-cache drill triggers prefetch for the target type
-// ---------------------------------------------------------------------------
-
-// Test_LA_081_ColdCacheDrillTriggersPrefetch verifies that when NeedsTargetCache
-// is true and the cache is empty, the orchestrator runs the paginated fetcher
-// first, then uses the resulting pages as the cache when checking for missing
-// IDs, and finally lazy-adds only the IDs not found in the prefetched pages.
+// With NeedsTargetCache and a cold cache, the paginated fetcher runs first
+// and only IDs absent from its pages are lazy-added.
 func Test_LA_081_ColdCacheDrillTriggersPrefetch(t *testing.T) {
 	const (
 		srcType    = "test-la081-src"
@@ -408,12 +361,10 @@ func Test_LA_081_ColdCacheDrillTriggersPrefetch(t *testing.T) {
 		t.Fatal("LA-081: no RelatedCheckResultMsg received")
 	}
 
-	// Paginated fetcher must have been called for the cold-cache prefetch.
 	if atomic.LoadInt32(&paginatedCalls) == 0 {
 		t.Error("LA-081: paginated fetcher was not called — cold-cache prefetch did not fire")
 	}
 
-	// CachedPages must contain the 2 pre-fetched resources.
 	if resultMsg.CachedPages == nil {
 		t.Fatal("LA-081: CachedPages is nil — prefetch result not returned in msg")
 	}
@@ -422,7 +373,6 @@ func Test_LA_081_ColdCacheDrillTriggersPrefetch(t *testing.T) {
 		t.Errorf("LA-081: CachedPages[%s] has %d resources, want 2", targetType, len(cachedEntry.Resources))
 	}
 
-	// LazyAddedResources must contain only the missing ID (lazy-1), not pre-1.
 	if resultMsg.LazyAddedResources == nil {
 		t.Fatal("LA-081: LazyAddedResources is nil — lazy-add path did not fire for missing ID")
 	}
@@ -435,15 +385,8 @@ func Test_LA_081_ColdCacheDrillTriggersPrefetch(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// LA-082 — Warm-cache drill re-uses top-level fetch, adds only missing IDs
-// ---------------------------------------------------------------------------
-
-// Test_LA_082_WarmCacheDrillReusesCache verifies that when the target-type
-// cache is already warm (seeded via a prior CachedPages write-back) and
-// NeedsTargetCache is true, the paginated fetcher is NOT called again — the
-// orchestrator reuses the existing cache, and only the missing ID is
-// lazy-added via FetchByIDs.
+// With NeedsTargetCache and a warm cache, the paginated fetcher is not called
+// and only the missing ID is lazy-added.
 func Test_LA_082_WarmCacheDrillReusesCache(t *testing.T) {
 	const (
 		srcType    = "test-la082-src"
@@ -467,7 +410,6 @@ func Test_LA_082_WarmCacheDrillReusesCache(t *testing.T) {
 			DisplayName:      "KMS Keys (warm)",
 			NeedsTargetCache: true,
 			Checker: func(_ context.Context, _ any, _ resource.Resource, _ resource.ResourceCache) resource.RelatedCheckResult {
-				// Checker emits an AWS-managed key not present in the warm cache.
 				return resource.KnownRelated(targetType, []string{"aws-managed-la082"}, false)
 			},
 		},
@@ -490,8 +432,6 @@ func Test_LA_082_WarmCacheDrillReusesCache(t *testing.T) {
 	m := newBlessedModel(t, "testprofile", "us-east-1")
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 120, Height: 36})
 
-	// Pre-seed the cache with the warm entry, simulating "user previously
-	// opened the main-menu KMS list".
 	m, _ = rootApplyMsg(m, messages.RelatedCheckResult{
 		ResourceType:     srcType,
 		SourceResourceID: "seed-la082",
@@ -504,8 +444,6 @@ func Test_LA_082_WarmCacheDrillReusesCache(t *testing.T) {
 		},
 	})
 
-	// Reset the paginated counter after pre-seed (we only care about calls
-	// during the actual drill below, not the seed step).
 	atomic.StoreInt32(&paginatedCalls, 0)
 
 	_, batchCmd := rootApplyMsg(m, messages.Navigate{
@@ -519,12 +457,10 @@ func Test_LA_082_WarmCacheDrillReusesCache(t *testing.T) {
 		t.Fatal("LA-082: no RelatedCheckResultMsg received")
 	}
 
-	// The paginated fetcher must NOT have been called — cache was warm.
 	if calls := atomic.LoadInt32(&paginatedCalls); calls != 0 {
 		t.Errorf("LA-082: paginated fetcher called %d time(s), want 0 — warm-cache drill must reuse existing cache", calls)
 	}
 
-	// LazyAddedResources must contain only the missing AWS-managed key.
 	if resultMsg.LazyAddedResources == nil {
 		t.Fatal("LA-082: LazyAddedResources is nil — aws-managed-la082 should have been lazy-added")
 	}

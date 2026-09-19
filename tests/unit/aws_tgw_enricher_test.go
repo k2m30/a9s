@@ -1,15 +1,5 @@
 package unit
 
-// aws_tgw_enricher_test.go — Behavioral tests for EnrichTGWAttachments.
-//
-// Contract assertions:
-//   - DescribeTransitGatewayAttachments is called once per TGW resource (filtered by TGW ID).
-//   - All attachments State=available → 0 findings.
-//   - Any attachment State=failed → finding for that TGW, severity "!".
-//   - Any attachment State=modifying → finding for that TGW, severity "~".
-//   - clients.EC2 == nil → (EnricherResult{Findings: non-nil empty}, nil).
-//   - API error for a resource → 0 findings for that resource, Truncated=true, no error returned.
-
 import (
 	"context"
 	"errors"
@@ -25,15 +15,9 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// tgwAttachmentFake implements EC2API for TGW attachment enrichment testing.
-// It embeds the interface and overrides only DescribeTransitGatewayAttachments.
-// The results map is keyed by transit-gateway-id filter value so the fake can
-// serve different responses per TGW resource.
 type tgwAttachmentFake struct {
 	awsclient.EC2API
-	// results maps TGW ID → attachment list. Used when errByTGW has no entry.
-	results map[string][]ec2types.TransitGatewayAttachment
-	// errByTGW maps TGW ID → error; overrides results when set.
+	results  map[string][]ec2types.TransitGatewayAttachment
 	errByTGW map[string]error
 }
 
@@ -42,7 +26,6 @@ func (f *tgwAttachmentFake) DescribeTransitGatewayAttachments(
 	in *ec2.DescribeTransitGatewayAttachmentsInput,
 	_ ...func(*ec2.Options),
 ) (*ec2.DescribeTransitGatewayAttachmentsOutput, error) {
-	// Extract the transit-gateway-id filter value to look up the per-TGW response.
 	tgwID := ""
 	if in != nil {
 		for _, f := range in.Filters {
@@ -61,10 +44,8 @@ func (f *tgwAttachmentFake) DescribeTransitGatewayAttachments(
 	return &ec2.DescribeTransitGatewayAttachmentsOutput{TransitGatewayAttachments: attachments}, nil
 }
 
-// Compile-time check: tgwAttachmentFake satisfies EC2API.
 var _ awsclient.EC2API = (*tgwAttachmentFake)(nil)
 
-// tgwResources returns a slice of TGW Resource stubs with the given IDs.
 func tgwResources(ids ...string) []resource.Resource {
 	res := make([]resource.Resource, 0, len(ids))
 	for _, id := range ids {
@@ -80,7 +61,6 @@ func tgwResources(ids ...string) []resource.Resource {
 	return res
 }
 
-// tgwAttachment builds a TransitGatewayAttachment with the given TGW ID and state.
 func tgwAttachment(tgwID, attachID string, state ec2types.TransitGatewayAttachmentState) ec2types.TransitGatewayAttachment {
 	return ec2types.TransitGatewayAttachment{
 		TransitGatewayId:           aws.String(tgwID),
@@ -89,8 +69,6 @@ func tgwAttachment(tgwID, attachID string, state ec2types.TransitGatewayAttachme
 	}
 }
 
-// TestEnrichTGWAttachments_AllAvailableProducesNoFindings verifies that when all
-// attachments for both TGWs are in the "available" state, no findings are produced.
 func TestEnrichTGWAttachments_AllAvailableProducesNoFindings(t *testing.T) {
 	fake := &tgwAttachmentFake{
 		results: map[string][]ec2types.TransitGatewayAttachment{
@@ -113,9 +91,6 @@ func TestEnrichTGWAttachments_AllAvailableProducesNoFindings(t *testing.T) {
 	}
 }
 
-// TestEnrichTGWAttachments_FailedAttachmentProducesFindingSevBang verifies that
-// when TGW-1 has an attachment in "failed" state, a finding with severity "!" is
-// produced for TGW-1, and TGW-2 (all available) produces no finding.
 func TestEnrichTGWAttachments_FailedAttachmentProducesFindingSevBang(t *testing.T) {
 	fake := &tgwAttachmentFake{
 		results: map[string][]ec2types.TransitGatewayAttachment{
@@ -143,9 +118,6 @@ func TestEnrichTGWAttachments_FailedAttachmentProducesFindingSevBang(t *testing.
 	}
 }
 
-// TestEnrichTGWAttachments_ModifyingAttachmentProducesFindingSevTilde verifies that
-// when TGW-1 has an attachment in "modifying" state, a finding with severity "~" is
-// produced (informational, not breaking).
 func TestEnrichTGWAttachments_ModifyingAttachmentProducesFindingSevTilde(t *testing.T) {
 	fake := &tgwAttachmentFake{
 		results: map[string][]ec2types.TransitGatewayAttachment{
@@ -173,8 +145,6 @@ func TestEnrichTGWAttachments_ModifyingAttachmentProducesFindingSevTilde(t *test
 	}
 }
 
-// TestEnrichTGWAttachments_NilClientReturnsEmptyFindingsNoError verifies that when
-// clients.EC2 is nil the enricher returns a non-nil empty Findings map and no error.
 func TestEnrichTGWAttachments_NilClientReturnsEmptyFindingsNoError(t *testing.T) {
 	clients := &awsclient.ServiceClients{EC2: nil}
 
@@ -190,10 +160,6 @@ func TestEnrichTGWAttachments_NilClientReturnsEmptyFindingsNoError(t *testing.T)
 	}
 }
 
-// TestEnrichTGWAttachments_APIErrorSetsTruncatedAndSurfacesError verifies that when
-// the API call for TGW-1 returns an error, the enricher sets Truncated=true, produces
-// 0 findings for the failed TGW, and returns a composite error containing the enricher
-// prefix and the failing TGW ID.
 func TestEnrichTGWAttachments_APIErrorSetsTruncatedAndSurfacesError(t *testing.T) {
 	apiErr := errors.New("ec2: DescribeTransitGatewayAttachments throttled")
 	fake := &tgwAttachmentFake{

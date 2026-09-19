@@ -1,16 +1,5 @@
 package unit_test
 
-// aws_acm_related_extra_test.go — coverage restoration for acm_related.go:
-//   checkACMELB (ALB/NLB ARN shape + Classic ELB shape + non-LB ARN skipped)
-//   checkACMAPIGW (domainnames ARN + restapis ARN)
-//   checkACMR53 (zone-suffix match from cache, no-match from cache)
-//
-// checkEIPECS / checkEIPECSSvc / checkEIPECSTask are genuine stubs that
-// unconditionally return State: RelatedUnknown for non-empty IDs; they are intentionally
-// not tested here. (checkEIPLogs, the same shape, was removed along with its
-// eip:logs registration — see qa_demo_pivot_coverage_test.go's
-// knownDisconnectedPivots terminal-state comment.)
-
 import (
 	"context"
 	"testing"
@@ -46,17 +35,12 @@ func (m *acmDescribeCertMock) DescribeCertificate(
 	}, nil
 }
 
-// Compile-time: acmDescribeCertMock satisfies ACMAPI.
 var _ awsclient.ACMAPI = (*acmDescribeCertMock)(nil)
 
 // acmRelatedClients returns a *awsclient.ServiceClients with ACM set to mock.
 func acmRelatedClients(mock awsclient.ACMAPI) *awsclient.ServiceClients {
 	return &awsclient.ServiceClients{ACM: mock}
 }
-
-// ---------------------------------------------------------------------------
-// checkACMELB — ARN parsing for ALB/NLB and Classic ELB shapes
-// ---------------------------------------------------------------------------
 
 // TestRelated_ACM_ELB_ALBShape: an ALB ARN (:loadbalancer/app/<name>/<id>)
 // produces the load balancer name as the resource ID.
@@ -166,10 +150,6 @@ func TestRelated_ACM_ELB_NonLBARNSkipped(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// checkACMAPIGW — domainnames and restapis ARN parsing
-// ---------------------------------------------------------------------------
-
 // TestRelated_ACM_APIGW_DomainnamesARN: an InUseBy ARN naming an API
 // Gateway custom domain is not counted — a domain name is no apigw row — and
 // the count says it left one out.
@@ -245,10 +225,6 @@ func TestRelated_ACM_APIGW_NoMatchARN(t *testing.T) {
 		t.Errorf("Count = %d, want 0 (LB ARN does not match APIGW patterns)", result.Count())
 	}
 }
-
-// ---------------------------------------------------------------------------
-// checkACMR53 — zone-suffix matching from R53 zone cache
-// ---------------------------------------------------------------------------
 
 // makeACMR53Zone returns a resource.Resource representing a Route 53 hosted zone
 // with the zone name in Fields["name"] (as read by checkACMR53).
@@ -349,7 +325,6 @@ func TestRelated_ACM_R53_NoCertDomainValidation(t *testing.T) {
 		},
 	}
 
-	// No DomainValidationOptions — empty slice.
 	mock := &acmDescribeCertMock{domainValidationOptions: nil}
 	clients := acmRelatedClients(mock)
 

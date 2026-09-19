@@ -1,19 +1,3 @@
-// costs_round5_test.go — Cost Explorer: seven contract pins (fold, the
-// zero-value neutral-color pin, and -c startup are pinned elsewhere and are
-// NOT repeated here).
-//
-// package unit_test (not unit): every finding here is reachable via the
-// headless app.Controller / pure core/costs package — no TUI-level
-// helper is needed, so this file reuses costs_state_test.go's
-// newCostsController/topDrill/fixedCostsNow/monthRecord and
-// costs_interaction_test.go's findFetchCostsTask directly (same package).
-//
-// Finding E asserts against CostsBody's FooterNote seam (the same field
-// DrillRefusedReason uses for "Enter did something observable, not a silent
-// no-op") — loosely: non-empty and resource-ID-bearing for a supported
-// service, non-empty for an unsupported one. It pins only that Enter on a
-// RESOURCE_ID row is never silent, not the exact wording or the exact
-// supported-service table.
 package unit_test
 
 import (
@@ -57,13 +41,6 @@ func round5FullDailyRecords(t *testing.T, window []costs.Period, rowKey string, 
 	return recs
 }
 
-// ===========================================================================
-// A — ApplyCostsLoaded must not stamp week/year DISPLAY buckets as covered
-// via MergeCoverage when ev.Records are native DAILY/MONTHLY (a full
-// CostsLoaded round-trip through the real apply path, not a synthetic Store
-// seed), or the week grid renders empty.
-// ===========================================================================
-
 func TestCostsRound5_A_WeekViewCoverageStamp_DoesNotShadowNativeDailyRecords(t *testing.T) {
 	c := newCostsController(t, fixedCostsNow)
 	root := topDrill(t, c)
@@ -86,11 +63,8 @@ func TestCostsRound5_A_WeekViewCoverageStamp_DoesNotShadowNativeDailyRecords(t *
 		t.Fatalf("precondition: expected Granularity week, got %q", weekTop.Granularity)
 	}
 
-	// The REAL apply path: native DAILY records (exactly what CE returns
-	// for a week-granularity display request) PLUS the display-level
-	// Window (payload.Window == top.Window, the clipped week buckets) —
-	// exactly what ensureCostsShapeFetched dispatches and ApplyCostsLoaded
-	// receives back via messages.CostsLoaded.
+	// CE returns native DAILY records for a week-granularity display request;
+	// the payload Window carries the clipped week buckets.
 	recs := round5FullDailyRecords(t, weekTop.Window, "Amazon EC2", 10)
 	c.Handle(messages.CostsLoaded{
 		Query:  payload.Query,
@@ -122,23 +96,15 @@ func TestCostsRound5_A_WeekViewCoverageStamp_DoesNotShadowNativeDailyRecords(t *
 		t.Errorf("week-granularity body's rows are all zero after a full CostsLoaded round-trip with native daily records (rows: %+v)", vs.Body.Costs.Rows)
 	}
 
-	// Second half: re-evaluating the SAME base query shape (invoice ->
-	// unblended -> amortized cycles back to invoice's own CacheKey, per
-	// costsQueryForFrame's doc) must NOT re-emit a fetch — Lookup must
-	// resolve the native daily records already merged, not treat the shape
-	// as still missing because of an empty display-bucket coverage stamp
-	// shadowing them.
+	// invoice -> unblended -> amortized cycles back to invoice's own CacheKey
+	// (costsQueryForFrame), so Lookup must resolve the native daily records
+	// already merged without a fetch.
 	c.Apply(app.Action{Kind: app.ActionCostMetric})              // invoice -> unblended (distinct shape, ignore)
 	_, tasks2 := c.Apply(app.Action{Kind: app.ActionCostMetric}) // unblended -> amortized (back to invoice's base shape)
 	if _, found := findFetchCostsTask(tasks2); found {
 		t.Error("re-evaluating the same base query shape re-emitted a KindFetchCosts task — a subsequent Lookup must not prefer an empty display-bucket coverage entry over the real merged native records")
 	}
 }
-
-// ===========================================================================
-// B (P1) — a CostsLoaded arriving while Help (or Identity) is stacked
-// ABOVE the costs screen must still merge into the costs screen beneath.
-// ===========================================================================
 
 func TestCostsRound5_B_CostsLoadedWhileOverlayStacked_StillMergesIntoScreenBeneath(t *testing.T) {
 	c := newCostsController(t, fixedCostsNow)
@@ -152,18 +118,14 @@ func TestCostsRound5_B_CostsLoadedWhileOverlayStacked_StillMergesIntoScreenBenea
 		t.Fatal("precondition: fetch dispatch did not set Loading")
 	}
 
-	// Push an overlay (Help) ON TOP of the costs screen — mirrors a user
-	// pressing '?' while a fetch is outstanding.
 	c.ApplyIntents([]runtime.UIIntent{runtime.PushScreen{ID: runtime.ScreenHelp}})
 
-	// Deliver the fetch result WHILE Help is stacked above.
 	c.Handle(messages.CostsLoaded{
 		Query:    payload.Query,
 		Grid:     costs.GridResult{Fetched: true, Records: []costs.Record{monthRecord(fixedCostsNow, "Amazon EC2", 1200.0)}},
 		Requests: 1,
 	})
 
-	// Pop the overlay back to the costs screen.
 	c.ApplyIntents([]runtime.UIIntent{runtime.PopScreen{}})
 
 	vs := c.Snapshot()
@@ -177,14 +139,6 @@ func TestCostsRound5_B_CostsLoadedWhileOverlayStacked_StillMergesIntoScreenBenea
 		t.Error("costs screen has zero rows after popping Help — the fetch result delivered while Help was on top was never merged")
 	}
 }
-
-// ===========================================================================
-// C — in-flight matching must include the requested RANGE, not just
-// CacheKey (same-shape different-range deliveries): fetch May
-// (week-granularity), zoom to June (same CacheKey, different Range) before
-// May's result lands, deliver May's result -> June must stay Loading;
-// deliver June's -> renders.
-// ===========================================================================
 
 func TestCostsRound5_C_InFlightMatch_IncludesRange_NotJustCacheKey(t *testing.T) {
 	c := newCostsController(t, fixedCostsNow)
@@ -215,9 +169,6 @@ func TestCostsRound5_C_InFlightMatch_IncludesRange_NotJustCacheKey(t *testing.T)
 		t.Fatal("precondition: May zoom-in did not set Loading")
 	}
 
-	// Zoom back out (trailing default, lands at the newest column per
-	// FR-002) WITHOUT ever delivering May's result, then move to June and
-	// zoom in again — same base query shape, different Range.
 	c.Apply(app.Action{Kind: app.ActionCostZoomOut})
 	monthTop := topDrill(t, c)
 	if monthTop.Granularity != costs.GranularityMonth {
@@ -243,8 +194,6 @@ func TestCostsRound5_C_InFlightMatch_IncludesRange_NotJustCacheKey(t *testing.T)
 		t.Fatalf("precondition broken: May/June queries have the SAME Range %+v — test needs them to differ", mayPayload.Query.Range)
 	}
 
-	// Deliver MAY's result while June is the awaited shape+range — must
-	// NOT clear Loading.
 	c.Handle(messages.CostsLoaded{
 		Query:    mayPayload.Query,
 		Grid:     costs.GridResult{Fetched: true, Records: []costs.Record{{Period: costs.Period{Start: "2026-05-04", End: "2026-05-05"}, Keys: []string{"Amazon EC2"}, Metrics: map[costs.Metric]costs.Amount{costs.MetricInvoice: {Value: 5, Unit: "USD"}}}}},
@@ -254,9 +203,8 @@ func TestCostsRound5_C_InFlightMatch_IncludesRange_NotJustCacheKey(t *testing.T)
 		t.Error("delivering May's result while June (same CacheKey, different Range) is awaited cleared Loading — in-flight matching must include the requested RANGE, not just CacheKey")
 	}
 
-	// Deliver JUNE's own (matching) result, fully tiling June's week window
-	// (Store.Lookup's lookupContained requires edge-to-edge daily coverage
-	// to resolve a week column at all) — Loading clears, grid renders.
+	// Store.Lookup's lookupContained requires edge-to-edge daily coverage to
+	// resolve a week column.
 	c.Handle(messages.CostsLoaded{
 		Query:    junePayload.Query,
 		Grid:     costs.GridResult{Fetched: true, Records: round5FullDailyRecords(t, juneWeekTop.Window, "Amazon EC2", 7)},
@@ -270,14 +218,6 @@ func TestCostsRound5_C_InFlightMatch_IncludesRange_NotJustCacheKey(t *testing.T)
 		t.Error("after June's result landed, the grid has zero rows")
 	}
 }
-
-// ===========================================================================
-// D (P2) — the demo transport must serve GetCostAndUsageWithResources:
-// resource-level drill in --demo returns synthetic per-resource costs
-// whose resource IDs reference existing demo fixture resources (e.g. the
-// demo EC2 instance IDs), so a future resource-detail jump lands on real
-// demo entities.
-// ===========================================================================
 
 func TestCostsRound5_D_DemoTransport_ServesGetCostAndUsageWithResources_RealFixtureIDs(t *testing.T) {
 	client := newDemoCostsClient()
@@ -311,13 +251,6 @@ func TestCostsRound5_D_DemoTransport_ServesGetCostAndUsageWithResources_RealFixt
 	}
 }
 
-// ===========================================================================
-// E (P2) — Enter on a RESOURCE_ID row must not be a dead end. See the file
-// header comment for the exact (deliberately minimal, flagged) observable
-// this pins: CostsBody.FooterNote, mirroring DrillRefusedReason's existing
-// "Enter did something observable" seam.
-// ===========================================================================
-
 // round5DrillToResourceRow drills SERVICE -> USAGE_TYPE -> RESOURCE_ID
 // (pinning serviceName at the root) and seeds exactly one RESOURCE_ID row
 // (resourceKey) at the bottom frame, cursor positioned on it.
@@ -336,9 +269,8 @@ func round5DrillToResourceRow(t *testing.T, serviceName, resourceKey string) *ap
 		t.Fatalf("precondition: expected USAGE_TYPE frame after first drill, got RowDim=%q", got)
 	}
 
-	// Loading gates Select unconditionally now (screen.Select's WaitForRows) —
-	// the USAGE_TYPE frame's own fetch must land before the next Enter, or
-	// it strictly no-ops instead of advancing.
+	// Loading gates Select (screen.Select's WaitForRows): the USAGE_TYPE
+	// frame's own fetch must land before the next Enter, or it no-ops.
 	drill1Payload, found := findFetchCostsTask(drill1Tasks)
 	if !found {
 		t.Fatal("precondition: SERVICE -> USAGE_TYPE drill did not emit a fetch task")
@@ -369,15 +301,6 @@ func round5DrillToResourceRow(t *testing.T, serviceName, resourceKey string) *ap
 	return c
 }
 
-// TestCostsRound5_E_ResourceRowEnter_SupportedService_NotSilentNoOp is
-// reconciled to round8's finding 3 (superseding this test's original
-// FooterNote-only contract): Enter on a mapped (EC2) resource row must
-// now navigate — emit a KindFetchByIDDetail task — rather than merely set
-// an observable footer note. See TestCostsRound8_Item3_
-// ResourceRowEnter_SupportedService_EmitsFetchByIDDetailTask in
-// costs_round8_test.go for the full traced rationale; this test keeps its
-// original name (still exercises the same drill-to-RESOURCE_ID scenario)
-// but now asserts the navigation task instead.
 func TestCostsRound5_E_ResourceRowEnter_SupportedService_NotSilentNoOp(t *testing.T) {
 	const demoEC2InstanceID = "i-0a1b2c3d4e5f60001"
 	c := round5DrillToResourceRow(t, "Amazon Elastic Compute Cloud - Compute", demoEC2InstanceID)
@@ -408,17 +331,9 @@ func TestCostsRound5_E_ResourceRowEnter_SupportedService_NotSilentNoOp(t *testin
 	}
 }
 
-// TestCostsRound5_E_ResourceRowEnter_UnsupportedService_DefinedBehavior_NotSilentNoOp
-// pins round7's NEW contract (superseding this test's original scenario):
-// CE's GetCostAndUsageWithResources only supports EC2
-// ("Amazon Elastic Compute Cloud - Compute" — round7, finding 2), so a
-// non-EC2 single-service drill is now refused at the USAGE_TYPE ->
-// RESOURCE_ID transition itself — the RESOURCE_ID frame is never reached,
-// so the original "seed a RESOURCE_ID row, Enter on it" scenario is
-// unreachable by design. round5DrillToResourceRow (still used, unchanged,
-// by the EC2 sibling test above) is deliberately NOT reused here, since
-// its own precondition (successfully reaching RESOURCE_ID) is exactly what
-// a non-EC2 service must now fail.
+// CE's GetCostAndUsageWithResources supports only EC2 ("Amazon Elastic
+// Compute Cloud - Compute"), so a non-EC2 single-service drill is refused
+// at the USAGE_TYPE -> RESOURCE_ID transition.
 func TestCostsRound5_E_ResourceRowEnter_UnsupportedService_DefinedBehavior_NotSilentNoOp(t *testing.T) {
 	c := newCostsController(t, fixedCostsNow)
 
@@ -436,10 +351,8 @@ func TestCostsRound5_E_ResourceRowEnter_UnsupportedService_DefinedBehavior_NotSi
 		t.Fatalf("precondition: expected drill stack depth 2 after the first drill, got %d", depth)
 	}
 
-	// Loading gates Select unconditionally now (screen.Select's
-	// WaitForRows) — the USAGE_TYPE frame's own fetch must land before the
-	// next Enter, or it strictly no-ops instead of even reaching the
-	// RESOURCE_ID refusal this test targets.
+	// Loading gates Select (screen.Select's WaitForRows): the USAGE_TYPE
+	// frame's own fetch must land before the next Enter, or it no-ops.
 	drill1Payload, found := findFetchCostsTask(drill1Tasks)
 	if !found {
 		t.Fatal("precondition: SERVICE -> USAGE_TYPE drill did not emit a fetch task")
@@ -452,9 +365,7 @@ func TestCostsRound5_E_ResourceRowEnter_UnsupportedService_DefinedBehavior_NotSi
 		Requests: 1,
 	})
 
-	// Enter on the USAGE_TYPE row with a non-EC2 SERVICE pinned: the drill
-	// to RESOURCE_ID must be refused honestly (FR-007), not attempted
-	// against CE (which would reject it) and not a silent no-op.
+	// CE rejects a RESOURCE_ID drill for a non-EC2 service.
 	vs, _ := c.Apply(app.Action{Kind: app.ActionSelect})
 
 	if depth := len(c.GetCostsDrillStack()); depth != 2 {
@@ -468,12 +379,7 @@ func TestCostsRound5_E_ResourceRowEnter_UnsupportedService_DefinedBehavior_NotSi
 	}
 }
 
-// ===========================================================================
-// F (P2) — anomaly cell-matching by Period.Start containment: a month-long
-// anomaly must mark the week/day column containing its start when drilled
-// in, not vanish because the anomaly's whole Period no longer fits inside
-// any single finer-granularity column.
-// ===========================================================================
+// A month-long anomaly marks the week/day column containing its start.
 
 func TestCostsRound5_F_AnomalyMatchesByPeriodStartContainment_NotFullContainment(t *testing.T) {
 	weekColumns := []costs.Period{
@@ -509,12 +415,9 @@ func TestCostsRound5_F_AnomalyMatchesByPeriodStartContainment_NotFullContainment
 	}
 }
 
-// ===========================================================================
-// G (P2) — delta semantics for negative rows must reflect the EFFECT ON
-// SPEND, not a naive signed percentage: -100 -> -50 (a credit/refund
-// shrinking) is spend GROWTH, -50 -> -100 (a credit growing) is a drop;
-// zero-crossing must render sanely too.
-// ===========================================================================
+// Delta for negative rows reflects the effect on spend: -100 -> -50 (a
+// credit shrinking) is spend growth, -50 -> -100 (a credit growing) is a
+// drop.
 
 func TestCostsRound5_G_DeltaSemantics_NegativeRows_ReflectSpendEffect(t *testing.T) {
 	window := []costs.Period{

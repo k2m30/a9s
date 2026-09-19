@@ -15,10 +15,6 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// ---------------------------------------------------------------------------
-// T021 - Test EC2 response parsing
-// ---------------------------------------------------------------------------
-
 func TestFetchEC2Instances_ParsesMultipleReservations(t *testing.T) {
 	launchTime := time.Date(2025, 1, 15, 10, 30, 0, 0, time.UTC)
 
@@ -96,7 +92,6 @@ func TestFetchEC2Instances_ParsesMultipleReservations(t *testing.T) {
 		t.Fatalf("expected 3 resources, got %d", len(resources))
 	}
 
-	// Verify first instance (running — PR-03b: Status is empty, state surfaced via Fields)
 	r0 := resources[0]
 	if r0.ID != "i-0001" {
 		t.Errorf("resource[0].ID: expected %q, got %q", "i-0001", r0.ID)
@@ -104,10 +99,8 @@ func TestFetchEC2Instances_ParsesMultipleReservations(t *testing.T) {
 	if r0.Name != "web-server-1" {
 		t.Errorf("resource[0].Name: expected %q, got %q", "web-server-1", r0.Name)
 	}
-	// PR-03b: fetcher no longer writes Resource.Status; lifecycle is in Fields["state"].
-	// A running instance carries no lifecycle finding. It does carry the
-	// ec2.public-ip posture finding, because this fixture has a public address
-	// and Fields["public_ip"] is asserted below.
+	// A running instance carries no lifecycle finding; its only finding is
+	// ec2.public-ip, earned by this fixture's public address.
 	if len(r0.Findings) != 1 || r0.Findings[0].Code != "ec2.public-ip" {
 		t.Errorf("resource[0].Findings: expected only ec2.public-ip for running instance, got %+v", r0.Findings)
 	}
@@ -115,7 +108,6 @@ func TestFetchEC2Instances_ParsesMultipleReservations(t *testing.T) {
 		t.Errorf("resource[0].Fields[\"state\"]: expected %q, got %q", "running", r0.Fields["state"])
 	}
 
-	// Verify second instance (stopped — no Server.* reason → CodeEC2StateStopped / SevWarn)
 	r1 := resources[1]
 	if r1.ID != "i-0002" {
 		t.Errorf("resource[1].ID: expected %q, got %q", "i-0002", r1.ID)
@@ -123,7 +115,6 @@ func TestFetchEC2Instances_ParsesMultipleReservations(t *testing.T) {
 	if r1.Name != "web-server-2" {
 		t.Errorf("resource[1].Name: expected %q, got %q", "web-server-2", r1.Name)
 	}
-	// PR-03b: fetcher no longer writes Resource.Status; stopped state → Finding emitted.
 	if len(r1.Findings) != 1 {
 		t.Fatalf("resource[1].Findings: expected 1 finding for stopped instance, got %d", len(r1.Findings))
 	}
@@ -134,7 +125,6 @@ func TestFetchEC2Instances_ParsesMultipleReservations(t *testing.T) {
 		t.Errorf("resource[1].Findings[0].Severity: expected SevWarn, got %v", r1.Findings[0].Severity)
 	}
 
-	// Verify third instance (running — no lifecycle finding)
 	r2 := resources[2]
 	if r2.ID != "i-0003" {
 		t.Errorf("resource[2].ID: expected %q, got %q", "i-0003", r2.ID)
@@ -142,8 +132,8 @@ func TestFetchEC2Instances_ParsesMultipleReservations(t *testing.T) {
 	if r2.Name != "api-server" {
 		t.Errorf("resource[2].Name: expected %q, got %q", "api-server", r2.Name)
 	}
-	// PR-03b: fetcher no longer writes Resource.Status. As with r0, the only
-	// finding is the ec2.public-ip posture signal this fixture's address earns.
+	// The only finding is the ec2.public-ip posture signal this fixture's address
+	// earns.
 	if len(r2.Findings) != 1 || r2.Findings[0].Code != "ec2.public-ip" {
 		t.Errorf("resource[2].Findings: expected only ec2.public-ip for running instance, got %+v", r2.Findings)
 	}
@@ -151,7 +141,6 @@ func TestFetchEC2Instances_ParsesMultipleReservations(t *testing.T) {
 		t.Errorf("resource[2].Fields[\"state\"]: expected %q, got %q", "running", r2.Fields["state"])
 	}
 
-	// Verify Fields contain the expected keys
 	requiredFields := []string{"instance_id", "name", "state", "type", "private_ip", "public_ip", "launch_time", "lifecycle"}
 	for i, r := range resources {
 		for _, key := range requiredFields {
@@ -161,7 +150,6 @@ func TestFetchEC2Instances_ParsesMultipleReservations(t *testing.T) {
 		}
 	}
 
-	// Verify specific field values on the first instance
 	if r0.Fields["instance_id"] != "i-0001" {
 		t.Errorf("resource[0].Fields[\"instance_id\"]: expected %q, got %q", "i-0001", r0.Fields["instance_id"])
 	}
@@ -175,7 +163,6 @@ func TestFetchEC2Instances_ParsesMultipleReservations(t *testing.T) {
 		t.Errorf("resource[0].Fields[\"public_ip\"]: expected %q, got %q", "54.1.2.3", r0.Fields["public_ip"])
 	}
 
-	// Second instance has no public IP - should be empty or "-"
 	if r1.Fields["public_ip"] != "" && r1.Fields["public_ip"] != "-" {
 		t.Errorf("resource[1].Fields[\"public_ip\"]: expected empty or \"-\", got %q", r1.Fields["public_ip"])
 	}
@@ -215,10 +202,6 @@ func TestFetchEC2Instances_EmptyResponse(t *testing.T) {
 		t.Errorf("expected 0 resources, got %d", len(resources))
 	}
 }
-
-// ---------------------------------------------------------------------------
-// T021b - Test EC2 InstanceLifecycle field parsing
-// ---------------------------------------------------------------------------
 
 func TestFetchEC2Instances_LifecycleSpot(t *testing.T) {
 	launchTime := time.Date(2025, 6, 1, 12, 0, 0, 0, time.UTC)

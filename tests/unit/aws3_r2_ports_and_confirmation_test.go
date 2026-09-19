@@ -2,11 +2,10 @@
 
 package unit
 
-// aws3_r2_ports_and_confirmation_test.go — three facts that are each read
-// from their field rather than computed from a rendered sentence or spelled
-// twice: the port list a security group leaves open, the number agreement in
-// a phrase declared with a bare "(s)", and whether an SNS endpoint confirmed
-// its subscription.
+// Three facts each read from their own field rather than computed from a
+// rendered sentence or spelled twice: the port list a security group leaves
+// open, the number agreement in a phrase declared with a bare "(s)", and
+// whether an SNS endpoint confirmed its subscription.
 
 import (
 	"context"
@@ -22,10 +21,6 @@ import (
 	awsclient "github.com/k2m30/a9s/v3/core/aws"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
-
-// ---------------------------------------------------------------------------
-// (1) the port list is a field, not a sentence to parse
-// ---------------------------------------------------------------------------
 
 type aws3SGFake struct{ groups []ec2types.SecurityGroup }
 
@@ -58,10 +53,8 @@ func aws3FetchSGs(t *testing.T, groups ...ec2types.SecurityGroup) []resource.Res
 	return out.Resources
 }
 
-// TestSGPublishesItsOpenPortsAsAField pins that the port list a group leaves
-// open is a field of its own. It was recoverable only by parsing the rendered
-// risk_summary sentence back apart, which made the wording a parse key: every
-// reword silently retired the reader.
+// The port list a group leaves open is a field of its own; parsing it back out
+// of the rendered risk_summary would make the wording a parse key.
 func TestSGPublishesItsOpenPortsAsAField(t *testing.T) {
 	rows := aws3FetchSGs(t, aws3SG("sg-0aaa111bbb222ccc1", 22, 22))
 	if got := rows[0].Fields["open_ports"]; got != "22" {
@@ -77,10 +70,9 @@ func TestSGPublishesItsOpenPortsAsAField(t *testing.T) {
 	}
 }
 
-// TestEC2ExposureReadsThePortListNotTheSentence rewords the cached group's
-// risk_summary and reads the instance's exposure finding back intact: the
-// cross-ref reads the port list, not the sentence, so a reworded phrase does
-// not answer "no ports" and silence the instance.
+// The EC2 exposure cross-ref reads the group's port list, not its risk_summary
+// sentence, so rewording the phrase cannot answer "no ports" and silence the
+// instance.
 func TestEC2ExposureReadsThePortListNotTheSentence(t *testing.T) {
 	const id = "i-0exposed0aaaaaa2"
 	sgRows := aws3FetchSGs(t, aws3SG("sg-0mongo000aaaaaa2", 27017, 27017))
@@ -107,10 +99,6 @@ func TestEC2ExposureReadsThePortListNotTheSentence(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// (2) a declared "(s)" agrees with its value, wherever it sits
-// ---------------------------------------------------------------------------
-
 // TestOnePortReadsAsOnePort pins the singular at the two surfaces that name a
 // port list: the group's own status cell and the instance's exposure phrase.
 func TestOnePortReadsAsOnePort(t *testing.T) {
@@ -125,10 +113,6 @@ func TestOnePortReadsAsOnePort(t *testing.T) {
 		t.Errorf("risk_summary = %q, want %q", got, "ports 3306, 3389 open to 0.0.0.0/0")
 	}
 }
-
-// ---------------------------------------------------------------------------
-// (3) one reading of the confirmation fact
-// ---------------------------------------------------------------------------
 
 // aws3SNSSubFake answers both subscription list calls with one subscription
 // whose SubscriptionArn AWS never filled in.
@@ -151,10 +135,8 @@ func aws3ArnlessSub() snstypes.Subscription {
 	}
 }
 
-// TestSubscriptionWithoutAnArnIsNotConfirmedOnEitherSurface pins the fact both
-// SNS subscription surfaces answer. AWS puts the state where the ARN goes, so
-// a subscription that came back with neither has confirmed nothing — and the
-// by-topic child said "Confirmed" because it read the ARN for itself.
+// AWS puts the state word where the ARN goes, so a subscription that came back
+// with neither has confirmed nothing, on either surface.
 func TestSubscriptionWithoutAnArnIsNotConfirmedOnEitherSurface(t *testing.T) {
 	fake := &aws3SNSSubFake{}
 

@@ -1,9 +1,5 @@
 package unit
 
-// codex2_round2_test.go — one owner of "which AWS-managed policies are
-// dangerous", one parse of a role's inline policy documents, and a demo IAM
-// fake that refuses a key the fixtures never registered.
-
 import (
 	"context"
 	"testing"
@@ -17,8 +13,6 @@ import (
 	"github.com/k2m30/a9s/v3/core/domain"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
-
-// ─── item 1 — the dangerous-policy set is matched by the AWS-owned ARN ──────
 
 type codex2RolePolicyFake struct {
 	awsclient.IAMAPI
@@ -49,10 +43,9 @@ func codex2FetchRolePolicy(t *testing.T, name, arn string) resource.Resource {
 	return res.Resources[0]
 }
 
-// TestRolePolicy_DangerousSetIsMatchedByTheAWSOwnedARN pins the fix for the
-// second dangerous-policy list: the child view matched by bare PolicyName, so
-// a customer-managed policy an operator happened to call AdministratorAccess
-// rendered red while carrying whatever permissions its account gave it.
+// A customer-managed policy can be named AdministratorAccess and carry
+// whatever permissions its account gives it; only the AWS-owned ARN identifies
+// the AWS-managed policy.
 func TestRolePolicy_DangerousSetIsMatchedByTheAWSOwnedARN(t *testing.T) {
 	for _, tc := range []struct {
 		name   string
@@ -82,13 +75,9 @@ func TestRolePolicy_DangerousSetIsMatchedByTheAWSOwnedARN(t *testing.T) {
 	}
 }
 
-// ─── item 2 — one parse of a role's inline policy documents ─────────────────
-
-// TestIAMRoles_InlineResourcesReadOffTheOneParse pins that policy_resources
-// comes off the same parsed document the privilege-escalation check reads.
-// The separate struct-based reader accepted only an array Statement, so a
-// role whose inline policy uses the bare-object form lost its resources and
-// the s3→role pivot behind that field went quiet.
+// An inline policy's Statement can be a bare object instead of an array; the
+// s3→role pivot reads policy_resources off the same parse the
+// privilege-escalation check uses.
 func TestIAMRoles_InlineResourcesReadOffTheOneParse(t *testing.T) {
 	const doc = `{"Version":"2012-10-17","Statement":{"Effect":"Allow","Action":"s3:GetObject","Resource":"arn:aws:s3:::acme-reports/*"}}`
 	fake := &codex2RoleFake{
@@ -106,13 +95,9 @@ func TestIAMRoles_InlineResourcesReadOffTheOneParse(t *testing.T) {
 	}
 }
 
-// ─── item 4 — the demo IAM fake refuses a key it does not hold ──────────────
-
-// TestDemoIAMFake_RefusesAKeyTheFixturesNeverRegistered pins the fake's
-// honesty rule: a GET for an entity the fixtures do not hold answers
-// NoSuchEntity, and a LIST for one does too. Answering an empty result made a
-// fixture gap read as "this principal has none", which is exactly the
-// confident zero the demo exists to disprove.
+// An empty answer for an entity the fixtures do not hold would make a fixture
+// gap read as "this principal has none", the confident zero the demo exists to
+// disprove.
 func TestDemoIAMFake_RefusesAKeyTheFixturesNeverRegistered(t *testing.T) {
 	f := fakes.NewIAM()
 	ctx := context.Background()
@@ -190,9 +175,8 @@ func TestDemoIAMFake_RefusesAKeyTheFixturesNeverRegistered(t *testing.T) {
 	}
 }
 
-// TestDemoIAMFake_StillAnswersForEveryRegisteredRole is the negative control:
-// "this principal exists and has none" is a real AWS answer and must stay an
-// empty list, not a refusal. Every role the fixtures hold must answer.
+// "This principal exists and has none" is a real AWS answer: an empty list,
+// not a refusal.
 func TestDemoIAMFake_StillAnswersForEveryRegisteredRole(t *testing.T) {
 	f := fakes.NewIAM()
 	ctx := context.Background()
@@ -214,10 +198,9 @@ func TestDemoIAMFake_StillAnswersForEveryRegisteredRole(t *testing.T) {
 	}
 }
 
-// TestDemoIAMFake_StillAnswersForEveryRegisteredPolicy pins the other half of
-// the honesty rule: a policy the fixture lists answers its entities lookup
-// (empty when it is attached to nothing), so the policy → roles pivot never
-// sees a not-found for a policy the list just showed.
+// A policy the fixture lists answers its entities lookup (empty when it is
+// attached to nothing), so the policy → roles pivot never sees a not-found for
+// a policy the list just showed.
 func TestDemoIAMFake_StillAnswersForEveryRegisteredPolicy(t *testing.T) {
 	ctx := context.Background()
 	f := fakes.NewIAM()

@@ -12,10 +12,6 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// ---------------------------------------------------------------------------
-// Mock — ElastiCacheDescribeReplicationGroupsAPI
-// ---------------------------------------------------------------------------
-
 type mockRedisRGClient struct {
 	output *elasticache.DescribeReplicationGroupsOutput
 	err    error
@@ -29,14 +25,8 @@ func (m *mockRedisRGClient) DescribeReplicationGroups(
 	return m.output, m.err
 }
 
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-// rgOutput wraps a single ReplicationGroup into a DescribeReplicationGroupsOutput.
-// Engine defaults to "redis" when unset so pre-existing tests don't need to
-// restate it. Tests that exercise the engine-filter path (valkey, memcached,
-// nil Engine) construct DescribeReplicationGroupsOutput directly.
+// rgOutput defaults Engine to "redis" when unset; engine-filter tests build
+// DescribeReplicationGroupsOutput directly.
 func rgOutput(rg elasticachetypes.ReplicationGroup) *elasticache.DescribeReplicationGroupsOutput {
 	if rg.Engine == nil {
 		rg.Engine = aws.String("redis")
@@ -46,11 +36,8 @@ func rgOutput(rg elasticachetypes.ReplicationGroup) *elasticache.DescribeReplica
 	}
 }
 
-// w2RedisHealthyPosture fills the four posture fields the batch added when a
-// fixture leaves them unset. These tests are about lifecycle and shard status,
-// so an unset encryption or backup field is "not what this test is about",
-// not "misconfigured" — without the default every one of them would also
-// assert three posture findings it never meant to describe.
+// w2RedisHealthyPosture fills the posture fields a fixture leaves unset, so
+// lifecycle and shard-status tests do not also assert posture findings.
 func w2RedisHealthyPosture(rg elasticachetypes.ReplicationGroup) elasticachetypes.ReplicationGroup {
 	if rg.AtRestEncryptionEnabled == nil {
 		rg.AtRestEncryptionEnabled = aws.Bool(true)
@@ -66,10 +53,6 @@ func w2RedisHealthyPosture(rg elasticachetypes.ReplicationGroup) elasticachetype
 	}
 	return rg
 }
-
-// ---------------------------------------------------------------------------
-// T001 — Healthy available: Fields["status"] == "" (Healthy silence)
-// ---------------------------------------------------------------------------
 
 func TestRedis_Fetch_HealthyAvailable(t *testing.T) {
 	mock := &mockRedisRGClient{
@@ -102,10 +85,6 @@ func TestRedis_Fetch_HealthyAvailable(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// T002 — Status=creating
-// ---------------------------------------------------------------------------
-
 func TestRedis_Fetch_StatusCreating(t *testing.T) {
 	mock := &mockRedisRGClient{
 		output: rgOutput(elasticachetypes.ReplicationGroup{
@@ -129,10 +108,6 @@ func TestRedis_Fetch_StatusCreating(t *testing.T) {
 		t.Errorf("Findings = %v, want one finding with Phrase %q", r.Findings, wantPhrase)
 	}
 }
-
-// ---------------------------------------------------------------------------
-// T003 — Status=modifying (with AutomaticFailover enabled — single warning)
-// ---------------------------------------------------------------------------
 
 func TestRedis_Fetch_StatusModifying(t *testing.T) {
 	mock := &mockRedisRGClient{
@@ -158,10 +133,6 @@ func TestRedis_Fetch_StatusModifying(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// T004 — Status=snapshotting
-// ---------------------------------------------------------------------------
-
 func TestRedis_Fetch_StatusSnapshotting(t *testing.T) {
 	mock := &mockRedisRGClient{
 		output: rgOutput(elasticachetypes.ReplicationGroup{
@@ -185,10 +156,6 @@ func TestRedis_Fetch_StatusSnapshotting(t *testing.T) {
 		t.Errorf("Findings = %v, want one finding with Phrase %q", r.Findings, wantPhrase)
 	}
 }
-
-// ---------------------------------------------------------------------------
-// T005 — Status=deleting
-// ---------------------------------------------------------------------------
 
 func TestRedis_Fetch_StatusDeleting(t *testing.T) {
 	mock := &mockRedisRGClient{
@@ -214,10 +181,6 @@ func TestRedis_Fetch_StatusDeleting(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// T006 — Status=create-failed (Broken)
-// ---------------------------------------------------------------------------
-
 func TestRedis_Fetch_StatusCreateFailed(t *testing.T) {
 	mock := &mockRedisRGClient{
 		output: rgOutput(elasticachetypes.ReplicationGroup{
@@ -241,10 +204,6 @@ func TestRedis_Fetch_StatusCreateFailed(t *testing.T) {
 		t.Errorf("Findings = %v, want one finding with Phrase %q", r.Findings, wantPhrase)
 	}
 }
-
-// ---------------------------------------------------------------------------
-// T007 — MultiAZ=enabled, AutomaticFailover=disabled (single warning)
-// ---------------------------------------------------------------------------
 
 func TestRedis_Fetch_MultiAZWithoutFailover(t *testing.T) {
 	mock := &mockRedisRGClient{
@@ -270,10 +229,6 @@ func TestRedis_Fetch_MultiAZWithoutFailover(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// T008 — MultiAZ=disabled, AutomaticFailover=disabled (single-AZ — no finding)
-// ---------------------------------------------------------------------------
-
 func TestRedis_Fetch_MultiAZDisabled_NoFinding(t *testing.T) {
 	mock := &mockRedisRGClient{
 		output: rgOutput(elasticachetypes.ReplicationGroup{
@@ -297,10 +252,6 @@ func TestRedis_Fetch_MultiAZDisabled_NoFinding(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// T009 — Multi-W1 (U7a): Status=modifying + MultiAZ without auto-failover
-// ---------------------------------------------------------------------------
-
 func TestRedis_Fetch_MultiW1_ModifyingPlusNoFailover(t *testing.T) {
 	mock := &mockRedisRGClient{
 		output: rgOutput(elasticachetypes.ReplicationGroup{
@@ -323,8 +274,7 @@ func TestRedis_Fetch_MultiW1_ModifyingPlusNoFailover(t *testing.T) {
 	if len(r.Findings) != 2 {
 		t.Fatalf("Findings len = %d, want 2; Findings = %v", len(r.Findings), r.Findings)
 	}
-	// Findings must be in §4 precedence order: alphabetical among warnings.
-	// "modifying — config change" < "multi-AZ without auto-failover" alphabetically.
+	// Warnings sort alphabetically by phrase.
 	if r.Findings[0].Phrase != "modifying \u2014 config change" {
 		t.Errorf("Findings[0].Phrase = %q, want %q", r.Findings[0].Phrase, "modifying \u2014 config change")
 	}
@@ -332,10 +282,6 @@ func TestRedis_Fetch_MultiW1_ModifyingPlusNoFailover(t *testing.T) {
 		t.Errorf("Findings[1].Phrase = %q, want %q", r.Findings[1].Phrase, "multi-AZ without auto-failover")
 	}
 }
-
-// ---------------------------------------------------------------------------
-// T010 — Column population: cluster_id, node_type, nodes, endpoint
-// ---------------------------------------------------------------------------
 
 func TestRedis_Fetch_PopulatesColumns(t *testing.T) {
 	mock := &mockRedisRGClient{
@@ -373,10 +319,6 @@ func TestRedis_Fetch_PopulatesColumns(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// T011 — Anti-test: no CloudWatch metric fields invented (Wave 3 out of scope)
-// ---------------------------------------------------------------------------
-
 func TestRedis_Wave3_NoMetricFieldsInvented(t *testing.T) {
 	mock := &mockRedisRGClient{
 		output: rgOutput(elasticachetypes.ReplicationGroup{
@@ -392,24 +334,17 @@ func TestRedis_Wave3_NoMetricFieldsInvented(t *testing.T) {
 	}
 	r := result.Resources[0]
 
-	// Wave 3 metric fields must NOT be populated by the Wave 1 fetcher.
 	forbiddenKeys := []string{"memory_pressure", "evictions", "replication_lag", "engine_cpu"}
 	for _, key := range forbiddenKeys {
 		if val, ok := r.Fields[key]; ok {
 			t.Errorf("Fields[%q] = %q should not exist — Wave 3 metrics are out of scope for Wave 1 fetcher", key, val)
 		}
 	}
-	// Verify status is still healthy-silence (no metric override).
 	if r.Fields["status"] != "" {
 		t.Errorf("Fields[\"status\"] = %q, want %q (healthy group)", r.Fields["status"], "")
 	}
 }
 
-// ---------------------------------------------------------------------------
-// §0b.1 — Engine filter: Valkey / Memcached / nil Engine RGs must be dropped
-// ---------------------------------------------------------------------------
-
-// rgOutputMulti wraps multiple ReplicationGroups into a DescribeReplicationGroupsOutput.
 func rgOutputMulti(rgs ...elasticachetypes.ReplicationGroup) *elasticache.DescribeReplicationGroupsOutput {
 	out := make([]elasticachetypes.ReplicationGroup, 0, len(rgs))
 	for _, rg := range rgs {
@@ -420,8 +355,6 @@ func rgOutputMulti(rgs ...elasticachetypes.ReplicationGroup) *elasticache.Descri
 	}
 }
 
-// TestRedis_Fetch_SkipsNonRedisEngines verifies that a Valkey RG is excluded
-// and only the Redis RG is returned. This is the regression pin for §0b.1.
 func TestRedis_Fetch_SkipsNonRedisEngines(t *testing.T) {
 	mock := &mockRedisRGClient{
 		output: rgOutputMulti(
@@ -450,8 +383,6 @@ func TestRedis_Fetch_SkipsNonRedisEngines(t *testing.T) {
 	}
 }
 
-// TestRedis_Fetch_MemcachedEngineFiltered verifies that a Memcached RG is
-// excluded and only the Redis RG is returned.
 func TestRedis_Fetch_MemcachedEngineFiltered(t *testing.T) {
 	mock := &mockRedisRGClient{
 		output: rgOutputMulti(
@@ -480,8 +411,6 @@ func TestRedis_Fetch_MemcachedEngineFiltered(t *testing.T) {
 	}
 }
 
-// TestRedis_Fetch_NilEngineFiltered verifies that a RG with Engine==nil is
-// treated as non-redis and dropped (defensive nil guard per §0b.1).
 func TestRedis_Fetch_NilEngineFiltered(t *testing.T) {
 	mock := &mockRedisRGClient{
 		output: rgOutputMulti(
@@ -510,7 +439,6 @@ func TestRedis_Fetch_NilEngineFiltered(t *testing.T) {
 	}
 }
 
-// resourceIDs returns the IDs of a slice of resources for error messages.
 func resourceIDs(rs []resource.Resource) []string {
 	ids := make([]string, len(rs))
 	for i, r := range rs {
@@ -519,11 +447,6 @@ func resourceIDs(rs []resource.Resource) []string {
 	return ids
 }
 
-// ---------------------------------------------------------------------------
-// §0b.4 — Shard-level signals for multi-shard RGs
-// ---------------------------------------------------------------------------
-
-// nodeGroup is a convenience constructor for an elasticachetypes.NodeGroup.
 func nodeGroup(id, status string) elasticachetypes.NodeGroup {
 	return elasticachetypes.NodeGroup{
 		NodeGroupId: aws.String(id),
@@ -531,11 +454,6 @@ func nodeGroup(id, status string) elasticachetypes.NodeGroup {
 	}
 }
 
-// TestRedis_Fetch_SingleShardModifying_UsesRGPhrase verifies that a single-shard
-// RG (NodeGroups==1) with Status=modifying uses the old RG-level phrase, not a
-// shard-scoped phrase. Single-shard behavior must be preserved.
-// NOTE: this test passes with the CURRENT code (no shard logic yet) because the
-// current code already emits the RG-level phrase for all modifying groups.
 func TestRedis_Fetch_SingleShardModifying_UsesRGPhrase(t *testing.T) {
 	mock := &mockRedisRGClient{
 		output: rgOutput(elasticachetypes.ReplicationGroup{
@@ -563,8 +481,6 @@ func TestRedis_Fetch_SingleShardModifying_UsesRGPhrase(t *testing.T) {
 	}
 }
 
-// TestRedis_Fetch_MultiShard_OneShardModifying verifies that a 3-shard RG with
-// only shard 0001 modifying emits a shard-scoped phrase.
 func TestRedis_Fetch_MultiShard_OneShardModifying(t *testing.T) {
 	mock := &mockRedisRGClient{
 		output: rgOutput(elasticachetypes.ReplicationGroup{
@@ -594,10 +510,6 @@ func TestRedis_Fetch_MultiShard_OneShardModifying(t *testing.T) {
 	}
 }
 
-// TestRedis_Fetch_MultiShard_TwoShardsTransitioning verifies that a 3-shard RG
-// with 0001 modifying and 0002 snapshotting emits the leading phrase with (+1).
-// Rule 7: top phrase is alphabetically first; hidden count is 1.
-// Alphabetical: "shard 0001: modifying" < "shard 0002: snapshotting".
 func TestRedis_Fetch_MultiShard_TwoShardsTransitioning(t *testing.T) {
 	mock := &mockRedisRGClient{
 		output: rgOutput(elasticachetypes.ReplicationGroup{
@@ -634,9 +546,6 @@ func TestRedis_Fetch_MultiShard_TwoShardsTransitioning(t *testing.T) {
 	}
 }
 
-// TestRedis_Fetch_MultiShard_AllShardAvailableButRGModifying verifies that when
-// all NodeGroups are available but the RG itself reports Status=modifying, the
-// fetcher falls back to the RG-level phrase (transient state).
 func TestRedis_Fetch_MultiShard_AllShardAvailableButRGModifying(t *testing.T) {
 	mock := &mockRedisRGClient{
 		output: rgOutput(elasticachetypes.ReplicationGroup{
@@ -667,10 +576,6 @@ func TestRedis_Fetch_MultiShard_AllShardAvailableButRGModifying(t *testing.T) {
 	}
 }
 
-// TestRedis_Fetch_MultiShard_ShardPlusMultiAZNoFailover verifies Rule 7 when
-// a shard-level phrase coexists with the multi-AZ without auto-failover warning.
-// Alphabetical: "multi-AZ without auto-failover" < "shard 0001: modifying"
-// ("multi" < "shard") → multi-AZ phrase is the top phrase; shard is hidden.
 func TestRedis_Fetch_MultiShard_ShardPlusMultiAZNoFailover(t *testing.T) {
 	mock := &mockRedisRGClient{
 		output: rgOutput(elasticachetypes.ReplicationGroup{
@@ -692,7 +597,6 @@ func TestRedis_Fetch_MultiShard_ShardPlusMultiAZNoFailover(t *testing.T) {
 	r := result.Resources[0]
 
 	// Alphabetical: "multi-AZ without auto-failover" < "shard 0001: modifying".
-	// Top phrase: "multi-AZ without auto-failover"; hidden count: 1.
 	const wantStatus = "multi-AZ without auto-failover (+1)"
 	if r.Fields["status"] != wantStatus {
 		t.Errorf("Fields[\"status\"] = %q, want %q", r.Fields["status"], wantStatus)

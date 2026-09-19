@@ -1,59 +1,3 @@
-// app_web_live_cold_boot_test.go — pins against the cache contract at
-// docs/design/cache-requirements.md (per-type files, load-before-save
-// invariant, scope and privacy rules).
-//
-//   - C1 ("show what you know"):
-//     TestWebBoot_AvailabilityCacheLoaded_AppliesCountsAndIssuesToMenu — the
-//     disk-cache counts/issue-badges reach the menu once the real
-//     messages.AvailabilityCacheLoaded event is processed.
-//   - C3 (one global updating flag):
-//     TestWebBoot_Refreshing_TrueDuringCacheSeededSweep_FalseOnComplete.
-//   - C4: the cold list-open Loading-shell controller-level precondition.
-//   - handleAvailabilityCacheLoaded never seeds disk rows into
-//     ProbeResources (single-page fixture);
-//     TestColdBoot_SeedsAllLoadedPages_PerTypeFile_InstantlySeedsBefore
-//     FetchCompletes extends it to the per-type-file, all-pages scope.
-//   - C7 (no merge logic): per-type files make merge-avoidance structural —
-//     a save physically only ever touches one type's file, so there is no
-//     "other types" data in scope to clobber.
-//     TestPerTypeSave_TouchingOneType_LeavesSiblingFilesByteExact.
-//   - C6 all-loaded-pages: TestAllLoadedPages_PersistBeyondFirstPage_InTypeFile
-//     and TestColdBoot_SeedsAllLoadedPages_PerTypeFile_InstantlySeedsBefore
-//     FetchCompletes.
-//   - C6 detail/related session-only:
-//     TestDetailAndRelatedState_NeverPersistedToDisk (structural, against
-//     TypeFile's schema) and
-//     TestColdBoot_SecondVisit_RelatedFanOutRerunsAfterRestart. Related
-//     blocks auto-populate as Loading placeholders on every detail-open
-//     regardless of history, so the pin is on CACHE state: a restarted
-//     controller dispatches the related fan-out task again for a resource
-//     visited in a prior process, proving nothing related-panel-shaped
-//     survived restart to short-circuit it.
-//   - C1 no TTL: TestAncientTypeFile_SeedsNormally_NoAgeDiscard, on
-//     TypeFile.SavedAt.
-//   - C6 scope boundary: TestChildAndFilteredLists_NeverWrittenToTypeFile
-//     pins "only the canonical top-level, unfiltered list... is persisted —
-//     child lists, related-navigation lists, and filtered views ... are
-//     never written to disk".
-//   - C6 render-time derivation:
-//     TestColorsGlyphsStatus_NotPersisted_DerivedAtRenderFromFieldsAndFindings
-//     pins "Colors, glyphs and status texts are NOT persisted... derived at
-//     render time".
-//   - C7 hard invariant: TestLoadBeforeSave_PairSwitch_NeverSavesBeforeLoad
-//     pins load-before-save at the runtime/controller level via a
-//     pair-switch scenario (Store is the only way to save — no Store, no
-//     save — so the runtime never calls a save-shaped path for a pair whose
-//     Store it has not obtained via LoadDir first).
-//   - C7b: TestNoCache_NeverLoadsPopulatedDir_NeverWritesFiles pins
-//     "--no-cache disables persisted load AND save entirely" at the
-//     controller level using session.NoCache.
-//   - C7a chokepoint audit: scans for cache.DirForTest(...) references and
-//     os.* primitives fed a cache.DirForTest(...)-derived path, outside
-//     core/cache.
-//   - C7a format-marker pin: TypeFile.Version is the pinned first field.
-//
-// All tests are hermetic: A9S_CONFIG_FOLDER redirected to t.TempDir(), no AWS
-// credentials, no network.
 package unit_test
 
 import (
@@ -79,10 +23,9 @@ import (
 	"github.com/k2m30/a9s/v3/core/session"
 )
 
-// newLiveWebStyleController builds a Controller the same way
-// core/web/construct.go newSession does for a LIVE (non-demo) session:
-// runtime.Bootstrap + app.New + SetUIMode("web") — no pre-supplied clients,
-// no synchronous demo handshake, s.NoCache left false (the live default).
+// newLiveWebStyleController builds a Controller the way core/web/construct.go's
+// newSession does for a live (non-demo) session: no pre-supplied clients and
+// s.NoCache false.
 func newLiveWebStyleController(t *testing.T, profile, region string) (*runtime.Core, *app.Controller) {
 	t.Helper()
 	core := runtime.Bootstrap(profile, region, resource.AllResourceTypes())
@@ -92,18 +35,6 @@ func newLiveWebStyleController(t *testing.T, profile, region string) (*runtime.C
 	return core, ctrl
 }
 
-// -----------------------------------------------------------------------
-// Contract A (GREEN precondition) — cache-loaded counts DO reach the menu
-// -----------------------------------------------------------------------
-
-// TestWebBoot_AvailabilityCacheLoaded_AppliesCountsAndIssuesToMenu locks in
-// the working half of the cache-load path: once ExecuteTask(TaskKindLoadAvailCache)'s
-// resulting messages.AvailabilityCacheLoaded event reaches Controller.Handle
-// (exactly what DrainSyncProgress does with BootstrapLive's returned tasks),
-// the menu DOES carry the cached counts and issue badges. This guards against
-// a future regression accidentally breaking the part that already works,
-// while Contract B below pins the part that is genuinely broken (Refreshing
-// staying false throughout the sweep this same event kicks off).
 func TestWebBoot_AvailabilityCacheLoaded_AppliesCountsAndIssuesToMenu(t *testing.T) {
 	t.Setenv("A9S_CONFIG_FOLDER", t.TempDir())
 	_, ctrl := newLiveWebStyleController(t, "", "us-east-1")
@@ -135,25 +66,6 @@ func TestWebBoot_AvailabilityCacheLoaded_AppliesCountsAndIssuesToMenu(t *testing
 	}
 }
 
-// -----------------------------------------------------------------------
-// Contract B — MenuBody.Refreshing must be observable during a cache-seeded
-// live sweep (C3's one-global-updating-flag half; the per-entry origin flag
-// half of round-2's C3 is intentionally NOT pinned in this file — it names
-// a NEW app-level view-state field the round-2 handoff did not specify a
-// signature for, so pinning it here would mean QA inventing that field.
-// Left for a follow-up dispatch once app.MenuEntry's origin-flag field name
-// is specified.)
-// -----------------------------------------------------------------------
-
-// TestWebBoot_Refreshing_TrueDuringCacheSeededSweep_FalseOnComplete pins
-// Contract B / the global-flag half of C3 against the real handler under
-// test: driving the actual messages.AvailabilityCacheLoaded event (what
-// ExecuteTask(TaskKindLoadAvailCache) produces) through Controller.Handle,
-// exactly as DrainSyncProgress does for BootstrapLive's returned tasks.
-//
-// The fixture seeds a REAL on-disk s3 file so the cache load has a type to
-// retain rows for, exercising the sweep-in-flight signal Contract B
-// describes end to end rather than an empty-seed shortcut.
 func TestWebBoot_Refreshing_TrueDuringCacheSeededSweep_FalseOnComplete(t *testing.T) {
 	t.Setenv("A9S_CONFIG_FOLDER", t.TempDir())
 	core, ctrl := newLiveWebStyleController(t, "webboot-refreshing-prof", "us-east-1")
@@ -183,14 +95,9 @@ func TestWebBoot_Refreshing_TrueDuringCacheSeededSweep_FalseOnComplete(t *testin
 		t.Fatal("Handle(AvailabilityCacheLoaded) returned nil Body.Menu")
 	}
 
-	// A disk-cache load against nil clients (this controller's state —
-	// newLiveWebStyleController never sets Clients) dispatches NO probe tasks;
-	// it only latches Session.AvailSweepPending. ClientsReady is what drains
-	// the first batch (fireNextAvailabilityProbes(4)) — mirror that real
-	// sequence here so the sweep this test's Refreshing assertion depends on
-	// is actually queued.
-	// Gen:1 — ConnectGen seeds at 1 (session.New()); this controller's session
-	// is never rotated.
+	// A disk-cache load against nil clients dispatches no probe tasks; it only
+	// latches Session.AvailSweepPending, and ClientsReady drains the first batch.
+	// Gen:1 — ConnectGen seeds at 1 and this session is never rotated.
 	vs, readyTasks := ctrl.Handle(messages.ClientsReady{Gen: 1})
 	tasks = append(tasks, readyTasks...)
 
@@ -209,9 +116,8 @@ func TestWebBoot_Refreshing_TrueDuringCacheSeededSweep_FalseOnComplete(t *testin
 		t.Error("MenuBody.Refreshing = false, want true — a cache-seeded live sweep with outstanding availability probes must show Refreshing=true so a polling browser sees it (C3), matching the live-smoke gap")
 	}
 
-	// Stamp the live AvailabilityGen — AcceptZeroGen()==false for
-	// AvailabilityChecked, so a Gen:0 event is unconditionally dropped as
-	// stale by Core.HandleEvent's IsStale guard.
+	// AvailabilityChecked.AcceptZeroGen() is false, so Gen must carry the live
+	// AvailabilityGen or Core.HandleEvent drops the event as stale.
 	liveGen := core.Session().AvailabilityGen
 
 	pending := tasks
@@ -240,16 +146,6 @@ func TestWebBoot_Refreshing_TrueDuringCacheSeededSweep_FalseOnComplete(t *testin
 	}
 }
 
-// -----------------------------------------------------------------------
-// Contract C — cold list-open Loading-shell precondition (C4, unchanged by
-// round-2, seam documentation)
-// -----------------------------------------------------------------------
-
-// TestWebBoot_ColdListOpen_ControllerLevel_ReturnsLoadingShellAndFetchTask
-// documents the GREEN half of Contract C / C4 at the controller level: on a
-// completely cold live-web-style controller (no ProbeResources, no
-// ResourceCache), Apply(open-list) already returns Loading=true in the same
-// snapshot as the KindFetchResources task.
 func TestWebBoot_ColdListOpen_ControllerLevel_ReturnsLoadingShellAndFetchTask(t *testing.T) {
 	t.Setenv("A9S_CONFIG_FOLDER", t.TempDir())
 	_, ctrl := newLiveWebStyleController(t, "", "us-east-1")
@@ -284,32 +180,10 @@ func TestWebBoot_ColdListOpen_ControllerLevel_ReturnsLoadingShellAndFetchTask(t 
 	}
 }
 
-// -----------------------------------------------------------------------
-// Contract D — disk-rows seeding at web boot (cache-load never seeds Rows)
-// -----------------------------------------------------------------------
-
-// TestWebBoot_AvailabilityCacheLoaded_CountsOnlyFallback_KeepsLoadingTrue pins
-// Contract D / C6a directly against the real handler: when
-// AvailabilityCacheLoaded carries a known count for a type but the on-disk
-// per-type Store has NO real row data for it (a counts-only projection —
-// e.g. a synthetic/legacy event, or a cold pair with a count but no
-// persisted rows file), handleAvailabilityCacheLoaded feeds RowStore's
-// counts-only observation (ObserveCountRows, C6a) and must NEVER fabricate
-// placeholder Rows — so a list opened immediately after shows Loading=true
-// with zero rows, not a seeded-but-fake page (docs/design/cache-requirements.md
-// C6a: "a counts-only observation... never touches a type's persisted Rows").
-//
-// See TestColdBoot_SeedsAllLoadedPages_PerTypeFile_InstantlySeedsBeforeFetch
-// Completes below for the REAL-disk-row seeding contract (Loading=false),
-// which is what a genuine warm/cold-boot-with-cache scenario exercises.
 func TestWebBoot_AvailabilityCacheLoaded_CountsOnlyFallback_KeepsLoadingTrue(t *testing.T) {
 	t.Setenv("A9S_CONFIG_FOLDER", t.TempDir())
 	_, ctrl := newLiveWebStyleController(t, "", "us-east-1")
 
-	// Models exactly what ExecuteTask(TaskKindLoadAvailCache) would produce
-	// from a counts-only projection with no per-type disk file backing it —
-	// no cache package type is referenced directly, so this stays isolated
-	// from the round-2 on-disk shape.
 	_, _ = ctrl.Handle(messages.AvailabilityCacheLoaded{
 		Entries: map[string]int{"ec2": 1},
 	})
@@ -328,27 +202,13 @@ func TestWebBoot_AvailabilityCacheLoaded_CountsOnlyFallback_KeepsLoadingTrue(t *
 	}
 }
 
-// -----------------------------------------------------------------------
-// Round-2 Contract F — per-type-file isolation (structural no-merge, C7)
-// -----------------------------------------------------------------------
-
-// perTypeCacheDir mirrors what cache.DirForTest(profile, region) will resolve to
-// under an A9S_CONFIG_FOLDER-redirected temp dir, for tests that need to
-// assert directly on directory/file existence without going through
-// cache.LoadDirForTest. Kept minimal and local to this file.
+// perTypeCacheDir returns the directory cache.DirForTest(profile, region)
+// resolves to under the redirected A9S_CONFIG_FOLDER.
 func perTypeCacheDir(t *testing.T, profile, region string) string {
 	t.Helper()
 	return cache.DirForTest(profile, region)
 }
 
-// TestPerTypeSave_TouchingOneType_LeavesSiblingFilesByteExact pins round-2's
-// structural no-merge story: "The cache is a directory per profile+region
-// containing one self-contained file per resource type... Saving writes
-// ONLY the touched type's file... a session that only touched s3 physically
-// cannot disturb another type's file." Unlike round-1's whole-state-save
-// test, this is checkable at the FILESYSTEM level: ec2's file's bytes must
-// be byte-identical before and after an s3-only save, because a per-type
-// save mechanically has no code path that could open ec2's file at all.
 func TestPerTypeSave_TouchingOneType_LeavesSiblingFilesByteExact(t *testing.T) {
 	tmp := t.TempDir()
 	t.Setenv("A9S_CONFIG_FOLDER", tmp)
@@ -388,7 +248,6 @@ func TestPerTypeSave_TouchingOneType_LeavesSiblingFilesByteExact(t *testing.T) {
 		t.Fatalf("reading ec2 type file before the s3-only save: %v", err)
 	}
 
-	// A fresh session for the SAME pair: load, touch ONLY s3, save ONLY s3.
 	store2 := cache.LoadDirForTest("merge-prof", "us-east-1")
 	if store2 == nil {
 		t.Fatal("cache.LoadDirForTest returned nil on a populated directory")
@@ -431,15 +290,6 @@ func TestPerTypeSave_TouchingOneType_LeavesSiblingFilesByteExact(t *testing.T) {
 	}
 }
 
-// -----------------------------------------------------------------------
-// Round-2 — C6 "ALL loaded pages", re-pinned against per-type files
-// -----------------------------------------------------------------------
-
-// TestAllLoadedPages_PersistBeyondFirstPage_InTypeFile pins the blunt scope
-// of C6 against the new per-type-file surface directly: a TypeFile.Rows
-// slice built from 55 fetched rows (50 + a 5-row load-more) must round-trip
-// through Put+SaveType+LoadDir with all 55 rows intact, including their
-// per-row Findings.
 func TestAllLoadedPages_PersistBeyondFirstPage_InTypeFile(t *testing.T) {
 	tmp := t.TempDir()
 	t.Setenv("A9S_CONFIG_FOLDER", tmp)
@@ -469,11 +319,6 @@ func TestAllLoadedPages_PersistBeyondFirstPage_InTypeFile(t *testing.T) {
 	}
 }
 
-// TestColdBoot_SeedsAllLoadedPages_PerTypeFile_InstantlySeedsBeforeFetch
-// Completes pins the cold-boot half of C6's "all pages" scope against the
-// per-type-file surface: a TypeFile carrying 55 rows for s3 must seed a
-// freshly-booted controller's list-open with all 55 rows instantly
-// (Loading=false, Refreshing=true) before any live fetch completes.
 func TestColdBoot_SeedsAllLoadedPages_PerTypeFile_InstantlySeedsBeforeFetchCompletes(t *testing.T) {
 	tmp := t.TempDir()
 	t.Setenv("A9S_CONFIG_FOLDER", tmp)
@@ -534,17 +379,9 @@ func TestColdBoot_SeedsAllLoadedPages_PerTypeFile_InstantlySeedsBeforeFetchCompl
 	}
 }
 
-// -----------------------------------------------------------------------
-// Round-2 — C6 render-time derivation of colors/glyphs/status
-// -----------------------------------------------------------------------
-
-// TestColorsGlyphsStatus_NotPersisted_TypeFileHasNoSuchFields pins the
-// round-2 addition to C6: "Colors, glyphs and status texts are NOT
-// persisted; they are derived at render time from the persisted fields +
-// findings". This is a structural pin via reflection on cache.Row: it must
-// carry only ID/Name/Fields/Findings — no color/glyph/status/decorator
-// field of any kind — so a future classification-rules change never
-// requires a cache migration.
+// cache.Row carries only ID/Name/Fields/Findings: colors, glyphs and status are
+// derived at render time, so a classification-rules change never requires a
+// cache migration.
 func TestColorsGlyphsStatus_NotPersisted_TypeFileHasNoSuchFields(t *testing.T) {
 	rt := reflect.TypeOf(cache.Row{})
 	forbidden := []string{"color", "glyph", "status", "decorator"}
@@ -558,18 +395,6 @@ func TestColorsGlyphsStatus_NotPersisted_TypeFileHasNoSuchFields(t *testing.T) {
 	}
 }
 
-// -----------------------------------------------------------------------
-// Round-2 — C6 scope boundary: only the canonical top-level list persists
-// -----------------------------------------------------------------------
-
-// TestChildAndFilteredLists_NeverWrittenToTypeFile pins: "only the
-// canonical top-level, unfiltered list of a type is persisted — child
-// lists, related-navigation lists, and filtered views are session views
-// over that data and are never written to disk (they must not poison the
-// type's cache)." Modeled by opening a CHILD list (ParentContext set) for a
-// type, landing resources on it, and asserting no save occurs for that
-// child context — the top-level type's file (if any existed) must be
-// unaffected, and no new file must appear for the child scope.
 func TestChildAndFilteredLists_NeverWrittenToTypeFile(t *testing.T) {
 	tmp := t.TempDir()
 	t.Setenv("A9S_CONFIG_FOLDER", tmp)
@@ -581,9 +406,6 @@ func TestChildAndFilteredLists_NeverWrittenToTypeFile(t *testing.T) {
 	ctrl := newBlessedController(t, core)
 	t.Cleanup(ctrl.Close)
 
-	// Push a CHILD list screen directly (ParentContext set), bypassing the
-	// normal top-level ActionCommand open, mirroring how a drill-down child
-	// view is modeled at the controller level.
 	ctrl.ApplyIntents([]runtime.UIIntent{
 		runtime.PushScreen{
 			ID:      runtime.ScreenChildList,
@@ -601,17 +423,6 @@ func TestChildAndFilteredLists_NeverWrittenToTypeFile(t *testing.T) {
 	}
 }
 
-// -----------------------------------------------------------------------
-// Round-2 Contract H — C6 detail/related state is session-only, never
-// persisted (structural), plus the FIXED cache-state pin for restart
-// -----------------------------------------------------------------------
-
-// TestDetailAndRelatedState_NeverPersistedToDisk pins the session-only half
-// of C6 structurally: cache.TypeFile carries no field that could represent
-// detail-screen or related-panel data (no field name containing "detail" or
-// "related" anywhere on the type), so no implementation of SaveType could
-// accidentally persist it without adding such a field first — which this
-// test would then catch.
 func TestDetailAndRelatedState_NeverPersistedToDisk(t *testing.T) {
 	rt := reflect.TypeOf(cache.TypeFile{})
 	forbidden := []string{"detail", "related"}
@@ -625,24 +436,15 @@ func TestDetailAndRelatedState_NeverPersistedToDisk(t *testing.T) {
 	}
 }
 
-// TestColdBoot_SecondVisit_RelatedFanOutRerunsAfterRestart pins CACHE state
-// rather than panel emptiness (EnsureDetailState auto-populates Related
-// blocks as Loading placeholders on every detail-open regardless of history,
-// so asserting on panel emptiness is vacuous): a related-check result cached
-// in-session (via Core.RelatedCacheSet, the same seam handleRelatedCheckBatch
-// writes through) for a given resource must NOT be visible to a brand-new
-// controller for the same profile+region — proving nothing related-panel-
-// shaped survives a restart, so the SAME resource's detail re-open on the
-// new controller has no cache hit to short-circuit the fan-out with (i.e.
-// RelatedCacheGet on the new controller returns ok=false for the exact key
-// the old controller had populated).
+// EnsureDetailState fills Related blocks with Loading placeholders on every
+// detail-open, so panel emptiness proves nothing; the restart check is on
+// RelatedCacheGet.
 func TestColdBoot_SecondVisit_RelatedFanOutRerunsAfterRestart(t *testing.T) {
 	tmp := t.TempDir()
 	t.Setenv("A9S_CONFIG_FOLDER", tmp)
 
 	relatedCacheKey := runtime.RelatedCacheKey("ec2", "i-0restartvisit001")
 
-	// First "session": populate the related-check cache for one resource.
 	func() {
 		s := session.New()
 		s.Profile = "restart-prof"
@@ -656,7 +458,6 @@ func TestColdBoot_SecondVisit_RelatedFanOutRerunsAfterRestart(t *testing.T) {
 		}
 	}()
 
-	// "Restart": brand-new session/core for the SAME profile+region.
 	s2 := session.New()
 	s2.Profile = "restart-prof"
 	s2.Region = "us-east-1"
@@ -667,25 +468,8 @@ func TestColdBoot_SecondVisit_RelatedFanOutRerunsAfterRestart(t *testing.T) {
 	}
 }
 
-// -----------------------------------------------------------------------
-// Round-2 — C7 hard invariant: no save before that pair's directory has
-// been loaded this session
-// -----------------------------------------------------------------------
-
-// TestLoadBeforeSave_PairSwitch_NeverSavesBeforeLoad pins the HARD
-// INVARIANT: "no save for a profile+region may happen before that pair's
-// cache directory has been loaded (or declared absent/corrupt) in this
-// session — early-startup and pair-switch writes must never race the load
-// and wipe older knowledge." This is structural by construction on the new
-// Store API (Put/SaveType are methods ON a *Store, and the only way to
-// obtain one is LoadDir) — there is no package-level cache.SaveType(profile,
-// region, ...) that could be called without a prior LoadDir. This test pins
-// that structural guarantee still holds through a pair-switch at the
-// controller level: switching profile/region must not leave any file
-// written for the NEW pair until that pair's own LoadDir has actually run,
-// modeled here by asserting the new pair's directory does not exist
-// immediately after the switch intent, before any load/save task has been
-// processed.
+// No save for a profile+region may happen before that pair's cache directory
+// has been loaded this session; a *Store is obtainable only through LoadDir.
 func TestLoadBeforeSave_PairSwitch_NeverSavesBeforeLoad(t *testing.T) {
 	tmp := t.TempDir()
 	t.Setenv("A9S_CONFIG_FOLDER", tmp)
@@ -697,18 +481,12 @@ func TestLoadBeforeSave_PairSwitch_NeverSavesBeforeLoad(t *testing.T) {
 	ctrl := newBlessedController(t, core)
 	t.Cleanup(ctrl.Close)
 
-	// Establish pair A's directory via a real load+save round trip.
 	storeA := cache.LoadDirForTest("pair-a", "us-east-1")
 	storeA.Put("ec2", cache.TypeFile{HasResources: true, Count: 1})
 	if err := storeA.SaveType("ec2"); err != nil {
 		t.Fatalf("SaveType (pair A fixture): %v", err)
 	}
 
-	// Switch to pair B (never before seen) at the controller level. Per the
-	// invariant, nothing may be written for pair B's directory as a direct
-	// consequence of the switch intent alone — a save must wait for pair
-	// B's own LoadDir to run first (mirroring C9's "loads the new pair's
-	// file per C1" ordering).
 	core.SetProfile("pair-b")
 	core.SetRegion("us-west-2")
 	_ = ctrl
@@ -719,17 +497,6 @@ func TestLoadBeforeSave_PairSwitch_NeverSavesBeforeLoad(t *testing.T) {
 	}
 }
 
-// -----------------------------------------------------------------------
-// Round-2 Contract C7b — --no-cache disables persisted load AND save
-// -----------------------------------------------------------------------
-
-// TestNoCache_NeverLoadsPopulatedDir_NeverWritesFiles pins C7b: "--no-cache
-// disables persisted load AND save entirely (cold behavior every start,
-// nothing written)". Pre-populates a real per-type file for the pair, boots
-// a NoCache=true controller for that exact pair, drives a full open+fetch
-// cycle, and asserts (a) the pre-existing file's count never reaches the
-// menu (proving no load happened) and (b) the file on disk is byte-
-// unchanged (proving no save happened).
 func TestNoCache_NeverLoadsPopulatedDir_NeverWritesFiles(t *testing.T) {
 	tmp := t.TempDir()
 	t.Setenv("A9S_CONFIG_FOLDER", tmp)
@@ -781,14 +548,6 @@ func TestNoCache_NeverLoadsPopulatedDir_NeverWritesFiles(t *testing.T) {
 	}
 }
 
-// -----------------------------------------------------------------------
-// Round-2 — C1 "no TTL", re-pinned against TypeFile.SavedAt
-// -----------------------------------------------------------------------
-
-// TestAncientTypeFile_SeedsNormally_NoAgeDiscard pins C1's explicit,
-// deliberate no-TTL rule against the round-2 per-type SavedAt field: a
-// TypeFile with a SavedAt years in the past must seed the menu/list exactly
-// like a freshly-saved one would — nothing discards by age.
 func TestAncientTypeFile_SeedsNormally_NoAgeDiscard(t *testing.T) {
 	tmp := t.TempDir()
 	t.Setenv("A9S_CONFIG_FOLDER", tmp)
@@ -805,10 +564,8 @@ func TestAncientTypeFile_SeedsNormally_NoAgeDiscard(t *testing.T) {
 		t.Fatalf("SaveType: %v", err)
 	}
 
-	// Backdate the just-saved file's SavedAt by rewriting it through the
-	// same Store API (Put stamps SavedAt=now on every call per the
-	// architect's handoff, so backdating requires a second, explicit Put
-	// with SavedAt set, then a re-save).
+	// Put stamps SavedAt=now, so backdating needs a second Put with SavedAt set,
+	// then a re-save.
 	tf, ok := store.Type("s3")
 	if !ok {
 		t.Fatal(`store.Type("s3") missing after fixture save`)
@@ -862,41 +619,20 @@ func TestAncientTypeFile_SeedsNormally_NoAgeDiscard(t *testing.T) {
 	}
 }
 
-// -----------------------------------------------------------------------
-// Contract C7a — at-rest security seam: single chokepoint + format marker
-// -----------------------------------------------------------------------
-
 // cacheDiskAccessAllowlist lists "<repo-relative-path>:<os.*-func-name>" keys
-// that are legitimately allowed to reference a raw cache-path-derived disk
-// primitive outside the cache package (currently empty — every production
-// caller today goes through cache.LoadDirForTest/(*Store).SaveType). Mirrors
-// nonPaginatedAPIs's allowlist pattern in enrichment_pagination_audit_test.go:
-// additions require a justification comment at the call site, not silent
-// broadening.
+// allowed to reference a raw cache-path-derived disk primitive outside the
+// cache package. Each addition needs a justification comment at the call site.
 var cacheDiskAccessAllowlist = map[string]bool{}
 
-// cacheDiskPrimitives are the os-level calls C7a forbids outside
-// core/cache — direct filesystem access to a cache file's bytes or
-// path bypasses the single encode/decode chokepoint C7a requires.
+// cacheDiskPrimitives are the os-level calls forbidden outside core/cache:
+// direct access to a cache file's bytes or path bypasses the single
+// encode/decode chokepoint.
 var cacheDiskPrimitives = map[string]bool{
 	"ReadFile": true, "WriteFile": true, "Open": true,
 	"OpenFile": true, "Create": true, "Remove": true, "Rename": true,
 	"ReadDir": true, "Mkdir": true, "MkdirAll": true, "RemoveAll": true,
 }
 
-// TestCacheFileIO_OnlyThroughCachePackage_NoDirectDiskAccessElsewhere pins
-// C7a's single-chokepoint requirement, updated for round-2's directory-per-
-// pair layout: "every read and write of cache files goes through ONE
-// encode/decode pair inside the cache module — no other code touches their
-// bytes or paths". Source-grep AST audit (repo precedent:
-// TestNoSingleCallListAPIEnrichers) over every internal/ .go file
-// (excluding core/cache and _test.go files) for:
-//  1. any os.<primitive>(...) call whose argument expression textually
-//     references "cache." (catches os.ReadFile(cache.DirForTest(...)+...) and
-//     similar path-construction-then-raw-I/O patterns), and
-//  2. any direct reference to cache.DirForTest at all outside core/cache —
-//     resolving the per-pair directory path is itself the seam violation
-//     C7a rules out; only cache.LoadDirForTest/(*Store).SaveType may do it.
 func TestCacheFileIO_OnlyThroughCachePackage_NoDirectDiskAccessElsewhere(t *testing.T) {
 	_, thisFile, _, ok := goruntime.Caller(0)
 	if !ok {
@@ -953,8 +689,8 @@ func TestCacheFileIO_OnlyThroughCachePackage_NoDirectDiskAccessElsewhere(t *test
 			if !ok {
 				return true
 			}
-			// Case 2: any selector cache.DirForTest, anywhere in the file — even
-			// outside an os.* call — is itself the seam violation.
+			// Calling cache.DirForTest outside core/cache is itself a violation, even
+			// outside an os.* call.
 			if pkgIdent, isIdent := sel.X.(*ast.Ident); isIdent && pkgIdent.Name == "cache" && sel.Sel.Name == "DirForTest" {
 				key := baseName + ":cache.DirForTest"
 				if !cacheDiskAccessAllowlist[key] {
@@ -965,8 +701,8 @@ func TestCacheFileIO_OnlyThroughCachePackage_NoDirectDiskAccessElsewhere(t *test
 				return true
 			}
 
-			// Case 1: os.<primitive>(...) whose args textually reference
-			// "cache." — catches os.ReadFile(cache.DirForTest(...)+...) etc.
+			// An os.* primitive whose arguments reference "cache." touches a cache path
+			// directly.
 			pkgIdent, ok := sel.X.(*ast.Ident)
 			if !ok || pkgIdent.Name != "os" || !cacheDiskPrimitives[sel.Sel.Name] {
 				return true
@@ -999,12 +735,6 @@ func TestCacheFileIO_OnlyThroughCachePackage_NoDirectDiskAccessElsewhere(t *test
 	}
 }
 
-// TestTypeFile_FirstFieldIsFormatVersion pins C7a's format-marker
-// requirement against the round-2 per-type schema: "each file starts with a
-// format marker (the schema version)... version is a single integer". This
-// is a structural pin on cache.TypeFile's field order via reflection — the
-// first field must be an integer named "Version" serializing under a
-// yaml:"version" tag.
 func TestTypeFile_FirstFieldIsFormatVersion(t *testing.T) {
 	rt := reflect.TypeOf(cache.TypeFile{})
 	if rt.NumField() == 0 {
@@ -1024,22 +754,13 @@ func TestTypeFile_FirstFieldIsFormatVersion(t *testing.T) {
 	}
 }
 
-// TestCacheSchemaVersion_Exported pins that cache.SchemaVersion (the
-// current format marker value new saves must stamp) is exported and equals
-// 2 (per-finding FirstSeen is part of the on-disk schema).
+// Per-finding FirstSeen is part of the on-disk schema at version 2.
 func TestCacheSchemaVersion_Exported(t *testing.T) {
 	if cache.SchemaVersion != 2 {
 		t.Errorf("cache.SchemaVersion = %d, want 2", cache.SchemaVersion)
 	}
 }
 
-// -----------------------------------------------------------------------
-// small local helpers (kept file-local per this package's existing
-// convention of not sharing helpers across test files)
-// -----------------------------------------------------------------------
-
-// readFileForAudit reads a file's full contents as a string for
-// byte-comparison assertions.
 func readFileForAudit(t *testing.T, path string) (string, error) {
 	t.Helper()
 	data, err := os.ReadFile(path)
@@ -1049,26 +770,17 @@ func readFileForAudit(t *testing.T, path string) (string, error) {
 	return string(data), nil
 }
 
-// fileExistsForAudit reports whether path exists (any error, including
-// permission errors, is treated as "does not exist" for this audit's
-// purposes — a strict existence check is not required here since Save
-// failures are surfaced separately by their own error returns).
+// fileExistsForAudit treats any stat error as absent.
 func fileExistsForAudit(path string) bool {
 	_, err := os.Stat(path)
 	return err == nil
 }
 
-// dirExistsForAudit reports whether the directory at path exists.
 func dirExistsForAudit(path string) bool {
 	info, err := os.Stat(path)
 	return err == nil && info.IsDir()
 }
 
-// itoaColdBoot is a tiny local decimal formatter so this file has no
-// dependency on strconv beyond what's already imported elsewhere in the
-// package, mirroring itoaTest in runtime_cache_rows_exact_totals_test.go
-// (duplicated locally to avoid cross-file coupling to another test file's
-// helper lifetime, matching this package's existing convention).
 func itoaColdBoot(n int) string {
 	if n == 0 {
 		return "0"

@@ -34,8 +34,6 @@ func ecsSvcCheckerByTarget(t *testing.T, target string) resource.RelatedChecker 
 	return nil
 }
 
-// --- ECS Cluster checker (Pattern F — Fields-based) ---
-
 func TestRelated_ECSSvc_Cluster_FromFields(t *testing.T) {
 	checker := ecsSvcCheckerByTarget(t, "ecs")
 	res := resource.Resource{
@@ -63,8 +61,6 @@ func TestRelated_ECSSvc_Cluster_EmptyField(t *testing.T) {
 	}
 }
 
-// --- Target Groups checker (Pattern F — struct-based, LoadBalancers[].TargetGroupArn) ---
-
 func TestRelated_ECSSvc_TargetGroups_FromLoadBalancers(t *testing.T) {
 	tgArn := "arn:aws:elasticloadbalancing:us-east-1:123456789012:targetgroup/api-tg/abc123"
 	svc := ecstypes.Service{
@@ -90,7 +86,6 @@ func TestRelated_ECSSvc_TargetGroups_FromLoadBalancers(t *testing.T) {
 	if len(result.ResourceIDs()) != 1 {
 		t.Fatalf("ResourceIDs len = %d, want 1", len(result.ResourceIDs()))
 	}
-	// The name extracted from the ARN should be "api-tg"
 	if result.ResourceIDs()[0] != "api-tg" {
 		t.Errorf("ResourceIDs[0] = %q, want %q", result.ResourceIDs()[0], "api-tg")
 	}
@@ -131,8 +126,6 @@ func TestRelated_ECSSvc_TargetGroups_InvalidRawStruct(t *testing.T) {
 		t.Errorf("Count = %d, want -1 for invalid RawStruct", result.Count())
 	}
 }
-
-// --- CloudWatch Alarms checker (Pattern C — cache, ServiceName+ClusterName dimensions) ---
 
 func TestRelated_ECSSvc_Alarms_MatchServiceAndCluster(t *testing.T) {
 	serviceName := "api-service"
@@ -250,8 +243,6 @@ func TestRelated_ECSSvc_Alarms_EmptyServiceID(t *testing.T) {
 	}
 }
 
-// --- CloudFormation Stacks checker (Pattern C — cache, aws:cloudformation:stack-name tag) ---
-
 func TestRelated_ECSSvc_CFN_FromTags(t *testing.T) {
 	cfnRes := resource.Resource{
 		ID:   "my-stack",
@@ -339,11 +330,6 @@ func TestRelated_ECSSvc_CFN_CacheMissNoClients(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// ecs-svc→eb-rule (Pattern C+reverse: cache["eb-rule"] scan, EventPattern match)
-// ---------------------------------------------------------------------------
-
-// ecsSvcSourceResource builds an ECS service resource used as the parent.
 func ecsSvcSourceResource(serviceName, clusterName, taskDefARN string) resource.Resource {
 	return resource.Resource{
 		ID:   serviceName,
@@ -360,8 +346,6 @@ func ecsSvcSourceResource(serviceName, clusterName, taskDefARN string) resource.
 	}
 }
 
-// ecsEbRuleResource builds an eb-rule cache entry with an EventPattern that
-// references the given ECS service by group ("service:{svcName}") and cluster ARN.
 func ecsEbRuleResource(ruleName, svcName, clusterName string) resource.Resource {
 	pattern := `{"source":["aws.ecs"],"detail":{"group":["service:` + svcName + `"],"clusterArn":["arn:aws:ecs:us-east-1:123456789012:cluster/` + clusterName + `"]}}`
 	return resource.Resource{
@@ -374,7 +358,6 @@ func ecsEbRuleResource(ruleName, svcName, clusterName string) resource.Resource 
 	}
 }
 
-// ecsEbRuleResourceUnrelated builds an eb-rule cache entry for a different ECS service.
 func ecsEbRuleResourceUnrelated(ruleName string) resource.Resource {
 	pattern := `{"source":["aws.ecs"],"detail":{"group":["service:other-service"]}}`
 	return resource.Resource{
@@ -387,8 +370,6 @@ func ecsEbRuleResourceUnrelated(ruleName string) resource.Resource {
 	}
 }
 
-// TestRelated_ECSSvc_EbRule_Match verifies that an EventBridge rule whose EventPattern
-// references this ECS service by group name is returned with Count=1.
 func TestRelated_ECSSvc_EbRule_Match(t *testing.T) {
 	const svcName = "api-service"
 	const clusterName = "prod-cluster"
@@ -414,8 +395,6 @@ func TestRelated_ECSSvc_EbRule_Match(t *testing.T) {
 	}
 }
 
-// TestRelated_ECSSvc_EbRule_Match_Truncated verifies that IsTruncated propagates
-// to Truncated=true while Count still reflects found matches.
 func TestRelated_ECSSvc_EbRule_Match_Truncated(t *testing.T) {
 	const svcName = "api-service"
 	const clusterName = "prod-cluster"
@@ -439,8 +418,6 @@ func TestRelated_ECSSvc_EbRule_Match_Truncated(t *testing.T) {
 	}
 }
 
-// TestRelated_ECSSvc_EbRule_Empty verifies that a cache containing only unrelated
-// rules returns Count=0.
 func TestRelated_ECSSvc_EbRule_Empty(t *testing.T) {
 	const svcName = "api-service"
 	const clusterName = "prod-cluster"
@@ -459,8 +436,7 @@ func TestRelated_ECSSvc_EbRule_Empty(t *testing.T) {
 	}
 }
 
-// TestRelated_ECSSvc_EbRule_FetchFilter verifies that the checker does NOT populate
-// FetchFilter — reverse-scan checkers must not set FetchFilter (Fix 3).
+// Reverse-scan checkers leave FetchFilter unset.
 func TestRelated_ECSSvc_EbRule_FetchFilter(t *testing.T) {
 	const svcName = "api-service"
 
@@ -476,12 +452,6 @@ func TestRelated_ECSSvc_EbRule_FetchFilter(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// ecs-svc→sfn (Pattern C+reverse: cache["sfn"] scan, sfnDescribe + ASL parse)
-// ---------------------------------------------------------------------------
-
-// fakeSFNForECSSvc satisfies awsclient.SFNAPI via embedding. Only DescribeStateMachine
-// is overridden — it returns the pre-configured output keyed by state machine ARN.
 type fakeSFNForECSSvc struct {
 	awsclient.SFNAPI
 	describeOutputByARN map[string]*sfnsvc.DescribeStateMachineOutput
@@ -499,7 +469,6 @@ func (f *fakeSFNForECSSvc) DescribeStateMachine(_ context.Context, input *sfnsvc
 	return &sfnsvc.DescribeStateMachineOutput{}, nil
 }
 
-// sfnResourceWithARN builds a cache entry for cache["sfn"] with an ARN in Fields.
 func sfnResourceWithARN(name, arn string) resource.Resource {
 	return resource.Resource{
 		ID:   name,
@@ -510,14 +479,10 @@ func sfnResourceWithARN(name, arn string) resource.Resource {
 	}
 }
 
-// sfnASLWithECSFamily returns an ASL definition JSON that contains a Task state
-// calling ecs:runTask with the given task definition family.
 func sfnASLWithECSFamily(family string) string {
 	return `{"Comment":"test","StartAt":"Run","States":{"Run":{"Type":"Task","Resource":"arn:aws:states:::ecs:runTask.sync","Parameters":{"TaskDefinition":"` + family + `","LaunchType":"FARGATE"},"End":true}}}`
 }
 
-// TestRelated_ECSSvc_SFN_Match verifies that a state machine whose ASL definition
-// references this service's task definition family is returned with Count=1.
 func TestRelated_ECSSvc_SFN_Match(t *testing.T) {
 	const svcName = "api-service"
 	const clusterName = "prod-cluster"
@@ -554,8 +519,6 @@ func TestRelated_ECSSvc_SFN_Match(t *testing.T) {
 	}
 }
 
-// TestRelated_ECSSvc_SFN_Empty verifies that a state machine with a non-matching
-// task family returns Count=0.
 func TestRelated_ECSSvc_SFN_Empty(t *testing.T) {
 	const taskDefARN = "arn:aws:ecs:us-east-1:123456789012:task-definition/api-task:5"
 	const sfnARN = "arn:aws:states:us-east-1:123456789012:stateMachine:other-pipeline"
@@ -583,8 +546,6 @@ func TestRelated_ECSSvc_SFN_Empty(t *testing.T) {
 	}
 }
 
-// TestRelated_ECSSvc_SFN_WrongRawStruct verifies that a wrong parent RawStruct
-// type returns Count=-1 (assertStruct guard).
 func TestRelated_ECSSvc_SFN_WrongRawStruct(t *testing.T) {
 	source := resource.Resource{
 		ID:        "api-service",
@@ -598,11 +559,6 @@ func TestRelated_ECSSvc_SFN_WrongRawStruct(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// ecs-svc→ecr (Pattern A: DescribeTaskDefinition → container image ECR URIs)
-// ---------------------------------------------------------------------------
-
-// ecsSvcWithTaskDef builds an ECS service resource with a TaskDefinition ARN set.
 func ecsSvcWithTaskDef(svcName, taskDefARN string) resource.Resource {
 	return resource.Resource{
 		ID:   svcName,
@@ -618,8 +574,6 @@ func ecsSvcWithTaskDef(svcName, taskDefARN string) resource.Resource {
 	}
 }
 
-// TestRelated_ECSSvc_ECR_Match verifies that when DescribeTaskDefinition returns
-// a container image referencing an ECR URI, the repo name is returned in ResourceIDs.
 func TestRelated_ECSSvc_ECR_Match(t *testing.T) {
 	const taskDefARN = "arn:aws:ecs:us-east-1:123456789012:task-definition/api-task:5"
 	const ecrImage = "123456789012.dkr.ecr.us-east-1.amazonaws.com/my-repo:v1.2.3"
@@ -647,8 +601,6 @@ func TestRelated_ECSSvc_ECR_Match(t *testing.T) {
 	}
 }
 
-// TestRelated_ECSSvc_ECR_NoECRImages verifies that when DescribeTaskDefinition
-// returns only non-ECR images (e.g. nginx:latest), Count=0.
 func TestRelated_ECSSvc_ECR_NoECRImages(t *testing.T) {
 	const taskDefARN = "arn:aws:ecs:us-east-1:123456789012:task-definition/api-task:5"
 
@@ -669,8 +621,6 @@ func TestRelated_ECSSvc_ECR_NoECRImages(t *testing.T) {
 	}
 }
 
-// TestRelated_ECSSvc_ECR_MultipleContainers verifies that when multiple containers
-// reference ECR images, all distinct repo names are returned.
 func TestRelated_ECSSvc_ECR_MultipleContainers(t *testing.T) {
 	const taskDefARN = "arn:aws:ecs:us-east-1:123456789012:task-definition/multi-task:3"
 
@@ -694,8 +644,6 @@ func TestRelated_ECSSvc_ECR_MultipleContainers(t *testing.T) {
 	}
 }
 
-// TestRelated_ECSSvc_ECR_NoTaskDef verifies that a service with no TaskDefinition
-// set returns Count=0 (not an error).
 func TestRelated_ECSSvc_ECR_NoTaskDef(t *testing.T) {
 	source := resource.Resource{
 		ID:     "api-service",
@@ -713,7 +661,6 @@ func TestRelated_ECSSvc_ECR_NoTaskDef(t *testing.T) {
 	}
 }
 
-// TestRelated_ECSSvc_ECR_NoClient verifies that nil/missing clients returns Count=-1.
 func TestRelated_ECSSvc_ECR_NoClient(t *testing.T) {
 	const taskDefARN = "arn:aws:ecs:us-east-1:123456789012:task-definition/api-task:5"
 
@@ -725,8 +672,6 @@ func TestRelated_ECSSvc_ECR_NoClient(t *testing.T) {
 	}
 }
 
-// TestRelated_ECSSvc_ECR_WrongRawStruct verifies that a wrong parent RawStruct
-// type returns Count=-1 (assertStruct guard).
 func TestRelated_ECSSvc_ECR_WrongRawStruct(t *testing.T) {
 	source := resource.Resource{
 		ID:        "api-service",
@@ -740,12 +685,6 @@ func TestRelated_ECSSvc_ECR_WrongRawStruct(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// ecs-svc→secrets (Pattern A: DescribeTaskDefinition → Secrets[].ValueFrom ARNs)
-// ---------------------------------------------------------------------------
-
-// TestRelated_ECSSvc_Secrets_Match verifies that secretsmanager ARNs in
-// Secrets[].ValueFrom are returned as ResourceIDs.
 func TestRelated_ECSSvc_Secrets_Match(t *testing.T) {
 	const taskDefARN = "arn:aws:ecs:us-east-1:123456789012:task-definition/api-task:5"
 	const secretARN = "arn:aws:secretsmanager:us-east-1:123456789012:secret:my-db-password-aBcDef"
@@ -782,8 +721,6 @@ func TestRelated_ECSSvc_Secrets_Match(t *testing.T) {
 	}
 }
 
-// TestRelated_ECSSvc_Secrets_RepositoryCredentials verifies that a
-// RepositoryCredentials.CredentialsParameter secretsmanager ARN is also returned.
 func TestRelated_ECSSvc_Secrets_RepositoryCredentials(t *testing.T) {
 	const taskDefARN = "arn:aws:ecs:us-east-1:123456789012:task-definition/api-task:5"
 	const credARN = "arn:aws:secretsmanager:us-east-1:123456789012:secret:ecr-creds-xYzAbC"
@@ -812,8 +749,6 @@ func TestRelated_ECSSvc_Secrets_RepositoryCredentials(t *testing.T) {
 	}
 }
 
-// TestRelated_ECSSvc_Secrets_NoSecrets verifies that a task definition with no
-// secret references returns Count=0.
 func TestRelated_ECSSvc_Secrets_NoSecrets(t *testing.T) {
 	const taskDefARN = "arn:aws:ecs:us-east-1:123456789012:task-definition/api-task:5"
 
@@ -833,8 +768,6 @@ func TestRelated_ECSSvc_Secrets_NoSecrets(t *testing.T) {
 	}
 }
 
-// TestRelated_ECSSvc_Secrets_NoTaskDef verifies that a service with no TaskDefinition
-// set returns Count=0 (not an error).
 func TestRelated_ECSSvc_Secrets_NoTaskDef(t *testing.T) {
 	source := resource.Resource{
 		ID:     "api-service",
@@ -852,7 +785,6 @@ func TestRelated_ECSSvc_Secrets_NoTaskDef(t *testing.T) {
 	}
 }
 
-// TestRelated_ECSSvc_Secrets_NoClient verifies that nil/missing clients returns Count=-1.
 func TestRelated_ECSSvc_Secrets_NoClient(t *testing.T) {
 	const taskDefARN = "arn:aws:ecs:us-east-1:123456789012:task-definition/api-task:5"
 
@@ -864,8 +796,6 @@ func TestRelated_ECSSvc_Secrets_NoClient(t *testing.T) {
 	}
 }
 
-// TestRelated_ECSSvc_Secrets_NonSMARNSkipped verifies that non-secretsmanager
-// ValueFrom values (e.g. SSM Parameter Store ARNs) are not returned.
 func TestRelated_ECSSvc_Secrets_NonSMARNSkipped(t *testing.T) {
 	const taskDefARN = "arn:aws:ecs:us-east-1:123456789012:task-definition/api-task:5"
 	const ssmARN = "arn:aws:ssm:us-east-1:123456789012:parameter/my-param"
@@ -890,12 +820,6 @@ func TestRelated_ECSSvc_Secrets_NonSMARNSkipped(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// ecs-svc→ct-events (Pattern C+reverse: cache scan, Resource.ResourceName contains svcName)
-// ---------------------------------------------------------------------------
-
-// TestRelated_ECSSvc_CTEvents_MatchByResourceName verifies that a CloudTrail
-// event referencing this service by name in Resources is returned.
 func TestRelated_ECSSvc_CTEvents_MatchByResourceName(t *testing.T) {
 	const svcName = "api-service"
 	evRes := resource.Resource{
@@ -934,8 +858,6 @@ func TestRelated_ECSSvc_CTEvents_MatchByResourceName(t *testing.T) {
 	}
 }
 
-// TestRelated_ECSSvc_CTEvents_NoMatch verifies Count=0 when no events reference
-// this service.
 func TestRelated_ECSSvc_CTEvents_NoMatch(t *testing.T) {
 	evRes := resource.Resource{
 		ID:   "evt-other",
@@ -960,8 +882,6 @@ func TestRelated_ECSSvc_CTEvents_NoMatch(t *testing.T) {
 	}
 }
 
-// TestRelated_ECSSvc_CTEvents_CacheMissNoClients verifies Count=-1 when the
-// ct-events cache is empty and no clients are available.
 func TestRelated_ECSSvc_CTEvents_CacheMissNoClients(t *testing.T) {
 	source := resource.Resource{ID: "api-service", Name: "api-service"}
 
@@ -973,7 +893,6 @@ func TestRelated_ECSSvc_CTEvents_CacheMissNoClients(t *testing.T) {
 	}
 }
 
-// TestRelated_ECSSvc_CTEvents_EmptyServiceID verifies Count=0 for empty service ID.
 func TestRelated_ECSSvc_CTEvents_EmptyServiceID(t *testing.T) {
 	source := resource.Resource{ID: "", Name: ""}
 
@@ -985,12 +904,6 @@ func TestRelated_ECSSvc_CTEvents_EmptyServiceID(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// ecs-svc→ecs-task (Pattern C — task.Group == "service:{svcName}")
-// ---------------------------------------------------------------------------
-
-// TestRelated_ECSSvc_Tasks_MatchByGroup verifies that tasks whose Group field
-// matches "service:{svcName}" are returned.
 func TestRelated_ECSSvc_Tasks_MatchByGroup(t *testing.T) {
 	const svcName = "api-service"
 	taskRes := resource.Resource{
@@ -1025,8 +938,6 @@ func TestRelated_ECSSvc_Tasks_MatchByGroup(t *testing.T) {
 	}
 }
 
-// TestRelated_ECSSvc_Tasks_NoMatch verifies Count=0 when no tasks match this
-// service's group.
 func TestRelated_ECSSvc_Tasks_NoMatch(t *testing.T) {
 	taskRes := resource.Resource{
 		ID:   "task-other",
@@ -1048,8 +959,6 @@ func TestRelated_ECSSvc_Tasks_NoMatch(t *testing.T) {
 	}
 }
 
-// TestRelated_ECSSvc_Tasks_CacheMissNoClients verifies Count=-1 when the
-// ecs-task cache is empty and no clients are available.
 func TestRelated_ECSSvc_Tasks_CacheMissNoClients(t *testing.T) {
 	source := resource.Resource{ID: "api-service", Name: "api-service"}
 
@@ -1061,12 +970,6 @@ func TestRelated_ECSSvc_Tasks_CacheMissNoClients(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// ecs-svc→subnet (Pattern F — NetworkConfiguration.AwsvpcConfiguration.Subnets)
-// ---------------------------------------------------------------------------
-
-// TestRelated_ECSSvc_Subnet_FromRawStruct verifies that subnets from the
-// service's AwsvpcConfiguration are returned.
 func TestRelated_ECSSvc_Subnet_FromRawStruct(t *testing.T) {
 	source := resource.Resource{
 		ID:   "api-service",
@@ -1096,8 +999,6 @@ func TestRelated_ECSSvc_Subnet_FromRawStruct(t *testing.T) {
 	}
 }
 
-// TestRelated_ECSSvc_Subnet_NoNetworkConfig verifies Count=0 when no
-// network configuration is set (e.g. bridge/host mode).
 func TestRelated_ECSSvc_Subnet_NoNetworkConfig(t *testing.T) {
 	source := resource.Resource{
 		ID:   "api-service",
@@ -1116,8 +1017,6 @@ func TestRelated_ECSSvc_Subnet_NoNetworkConfig(t *testing.T) {
 	}
 }
 
-// TestRelated_ECSSvc_Subnet_InvalidRawStruct verifies Count=-1 for a wrong
-// RawStruct type.
 func TestRelated_ECSSvc_Subnet_InvalidRawStruct(t *testing.T) {
 	source := resource.Resource{
 		ID:        "api-service",
@@ -1132,12 +1031,6 @@ func TestRelated_ECSSvc_Subnet_InvalidRawStruct(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// ecs-svc→vpc (Pattern C — subnet cache, Fields["vpc_id"] lookup)
-// ---------------------------------------------------------------------------
-
-// TestRelated_ECSSvc_VPC_MatchViaSubnetCache verifies that the VPC is resolved
-// by looking up the service's subnets in the subnet cache.
 func TestRelated_ECSSvc_VPC_MatchViaSubnetCache(t *testing.T) {
 	subnetRes := resource.Resource{
 		ID:     "subnet-aaa111",
@@ -1171,8 +1064,6 @@ func TestRelated_ECSSvc_VPC_MatchViaSubnetCache(t *testing.T) {
 	}
 }
 
-// TestRelated_ECSSvc_VPC_NoNetworkConfig verifies Count=0 when the service
-// has no NetworkConfiguration (bridge/host mode).
 func TestRelated_ECSSvc_VPC_NoNetworkConfig(t *testing.T) {
 	source := resource.Resource{
 		ID:   "api-service",
@@ -1191,8 +1082,6 @@ func TestRelated_ECSSvc_VPC_NoNetworkConfig(t *testing.T) {
 	}
 }
 
-// TestRelated_ECSSvc_VPC_CacheMissNoClients verifies Count=-1 when the
-// subnet cache is empty and no clients are available.
 func TestRelated_ECSSvc_VPC_CacheMissNoClients(t *testing.T) {
 	source := resource.Resource{
 		ID:   "api-service",
@@ -1215,7 +1104,6 @@ func TestRelated_ECSSvc_VPC_CacheMissNoClients(t *testing.T) {
 	}
 }
 
-// TestRelated_ECSSvc_VPC_InvalidRawStruct verifies Count=0 for a wrong RawStruct.
 func TestRelated_ECSSvc_VPC_InvalidRawStruct(t *testing.T) {
 	source := resource.Resource{
 		ID:        "api-service",
@@ -1230,11 +1118,6 @@ func TestRelated_ECSSvc_VPC_InvalidRawStruct(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// checkECSSvcSG — SecurityGroups from NetworkConfiguration.AwsvpcConfiguration (Pattern F)
-// ---------------------------------------------------------------------------
-
-// TestRelated_ECSSvc_SG_Found verifies that SG IDs from AwsvpcConfiguration are returned.
 func TestRelated_ECSSvc_SG_Found(t *testing.T) {
 	source := resource.Resource{
 		ID:   "api-service",
@@ -1264,7 +1147,6 @@ func TestRelated_ECSSvc_SG_Found(t *testing.T) {
 	}
 }
 
-// TestRelated_ECSSvc_SG_NilNetworkConfiguration verifies Count=0 when NetworkConfiguration is nil.
 func TestRelated_ECSSvc_SG_NilNetworkConfiguration(t *testing.T) {
 	source := resource.Resource{
 		ID:   "api-service",
@@ -1283,7 +1165,6 @@ func TestRelated_ECSSvc_SG_NilNetworkConfiguration(t *testing.T) {
 	}
 }
 
-// TestRelated_ECSSvc_SG_WrongRawStruct verifies Count=-1 when RawStruct is not an ECS Service.
 func TestRelated_ECSSvc_SG_WrongRawStruct(t *testing.T) {
 	source := resource.Resource{
 		ID:        "api-service",
@@ -1298,12 +1179,6 @@ func TestRelated_ECSSvc_SG_WrongRawStruct(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// checkECSSvcLogs — task def family → log group prefix match (Pattern N)
-// ---------------------------------------------------------------------------
-
-// TestRelated_ECSSvc_Logs_MatchByFamily verifies that log groups containing the
-// task definition family name are returned.
 func TestRelated_ECSSvc_Logs_MatchByFamily(t *testing.T) {
 	const family = "api-task"
 	logRes := resource.Resource{
@@ -1333,8 +1208,6 @@ func TestRelated_ECSSvc_Logs_MatchByFamily(t *testing.T) {
 	}
 }
 
-// TestRelated_ECSSvc_Logs_NoMatchDifferentFamily verifies Count=0 when log group names
-// do not contain the task definition family.
 func TestRelated_ECSSvc_Logs_NoMatchDifferentFamily(t *testing.T) {
 	logRes := resource.Resource{
 		ID:   "/aws/ecs/other-task",
@@ -1360,7 +1233,6 @@ func TestRelated_ECSSvc_Logs_NoMatchDifferentFamily(t *testing.T) {
 	}
 }
 
-// TestRelated_ECSSvc_Logs_NilTaskDef verifies Count=0 when TaskDefinition is nil.
 func TestRelated_ECSSvc_Logs_NilTaskDef(t *testing.T) {
 	source := resource.Resource{
 		ID:   "api-service",
@@ -1379,7 +1251,6 @@ func TestRelated_ECSSvc_Logs_NilTaskDef(t *testing.T) {
 	}
 }
 
-// TestRelated_ECSSvc_Logs_NilCache verifies Count=-1 when cache is empty and clients nil.
 func TestRelated_ECSSvc_Logs_NilCache(t *testing.T) {
 	source := resource.Resource{
 		ID:   "api-service",
@@ -1398,8 +1269,6 @@ func TestRelated_ECSSvc_Logs_NilCache(t *testing.T) {
 	}
 }
 
-// TestRelated_ECSSvc_Logs_TruncatedCacheNoMatch verifies Truncated=true when
-// cache is truncated and no log groups match.
 func TestRelated_ECSSvc_Logs_TruncatedCacheNoMatch(t *testing.T) {
 	logRes := resource.Resource{
 		ID:   "/aws/ecs/other-task",
@@ -1428,12 +1297,6 @@ func TestRelated_ECSSvc_Logs_TruncatedCacheNoMatch(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// checkECSSvcELB — two-hop TG→ELB lookup (Pattern F+C)
-// ---------------------------------------------------------------------------
-
-// TestRelated_ECSSvc_ELB_FoundViaTG verifies the two-hop TG→ELB resolution:
-// service LoadBalancers → TG ARN → ELB ARN.
 func TestRelated_ECSSvc_ELB_FoundViaTG(t *testing.T) {
 	const tgARN = "arn:aws:elasticloadbalancing:us-east-1:123456789012:targetgroup/api-tg/abc123"
 	const elbARN = "arn:aws:elasticloadbalancing:us-east-1:123456789012:loadbalancer/app/api-alb/xyz789"
@@ -1446,9 +1309,8 @@ func TestRelated_ECSSvc_ELB_FoundViaTG(t *testing.T) {
 			LoadBalancerArns: []string{elbARN},
 		},
 	}
-	// elb.go's fetcher assigns ID: lbName (bare name, not ARN) — the checker
-	// per ecs-svc.md:66 must cross-reference by Fields["load_balancer_arn"],
-	// not by matching the bare ID against the full LoadBalancerArns ARN.
+	// The elb fetcher keys rows by bare load balancer name, so the checker
+	// cross-references Fields["load_balancer_arn"].
 	elbRes := resource.Resource{
 		ID:     "api-alb",
 		Name:   "api-alb",
@@ -1480,7 +1342,6 @@ func TestRelated_ECSSvc_ELB_FoundViaTG(t *testing.T) {
 	}
 }
 
-// TestRelated_ECSSvc_ELB_NoLoadBalancers verifies Count=0 when service has no LoadBalancers.
 func TestRelated_ECSSvc_ELB_NoLoadBalancers(t *testing.T) {
 	source := resource.Resource{
 		ID:   "api-service",
@@ -1499,8 +1360,6 @@ func TestRelated_ECSSvc_ELB_NoLoadBalancers(t *testing.T) {
 	}
 }
 
-// TestRelated_ECSSvc_ELB_TGInCacheButNoELBMatch verifies Count=0 when TG cache is
-// populated but no ELB ARN matches.
 func TestRelated_ECSSvc_ELB_TGInCacheButNoELBMatch(t *testing.T) {
 	const tgARN = "arn:aws:elasticloadbalancing:us-east-1:123456789012:targetgroup/api-tg/abc123"
 	const elbARN = "arn:aws:elasticloadbalancing:us-east-1:123456789012:loadbalancer/app/api-alb/xyz789"
@@ -1514,8 +1373,6 @@ func TestRelated_ECSSvc_ELB_TGInCacheButNoELBMatch(t *testing.T) {
 			LoadBalancerArns: []string{elbARN},
 		},
 	}
-	// ELB cache has only a different ELB — matched by Fields["load_balancer_arn"]
-	// per ecs-svc.md:66, not by bare ID.
 	elbRes := resource.Resource{
 		ID:     "other-alb",
 		Name:   "other-alb",
@@ -1544,7 +1401,6 @@ func TestRelated_ECSSvc_ELB_TGInCacheButNoELBMatch(t *testing.T) {
 	}
 }
 
-// TestRelated_ECSSvc_ELB_NilTGCache verifies Count=0 when TG cache is empty and clients nil.
 func TestRelated_ECSSvc_ELB_NilTGCache(t *testing.T) {
 	const tgARN = "arn:aws:elasticloadbalancing:us-east-1:123456789012:targetgroup/api-tg/abc123"
 	source := resource.Resource{
@@ -1559,7 +1415,6 @@ func TestRelated_ECSSvc_ELB_NilTGCache(t *testing.T) {
 	}
 
 	checker := ecsSvcCheckerByTarget(t, "elb")
-	// nil clients + empty cache → tgList is nil → Count: 0
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 
 	if result.Count() != 0 {
@@ -1567,7 +1422,6 @@ func TestRelated_ECSSvc_ELB_NilTGCache(t *testing.T) {
 	}
 }
 
-// TestRelated_ECSSvc_ELB_WrongRawStruct verifies Count=0 when RawStruct is not an ECS Service.
 func TestRelated_ECSSvc_ELB_WrongRawStruct(t *testing.T) {
 	source := resource.Resource{
 		ID:        "api-service",
@@ -1585,5 +1439,5 @@ func TestRelated_ECSSvc_ELB_WrongRawStruct(t *testing.T) {
 // ensure elbv2types import is used
 var _ = elbv2types.TargetGroup{}
 
-// ensure awsclient import is still used
+// ensure awsclient import is used
 var _ = awsclient.ServiceClients{}

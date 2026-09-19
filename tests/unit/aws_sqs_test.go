@@ -11,10 +11,6 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// ---------------------------------------------------------------------------
-// SQS Queues fetcher tests (Pattern C: list + describe)
-// ---------------------------------------------------------------------------
-
 func TestFetchSQSQueues_ParsesMultipleQueues(t *testing.T) {
 	listMock := &fakeSQSListQueues{
 		Output: &sqs.ListQueuesOutput{
@@ -56,7 +52,6 @@ func TestFetchSQSQueues_ParsesMultipleQueues(t *testing.T) {
 		t.Fatalf("expected 2 resources, got %d", len(resources))
 	}
 
-	// Verify required fields exist
 	requiredFields := []string{"queue_name", "queue_url", "approx_messages", "approx_not_visible", "delay_seconds"}
 	for i, r := range resources {
 		for _, key := range requiredFields {
@@ -66,7 +61,6 @@ func TestFetchSQSQueues_ParsesMultipleQueues(t *testing.T) {
 		}
 	}
 
-	// Verify first queue
 	r0 := resources[0]
 	if r0.ID != "my-orders-queue" {
 		t.Errorf("resource[0].ID: expected %q, got %q", "my-orders-queue", r0.ID)
@@ -91,7 +85,6 @@ func TestFetchSQSQueues_ParsesMultipleQueues(t *testing.T) {
 		t.Errorf("resource[0].Fields[\"delay_seconds\"]: expected %q, got %q", "0", r0.Fields["delay_seconds"])
 	}
 
-	// Verify second queue
 	r1 := resources[1]
 	if r1.ID != "my-dlq" {
 		t.Errorf("resource[1].ID: expected %q, got %q", "my-dlq", r1.ID)

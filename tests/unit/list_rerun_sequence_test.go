@@ -1,11 +1,7 @@
-// list_rerun_sequence_test.go — listgen row 7. The enrichment-rerun reseed
-// decided which of two results for one list was newer by comparing enrichment
-// generations, a second counter answering the ordering question the per-type
-// request sequence already owns. The two disagree whenever the newer request
-// is not itself an enrichment rerun: pressing Ctrl+R and then `m` before the
-// refresh lands leaves the refresh's own result carrying the current
-// enrichment generation and a superseded request sequence, and the reseed
-// replaced the deeper page with it.
+// The enrichment-rerun reseed orders two results for one list by the
+// per-type request sequence, not by enrichment generation. Pressing Ctrl+R
+// and then `m` before the refresh lands leaves the refresh's result carrying
+// the current enrichment generation and a superseded request sequence.
 package unit
 
 import (
@@ -25,15 +21,12 @@ func TestRerunReseed_SupersededRequestNeverReseeds(t *testing.T) {
 	ctrl, core := newDetailParityHeadlessController(t)
 	_ = ctrl
 
-	// Ctrl+R: the rerun token is minted and the refetch dispatched.
 	typeGen := core.RefreshListEnrichment(listGenType)
 	if typeGen == 0 {
 		t.Fatalf("RefreshListEnrichment(%q) returned 0 — this type has no issue enricher, so the rerun branch is unreachable", listGenType)
 	}
 	refreshSeq := core.NextListFetchSeq(listGenScreen)
 
-	// The operator hits `m` before the refresh answers. The load-more takes
-	// the newer sequence and its page lands first.
 	loadMoreSeq := core.NextListFetchSeq(listGenScreen)
 	deep := listGenRows(6, "i-deep")
 	core.ObserveRows(listGenType, deep, &resource.PaginationMeta{IsTruncated: false}, session.OriginFetch, false)
@@ -41,8 +34,6 @@ func TestRerunReseed_SupersededRequestNeverReseeds(t *testing.T) {
 		t.Fatalf("load-more sequence %d did not outrank the refresh's %d", loadMoreSeq, refreshSeq)
 	}
 
-	// The refresh's own result arrives last, still carrying the enrichment
-	// generation the rerun branch matches on.
 	core.HandleResourcesLoaded(runtime.ResourcesLoadedEvent{
 		ResourceType: listGenType,
 		Resources:    listGenRows(2, "i-stale"),
@@ -61,8 +52,7 @@ func TestRerunReseed_SupersededRequestNeverReseeds(t *testing.T) {
 	}
 }
 
-// TestRerunReseed_LatestRequestStillReseeds is the negated form: when the
-// rerun IS the newest request, it reseeds as before, so the guard cannot be
+// When the rerun is the newest request it reseeds, so the guard cannot be
 // satisfied by refusing every rerun.
 func TestRerunReseed_LatestRequestStillReseeds(t *testing.T) {
 	_, core := newDetailParityHeadlessController(t)

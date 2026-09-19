@@ -18,20 +18,7 @@ import (
 
 // Per-finding FirstSeen persisted in the availability cache
 // (cache.Row.FindingFirstSeen), read back off the file the save wrote.
-//
-// A first observation time cannot be reconstructed once it is not recorded;
-// the pins below hold the stamping honest.
-//
-// Drives the real save path (newTestControllerAndCore + Controller.Apply +
-// Controller.ApplyResourcesLoaded, the same wiring
-// TestSaveResourceListCache_FindingsSurviveWiredSaveAndColdBootReseed in
-// app_pilot_defects_test.go exercises) so the carry/drop/reappear logic
-// inside Core.saveResourceListCache is what's actually under test, not a
-// hand-built cache.Row. Two "sweeps" against the SAME Controller/session
-// give saveResourceListCache's `existing, _ := store.Type(canon)` a real
-// previous generation to diff against, without a second Controller (every
-// test constructs the app through the one blessed helper — see
-// qa_controller_construction_discipline_test.go).
+// A first observation time cannot be reconstructed once it is not recorded.
 
 func TestCacheFirstSeen_PersistsAcrossSaves(t *testing.T) {
 	ctrl, _ := newTestControllerAndCore(t)
@@ -90,11 +77,9 @@ func TestCacheFirstSeen_ResolvedFindingDropsOut(t *testing.T) {
 		Code:     "s3-public-read",
 		Phrase:   "publicly readable",
 		Severity: domain.SevBroken,
-		// Source "wave1", not "wave2": a Wave-2-sourced finding's absence
-		// from an incoming row is legitimately carried forward by
-		// reconcileTypeFile's C6b Wave-2 carry (carryWave2ForRows) — that's
-		// the flicker guard, not a resolution. Only a Wave-1 finding's
-		// absence from the incoming row is a genuine resolution.
+		// A Wave-2 finding absent from an incoming row is carried forward
+		// (carryWave2ForRows, the flicker guard); only a Wave-1 finding's absence
+		// is a resolution.
 		Source: "wave1",
 	}
 	rowID := "bucket-fs-resolve"
@@ -117,7 +102,6 @@ func TestCacheFirstSeen_ResolvedFindingDropsOut(t *testing.T) {
 		t.Fatalf("save 1: FindingFirstSeen[%q] missing before resolution", finding.Code)
 	}
 
-	// The finding resolves: save 2 has the same row with no findings at all.
 	ctrl.ApplyResourcesLoaded("s3", []resource.Resource{{
 		ID:     rowID,
 		Name:   "fs-resolve-bucket",
@@ -144,11 +128,8 @@ func TestCacheFirstSeen_ReappearingFindingFreshStamp(t *testing.T) {
 		Code:     "s3-public-read",
 		Phrase:   "publicly readable",
 		Severity: domain.SevBroken,
-		// Source "wave1": see TestCacheFirstSeen_ResolvedFindingDropsOut —
-		// a Wave-2-sourced finding's absence from an incoming row would be
-		// carried forward by C6b instead of genuinely resolving, which
-		// would make the later reappearance indistinguishable from "never
-		// left".
+		// Wave-1: a carried-forward Wave-2 finding would make the reappearance
+		// indistinguishable from never having left.
 		Source: "wave1",
 	}
 	rowID := "bucket-fs-reappear"

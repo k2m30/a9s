@@ -1,16 +1,5 @@
 package unit
 
-// aws_ecr_enricher_test.go — Behavioral tests for EnrichECRRepository.
-//
-// Contract assertions:
-//   - DescribeImageScanFindings is called once per ECR resource (keyed by repository name).
-//   - Both repos have FindingSeverityCounts[CRITICAL]=0, [HIGH]=0 → 0 findings.
-//   - repo-1 has FindingSeverityCounts[CRITICAL]=2 → 1 finding for repo-1 sev "!".
-//   - repo-1 has FindingSeverityCounts[HIGH]=5 → 1 finding for repo-1 sev "~".
-//   - repo-1 returns ScanNotFoundException → 0 findings, NOT truncated (silently skipped).
-//   - clients.ECR == nil → (EnricherResult{Findings: non-nil empty}, nil).
-//   - Generic API error for a resource → 0 findings for that resource, Truncated=true, no error returned.
-
 import (
 	"context"
 	"errors"
@@ -24,15 +13,9 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// ecrScanFindingsFake implements ECRAPI for enrichment testing.
-// It embeds the aggregate interface and overrides only DescribeImageScanFindings.
-// The results map is keyed by repository name so the fake can serve different
-// responses per resource. errByRepo overrides results when set.
 type ecrScanFindingsFake struct {
 	awsclient.ECRAPI
-	// results maps repositoryName → ImageScanFindings.
-	results map[string]*ecrtypes.ImageScanFindings
-	// errByRepo maps repositoryName → error; overrides results when set.
+	results   map[string]*ecrtypes.ImageScanFindings
 	errByRepo map[string]error
 }
 
@@ -57,11 +40,9 @@ func (f *ecrScanFindingsFake) DescribeImageScanFindings(
 	return &ecrsvc.DescribeImageScanFindingsOutput{ImageScanFindings: findings}, nil
 }
 
-// DescribeImages is the path the post-rewrite EnrichECRRepository calls
-// (one DescribeImages per repo, reading ImageScanFindingsSummary inline).
-// The fake synthesises an ImageDetails entry whose ImageScanFindingsSummary
-// mirrors f.results[repo] so existing tests that populate `results` continue
-// to exercise the aggregate-severity path.
+// EnrichECRRepository reads ImageScanFindingsSummary from one DescribeImages
+// call per repo; the fake synthesises an ImageDetails entry whose summary
+// mirrors f.results[repo].
 func (f *ecrScanFindingsFake) DescribeImages(
 	_ context.Context,
 	in *ecrsvc.DescribeImagesInput,
@@ -92,10 +73,8 @@ func (f *ecrScanFindingsFake) DescribeImages(
 	}, nil
 }
 
-// Compile-time check: ecrScanFindingsFake satisfies ECRAPI.
 var _ awsclient.ECRAPI = (*ecrScanFindingsFake)(nil)
 
-// ecrRepoResources returns a slice of ECR Resource stubs with the given repository names.
 func ecrRepoResources(names ...string) []resource.Resource {
 	res := make([]resource.Resource, 0, len(names))
 	for _, name := range names {
@@ -114,8 +93,6 @@ func ecrRepoResources(names ...string) []resource.Resource {
 	return res
 }
 
-// ecrScanFindings builds an ImageScanFindings with the provided severity counts.
-// Pass string keys matching FindingSeverity values ("CRITICAL", "HIGH", etc.).
 func ecrScanFindings(counts map[string]int32) *ecrtypes.ImageScanFindings {
 	return &ecrtypes.ImageScanFindings{
 		FindingSeverityCounts: counts,
@@ -127,9 +104,6 @@ const (
 	ecrRepo2 = "my-service-worker"
 )
 
-// TestEnrichECRRepository_NoFindingsWhenAllCountsZero verifies that when both
-// repositories have FindingSeverityCounts[CRITICAL]=0 and [HIGH]=0, the enricher
-// produces 0 findings and IssueCount=0.
 func TestEnrichECRRepository_NoFindingsWhenAllCountsZero(t *testing.T) {
 	fake := &ecrScanFindingsFake{
 		results: map[string]*ecrtypes.ImageScanFindings{
@@ -158,9 +132,6 @@ func TestEnrichECRRepository_NoFindingsWhenAllCountsZero(t *testing.T) {
 	}
 }
 
-// TestEnrichECRRepository_CriticalFindingsProduceSevBang verifies that when repo-1
-// has FindingSeverityCounts[CRITICAL]=2, a finding with severity "!" is produced
-// for repo-1 and repo-2 has no finding.
 func TestEnrichECRRepository_CriticalFindingsProduceSevBang(t *testing.T) {
 	t.Skip("EnrichECRRepository is disabled (see ecr_issue_enrichment.go)")
 	fake := &ecrScanFindingsFake{
@@ -195,9 +166,7 @@ func TestEnrichECRRepository_CriticalFindingsProduceSevBang(t *testing.T) {
 	}
 }
 
-// TestEnrichECRRepository_HighFindingsProduceSevTilde verifies that when repo-1 has
-// FindingSeverityCounts[HIGH]=5 (no CRITICAL), a finding with severity "~" is produced
-// for repo-1. Severity "~" findings do NOT contribute to IssueCount.
+// Severity "~" findings do not count toward IssueCount.
 func TestEnrichECRRepository_HighFindingsProduceSevTilde(t *testing.T) {
 	t.Skip("EnrichECRRepository is disabled (see ecr_issue_enrichment.go)")
 	fake := &ecrScanFindingsFake{
@@ -232,18 +201,10 @@ func TestEnrichECRRepository_HighFindingsProduceSevTilde(t *testing.T) {
 	}
 }
 
-// TestEnrichECRRepository_UnscannedImagesSkipped verifies that when a repo's
-// DescribeImages response contains images whose ImageScanFindingsSummary is
-// nil (scan-on-push disabled or scan not yet completed), those images are
-// silently skipped — no finding, no Truncated, no error. Under the old
-// ListImages→DescribeImageScanFindings architecture this was ScanNotFoundException;
-// under the N+1 DescribeImages architecture, it's simply a nil summary field
-// in the inline response.
+// A nil ImageScanFindingsSummary means scan-on-push is off or the scan has not
+// completed; such images yield no finding, truncation or error.
 func TestEnrichECRRepository_UnscannedImagesSkipped(t *testing.T) {
 	fake := &ecrScanFindingsFake{
-		// repo-1 gets a response with only nil-summary images (unscanned) via
-		// the extended DescribeImages fake method which synthesises from results:
-		// we set results[repo-1] = nil to simulate "no scan data".
 		results: map[string]*ecrtypes.ImageScanFindings{
 			ecrRepo2: ecrScanFindings(map[string]int32{
 				string(ecrtypes.FindingSeverityCritical): 0,
@@ -266,8 +227,6 @@ func TestEnrichECRRepository_UnscannedImagesSkipped(t *testing.T) {
 	}
 }
 
-// TestEnrichECRRepository_NilClientReturnsEmptyFindingsNoError verifies that when
-// clients.ECR is nil the enricher returns a non-nil empty Findings map and no error.
 func TestEnrichECRRepository_NilClientReturnsEmptyFindingsNoError(t *testing.T) {
 	clients := &awsclient.ServiceClients{ECR: nil}
 
@@ -283,10 +242,6 @@ func TestEnrichECRRepository_NilClientReturnsEmptyFindingsNoError(t *testing.T) 
 	}
 }
 
-// TestEnrichECRRepository_APIErrorSetsTruncatedNoError verifies that when the API
-// call for repo-1 returns a generic error (not ScanNotFoundException), the enricher
-// sets Truncated=true, produces 0 findings for that repo, and does not propagate the
-// error.
 func TestEnrichECRRepository_APIErrorSetsTruncatedNoError(t *testing.T) {
 	t.Skip("EnrichECRRepository is disabled (see ecr_issue_enrichment.go)")
 	apiErr := errors.New("ecr: DescribeImageScanFindings throttled")

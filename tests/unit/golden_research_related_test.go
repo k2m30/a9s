@@ -6,12 +6,9 @@ package unit
 // Reads every docs/design/related-resources/{shortname}.md file, extracts
 // table rows marked "| P0 |", parses the target shortname from the first
 // column (parenthesized, e.g. "(ec2)"), then verifies that resource.GetRelated
-// for the source type contains a RelatedDef with that TargetType.
-//
-// This test DOES NOT check:
-//   - P1 or P2 relationships (only P0 is mandatory)
-//   - Whether checkers are nil (covered by TestGolden_LiveCheckerCompleteness)
-//   - Targets that are not top-level resource types in a9s
+// for the source type contains a RelatedDef with that TargetType. Only P0
+// relationships are mandatory; nil checkers are covered by
+// TestGolden_LiveCheckerCompleteness.
 
 import (
 	"os"
@@ -92,14 +89,11 @@ func TestGolden_ResearchP0RelationshipsRegistered(t *testing.T) {
 			continue
 		}
 
-		// Collect all P0 target shortnames from this file.
 		p0Targets := extractP0Targets(string(content))
 		if len(p0Targets) == 0 {
-			// No P0 relationships defined — nothing to check.
 			continue
 		}
 
-		// Build the set of registered target types for this source.
 		defs := resource.GetRelated(sourceShortname)
 		registered := make(map[string]bool, len(defs))
 		for _, d := range defs {

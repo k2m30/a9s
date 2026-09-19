@@ -13,10 +13,6 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// ---------------------------------------------------------------------------
-// T-TG01 - Test Target Groups response parsing
-// ---------------------------------------------------------------------------
-
 func TestFetchTargetGroups_ParsesMultipleTargetGroups(t *testing.T) {
 	port80 := int32(80)
 	port443 := int32(443)
@@ -71,7 +67,6 @@ func TestFetchTargetGroups_ParsesMultipleTargetGroups(t *testing.T) {
 		t.Fatalf("expected 2 resources, got %d", len(resources))
 	}
 
-	// Verify required fields exist
 	requiredFields := []string{"target_group_name", "port", "protocol", "vpc_id", "target_type", "health_check_path"}
 	for i, r := range resources {
 		for _, key := range requiredFields {
@@ -81,7 +76,6 @@ func TestFetchTargetGroups_ParsesMultipleTargetGroups(t *testing.T) {
 		}
 	}
 
-	// Verify first target group
 	r0 := resources[0]
 	if r0.ID != "prod-web-tg" {
 		t.Errorf("resource[0].ID: expected %q, got %q", "prod-web-tg", r0.ID)
@@ -108,7 +102,6 @@ func TestFetchTargetGroups_ParsesMultipleTargetGroups(t *testing.T) {
 		t.Errorf("resource[0].Fields[\"health_check_path\"]: expected %q, got %q", "/health", r0.Fields["health_check_path"])
 	}
 
-	// Verify second target group
 	r1 := resources[1]
 	if r1.ID != "prod-api-tg" {
 		t.Errorf("resource[1].ID: expected %q, got %q", "prod-api-tg", r1.ID)
@@ -162,9 +155,7 @@ func TestFetchTargetGroups_EmptyResponse(t *testing.T) {
 	}
 }
 
-// TestFetchTargetGroups_FieldsContainARN verifies that the target group ARN
-// is available in Fields so child views can use it for API calls.
-// DescribeTargetHealth requires the full ARN, not just the name.
+// DescribeTargetHealth requires the full target group ARN, not the name.
 func TestFetchTargetGroups_FieldsContainARN(t *testing.T) {
 	port80 := int32(80)
 	mock := &mockELBv2DescribeTargetGroupsClient{
@@ -194,7 +185,6 @@ func TestFetchTargetGroups_FieldsContainARN(t *testing.T) {
 
 	r := resources[0]
 
-	// The ARN must be in Fields so child views (tg_health) can pass it to DescribeTargetHealth
 	arn := r.Fields["target_group_arn"]
 	if arn == "" {
 		t.Fatal("Fields[\"target_group_arn\"] is empty — child view DescribeTargetHealth needs the full ARN")

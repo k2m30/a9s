@@ -1,15 +1,5 @@
 package unit
 
-// aws_apigw_enricher_test.go — Behavioral tests for EnrichAPIGatewayStage.
-//
-// Contract assertions:
-//   - GetStages is called once per API Gateway resource (keyed by API ID).
-//   - Stages with ThrottlingBurstLimit > 0 AND AccessLogSettings non-nil → 0 findings.
-//   - A stage with ThrottlingBurstLimit=0 → 1 finding sev "~" "throttling" for that API.
-//   - A stage with AccessLogSettings=nil → 1 finding sev "~" "access logs" for that API.
-//   - clients.APIGatewayV2 == nil → (EnricherResult{Findings: non-nil empty}, nil).
-//   - API error for a resource → 0 findings for that resource, Truncated=true, no error returned.
-
 import (
 	"context"
 	"errors"
@@ -44,10 +34,9 @@ type apigwGetStagesFake struct {
 	results map[string][]apigwtypes.Stage
 	// errByID maps API ID → error; overrides results when set.
 	errByID map[string]error
-	// authorizers maps API ID → slice of Authorizer. A nil map means every
-	// API has one: these tests predate apigw.no-authorizer and are about the
-	// stage-config rows, so an unauthorized API would add a finding none of
-	// them is asking about. Set it to exercise row 18.
+	// authorizers maps API ID → slice of Authorizer. A nil map gives every API
+	// one authorizer, keeping the no-authorizer finding out of the stage-config
+	// tests.
 	authorizers map[string][]apigwtypes.Authorizer
 }
 
@@ -90,7 +79,6 @@ func (f *apigwGetStagesFake) GetStages(
 	return &apigatewayv2.GetStagesOutput{Items: stages}, nil
 }
 
-// Compile-time check: apigwGetStagesFake satisfies APIGatewayV2API.
 var _ awsclient.APIGatewayV2API = (*apigwGetStagesFake)(nil)
 
 // apigwResources returns a slice of API Gateway Resource stubs with the given API IDs.
@@ -212,7 +200,7 @@ func TestEnrichAPIGatewayStage_NoAccessLogsProducesFindingSevTilde(t *testing.T)
 			ThrottlingBurstLimit: aws.Int32(500),
 			ThrottlingRateLimit:  aws.Float64(1000),
 		},
-		AccessLogSettings: nil, // no access logs configured
+		AccessLogSettings: nil,
 	}
 	fake := &apigwGetStagesFake{
 		results: map[string][]apigwtypes.Stage{
@@ -274,7 +262,6 @@ func TestEnrichAPIGatewayStage_ZeroStagesEmitsWarning(t *testing.T) {
 
 	fake := &apigwGetStagesFake{
 		results: map[string][]apigwtypes.Stage{
-			// 0 stages for this API (key present but empty slice)
 			emptyAPIID: {},
 		},
 	}
@@ -286,7 +273,6 @@ func TestEnrichAPIGatewayStage_ZeroStagesEmitsWarning(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	// A finding must be emitted for the API with 0 stages.
 	fs, ok := result.Findings[emptyAPIID]
 	if !ok {
 		t.Fatalf(

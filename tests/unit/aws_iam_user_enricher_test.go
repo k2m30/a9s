@@ -1,14 +1,5 @@
 package unit
 
-// aws_iam_user_enricher_test.go — Behavioral tests for EnrichIAMUserMFA.
-//
-// Contract assertions:
-//   - GetLoginProfile success + MFADevices=[device-1] → 0 findings.
-//   - GetLoginProfile success + MFADevices=[] → 1 finding sev "!" (no MFA on console user).
-//   - GetLoginProfile NoSuchEntityException (no console) + recent access key → 0 findings.
-//   - GetLoginProfile success + MFA=[device] + AccessKey.CreateDate=now-100d → 1 finding sev "~".
-//   - clients.IAM == nil → 0 findings, no error.
-
 import (
 	"context"
 	"testing"
@@ -85,7 +76,6 @@ func (f *iamUserMFAFake) ListAccessKeys(
 	return &iam.ListAccessKeysOutput{AccessKeyMetadata: keys}, nil
 }
 
-// Compile-time check: iamUserMFAFake satisfies IAMAPI.
 var _ awsclient.IAMAPI = (*iamUserMFAFake)(nil)
 
 // iamUserResources returns a slice of 2 iam-user Resource stubs.
@@ -154,7 +144,6 @@ func TestEnrichIAMUserMFA_WithMFAProducesNoFindings(t *testing.T) {
 // with no MFA device produces a finding with severity "!".
 func TestEnrichIAMUserMFA_NoMFAProducesFindingSevBang(t *testing.T) {
 	fake := &iamUserMFAFake{
-		// alice: console user, no MFA devices
 		mfaDevicesByUser: map[string][]iamtypes.MFADevice{
 			"alice": {},
 			"bob":   {{SerialNumber: aws.String("arn:aws:iam::123456789012:mfa/bob")}},
@@ -216,7 +205,6 @@ func TestEnrichIAMUserMFA_NoConsoleNoOldKeysProducesNoFindings(t *testing.T) {
 // severity "~". MFA is present so no "!" finding for the same user.
 func TestEnrichIAMUserMFA_OldAccessKeyProducesFindingSevTilde(t *testing.T) {
 	fake := &iamUserMFAFake{
-		// alice: console, has MFA, but access key is 100d old
 		mfaDevicesByUser: map[string][]iamtypes.MFADevice{
 			"alice": {{SerialNumber: aws.String("arn:aws:iam::123456789012:mfa/alice")}},
 			"bob":   {{SerialNumber: aws.String("arn:aws:iam::123456789012:mfa/bob")}},
@@ -274,7 +262,7 @@ func (f *iamUserMFAFake) ListAttachedUserPolicies(
 }
 
 // The user enricher also asks when each key was last used. "Just now" keeps
-// these tests about MFA and key age, which is what they were written for.
+// these tests about MFA and key age.
 func (f *iamUserMFAFake) GetAccessKeyLastUsed(
 	_ context.Context,
 	_ *iam.GetAccessKeyLastUsedInput,

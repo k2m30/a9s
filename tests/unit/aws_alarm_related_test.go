@@ -26,8 +26,6 @@ func alarmCheckerByTarget(t *testing.T, target string) resource.RelatedChecker {
 	return nil
 }
 
-// --- SNS Checker Tests ---
-
 func TestRelated_Alarm_SNS_Found(t *testing.T) {
 	snsARN := "arn:aws:sns:us-east-1:123456789012:my-topic"
 	raw := cwtypes.MetricAlarm{
@@ -132,12 +130,7 @@ func TestRelated_Alarm_SNS_InvalidRawStruct(t *testing.T) {
 	}
 }
 
-// --- ASG Checker Tests ---
-
 func TestRelated_Alarm_ASG_MatchByDimension(t *testing.T) {
-	// Alarm has AutoScalingGroupName dimension pointing to "my-asg"
-	// ASG cache has a resource with ID "my-asg"
-	// → Count: 1
 	raw := cwtypes.MetricAlarm{
 		Dimensions: []cwtypes.Dimension{
 			{
@@ -162,8 +155,6 @@ func TestRelated_Alarm_ASG_MatchByDimension(t *testing.T) {
 }
 
 func TestRelated_Alarm_ASG_NoMatch(t *testing.T) {
-	// Alarm has dimension, but ASG cache has different name
-	// → Count: 0
 	raw := cwtypes.MetricAlarm{
 		Dimensions: []cwtypes.Dimension{
 			{
@@ -188,8 +179,6 @@ func TestRelated_Alarm_ASG_NoMatch(t *testing.T) {
 }
 
 func TestRelated_Alarm_ASG_NoDimension(t *testing.T) {
-	// Alarm has no AutoScalingGroupName dimension
-	// → Count: 0
 	raw := cwtypes.MetricAlarm{
 		Dimensions: []cwtypes.Dimension{
 			{
@@ -214,8 +203,6 @@ func TestRelated_Alarm_ASG_NoDimension(t *testing.T) {
 }
 
 func TestRelated_Alarm_ASG_NilCache(t *testing.T) {
-	// Empty cache
-	// → State: RelatedUnknown
 	raw := cwtypes.MetricAlarm{
 		Dimensions: []cwtypes.Dimension{
 			{
@@ -234,11 +221,6 @@ func TestRelated_Alarm_ASG_NilCache(t *testing.T) {
 		t.Errorf("Count = %d, want -1 (empty cache)", result.Count())
 	}
 }
-
-// ---------------------------------------------------------------------------
-// Dimension-extraction checkers (Pattern F — no cache, reads RawStruct directly)
-// Each checker extracts a dimension value and returns it as a ResourceID.
-// ---------------------------------------------------------------------------
 
 func TestRelated_Alarm_APIGW_MatchByApiName(t *testing.T) {
 	raw := cwtypes.MetricAlarm{
@@ -714,13 +696,9 @@ func TestRelated_Alarm_WAF_NoDimension(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// checkAlarmCTEvents — cache-based, matches monitoring.amazonaws.com + "Alarm"
-// ---------------------------------------------------------------------------
-
 func TestRelated_Alarm_CTEvents_MatchMonitoringAlarm(t *testing.T) {
 	// checkAlarmCTEvents matches on Fields["source"] (not "event_source") and
-	// Fields["event_name"] — docs/resources/alarm.md §2 `ct-events`.
+	// Fields["event_name"] — docs/resources/alarm.md, `ct-events`.
 	evRes := resource.Resource{
 		ID: "ct-event-abc",
 		Fields: map[string]string{
@@ -752,7 +730,7 @@ func TestRelated_Alarm_CTEvents_MatchMonitoringAlarm(t *testing.T) {
 }
 
 func TestRelated_Alarm_CTEvents_NoMatchWhenEventNameLacksAlarm(t *testing.T) {
-	// docs/resources/alarm.md §2 `ct-events` — field is Fields["source"].
+	// docs/resources/alarm.md, `ct-events`: the field is Fields["source"].
 	evRes := resource.Resource{
 		ID: "ct-event-abc",
 		Fields: map[string]string{

@@ -1,18 +1,5 @@
 package unit
 
-// app_fetchers_branch_coverage_test.go — behavioral tests for zero-hit and near-zero-hit
-// functions reachable via internal/tui:
-//
-//   - fetchAMIDetail (0.0%)          — nil-client guard (only testable path)
-//   - loadAvailabilityCache (27.3%)  — success path with real disk cache data
-//   - fetchMoreResources (26.7%)     — filtered success path with registered fetcher
-//   - fetchResourcesFiltered (41.7%) — no-fetcher error path with non-nil clients
-//
-// The on-disk fixture writer writes per-type files via
-// cache.LoadDirForTest/(*Store).Put/SaveType (docs/design/cache-requirements.md
-// C7); the production consumer is internal/tui/probe_adapter.go's
-// loadAvailabilityCache via Core.LoadAvailabilityCache.
-
 import (
 	"context"
 	"fmt"
@@ -26,32 +13,6 @@ import (
 	"github.com/k2m30/a9s/v3/core/runtime/messages"
 	"github.com/k2m30/a9s/v3/internal/tui"
 )
-
-// ─────────────────────────────────────────────────────────────────────────────
-// fetchAMIDetail — nil-client guard (line 84)
-// ─────────────────────────────────────────────────────────────────────────────
-
-// TestFetchAMIDetail_NilClients verifies that when the model has no AWS clients
-// the fetchAMIDetail cmd closure returns a FlashMsg{IsError: true} containing
-// the image ID and "not initialized".
-//
-// fetchAMIDetail is triggered via a RelatedNavigateMsg that resolves to an AMI
-// target with m.clients == nil (which skips the `if m.clients != nil` guard in
-// handleRelatedNavigate and does NOT call fetchAMIDetail). The only unit-
-// testable path is therefore the nil-client guard inside the cmd closure itself.
-// We trigger it by producing the cmd via a model with clients, then replacing
-// clients with nil before execution — but we don't have access to internal state.
-//
-// Alternative: the method is also reachable via the model's handleRelatedNavigate
-// path when clients IS non-nil — but that requires a real EC2 client. The
-// most we can verify unit-test-side is that the guard fires and the message
-// type is correct. We do this by calling fetchAMIDetail indirectly: the model's
-// related-navigate handler calls it only when m.clients != nil. With nil clients
-// the navigate handler takes a different branch. We document this constraint and
-// verify no panic.
-// ─────────────────────────────────────────────────────────────────────────────
-// loadAvailabilityCache — success path with populated disk cache
-// ─────────────────────────────────────────────────────────────────────────────
 
 // writeCacheTypesForModel writes one or more per-type cache.TypeFile entries
 // for the given profile/region via the real Store API (Put+SaveType).
@@ -68,13 +29,8 @@ func writeCacheTypesForModel(t *testing.T, profile, region string, entries map[s
 	}
 }
 
-// TestLoadAvailabilityCache_PopulatedCacheReturnsEntries verifies that when a
-// valid, non-expired cache file exists on disk the returned
-// AvailabilityCacheLoadedMsg contains the expected entries and Expired=false.
-//
-// loadAvailabilityCache is invoked inside handleClientsReady. We send a
-// ClientsReadyMsg (with demo clients, Gen=0) to trigger the full path, then
-// execute the returned cmd batch to extract the AvailabilityCacheLoadedMsg.
+// loadAvailabilityCache runs inside handleClientsReady, so a ClientsReadyMsg
+// triggers the full path.
 func TestLoadAvailabilityCache_PopulatedCacheReturnsEntries(t *testing.T) {
 	withTuiVersion(t, "test")
 	tmp := t.TempDir()
@@ -83,7 +39,6 @@ func TestLoadAvailabilityCache_PopulatedCacheReturnsEntries(t *testing.T) {
 	profile := "wave5-cache-profile"
 	region := "eu-west-1"
 
-	// Write fresh per-type cache files with known entries.
 	writeCacheTypesForModel(t, profile, region, map[string]cache.TypeFile{
 		"ec2": {HasResources: true, Count: 12},
 		"s3":  {HasResources: true, Count: 5},
@@ -109,7 +64,6 @@ func TestLoadAvailabilityCache_PopulatedCacheReturnsEntries(t *testing.T) {
 		t.Fatal("ClientsReadyMsg should return a cmd batch containing loadAvailabilityCache cmd")
 	}
 
-	// Walk the batch to find AvailabilityCacheLoadedMsg.
 	var cacheMsg *messages.AvailabilityCacheLoaded
 	collectFromCmd(t, cmd, &cacheMsg)
 
@@ -122,14 +76,11 @@ func TestLoadAvailabilityCache_PopulatedCacheReturnsEntries(t *testing.T) {
 	if cacheMsg.Entries["s3"] != 5 {
 		t.Errorf("Entries[s3] = %d, want 5", cacheMsg.Entries["s3"])
 	}
-	// Error entries should NOT appear in Entries.
 	if _, ok := cacheMsg.Entries["kms"]; ok {
 		t.Errorf("Entries[kms] should be absent (error entry excluded), but was present")
 	}
 }
 
-// TestLoadAvailabilityCache_IssueFieldsMapped verifies that issue fields in the
-// cache file are correctly mapped into IssueCounts / IssueKnown / IssueTruncated.
 func TestLoadAvailabilityCache_IssueFieldsMapped(t *testing.T) {
 	withTuiVersion(t, "test")
 	tmp := t.TempDir()
@@ -204,12 +155,6 @@ func collectFromCmd(t *testing.T, cmd tea.Cmd, target **messages.AvailabilityCac
 	}
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// fetchMoreResources — filtered-fetcher success branch (line 161-174)
-// ─────────────────────────────────────────────────────────────────────────────
-
-// TestFetchMoreResources_FilteredFetcherErrorPropagated verifies that when the
-// filtered fetcher returns an error, the cmd returns APIErrorMsg (not a panic).
 func TestFetchMoreResources_FilteredFetcherErrorPropagated(t *testing.T) {
 	withTuiVersion(t, "test")
 
@@ -248,17 +193,8 @@ func TestFetchMoreResources_FilteredFetcherErrorPropagated(t *testing.T) {
 	}
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// fetchResourcesFiltered — no-fetcher error path (line 66-69)
-// ─────────────────────────────────────────────────────────────────────────────
-
-// TestFetchResourcesFiltered_NoFetcherWithDemoClients verifies that when a
-// FilteredPaginatedFetcher is not registered for the resource type, the cmd
-// returns APIErrorMsg{"no filtered fetcher registered"} — even with non-nil clients.
-//
-// The existing TestFetchResourcesFiltered_NoFetcher (in dispatchers_test.go)
-// exercises this path with nil clients, hitting the nil-client guard first.
-// This test uses demo clients to reach the pf==nil branch.
+// With nil clients the nil-client guard fires first; demo clients reach the
+// no-filtered-fetcher branch.
 func TestFetchResourcesFiltered_NoFetcherWithDemoClients(t *testing.T) {
 	withTuiVersion(t, "test")
 
@@ -274,12 +210,6 @@ func TestFetchResourcesFiltered_NoFetcherWithDemoClients(t *testing.T) {
 	)
 	m, _ = rootApplyMsg(m, tea.WindowSizeMsg{Width: 80, Height: 40})
 
-	// Navigate to EC2 list, then send RelatedNavigateMsg with FetchFilter for
-	// a type with no filtered fetcher. Because this goes through handleRelatedNavigate
-	// which calls m.fetchResourcesFiltered directly for NavigationKindFilteredList results,
-	// we need to trigger that path. The easiest approach: register a typed resource
-	// and send a LoadMoreMsg with FetchFilter using demo clients.
-	// Use an arbitrary short name with no fetchers registered.
 	const noFFType = "test_no_ff_demo_clients"
 
 	_, cmd := rootApplyMsg(m, messages.LoadMore{

@@ -1,47 +1,22 @@
-// costs_review3_test.go — Cost Explorer pins reachable via the exported
-// core/aws.FetchEC2InstancesByIDs surface, the pure core/costs.Store/
-// screen.BuildViewModel surface, or the headless app.Controller surface — no
-// TUI helper needed. Reuses newCostsController/topDrill/fixedCostsNow/
-// fullMetricRecord/findFetchCostsTask (costs_state_test.go/
-// costs_interaction_test.go) and selfReviewAPIError/strPtrSelfReview
-// (costs_selfreview_test.go), all defined in this same package.
+// DescribeInstances with no InstanceIds is an account-wide describe, so a
+// by-ID fetch whose every requested ID is named bad must stop instead of
+// retrying an empty slice.
 //
-// R1 (core/aws/ec2_by_ids.go): when EVERY requested ID is named bad, the
-// retry slice is empty and the fetch must stop — DescribeInstances with no
-// InstanceIds is an ACCOUNT-WIDE describe.
+// GetAnomalies is range-scoped via DateInterval, so a fresh anomaly snapshot
+// for the default trailing-12-months range does not cover a wider (year-zoom)
+// range.
 //
-// R2 (core/costs/screen/screen.go PlanFetch + core/costs/store.go
-// Store.Anomalies): the anomaly fetch (FetchCostAnomaliesCounted) is
-// range-scoped via GetAnomalies's DateInterval, so a fresh snapshot cached
-// under the default trailing-12-months range does not cover a materially
-// wider (e.g. year-zoom) range; PlanFetch's Anomalies half must consider the
-// range the CURRENT frame needs, not only the TTL.
+// An expired open-period bucket whose refetch authoritatively returns zero
+// groups has its FetchedAt advanced, or Lookup reports it missing forever and
+// loops the refetch. Refreshing FetchedAt only resets the 24h TTL clock; it
+// does not promote the bucket past its settlementLag closure check.
 //
-// R3 (core/costs/store.go MergeCoverage): a bucket that ALREADY exists but is
-// TTL-stale (a still-open period, fetched once, now expired) whose refetch
-// authoritatively returns zero groups must have its FetchedAt advanced, or
-// Lookup reports it missing forever and loops the refetch. Refreshing
-// FetchedAt alone (never touching Records, never forcing immutableAt) only
-// resets the 24h TTL clock; it does not promote the bucket past its own
-// settlementLag closure check. The anti-promotion rule (a period ABSENT from
-// the fetched range must never be re-stamped) is pinned separately below.
-// TestCostsReview2_R2_ZeroRecordPeriod_MergeCoverage_NotReportedMissing
-// (costs_review2_test.go) covers only a period NEVER before seen.
+// Demo mode (--demo sets NoCache=true) must not read or write a real
+// ~/.a9s/cache/<profile>--costs.yaml file.
 //
-// R4 (core/app/costs_state.go ensureCostsState): costs.LoadStore(profile)
-// and Handle's dirtyStore.Save() flush are gated on c.core.NoCache(), like
-// every OTHER cache in the codebase (core/session/session.go's NoCache-gated
-// EnsureCacheStore family, core/runtime/handlers.go,
-// core/runtime/probes.go); demo mode (--demo sets NoCache=true) must not
-// read or write a real ~/.a9s/cache/<profile>--costs.yaml file.
-//
-// R5 (core/costs/grid.go BuildGrid + core/costs/screen/screen.go
-// BuildViewModel): specs/021-cost-explorer/data-model.md ("sorted desc by row
-// total over VISIBLE window") and spec.md ("Row sort is descending by row
-// total over the visible window... documented in the help screen") both name
-// the VISIBLE window. BuildGrid sorts by the FULL window total (a pure
-// grid-level concern, no viewport parameter); BuildViewModel slices columns,
-// drops all-zero VISIBLE rows and re-sorts by the visible-window total.
+// Row sort is descending by row total over the visible window: BuildGrid sorts
+// by the full-window total, and BuildViewModel re-sorts by the visible-window
+// total after slicing columns.
 package unit_test
 
 import (
@@ -67,17 +42,10 @@ import (
 	"github.com/k2m30/a9s/v3/core/session"
 )
 
-// ===========================================================================
-// R1 — all-IDs-bad must never fall through to an unfiltered DescribeInstances.
-// ===========================================================================
-
-// costsReview3EC2AllBadAPI counts DescribeInstances calls and simulates
-// AWS's real batch-level InvalidInstanceID.NotFound naming EVERY requested
-// ID — the "every ID in this batch is bad" case, distinct from
-// costs_selfreview_test.go's C12 (one bad, one good) scenario. A call with
-// an EMPTY InstanceIds list is simulated as a real, unfiltered
-// account-wide describe would behave: it returns instances that were never
-// requested.
+// costsReview3EC2AllBadAPI counts DescribeInstances calls and returns AWS's
+// batch-level InvalidInstanceID.NotFound naming every requested ID. A call
+// with an empty InstanceIds list behaves like a real account-wide describe: it
+// returns instances that were never requested.
 type costsReview3EC2AllBadAPI struct {
 	calls      int
 	bad1, bad2 string
@@ -118,10 +86,6 @@ func TestCostsReview3_R1_EC2ByIDs_AllIDsBad_NeverAccountWideDescribe(t *testing.
 	}
 }
 
-// ===========================================================================
-// R2 — anomaly freshness must account for the requested range, not TTL alone.
-// ===========================================================================
-
 func TestCostsReview3_R2_AnomalyFreshness_WiderRangeStillRefetches(t *testing.T) {
 	c := newCostsController(t, fixedCostsNow)
 	root := topDrill(t, c)
@@ -155,12 +119,6 @@ func TestCostsReview3_R2_AnomalyFreshness_WiderRangeStillRefetches(t *testing.T)
 		t.Error("SkipAnomalies=true after zooming to a materially wider (year) range — the cached anomaly snapshot only ever covered the narrower month-view range; Store.Anomalies' freshness check is TTL-only and range-blind")
 	}
 }
-
-// ===========================================================================
-// R3 — an authoritative zero-group refetch of an expired OPEN period must
-// clear the stale bucket and stamp coverage; a period absent from the
-// fetched range must never be re-stamped (unchanged).
-// ===========================================================================
 
 func TestCostsReview3_R3_ExpiredOpenBucket_AuthoritativeZeroRefetch_ClearsStaleAndStampsCovered(t *testing.T) {
 	t.Setenv("A9S_CONFIG_FOLDER", t.TempDir())
@@ -213,11 +171,6 @@ func TestCostsReview3_R3_PeriodAbsentFromFetchedRange_NeverRestamped(t *testing.
 		t.Error("MergeCoverage(q, fetchedRange, now) stamped a period OUTSIDE fetchedRange as covered — a period the executor never actually requested must stay missing, or a genuinely-never-fetched gap silently reads as covered-empty forever")
 	}
 }
-
-// ===========================================================================
-// R4 — NoCache must make the costs store memory-only: no disk read, no
-// disk write.
-// ===========================================================================
 
 func TestCostsReview3_R4_NoCache_MemoryOnlyStore_NoDiskReadOrWrite(t *testing.T) {
 	t.Setenv("A9S_CONFIG_FOLDER", t.TempDir())
@@ -286,11 +239,6 @@ func TestCostsReview3_R4_NoCache_MemoryOnlyStore_NoDiskReadOrWrite(t *testing.T)
 	}
 }
 
-// ===========================================================================
-// R5 — visible-window row ranking: BuildViewModel must re-sort by the
-// VISIBLE columns, not preserve BuildGrid's full-window order.
-// ===========================================================================
-
 func TestCostsReview3_R5_BuildViewModel_RowsReRankByVisibleWindowNotFullWindow(t *testing.T) {
 	p0 := costs.Period{Start: "2026-04-01", End: "2026-05-01"}
 	p1 := costs.Period{Start: "2026-05-01", End: "2026-06-01"}
@@ -301,11 +249,8 @@ func TestCostsReview3_R5_BuildViewModel_RowsReRankByVisibleWindowNotFullWindow(t
 		RowDim:  costs.DimensionService,
 		Columns: []costs.Period{p0, p1, p2, p3},
 		Rows: []costs.GridRow{
-			// BuildGrid's own full-window sort (its doc: "sorts rows desc by
-			// absolute row total") legitimately ranks this row first — its
-			// $10000 lands entirely in an off-screen column. This is the
-			// exact "BuildGrid's full-window ordering as input" the view
-			// must re-sort, not preserve.
+			// BuildGrid's full-window sort ranks this row first: its $10000 lands
+			// entirely in an off-screen column.
 			{Key: "OffscreenHeavy", Label: "OffscreenHeavy", Cells: []costs.CellValue{
 				{Amount: costs.Amount{Value: 10000, Unit: "USD"}},
 				{Amount: costs.Amount{Value: 0, Unit: "USD"}},
@@ -333,35 +278,16 @@ func TestCostsReview3_R5_BuildViewModel_RowsReRankByVisibleWindowNotFullWindow(t
 	}
 }
 
-// ===========================================================================
-// P1 — an anomaly-only (SkipGrid) delivery must never be mistaken for CE's
-// own authoritative zero-group grid result. Traced precisely:
-// executor.go:517 sets `Window: p.Window` UNCONDITIONALLY (SkipGrid or not),
-// and when SkipGrid is true `result` stays its zero value, so `Records:
-// result.Records` is nil too — a SkipGrid delivery is byte-for-byte
-// indistinguishable from a genuine "CE queried this shape and found
-// nothing" result at the ApplyCostsLoaded layer. Two call sites key off
-// exactly that ambiguity:
-//   - costs_state.go:982 `if len(ev.Window) > 0 { cs.Store.MergeCoverage(...) }`
-//     — unconditional, regardless of whether the grid was ever queried this
-//     round. MergeCoverage's own authoritative-zero-clears behavior
-//     (fetchedWhileOpen + !FetchedAt.Equal(now)) then wipes a WARM,
-//     non-stale bucket's real Records the moment an unrelated anomaly-only
-//     refresh completes for the same shape/window.
-//   - costs_state.go:1012 `applyCostsGranularityFallback`'s own trigger
-//     (`!matchesAwaited || len(ev.Records) != 0`) shares the identical
-//     blind spot: `matchesAwaited` (costs_state.go:930-943) matches on
-//     Query shape/range alone, never on SkipGrid, so the SAME masquerading
-//     delivery can wrongly fire the N3 re-plan too.
-// ===========================================================================
+// An anomaly-only (SkipGrid) delivery carries the frame's Window and nil
+// Records, the same shape as CE's authoritative zero-group result; it must
+// never clear a warm bucket's coverage or fire the granularity fallback.
 
 func TestCostsReview3_P1_AnomalyOnlyDelivery_NeverClearsWarmGridCoverage(t *testing.T) {
 	t.Setenv("A9S_CONFIG_FOLDER", t.TempDir())
 	const profile = "review3-p1a"
-	// The seed is fetched STRICTLY EARLIER than fixedCostsNow (still well
-	// within the 24h open-period TTL) — MergeCoverage's own
-	// `!existing.FetchedAt.Equal(now)` guard would otherwise accidentally
-	// mask this exact bug if both deliveries shared one identical "now".
+	// The seed is fetched strictly earlier than fixedCostsNow, within the 24h
+	// open-period TTL: MergeCoverage's `!existing.FetchedAt.Equal(now)` guard
+	// would hide a wrong clear if both deliveries shared one "now".
 	seedNow := fixedCostsNow.Add(-2 * time.Hour)
 
 	window := costs.BuildWindow(costs.GranularityMonth, fixedCostsNow)
@@ -389,11 +315,9 @@ func TestCostsReview3_P1_AnomalyOnlyDelivery_NeverClearsWarmGridCoverage(t *test
 		t.Fatalf("precondition: warm grid loaded from disk did not render the seeded EC2 row: %+v", vs.Body.Costs.Rows)
 	}
 
-	// An anomaly-only (SkipGrid) refresh for the SAME shape/window
-	// completes — exactly ensureCostsShapeFetched's own X3 dispatch once
-	// the grid is already covered but the anomaly TTL has expired. Its
-	// Records is nil because the grid was not re-fetched in this delivery,
-	// NOT because CE authoritatively confirmed zero.
+	// ensureCostsShapeFetched dispatches an anomaly-only refresh once the grid is
+	// covered and the anomaly TTL has expired; its Records is nil because the
+	// grid was not re-fetched, not because CE confirmed zero.
 	c.Handle(messages.CostsLoaded{
 		Query:     q,
 		Grid:      costs.GridResult{Fetched: false},
@@ -413,9 +337,8 @@ func TestCostsReview3_P1_AnomalyOnlyDelivery_NeverFiresGranularityFallback(t *te
 	root := topDrill(t, c)
 	newestCol := root.Window[len(root.Window)-1]
 
-	// Drill from a NON-ZERO parent cell — makes the pushed child frame
-	// Fallback-eligible (N3's own precondition), exactly like
-	// TestCostsNoRegion_N3_GranularityFallback_ReplansOnceAtParentGranularity.
+	// A drill from a non-zero parent cell makes the pushed child frame
+	// Fallback-eligible.
 	_, tasks := c.Apply(app.Action{Kind: app.ActionCostPivot, N: 1}) // SERVICE pivot
 	payload, found := findFetchCostsTask(tasks)
 	if !found {
@@ -468,15 +391,9 @@ func TestCostsReview3_P1_AnomalyOnlyDelivery_NeverFiresGranularityFallback(t *te
 	}
 }
 
-// ===========================================================================
-// P3 — Esc (ActionBack) at drill depth must clear CostsState-wide Loading/
-// ErrorMsg inherited from the just-popped child frame. Traced precisely:
-// applyCostsBack (costs_state.go:624-630) only pops cs.DrillStack — it never
-// touches cs.Loading/cs.ErrorMsg/cs.AwaitedIdentity/cs.DrillRefusedReason/
-// cs.ResourceRowNote, all of which are CostsState-WIDE fields, not
-// per-DrillLevel. A child frame's own in-flight/failed fetch state survives
-// the pop and renders against the (unrelated, already-available) parent.
-// ===========================================================================
+// Loading, ErrorMsg, AwaitedIdentity, DrillRefusedReason and ResourceRowNote
+// are CostsState-wide, not per-DrillLevel, so Esc at drill depth must clear
+// what the popped child frame left there.
 
 func TestCostsReview3_P3_Back_ClearsInheritedLoading(t *testing.T) {
 	c := newCostsController(t, fixedCostsNow)
@@ -555,15 +472,9 @@ func TestCostsReview3_P3_Back_ClearsInheritedErrorMsg(t *testing.T) {
 	}
 }
 
-// ===========================================================================
-// P5 — a costs fetch dispatched before AWS finishes connecting must recover
-// once ClientsReady lands, mirroring list screens' own retry idiom. Traced
-// precisely: maybeRefreshIntents (handlers.go:407-419) gates entirely on
-// ev.HasActiveRL (topListState() != nil) — ScreenCosts is never considered,
-// so a pre-connect costs ErrorMsg ("cost explorer: no client configured for
-// this session", executor.go:453) never clears and no re-fetch is ever
-// dispatched, even after the real connection completes.
-// ===========================================================================
+// A costs fetch dispatched before AWS finishes connecting fails with "cost
+// explorer: no client configured for this session" and must recover once
+// ClientsReady lands, as list screens do.
 
 func TestCostsReview3_P5_ClientsReady_RecoversPreConnectCostsError(t *testing.T) {
 	t.Setenv("A9S_CONFIG_FOLDER", t.TempDir())

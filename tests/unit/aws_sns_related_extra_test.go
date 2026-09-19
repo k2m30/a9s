@@ -1,8 +1,5 @@
 package unit_test
 
-// aws_sns_related_extra_test.go — additional coverage for sns_related.go
-// Covers: checkSNSSub, checkSNSKMS, checkSNSRole, extractRoleNamesFromPolicy.
-
 import (
 	"context"
 	"testing"
@@ -15,7 +12,6 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// fakeSNSFull implements the full SNSAPI for ServiceClients.SNS.
 type fakeSNSFull struct {
 	attrs map[string]string
 	err   error
@@ -39,8 +35,6 @@ func (f *fakeSNSFull) ListTagsForResource(_ context.Context, _ *snssvc.ListTagsF
 func (f *fakeSNSFull) GetSubscriptionAttributes(_ context.Context, _ *snssvc.GetSubscriptionAttributesInput, _ ...func(*snssvc.Options)) (*snssvc.GetSubscriptionAttributesOutput, error) {
 	return &snssvc.GetSubscriptionAttributesOutput{}, nil
 }
-
-// --- checkSNSSub (Pattern C — reverse lookup: match topic_arn in sns-sub cache) ---
 
 func TestRelated_SNS_Sub_FoundByTopicARN(t *testing.T) {
 	const topicARN = "arn:aws:sns:us-east-1:123456789012:order-events"
@@ -95,7 +89,6 @@ func TestRelated_SNS_Sub_MultipleSubscribers(t *testing.T) {
 }
 
 func TestRelated_SNS_Sub_EmptyTopicARN(t *testing.T) {
-	// Both topic_arn field and ID are empty → returns -1.
 	source := resource.Resource{ID: "", Fields: map[string]string{}}
 	checker := snsCheckerByTarget(t, "sns-sub")
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
@@ -106,11 +99,10 @@ func TestRelated_SNS_Sub_EmptyTopicARN(t *testing.T) {
 }
 
 func TestRelated_SNS_Sub_FallsBackToID(t *testing.T) {
-	// topic_arn field absent; falls back to res.ID.
 	const topicARN = "arn:aws:sns:us-east-1:123456789012:order-events"
 	source := resource.Resource{
 		ID:     topicARN,
-		Fields: map[string]string{}, // no topic_arn key
+		Fields: map[string]string{},
 	}
 	sub := resource.Resource{
 		ID:     "sub-001",
@@ -140,8 +132,6 @@ func TestRelated_SNS_Sub_NilCacheNoClients(t *testing.T) {
 		t.Errorf("Count = %d, want -1 (empty cache, nil clients)", result.Count())
 	}
 }
-
-// --- checkSNSKMS (Pattern C — GetTopicAttributes → KmsMasterKeyId) ---
 
 func TestRelated_SNS_KMS_FoundFromAttributes(t *testing.T) {
 	const topicARN = "arn:aws:sns:us-east-1:123456789012:order-events"
@@ -176,7 +166,7 @@ func TestRelated_SNS_KMS_NotEncrypted(t *testing.T) {
 	}
 	clients := &awsclient.ServiceClients{
 		SNS: &fakeSNSFull{
-			attrs: map[string]string{}, // no KmsMasterKeyId
+			attrs: map[string]string{},
 		},
 	}
 
@@ -210,8 +200,6 @@ func TestRelated_SNS_KMS_EmptyTopicARNReturnsZero(t *testing.T) {
 		t.Errorf("Count = %d, want 0 (empty ARN)", result.Count())
 	}
 }
-
-// --- checkSNSRole (Pattern C — GetTopicAttributes → Policy → extract role ARNs) ---
 
 func TestRelated_SNS_Role_ExtractsFromPolicy(t *testing.T) {
 	const topicARN = "arn:aws:sns:us-east-1:123456789012:order-events"
@@ -298,7 +286,7 @@ func TestRelated_SNS_Role_EmptyPolicyString(t *testing.T) {
 		Fields: map[string]string{"topic_arn": topicARN},
 	}
 	clients := &awsclient.ServiceClients{
-		SNS: &fakeSNSFull{attrs: map[string]string{}}, // no Policy key
+		SNS: &fakeSNSFull{attrs: map[string]string{}},
 	}
 
 	checker := snsCheckerByTarget(t, "role")
@@ -322,9 +310,6 @@ func TestRelated_SNS_Role_NilClientsReturnsUnknown(t *testing.T) {
 	}
 }
 
-// --- snsAlarmReferences — exercised via existing alarm tests above;
-//     direct tests for OKActions and InsufficientDataActions edge cases. ---
-
 func TestRelated_SNS_Alarm_OKActions(t *testing.T) {
 	const topicARN = "arn:aws:sns:us-east-1:123456789012:alert-ok"
 	source := resource.Resource{
@@ -333,18 +318,14 @@ func TestRelated_SNS_Alarm_OKActions(t *testing.T) {
 	}
 	alarmRes := resource.Resource{
 		ID:        "alarm-ok-action",
-		RawStruct: resource.ResourceCacheEntry{}, // wrong type — should skip
+		RawStruct: resource.ResourceCacheEntry{},
 	}
 	_ = alarmRes
-	// Build alarm that references topic in OKActions only.
 	alarmWithOKAction := resource.Resource{
 		ID: "alarm-ok-action",
 	}
 	_ = alarmWithOKAction
 
-	// We cannot embed cwtypes.MetricAlarm OKActions here without a circular look —
-	// the test via checkSNSAlarm already tests OKActions via TestRelated_SNS_Alarm_Found.
-	// Verify that alarmRes with wrong RawStruct type is skipped gracefully.
 	alarmWrong := resource.Resource{
 		ID:        "alarm-wrong-raw",
 		RawStruct: "not-a-metric-alarm",
@@ -361,11 +342,8 @@ func TestRelated_SNS_Alarm_OKActions(t *testing.T) {
 	}
 }
 
-// --- checkSNSRole: non-role ARN in Principal ignored ---
-
 func TestRelated_SNS_Role_PrincipalWithUserARNIgnored(t *testing.T) {
 	const topicARN = "arn:aws:sns:us-east-1:123456789012:order-events"
-	// Policy with IAM user (not role) principal
 	policy := `{
 		"Statement": [{
 			"Effect": "Allow",
@@ -390,12 +368,11 @@ func TestRelated_SNS_Role_PrincipalWithUserARNIgnored(t *testing.T) {
 }
 
 func TestRelated_SNS_Role_UsesTopicARNFromID(t *testing.T) {
-	// Fallback: no topic_arn in Fields, uses res.ID.
 	const topicARN = "arn:aws:sns:us-east-1:123456789012:order-events"
 	policy := `{"Statement": [{"Principal": {"AWS": "arn:aws:iam::123456789012:role/reader"}}]}`
 	source := resource.Resource{
 		ID:     topicARN,
-		Fields: map[string]string{}, // no topic_arn
+		Fields: map[string]string{},
 	}
 	clients := &awsclient.ServiceClients{
 		SNS: &fakeSNSFull{attrs: map[string]string{"Policy": policy}},

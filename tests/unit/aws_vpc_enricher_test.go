@@ -1,15 +1,5 @@
 package unit
 
-// aws_vpc_enricher_test.go — Behavioral tests for EnrichVPCFlowLogs.
-//
-// Contract assertions:
-//   - DescribeFlowLogs is called once per VPC resource (filtered by resource-id).
-//   - All VPCs have at least one FlowLog with FlowLogStatus=ACTIVE → 0 findings.
-//   - VPC has FlowLogs[] empty → finding for that VPC, severity "~".
-//   - VPC has FlowLogs only with non-ACTIVE status (e.g. "PENDING") → finding for that VPC, severity "~".
-//   - clients.EC2 == nil → (EnricherResult{Findings: non-nil empty}, nil).
-//   - API error for VPC-1, ok for VPC-2 → 0 findings for VPC-1, findings for VPC-2 per its state, Truncated=true.
-
 import (
 	"context"
 	"errors"
@@ -24,15 +14,9 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// vpcFlowLogFake implements EC2API for VPC flow-log enrichment testing.
-// It embeds the interface and overrides only DescribeFlowLogs.
-// The results map is keyed by the "resource-id" filter value so the fake can
-// serve different responses per VPC resource.
 type vpcFlowLogFake struct {
 	awsclient.EC2API
-	// results maps VPC ID → flow log list. Used when errByVPC has no entry.
-	results map[string][]ec2types.FlowLog
-	// errByVPC maps VPC ID → error; overrides results when set.
+	results  map[string][]ec2types.FlowLog
 	errByVPC map[string]error
 }
 
@@ -59,10 +43,8 @@ func (f *vpcFlowLogFake) DescribeFlowLogs(
 	return &ec2svc.DescribeFlowLogsOutput{FlowLogs: logs}, nil
 }
 
-// Compile-time check: vpcFlowLogFake satisfies EC2API.
 var _ awsclient.EC2API = (*vpcFlowLogFake)(nil)
 
-// vpcResources returns a slice of VPC Resource stubs with the given IDs.
 func vpcResources(ids ...string) []resource.Resource {
 	res := make([]resource.Resource, 0, len(ids))
 	for _, id := range ids {
@@ -78,7 +60,6 @@ func vpcResources(ids ...string) []resource.Resource {
 	return res
 }
 
-// activeFlowLog returns a FlowLog stub with FlowLogStatus=ACTIVE for the given VPC.
 func activeFlowLog(vpcID, flowLogID string) ec2types.FlowLog {
 	return ec2types.FlowLog{
 		FlowLogId:     aws.String(flowLogID),
@@ -87,7 +68,6 @@ func activeFlowLog(vpcID, flowLogID string) ec2types.FlowLog {
 	}
 }
 
-// pendingFlowLog returns a FlowLog stub with FlowLogStatus=PENDING for the given VPC.
 func pendingFlowLog(vpcID, flowLogID string) ec2types.FlowLog {
 	return ec2types.FlowLog{
 		FlowLogId:     aws.String(flowLogID),
@@ -96,8 +76,6 @@ func pendingFlowLog(vpcID, flowLogID string) ec2types.FlowLog {
 	}
 }
 
-// TestEnrichVPCFlowLogs_BothActiveProducesNoFindings verifies that when both VPCs
-// have an ACTIVE flow log, no findings are produced.
 func TestEnrichVPCFlowLogs_BothActiveProducesNoFindings(t *testing.T) {
 	fake := &vpcFlowLogFake{
 		results: map[string][]ec2types.FlowLog{
@@ -120,8 +98,6 @@ func TestEnrichVPCFlowLogs_BothActiveProducesNoFindings(t *testing.T) {
 	}
 }
 
-// TestEnrichVPCFlowLogs_NoLogsProducesFindingSevTilde verifies that when both VPCs
-// have empty FlowLogs[], a finding with severity "~" is produced for each.
 func TestEnrichVPCFlowLogs_NoLogsProducesFindingSevTilde(t *testing.T) {
 	fake := &vpcFlowLogFake{
 		results: map[string][]ec2types.FlowLog{
@@ -152,9 +128,6 @@ func TestEnrichVPCFlowLogs_NoLogsProducesFindingSevTilde(t *testing.T) {
 	}
 }
 
-// TestEnrichVPCFlowLogs_InactiveOnlyProducesFindingForAffectedVPC verifies that when
-// VPC-1 has only a PENDING (non-ACTIVE) flow log, a finding with severity "~" is
-// produced for VPC-1. VPC-2 with an ACTIVE flow log produces no finding.
 func TestEnrichVPCFlowLogs_InactiveOnlyProducesFindingForAffectedVPC(t *testing.T) {
 	fake := &vpcFlowLogFake{
 		results: map[string][]ec2types.FlowLog{
@@ -185,8 +158,6 @@ func TestEnrichVPCFlowLogs_InactiveOnlyProducesFindingForAffectedVPC(t *testing.
 	}
 }
 
-// TestEnrichVPCFlowLogs_NilClientReturnsEmptyFindingsNoError verifies that when
-// clients.EC2 is nil the enricher returns a non-nil empty Findings map and no error.
 func TestEnrichVPCFlowLogs_NilClientReturnsEmptyFindingsNoError(t *testing.T) {
 	clients := &awsclient.ServiceClients{EC2: nil}
 
@@ -202,12 +173,8 @@ func TestEnrichVPCFlowLogs_NilClientReturnsEmptyFindingsNoError(t *testing.T) {
 	}
 }
 
-// TestEnrichVPCFlowLogs_APIErrorMarksRowTruncatedIDFindsOtherVPCNoBadge verifies
-// that when the API call for VPC-1 returns an error, the enricher marks that
-// VPC's row via TruncatedIDs and still produces a finding for VPC-2 (which
-// has no active flow log). vpc is a "~"-only enricher (IssueCount always 0),
-// so the coverage gap must never lower-bound the aggregate issue badge —
-// Truncated stays false.
+// vpc is a "~"-only enricher (IssueCount is always 0), so a coverage gap
+// never lower-bounds the issue badge: Truncated stays false.
 func TestEnrichVPCFlowLogs_APIErrorMarksRowTruncatedIDFindsOtherVPCNoBadge(t *testing.T) {
 	apiErr := errors.New("ec2: DescribeFlowLogs throttled")
 	fake := &vpcFlowLogFake{

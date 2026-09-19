@@ -21,9 +21,8 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// d1BatchTypes are the types whose classifier or phrase picker this batch
-// touches: the seven raw-field classifiers, opensearch's own phrase builder,
-// the three compute fallbacks, and the two security classifiers.
+// d1BatchTypes are the seven raw-field classifiers, opensearch's own phrase
+// builder, the three compute fallbacks, and the two security classifiers.
 var d1BatchTypes = map[string]bool{
 	"alarm": true, "trail": true, "ct-events": true, "rtb": true,
 	"sns-sub": true, "ses": true, "ssm": true,
@@ -47,7 +46,7 @@ func d1WorstSeverity(fs []domain.Finding) (domain.Severity, bool) {
 	return worst, true
 }
 
-// ─── rows 6 and 7: the selector's own rules ─────────────────────────────────
+// ─── the selector's own rules ─────────────────────────────────
 
 // TestD1_TopFindingNeverShowsHealthyText pins that a severity which is neither
 // an issue nor dim cannot win the Status cell. SevOK sits between dim and warn
@@ -110,11 +109,11 @@ func TestD1_StatusPhraseCountsIssuesOnly(t *testing.T) {
 	}
 }
 
-// ─── rows 1, 4 and 5: colour comes from findings on every demo row ──────────
+// ─── colour comes from findings on every demo row ──────────
 
 // TestD1_DemoRowColourIsTheWorstFindingSeverity pins that every demo row of
 // every batch type is coloured by its own findings and by nothing else. A
-// classifier that still reads raw fields — either instead of the findings or
+// classifier that reads raw fields — either instead of the findings or
 // as a fallback after them — disagrees with this oracle on some row.
 func TestD1_DemoRowColourIsTheWorstFindingSeverity(t *testing.T) {
 	clients := demo.NewServiceClients()
@@ -166,11 +165,10 @@ func TestD1_EveryDemoRowColourIsExplainedByAFinding(t *testing.T) {
 	}
 }
 
-// ─── row 1: the phrases the seven classifiers' branches were computing ──────
+// ─── the phrases the seven classifiers' branches compute ──────
 
 // d1ExpectedPhrases are the phrases each type's own fetcher emits on these
-// fields. Pinned unchanged: a phrase moving here means an emitter was
-// rewritten.
+// fields.
 var d1ExpectedPhrases = map[string][]string{
 	"alarm":     {"alarm triggered", "insufficient data", "no actions"},
 	"trail":     {"not logging", "log file validation disabled"},
@@ -184,7 +182,7 @@ var d1ExpectedPhrases = map[string][]string{
 	"ssm": {"plaintext value looks like a credential", "not modified in over 365 days"},
 }
 
-// ─── row 2: the two private phrase pickers ──────────────────────────────────
+// ─── the two private phrase pickers ──────────────────────────────────
 
 // TestD1_OpenSearchStatusCountsEverySignalOnce pins that the background-check
 // signals are findings on the row, not a separate counter. While they are
@@ -222,7 +220,7 @@ func TestD1_SESStatusIsTheWorstFindingsPhrase(t *testing.T) {
 	}
 }
 
-// ─── row 3: the ecs-svc child rows carry the parent's findings ──────────────
+// ─── the ecs-svc child rows carry the parent's findings ──────────────
 
 // d1ECSFake serves the four ECS calls both the ecs-task fetcher and the
 // ecs-svc child fetcher make, over one fixed task list. The demo fake filters
@@ -297,9 +295,7 @@ func d1Task(id, lastStatus, desiredStatus, health string, stopCode ecstypes.Task
 
 // TestD1_ChildTaskRowsCarryTheSameFindingsAsTheParentType pins that a task
 // reached through its service shows what the same task shows in the ecs-task
-// list. The child fetcher computes only the six transitional states, so an
-// unhealthy task and a crash-stopped one are silent in the child view while
-// the parent type reports both.
+// list, including an unhealthy task and a crash-stopped one.
 func TestD1_ChildTaskRowsCarryTheSameFindingsAsTheParentType(t *testing.T) {
 	fake := &d1ECSFake{tasks: []ecstypes.Task{
 		d1Task("aaaa1111bbbb2222cccc3333dddd4444", "RUNNING", "RUNNING", "UNHEALTHY", ""),
@@ -369,4 +365,4 @@ func d1SameCodes(a, b []domain.Finding) bool {
 	return true
 }
 
-// ─── standard batch test: no supporting row restates its phrase ─────────────
+// ─── no supporting row restates its phrase ─────────────

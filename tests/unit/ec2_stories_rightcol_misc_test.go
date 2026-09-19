@@ -1,8 +1,8 @@
 package unit_test
 
 // ec2_stories_rightcol_misc_test.go — shared EC2 resource fixture for the
-// EC2 QA stories that still need a hand-built EC2 resource (rather than a
-// demo fixture). Callers drive the live Controller/RenderDetail seam via
+// EC2 tests that need a hand-built EC2 resource (rather than a demo fixture).
+// Callers drive the live Controller/RenderDetail seam via
 // makePreviewEC2Detail/previewDetailView
 // (left_column_preview_regressions_test.go).
 
@@ -11,7 +11,7 @@ import (
 )
 
 // ec2StoryResource returns the synthetic EC2 instance shared by the EC2
-// right-column QA stories (Issue #119/#140).
+// right-column tests.
 func ec2StoryResource() resource.Resource {
 	return resource.Resource{
 		ID:   "i-0a1b2c3d4e5f60001",

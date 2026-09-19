@@ -31,16 +31,12 @@ func kmsCheckerByTarget(t *testing.T, target string) resource.RelatedChecker {
 	return nil
 }
 
-// --- Navigable Fields ---
-
 func TestNavigableFields_KMS_None(t *testing.T) {
 	nav := resource.IsFieldNavigableForTest("kms", "KeyId")
 	if nav != nil {
 		t.Errorf("expected no navigable fields for kms, but KeyId resolved to %v", nav)
 	}
 }
-
-// --- EBS checker (Pattern C — cache, KmsKeyId ARN) ---
 
 func TestRelated_KMS_EBS_Found(t *testing.T) {
 	const keyID = "a1b2c3d4-5678-90ab-cdef-111111111111"
@@ -126,8 +122,6 @@ func TestRelated_KMS_EBS_CacheMissNoClients(t *testing.T) {
 	}
 }
 
-// --- RDS checker (Pattern C — cache, KmsKeyId ARN) ---
-
 func TestRelated_KMS_RDS_Found(t *testing.T) {
 	const keyID = "b2c3d4e5-6789-01bc-defg-222222222222"
 	arn := "arn:aws:kms:us-east-1:123456789012:key/" + keyID
@@ -211,8 +205,6 @@ func TestRelated_KMS_RDS_CacheMissNoClients(t *testing.T) {
 		t.Errorf("Count = %d, want -1 (unknown)", result.Count())
 	}
 }
-
-// --- Secrets checker (Pattern C — cache, KmsKeyId ARN) ---
 
 func TestRelated_KMS_Secrets_Found(t *testing.T) {
 	const keyID = "c3d4e5f6-7890-12cd-efgh-333333333333"
@@ -300,10 +292,6 @@ func TestRelated_KMS_Secrets_CacheMissNoClients(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// checkKMSRole — Pattern C: GetKeyPolicy + ListGrants
-// ---------------------------------------------------------------------------
-
 // TestRelated_KMS_Role_Match verifies that grants with role ARNs in
 // GranteePrincipal are returned as resource IDs.
 func TestRelated_KMS_Role_Match(t *testing.T) {
@@ -374,10 +362,6 @@ func TestRelated_KMS_Role_WrongRawStruct(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// Fix 1: checkKMSRole error propagation — errors must return Count=-1
-// ---------------------------------------------------------------------------
-
 // TestRelated_KMS_Role_AccessDenied_ReturnsMinusOne verifies that when
 // GetKeyPolicy returns AccessDeniedException the checker returns Count=-1 and
 // a non-nil Err, not silently swallowing the error.
@@ -388,7 +372,6 @@ func TestRelated_KMS_Role_AccessDenied_ReturnsMinusOne(t *testing.T) {
 		ID:   keyID,
 		Name: "alias/denied-key",
 	}
-	// GetKeyPolicy returns AccessDenied; ListGrants returns empty (never reached).
 	clients := &awsclient.ServiceClients{
 		KMS: &fakeKMSChecker{
 			getKeyPolicyErr: newAccessDeniedError(),
@@ -415,9 +398,6 @@ func TestRelated_KMS_Role_ListGrantsAccessDenied_ReturnsMinusOne(t *testing.T) {
 		ID:   keyID,
 		Name: "alias/list-grants-denied-key",
 	}
-	// GetKeyPolicy returns an empty (non-nil) output with no policy JSON
-	// so the policy parse finds no role principals.
-	// ListGrants then returns AccessDenied.
 	clients := &awsclient.ServiceClients{
 		KMS: &fakeKMSChecker{
 			getKeyPolicyOut: &kmssvc.GetKeyPolicyOutput{},

@@ -1,19 +1,8 @@
 package unit
 
-// Tests for probeEnrichment coverage (internal/tui/app_fetchers.go).
-//
-// probeEnrichment is invoked when ResourcesLoadedMsg{TypeGen!=0} arrives after
-// a Ctrl+R. Its branches:
-//
-//  (a) enricher == nil for the given type → returns nil cmd (skipped by buildEnrichQueue)
-//  (b) clients == nil → EnrichmentCheckedMsg{Err: "AWS clients not initialized"}
-//  (c) enricher returns error → EnrichmentCheckedMsg{Err: <error>}
-//  (d) enricher success → EnrichmentCheckedMsg{TypeGen > 0, ResourceType set}
-//
-// Approach: use the existing "dbi" type (has enricher in registry and is in
-// buildEnrichQueue's order list). For branches (c), temporarily replace
-// EnricherRegistry["dbi"] with a fake that returns an error, restoring the
-// original with t.Cleanup.
+// probeEnrichment runs when ResourcesLoadedMsg{TypeGen!=0} arrives after a
+// Ctrl+R. "dbi" has a registered enricher and is in buildEnrichQueue's order
+// list.
 
 import (
 	"context"
@@ -71,8 +60,6 @@ func setupEnrichmentDispatch(t *testing.T, resources []resource.Resource) (tui.M
 	return m, func() interface{} { return probeCmd() }
 }
 
-// TestProbeEnrichment_NilClients_ReturnsErrorMsg verifies that when clients are
-// nil (no AWS connection), probeEnrichment returns EnrichmentCheckedMsg with Err.
 func TestProbeEnrichment_NilClients_ReturnsErrorMsg(t *testing.T) {
 	tui.Version = "test"
 
@@ -93,15 +80,6 @@ func TestProbeEnrichment_NilClients_ReturnsErrorMsg(t *testing.T) {
 	}
 }
 
-// TestProbeEnrichment_EnricherError_ReturnsErrorMsg verifies that when the
-// registered enricher returns an error, probeEnrichment returns
-// EnrichmentCheckedMsg with Err set. We override the dbi enricher with a fake
-// that errors via SetWave2EnricherForTest; cleanup is automatic via t.Cleanup.
-//
-// To prove branch (c) (enricher-error) is reached and not branch (b)
-// (nil-clients), the test seeds the session with a non-nil empty
-// *awsclient.ServiceClients via the public ClientsReady message channel
-// and asserts the substring of the sentinel error returned by the fake.
 func TestProbeEnrichment_EnricherError_ReturnsErrorMsg(t *testing.T) {
 	tui.Version = "test"
 
@@ -116,9 +94,9 @@ func TestProbeEnrichment_EnricherError_ReturnsErrorMsg(t *testing.T) {
 		Priority: prev.Priority,
 	})
 
-	// Seed non-nil empty clients via the public message channel so probeEnrichment's
-	// nil-clients early-return (branch b) is NOT taken. The fake enricher ignores
-	// the *ServiceClients argument so a zero value is safe.
+	// Non-nil empty clients keep probeEnrichment past its nil-clients early
+	// return; the fake enricher ignores the *ServiceClients argument, so a zero
+	// value is safe.
 	m := newRootSizedModel()
 	// Gen:1 — ConnectGen seeds at 1 (session.New()); this model is never rotated.
 	m, _ = rootApplyMsg(m, messages.ClientsReady{Clients: &awsclient.ServiceClients{}, Gen: 1})
@@ -145,8 +123,6 @@ func TestProbeEnrichment_EnricherError_ReturnsErrorMsg(t *testing.T) {
 	}
 }
 
-// TestProbeEnrichment_TypeGenForwarded verifies that EnrichmentCheckedMsg
-// carries a non-zero TypeGen from the probeEnrichment invocation.
 func TestProbeEnrichment_TypeGenForwarded(t *testing.T) {
 	tui.Version = "test"
 
@@ -167,16 +143,11 @@ func TestProbeEnrichment_TypeGenForwarded(t *testing.T) {
 	}
 }
 
-// TestProbeEnrichment_NoEnricher_NoCmdDispatched verifies that when no enricher
-// is registered for a type, probeEnrichment is not dispatched (returns nil cmd).
-//
-// We test this by temporarily shadowing dbi via DeleteWave2EnricherForTest
-// (injects an Fn=nil override). With no enricher, buildEnrichQueue skips
-// dbi → no probeEnrichment cmd returned. Cleanup is automatic.
+// DeleteWave2EnricherForTest shadows dbi with an Fn=nil override, so
+// buildEnrichQueue skips dbi.
 func TestProbeEnrichment_NoEnricher_NoCmdDispatched(t *testing.T) {
 	tui.Version = "test"
 
-	// Temporarily remove the dbi enricher via Fn=nil override.
 	awsclient.DeleteWave2EnricherForTest(t, "dbi")
 
 	m := newRootSizedModel()
@@ -197,16 +168,12 @@ func TestProbeEnrichment_NoEnricher_NoCmdDispatched(t *testing.T) {
 	}
 }
 
-// TestProbeEnrichment_EmptyResources_StillDispatches verifies that an empty
-// probeResources slice doesn't prevent the cmd from being returned. The enricher
-// is still called (with an empty slice) when probeResources is empty.
 func TestProbeEnrichment_EmptyResources_StillDispatches(t *testing.T) {
 	tui.Version = "test"
 
 	m := newRootSizedModel()
 	m = navigateToDBIList(m)
 	m, _ = rootApplyMsg(m, ctrlRKeyMsg())
-	// Deliver empty resource list with TypeGen=1.
 	_, probeCmd := rootApplyMsg(m, messages.ResourcesLoaded{Provenance: messages.FetchProvenanceCanonicalList,
 		ResourceType: "dbi",
 		Resources:    []resource.Resource{}, // empty
@@ -215,7 +182,6 @@ func TestProbeEnrichment_EmptyResources_StillDispatches(t *testing.T) {
 
 	// buildEnrichQueue checks probeResources[shortName] is present (not empty).
 	// An empty ResourcesLoadedMsg should still seed probeResources (even empty).
-	// If probeCmd is nil here, that's also acceptable behavior — the test documents it.
 	if probeCmd != nil {
 		// Execute it — must not panic.
 		msg := probeCmd()

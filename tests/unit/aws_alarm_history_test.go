@@ -15,10 +15,6 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// ---------------------------------------------------------------------------
-// CloudWatch Alarm History fetcher tests (child of CloudWatch Alarms)
-// ---------------------------------------------------------------------------
-
 // TestFetchAlarmHistory_Basic verifies parsing of 1 alarm history item with all
 // fields populated, checking ID, Name, Status, all Fields, and RawStruct.
 func TestFetchAlarmHistory_Basic(t *testing.T) {
@@ -117,7 +113,6 @@ func TestFetchAlarmHistory_Basic(t *testing.T) {
 		}
 	})
 
-	// Verify required fields are present
 	t.Run("required_fields_present", func(t *testing.T) {
 		requiredFields := []string{"timestamp", "history_item_type", "history_summary"}
 		for _, key := range requiredFields {
@@ -192,8 +187,6 @@ func TestFetchAlarmHistory_NilFields(t *testing.T) {
 					AlarmType:       cwtypes.AlarmTypeMetricAlarm,
 					HistoryItemType: cwtypes.HistoryItemTypeConfigurationUpdate,
 					Timestamp:       &ts,
-					// HistorySummary is nil
-					// HistoryData is nil
 				},
 			},
 		},
@@ -203,7 +196,6 @@ func TestFetchAlarmHistory_NilFields(t *testing.T) {
 		"alarm_name": "NilFieldsAlarm",
 	}
 
-	// Should not panic
 	result, err := awsclient.FetchAlarmHistory(
 		context.Background(),
 		mock,
@@ -413,7 +405,6 @@ func TestFetchAlarmHistory_RawStruct(t *testing.T) {
 func TestFetchAlarmHistory_Pagination(t *testing.T) {
 	ts := time.Date(2024, 3, 22, 10, 0, 0, 0, time.UTC)
 
-	// Page 1: 3 items with NextToken indicating more pages exist.
 	page1Mock := &mockCloudWatchDescribeAlarmHistoryClient{
 		output: &cloudwatch.DescribeAlarmHistoryOutput{
 			NextToken: aws.String("page2-token"),
@@ -447,7 +438,6 @@ func TestFetchAlarmHistory_Pagination(t *testing.T) {
 		"alarm_name": "PaginatedAlarm",
 	}
 
-	// First call: no continuation token — fetches page 1.
 	result1, err := awsclient.FetchAlarmHistory(
 		context.Background(),
 		page1Mock,
@@ -520,18 +510,14 @@ func TestFetchAlarmHistory_Pagination(t *testing.T) {
 	})
 
 	t.Run("page1_single_api_call", func(t *testing.T) {
-		// The new implementation makes exactly one API call per FetchAlarmHistory invocation.
-		// The mock uses single output field (not outputs slice), so callIdx stays 0.
-		// Verify the mock was only called once by checking Resources were returned.
+		// The mock has a single output field, so a returned page proves one API call.
 		if len(result1.Resources) == 0 {
 			t.Error("expected resources from single API call")
 		}
 	})
 
-	// Page 2: 2 items with no NextToken — last page.
 	page2Mock := &mockCloudWatchDescribeAlarmHistoryClient{
 		output: &cloudwatch.DescribeAlarmHistoryOutput{
-			// No NextToken — last page
 			AlarmHistoryItems: []cwtypes.AlarmHistoryItem{
 				{
 					AlarmName:       aws.String("PaginatedAlarm"),
@@ -551,7 +537,6 @@ func TestFetchAlarmHistory_Pagination(t *testing.T) {
 		},
 	}
 
-	// Second call: pass continuation token from page 1 to fetch page 2.
 	result2, err := awsclient.FetchAlarmHistory(
 		context.Background(),
 		page2Mock,
@@ -597,13 +582,12 @@ func TestFetchAlarmHistory_Pagination(t *testing.T) {
 }
 
 // TestFetchAlarmHistory_MaxCap verifies that a single API page of 50 items is
-// returned as-is with correct IsTruncated=true metadata when the API indicates
-// more pages exist. The 200-item cap no longer applies — each call returns one
-// page and the caller drives pagination via continuation tokens.
+// returned as-is with IsTruncated=true when the API indicates more pages
+// exist: each call returns one page and the caller drives pagination via
+// continuation tokens.
 func TestFetchAlarmHistory_MaxCap(t *testing.T) {
 	ts := time.Date(2024, 6, 15, 12, 0, 0, 0, time.UTC)
 
-	// Build one page of 50 items with a NextToken indicating more pages exist.
 	var items []cwtypes.AlarmHistoryItem
 	for i := range 50 {
 		itemTs := ts.Add(time.Duration(i) * time.Second)
@@ -802,7 +786,6 @@ func TestFetchAlarmHistory_ContinuationToken(t *testing.T) {
 		t.Fatalf("expected 1 resource, got %d", len(result.Resources))
 	}
 
-	// Verify the continuation token was forwarded
 	if wrapper.capturedNextToken == nil {
 		t.Fatal("expected NextToken to be set in API call")
 	}

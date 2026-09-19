@@ -1,35 +1,3 @@
-// app_preconnect_replay_test.go — pre-connect replay
-// (docs/design/cache-requirements.md C10): a navigation issued BEFORE the
-// AWS connect completes renders the cached list (C1), its fetch task fails
-// with "AWS clients not initialized", and the last navigation must replay
-// automatically once the connect lands — never a list stuck on cached rows
-// plus a permanent LastFetchError.
-//
-// The mechanism pinned here:
-//  1. session.New() seeds PendingRefresh: true so a fresh session (no
-//     prior profile/region switch) has a pending post-connect refresh armed
-//     at STARTUP, not only after HandleProfileSelected /
-//     HandleRegionSelected set it on switch.
-//  2. BootstrapLive passes the REAL StackDepth (len(c.stack)) and
-//     HasActiveRL (c.topListState() != nil) into ClientsReadyEvent —
-//     otherwise maybeRefreshIntents (core/runtime/handlers.go) can never see
-//     an active list and never emits RefreshActiveListIntent.
-//  3. activeListRefreshTasks (core/app/actions_list.go) turns
-//     RefreshActiveListIntent into a real KindFetchResources task for the
-//     active list's type, at BOTH:
-//     - BootstrapLive's return (the STARTUP connect seam), and
-//     - Controller.Handle's messages.ClientsReady path (the web
-//     profile-switch reconnect seam) — reached when DrainSync/
-//     DrainSyncPartition executes a TaskKindConnect task and feeds the
-//     resulting messages.ClientsReady through Controller.Handle
-//     (core/app/drainsync.go). Test 1 below drives this exact path.
-//
-// All tests are hermetic: A9S_CONFIG_FOLDER redirected to t.TempDir(), no
-// AWS credentials, no network. Cache seeding uses the real
-// cache.LoadDirForTest/Put/SaveType per-type-file surface (mirrors
-// TestPerTypeSave_TouchingOneType_LeavesSiblingFilesByteExact in
-// app_web_live_cold_boot_test.go). Fake profile/region names only
-// ("pilot-prof"/"us-east-1"); realistic resource IDs.
 package unit_test
 
 import (
@@ -43,12 +11,8 @@ import (
 	"github.com/k2m30/a9s/v3/core/session"
 )
 
-// seedS3TypeFile writes a single-type disk cache (mirrors the
-// TestPerTypeSave_TouchingOneType_LeavesSiblingFilesByteExact fixture
-// pattern) so a controller built against the same profile/region pair can
-// warm-seed ProbeResources from disk via EnsureCacheStore/CacheStoreToEvent,
-// exactly as core/web/construct.go's newSession does for the live,
-// no-pre-supplied-clients path.
+// seedS3TypeFile writes a single-type disk cache that a controller for the same
+// profile/region warm-seeds from via EnsureCacheStore/CacheStoreToEvent.
 func seedS3TypeFile(t *testing.T, profile, region string) {
 	t.Helper()
 	store := cache.LoadDirForTest(profile, region)
@@ -69,10 +33,7 @@ func seedS3TypeFile(t *testing.T, profile, region string) {
 }
 
 // newHermeticLiveController builds a live (non-demo) controller against a
-// temp-dir-redirected cache, exactly like newLiveWebStyleController in
-// app_web_live_cold_boot_test.go, but does not seed any clients — the
-// scenario under test is explicitly "navigation issued BEFORE the AWS
-// connect completes".
+// temp-dir cache with no AWS clients.
 func newHermeticLiveController(t *testing.T, profile, region string) (*runtime.Core, *app.Controller) {
 	t.Helper()
 	core := runtime.Bootstrap(profile, region, resource.AllResourceTypes())
@@ -82,12 +43,6 @@ func newHermeticLiveController(t *testing.T, profile, region string) (*runtime.C
 	return core, ctrl
 }
 
-// TestSessionNew_PendingRefreshTrue pins root cause #1 directly: a freshly
-// constructed Session (no profile/region switch has happened yet) must
-// already carry PendingRefresh: true, so the very first STARTUP connect can
-// fire the replay just as a post-switch reconnect does today via
-// HandleProfileSelected/HandleRegionSelected (which explicitly set
-// s.PendingRefresh = true on switch).
 func TestSessionNew_PendingRefreshTrue(t *testing.T) {
 	s := session.New()
 	if !s.PendingRefresh {
@@ -95,30 +50,6 @@ func TestSessionNew_PendingRefreshTrue(t *testing.T) {
 	}
 }
 
-// TestPreConnectNavigate_ReplaysFetchOnClientsReady pins the pre-connect replay end-to-end
-// at the seam the web lane actually uses.
-//
-// Setup: a live controller (no clients) whose disk cache already has s3
-// rows (seedS3TypeFile) is warmed via EnsureCacheStore/CacheStoreToEvent —
-// the same mechanism core/web/construct.go's newSession runs for the
-// live no-pre-supplied-clients path — so the very first snapshot carries
-// cached counts (C1 precondition).
-//
-// The test then applies the pre-connect navigation
-// (app.Action{Kind: app.ActionCommand, Arg: "s3"}), asserting the cached
-// rows render immediately (C1 half of the contract, already green today per
-// TestWebBoot_AvailabilityCacheLoaded_DoesNotSeedProbeResourcesRows's
-// sibling pattern — this assertion here is the regression guard that stops
-// a future change from breaking C1 while fixing C10).
-//
-// It then drives the connect-completion seam exactly the way DrainSync does
-// for a TaskKindConnect result: feeding a messages.ClientsReady event
-// through Controller.Handle (this is what a profile-switch reconnect's
-// TaskKindConnect task result flows through, per
-// core/app/drainsync.go's `_, followUp := c.Handle(ev)`). The RETURNED
-// follow-up tasks must include a KindFetchResources task scoped to "s3" —
-// the navigated type — proving the last pre-connect navigation is replayed
-// automatically once connected, instead of being permanently dropped.
 func TestPreConnectNavigate_ReplaysFetchOnClientsReady(t *testing.T) {
 	t.Setenv("A9S_CONFIG_FOLDER", t.TempDir())
 	const profile, region = "pilot-prof", "us-east-1"
@@ -169,19 +100,11 @@ func TestPreConnectNavigate_ReplaysFetchOnClientsReady(t *testing.T) {
 	}
 }
 
-// TestMenuOnlyStartup_NoRefreshTask pins the non-regression half of the pre-connect replay:
-// a session that never navigated away from the main menu before connecting
-// must NOT get a spurious replay fetch — there is no "last navigation" to
-// replay. It also pins that PendingRefresh is consumed (one-shot): a SECOND
-// ClientsReady landing after the first must not re-fire either, mirroring
-// maybeRefreshIntents' existing "c.session.PendingRefresh = false" clear-on-
-// consume behavior for the profile-switch path.
 func TestMenuOnlyStartup_NoRefreshTask(t *testing.T) {
 	t.Setenv("A9S_CONFIG_FOLDER", t.TempDir())
 	const profile, region = "pilot-prof", "us-east-1"
 
 	core, ctrl := newHermeticLiveController(t, profile, region)
-	// No navigation at all — the stack stays on the menu.
 
 	snap := ctrl.Snapshot()
 	if snap.Body.Kind != app.BodyKindMenu {
@@ -200,8 +123,6 @@ func TestMenuOnlyStartup_NoRefreshTask(t *testing.T) {
 		}
 	}
 
-	// PendingRefresh must be consumed after the first ClientsReady — a
-	// second one (e.g. a stray duplicate delivery) must not re-fire either.
 	_, followUp2 := ctrl.Handle(messages.ClientsReady{
 		Clients: nil,
 		Region:  region,
@@ -215,19 +136,6 @@ func TestMenuOnlyStartup_NoRefreshTask(t *testing.T) {
 	}
 }
 
-// TestPreConnectNavigate_ReplayDrain_ClearsLastFetchError is the optional
-// C4 error-marker companion: after the replay fetch task returned by
-// ClientsReady is actually drained (fed through Controller.Handle as a
-// messages.ResourcesLoaded result, the same lane DrainSync uses), the list's
-// LastFetchError marker must be cleared and fresh rows must be showing —
-// proving the replay is not just a task being RETURNED but one whose result
-// actually reaches the screen.
-//
-// This seeds LastFetchError directly via a prior messages.APIError landing
-// on the s3 list (mirrors C4's "keeps the content, swaps the marker for
-// an error marker" contract already pinned elsewhere) to model the exact
-// failure state the pre-connect replay describes: "AWS clients not initialized" left a
-// permanent error marker on the pre-connect fetch attempt.
 func TestPreConnectNavigate_ReplayDrain_ClearsLastFetchError(t *testing.T) {
 	t.Setenv("A9S_CONFIG_FOLDER", t.TempDir())
 	const profile, region = "pilot-prof", "us-east-1"
@@ -242,8 +150,6 @@ func TestPreConnectNavigate_ReplayDrain_ClearsLastFetchError(t *testing.T) {
 
 	_, _ = ctrl.Apply(app.Action{Kind: app.ActionCommand, Arg: "s3"})
 
-	// Model the pre-connect fetch's "AWS clients not initialized" failure
-	// landing on the list before the connect completes.
 	ctrl.Handle(messages.APIError{
 		Err:          errPreConnectClientsNotInitialized{},
 		ResourceType: "s3",
@@ -294,10 +200,8 @@ func TestPreConnectNavigate_ReplayDrain_ClearsLastFetchError(t *testing.T) {
 	}
 }
 
-// errPreConnectClientsNotInitialized is a minimal error type standing in
-// for the real "AWS clients not initialized" error the pre-connect replay names, kept local
-// to this file so the test has no dependency on the production error
-// value's exact type or message.
+// errPreConnectClientsNotInitialized stands in for the production
+// "AWS clients not initialized" error.
 type errPreConnectClientsNotInitialized struct{}
 
 func (errPreConnectClientsNotInitialized) Error() string {

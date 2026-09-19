@@ -1,16 +1,5 @@
 package unit
 
-// app_restart_availability_sweep_test.go — coverage for
-// Controller.RestartAvailabilitySweep (core/app/actions_list.go): the neutral
-// main-menu refresh bundle handleActionRefresh's menu branch calls — bump
-// AvailabilityGen + EnrichmentGen, reset the enrichment maps, strip
-// wave2-sourced findings from every retained type's rows
-// (Core.ClearAllWave2Findings), reset the probe maps, clear the menu's
-// cached availability/issue state (MenuClearAvailabilityIntent), and clear
-// the swept-pair latch — returning the single TaskKindLoadAvailCache task
-// that chains the sweep through the drain loop. No-op (nil tasks, gens
-// unchanged) in no-cache mode.
-
 import (
 	"testing"
 
@@ -21,14 +10,6 @@ import (
 	"github.com/k2m30/a9s/v3/core/session"
 )
 
-// TestApply_ActionRefresh_MenuScreen_BumpsGensClearsMenuAndStripsWave2 drives
-// Apply(ActionRefresh) on the menu screen (the default/root screen of a
-// freshly-constructed Controller) and asserts the full mutation bundle:
-// the TaskKindLoadAvailCache task is returned, both gens advance, the
-// menu's cached availability/issue state is cleared through the exported
-// GetMenuAvailability/GetMenuTruncated/GetMenuIssueCounts readers, and a
-// wave2-sourced finding is stripped from a seeded type's rows while its
-// wave1 finding survives (reusing the wave-3 RefreshListEnrichment idiom).
 func TestApply_ActionRefresh_MenuScreen_BumpsGensClearsMenuAndStripsWave2(t *testing.T) {
 	c, core := newDetailParityHeadlessController(t)
 
@@ -94,10 +75,6 @@ func TestApply_ActionRefresh_MenuScreen_BumpsGensClearsMenuAndStripsWave2(t *tes
 	}
 }
 
-// TestApply_ActionRefresh_MenuScreen_NoCacheMode_NilTasksGensUnchanged covers
-// the no-cache short-circuit: RestartAvailabilitySweep must return nil
-// (no TaskKindLoadAvailCache, no gen bump) when the session runs in
-// no-cache mode.
 func TestApply_ActionRefresh_MenuScreen_NoCacheMode_NilTasksGensUnchanged(t *testing.T) {
 	c, core := newDetailParityHeadlessController(t)
 	core.SetNoCache(true)

@@ -79,12 +79,6 @@ func TestRelated_Athena_S3_Unknown(t *testing.T) {
 	}
 }
 
-// NOTE: The athena→s3 "Found" path now makes a live GetWorkGroup API call
-// (Pattern C). Verifying a positive match requires a mocked *ServiceClients
-// whose Athena satisfies AthenaGetWorkGroupAPI — set up in the integration
-// test suite. Unit tests cover the nil-clients path (above) and the
-// s3://-URI parser via bucketFromS3URI in its own test.
-
 func TestRelated_Athena_KMS_Unknown(t *testing.T) {
 	res := resource.Resource{
 		ID:     "primary",
@@ -97,13 +91,6 @@ func TestRelated_Athena_KMS_Unknown(t *testing.T) {
 		t.Errorf("Count = %d, want -1 (GetWorkGroup enrichment needed)", result.Count())
 	}
 }
-
-// Same pattern for athena→kms: the positive match now requires a mocked
-// GetWorkGroup response. See integration tests.
-
-// ---------------------------------------------------------------------------
-// checkAthenaS3 — positive match with fake AthenaAPI
-// ---------------------------------------------------------------------------
 
 // TestRelated_Athena_S3_Match verifies that a workgroup with an s3:// OutputLocation
 // returns Count=1 and the bucket name extracted from the URI.
@@ -142,10 +129,6 @@ func TestRelated_Athena_S3_NoOutputLocation(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// checkAthenaKMS — positive match with fake AthenaAPI
-// ---------------------------------------------------------------------------
-
 // TestRelated_Athena_KMS_Match verifies that a KMS key ARN extracts the UUID
 // (last "/" segment) as the resource ID.
 func TestRelated_Athena_KMS_Match(t *testing.T) {
@@ -178,10 +161,6 @@ func TestRelated_Athena_KMS_NoKey(t *testing.T) {
 		t.Errorf("Count = %d, want 0 (no KMS key)", result.Count())
 	}
 }
-
-// ---------------------------------------------------------------------------
-// checkAthenaLogs — CW metrics enabled/disabled branches
-// ---------------------------------------------------------------------------
 
 // TestRelated_Athena_Logs_CWEnabled verifies that when PublishCloudWatchMetricsEnabled
 // is true the log group /aws/athena/<wgName> is returned.
@@ -217,10 +196,6 @@ func TestRelated_Athena_Logs_CWDisabled(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// checkAthenaRole — ExecutionRole extraction
-// ---------------------------------------------------------------------------
-
 // TestRelated_Athena_Role_Match verifies that the ExecutionRole ARN last segment
 // is returned as the role name.
 func TestRelated_Athena_Role_Match(t *testing.T) {
@@ -254,15 +229,9 @@ func TestRelated_Athena_Role_NoRole(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// checkAthenaS3 — demo default workgroup "primary"
-// ---------------------------------------------------------------------------
-
-// TestRelated_Athena_S3_PrimaryWorkgroup_NotUnknown pins FIX 2: the demo
-// default workgroup "primary" has no entry in fixtures.WorkGroupDetails, so
-// the demo AthenaFake's GetWorkGroup returns an empty Configuration and
-// checkAthenaS3 falls back to RelatedUnknown — leaving the RELATED panel
-// all-blank for the very first workgroup a demo user opens.
+// TestRelated_Athena_S3_PrimaryWorkgroup_NotUnknown: the demo default workgroup
+// "primary" is the first one a demo user opens; its GetWorkGroup answer must
+// carry a Configuration so the S3 pivot resolves.
 func TestRelated_Athena_S3_PrimaryWorkgroup_NotUnknown(t *testing.T) {
 	res := resource.Resource{ID: "primary", Name: "primary", Fields: map[string]string{}}
 	clients := &awsclient.ServiceClients{Athena: fakes.NewAthena()}
@@ -274,10 +243,3 @@ func TestRelated_Athena_S3_PrimaryWorkgroup_NotUnknown(t *testing.T) {
 			"(the \"primary\" workgroup needs a WorkGroupDetails entry in demo fixtures)", res.ID)
 	}
 }
-
-// athena:glue (checkAthenaGlue) was removed along with its registration: its
-// own comment documented that no structured glue job/catalog field exists on
-// the WorkGroup config, so resolving which specific Glue jobs share a
-// catalog would require a catalog crawl outside this checker's scope. See
-// qa_demo_pivot_coverage_test.go's knownDisconnectedPivots terminal-state
-// comment for the burn-down precedent this deletion follows.

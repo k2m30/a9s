@@ -1,10 +1,5 @@
 package unit_test
 
-// ct_events_pivot_e2e_nav_test.go — Layer 5 end-to-end regression test for
-// demo-mode ct-events self-pivot navigation.
-//
-// All tests need rewrite onto the cold-cache harness (T047-T049, Phase 5 rewrite).
-
 import (
 	"testing"
 

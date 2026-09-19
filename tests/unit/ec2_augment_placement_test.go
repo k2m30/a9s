@@ -1,34 +1,9 @@
 package unit
 
-// ec2_augment_placement_test.go — regression test for PR-01 Bug 2.
-//
-// Bug: augmentEC2StatusChecks searches for a domain.Section with Title == "State"
-// to find the insertion point. However, projection.Generic does NOT produce a
-// section titled "State" — State appears as an ItemHeader (domain.ItemHeader)
-// inside an unnamed leading section. The Title-based search never matches, so
-// Status Checks is always appended at the end (after Tags), not immediately
-// after the State block.
-//
-// Fix: augmentEC2StatusChecks must instead locate the State block by scanning
-// for an ItemHeader whose Label == "State" within the leading unnamed section,
-// then split and insert after that header+subfields cluster.
-//
-// This test builds a synthetic []domain.Section that mirrors what
-// projection.Generic produces for a running EC2 instance:
-//
-//	Section{Title: ""}  — unnamed leading section
-//	  Items:
-//	    ItemField{Label:"InstanceId", Value:"i-xxx"}
-//	    ItemHeader{Label:"State"}
-//	    ItemSubfield{Label:"Name", Value:"running"}
-//	    ItemSubfield{Label:"Code", Value:"16"}
-//	    ItemField{Label:"InstanceType", Value:"t3.large"}
-//	Section{Title: "Tags"}
-//	  Items:
-//	    ItemField{Label:"env", Value:"prod"}
-//
-// It calls the EC2 type's Augment hook (resource.FindResourceType("ec2").Augment)
-// and verifies that Status Checks appears BEFORE Tags in the result.
+// ec2_augment_placement_test.go — projection.Generic places State as an
+// ItemHeader inside the unnamed leading section, not as a section titled
+// "State". augmentEC2StatusChecks locates the State block by that header and
+// inserts Status Checks after the header+subfields cluster, before Tags.
 
 import (
 	"testing"
@@ -82,15 +57,7 @@ func sectionIndexByTitle(sections []domain.Section, title string) int {
 }
 
 // TestAugmentEC2StatusChecks_PlacementAfterState asserts that when the EC2
-// augmenter injects "Status Checks" it appears BEFORE the "Tags" section in
-// the output.
-//
-// Today the augmenter searches for sec.Title == "State" — which never matches
-// because projection.Generic places State as an ItemHeader inside an unnamed
-// section. So Status Checks is appended at the very end (after Tags).
-//
-// The test FAILS today because Status Checks index > Tags index.
-// After the fix, Status Checks index < Tags index.
+// augmenter injects "Status Checks" it appears before the "Tags" section.
 func TestAugmentEC2StatusChecks_PlacementAfterState(t *testing.T) {
 	td := resource.FindResourceType("ec2")
 	if td == nil {
@@ -123,8 +90,6 @@ func TestAugmentEC2StatusChecks_PlacementAfterState(t *testing.T) {
 		t.Fatalf("'Tags' section missing from augmented output; got sections: %v", sectionTitles(result))
 	}
 
-	// The key assertion: Status Checks must appear BEFORE Tags.
-	// Today this fails because Status Checks is appended at end (index > Tags index).
 	if statusChecksIdx > tagsIdx {
 		t.Errorf(
 			"Status Checks placed at index %d (after Tags at index %d) but expected immediately after State block — "+

@@ -438,16 +438,9 @@ func TestHasServicePrincipalWithoutSourceScope(t *testing.T) {
 	}
 }
 
-// --- verify round: adversarial attacks against the landed engine ---
-
-// FINDING 1: a real IAM document, when percent-encoded by a real-world
-// encoder that leaves '+' unescaped (many do, since '+' needs no escaping
-// outside a form body), has any literal '+' in its content silently turned
-// into a space. url.QueryUnescape treats '+' as application/x-www-form-urlencoded
-// space, which AWS's percent-encoded policy documents are not: AWS encodes a
-// real space as %20, so a literal '+' surviving the encoder means a literal
-// '+' in the source, not a space. iampolicy.Parse (policy.go:60-63) uses
-// url.QueryUnescape and corrupts it.
+// AWS percent-encodes a real space as %20, so a literal '+' an encoder left
+// unescaped is a '+', not a space. url.QueryUnescape reads '+' as a
+// form-encoded space and would corrupt it.
 func TestParse_URLEncoded_LiteralPlusIsNotSpace(t *testing.T) {
 	plain := `{"Statement":[{"Effect":"Allow","Principal":"*","Action":"s3:GetObject","Resource":"*","Condition":{"StringEquals":{"aws:PrincipalTag/Team":"a+b"}}}]}`
 	encoded := strings.ReplaceAll(url.QueryEscape(plain), "%2B", "+")
@@ -466,14 +459,9 @@ func TestParse_URLEncoded_LiteralPlusIsNotSpace(t *testing.T) {
 	}
 }
 
-// FINDING 2: a statement carrying both Principal and NotPrincipal (invalid
-// under AWS's own policy grammar, but not guaranteed to be rejected for an
-// already-attached or hand-edited resource policy read back via a read-only
-// API) takes the NotPrincipal branch unconditionally (policy.go:85-90) and
-// silently discards the real Principal's AWS entries — evaluate.go:46-48
-// then `continue`s past CrossAccount aggregation for the whole statement.
-// A concrete cross-account principal must not vanish from CrossAccount just
-// because a NotPrincipal key also happens to be present.
+// A statement carrying both Principal and NotPrincipal is invalid under AWS's
+// policy grammar but can still be read back from a hand-edited resource
+// policy; its concrete cross-account Principal still reaches CrossAccount.
 func TestEvaluate_PrincipalAndNotPrincipalBothPresent_CrossAccountNotDropped(t *testing.T) {
 	doc := `{"Statement":{"Effect":"Allow","Principal":{"AWS":"210987654321"},"NotPrincipal":{"AWS":"999888777666"},"Action":"s3:GetObject","Resource":"*"}}`
 	d := mustParse(t, doc)
@@ -482,8 +470,6 @@ func TestEvaluate_PrincipalAndNotPrincipalBothPresent_CrossAccountNotDropped(t *
 		t.Errorf("CrossAccount = %v, want it to contain 210987654321 (the real Principal, not silently dropped because NotPrincipal was also present)", ex.CrossAccount)
 	}
 }
-
-// --- verify round: correctly-handled edge cases, pinned against regression ---
 
 func TestEvaluate_ForAnyValuePrefixedOperator_StillRestrictive(t *testing.T) {
 	doc := `{"Statement":{"Effect":"Allow","Principal":{"AWS":"*"},"Action":"s3:GetObject","Resource":"*","Condition":{"ForAnyValue:StringEquals":{"aws:PrincipalOrgID":"o-abc123"}}}}`
@@ -525,8 +511,6 @@ func TestPrivilegeEscalation_LowercaseActionsStillMatchCombo(t *testing.T) {
 		t.Errorf("PrivilegeEscalation() = %v, want to contain PassRole+CreateLambda+Invoke even with all-lowercase action names", d.PrivilegeEscalation())
 	}
 }
-
-// --- edge cases around the fixes above ---
 
 func TestEvaluate_NotPrincipalOnly_NoPrincipalBlock_PublicButNoCrossAccount(t *testing.T) {
 	doc := `{"Statement":{"Effect":"Allow","NotPrincipal":{"AWS":"210987654321"},"Action":"s3:GetObject","Resource":"*"}}`

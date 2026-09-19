@@ -30,7 +30,7 @@ func deepCopyParams(m map[string]any) map[string]any {
 
 // TestCTDetailSummarizeGeneric_PurityNoMutation is the load-bearing purity contract test.
 // SummarizeGeneric must not mutate the params map it receives. Mutation here would corrupt
-// the cleaned-params returned by ExtractTarget (T006 de-dup rule), causing downstream bugs.
+// the cleaned-params returned by ExtractTarget, causing downstream bugs.
 func TestCTDetailSummarizeGeneric_PurityNoMutation(t *testing.T) {
 	params := map[string]any{
 		"foo":    "bar",
@@ -94,7 +94,6 @@ func TestCTDetailSummarizeGeneric_HeterogeneousTypes(t *testing.T) {
 		"nestedMap": map[string]any{"deep": "value"},
 	}
 	var rows []ctevent.Row
-	// Must not panic.
 	func() {
 		defer func() {
 			if r := recover(); r != nil {
@@ -123,7 +122,6 @@ func TestCTDetailSummarizeGeneric_EventNameIgnored(t *testing.T) {
 	if rowsArbitrary == nil {
 		t.Fatal("SummarizeGeneric(\"SomeRandomEvent\", params) returned nil; want non-nil slice")
 	}
-	// The output shape must be the same regardless of the eventName passed.
 	if len(rowsEmpty) != len(rowsArbitrary) {
 		t.Errorf("eventName changes row count: got %d for empty name, %d for non-empty name; generic walk must ignore eventName",
 			len(rowsEmpty), len(rowsArbitrary))

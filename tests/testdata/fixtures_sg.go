@@ -6,9 +6,6 @@ import (
 )
 
 // RealSecurityGroups returns sanitized Security Group data based on real AWS structure.
-// Account: 123456789012 (sanitized)
-// Region: us-east-1
-// Total security groups: 21
 func RealSecurityGroups() []ec2types.SecurityGroup {
 	return []ec2types.SecurityGroup{
 		{

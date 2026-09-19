@@ -1,9 +1,5 @@
 package unit
 
-// codex2_round5_test.go — the third instance of "a recorded failure never
-// leaves its function", found by the gate in
-// qa_failure_discharge_gate_test.go.
-
 import (
 	"context"
 	"errors"
@@ -30,10 +26,8 @@ func codex2DBIRows(t *testing.T, instances ...rdstypes.DBInstance) []resource.Re
 	return rs
 }
 
-// TestEnrichDBI_RefusedEngineVersionLookupReachesTheOperator pins the third
-// silent lane: enrichDBIEngineVersions recorded its failures into a local
-// slice, used it only to raise the Truncated flag, and dropped the causes. The
-// row rendered "?" with nothing anywhere saying the call was refused.
+// A refused engine-version lookup renders "?" on the row; the refusal must
+// reach the operator.
 func TestEnrichDBI_RefusedEngineVersionLookupReachesTheOperator(t *testing.T) {
 	old := w2DBIInstance("acme-legacy-db")
 	old.Engine = aws.String("mysql")
@@ -63,8 +57,6 @@ func TestEnrichDBI_RefusedEngineVersionLookupReachesTheOperator(t *testing.T) {
 	}
 }
 
-// TestEnrichDBI_HealthyRunStillReturnsNoError is the negative control: the
-// aggregate must stay nil when nothing failed, or every clean run reports one.
 func TestEnrichDBI_HealthyRunStillReturnsNoError(t *testing.T) {
 	current := w2DBIInstance("acme-billing-db")
 	current.Engine = aws.String("postgres")

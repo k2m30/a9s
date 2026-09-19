@@ -1,19 +1,5 @@
 package unit
 
-// aws_iam_policies_enrich_test.go — coverage for enrichPolicy in iam_policies_enrich.go.
-//
-// Covers:
-//   - wrong clients type → error "invalid detail-enrichment context"
-//   - nil DetailEnrichmentCtx → error
-//   - nil Clients inside ctx → error
-//   - nil PolicyDocs inside ctx → error
-//   - wrong RawStruct type → error
-//   - nil policy ARN → error
-//   - cache hit → returns enriched without calling API
-//   - cache miss → calls FetchManagedPolicyDocument, stores result
-//   - PolicyEnriched re-enrichment path → accepts PolicyEnriched as input
-//   - API error propagated to caller
-
 import (
 	"context"
 	"net/url"
@@ -26,10 +12,6 @@ import (
 	awsclient "github.com/k2m30/a9s/v3/core/aws"
 	"github.com/k2m30/a9s/v3/core/resource"
 )
-
-// ---------------------------------------------------------------------------
-// enrichPolicyIAM — a full IAMAPI fake with controllable GetPolicy/GetPolicyVersion
-// ---------------------------------------------------------------------------
 
 type enrichPolicyIAM struct {
 	getPolicyFn        func(*iam.GetPolicyInput) (*iam.GetPolicyOutput, error)
@@ -54,8 +36,6 @@ func (f *enrichPolicyIAM) GetPolicyVersion(_ context.Context, in *iam.GetPolicyV
 		PolicyVersion: &iamtypes.PolicyVersion{Document: aws.String(emptyDoc)},
 	}, nil
 }
-
-// --- Stubs for the rest of IAMAPI ---
 
 func (f *enrichPolicyIAM) ListRoles(_ context.Context, _ *iam.ListRolesInput, _ ...func(*iam.Options)) (*iam.ListRolesOutput, error) {
 	return &iam.ListRolesOutput{}, nil
@@ -112,12 +92,7 @@ func (f *enrichPolicyIAM) GetInstanceProfile(_ context.Context, _ *iam.GetInstan
 	return &iam.GetInstanceProfileOutput{InstanceProfile: &iamtypes.InstanceProfile{}}, nil
 }
 
-// Compile-time check: enrichPolicyIAM satisfies IAMAPI.
 var _ awsclient.IAMAPI = (*enrichPolicyIAM)(nil)
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
 
 // enrichPolicyEnricher returns the registered detail enricher for "policy".
 // Fails immediately if not found.
@@ -154,10 +129,6 @@ func makePolicyRes(arn string) resource.Resource {
 func buildVersionDoc(docJSON string) string {
 	return url.PathEscape(docJSON)
 }
-
-// ---------------------------------------------------------------------------
-// Tests: invalid clients
-// ---------------------------------------------------------------------------
 
 func TestEnrichPolicy_WrongClientsType_ReturnsError(t *testing.T) {
 	enricher := enrichPolicyEnricher(t)
@@ -207,10 +178,6 @@ func TestEnrichPolicy_NilPolicyDocs_ReturnsError(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// Tests: bad RawStruct
-// ---------------------------------------------------------------------------
-
 func TestEnrichPolicy_WrongRawStructType_ReturnsError(t *testing.T) {
 	enricher := enrichPolicyEnricher(t)
 	res := resource.Resource{
@@ -250,14 +217,9 @@ func TestEnrichPolicy_EmptyPolicyARN_ReturnsError(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// Tests: cache hit
-// ---------------------------------------------------------------------------
-
 func TestEnrichPolicy_CacheHit_ReturnsEnrichedWithoutAPICall(t *testing.T) {
 	const policyArn = "arn:aws:iam::123456789012:policy/cached-policy"
 
-	// Track if GetPolicyVersion is ever called.
 	apiCalled := false
 	iamFake := &enrichPolicyIAM{
 		getPolicyVersionFn: func(_ *iam.GetPolicyVersionInput) (*iam.GetPolicyVersionOutput, error) {
@@ -266,7 +228,6 @@ func TestEnrichPolicy_CacheHit_ReturnsEnrichedWithoutAPICall(t *testing.T) {
 		},
 	}
 
-	// Pre-populate the cache with a document.
 	policyDocs := &awsclient.PolicyDocumentCache{}
 	cachedDoc := map[string]any{"Version": "2012-10-17", "Statement": []any{}}
 	policyDocs.Set(awsclient.ManagedKey(policyArn), cachedDoc)
@@ -298,10 +259,6 @@ func TestEnrichPolicy_CacheHit_ReturnsEnrichedWithoutAPICall(t *testing.T) {
 		t.Error("enriched.Document must not be nil on cache hit")
 	}
 }
-
-// ---------------------------------------------------------------------------
-// Tests: cache miss
-// ---------------------------------------------------------------------------
 
 func TestEnrichPolicy_CacheMiss_CallsAPIAndStoresResult(t *testing.T) {
 	const policyArn = "arn:aws:iam::123456789012:policy/new-policy"
@@ -350,7 +307,6 @@ func TestEnrichPolicy_CacheMiss_CallsAPIAndStoresResult(t *testing.T) {
 		t.Error("enriched.Document must not be nil after API call")
 	}
 
-	// Verify the result was stored in cache.
 	cached := policyDocs.Get(awsclient.ManagedKey(policyArn))
 	if cached == nil {
 		t.Error("document should be stored in cache after fetch, but cache.Get returned nil")
@@ -384,11 +340,9 @@ func TestEnrichPolicy_CacheMiss_SecondCallUsesCacheNotAPI(t *testing.T) {
 	enricher := enrichPolicyEnricher(t)
 	res := makePolicyRes(policyArn)
 
-	// First call — hits API.
 	if _, err := enricher(context.Background(), ctx, res); err != nil {
 		t.Fatalf("first call error: %v", err)
 	}
-	// Second call — should use cache.
 	if _, err := enricher(context.Background(), ctx, res); err != nil {
 		t.Fatalf("second call error: %v", err)
 	}
@@ -397,10 +351,6 @@ func TestEnrichPolicy_CacheMiss_SecondCallUsesCacheNotAPI(t *testing.T) {
 		t.Errorf("GetPolicyVersion called %d times across two enrichments, want 1 (second should use cache)", apiCallCount)
 	}
 }
-
-// ---------------------------------------------------------------------------
-// Tests: PolicyEnriched re-enrichment path
-// ---------------------------------------------------------------------------
 
 func TestEnrichPolicy_PolicyEnrichedRawStruct_Accepted(t *testing.T) {
 	const policyArn = "arn:aws:iam::123456789012:policy/already-enriched"
@@ -422,7 +372,6 @@ func TestEnrichPolicy_PolicyEnrichedRawStruct_Accepted(t *testing.T) {
 	ctx := makePolicyCtx(iamFake)
 	enricher := enrichPolicyEnricher(t)
 
-	// Input is already a PolicyEnriched (re-enrichment scenario).
 	res := resource.Resource{
 		ID: policyArn,
 		RawStruct: awsclient.PolicyEnriched{
@@ -448,10 +397,6 @@ func TestEnrichPolicy_PolicyEnrichedRawStruct_Accepted(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// Tests: API error propagation
-// ---------------------------------------------------------------------------
-
 func TestEnrichPolicy_APIError_Propagated(t *testing.T) {
 	const policyArn = "arn:aws:iam::123456789012:policy/error-policy"
 
@@ -470,10 +415,6 @@ func TestEnrichPolicy_APIError_Propagated(t *testing.T) {
 		t.Fatal("expected error from API failure, got nil")
 	}
 }
-
-// ---------------------------------------------------------------------------
-// Tests: PolicyDocumentCache registry
-// ---------------------------------------------------------------------------
 
 func TestDetailEnricherRegistry_Policy_IsNonNil(t *testing.T) {
 	e := resource.GetDetailEnricher("policy")

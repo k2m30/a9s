@@ -1,12 +1,5 @@
 package unit_test
 
-// aws_opensearch_related_test.go — related-panel checker tests for the opensearch
-// resource type.
-//
-// Tests use the graph-root fixture (fixtures.GraphRootDomain / acme-logs) and
-// per-pivot caches populated from sibling fixtures. Adversarial cases (nil
-// RawStruct, ListTags error, DescribeDomainConfig error) are constructed inline.
-
 import (
 	"context"
 	"errors"
@@ -26,24 +19,16 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// ---------------------------------------------------------------------------
-// Mocks — OpenSearch API surfaces used by related checkers
-// ---------------------------------------------------------------------------
-
 // mockOSFullAPI implements OpenSearchAPI + OpenSearchListTagsAPI +
 // OpenSearchDescribeDomainConfigAPI so it can be assigned to
 // ServiceClients.OpenSearch.
 type mockOSFullAPI struct {
-	// ListDomainNames
-	listOutput *opensearch.ListDomainNamesOutput
-	listErr    error
-	// DescribeDomains
-	describeOutput *opensearch.DescribeDomainsOutput
-	describeErr    error
-	// ListTags
-	listTagsOutput *opensearch.ListTagsOutput
-	listTagsErr    error
-	// DescribeDomainConfig
+	listOutput                 *opensearch.ListDomainNamesOutput
+	listErr                    error
+	describeOutput             *opensearch.DescribeDomainsOutput
+	describeErr                error
+	listTagsOutput             *opensearch.ListTagsOutput
+	listTagsErr                error
 	describeDomainConfigOutput *opensearch.DescribeDomainConfigOutput
 	describeDomainConfigErr    error
 }
@@ -92,10 +77,6 @@ func (m *mockOSFullAPI) DescribeDomainConfig(
 	return m.describeDomainConfigOutput, m.describeDomainConfigErr
 }
 
-// ---------------------------------------------------------------------------
-// Helper — opensearchCheckerByTarget
-// ---------------------------------------------------------------------------
-
 func opensearchCheckerByTarget(t *testing.T, target string) resource.RelatedChecker {
 	t.Helper()
 	for _, def := range resource.GetRelated("opensearch") {
@@ -109,10 +90,6 @@ func opensearchCheckerByTarget(t *testing.T, target string) resource.RelatedChec
 	t.Fatalf("opensearch related checker for %s not found", target)
 	return nil
 }
-
-// ---------------------------------------------------------------------------
-// Helper — osGraphRootResource builds the graph-root resource from the fixture.
-// ---------------------------------------------------------------------------
 
 func osGraphRootResource() resource.Resource {
 	fix := fixtures.NewOpenSearchFixtures()
@@ -132,10 +109,6 @@ func osGraphRootResource() resource.Resource {
 	panic("GraphRootDomain fixture not found — check fixtures.NewOpenSearchFixtures()")
 }
 
-// ---------------------------------------------------------------------------
-// 1. ACM — resolves via DescribeDomainConfig.CustomEndpointCertificateArn
-// ---------------------------------------------------------------------------
-
 func TestRelated_OpenSearch_ACM(t *testing.T) {
 	clients := &awsclient.ServiceClients{
 		OpenSearch: &mockOSFullAPI{
@@ -153,9 +126,8 @@ func TestRelated_OpenSearch_ACM(t *testing.T) {
 		},
 	}
 
-	// The ACM fetcher indexes Resource.ID by DomainName. The checker now
-	// reverse-scans the acm cache for a CertificateSummary whose ARN matches
-	// and returns the target Resource.ID (DomainName) so drill-through lands.
+	// The ACM fetcher keys Resource.ID by DomainName, so the checker maps the
+	// certificate ARN back to its DomainName for drill-through to land.
 	acmDomainName := "acme-logs.internal.com"
 	acmRes := resource.Resource{
 		ID:   acmDomainName,
@@ -182,10 +154,6 @@ func TestRelated_OpenSearch_ACM(t *testing.T) {
 		t.Errorf("ResourceIDs = %v, want [%s] (ACM fetcher indexes by DomainName, not bare cert ID)", result.ResourceIDs(), acmDomainName)
 	}
 }
-
-// ---------------------------------------------------------------------------
-// 2. Alarm — reverse-scan by Namespace=AWS/ES + DomainName dimension
-// ---------------------------------------------------------------------------
 
 func TestRelated_OpenSearch_Alarm(t *testing.T) {
 	alarmA := resource.Resource{
@@ -235,10 +203,6 @@ func TestRelated_OpenSearch_Alarm(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// 3. CFN — resolves via ListTags returning aws:cloudformation:stack-name
-// ---------------------------------------------------------------------------
-
 func TestRelated_OpenSearch_CFN(t *testing.T) {
 	clients := &awsclient.ServiceClients{
 		OpenSearch: &mockOSFullAPI{
@@ -276,10 +240,6 @@ func TestRelated_OpenSearch_CFN(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// 4. KMS — resolves via EncryptionAtRestOptions.KmsKeyId (bare key ID)
-// ---------------------------------------------------------------------------
-
 func TestRelated_OpenSearch_KMS(t *testing.T) {
 	kmsRes := resource.Resource{
 		ID:   fixtures.OpenSearchKMSKeyID,
@@ -300,12 +260,8 @@ func TestRelated_OpenSearch_KMS(t *testing.T) {
 	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != fixtures.OpenSearchKMSKeyID {
 		t.Errorf("ResourceIDs = %v, want [%s]", result.ResourceIDs(), fixtures.OpenSearchKMSKeyID)
 	}
-	_ = kmsRes // kms checker uses forward-lookup from DomainStatus, not cache scan
+	_ = kmsRes // kms checker reads DomainStatus directly
 }
-
-// ---------------------------------------------------------------------------
-// 5. Logs — resolves via LogPublishingOptions (3 groups from graph-root fixture)
-// ---------------------------------------------------------------------------
 
 func TestRelated_OpenSearch_Logs(t *testing.T) {
 	logA := resource.Resource{ID: fixtures.OpenSearchLogGroupSearchSlow, Name: fixtures.OpenSearchLogGroupSearchSlow, Fields: map[string]string{}}
@@ -343,13 +299,8 @@ func TestRelated_OpenSearch_Logs(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// 6. SG — resolves via VPCOptions.SecurityGroupIds
-// ---------------------------------------------------------------------------
-
 func TestRelated_OpenSearch_SG(t *testing.T) {
-	// SG checker uses forward-lookup from DomainStatus, not cache scan, so
-	// the cache is intentionally empty here.
+	// The SG checker reads DomainStatus directly, so the cache is empty.
 	cache := resource.ResourceCache{}
 
 	checker := opensearchCheckerByTarget(t, "sg")
@@ -370,10 +321,6 @@ func TestRelated_OpenSearch_SG(t *testing.T) {
 		t.Errorf("ResourceIDs = %v, missing %s", result.ResourceIDs(), fixtures.OpenSearchSGB)
 	}
 }
-
-// ---------------------------------------------------------------------------
-// 7. Subnet — resolves via VPCOptions.SubnetIds
-// ---------------------------------------------------------------------------
 
 func TestRelated_OpenSearch_Subnet(t *testing.T) {
 	subnetA := resource.Resource{ID: fixtures.OpenSearchSubnetA, Name: fixtures.OpenSearchSubnetA, Fields: map[string]string{}}
@@ -397,12 +344,8 @@ func TestRelated_OpenSearch_Subnet(t *testing.T) {
 	if !ids[fixtures.OpenSearchSubnetB] {
 		t.Errorf("ResourceIDs = %v, missing %s", result.ResourceIDs(), fixtures.OpenSearchSubnetB)
 	}
-	_, _ = subnetA, subnetB // subnet checker uses forward-lookup from DomainStatus, not cache scan
+	_, _ = subnetA, subnetB // subnet checker reads DomainStatus directly
 }
-
-// ---------------------------------------------------------------------------
-// 8. VPC — resolves via VPCOptions.VPCId
-// ---------------------------------------------------------------------------
 
 func TestRelated_OpenSearch_VPC(t *testing.T) {
 	vpcRes := resource.Resource{ID: fixtures.OpenSearchVPCID, Name: fixtures.OpenSearchVPCID, Fields: map[string]string{}}
@@ -417,15 +360,10 @@ func TestRelated_OpenSearch_VPC(t *testing.T) {
 	if len(result.ResourceIDs()) != 1 || result.ResourceIDs()[0] != fixtures.OpenSearchVPCID {
 		t.Errorf("ResourceIDs = %v, want [%s]", result.ResourceIDs(), fixtures.OpenSearchVPCID)
 	}
-	_ = vpcRes // VPC checker uses forward-lookup from DomainStatus, not cache scan
+	_ = vpcRes // VPC checker reads DomainStatus directly
 }
 
-// ---------------------------------------------------------------------------
-// 9. Public domain returns Count=0 for VPC pivots (not -1)
-// ---------------------------------------------------------------------------
-
 func TestRelated_OpenSearch_PublicDomain_VPCPivotsZero(t *testing.T) {
-	// Build a public domain resource (no VPCOptions).
 	fix := fixtures.NewOpenSearchFixtures()
 	var healthyBaseline ostypes.DomainStatus
 	for _, d := range fix.Domains {
@@ -437,7 +375,6 @@ func TestRelated_OpenSearch_PublicDomain_VPCPivotsZero(t *testing.T) {
 	if healthyBaseline.DomainName == nil {
 		t.Fatalf("HealthyBaselineDomain fixture not found")
 	}
-	// Confirm it has no VPCOptions (public endpoint).
 	if healthyBaseline.VPCOptions != nil {
 		t.Skipf("HealthyBaselineDomain has VPCOptions — test precondition not met")
 	}
@@ -462,10 +399,6 @@ func TestRelated_OpenSearch_PublicDomain_VPCPivotsZero(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// 10. ct-events — verify a checker is registered on opensearch
-// ---------------------------------------------------------------------------
-
 func TestRelated_OpenSearch_CtEvents_Registered(t *testing.T) {
 	defs := resource.GetRelated("opensearch")
 	if len(defs) == 0 {
@@ -482,10 +415,6 @@ func TestRelated_OpenSearch_CtEvents_Registered(t *testing.T) {
 	t.Error("ct-events not registered for opensearch (universal pivot must be present)")
 }
 
-// ---------------------------------------------------------------------------
-// Adversarial 1 — nil RawStruct → all field-based checkers return Count=-1
-// ---------------------------------------------------------------------------
-
 func TestRelated_OpenSearch_Adversarial_NilRawStruct(t *testing.T) {
 	nilRes := resource.Resource{
 		ID:        "nil-raw-domain",
@@ -495,8 +424,6 @@ func TestRelated_OpenSearch_Adversarial_NilRawStruct(t *testing.T) {
 	}
 	cache := resource.ResourceCache{}
 
-	// All pattern-F checkers (sg, subnet, vpc, kms, logs) must return Count=-1
-	// when RawStruct cannot be asserted to DomainStatus.
 	for _, target := range []string{"sg", "subnet", "vpc", "logs"} {
 		checker := opensearchCheckerByTarget(t, target)
 		result := checker(context.Background(), nil, nilRes, cache)
@@ -505,10 +432,6 @@ func TestRelated_OpenSearch_Adversarial_NilRawStruct(t *testing.T) {
 		}
 	}
 }
-
-// ---------------------------------------------------------------------------
-// Adversarial 2 — ListTags returns error → cfn checker returns Count=-1
-// ---------------------------------------------------------------------------
 
 func TestRelated_OpenSearch_Adversarial_ListTagsError(t *testing.T) {
 	clients := &awsclient.ServiceClients{
@@ -527,10 +450,6 @@ func TestRelated_OpenSearch_Adversarial_ListTagsError(t *testing.T) {
 		t.Errorf("State = %v, want RelatedError (ListTags error)", result.State())
 	}
 }
-
-// ---------------------------------------------------------------------------
-// Adversarial 3 — DescribeDomainConfig returns error → acm checker returns Count=-1
-// ---------------------------------------------------------------------------
 
 func TestRelated_OpenSearch_Adversarial_DescribeDomainConfigError(t *testing.T) {
 	clients := &awsclient.ServiceClients{

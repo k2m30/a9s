@@ -1,19 +1,12 @@
 package unit_test
 
-// aws6_humanize_declared_fields_test.go — the fields whose types declare them
-// readable go on rendering as words.
+// The fields whose types declare them readable render as words. Each is
+// declared on its own type (ResourceTypeDef.HumanizeFields), so the sweep in
+// aws6_humanize_owner_test.go never reaches them; verbatimDetailPaths is for
+// values that must stay as AWS wrote them, and none of these is one.
 //
-// These twenty-nine were the last raw SDK constants on a demo detail screen.
-// Each is now declared on its own type (ResourceTypeDef.HumanizeFields) and
-// renders as words, so the sweep in aws6_humanize_owner_test.go never reaches
-// them and they need no entry there — verbatimDetailPaths is for values that
-// must stay as AWS wrote them, and none of these is one.
-//
-// The list survives as a ratchet, not as an exemption. Nothing here is
-// excused, deferred or waiting: every key is asserted to render as words, and
-// the day a declaration is dropped or a type stops reading it, this test says
-// which field went back to showing the constant. A plain deletion of the list
-// would leave that unwatched.
+// The list is a ratchet: every key is asserted to render as words, so a
+// dropped declaration names the field that shows the constant.
 
 import (
 	"sort"
@@ -30,10 +23,8 @@ import (
 //
 // That path is the SDK's, not the fetcher's key. A declaration names a FACT and
 // the fact reaches the detail off RawStruct, so "state" is watched as
-// StateValue and "status" as StackStatus. Watching the fetcher spelling instead
-// watched rows the configured detail does not render at all, which is how
-// INSUFFICIENT_DATA sat on the alarm screen while this ratchet reported the
-// field readable.
+// StateValue and "status" as StackStatus; the fetcher spelling can name rows
+// the configured detail does not render at all.
 //
 // An entry is removed only when the field itself is gone; the second half of
 // the test below fails if one stops rendering, so the list cannot rot.

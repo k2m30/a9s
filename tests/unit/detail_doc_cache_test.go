@@ -1,15 +1,8 @@
 package unit
 
-// detail_doc_cache_test.go — coverage for awsclient.DetailDocCache
-// (core/aws/detail_doc_cache.go), the session-scoped cache backing the
-// sfn/cfn on-demand detail enrichers (#261). Mirrors the PolicyDocumentCache
-// coverage in app_enrich_test.go (TestPolicyDocCache_ZeroValueSafe et al.).
-//
-// Covers:
-//   - zero-value cache: Get on an unset key returns nil, Set does not panic
-//   - Set/Get roundtrip for a single key
-//   - overwrite: a second Set for the same key replaces the first value
-//   - distinct keys (sfn:/cfn: prefixes) do not collide
+// detail_doc_cache_test.go — awsclient.DetailDocCache
+// (core/aws/detail_doc_cache.go), the session-scoped cache backing the sfn/cfn
+// on-demand detail enrichers.
 
 import (
 	"fmt"
@@ -133,20 +126,13 @@ func TestDetailDocCache_ConcurrentAccess_NoRace(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// Stale-op write refusal (boundary-sealing wave, #261): a write from an
-// operation strictly older than the key's recorded writer must be refused —
-// otherwise a slow, already-superseded detail-refresh's write could land
-// AFTER a newer operation's fresh write and silently resurrect stale
-// content. Assumed API surface: SetIfNewer(key string, doc any, opID
-// domain.Gen) bool — additive alongside the existing plain Set (which stays
-// the op-oblivious write path every pre-existing test above still uses
-// unmodified) rather than a breaking signature change to Set itself.
-// ---------------------------------------------------------------------------
+// SetIfNewer refuses a write from an operation strictly older than the key's
+// recorded writer, so a slow, already-superseded detail-refresh cannot land
+// after a newer operation's write and resurrect stale content.
 
-// TestDetailDocCache_SetIfNewer_StaleOpRefused_NewerOpReplaces pins the core
-// ordering contract: op 7 writes K, a strictly-older op 5 write is refused
-// (K keeps op 7's value), and a strictly-newer op 9 write replaces it.
+// TestDetailDocCache_SetIfNewer_StaleOpRefused_NewerOpReplaces pins the
+// ordering contract: a strictly-older op's write is refused and a
+// strictly-newer op's write replaces the value.
 func TestDetailDocCache_SetIfNewer_StaleOpRefused_NewerOpReplaces(t *testing.T) {
 	var cache awsclient.DetailDocCache
 	const key = "sfn:arn:aws:states:us-east-1:123456789012:stateMachine:order-processing"
@@ -197,14 +183,10 @@ func TestDetailDocCache_SetIfNewer_OpZero_WritesEmptyKey_DoesNotBlockLaterOp(t *
 	}
 }
 
-// ---------------------------------------------------------------------------
-// Version-keyed eviction (#261 boundary-sealing wave, item e): accepting a
-// newer version-stamped key for the same logical resource (e.g. a
+// Accepting a newer version-stamped key for the same logical resource (e.g. a
 // CloudFormation stack's repeated "cfn:<id>:<version>" template updates)
-// must evict the superseded key's doc AND its writerOp bookkeeping, so the
-// cache does not grow without bound across the session's lifetime for a
-// stack an operator keeps refreshing.
-// ---------------------------------------------------------------------------
+// evicts the superseded key's doc and its writerOp bookkeeping, so the cache
+// does not grow without bound for a stack an operator keeps refreshing.
 
 // TestDetailDocCache_SetIfNewer_NewerVersionedKey_EvictsSupersededDoc pins
 // the core eviction contract: two keys sharing the same "<prefix>:<id>"

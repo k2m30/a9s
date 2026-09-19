@@ -13,10 +13,6 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// ---------------------------------------------------------------------------
-// Subnet fetcher tests
-// ---------------------------------------------------------------------------
-
 func TestFetchSubnets_ParsesMultipleSubnets(t *testing.T) {
 	mock := &mockEC2DescribeSubnetsClient{
 		output: &ec2.DescribeSubnetsOutput{
@@ -64,7 +60,6 @@ func TestFetchSubnets_ParsesMultipleSubnets(t *testing.T) {
 		t.Fatalf("expected 2 resources, got %d", len(resources))
 	}
 
-	// Verify first subnet
 	r0 := resources[0]
 	if r0.ID != "subnet-0001" {
 		t.Errorf("resource[0].ID: expected %q, got %q", "subnet-0001", r0.ID)
@@ -72,13 +67,11 @@ func TestFetchSubnets_ParsesMultipleSubnets(t *testing.T) {
 	if r0.Name != "public-subnet-1a" {
 		t.Errorf("resource[0].Name: expected %q, got %q", "public-subnet-1a", r0.Name)
 	}
-	// subnet-0001 is available, so it carries no lifecycle finding — but it
-	// has MapPublicIpOnLaunch set, which is a posture finding in its own right.
+	// MapPublicIpOnLaunch is a posture finding independent of the subnet state.
 	if len(r0.Findings) != 1 || r0.Findings[0].Code != awsclient.CodeSubnetAutoPublicIP {
 		t.Errorf("resource[0].Findings = %+v, want exactly %s", r0.Findings, awsclient.CodeSubnetAutoPublicIP)
 	}
 
-	// Verify Fields on all resources
 	requiredFields := []string{"subnet_id", "name", "vpc_id", "cidr_block", "availability_zone", "state", "available_ips"}
 	for i, r := range resources {
 		for _, key := range requiredFields {
@@ -88,7 +81,6 @@ func TestFetchSubnets_ParsesMultipleSubnets(t *testing.T) {
 		}
 	}
 
-	// Verify specific field values on first subnet
 	if r0.Fields["subnet_id"] != "subnet-0001" {
 		t.Errorf("resource[0].Fields[\"subnet_id\"]: expected %q, got %q", "subnet-0001", r0.Fields["subnet_id"])
 	}
@@ -111,7 +103,6 @@ func TestFetchSubnets_ParsesMultipleSubnets(t *testing.T) {
 		t.Errorf("resource[0].Fields[\"available_ips\"]: expected %q, got %q", "251", r0.Fields["available_ips"])
 	}
 
-	// Verify second subnet (no Name tag, pending state)
 	r1 := resources[1]
 	if r1.ID != "subnet-0002" {
 		t.Errorf("resource[1].ID: expected %q, got %q", "subnet-0002", r1.ID)

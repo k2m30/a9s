@@ -8,12 +8,7 @@ import (
 )
 
 // RealNodeGroups returns sanitized EKS node group data based on real AWS structure.
-// Account: 123456789012 (sanitized)
-// Region: us-east-1
-// Cluster: test-cluster-1
-// Total node groups: 3
 func RealNodeGroups() []ekstypes.Nodegroup {
-	// gpu node group — CREATE_FAILED due to vCPU limit on g4dn.xlarge
 	gpuCreatedAt := time.Date(2025, 5, 29, 12, 55, 39, 984000000, time.UTC)
 	gpuModifiedAt := time.Date(2025, 5, 29, 13, 28, 52, 149000000, time.UTC)
 	gpuDesiredSize := int32(2)
@@ -21,7 +16,6 @@ func RealNodeGroups() []ekstypes.Nodegroup {
 	gpuMaxSize := int32(3)
 	gpuMaxUnavailablePct := int32(33)
 
-	// kafka node group — ACTIVE, fixed size 3x t3.large with NO_SCHEDULE taint
 	kafkaCreatedAt := time.Date(2025, 6, 6, 10, 33, 52, 285000000, time.UTC)
 	kafkaModifiedAt := time.Date(2026, 3, 18, 16, 14, 57, 316000000, time.UTC)
 	kafkaDesiredSize := int32(3)
@@ -29,7 +23,6 @@ func RealNodeGroups() []ekstypes.Nodegroup {
 	kafkaMaxSize := int32(3)
 	kafkaMaxUnavailablePct := int32(33)
 
-	// system node group — ACTIVE, 2-3x t3.large with karpenter controller label
 	kubeCreatedAt := time.Date(2025, 6, 6, 8, 4, 11, 211000000, time.UTC)
 	kubeModifiedAt := time.Date(2026, 3, 18, 16, 16, 14, 801000000, time.UTC)
 	kubeDesiredSize := int32(2)

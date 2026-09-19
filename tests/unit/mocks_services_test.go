@@ -301,10 +301,6 @@ func (m *mockEC2DescribeNetworkInterfacesClient) DescribeNetworkInterfaces(ctx c
 	return m.output, m.err
 }
 
-// SNS Subscriptions mocks: the fake client for ListSubscriptions now lives
-// in fakes_sns_test.go (fakeSNSListSubscriptions) — see that file's header
-// for the one-fake-per-interface convention.
-
 // ---------------------------------------------------------------------------
 // IAM Users mocks
 // ---------------------------------------------------------------------------
@@ -581,10 +577,6 @@ func (m *mockCloudTrailClient) GetTrailStatus(ctx context.Context, params *cloud
 	return &cloudtrail.GetTrailStatusOutput{}, nil
 }
 
-// Athena mocks: the fake client for ListWorkGroups now lives in
-// fakes_athena_test.go (fakeAthenaListWorkGroups) — see that file's header
-// for the one-fake-per-interface convention.
-
 // ---------------------------------------------------------------------------
 // CodeArtifact mocks
 // ---------------------------------------------------------------------------
@@ -599,10 +591,6 @@ func (m *mockCodeArtifactClient) ListRepositories(ctx context.Context, params *c
 }
 
 // CodeBuild mocks: the fake clients for ListProjects and BatchGetProjects
-// now live in fakes_codebuild_test.go (fakeCodeBuildListProjects,
-// fakeCodeBuildBatchGetProjects) — see that file's header for the
-// one-fake-per-interface convention.
-
 // ---------------------------------------------------------------------------
 // OpenSearch mocks
 // ---------------------------------------------------------------------------

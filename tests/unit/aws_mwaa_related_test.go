@@ -1,17 +1,14 @@
 package unit_test
 
 // aws_mwaa_related_test.go — related-resource checker tests for mwaa
-// (docs/resources/mwaa.md §2, docs/resources/mwaa-impl-plan.md §1
-// "related_targets"). Checkers live in core/aws/mwaa_related.go.
+// (docs/resources/mwaa.md). Checkers live in core/aws/mwaa_related.go.
 //
 // kms/logs/role/s3/sg/subnet are field-driven (read a field on the
-// Environment, no API call) — these are exercised against the REAL
-// FetchMWAAEnvironmentsPage output for the graph-root fixture, avoiding any
-// guess at internal Fields/RawStruct shape (mirrors
-// TestSubnet_Related_EKS_ResolvesViaRealFetcherOutput). alarm is a
-// cache-scan checker matching the CloudWatch AWS/MWAA EnvironmentName
-// dimension (same shape as checkDbiAlarm/checkGlueAlarms). ct-events is the
-// universal ctEventsCheckerFor("mwaa") pivot.
+// Environment, no API call) and run against the real
+// FetchMWAAEnvironmentsPage output for the graph-root fixture, so no test
+// guesses the internal Fields/RawStruct shape. alarm is a cache-scan checker
+// matching the CloudWatch AWS/MWAA EnvironmentName dimension. ct-events is
+// the universal ctEventsCheckerFor("mwaa") pivot.
 
 import (
 	"context"
@@ -37,9 +34,9 @@ func mwaaGraphRootResource(t *testing.T) resource.Resource {
 	clients := &awsclient.ServiceClients{MWAA: fakes.NewMWAA()}
 	result, err := awsclient.FetchMWAAEnvironmentsPage(context.Background(), clients, "")
 	if err == nil || !strings.Contains(err.Error(), fixtures.WarnAirflowDetailsDeniedID) {
-		// The demo set includes the details-denied witness, so the fetch
-		// must legitimately return rows + a composite error naming that
-		// witness (E5 partial success) — any other outcome is unexpected.
+		// The demo set includes the details-denied fixture, so the fetch
+		// returns rows + a composite error naming that fixture; any other
+		// outcome is unexpected.
 		t.Fatalf("expected the details-denied composite error naming %q, got %v", fixtures.WarnAirflowDetailsDeniedID, err)
 	}
 	for _, r := range result.Resources {
@@ -50,10 +47,6 @@ func mwaaGraphRootResource(t *testing.T) resource.Resource {
 	t.Fatalf("resource %q not found in fetch result", fixtures.ProdAirflowEtlID)
 	return resource.Resource{}
 }
-
-// ---------------------------------------------------------------------------
-// Registration
-// ---------------------------------------------------------------------------
 
 func TestRelated_MWAA_Registered(t *testing.T) {
 	defs := resource.GetRelated("mwaa")
@@ -112,12 +105,6 @@ func TestRelated_MWAA_ExcludedTargetsNotRegistered(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// Field-driven checkers — graph root (prod-airflow-etl) counts per
-// mwaa-impl-plan.md §1 "related_targets": kms 1, logs 5, role 1, s3 1, sg 2,
-// subnet 2.
-// ---------------------------------------------------------------------------
-
 func TestRelated_MWAA_GraphRootCounts(t *testing.T) {
 	res := mwaaGraphRootResource(t)
 	for _, tc := range []struct {
@@ -141,10 +128,6 @@ func TestRelated_MWAA_GraphRootCounts(t *testing.T) {
 		})
 	}
 }
-
-// ---------------------------------------------------------------------------
-// alarm — cache-scan checker matching the AWS/MWAA EnvironmentName dimension.
-// ---------------------------------------------------------------------------
 
 func TestRelated_MWAA_Alarm_MatchesByEnvironmentNameDimension(t *testing.T) {
 	res := mwaaGraphRootResource(t)
@@ -230,10 +213,8 @@ func TestRelated_MWAA_Alarm_LiveFetchErrorSurfacesErr(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// ct-events — universal ctEventsCheckerFor("mwaa") pivot: deferred,
+// ct-events is the universal ctEventsCheckerFor("mwaa") pivot: deferred,
 // server-side FetchFilter, drillable.
-// ---------------------------------------------------------------------------
 
 func TestRelated_MWAA_CtEvents_Drillable(t *testing.T) {
 	res := mwaaGraphRootResource(t)

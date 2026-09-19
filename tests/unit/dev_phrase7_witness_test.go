@@ -1,10 +1,9 @@
 package unit_test
 
-// dev_phrase7_witness_test.go — the demo bench half of the six premise fixes.
-// Each check was narrowed so it no longer fires on a resource AWS documents as
-// fine; these pin that the demo account actually contains such a resource, so
-// the corrected behaviour is visible on the bench and any rewrite that widens a
-// check back shows up as a red row here.
+// dev_phrase7_witness_test.go — each check below stays silent on a resource
+// AWS documents as fine; these pin that the demo account contains such a
+// resource, so the behaviour is visible on the bench and a check that widens
+// shows up as a red row here.
 
 import (
 	"strings"

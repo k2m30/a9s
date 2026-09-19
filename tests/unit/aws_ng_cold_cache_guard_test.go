@@ -1,24 +1,8 @@
-// aws_ng_cold_cache_guard_test.go pins the NG↔EC2 join's cache-only
-// contract for BOTH registered checkers on source "ng" targeting "ec2" and
-// "ebs" (resource.GetRelated("ng"), via ngCheckerByTarget from
-// aws_ng_ebs_cache_join_test.go).
-//
-// Two scenarios, one per checker (4 tests total):
-//
-//   - No "ec2" cache entry at all: the checker must return
-//     State: RelatedUnknown (resource.UnknownRelated) and must NEVER call
-//     EC2:DescribeInstances — a cold/missing cache entry is not a live-fetch
-//     trigger. Wired via a recording fake EC2 client inside a real
-//     *aws.ServiceClients so any call fails the test immediately.
-//   - An "ec2" cache entry present but holding disk-seeded rows (Fields
-//     only, no RawStruct — the on-disk cache shape after a restart) must
-//     also return State: RelatedUnknown, not a resolved Count:0 — a
-//     struct-less row set cannot be tag-matched, so treating it as an exact
-//     zero would be a false negative in the RELATED panel.
-//
-// RED today (HEAD): checkNGEC2 and checkNGEBS both call ngRelatedResources,
-// which falls through to FetchRelatedTarget's live-fetch-on-cache-miss path
-// and has no struct-shape guard on a cache hit.
+// The NG→EC2 and NG→EBS checkers are cache-only: a missing "ec2" cache
+// entry, or one holding struct-less disk-seeded rows, yields RelatedUnknown
+// and never calls EC2:DescribeInstances. A struct-less row set cannot be
+// tag-matched, so a resolved Count:0 would be a false negative in the
+// RELATED panel.
 package unit_test
 
 import (
@@ -72,8 +56,6 @@ func ngColdCacheGuardSource(t *testing.T) resource.Resource {
 	}
 }
 
-// --- Scenario (a): no "ec2" cache entry at all, recording fake EC2 client ---
-
 func TestNGColdCacheGuard_EC2_NoCacheEntry_NoLiveFetch(t *testing.T) {
 	source := ngColdCacheGuardSource(t)
 	cache := resource.ResourceCache{}
@@ -100,9 +82,6 @@ func TestNGColdCacheGuard_EBS_NoCacheEntry_NoLiveFetch(t *testing.T) {
 	}
 }
 
-// --- Scenario (b): "ec2" cache entry present but rows are struct-less
-// (Fields only, no RawStruct — the disk-seed shape) ---
-
 func ngColdCacheGuardStructLessEC2Cache() resource.ResourceCache {
 	return resource.ResourceCache{
 		"ec2": {
@@ -114,7 +93,7 @@ func ngColdCacheGuardStructLessEC2Cache() resource.ResourceCache {
 						"instance_id": "i-0diskseeded000001",
 						"state":       "running",
 					},
-					// No RawStruct — the on-disk cache seed shape.
+					// Fields-only rows are the shape the on-disk cache seeds after a restart.
 				},
 			},
 			IsTruncated: false,

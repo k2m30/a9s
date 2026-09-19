@@ -1,9 +1,6 @@
-// cachegen_cache_contract_test.go — the cache may neither attribute one
-// profile/region pair's answer to another, nor lose a live answer to a late
-// disk seed, a failed probe, or an out-of-order commit.
-//
-// Every pin drives the real controller/runtime event path or the real cache
-// package; nothing here reaches AWS and every identifier is synthetic.
+// The cache may neither attribute one profile/region pair's answer to another,
+// nor lose a live answer to a late disk seed, a failed probe, or an
+// out-of-order commit.
 package unit_test
 
 import (
@@ -60,11 +57,6 @@ func cachegenRows(n int, prefix string) []resource.Resource {
 	return out
 }
 
-// ───────────────────────────────────────────────────────────────────────────
-// Row 1 — every async cache result and save payload carries its dispatch
-// pair, and one apply point rejects a mismatch.
-// ───────────────────────────────────────────────────────────────────────────
-
 // TestCacheLoadResult_FromOtherPair_NeverPaintsCurrentMenu: an
 // AvailabilityCacheLoaded produced while profile A was current must not
 // reach profile B's menu when the operator switches before it is delivered.
@@ -80,7 +72,6 @@ func TestCacheLoadResult_FromOtherPair_NeverPaintsCurrentMenu(t *testing.T) {
 	ctrl, core, s := newCachegenController(t, "cachegen-pair-a", "us-east-1")
 	ev := runtime.CacheStoreToEvent(core.LoadAvailabilityCache())
 
-	// The operator switches to pair B before the queued load is delivered.
 	s.SetProfileRegion("cachegen-pair-b", "eu-west-1")
 	s.Rotate()
 	ctrl.ApplyIntents([]runtime.UIIntent{runtime.MenuClearAvailabilityIntent{}})
@@ -120,13 +111,8 @@ func TestSaveCachePayload_FromOtherPair_NeverWritesIntoNewPairDirectory(t *testi
 	}
 }
 
-// ───────────────────────────────────────────────────────────────────────────
-// Row 2 — the pair-directory encoding is injective.
-// ───────────────────────────────────────────────────────────────────────────
-
-// TestPairDirectory_DistinctProfiles_NeverShareOneDirectory: two profiles
-// that differ only in a character the old encoding folded to "_" must not
-// display or overwrite each other's cache.
+// Two profiles that differ only in a character sanitization would fold to "_"
+// never share a cache directory.
 func TestPairDirectory_DistinctProfiles_NeverShareOneDirectory(t *testing.T) {
 	t.Setenv("A9S_CONFIG_FOLDER", t.TempDir())
 
@@ -145,10 +131,6 @@ func TestPairDirectory_DistinctProfiles_NeverShareOneDirectory(t *testing.T) {
 		t.Errorf("profile %q reads profile %q's cache (count=%d) — the pair-directory encoding must be injective", "team_a", "team/a", tf.Count)
 	}
 }
-
-// ───────────────────────────────────────────────────────────────────────────
-// Row 3 — a Wave-2 result replaces only what it answered.
-// ───────────────────────────────────────────────────────────────────────────
 
 func cachegenWave2Finding(code string) domain.Finding {
 	return domain.Finding{
@@ -216,10 +198,6 @@ func TestEnrichmentPartial_KeepsFindingsForUninspectedIDs(t *testing.T) {
 	}
 }
 
-// ───────────────────────────────────────────────────────────────────────────
-// Row 4 — a live observation, zero rows included, outranks any disk seed.
-// ───────────────────────────────────────────────────────────────────────────
-
 // TestRowStore_DiskSeed_NeverResurrectsRowsOverLiveEmpty: a live exact
 // observation of an empty population must not be refilled by a late seed.
 func TestRowStore_DiskSeed_NeverResurrectsRowsOverLiveEmpty(t *testing.T) {
@@ -250,10 +228,6 @@ func TestMenuAvailability_CacheSeed_NeverRegressesVerifiedOrigin(t *testing.T) {
 		t.Errorf("menu s3 count = %d after a late cache seed, want 3 — a verified live count is never regressed by a seed", got)
 	}
 }
-
-// ───────────────────────────────────────────────────────────────────────────
-// Row 5 — commits land in preparation order.
-// ───────────────────────────────────────────────────────────────────────────
 
 // TestCommitSave_OlderPlanAfterNewer_NeverOverwrites: a plan prepared
 // first but committed last must not overwrite the newer state.
@@ -286,10 +260,6 @@ func TestCommitSave_OlderPlanAfterNewer_NeverOverwrites(t *testing.T) {
 		t.Errorf("on-disk s3 count = %d, want 55 — a commit older than the last committed plan must be skipped, never land last", tf.Count)
 	}
 }
-
-// ───────────────────────────────────────────────────────────────────────────
-// Row 6 — a per-type disk save never runs under the controller mutex.
-// ───────────────────────────────────────────────────────────────────────────
 
 // TestListSave_DoesNotBlockControllerReadersOnDiskIO: while a list result's
 // per-type save is running, a concurrent controller reader (the web
@@ -352,11 +322,6 @@ func TestListSave_DoesNotBlockControllerReadersOnDiskIO(t *testing.T) {
 	}
 }
 
-// ───────────────────────────────────────────────────────────────────────────
-// Row 7 — an authoritative issue observation assigns; only a
-// non-authoritative one is monotonic.
-// ───────────────────────────────────────────────────────────────────────────
-
 // TestMenuIssueBadge_AuthoritativeZero_LowersHealedCount: five cached
 // issues healed to zero and re-verified by Wave-2 must clear the badge.
 func TestMenuIssueBadge_AuthoritativeZero_LowersHealedCount(t *testing.T) {
@@ -381,10 +346,6 @@ func TestMenuIssueBadge_AuthoritativeZero_LowersHealedCount(t *testing.T) {
 		t.Errorf("menu s3 issue badge = %d after every issue healed and was re-verified, want 0 — an authoritative observation assigns the count, it does not only raise it", got)
 	}
 }
-
-// ───────────────────────────────────────────────────────────────────────────
-// Row 8 — one issue counter for the live badge and the saved one.
-// ───────────────────────────────────────────────────────────────────────────
 
 // TestSaveProjection_Wave2Warning_IsNotPersistedAsAnIssue: a warning-only
 // enrichment shows no live issue badge, so the next restart must not load
@@ -454,10 +415,6 @@ func TestSaveProjection_Wave2Broken_IsPersistedAsAnIssue(t *testing.T) {
 	}
 }
 
-// ───────────────────────────────────────────────────────────────────────────
-// Row 9 — one accessor for a type's known population.
-// ───────────────────────────────────────────────────────────────────────────
-
 // TestCachedListDepth_UsesKnownCountNotRowDepth: a file that knows 55 and
 // stores 50 rows must be re-verified to 55, not to 50.
 func TestCachedListDepth_UsesKnownCountNotRowDepth(t *testing.T) {
@@ -503,14 +460,8 @@ func TestSaveProjection_ReportsKnownTotalNotRowDepth(t *testing.T) {
 	}
 }
 
-// ───────────────────────────────────────────────────────────────────────────
-// Row 10 — a pair re-entry sweeps, and only a current-generation result
-// acknowledges one.
-// ───────────────────────────────────────────────────────────────────────────
-
-// TestPairReEntry_SweepsAgain: revisiting a pair already swept this
-// session must still verify it on sight (C1), not report disk values as
-// finished.
+// Revisiting a pair already swept this session verifies it on sight instead
+// of reporting disk values as finished.
 func TestPairReEntry_SweepsAgain(t *testing.T) {
 	t.Setenv("A9S_CONFIG_FOLDER", t.TempDir())
 
@@ -536,9 +487,8 @@ func TestPairReEntry_SweepsAgain(t *testing.T) {
 // result from a superseded generation must not make the menu claim the
 // sweep reached that type.
 //
-// The sweep is started through the real cache-load event; the pin is that the
-// stale result advances neither the progress counter nor Refreshing. A bare
-// RowStore seed is not a sweep and cannot stand in for one here.
+// The sweep starts through the real cache-load event: a bare RowStore seed is
+// not a sweep.
 func TestMenuRefreshing_StaleProbeResult_DoesNotAcknowledgeTheSweep(t *testing.T) {
 	t.Setenv("A9S_CONFIG_FOLDER", t.TempDir())
 
@@ -564,10 +514,8 @@ func TestMenuRefreshing_StaleProbeResult_DoesNotAcknowledgeTheSweep(t *testing.T
 // refresh must leave the menu refreshing until the new sweep answers.
 //
 // The clear zeroes the AvailChecked/AvailTotal counters Refreshing reads
-// (MenuState.ClearAvailability) and the restarted sweep's own cache load
-// re-arms them. Between the two the menu is not refreshing: with the counters
-// cleared, a menu claiming a sweep in flight before one has started would be
-// the defect.
+// (MenuState.ClearAvailability), and the restarted sweep's own cache load
+// re-arms them; between the two the menu is not refreshing.
 func TestMenuClearAvailability_ResetsSweepAcknowledgements(t *testing.T) {
 	t.Setenv("A9S_CONFIG_FOLDER", t.TempDir())
 
@@ -596,10 +544,6 @@ func TestMenuClearAvailability_ResetsSweepAcknowledgements(t *testing.T) {
 	}
 }
 
-// ───────────────────────────────────────────────────────────────────────────
-// Row 11 — an alias-named file is canonicalized once, at load.
-// ───────────────────────────────────────────────────────────────────────────
-
 // TestAliasNamedTypeFile_SuppliesRowsUnderCanonicalName: an older
 // rds.yaml must supply the dbi type's rows, not only its count.
 func TestAliasNamedTypeFile_SuppliesRowsUnderCanonicalName(t *testing.T) {
@@ -623,10 +567,6 @@ func TestAliasNamedTypeFile_SuppliesRowsUnderCanonicalName(t *testing.T) {
 		t.Errorf(`Store.Type("dbi").Rows = %d, want 1 — the canonicalized entry must carry the file's rows, not only its count`, len(tf.Rows))
 	}
 }
-
-// ───────────────────────────────────────────────────────────────────────────
-// Row 12 — an exact zero is knowledge, not an absent observation.
-// ───────────────────────────────────────────────────────────────────────────
 
 // TestExactEmptyTypeFile_IsReportedAsAnObservation: a valid
 // exact/count:0/issues-unknown file must reach the menu as a real zero,
@@ -689,13 +629,6 @@ func TestExactEmptyCache_SeedsAnObservedEmptyList(t *testing.T) {
 	}
 }
 
-// ───────────────────────────────────────────────────────────────────────────
-// Round 2 — the runtime decides once and the intent carries the decision;
-// the controller applies what the intent says and never re-decides.
-// ───────────────────────────────────────────────────────────────────────────
-
-// cachegenOpenS3List opens the top-level s3 list with rows and returns the
-// controller's rendered list body.
 func cachegenListBody(t *testing.T, ctrl *app.Controller) *app.ListBody {
 	t.Helper()
 	body := ctrl.Snapshot().Body.List
@@ -705,12 +638,8 @@ func cachegenListBody(t *testing.T, ctrl *app.Controller) *app.ListBody {
 	return body
 }
 
-// cachegenLoadList delivers a canonical top-level s3 list result through the
-// production task-result lane.
-// cachegenLoadList delivers a canonical s3 result and waits for whatever it
-// persists. The save runs on the cache writer's goroutine now, so a test that
-// reads the type file on the next line has to wait for it — the delivery and
-// the file it produces are one step from these tests' point of view.
+// cachegenLoadList delivers a canonical s3 result and waits for what it
+// persists: the save runs on the cache writer's goroutine.
 func cachegenLoadList(ctrl *app.Controller, rows []resource.Resource) {
 	handlePage(ctrl, messages.ResourcesLoaded{
 		ResourceType: "s3",
@@ -732,10 +661,8 @@ func cachegenRowFor(t *testing.T, body *app.ListBody, id string) app.ListRow {
 	return app.ListRow{}
 }
 
-// TestEnrichmentFailure_KeepsRenderedFindingOnTheList is row 3 on the surface
-// the operator actually looks at: a Wave-2 probe that timed out without
-// inspecting a row must leave that row's finding standing on screen, exactly
-// as the file keeps it.
+// A Wave-2 probe that timed out without inspecting a row leaves that row's
+// finding on screen, as the file keeps it.
 func TestEnrichmentFailure_KeepsRenderedFindingOnTheList(t *testing.T) {
 	t.Setenv("A9S_CONFIG_FOLDER", t.TempDir())
 	ctrl, _, _ := newCachegenController(t, "cachegen-renderfold", "us-east-1")
@@ -757,8 +684,6 @@ func TestEnrichmentFailure_KeepsRenderedFindingOnTheList(t *testing.T) {
 		t.Fatalf("precondition: rendered row color = %q, want %q", before.Color, "broken")
 	}
 
-	// The probe answers for nobody it was asked about: an error, and every
-	// row listed as uninspected.
 	ctrl.Handle(messages.EnrichmentChecked{
 		ResourceType: "s3",
 		Err:          errors.New("operation timed out"),
@@ -771,14 +696,12 @@ func TestEnrichmentFailure_KeepsRenderedFindingOnTheList(t *testing.T) {
 	}
 }
 
-// TestLateSeed_NeverRaisesTheIssueBadgeOverAVerifiedType is row 4 on the
-// badge: the count beside it already refuses a seed for a type verified this
-// session, and the badge must refuse it under the same rule.
+// The badge refuses a late seed for a type verified this session, under the
+// same rule as the count beside it.
 func TestLateSeed_NeverRaisesTheIssueBadgeOverAVerifiedType(t *testing.T) {
 	t.Setenv("A9S_CONFIG_FOLDER", t.TempDir())
 	ctrl, core, _ := newCachegenController(t, "cachegen-latebadge", "us-east-1")
 
-	// A live probe verifies s3 as empty and issue-free.
 	ctrl.Handle(messages.AvailabilityChecked{
 		ResourceType: "s3",
 		Count:        0,
@@ -789,7 +712,6 @@ func TestLateSeed_NeverRaisesTheIssueBadgeOverAVerifiedType(t *testing.T) {
 		t.Fatalf("precondition: menu s3 issue badge = %d after a live probe, want 0", got)
 	}
 
-	// The startup disk load lands late, carrying the last session's badge.
 	ctrl.Handle(messages.AvailabilityCacheLoaded{
 		Entries:     map[string]int{"s3": 3},
 		IssueCounts: map[string]int{"s3": 3},
@@ -801,8 +723,7 @@ func TestLateSeed_NeverRaisesTheIssueBadgeOverAVerifiedType(t *testing.T) {
 	}
 }
 
-// TestListRefresh_BadgeAndFileAgree is row 7 across both surfaces: one
-// authority decision per observation feeds the menu badge and the saved
+// One authority decision per observation feeds the menu badge and the saved
 // count, so a restart cannot change the badge with nothing changed in the
 // account.
 func TestListRefresh_BadgeAndFileAgree(t *testing.T) {
@@ -845,7 +766,6 @@ func TestListRefresh_BadgeAndFileAgree(t *testing.T) {
 		const profile = "cachegen-heal-verified"
 		ctrl, rows := seedFiveCachedIssues(t, profile)
 
-		// Wave-2 answers for the type: every issue is gone.
 		ctrl.Handle(messages.EnrichmentChecked{ResourceType: "s3"})
 		healed := make([]resource.Resource, len(rows))
 		for i, r := range rows {
@@ -865,9 +785,6 @@ func TestListRefresh_BadgeAndFileAgree(t *testing.T) {
 		const profile = "cachegen-heal-unverified"
 		ctrl, rows := seedFiveCachedIssues(t, profile)
 
-		// No Wave-2 result this session. Four of the five buckets are gone
-		// and the survivor comes back on its own, so the rows carry nothing
-		// to say about the four issues Wave-2 found last session.
 		survivor := rows[:1]
 		survivor[0].Findings = nil
 		cachegenLoadList(ctrl, survivor)
@@ -882,15 +799,8 @@ func TestListRefresh_BadgeAndFileAgree(t *testing.T) {
 	})
 }
 
-// ───────────────────────────────────────────────────────────────────────────
-// Round 3 — one writer of the menu origin, and one carry rule for a row the
-// last Wave-2 result did not answer for.
-// ───────────────────────────────────────────────────────────────────────────
-
-// TestMenuOrigin_HasOneWriter is row 13: the menu's origin map records where
-// a type's count came from, and the two lanes that observe a type must not
-// each write it their own way. Exactly one assignment site may exist, and it
-// is the intent that carries the origin.
+// The menu's origin map records where a type's count came from; exactly one
+// assignment site may exist, and it is the intent that carries the origin.
 func TestMenuOrigin_HasOneWriter(t *testing.T) {
 	fset := token.NewFileSet()
 	var sites []string
@@ -932,9 +842,8 @@ func TestMenuOrigin_HasOneWriter(t *testing.T) {
 	}
 }
 
-// TestListFetch_MarksVerifiedAndClearsCause is row 13's behavioural half: the
-// list lane observes its type through the same intents the probe lane emits,
-// so opening and fetching a type still marks it verified and still retires a
+// The list lane observes its type through the same intents the probe lane
+// emits, so opening and fetching a type marks it verified and retires a
 // previous probe's failure mark.
 func TestListFetch_MarksVerifiedAndClearsCause(t *testing.T) {
 	t.Setenv("A9S_CONFIG_FOLDER", t.TempDir())
@@ -947,7 +856,6 @@ func TestListFetch_MarksVerifiedAndClearsCause(t *testing.T) {
 	_, _ = ctrl.Apply(app.Action{Kind: app.ActionCommand, Arg: "s3"})
 	cachegenLoadList(ctrl, cachegenRows(2, "bucket-origin"))
 
-	// Back to the menu, where the origin and the cause are rendered.
 	_, _ = ctrl.Apply(app.Action{Kind: app.ActionBack})
 	menu := ctrl.Snapshot().Body.Menu
 	if menu == nil {
@@ -970,10 +878,8 @@ func TestListFetch_MarksVerifiedAndClearsCause(t *testing.T) {
 	}
 }
 
-// TestFreshFetch_KeepsUninspectedRowsFinding is row 14: a row the last Wave-2
-// result could not inspect keeps its cached finding across a fresh list
-// fetch, on screen and in the file alike. Otherwise the list renders a row
-// clean that the probe lane and the file both know is not.
+// A row the last Wave-2 result could not inspect keeps its cached finding
+// across a fresh list fetch, on screen and in the file alike.
 func TestFreshFetch_KeepsUninspectedRowsFinding(t *testing.T) {
 	t.Setenv("A9S_CONFIG_FOLDER", t.TempDir())
 	const profile = "cachegen-carryuninspected"
@@ -992,7 +898,6 @@ func TestFreshFetch_KeepsUninspectedRowsFinding(t *testing.T) {
 	_, _ = ctrl.Apply(app.Action{Kind: app.ActionCommand, Arg: "s3"})
 	cachegenLoadList(ctrl, rows)
 
-	// The enrichment pass answers for one row and times out on the other.
 	ctrl.Handle(messages.EnrichmentChecked{
 		ResourceType: "s3",
 		Findings:     map[string][]domain.Finding{answered: {cachegenWave2Finding("s3-public-read")}},
@@ -1000,8 +905,7 @@ func TestFreshFetch_KeepsUninspectedRowsFinding(t *testing.T) {
 		Err:          errors.New("operation timed out"),
 	})
 
-	// A fresh fetch: AWS returns both buckets, carrying no Wave-2 data of its
-	// own (Wave-2 is a separate pass).
+	// A fresh fetch carries no Wave-2 data: Wave-2 is a separate pass.
 	fresh := cachegenRows(2, "bucket-carry")
 	cachegenLoadList(ctrl, fresh)
 

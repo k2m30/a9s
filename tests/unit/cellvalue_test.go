@@ -6,8 +6,6 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// TestFormatExact_ProducesPlainDecimal verifies that FormatExact returns the
-// plain decimal string of the integer, with no suffix or decoration.
 func TestFormatExact_ProducesPlainDecimal(t *testing.T) {
 	cases := []struct {
 		input int
@@ -25,8 +23,7 @@ func TestFormatExact_ProducesPlainDecimal(t *testing.T) {
 	}
 }
 
-// TestFormatTruncated_AppendsPlusSuffix verifies that FormatTruncated
-// returns the decimal with a trailing "+" to signal a lower-bound count.
+// A trailing "+" marks a lower-bound count.
 func TestFormatTruncated_AppendsPlusSuffix(t *testing.T) {
 	cases := []struct {
 		input int
@@ -43,16 +40,12 @@ func TestFormatTruncated_AppendsPlusSuffix(t *testing.T) {
 	}
 }
 
-// TestCellUnknownText_IsEmDash verifies that the exported constant equals the
-// em dash character used throughout the UI.
 func TestCellUnknownText_IsEmDash(t *testing.T) {
 	if resource.CellUnknownText != "—" {
 		t.Errorf("CellUnknownText = %q; want %q", resource.CellUnknownText, "—")
 	}
 }
 
-// TestCellKind_Enum_DistinctValues verifies that the three CellKind constants
-// are pairwise distinct so downstream switches cannot accidentally conflate them.
 func TestCellKind_Enum_DistinctValues(t *testing.T) {
 	values := []resource.CellKind{
 		resource.CellKindExact,
@@ -68,9 +61,6 @@ func TestCellKind_Enum_DistinctValues(t *testing.T) {
 	}
 }
 
-// TestFormatTruncated_NotSameAsExact verifies that for any non-zero n,
-// FormatTruncated(n) differs from FormatExact(n). This guards against
-// accidentally stripping the "+" suffix.
 func TestFormatTruncated_NotSameAsExact(t *testing.T) {
 	nonZeroCases := []int{1, 5, 42, 1000, -1}
 	for _, n := range nonZeroCases {

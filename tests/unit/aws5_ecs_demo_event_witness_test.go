@@ -1,16 +1,8 @@
 package unit
 
-// aws5_ecs_demo_event_witness_test.go — the demo carries the two event
-// branches of the ecs-svc deployment finding.
-//
-// Before this, no demo ECS service carried Events at all, so neither the
-// placement branch nor the ELB branch had a rendered surface: the visibility
-// gate and the machine-style gate walk the demo fixtures, and a branch nothing
-// renders is a branch neither of them can see.
-//
-// Both witnesses are a second fact on a service that already carries this
-// finding through the stuck-tasks branch, so no row changes colour and no
-// count moves.
+// The demo carries both event branches of the ecs-svc deployment finding, each
+// on a service that already carries the finding through the stuck-tasks
+// branch, so no row changes colour and no count moves.
 
 import (
 	"context"
@@ -51,8 +43,7 @@ func aws5ECSDemoRows(t *testing.T) map[string][]domain.DetailRow {
 	return out
 }
 
-// TestECSDemo_PlacementWitnessRendersItsReason pins the placement branch's
-// demo witness: the service with no tasks running says why it has none.
+// The demo service with no tasks running says why it has none.
 func TestECSDemo_PlacementWitnessRendersItsReason(t *testing.T) {
 	rows := aws5ECSDemoRows(t)[fixtures.ECSServiceNoTasksRunning]
 	if !aws5HasRow(rows, "Event", "unable to place task") {
@@ -63,8 +54,8 @@ func TestECSDemo_PlacementWitnessRendersItsReason(t *testing.T) {
 	}
 }
 
-// TestECSDemo_HealthCheckWitnessRendersItsReason pins the ELB branch's demo
-// witness on the service that is running below its desired count.
+// The demo service running below its desired count renders the ELB
+// health-check reason.
 func TestECSDemo_HealthCheckWitnessRendersItsReason(t *testing.T) {
 	rows := aws5ECSDemoRows(t)[fixtures.ECSServiceBelowDesiredCount]
 	if !aws5HasRow(rows, "Event", "load balancer health checks failed") {
@@ -75,9 +66,8 @@ func TestECSDemo_HealthCheckWitnessRendersItsReason(t *testing.T) {
 	}
 }
 
-// TestECSDemo_OnlyTheTwoWitnessesCarryEvents pins the other half of the
-// one-witness rule: every other demo service is explicitly event-free, so a
-// later branch cannot trip on a row that was never meant to prove it.
+// Every other demo service is event-free, so a later branch cannot trip on a
+// row that was never meant to prove it.
 func TestECSDemo_OnlyTheTwoWitnessesCarryEvents(t *testing.T) {
 	for _, s := range fixtures.NewECSFixtures().Services {
 		name := aws.ToString(s.ServiceName)

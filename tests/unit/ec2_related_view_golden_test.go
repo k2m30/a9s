@@ -15,10 +15,7 @@ import (
 
 // snapshotEC2RelatedView renders the live RenderDetail seam for an EC2
 // resource with 4 related rows (mixed non-zero/zero counts) and the right
-// column focused — the live replacement for the retired
-// views.NewDetail(...).Update(RelatedCheckResult...).Update(KeyTab).View()
-// chain (DetailModel.Update/View are dead; see
-// specs/022-codebase-cleanup/wave3-map-detail.md).
+// column focused.
 func snapshotEC2RelatedView(t *testing.T) string {
 	t.Helper()
 

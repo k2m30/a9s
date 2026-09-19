@@ -1,16 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
 
-// app_detail_cursor_record_test.go — the cursor keeps the row it is reading
-// whatever the rebuild does to the layout, and two rows that read the same
-// are still two rows.
-//
-// The pins in app_detail_attention_cursor_test.go cover a cursor INSIDE the
-// Attention block. These are the same rule for the two cases that block
-// leaves open: a cursor on a content field below the block (a rebuild that
-// changes the block's size and the content list must carry it to the same
-// field), and a cursor on a wrapped Detail sentence (named by its row
+// The cursor keeps the row it is reading whatever the rebuild does to the
+// layout: a cursor on a content field below the Attention block lands on the
+// same field, and a cursor on a wrapped Detail sentence is named by its row
 // identity, not its prose, so two findings whose sentences wrap identically
-// stay two rows).
+// stay two rows.
 package unit_test
 
 import (
@@ -174,11 +168,9 @@ func attentionKeys(body *app.DetailBody) []string {
 	return out
 }
 
-// TestDetailCursor_DetailLineKeepsItsOwnFindingWhenTwoSentencesMatch: an
-// Attention row was named by the text painted on it, and a wrapped Detail
-// sentence is prose two findings can share word for word. The cursor then had
-// two rows answering to the same name and took the first, silently moving the
-// operator from the finding they were reading to another one.
+// A wrapped Detail sentence is prose two findings can share word for word, so
+// an Attention row is named by its identity, not the text painted on it, and
+// the cursor stays on the finding it was reading.
 func TestDetailCursor_DetailLineKeepsItsOwnFindingWhenTwoSentencesMatch(t *testing.T) {
 	const secondPhrase = "public ingress on port 3389 from 0.0.0.0/0"
 	row := identicalDetailRow("i-0fff666666666666f")

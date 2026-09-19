@@ -1,9 +1,8 @@
 package unit
 
-// dev_phrase7_edges_test.go — edges of the two narrowed conditions that the
-// premise pins leave open. Both were found by probing the predicates directly:
-// the version parser and the endpoint matcher each accept a shape that makes
-// the check answer for a resource it was not looking at.
+// dev_phrase7_edges_test.go — edges of two narrowed conditions: neither the
+// version parser nor the endpoint matcher may accept a shape that makes the
+// check answer for a resource it was not looking at.
 
 import (
 	"context"

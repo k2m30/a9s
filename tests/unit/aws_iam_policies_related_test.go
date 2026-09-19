@@ -28,8 +28,6 @@ func checkerByTarget(t *testing.T, source, target string) resource.RelatedChecke
 	return nil
 }
 
-// --- policy→role ---
-
 func TestRelated_Policy_Role_NonNil(t *testing.T) {
 	checker := checkerByTarget(t, "policy", "role")
 	// checkerByTarget fatals if checker is nil — reaching here means it's non-nil.
@@ -65,14 +63,11 @@ func TestRelated_Policy_Role_EmptyARN(t *testing.T) {
 		Name: "",
 	}
 	checker := checkerByTarget(t, "policy", "role")
-	// nil clients: must return -1, not panic
 	result := checker(context.Background(), nil, source, resource.ResourceCache{})
 	if result.State() != domain.RelatedUnknown {
 		t.Errorf("Count = %d, want -1 (nil clients)", result.Count())
 	}
 }
-
-// --- policy→iam-user ---
 
 func TestRelated_Policy_IAMUser_NonNil(t *testing.T) {
 	checker := checkerByTarget(t, "policy", "iam-user")
@@ -90,8 +85,6 @@ func TestRelated_Policy_IAMUser_EmptyARN(t *testing.T) {
 		t.Errorf("Count = %d, want -1 (nil clients)", result.Count())
 	}
 }
-
-// --- policy→iam-group ---
 
 func TestRelated_Policy_IAMGroup_NonNil(t *testing.T) {
 	checker := checkerByTarget(t, "policy", "iam-group")

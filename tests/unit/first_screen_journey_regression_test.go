@@ -125,8 +125,8 @@ func TestFirstScreen_DetailEnterRelatedList_EscReturnsToDetail(t *testing.T) {
 	}
 }
 
-// Regression: if a detail route is invoked without ResourceType but with EC2-shaped
-// fields, detail must still render as EC2 (including RELATED column).
+// A detail route invoked without ResourceType but with EC2-shaped fields must
+// still render as EC2 (including RELATED column).
 func TestFirstScreen_DetailMissingType_StillShowsRelatedForEC2Shape(t *testing.T) {
 	m := newBlessedModel(t, "demo", "us-east-1",
 		tui.WithClients(demo.NewServiceClients()),
@@ -159,8 +159,8 @@ func TestFirstScreen_DetailMissingType_StillShowsRelatedForEC2Shape(t *testing.T
 	}
 }
 
-// Bug reveal: real-image navigation can fall into an empty AMI list when the
-// target image exists in AWS but is not present in the owned-AMI list fetch.
+// An image that exists in AWS but is absent from the owned-AMI list fetch must
+// not land the operator in an empty AMI list.
 func TestFirstScreen_DetailEnterExternalImageID_DoesNotEndInEmptyAMIList(t *testing.T) {
 	m := newBlessedModel(t, "demo", "us-east-1",
 		tui.WithClients(demo.NewServiceClients()),
@@ -200,8 +200,8 @@ func TestFirstScreen_DetailEnterExternalImageID_DoesNotEndInEmptyAMIList(t *test
 	}
 	m = applyRootAndCmd(t, m, rootSpecialKey(tea.KeyEnter))
 
-	// Simulate the current live failure mode: the generic ami list fetch returns
-	// no rows for a referenced external image ID.
+	// The generic ami list fetch returns no rows for a referenced external
+	// image ID.
 	m = applyRootAndCmd(t, m, messages.ResourcesLoaded{Provenance: messages.FetchProvenanceCanonicalList,
 		ResourceType: "ami",
 		Resources:    nil,

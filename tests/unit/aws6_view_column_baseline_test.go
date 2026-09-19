@@ -2,8 +2,8 @@ package unit
 
 // viewColumnsAtOldestMigratableVersion records, per view, the column titles the
 // oldest build a migration still acts on generated. It is the left-hand side of
-// the invariant the gate below checks: today's built-in columns are this set
-// plus every recorded addition, minus what has since been removed.
+// the invariant the gate below checks: the current built-in columns are this set
+// plus every recorded addition, minus the columns that left the built-in views.
 //
 // It changes only when a column LEAVES the built-in views. A column joining
 // them is recorded in viewColumnAdditions (core/config/ensure_views.go) and

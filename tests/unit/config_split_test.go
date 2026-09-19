@@ -8,10 +8,6 @@ import (
 	"github.com/k2m30/a9s/v3/core/config"
 )
 
-// ===========================================================================
-// ParseSingle tests
-// ===========================================================================
-
 func TestParseSingle_ValidEC2(t *testing.T) {
 	data := []byte(`
 list:
@@ -116,7 +112,6 @@ func TestParseSingle_EmptyData(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ParseSingle on empty data failed: %v", err)
 	}
-	// Empty YAML should return an empty ViewDef, not nil
 	if vd == nil {
 		t.Fatal("expected non-nil ViewDef for empty data")
 	}
@@ -125,10 +120,6 @@ func TestParseSingle_EmptyData(t *testing.T) {
 	}
 }
 
-// ===========================================================================
-// LoadFromDirs tests
-// ===========================================================================
-
 func TestLoadFromDirs_SingleDir(t *testing.T) {
 	dir := t.TempDir()
 	viewsDir := filepath.Join(dir, "views")
@@ -136,7 +127,6 @@ func TestLoadFromDirs_SingleDir(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Write ec2.yaml
 	ec2Data := []byte(`list:
   Instance ID:
     path: instanceId
@@ -148,7 +138,6 @@ detail:
 		t.Fatal(err)
 	}
 
-	// Write s3.yaml
 	s3Data := []byte(`list:
   Bucket Name:
     path: name
@@ -168,7 +157,6 @@ detail:
 		t.Fatal("expected non-nil config")
 	}
 
-	// Check ec2
 	ec2, ok := cfg.Views["ec2"]
 	if !ok {
 		t.Fatal("missing ec2 view")
@@ -180,7 +168,6 @@ detail:
 		t.Errorf("ec2 col 0 title: %q", ec2.List[0].Title)
 	}
 
-	// Check s3
 	s3, ok := cfg.Views["s3"]
 	if !ok {
 		t.Fatal("missing s3 view")
@@ -191,7 +178,6 @@ detail:
 }
 
 func TestLoadFromDirs_LayerMerge(t *testing.T) {
-	// Global dir has ec2 and s3
 	globalDir := t.TempDir()
 	ec2Global := []byte(`list:
   Instance ID:
@@ -214,7 +200,6 @@ detail:
 		t.Fatal(err)
 	}
 
-	// Project dir overrides ec2 only
 	projectDir := t.TempDir()
 	ec2Project := []byte(`list:
   Instance ID:
@@ -237,7 +222,6 @@ detail:
 		t.Fatal("expected non-nil config")
 	}
 
-	// ec2 should come from project dir (overlay wins)
 	ec2 := cfg.Views["ec2"]
 	if len(ec2.List) != 1 || ec2.List[0].Width != 99 {
 		t.Errorf("ec2: expected project override (width=99), got %+v", ec2.List)
@@ -246,7 +230,6 @@ detail:
 		t.Errorf("ec2 detail: expected 2, got %d", len(ec2.Detail))
 	}
 
-	// s3 should still come from global dir (not overridden)
 	s3 := cfg.Views["s3"]
 	if len(s3.List) != 1 || s3.List[0].Width != 30 {
 		t.Errorf("s3: expected global (width=30), got %+v", s3.List)
@@ -276,11 +259,9 @@ func TestLoadFromDirs_EmptyDir(t *testing.T) {
 
 func TestLoadFromDirs_SkipsNonYAML(t *testing.T) {
 	dir := t.TempDir()
-	// Write a .txt file — should be skipped
 	if err := os.WriteFile(filepath.Join(dir, "notes.txt"), []byte("not yaml"), 0644); err != nil {
 		t.Fatal(err)
 	}
-	// Write a valid .yaml file
 	if err := os.WriteFile(filepath.Join(dir, "ec2.yaml"), []byte("list:\n  ID:\n    path: id\n    width: 10\n"), 0644); err != nil {
 		t.Fatal(err)
 	}
@@ -314,7 +295,6 @@ func TestLoadFromDirs_InvalidYAMLReturnsError(t *testing.T) {
 
 func TestLoadFromDirs_FilenameBecomesResourceName(t *testing.T) {
 	dir := t.TempDir()
-	// s3_objects.yaml -> resource name "s3_objects"
 	data := []byte(`list:
   Key:
     path: Key
@@ -333,12 +313,7 @@ func TestLoadFromDirs_FilenameBecomesResourceName(t *testing.T) {
 	}
 }
 
-// ===========================================================================
-// Load() integration with dirs
-// ===========================================================================
-
 func TestLoad_UsesViewsDirs(t *testing.T) {
-	// Set up a temp config dir with views/ subdirectory
 	tmpDir := t.TempDir()
 	viewsDir := filepath.Join(tmpDir, "views")
 	if err := os.MkdirAll(viewsDir, 0755); err != nil {
@@ -355,7 +330,6 @@ func TestLoad_UsesViewsDirs(t *testing.T) {
 	}
 
 	t.Setenv("A9S_CONFIG_FOLDER", tmpDir)
-	// Set HOME to something without .a9s
 	t.Setenv("HOME", t.TempDir())
 
 	cfg, err := config.Load()
@@ -376,7 +350,6 @@ func TestLoad_UsesViewsDirs(t *testing.T) {
 }
 
 func TestLoad_ProjectDirOverlaysGlobal(t *testing.T) {
-	// Global config dir with ec2 width=10
 	globalDir := t.TempDir()
 	globalViewsDir := filepath.Join(globalDir, "views")
 	if err := os.MkdirAll(globalViewsDir, 0755); err != nil {

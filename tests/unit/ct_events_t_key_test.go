@@ -11,10 +11,6 @@ import (
 	"github.com/k2m30/a9s/v3/internal/tui/views"
 )
 
-// ═══════════════════════════════════════════════════════════════════════════
-// "t" key navigation tests
-// ═══════════════════════════════════════════════════════════════════════════
-
 // ctEventsEC2Resource returns a test EC2 resource with an ARN field.
 func ctEventsEC2Resource() resource.Resource {
 	return resource.Resource{
@@ -135,7 +131,6 @@ func TestResourceList_TKey_NoopOnCtEventsList(t *testing.T) {
 	ctrl := newListViewCtrl(t, *td)
 	rl := views.NewResourceList(*td, nil, keys.Default(), ctrl)
 	rl.SetSize(120, 40)
-	// Load one event
 	ctrl.ApplyResourcesLoaded("ct-events", []resource.Resource{{
 		ID:     "evt-001",
 		Name:   "DescribeInstances",
@@ -149,7 +144,6 @@ func TestResourceList_TKey_NoopOnCtEventsList(t *testing.T) {
 
 // TestTKey_WorksFromAllViews verifies that pressing "t" emits RelatedNavigateMsg
 // with TargetType "ct-events" from every applicable view type.
-// Regression guard: catches "t doesn't work on some screens."
 func TestTKey_WorksFromAllViews(t *testing.T) {
 	// Use realistic EC2 fields — no explicit "arn" field; t key must work via res.ID fallback.
 	res := resource.Resource{
@@ -183,26 +177,10 @@ func TestTKey_WorksFromAllViews(t *testing.T) {
 		}
 	})
 
-	// Detail_LeftCol / Detail_RightColFocused subtests (dead views.DetailModel
-	// Update/View, 022-codebase-cleanup wave 3) removed — no port needed:
-	// Test_ActionCloudTrail_Detail_DispatchesCtEventsFetchFiltered
-	// (detail_ports_test.go) already pins the same contract (ActionCloudTrail
-	// on a detail screen dispatches a KindFetchFiltered task scoped to
-	// "ct-events") more precisely, against the live controller Apply path,
-	// independent of left/right-column focus (a renderer-only concern the
-	// controller-level action does not branch on).
-
-	// The YAML case (views.NewYAML+Update, both DEAD per
-	// specs/022-codebase-cleanup/wave3-map-text.md) is retired here: it's
-	// ported onto the live text-screen seam as
-	// text_ports_test.go's TestPort_YAML_TKey_LiveCTEventsNavigate.
 }
 
 // TestResourceList_TKey_SuppressedOnChildList verifies that on a child
-// resource list (parentContext != nil), pressing "t" is a no-op. The
-// corresponding footer-hint suppression is pinned separately by
-// list_ports_test.go's TestWave3ListFooterHints_CloudTrailTKey_
-// GatedByParentContext (dead ResourceListModel.BottomHints() removed here).
+// resource list (parentContext != nil), pressing "t" is a no-op.
 func TestResourceList_TKey_SuppressedOnChildList(t *testing.T) {
 	td := resource.GetChildType("s3_objects")
 	if td == nil {
@@ -211,7 +189,6 @@ func TestResourceList_TKey_SuppressedOnChildList(t *testing.T) {
 	ctrl := newChildListViewCtrl(t, *td)
 	rl := views.NewChildResourceList(*td, map[string]string{"bucket": "my-bucket"}, "my-bucket", nil, keys.Default(), ctrl)
 
-	// Key should be no-op
 	rl.SetSize(120, 40)
 	ctrl.ApplyResourcesLoaded("s3_objects", []resource.Resource{{
 		ID: "file.txt", Name: "file.txt", Fields: map[string]string{},
@@ -231,11 +208,3 @@ func TestMainMenu_TKey_Noop(t *testing.T) {
 		t.Fatal("t key should be no-op on main menu")
 	}
 }
-
-// TestBottomHints_MainMenu_NoCloudTrail (dead views.MainMenuModel.BottomHints)
-// removed — no live-seam port needed: the menu's live footer-hint source,
-// app.MenuFooterHintsFor (core/app/viewstate.go), is a fixed two-entry
-// literal ("ctrl+z", "ctrl+r") that can never contain a "t" hint, so the
-// no-CloudTrail-hint-on-menu invariant is now structurally guaranteed rather
-// than a runtime behavior worth pinning. See app_footer_hints_test.go for
-// MenuFooterHintsFor's live coverage.

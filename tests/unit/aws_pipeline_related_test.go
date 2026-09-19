@@ -11,8 +11,6 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// --- Navigable Fields ---
-
 func TestNavigableFields_Pipeline_None(t *testing.T) {
 	fields := resource.GetNavigableFields("pipeline")
 	if len(fields) != 0 {
@@ -20,8 +18,6 @@ func TestNavigableFields_Pipeline_None(t *testing.T) {
 	}
 }
 
-// pipelineCheckerByTarget returns the RelatedChecker for the given target
-// type registered under "pipeline". Fails immediately if not found or nil.
 func pipelineCheckerByTarget(t *testing.T, target string) resource.RelatedChecker {
 	t.Helper()
 	for _, def := range resource.GetRelated("pipeline") {
@@ -36,12 +32,6 @@ func pipelineCheckerByTarget(t *testing.T, target string) resource.RelatedChecke
 	return nil
 }
 
-// ---------------------------------------------------------------------------
-// checkPipelineEbRule — Pattern C: ListRuleNamesByTarget on pipeline ARN
-// ---------------------------------------------------------------------------
-
-// TestRelated_Pipeline_EbRule_Match verifies that when the fake EventBridge
-// returns 3 rule names, Count=3 and ResourceIDs has all 3 names.
 func TestRelated_Pipeline_EbRule_Match(t *testing.T) {
 	src := resource.Resource{
 		ID:   "my-pipeline",
@@ -66,8 +56,6 @@ func TestRelated_Pipeline_EbRule_Match(t *testing.T) {
 	}
 }
 
-// TestRelated_Pipeline_EbRule_Empty verifies that a pipeline with no ARN
-// field returns Count=0.
 func TestRelated_Pipeline_EbRule_Empty(t *testing.T) {
 	src := resource.Resource{
 		ID:     "my-pipeline",
@@ -82,8 +70,6 @@ func TestRelated_Pipeline_EbRule_Empty(t *testing.T) {
 	}
 }
 
-// TestRelated_Pipeline_EbRule_WrongRawStruct verifies that nil clients with
-// a valid ARN field returns Count=-1 (no EventBridge client available).
 func TestRelated_Pipeline_EbRule_WrongRawStruct(t *testing.T) {
 	src := resource.Resource{
 		ID:   "my-pipeline",
@@ -101,12 +87,6 @@ func TestRelated_Pipeline_EbRule_WrongRawStruct(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// checkPipelineCB — CodeBuild project name extraction
-// ---------------------------------------------------------------------------
-
-// TestRelated_Pipeline_CB_Match verifies that a CodeBuild action's ProjectName
-// is extracted and returned in ResourceIDs.
 func TestRelated_Pipeline_CB_Match(t *testing.T) {
 	const pipelineName = "build-pipeline"
 	src := resource.Resource{ID: pipelineName, Name: pipelineName, Fields: map[string]string{}}
@@ -126,7 +106,6 @@ func TestRelated_Pipeline_CB_Match(t *testing.T) {
 	}
 }
 
-// TestRelated_Pipeline_CB_NoMatch verifies Count=0 when no CodeBuild actions exist.
 func TestRelated_Pipeline_CB_NoMatch(t *testing.T) {
 	const pipelineName = "deploy-only-pipeline"
 	src := resource.Resource{ID: pipelineName, Name: pipelineName, Fields: map[string]string{}}
@@ -143,7 +122,6 @@ func TestRelated_Pipeline_CB_NoMatch(t *testing.T) {
 	}
 }
 
-// TestRelated_Pipeline_CB_NilClients verifies Count=-1 when clients are nil.
 func TestRelated_Pipeline_CB_NilClients(t *testing.T) {
 	src := resource.Resource{ID: "build-pipeline", Fields: map[string]string{}}
 	checker := pipelineCheckerByTarget(t, "cb")
@@ -154,16 +132,10 @@ func TestRelated_Pipeline_CB_NilClients(t *testing.T) {
 	}
 }
 
-// TestRelated_Pipeline_CB_FailedLookup_ReturnsError pins the current contract
-// (docs/related-resources.md rule 6): a client that IS wired but whose
-// GetPipeline comes back with no Pipeline in the response (this fake's
-// "misses" behavior — a call that was actually attempted) is a malformed
-// response, not "never attempted" — it must surface as RelatedError so the
-// operator sees the Flash + "!" error log and can retry, not silently
-// collapse to RelatedUnknown (which pipelineGetDeclaration/pipelineRelatedOnErr
-// now reserve for errPipelineNotConfigured — no CodePipeline client wired at
-// all). This test previously asserted RelatedUnknown for this same fixture;
-// that was the pre-rule-6 behavior.
+// A wired client whose GetPipeline returns no Pipeline made the call and got
+// a malformed response, so the pivot is RelatedError
+// (docs/related-resources.md); RelatedUnknown is reserved for a missing
+// CodePipeline client.
 func TestRelated_Pipeline_CB_FailedLookup_ReturnsError(t *testing.T) {
 	const pipelineName = "missing-pipeline"
 	src := resource.Resource{ID: pipelineName, Fields: map[string]string{}}
@@ -178,12 +150,6 @@ func TestRelated_Pipeline_CB_FailedLookup_ReturnsError(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// checkPipelineRole — IAM role name extraction from RoleArn
-// ---------------------------------------------------------------------------
-
-// TestRelated_Pipeline_Role_Match verifies the pipeline-level RoleArn last segment
-// is returned as the role name.
 func TestRelated_Pipeline_Role_Match(t *testing.T) {
 	const pipelineName = "role-pipeline"
 	src := resource.Resource{ID: pipelineName, Name: pipelineName, Fields: map[string]string{}}
@@ -203,7 +169,6 @@ func TestRelated_Pipeline_Role_Match(t *testing.T) {
 	}
 }
 
-// TestRelated_Pipeline_Role_NoRole verifies Count=0 when RoleArn is empty.
 func TestRelated_Pipeline_Role_NoRole(t *testing.T) {
 	const pipelineName = "no-role-pipeline"
 	src := resource.Resource{ID: pipelineName, Name: pipelineName, Fields: map[string]string{}}
@@ -220,14 +185,6 @@ func TestRelated_Pipeline_Role_NoRole(t *testing.T) {
 	}
 }
 
-// TestRelated_Pipeline_Role_FailedLookup_ReturnsError pins the current
-// contract (docs/related-resources.md rule 6): see
-// TestRelated_Pipeline_CB_FailedLookup_ReturnsError — the same fake/fixture
-// is a wired client whose GetPipeline comes back with no Pipeline (malformed
-// response, an attempted call), which pipelineRelatedOnErr classifies as
-// RelatedError, not RelatedUnknown (reserved for errPipelineNotConfigured —
-// no client wired at all). This test previously asserted RelatedUnknown for
-// this same fixture; that was the pre-rule-6 behavior.
 func TestRelated_Pipeline_Role_FailedLookup_ReturnsError(t *testing.T) {
 	const pipelineName = "missing-pipeline"
 	src := resource.Resource{ID: pipelineName, Fields: map[string]string{}}
@@ -242,12 +199,6 @@ func TestRelated_Pipeline_Role_FailedLookup_ReturnsError(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// checkPipelineCFN — CloudFormation stack name extraction
-// ---------------------------------------------------------------------------
-
-// TestRelated_Pipeline_CFN_Match verifies that a CloudFormation action's StackName
-// is extracted and returned.
 func TestRelated_Pipeline_CFN_Match(t *testing.T) {
 	const pipelineName = "cfn-pipeline"
 	src := resource.Resource{ID: pipelineName, Name: pipelineName, Fields: map[string]string{}}
@@ -267,12 +218,6 @@ func TestRelated_Pipeline_CFN_Match(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// checkPipelineCodeartifact — CodeArtifact repository name extraction
-// ---------------------------------------------------------------------------
-
-// TestRelated_Pipeline_CodeArtifact_Match verifies CodeArtifact repository name
-// extraction from a Source action.
 func TestRelated_Pipeline_CodeArtifact_Match(t *testing.T) {
 	const pipelineName = "ca-pipeline"
 	src := resource.Resource{ID: pipelineName, Name: pipelineName, Fields: map[string]string{}}
@@ -292,12 +237,6 @@ func TestRelated_Pipeline_CodeArtifact_Match(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// checkPipelineECR — ECR repository name extraction
-// ---------------------------------------------------------------------------
-
-// TestRelated_Pipeline_ECR_Match verifies ECR repository name extraction from
-// an ECR Source action.
 func TestRelated_Pipeline_ECR_Match(t *testing.T) {
 	const pipelineName = "ecr-pipeline"
 	const repoName = "my-app-image"
@@ -318,12 +257,6 @@ func TestRelated_Pipeline_ECR_Match(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// checkPipelineECSSvc — ECS service name extraction
-// ---------------------------------------------------------------------------
-
-// TestRelated_Pipeline_ECSSvc_Match verifies ECS service name extraction from
-// an ECS deploy action.
 func TestRelated_Pipeline_ECSSvc_Match(t *testing.T) {
 	const pipelineName = "ecs-deploy-pipeline"
 	const serviceName = "my-production-service"
@@ -344,12 +277,6 @@ func TestRelated_Pipeline_ECSSvc_Match(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// checkPipelineKMS — KMS key extraction from ArtifactStore.EncryptionKey
-// ---------------------------------------------------------------------------
-
-// TestRelated_Pipeline_KMS_Match verifies KMS key ID extraction from
-// ArtifactStore.EncryptionKey.Id (last ARN segment).
 func TestRelated_Pipeline_KMS_Match(t *testing.T) {
 	const pipelineName = "kms-pipeline"
 	const kmsARN = "arn:aws:kms:us-east-1:123456789012:key/deadbeef-aaaa-bbbb-cccc-000000000001"
@@ -370,13 +297,11 @@ func TestRelated_Pipeline_KMS_Match(t *testing.T) {
 	}
 }
 
-// TestRelated_Pipeline_KMS_NoKey verifies Count=0 when no EncryptionKey is set.
 func TestRelated_Pipeline_KMS_NoKey(t *testing.T) {
 	const pipelineName = "no-kms-pipeline"
 	src := resource.Resource{ID: pipelineName, Name: pipelineName, Fields: map[string]string{}}
 	clients := &awsclient.ServiceClients{
 		CodePipeline: newFakeCodePipelineWithDeclarations(map[string]*cptypes.PipelineDeclaration{
-			// ArtifactStore with bucket but no KMS key
 			pipelineName: pipelineDeclarationWithArtifactStore(pipelineName, "plain-bucket", ""),
 		}),
 	}
@@ -388,12 +313,6 @@ func TestRelated_Pipeline_KMS_NoKey(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// checkPipelineLambda — Lambda function name extraction
-// ---------------------------------------------------------------------------
-
-// TestRelated_Pipeline_Lambda_Match verifies Lambda function name extraction
-// from an Invoke action.
 func TestRelated_Pipeline_Lambda_Match(t *testing.T) {
 	const pipelineName = "lambda-pipeline"
 	const funcName = "my-gate-function"
@@ -414,12 +333,6 @@ func TestRelated_Pipeline_Lambda_Match(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// checkPipelineS3 — S3 bucket name extraction
-// ---------------------------------------------------------------------------
-
-// TestRelated_Pipeline_S3_ArtifactStore verifies that the ArtifactStore bucket
-// location is returned as the S3 resource ID.
 func TestRelated_Pipeline_S3_ArtifactStore(t *testing.T) {
 	const pipelineName = "s3-pipeline"
 	const bucketName = "my-pipeline-artifacts"
@@ -440,8 +353,6 @@ func TestRelated_Pipeline_S3_ArtifactStore(t *testing.T) {
 	}
 }
 
-// TestRelated_Pipeline_S3_DeployAction verifies that an S3 deploy action's
-// BucketName is included in results alongside (or instead of) ArtifactStore.
 func TestRelated_Pipeline_S3_DeployAction(t *testing.T) {
 	const pipelineName = "s3-deploy-pipeline"
 	const deployBucket = "my-website-bucket"
@@ -462,12 +373,6 @@ func TestRelated_Pipeline_S3_DeployAction(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// checkPipelineSNS — SNS topic ARN extraction from Approval actions
-// ---------------------------------------------------------------------------
-
-// TestRelated_Pipeline_SNS_Match verifies that a Manual approval action's
-// NotificationArn is returned as the SNS resource ID.
 func TestRelated_Pipeline_SNS_Match(t *testing.T) {
 	const pipelineName = "sns-pipeline"
 	const topicARN = "arn:aws:sns:us-east-1:123456789012:pipeline-approvals"
@@ -488,7 +393,6 @@ func TestRelated_Pipeline_SNS_Match(t *testing.T) {
 	}
 }
 
-// TestRelated_Pipeline_SNS_NoApproval verifies Count=0 when no approval actions exist.
 func TestRelated_Pipeline_SNS_NoApproval(t *testing.T) {
 	const pipelineName = "no-approval-pipeline"
 	src := resource.Resource{ID: pipelineName, Name: pipelineName, Fields: map[string]string{}}

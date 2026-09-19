@@ -1,5 +1,5 @@
 // fakes_related_checkers_misc_test.go contains fake AWS service client implementations
-// used by the coverage-restoration tests across athena, eventbridge_rule, backup,
+// used by the related-checker tests across athena, eventbridge_rule, backup,
 // redshift, tg, and pipeline related checkers.
 package unit_test
 
@@ -18,7 +18,6 @@ import (
 
 // ---------------------------------------------------------------------------
 // fakeAthenaCR — implements AthenaAPI (ListWorkGroups + GetWorkGroup)
-// Used by: athena coverage-restore tests.
 // ---------------------------------------------------------------------------
 
 type fakeAthenaCR struct {
@@ -104,15 +103,9 @@ func newFakeAthenaWithExecutionRole(roleARN string) *fakeAthenaCR {
 	}
 }
 
-// The fake client for EventBridgeAPI (ListRules, ListTargetsByRule,
-// ListRuleNamesByTarget) now lives in fakes_eventbridge_test.go
-// (fakeEventBridgeAPI) — see that file's header for the one-fake-per-
-// interface convention.
-
 // ---------------------------------------------------------------------------
 // fakeRedshiftCR — implements RedshiftAPI (DescribeClusters, DescribeLoggingStatus,
 // DescribeClusterSubnetGroups).
-// Used by: redshift coverage-restore tests.
 // ---------------------------------------------------------------------------
 
 type fakeRedshiftCR struct {
@@ -150,7 +143,6 @@ var _ awsclient.RedshiftAPI = (*fakeRedshiftCR)(nil)
 
 // ---------------------------------------------------------------------------
 // fakeELBv2CR — implements ELBv2API + ELBv2DescribeTagsAPI for TG checker tests.
-// Used by: tg coverage-restore tests.
 // ---------------------------------------------------------------------------
 
 type fakeELBv2CR struct {

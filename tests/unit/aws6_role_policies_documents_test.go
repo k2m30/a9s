@@ -1,7 +1,6 @@
 package unit_test
 
-// aws6_role_policies_documents_test.go — every managed policy the demo
-// account MODELS carries its document.
+// Every managed policy the demo account MODELS carries its document.
 //
 // The role_policies detail asks for a policy's document (GetPolicy for the
 // default version id, then GetPolicyVersion). A policy the fixtures list but

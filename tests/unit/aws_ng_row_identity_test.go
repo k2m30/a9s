@@ -1,5 +1,3 @@
-// aws_ng_row_identity_test.go — a node group's row identity across clusters.
-//
 // EKS scopes a node-group name to its cluster, so two clusters may each own a
 // node group called "workers". The ng list is one flat list keyed by
 // Resource.ID, so a bare name makes the second one vanish (or resolve to the
@@ -22,7 +20,6 @@ import (
 	_ "github.com/k2m30/a9s/v3/core/aws"
 )
 
-// ngRowByID finds a fetched row by its exact ID.
 func ngRowByID(t *testing.T, rows []resource.Resource, id string) resource.Resource {
 	t.Helper()
 	for _, r := range rows {
@@ -47,9 +44,6 @@ func activeNodegroup(cluster, name string) *ekstypes.Nodegroup {
 	}
 }
 
-// TestNGRows_SameNameInTwoClustersBothRender pins that a node-group name
-// reused across clusters produces two distinct rows that survive the list's
-// ID-keyed dedup, while the Node Group column still shows the bare name.
 func TestNGRows_SameNameInTwoClustersBothRender(t *testing.T) {
 	pf := resource.GetPaginatedFetcher("ng")
 	if pf == nil {
@@ -96,9 +90,8 @@ func TestNGRows_SameNameInTwoClustersBothRender(t *testing.T) {
 	}
 }
 
-// TestNGRow_ConsoleURLUsesTheBareName pins that the console link addresses
-// the node group by its bare name under its cluster — a composite id in the
-// path produces a 404 in the EKS console.
+// The EKS console addresses a node group by its bare name under its
+// cluster; a composite id in the path is a 404.
 func TestNGRow_ConsoleURLUsesTheBareName(t *testing.T) {
 	td := resource.FindResourceType("ng")
 	if td == nil || td.ConsoleURL == nil {
@@ -121,10 +114,8 @@ func TestNGRow_ConsoleURLUsesTheBareName(t *testing.T) {
 	}
 }
 
-// TestNGRow_CloudTrailFilterUsesTheBareName pins that the CloudTrail pivot
-// scopes by the name AWS records in its events. CloudTrail never writes
-// "<cluster>/<nodegroup>" as a ResourceName, so a composite value finds
-// nothing.
+// CloudTrail never writes "<cluster>/<nodegroup>" as a ResourceName, so the
+// pivot must scope by the bare name.
 func TestNGRow_CloudTrailFilterUsesTheBareName(t *testing.T) {
 	row := resource.Resource{
 		ID:   "green/workers",
@@ -141,10 +132,8 @@ func TestNGRow_CloudTrailFilterUsesTheBareName(t *testing.T) {
 	}
 }
 
-// TestNGRow_DegradedRowKeepsTheClusterScopedID pins that a node group the
-// describe would not answer for keeps the same ID shape as a full row — a
-// bare-name degraded row would collide with a healthy row of that name in
-// another cluster.
+// A degraded row keeps the cluster-scoped ID: a bare-name row would collide
+// with a healthy row of that name in another cluster.
 func TestNGRow_DegradedRowKeepsTheClusterScopedID(t *testing.T) {
 	pf := resource.GetPaginatedFetcher("ng")
 	if pf == nil {
@@ -156,7 +145,6 @@ func TestNGRow_DegradedRowKeepsTheClusterScopedID(t *testing.T) {
 		nodegroups: map[string][]string{"blue": {"workers"}, "green": {"workers"}},
 		nodegroupDetails: map[string]*ekstypes.Nodegroup{
 			"blue/workers": activeNodegroup("blue", "workers"),
-			// green/workers absent → DescribeNodegroup answers a nil body.
 		},
 	}
 	clients := &awsclient.ServiceClients{EKS: eksFake, EC2: fakes.NewEC2()}

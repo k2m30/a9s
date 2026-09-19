@@ -54,7 +54,7 @@ func firstScreenEntry(t *testing.T, c *app.Controller, shortName string) app.Men
 }
 
 // ---------------------------------------------------------------------------
-// Row 1 — the sweep announces itself in the title
+// the sweep announces itself in the title
 // ---------------------------------------------------------------------------
 
 // TestMenuTitle_SweepProgress_VerifyingCounter drives a three-type sweep
@@ -107,12 +107,12 @@ func TestMenuTitle_SweepProgress_VerifyingCounter(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// Row 2 — a failed probe says why, and says it once when it is account-wide
+// a failed probe says why, and says it once when it is account-wide
 // ---------------------------------------------------------------------------
 
 // TestMenuRow_FailedProbe_CarriesCauseAndKeepsCount pins that a row whose
 // probe failed keeps its cached count AND gains a short cause word, so
-// "not checked yet" and "checked and refused" no longer look identical.
+// "not checked yet" and "checked and refused" look different.
 func TestMenuRow_FailedProbe_CarriesCauseAndKeepsCount(t *testing.T) {
 	cases := []struct {
 		name string
@@ -210,11 +210,11 @@ func TestMenuTitle_WholeSweepFailed_SaysCauseOnce(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// Row 3 — a denied enrichment is one line, not a wall
+// a denied enrichment is one line, not a wall
 // ---------------------------------------------------------------------------
 
 // TestAggregateFailures_DeniedEnrichment_OneLinePerCause feeds 46 identical
-// AccessDenied failures (the reported shape: one per resource, each carrying
+// AccessDenied failures (one per resource, each carrying
 // a request id and an encoded authorization message) through the one helper
 // that phrases an aggregated failure, and pins the operator-readable result.
 func TestAggregateFailures_DeniedEnrichment_OneLinePerCause(t *testing.T) {
@@ -293,13 +293,13 @@ func TestAggregateFailures_DistinctCauses_OneLineEach(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// Row 4 — an opened list verifies its type
+// an opened list verifies its type
 // ---------------------------------------------------------------------------
 
-// TestMenuOrigin_FailedListFetch_DoesNotVerify is row 2's rule in the list
-// lane: a fetch that came back refused, with no rows, must not mark the type
-// verified and must not overwrite its cached count with a zero nobody
-// observed. Found by probing row 4's own change.
+// TestMenuOrigin_FailedListFetch_DoesNotVerify is the failed-probe rule in
+// the list lane: a fetch that came back refused, with no rows, must not mark
+// the type verified and must not overwrite its cached count with a zero nobody
+// observed.
 func TestMenuOrigin_FailedListFetch_DoesNotVerify(t *testing.T) {
 	c, _ := newTestControllerAndCore(t)
 	c.ApplyIntents([]runtime.UIIntent{

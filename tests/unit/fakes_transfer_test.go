@@ -2,11 +2,9 @@
 // SDK-interface fakes shared across tests/unit.
 //
 // Convention (docs/go-codebase-checklist.md, DRY section): one configurable
-// fake per SDK interface, in a service-named fakes_<service>_test.go file --
-// never re-implement the same interface under a new name in another file,
-// and never add another wave/batch-named fake file (fakes_us1_batchN_test.go,
-// fakes_related_checkers_branch_coverage_test.go, fakes_related_checkers_misc_test.go are historical
-// accretion naming, not a pattern to extend).
+// fake per SDK interface, in a service-named fakes_<service>_test.go file —
+// never re-implement the same interface under a new name in another file, and
+// never add a wave/batch-named fake file.
 package unit
 
 import (
@@ -27,7 +25,7 @@ import (
 //
 // DescribeServer: configured in priority order —
 //  1. DescribeErr, if set, is returned unconditionally (regardless of the
-//     requested server ID) — for regression tests that must prove
+//     requested server ID) — for tests that must prove
 //     DescribeServer is never called after a ListServers failure.
 //  2. ErrByName, keyed by server ID, if the ID has an entry.
 //  3. Servers, keyed by server ID, if the ID has an entry.

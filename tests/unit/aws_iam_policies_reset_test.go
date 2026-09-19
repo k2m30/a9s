@@ -2,10 +2,6 @@ package unit
 
 // aws_iam_policies_reset_test.go — pins for the PolicyStore-based IAM policy
 // cache.
-//
-//   TestPolicyStore_ClearForcesRebuild — the cache is rebuilt from a new mock
-//     after store.Clear(), not from stale prior data.
-//   TestPolicyStore_ClearIdempotent — calling Clear twice in a row must not panic.
 
 import (
 	"context"
@@ -50,27 +46,16 @@ func (f *countingListPoliciesAPI) ListGroups(_ context.Context, _ *iam.ListGroup
 	return &iam.ListGroupsOutput{}, nil
 }
 
-// Compile-time: countingListPoliciesAPI satisfies IAMAPI.
 var _ awsclient.IAMAPI = (*countingListPoliciesAPI)(nil)
 
 // TestPolicyStore_ClearForcesRebuild verifies that after store.Clear() is
 // called, the next FetchIAMPoliciesByIDs call rebuilds the cache from the
 // new API client — not from the stale prior call.
-//
-// Steps:
-//  1. Construct a fresh store per test (no global pollution).
-//  2. Call FetchIAMPoliciesByIDs with mock1 (returns "policy-A").
-//     Assert mock1.calls == 1, result contains "policy-A".
-//  3. Call again with the same mock1. Assert mock1.calls still == 1 (cache hit).
-//  4. Call store.Clear().
-//  5. Call FetchIAMPoliciesByIDs with mock2 (returns "policy-B").
-//     Assert mock2.calls == 1, result contains "policy-B" (not stale "policy-A").
 func TestPolicyStore_ClearForcesRebuild(t *testing.T) {
 	store := session.NewPolicyStore()
 
 	mock1 := &countingListPoliciesAPI{policyName: "policy-A"}
 
-	// Step 2: First call — must build the cache (ListPolicies called once).
 	res1, err := awsclient.FetchIAMPoliciesByIDsFull(context.Background(), mock1, []string{"policy-A"}, store, "aws")
 	if err != nil {
 		t.Fatalf("FetchIAMPoliciesByIDs (mock1, first call): unexpected error: %v", err)
@@ -82,7 +67,6 @@ func TestPolicyStore_ClearForcesRebuild(t *testing.T) {
 		t.Errorf("first call: want [{ID:policy-A}], got %v", res1)
 	}
 
-	// Step 3: Second call with same mock — must be a cache hit (no extra API call).
 	res2, err := awsclient.FetchIAMPoliciesByIDsFull(context.Background(), mock1, []string{"policy-A"}, store, "aws")
 	if err != nil {
 		t.Fatalf("FetchIAMPoliciesByIDs (mock1, second call): unexpected error: %v", err)
@@ -94,10 +78,8 @@ func TestPolicyStore_ClearForcesRebuild(t *testing.T) {
 		t.Errorf("second call: want [{ID:policy-A}], got %v", res2)
 	}
 
-	// Step 4: Clear the store.
 	store.Clear()
 
-	// Step 5: Call with mock2 — must rebuild from mock2 (returns "policy-B").
 	mock2 := &countingListPoliciesAPI{policyName: "policy-B"}
 	res3, err := awsclient.FetchIAMPoliciesByIDsFull(context.Background(), mock2, []string{"policy-B"}, store, "aws")
 	if err != nil {
@@ -113,13 +95,9 @@ func TestPolicyStore_ClearForcesRebuild(t *testing.T) {
 
 // TestPolicyStore_ClearIdempotent verifies that calling store.Clear() twice
 // in a row without an intervening fetch does not panic or produce an error.
-//
-// Regression: if Clear had non-idempotent cleanup (e.g., double-free of a map)
-// it would panic here.
 func TestPolicyStore_ClearIdempotent(t *testing.T) {
 	store := session.NewPolicyStore()
 
-	// Two clears in a row — must not panic.
 	store.Clear()
 	store.Clear()
 }

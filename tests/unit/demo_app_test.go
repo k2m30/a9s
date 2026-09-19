@@ -18,14 +18,6 @@ func demoClientsReadyMsg() messages.ClientsReady {
 	return messages.ClientsReady{Clients: demo.NewServiceClients(), Gen: 1}
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
-// Demo mode app.go integration tests — verify root model demo-mode behavior.
-// ═══════════════════════════════════════════════════════════════════════════
-
-// ---------------------------------------------------------------------------
-// 1. TestDemoMode_Init_NoAWSConnection
-// ---------------------------------------------------------------------------
-
 func TestDemoMode_Init_NoAWSConnection(t *testing.T) {
 	t.Parallel()
 	model := newBlessedModel(t, "demo", "us-east-1",
@@ -51,10 +43,6 @@ func TestDemoMode_Init_NoAWSConnection(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// 2. TestDemoMode_FetchResources_EC2
-// ---------------------------------------------------------------------------
-
 func TestDemoMode_FetchResources_EC2(t *testing.T) {
 	t.Parallel()
 	model := newBlessedModel(t, "demo", "us-east-1",
@@ -64,11 +52,9 @@ func TestDemoMode_FetchResources_EC2(t *testing.T) {
 		tui.WithProfileForTest(demo.DemoProfile),
 		tui.WithRegionForTest(demo.DemoRegion))
 
-	// Send ClientsReadyMsg to move past initialization
 	var m tea.Model = model
 	m, _ = m.Update(demoClientsReadyMsg())
 
-	// Navigate to EC2 resource list
 	_, cmd := m.Update(messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "ec2",
@@ -92,10 +78,6 @@ func TestDemoMode_FetchResources_EC2(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// 3. TestDemoMode_FetchResources_Unknown
-// ---------------------------------------------------------------------------
-
 func TestDemoMode_FetchResources_Unknown(t *testing.T) {
 	t.Parallel()
 	model := newBlessedModel(t, "demo", "us-east-1",
@@ -105,11 +87,9 @@ func TestDemoMode_FetchResources_Unknown(t *testing.T) {
 		tui.WithProfileForTest(demo.DemoProfile),
 		tui.WithRegionForTest(demo.DemoRegion))
 
-	// Send ClientsReadyMsg to move past initialization
 	var m tea.Model = model
 	m, _ = m.Update(demoClientsReadyMsg())
 
-	// Navigate to a non-demo resource type (nonexistent-type)
 	_, cmd := m.Update(messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "nonexistent-type",
@@ -135,15 +115,10 @@ func TestDemoMode_FetchResources_Unknown(t *testing.T) {
 			t.Errorf("expected 0 resources for non-demo type; got %d", len(m.Resources))
 		}
 	case messages.Flash:
-		// FlashMsg for unknown type is acceptable
 	default:
 		t.Fatalf("expected ResourcesLoadedMsg or FlashMsg; got %T", msg)
 	}
 }
-
-// ---------------------------------------------------------------------------
-// 4. TestDemoMode_BlockedCommand_Ctx
-// ---------------------------------------------------------------------------
 
 func TestDemoMode_BlockedCommand_Ctx(t *testing.T) {
 	t.Parallel()
@@ -175,10 +150,6 @@ func TestDemoMode_BlockedCommand_Ctx(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// 5. TestDemoMode_BlockedCommand_Region
-// ---------------------------------------------------------------------------
-
 func TestDemoMode_BlockedCommand_Region(t *testing.T) {
 	t.Parallel()
 	model := newBlessedModel(t, "demo", "us-east-1",
@@ -191,7 +162,6 @@ func TestDemoMode_BlockedCommand_Region(t *testing.T) {
 	var m tea.Model = model
 	m, _ = m.Update(demoClientsReadyMsg())
 
-	// Execute :region command via NavigateMsg
 	_, cmd := m.Update(messages.Navigate{Target: messages.TargetRegion})
 	if cmd == nil {
 		t.Fatal("NavigateMsg for TargetRegion returned nil cmd; expected flash message")
@@ -209,10 +179,6 @@ func TestDemoMode_BlockedCommand_Region(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// 6. TestDemoMode_RevealWorks
-// ---------------------------------------------------------------------------
-
 func TestDemoMode_RevealWorks(t *testing.T) {
 	t.Parallel()
 	model := newBlessedModel(t, "demo", "us-east-1",
@@ -225,7 +191,6 @@ func TestDemoMode_RevealWorks(t *testing.T) {
 	var m tea.Model = model
 	m, _ = m.Update(demoClientsReadyMsg())
 
-	// Navigate to secrets resource list
 	m, cmd := m.Update(messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "secrets",
@@ -240,11 +205,10 @@ func TestDemoMode_RevealWorks(t *testing.T) {
 		m, _ = m.Update(msg)
 	}
 
-	// Simulate pressing 'x' key — this triggers handleReveal via handleKeyMsg.
-	// The demo-mode block has been removed: reveal now goes through fetchRevealValue
-	// which calls the registry-based reveal fetcher. The cmd may succeed or fail
-	// depending on whether the demo transport handles the API call, but it must
-	// NOT return a FlashMsg with "not available in demo mode".
+	// 'x' reaches fetchRevealValue through the registry-based reveal fetcher.
+	// The call may succeed or fail depending on whether the demo transport
+	// handles it, but it must not be blocked by a "not available in demo mode"
+	// flash.
 	xKey := tea.KeyPressMsg{Code: -1, Text: "x"}
 	_, cmd = m.Update(xKey)
 	if cmd == nil {
@@ -253,10 +217,9 @@ func TestDemoMode_RevealWorks(t *testing.T) {
 	revealMsg := cmd()
 
 	// The result must be ValueRevealedMsg (either Err==nil or Err!=nil).
-	// A FlashMsg would mean the reveal was blocked — which is no longer expected.
+	// A FlashMsg would mean the reveal was blocked.
 	revealed, ok := revealMsg.(messages.ValueRevealed)
 	if !ok {
-		// If it is a FlashMsg, surface the text to make failures self-explanatory.
 		if flash, isFlash := revealMsg.(messages.Flash); isFlash {
 			t.Fatalf("reveal pathway was blocked; got FlashMsg{Text:%q, IsError:%v} — expected ValueRevealedMsg", flash.Text, flash.IsError)
 		}
@@ -272,10 +235,6 @@ func TestDemoMode_RevealWorks(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// 7. TestDemoMode_SSMRevealWorks
-// ---------------------------------------------------------------------------
-
 func TestDemoMode_SSMRevealWorks(t *testing.T) {
 	t.Parallel()
 	model := newBlessedModel(t, "demo", "us-east-1",
@@ -288,7 +247,6 @@ func TestDemoMode_SSMRevealWorks(t *testing.T) {
 	var m tea.Model = model
 	m, _ = m.Update(demoClientsReadyMsg())
 
-	// Navigate to SSM parameter list
 	m, cmd := m.Update(messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "ssm",
@@ -332,10 +290,6 @@ func TestDemoMode_SSMRevealWorks(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// 7. TestDemoMode_RefreshReturnsSameData
-// ---------------------------------------------------------------------------
-
 func TestDemoMode_RefreshReturnsSameData(t *testing.T) {
 	t.Parallel()
 	model := newBlessedModel(t, "demo", "us-east-1",
@@ -348,13 +302,11 @@ func TestDemoMode_RefreshReturnsSameData(t *testing.T) {
 	var m tea.Model = model
 	m, _ = m.Update(demoClientsReadyMsg())
 
-	// Navigate to EC2
 	m, cmd := m.Update(messages.Navigate{
 		Target:       messages.TargetResourceList,
 		ResourceType: "ec2",
 	})
 
-	// Execute first fetch
 	msg := extractMsg(t, cmd, func(msg tea.Msg) bool {
 		_, ok := msg.(messages.ResourcesLoaded)
 		return ok
@@ -362,10 +314,8 @@ func TestDemoMode_RefreshReturnsSameData(t *testing.T) {
 	rlm1 := msg.(messages.ResourcesLoaded)
 	firstCount := len(rlm1.Resources)
 
-	// Deliver the resources to the model
 	m, _ = m.Update(rlm1)
 
-	// Now trigger a LoadResourcesMsg (refresh path)
 	_, cmd = m.Update(messages.LoadResources{ResourceType: "ec2"})
 	if cmd == nil {
 		t.Fatal("LoadResourcesMsg returned nil cmd; expected fetch command")
@@ -381,17 +331,10 @@ func TestDemoMode_RefreshReturnsSameData(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// 8. TestNonDemoMode_Unchanged
-// ---------------------------------------------------------------------------
-
-// TestNonDemoMode_Unchanged pins that non-demo mode still initiates a live
-// AWS connect (messages.InitConnect), not a demo handshake
-// (messages.ClientsReady). Updated for the startup disk seed (D10): Init() on the live
-// (no-pre-supplied-clients) path now returns tea.Batch(connectCmd, seedCmd)
-// instead of a bare connectCmd, so the InitConnect message must be located by
-// walking the returned cmd tree (extractMsg, already defined in this file)
-// rather than asserting cmd() produces InitConnect directly.
+// TestNonDemoMode_Unchanged pins that non-demo mode initiates a live AWS
+// connect (messages.InitConnect), not a demo handshake (messages.ClientsReady).
+// Init() on the live path returns tea.Batch(connectCmd, seedCmd), so the
+// InitConnect message is found by walking the returned cmd tree.
 func TestNonDemoMode_Unchanged(t *testing.T) {
 	t.Parallel()
 	model := newBlessedModel(t, "", "")
@@ -408,10 +351,7 @@ func TestNonDemoMode_Unchanged(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// Helper: extractMsg walks batch commands to find a message matching pred.
-// ---------------------------------------------------------------------------
-
+// extractMsg walks batch commands to find a message matching pred.
 func extractMsg(t *testing.T, cmd tea.Cmd, pred func(tea.Msg) bool) tea.Msg {
 	t.Helper()
 	if cmd == nil {
@@ -422,7 +362,6 @@ func extractMsg(t *testing.T, cmd tea.Cmd, pred func(tea.Msg) bool) tea.Msg {
 	if pred(msg) {
 		return msg
 	}
-	// If it's a BatchMsg, recurse into each sub-cmd.
 	if batch, ok := msg.(tea.BatchMsg); ok {
 		for _, subCmd := range batch {
 			if subCmd == nil {
@@ -432,7 +371,6 @@ func extractMsg(t *testing.T, cmd tea.Cmd, pred func(tea.Msg) bool) tea.Msg {
 			if pred(subMsg) {
 				return subMsg
 			}
-			// Handle nested batches
 			if subBatch, ok := subMsg.(tea.BatchMsg); ok {
 				for _, innerCmd := range subBatch {
 					if innerCmd == nil {

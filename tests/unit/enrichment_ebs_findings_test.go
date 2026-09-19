@@ -1,15 +1,6 @@
 package unit
 
 // enrichment_ebs_findings_test.go — Behavioral tests for EnrichEBSVolumeStatus.
-//
-// Contract assertions (enricher-contract.md):
-//   - Returns EnricherResult.Findings keyed by volume ID.
-//   - Severity "!" for all findings.
-//   - Summary: "volume I/O degraded".
-//   - IssueCount = len(Findings).
-//   - Volumes with status "ok" must NOT appear in Findings.
-//   - Truncated = true when NextToken is non-nil.
-//   - Empty result → non-nil empty Findings map.
 
 import (
 	"context"

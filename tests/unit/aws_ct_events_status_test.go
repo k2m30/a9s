@@ -1,9 +1,6 @@
 package unit
 
-// Tests for the §1.1 severity model: Resource.Status must be one of
-// "ct-info" / "ct-attention" / "ct-danger" per docs/historical/design/ct-event-list-v2.md §1.1.
-//
-// Replaces the old ct-write / ct-read binary model (removed in v2 redesign).
+// Resource.Status for a CloudTrail event is one of "ct-info" / "ct-attention" / "ct-danger".
 
 import (
 	"context"
@@ -42,11 +39,6 @@ func plainAccountJSON(_, eventCategory, eventType string) string {
 	)
 }
 
-// ===========================================================================
-// CT1: CreateBucket (verb W) → Status must be "ct-attention"
-// §1.2 rule: Verb W → ct-attention
-// ===========================================================================
-
 func TestCTStatus_CreateBucket_IsCtAttention(t *testing.T) {
 	ctJSON := plainAccountJSON("CreateBucket", "Management", "AwsApiCall")
 	status, verb := buildCTEventWithStatus(t, "st-01", "CreateBucket", "s3.amazonaws.com", "alice", ctJSON, nil)
@@ -57,11 +49,6 @@ func TestCTStatus_CreateBucket_IsCtAttention(t *testing.T) {
 		t.Errorf("Status = %q, want ct-attention for verb W (CreateBucket) per §1.2", status)
 	}
 }
-
-// ===========================================================================
-// CT2: DeleteTable (verb D) → Status must be "ct-danger"
-// §1.2 rule: Verb D → ct-danger
-// ===========================================================================
 
 func TestCTStatus_DeleteTable_IsCtDanger(t *testing.T) {
 	ctJSON := plainAccountJSON("DeleteTable", "Management", "AwsApiCall")
@@ -74,11 +61,6 @@ func TestCTStatus_DeleteTable_IsCtDanger(t *testing.T) {
 	}
 }
 
-// ===========================================================================
-// CT3: DescribeInstances (verb R) → Status must be "ct-info"
-// §1.2 rule: plain read, no sensitive, no root, same-account → ct-info
-// ===========================================================================
-
 func TestCTStatus_DescribeInstances_IsCtInfo(t *testing.T) {
 	ctJSON := plainAccountJSON("DescribeInstances", "Management", "AwsApiCall")
 	status, verb := buildCTEventWithStatus(t, "st-03", "DescribeInstances", "ec2.amazonaws.com", "carol", ctJSON, nil)
@@ -89,11 +71,6 @@ func TestCTStatus_DescribeInstances_IsCtInfo(t *testing.T) {
 		t.Errorf("Status = %q, want ct-info for verb R (DescribeInstances) per §1.2", status)
 	}
 }
-
-// ===========================================================================
-// CT4: AwsServiceEvent (eventType=AwsServiceEvent, verb S) → Status must be "ct-info"
-// §1.2 rule: plain read/service, no error → ct-info
-// ===========================================================================
 
 func TestCTStatus_AwsServiceEvent_IsCtInfo(t *testing.T) {
 	ctJSON := buildFullCTEventJSON(
@@ -109,11 +86,6 @@ func TestCTStatus_AwsServiceEvent_IsCtInfo(t *testing.T) {
 	}
 }
 
-// ===========================================================================
-// CT5: Insight category (verb I) → Status must be "ct-info"
-// §1.2 rule: no error, no write/destroy, no root, no cross-account → ct-info
-// ===========================================================================
-
 func TestCTStatus_InsightCategory_IsCtInfo(t *testing.T) {
 	ctJSON := buildFullCTEventJSON(
 		"123456789012", "123456789012", "1.2.3.4", "us-east-1",
@@ -127,11 +99,6 @@ func TestCTStatus_InsightCategory_IsCtInfo(t *testing.T) {
 		t.Errorf("Status = %q, want ct-info for Insight (verb I) per §1.2", status)
 	}
 }
-
-// ===========================================================================
-// CT6: NetworkActivity (verb N) → Status must be "ct-info"
-// §1.2 rule: no error, no write/destroy → ct-info
-// ===========================================================================
 
 func TestCTStatus_NetworkActivity_IsCtInfo(t *testing.T) {
 	ctJSON := buildFullCTEventJSON(
@@ -147,11 +114,6 @@ func TestCTStatus_NetworkActivity_IsCtInfo(t *testing.T) {
 	}
 }
 
-// ===========================================================================
-// CT7: W verb with errorCode=AccessDenied → "ct-danger"
-// §1.2 rule: errorCode != "" → ct-danger (highest precedence)
-// ===========================================================================
-
 func TestCTStatus_WriteWithError_IsCtDanger(t *testing.T) {
 	ctJSON := buildFullCTEventJSON(
 		"123456789012", "123456789012", "1.2.3.4", "us-east-1",
@@ -166,11 +128,6 @@ func TestCTStatus_WriteWithError_IsCtDanger(t *testing.T) {
 	}
 }
 
-// ===========================================================================
-// CT8: D verb by Root identity → "ct-danger"
-// §1.2 rule: Verb D → ct-danger (danger beats Root attention)
-// ===========================================================================
-
 func TestCTStatus_DeleteByRoot_IsCtDanger(t *testing.T) {
 	rootJSON := `{"eventVersion":"1.08","userIdentity":{"type":"Root","accountId":"123456789012"},"eventTime":"2026-03-28T14:30:00Z","eventSource":"s3.amazonaws.com","eventName":"DeleteBucket","awsRegion":"us-east-1","sourceIPAddress":"1.2.3.4","userAgent":"aws-cli/2.0","errorCode":"","eventCategory":"Management","eventType":"AwsApiCall","recipientAccountId":"123456789012"}`
 	status, verb := buildCTEventWithStatus(t, "st-08", "DeleteBucket", "s3.amazonaws.com", "root", rootJSON, nil)
@@ -181,11 +138,6 @@ func TestCTStatus_DeleteByRoot_IsCtDanger(t *testing.T) {
 		t.Errorf("Status = %q, want ct-danger for Root delete per §1.2 (D verb wins over root)", status)
 	}
 }
-
-// ===========================================================================
-// CT9: R verb cross-account → "ct-attention"
-// §1.2 rule: cross-account → ct-attention (escalates from ct-info)
-// ===========================================================================
 
 func TestCTStatus_ReadCrossAccount_IsCtAttention(t *testing.T) {
 	ctJSON := buildFullCTEventJSON(
@@ -202,11 +154,6 @@ func TestCTStatus_ReadCrossAccount_IsCtAttention(t *testing.T) {
 	}
 }
 
-// ===========================================================================
-// CT10: Root R verb (non-destructive) → "ct-attention"
-// §1.2 rule: Root identity → ct-attention
-// ===========================================================================
-
 func TestCTStatus_RootRead_IsCtAttention(t *testing.T) {
 	rootJSON := `{"eventVersion":"1.08","userIdentity":{"type":"Root","accountId":"123456789012"},"eventTime":"2026-03-28T14:30:00Z","eventSource":"ec2.amazonaws.com","eventName":"DescribeInstances","awsRegion":"us-east-1","sourceIPAddress":"1.2.3.4","userAgent":"aws-cli/2.0","errorCode":"","eventCategory":"Management","eventType":"AwsApiCall","recipientAccountId":"123456789012"}`
 	status, verb := buildCTEventWithStatus(t, "st-10", "DescribeInstances", "ec2.amazonaws.com", "", rootJSON, nil)
@@ -217,11 +164,6 @@ func TestCTStatus_RootRead_IsCtAttention(t *testing.T) {
 		t.Errorf("Status = %q, want ct-attention for Root read per §1.2", status)
 	}
 }
-
-// ===========================================================================
-// CT11: Exhaustive guard — all events must have Status in {"ct-info","ct-attention","ct-danger"}
-// §1.1: three semantic statuses, no others.
-// ===========================================================================
 
 func TestCTStatus_ExhaustiveGuard_ThreeValuesOnly(t *testing.T) {
 	type evDef struct {

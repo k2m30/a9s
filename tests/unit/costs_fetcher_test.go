@@ -13,26 +13,6 @@ import (
 	"github.com/k2m30/a9s/v3/core/costs"
 )
 
-// Fetcher functions under test (core/aws, package aws) are named to
-// mirror the paginated-fetch convention already used across this package
-// (e.g. FetchAlarmHistory), adapted to the four CE interfaces named in
-// data-model.md's "AWS layer" section:
-//
-//	func FetchCostAndUsage(ctx, api CostsGetCostAndUsageAPI, q costs.Query) (a9saws.CostFetchResult, error)
-//	func FetchCostAndUsageWithResources(ctx, api CostsGetCostAndUsageWithResourcesAPI, q costs.Query) (a9saws.CostFetchResult, error)
-//	func FetchCostAnomaliesCounted(ctx, api CostsGetAnomaliesAPI, window costs.Period) ([]costs.AnomalyMark, int, error)
-//
-// CostFetchResult{Records []costs.Record, Attrs map[string]string, RequestCount int}
-// and the three typed sentinel errors (ErrCostsAccessDenied, ErrCostsDataUnavailable,
-// ErrCostsThrottled) are likewise not spelled out verbatim in data-model.md
-// beyond "classify errors ... typed sentinel errors" — this file pins that contract.
-
-// strPtr is defined in aws_related_checker_mechanism_test.go (shared package unit_test).
-
-// ---------------------------------------------------------------------------
-// Mocks for the four CE interfaces (data-model.md "AWS layer")
-// ---------------------------------------------------------------------------
-
 type mockCostsGetCostAndUsageClient struct {
 	pages []*costexplorer.GetCostAndUsageOutput
 	err   error
@@ -84,10 +64,6 @@ func (m *mockCostsGetAnomaliesClient) GetAnomalies(
 ) (*costexplorer.GetAnomaliesOutput, error) {
 	return m.output, nil
 }
-
-// ---------------------------------------------------------------------------
-// GetCostAndUsage
-// ---------------------------------------------------------------------------
 
 func ceGroup(key string, amounts map[string]string) cetypes.Group {
 	metrics := make(map[string]cetypes.MetricValue, len(amounts))
@@ -177,13 +153,7 @@ func TestFetchCostAndUsage_DimensionValueAttributesMapIntoAttrs(t *testing.T) {
 	}
 }
 
-// TestFetchCostAndUsage_ParsesAllFourMetrics is reconciled from the former
-// TestFetchCostAndUsage_ParsesAllFiveMetrics (closure wave):
-// MetricNetUnblended is dropped from the fetcher's parsed set. The AWS
-// response fixture still realistically includes "NetUnblendedCost" (CE
-// still returns it) — only the fetcher's mapping of that key into Metrics
-// goes away, so the fixture input is unchanged but the expected output
-// drops to four entries summing to 1000, not five summing to 1500.
+// CE returns NetUnblendedCost alongside the four metrics a9s maps.
 func TestFetchCostAndUsage_ParsesAllFourMetrics(t *testing.T) {
 	mock := &mockCostsGetCostAndUsageClient{
 		pages: []*costexplorer.GetCostAndUsageOutput{
@@ -197,7 +167,7 @@ func TestFetchCostAndUsage_ParsesAllFourMetrics(t *testing.T) {
 								"BlendedCost":      "200.0000000000",
 								"AmortizedCost":    "300.0000000000",
 								"NetAmortizedCost": "400.0000000000",
-								"NetUnblendedCost": "500.0000000000", // still returned by CE; no longer parsed into Metrics
+								"NetUnblendedCost": "500.0000000000",
 							}),
 						},
 					},
@@ -206,8 +176,8 @@ func TestFetchCostAndUsage_ParsesAllFourMetrics(t *testing.T) {
 		},
 	}
 
-	// No RECORD_TYPE filter: per data-model.md's display mapping this is the
-	// "invoice" query shape, so UnblendedCost lands under Metric("invoice").
+	// No RECORD_TYPE filter is the "invoice" query shape, so UnblendedCost lands
+	// under Metric("invoice").
 	q := costs.Query{Granularity: "MONTHLY", GroupBy: []costs.Dimension{costs.Dimension("SERVICE")}, Range: costs.Period{Start: "2026-06-01", End: "2026-07-01"}}
 	result, err := a9saws.FetchCostAndUsage(context.Background(), mock, q)
 	if err != nil {
@@ -220,9 +190,6 @@ func TestFetchCostAndUsage_ParsesAllFourMetrics(t *testing.T) {
 	if len(metrics) != 4 {
 		t.Fatalf("len(Metrics) = %d, want 4 (the net-unblended metric dropped), got %+v", len(metrics), metrics)
 	}
-	// The exact 4-key set (invoice/blended/amortized/net-amortized) is
-	// pinned individually below — len==4 together with those 4 named
-	// checks already exhaustively rules out any 5th key.
 	var sum float64
 	for _, amt := range metrics {
 		sum += amt.Value
@@ -318,10 +285,6 @@ func TestFetchCostAndUsage_ClassifiesErrors(t *testing.T) {
 	})
 }
 
-// ---------------------------------------------------------------------------
-// GetCostAndUsageWithResources
-// ---------------------------------------------------------------------------
-
 func TestFetchCostAndUsageWithResources_MapsRecordsAndCountsRequests(t *testing.T) {
 	mock := &mockCostsGetCostAndUsageWithResourcesClient{
 		pages: []*costexplorer.GetCostAndUsageWithResourcesOutput{
@@ -361,18 +324,7 @@ func TestFetchCostAndUsageWithResources_MapsRecordsAndCountsRequests(t *testing.
 	}
 }
 
-// ---------------------------------------------------------------------------
-// GetAnomalies
-// ---------------------------------------------------------------------------
-
-// TestFetchCostAnomalies_MapsDimension is reconciled from the former
-// TestFetchCostAnomalies_MapsRootCausesAndDimension (closure wave):
-// AnomalyMark.RootCause/.Score/.ID die with the fields, so this test no
-// longer asserts on m.ID/m.RootCause — Dimension (+ Period) becomes the
-// ONLY mapped representation of a root cause. The AWS SDK response fixture
-// itself is left as a realistic shape (AnomalyId/AnomalyScore/RootCauses
-// are still real fields on cetypes.Anomaly) — only the ASSERTIONS on the
-// now-dead AnomalyMark fields are removed.
+// Dimension and Period are the only mapped representation of a root cause.
 func TestFetchCostAnomalies_MapsDimension(t *testing.T) {
 	mock := &mockCostsGetAnomaliesClient{
 		output: &costexplorer.GetAnomaliesOutput{

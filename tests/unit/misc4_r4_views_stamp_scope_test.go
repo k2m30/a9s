@@ -1,15 +1,10 @@
 package unit
 
-// misc4_r4_views_stamp_scope_test.go — misc4 row 4.
-//
-// GeneratedViewsVersion's own doc named removes and renames among the reasons
-// to bump it, and the merge can do neither: it adds a built-in title the file
-// on disk does not carry, and it re-sources a column still reading what an
-// older build generated. Nothing deletes a column, and a renamed built-in
-// reaches the merge as a title the file has never heard of — so the operator
-// ends up with both.
-//
-// These pin the merge's actual reach, so the corrected doc stays true.
+// The views merge adds a built-in title the file on disk does not carry and
+// re-sources a column still reading what an older build generated. It never
+// deletes a column, and a renamed built-in reaches the merge as a title the
+// file has never seen, so the operator ends up with both: bumping
+// GeneratedViewsVersion cannot deliver a remove or a rename.
 
 import (
 	"os"

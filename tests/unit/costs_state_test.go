@@ -1,32 +1,3 @@
-// costs_state_test.go — Cost Explorer controller-side drill/pivot/metric/zoom
-// state machine (specs/021-cost-explorer/data-model.md §"Controller &
-// runtime additions").
-//
-//   - app.CostsState, app.ActionCostZoomIn/Out, app.ActionCostMetric,
-//     app.ActionCostPivot and runtime.ScreenCosts are given verbatim in
-//     data-model.md.
-//   - app.Controller.EnsureCostsState(now time.Time) follows the Ensure*State
-//     family (EnsureDetailState, EnsureTextState, EnsureSelectorState all
-//     take the screen's seed data; Costs' only seed data is the injected
-//     clock used to compute the default 12-month window, matching this
-//     package's "now is injected, never time.Now() internally" convention).
-//   - messages.CostsLoaded{Query, Grid, Attrs, Anomalies, Requests, Err} —
-//     Grid costs.GridResult{Fetched, Records, Err} is symmetric with
-//     costs.AnomalyResult — is routed through app.Controller's real
-//     Handle(runtime.Event) dispatch (not a test-only seam) so these tests
-//     exercise the same path production code uses.
-//   - Grid-cursor movement reuses ActionMoveUp/ActionMoveDown for the row
-//     axis (row dimension) and ActionScrollLeft/ActionScrollRight for the
-//     column axis (time axis), per data-model.md ("movement reuses
-//     ActionMoveUp/Down etc.").
-//
-// Grid-seeding trick used throughout: every seeded costs.Record uses a
-// Period equal to the injected "now"'s own month. Query.CacheKey() only
-// derives from Granularity+GroupBy+Filter (Range is explicitly excluded per
-// data-model.md), so the seeded Query never needs to reproduce
-// EnsureCostsState's exact window math — and using "now"'s own month as the
-// record Period guarantees it lands inside ANY reasonable trailing-N-
-// months-ending-at-now window, regardless of N.
 package unit_test
 
 import (
@@ -82,8 +53,8 @@ func topDrill(t *testing.T, c *app.Controller) costs.DrillLevel {
 }
 
 // monthRecord builds one costs.Record for rowKey, priced amount, within
-// now's own month — see file header for why this guarantees the record
-// lands inside whatever window EnsureCostsState(now) computes.
+// now's own month. Query.CacheKey() excludes Range, so a record in now's
+// month lands inside any trailing window EnsureCostsState(now) computes.
 func monthRecord(now time.Time, rowKey string, amount float64) costs.Record {
 	start := time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, time.UTC)
 	end := start.AddDate(0, 1, 0)
@@ -112,10 +83,6 @@ func seedServiceGrid(t *testing.T, c *app.Controller, now time.Time) {
 		Requests: 1,
 	})
 }
-
-// ---------------------------------------------------------------------------
-// EnsureCostsState seeds the root drill frame
-// ---------------------------------------------------------------------------
 
 func TestCostsState_EnsureCostsState_SeedsRootDrillFrame(t *testing.T) {
 	c := newCostsController(t, fixedCostsNow)
@@ -163,10 +130,6 @@ func TestCostsState_EnsureCostsState_SeedsRootDrillFrame(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// A freshly-pushed child drill frame also opens on the newest column
-// ---------------------------------------------------------------------------
-
 func TestCostsState_PushDrill_ChildFrame_OpensOnCurrentColumn(t *testing.T) {
 	c := newCostsController(t, fixedCostsNow)
 	seedServiceGrid(t, c, fixedCostsNow)
@@ -184,7 +147,7 @@ func TestCostsState_PushDrill_ChildFrame_OpensOnCurrentColumn(t *testing.T) {
 		t.Fatal("precondition: pushed child frame's Window is empty")
 	}
 
-	// FR-002 "open at today": the child opens on the CURRENT column — the
+	// The child opens on the CURRENT column — the
 	// newest whose period has already begun at now — NOT the raw last column
 	// (week/day child windows tile the whole parent period, so their last
 	// column can be an empty future bucket) and NOT column 0 (the oldest
@@ -205,10 +168,6 @@ func TestCostsState_PushDrill_ChildFrame_OpensOnCurrentColumn(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// Zoom walks year -> month -> week -> day with boundary no-ops
-// ---------------------------------------------------------------------------
-
 func TestCostsState_Zoom_WalksGranularityChain_WithBoundaryNoops(t *testing.T) {
 	c := newCostsController(t, fixedCostsNow)
 
@@ -217,8 +176,6 @@ func TestCostsState_Zoom_WalksGranularityChain_WithBoundaryNoops(t *testing.T) {
 		return topDrill(t, c).Granularity
 	}
 
-	// Root starts at month (the default). Zoom out walks toward year;
-	// zoom in walks toward day. Boundary no-ops verified in both directions.
 	steps := []struct {
 		name string
 		kind app.ActionKind
@@ -244,16 +201,8 @@ func TestCostsState_Zoom_WalksGranularityChain_WithBoundaryNoops(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// Zoom on a RESOURCE_ID frame must stay within the 14-day CE resource-level
-// retention window — the same bound PushDrill enforces via
-// costs.ClampResourceDrillWindow (screen.go's Select) the moment a RESOURCE_ID
-// frame is first pushed. applyCostZoom has no RESOURCE_ID branch: zooming out
-// either re-anchors on the cursor's current period (week/day) or rebuilds the
-// ordinary trailing month/year window (costs.BuildWindow(g, cs.Now)) with no
-// clamp at all — a follow-up GetCostAndUsageWithResources fetch over that
-// window would span far more than 14 days and CE would reject it.
-// ---------------------------------------------------------------------------
+// CE's resource-level data covers the last 14 days;
+// GetCostAndUsageWithResources rejects a window spanning more.
 
 func TestCostsState_Zoom_ResourceIDFrame_ZoomOut_StaysWithinRetentionWindow(t *testing.T) {
 	const demoEC2InstanceID = "i-0a1b2c3d4e5f60001"
@@ -268,10 +217,6 @@ func TestCostsState_Zoom_ResourceIDFrame_ZoomOut_StaysWithinRetentionWindow(t *t
 
 	_, tasks := c.Apply(app.Action{Kind: app.ActionCostZoomOut})
 
-	// Rendered result: RowDim staying RESOURCE_ID after a zoom-out already
-	// proves the frame was mutated in place rather than popped/replaced —
-	// pinning len(GetCostsDrillStack()) on top of this would just encode the
-	// same fact as an internal-state magic number.
 	top := topDrill(t, c)
 	if top.RowDim != costs.DimensionResourceID {
 		t.Fatalf("zoom must mutate the top frame in place — RowDim changed to %q", top.RowDim)
@@ -293,11 +238,8 @@ func TestCostsState_Zoom_ResourceIDFrame_ZoomOut_StaysWithinRetentionWindow(t *t
 			span, top.Window[0].Start, top.Window[len(top.Window)-1].End, costs.ResourceDrillWindowRetentionDays)
 	}
 
-	// Dispatched fetch payload: on a cache miss for this zoom's shape, the
-	// CE fetch it triggers must itself carry a window within the same
-	// retention bound. Empirically this particular zoom hits cache (no task
-	// fires) — "if found" keeps the assertion honest instead of requiring a
-	// task the production path doesn't actually dispatch here.
+	// This zoom hits cache, so no task may fire; a fetch that does fire must
+	// carry a window within the retention bound.
 	if payload, found := findFetchCostsTask(tasks); found {
 		if len(payload.Window) == 0 {
 			t.Fatal("dispatched fetch task carries an empty Window")
@@ -313,11 +255,6 @@ func TestCostsState_Zoom_ResourceIDFrame_ZoomOut_StaysWithinRetentionWindow(t *t
 	}
 }
 
-// TestCostsState_Zoom_NonResourceFrame_ZoomOut_KeepsTrailingWindowShape pins
-// the sibling case a RESOURCE_ID-specific fix must not disturb: a
-// SERVICE-pivoted (non-RESOURCE_ID) root frame's zoom-out keeps building the
-// ordinary trailing window byte-for-byte — the 14-day resource retention
-// clamp applies only to RESOURCE_ID frames.
 func TestCostsState_Zoom_NonResourceFrame_ZoomOut_KeepsTrailingWindowShape(t *testing.T) {
 	c := newCostsController(t, fixedCostsNow)
 
@@ -342,16 +279,12 @@ func TestCostsState_Zoom_NonResourceFrame_ZoomOut_KeepsTrailingWindowShape(t *te
 	}
 }
 
-// ---------------------------------------------------------------------------
-// Metric cycles the five display metrics
-// ---------------------------------------------------------------------------
-
 func TestCostsState_Metric_CyclesFiveDisplayModes(t *testing.T) {
 	c := newCostsController(t, fixedCostsNow)
 
-	// Cycle order per data-model.md's display mapping list: invoice ->
-	// unblended -> amortized -> net-amortized -> blended -> back to invoice.
-	// net-unblended is stored-only and MUST NOT appear in the cycle.
+	// Cycle order: invoice -> unblended -> amortized -> net-amortized ->
+	// blended -> back to invoice. net-unblended is stored-only and never in
+	// the cycle.
 	wantOrder := []costs.Metric{
 		costs.MetricUnblended,
 		costs.MetricAmortized,
@@ -371,16 +304,8 @@ func TestCostsState_Metric_CyclesFiveDisplayModes(t *testing.T) {
 		if got != string(want) {
 			t.Errorf("cycle step %d: Metric got %q want %q", i+1, got, want)
 		}
-		// net-unblended is stored-only and must never surface in the 'b'
-		// cycle — wantOrder above never includes it, so the cycle itself
-		// (only ever comparing got against wantOrder's 5 entries) already
-		// makes that structurally true; no separate guard needed.
 	}
 }
-
-// ---------------------------------------------------------------------------
-// Pivot presets (digit keys 0-9)
-// ---------------------------------------------------------------------------
 
 func TestCostsState_Pivot_DigitPresetsSwitchRowDim(t *testing.T) {
 	cases := []struct {
@@ -479,16 +404,10 @@ func TestCostsState_Pivot_Zero_ResetsToDefaultView(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// Movement actions clamp cursor to grid bounds
-// ---------------------------------------------------------------------------
-
 func TestCostsState_Movement_ClampsRowToGridBounds(t *testing.T) {
 	c := newCostsController(t, fixedCostsNow)
 	seedServiceGrid(t, c, fixedCostsNow) // 3 rows: index 0..2
 
-	// Move down past the last row repeatedly — must clamp at the last index,
-	// never run past it or wrap.
 	for i := 0; i < 5; i++ {
 		c.Apply(app.Action{Kind: app.ActionMoveDown})
 	}
@@ -496,7 +415,6 @@ func TestCostsState_Movement_ClampsRowToGridBounds(t *testing.T) {
 		t.Errorf("after 5x move-down over 3 rows: CursorRow got %d want 2 (clamped to last row)", row)
 	}
 
-	// Move up past the first row repeatedly — must clamp at 0.
 	for i := 0; i < 5; i++ {
 		c.Apply(app.Action{Kind: app.ActionMoveUp})
 	}
@@ -509,8 +427,6 @@ func TestCostsState_Movement_ClampsColumnToGridBounds(t *testing.T) {
 	c := newCostsController(t, fixedCostsNow)
 	seedServiceGrid(t, c, fixedCostsNow)
 
-	// FR-002 "open at today": the cursor starts on the newest (last) column,
-	// not column 0.
 	windowLen := len(topDrill(t, c).Window)
 	if windowLen == 0 {
 		t.Fatal("precondition: root drill Window is empty, cannot test column clamping")
@@ -520,8 +436,6 @@ func TestCostsState_Movement_ClampsColumnToGridBounds(t *testing.T) {
 		t.Fatalf("precondition: CursorCol got %d want %d (opens on the newest/rightmost column)", before, windowLen-1)
 	}
 
-	// Scroll right far past the last column — must stay clamped at
-	// len(Window)-1, never run off the end.
 	for i := 0; i < windowLen+5; i++ {
 		c.Apply(app.Action{Kind: app.ActionScrollRight})
 	}
@@ -529,8 +443,6 @@ func TestCostsState_Movement_ClampsColumnToGridBounds(t *testing.T) {
 		t.Errorf("after scrolling right past the last column: CursorCol got %d want %d (clamped to last column)", col, windowLen-1)
 	}
 
-	// Scroll left all the way back past column 0 — must clamp at 0, never
-	// go negative.
 	for i := 0; i < windowLen+5; i++ {
 		c.Apply(app.Action{Kind: app.ActionScrollLeft})
 	}
@@ -538,10 +450,6 @@ func TestCostsState_Movement_ClampsColumnToGridBounds(t *testing.T) {
 		t.Errorf("after scrolling left past column 0: CursorCol got %d want 0 (clamped)", col)
 	}
 }
-
-// ---------------------------------------------------------------------------
-// ActionBack pops a drill frame, restoring cursor/scroll exactly
-// ---------------------------------------------------------------------------
 
 func TestCostsState_ActionBack_PopsDrillFrame_RestoresCursorScrollExactly(t *testing.T) {
 	c := newCostsController(t, fixedCostsNow)

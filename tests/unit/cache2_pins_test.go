@@ -1,8 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later OR LicenseRef-Commercial
 
-// cache2_pins_test.go pins the cache2 round: the pair guard's unresolved
-// window, the single producer of the availability file, the zero WritePlan,
-// and the alias-keyed scan-health guard. Synthetic identifiers only.
 package unit_test
 
 import (
@@ -20,19 +17,7 @@ import (
 	"github.com/k2m30/a9s/v3/core/session"
 )
 
-// ---------------------------------------------------------------------------
-// Row 1 — the pair guard must have no unresolved window.
-// ---------------------------------------------------------------------------
-
-// TestCache2_LoadAvailabilityCache_StampsResolvedRegion_StaleLoadRejected pins
-// the C9 pair guard's pre-connect hole (handlers_availability.go): the guard
-// compares a stamped load against the session pair only when the SESSION pair
-// is itself fully resolved, so in the window before connect settles — where
-// the load lane has already resolved a region from local config but never
-// wrote it back — a load stamped with a DIFFERENT pair is applied instead of
-// discarded.
-//
-// The contract: the load lane is the session's region resolution point. Once
+// The load lane is the session's region resolution point. Once
 // LoadAvailabilityCache has run, the session's own pair is resolved, so the
 // guard always has a fact to compare against and a foreign-pair load is
 // rejected whenever it lands.
@@ -55,7 +40,6 @@ func TestCache2_LoadAvailabilityCache_StampsResolvedRegion_StaleLoadRejected(t *
 			"unresolved window it silently skips", profile, region)
 	}
 
-	// A load answering for a DIFFERENT pair must be discarded whole.
 	intents, _ := core.HandleEvent(messages.AvailabilityCacheLoaded{
 		Profile: "cache2-other-prof",
 		Region:  "eu-north-1",
@@ -68,9 +52,8 @@ func TestCache2_LoadAvailabilityCache_StampsResolvedRegion_StaleLoadRejected(t *
 	}
 }
 
-// TestCache2_PreConnectLoadForOwnResolvedPair_StillSeeds keeps the D10/D11
-// pre-connect seed alive: the load the lane itself dispatched, stamped with
-// the pair it resolved, must still reach the menu.
+// The load the lane itself dispatched, stamped with the pair it resolved,
+// still reaches the menu before connect.
 func TestCache2_PreConnectLoadForOwnResolvedPair_StillSeeds(t *testing.T) {
 	t.Setenv("AWS_REGION", "eu-north-1")
 	root := t.TempDir()
@@ -94,21 +77,15 @@ func TestCache2_PreConnectLoadForOwnResolvedPair_StillSeeds(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// Row 2 — a save prepared for a pair the session has left never reaches disk.
-// ---------------------------------------------------------------------------
-
-// TestCache2_SaveForLeftPair_RefusedAtChokepoint is why per-pair coalescing in
-// the availability writer cannot be observed: whichever payload survives the
-// queue, WithCacheStoreSave refuses any save whose pair is no longer the
-// session's (C9, session.go). A queued pair-A snapshot is therefore dropped at
-// the chokepoint regardless of how the queue coalesced, so widening the queue
-// to one slot per pair changes nothing that reaches disk.
+// Per-pair coalescing in the availability writer cannot be observed:
+// whichever payload survives the queue, WithCacheStoreSave refuses any save
+// whose pair is not the session's current pair. A queued pair-A snapshot is
+// dropped at the chokepoint however the queue coalesced, so one queue slot
+// per pair changes nothing that reaches disk.
 func TestCache2_SaveForLeftPair_RefusedAtChokepoint(t *testing.T) {
 	_, core := newTestControllerAndCore(t)
 	pairA := core.Pair()
 
-	// The operator switches to pair B before the queued A save runs.
 	core.Session().SetProfileRegion("cache2-other-prof", "us-east-1")
 
 	if err := core.SaveAvailabilityCache(pairA,
@@ -125,24 +102,14 @@ func TestCache2_SaveForLeftPair_RefusedAtChokepoint(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// Row 3 — one producer of the availability file.
-// ---------------------------------------------------------------------------
-
-// TestCache2_MenuAvailabilityPersist_DerivesFromRowStore: the menu-badge
-// persistence lane derives every type's count from RowStore, the session's
-// single source of truth for observed rows, not from a frozen clone of
-// MenuState's five maps; the two disagree whenever RowStore has learned
-// something the menu snapshot predates.
-// has learned something the menu snapshot predates.
-//
-// Here s3 is seeded from disk at a truncated 50, then observed live as an exact
-// 3. The menu still holds 50. Whatever lands in s3.yaml must be RowStore's 3.
+// The menu-badge persistence lane derives every type's count from RowStore,
+// the session's single source of truth for observed rows; MenuState's maps
+// disagree with it whenever RowStore has learned something the menu snapshot
+// predates.
 func TestCache2_MenuAvailabilityPersist_DerivesFromRowStore(t *testing.T) {
 	c, core := newTestControllerAndCore(t)
 	pair := core.Pair()
 
-	// Menu learns a truncated s3 count of 50 from the disk-cache seed.
 	c.Handle(messages.AvailabilityCacheLoaded{
 		Profile:   pair.Profile,
 		Region:    pair.Region,
@@ -150,14 +117,12 @@ func TestCache2_MenuAvailabilityPersist_DerivesFromRowStore(t *testing.T) {
 		Truncated: map[string]bool{"s3": true},
 	})
 
-	// RowStore then observes s3 live and exact: three buckets, no more pages.
 	core.ObserveRows("s3", []resource.Resource{
 		{ID: "bucket-alpha", Name: "bucket-alpha", Type: "s3"},
 		{ID: "bucket-beta", Name: "bucket-beta", Type: "s3"},
 		{ID: "bucket-gamma", Name: "bucket-gamma", Type: "s3"},
 	}, &resource.PaginationMeta{IsTruncated: false}, session.OriginFetch, false)
 
-	// An unrelated top-level list load drives the menu persistence lane.
 	c.Apply(app.Action{Kind: app.ActionCommand, Arg: "ec2"})
 	c.ApplyResourcesLoaded("ec2", []resource.Resource{
 		{ID: "i-cache2aaaa1111", Name: "web-1", Type: "ec2"},
@@ -177,12 +142,7 @@ func TestCache2_MenuAvailabilityPersist_DerivesFromRowStore(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// Row 4 — the zero WritePlan is unusable by construction.
-// ---------------------------------------------------------------------------
-
-// TestCache2_ZeroWritePlan_RefusedByName pins that committing a hand-built
-// zero WritePlan fails naming the plan, rather than surfacing as an
+// A hand-built zero WritePlan fails naming the plan instead of an
 // unattributable MkdirAll error on the empty path.
 func TestCache2_ZeroWritePlan_RefusedByName(t *testing.T) {
 	root := t.TempDir()
@@ -198,15 +158,9 @@ func TestCache2_ZeroWritePlan_RefusedByName(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// Row 5 — the scan-health guard is keyed on the canonical short name.
-// ---------------------------------------------------------------------------
-
-// TestCache2_ScanHealthGuard_AliasAndCanonicalAreOneKey pins that a probe
-// failure delivered under a type's registry alias ("rds") and under its
-// canonical short name ("dbi") is one entry, not two: the per-sweep
-// scan-health guard keys on the canonical name, so a redundant delivery under
-// the other spelling cannot re-flash the banner.
+// A probe failure delivered under a registry alias ("rds") and under the
+// canonical short name ("dbi") is one scan-health entry, so a redundant
+// delivery under the other spelling cannot re-flash the banner.
 func TestCache2_ScanHealthGuard_AliasAndCanonicalAreOneKey(t *testing.T) {
 	_, core := newTestControllerAndCore(t)
 	s := core.Session()

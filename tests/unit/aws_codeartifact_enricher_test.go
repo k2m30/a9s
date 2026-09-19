@@ -1,16 +1,5 @@
 package unit
 
-// aws_codeartifact_enricher_test.go — Behavioral tests for EnrichCodeArtifactRepository.
-//
-// Contract assertions:
-//   - GetRepositoryPermissionsPolicy is called once per CodeArtifact resource keyed by repo name
-//     (domain taken from Fields["domain"]).
-//   - Both repos have a policy with a specific (non-wildcard) principal → 0 findings.
-//   - repo-1 returns ResourceNotFoundException → 1 finding sev "~" "no permissions policy".
-//   - repo-1 policy Document contains "Principal":"*" → 1 finding sev "!" "public access".
-//   - clients.CodeArtifact == nil → (EnricherResult{Findings: non-nil empty}, nil).
-//   - Generic API error for a resource → 0 findings for that resource, Truncated=true, no error.
-
 import (
 	"context"
 	"errors"
@@ -66,11 +55,10 @@ func (f *codeArtifactPermPolicyFake) GetRepositoryPermissionsPolicy(
 	return &codeartifactsvc.GetRepositoryPermissionsPolicyOutput{Policy: policy}, nil
 }
 
-// Compile-time check: codeArtifactPermPolicyFake satisfies CodeArtifactAPI.
 var _ awsclient.CodeArtifactAPI = (*codeArtifactPermPolicyFake)(nil)
 
 // codeArtifactRepoResources returns a slice of CodeArtifact Resource stubs with the given
-// repo names. All resources share domain "my-domain" per the scope spec.
+// repo names. All resources share domain "my-domain".
 func codeArtifactRepoResources(names ...string) []resource.Resource {
 	res := make([]resource.Resource, 0, len(names))
 	for _, name := range names {

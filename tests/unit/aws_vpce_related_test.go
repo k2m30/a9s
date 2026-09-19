@@ -13,8 +13,6 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// vpceCheckerByTarget retrieves the RelatedChecker for the given targetType
-// and fails the test if the checker is nil or not found.
 func vpceCheckerByTarget(t *testing.T, target string) resource.RelatedChecker {
 	t.Helper()
 	for _, def := range resource.GetRelated("vpce") {
@@ -29,8 +27,6 @@ func vpceCheckerByTarget(t *testing.T, target string) resource.RelatedChecker {
 	return nil
 }
 
-// vpceSrcInterfaceResource returns a canonical interface-type VPC endpoint test
-// resource with subnets, security groups, ENIs, and no route tables.
 func vpceSrcInterfaceResource() resource.Resource {
 	return resource.Resource{
 		ID: "vpce-abc123",
@@ -49,8 +45,6 @@ func vpceSrcInterfaceResource() resource.Resource {
 	}
 }
 
-// vpceSrcGatewayResource returns a canonical gateway-type VPC endpoint test
-// resource with route tables and no subnets, SGs, or ENIs.
 func vpceSrcGatewayResource() resource.Resource {
 	return resource.Resource{
 		ID: "vpce-gw123",
@@ -66,9 +60,6 @@ func vpceSrcGatewayResource() resource.Resource {
 	}
 }
 
-// --- Subnet checker (Pattern F — reads SubnetIds from RawStruct) ---
-
-// TestRelated_VPCE_Subnet_HasIDs verifies that SubnetIds are counted correctly.
 func TestRelated_VPCE_Subnet_HasIDs(t *testing.T) {
 	res := vpceSrcInterfaceResource()
 	checker := vpceCheckerByTarget(t, "subnet")
@@ -82,8 +73,6 @@ func TestRelated_VPCE_Subnet_HasIDs(t *testing.T) {
 	}
 }
 
-// TestRelated_VPCE_Subnet_Empty verifies that an empty SubnetIds slice returns
-// Count=0.
 func TestRelated_VPCE_Subnet_Empty(t *testing.T) {
 	res := vpceSrcGatewayResource()
 	checker := vpceCheckerByTarget(t, "subnet")
@@ -94,10 +83,6 @@ func TestRelated_VPCE_Subnet_Empty(t *testing.T) {
 	}
 }
 
-// --- Security Group checker (Pattern F — reads Groups from RawStruct) ---
-
-// TestRelated_VPCE_SG_HasGroups verifies that Groups entries are counted
-// correctly.
 func TestRelated_VPCE_SG_HasGroups(t *testing.T) {
 	res := vpceSrcInterfaceResource()
 	checker := vpceCheckerByTarget(t, "sg")
@@ -111,8 +96,6 @@ func TestRelated_VPCE_SG_HasGroups(t *testing.T) {
 	}
 }
 
-// TestRelated_VPCE_SG_Empty verifies that an empty Groups slice returns
-// Count=0.
 func TestRelated_VPCE_SG_Empty(t *testing.T) {
 	res := vpceSrcGatewayResource()
 	checker := vpceCheckerByTarget(t, "sg")
@@ -123,10 +106,6 @@ func TestRelated_VPCE_SG_Empty(t *testing.T) {
 	}
 }
 
-// --- Route Table checker (Pattern F — reads RouteTableIds from RawStruct) ---
-
-// TestRelated_VPCE_RTB_HasIDs verifies that RouteTableIds are counted
-// correctly.
 func TestRelated_VPCE_RTB_HasIDs(t *testing.T) {
 	res := vpceSrcGatewayResource()
 	checker := vpceCheckerByTarget(t, "rtb")
@@ -140,8 +119,6 @@ func TestRelated_VPCE_RTB_HasIDs(t *testing.T) {
 	}
 }
 
-// TestRelated_VPCE_RTB_Empty verifies that an empty RouteTableIds slice
-// returns Count=0.
 func TestRelated_VPCE_RTB_Empty(t *testing.T) {
 	res := vpceSrcInterfaceResource()
 	checker := vpceCheckerByTarget(t, "rtb")
@@ -152,11 +129,6 @@ func TestRelated_VPCE_RTB_Empty(t *testing.T) {
 	}
 }
 
-// --- Network Interface checker (Pattern F — reads NetworkInterfaceIds from
-// RawStruct) ---
-
-// TestRelated_VPCE_ENI_HasIDs verifies that NetworkInterfaceIds are counted
-// correctly.
 func TestRelated_VPCE_ENI_HasIDs(t *testing.T) {
 	res := vpceSrcInterfaceResource()
 	checker := vpceCheckerByTarget(t, "eni")
@@ -170,8 +142,6 @@ func TestRelated_VPCE_ENI_HasIDs(t *testing.T) {
 	}
 }
 
-// TestRelated_VPCE_ENI_Empty verifies that an empty NetworkInterfaceIds slice
-// returns Count=0.
 func TestRelated_VPCE_ENI_Empty(t *testing.T) {
 	res := vpceSrcGatewayResource()
 	checker := vpceCheckerByTarget(t, "eni")
@@ -182,10 +152,6 @@ func TestRelated_VPCE_ENI_Empty(t *testing.T) {
 	}
 }
 
-// --- Bad RawStruct ---
-
-// TestRelated_VPCE_BadRawStruct verifies that a wrong RawStruct type causes
-// all checkers to return Count=-1 or Count=0 rather than panicking.
 func TestRelated_VPCE_BadRawStruct(t *testing.T) {
 	res := resource.Resource{
 		ID:        "vpce-bad",
@@ -203,10 +169,6 @@ func TestRelated_VPCE_BadRawStruct(t *testing.T) {
 	}
 }
 
-// --- Navigable Field Registration ---
-
-// TestNavigableFields_VPCE verifies that VpcId→vpc is registered as a
-// navigable field.
 func TestNavigableFields_VPCE(t *testing.T) {
 	nav := resource.IsFieldNavigableForTest("vpce", "VpcId")
 	if nav == nil {
@@ -217,11 +179,8 @@ func TestNavigableFields_VPCE(t *testing.T) {
 	}
 }
 
-// --- VPC checker (Pattern F — reads vpc_id from Fields) ---
-
-// TestRelated_VPCE_VPC_HasVPCID verifies that Fields["vpc_id"] is returned.
 func TestRelated_VPCE_VPC_HasVPCID(t *testing.T) {
-	res := vpceSrcInterfaceResource() // vpc_id = "vpc-abc123"
+	res := vpceSrcInterfaceResource()
 	checker := vpceCheckerByTarget(t, "vpc")
 	result := checker(context.Background(), nil, res, resource.ResourceCache{})
 
@@ -233,7 +192,6 @@ func TestRelated_VPCE_VPC_HasVPCID(t *testing.T) {
 	}
 }
 
-// TestRelated_VPCE_VPC_EmptyVPCID verifies that an empty vpc_id returns Count=0.
 func TestRelated_VPCE_VPC_EmptyVPCID(t *testing.T) {
 	res := resource.Resource{
 		ID:        "vpce-nofield",
@@ -248,16 +206,6 @@ func TestRelated_VPCE_VPC_EmptyVPCID(t *testing.T) {
 	}
 }
 
-// vpce:acm, vpce:cf (checkVPCEACM/CF) were removed along with their
-// registrations: both were hardcoded to State: RelatedUnknown whenever res.ID != "" (i.e.
-// always, for any real fixture), with no AWS API path to resolve a concrete
-// match from a VPC endpoint listing alone. See
-// qa_demo_pivot_coverage_test.go's knownDisconnectedPivots terminal-state
-// comment for the burn-down precedent this deletion follows.
-
-// --- R53 checker (Pattern stub — empty ID → 0, non-empty → RelatedUnknown) ---
-
-// TestRelated_VPCE_R53_EmptyID verifies Count=0 for empty endpoint ID.
 func TestRelated_VPCE_R53_EmptyID(t *testing.T) {
 	res := resource.Resource{ID: "", Fields: map[string]string{}}
 	checker := vpceCheckerByTarget(t, "r53")
@@ -267,7 +215,6 @@ func TestRelated_VPCE_R53_EmptyID(t *testing.T) {
 	}
 }
 
-// TestRelated_VPCE_R53_NonEmptyID verifies State=RelatedUnknown for a real endpoint ID.
 func TestRelated_VPCE_R53_NonEmptyID(t *testing.T) {
 	res := vpceSrcInterfaceResource()
 	checker := vpceCheckerByTarget(t, "r53")
@@ -277,19 +224,6 @@ func TestRelated_VPCE_R53_NonEmptyID(t *testing.T) {
 	}
 }
 
-// vpce:s3, vpce:tg, vpce:waf (checkVPCES3/TG/WAF) were removed along with
-// their registrations: each was hardcoded to State: RelatedUnknown whenever res.ID != ""
-// (i.e. always, for any real fixture) — S3 gateway access needs
-// policy-document JSON interpretation, TG/WAF associations require
-// DescribeTargetHealth / wafv2:ListResourcesForWebACL from the other side,
-// none of it resolvable from a VPC endpoint listing alone. See
-// qa_demo_pivot_coverage_test.go's knownDisconnectedPivots terminal-state
-// comment for the burn-down precedent this deletion follows.
-
-// --- Alarm checker (Pattern C — cache scan, VpcEndpointId dimension) ---
-
-// TestRelated_VPCE_Alarm_MatchByDimension verifies that an alarm with
-// "VpcEndpointId" dimension matching the endpoint ID is returned.
 func TestRelated_VPCE_Alarm_MatchByDimension(t *testing.T) {
 	alarmRes := resource.Resource{
 		ID: "vpce-packets-alarm",
@@ -303,7 +237,7 @@ func TestRelated_VPCE_Alarm_MatchByDimension(t *testing.T) {
 	cache := resource.ResourceCache{
 		"alarm": resource.ResourceCacheEntry{Resources: []resource.Resource{alarmRes}},
 	}
-	res := vpceSrcInterfaceResource() // ID = "vpce-abc123"
+	res := vpceSrcInterfaceResource()
 
 	checker := vpceCheckerByTarget(t, "alarm")
 	result := checker(context.Background(), nil, res, cache)
@@ -316,8 +250,6 @@ func TestRelated_VPCE_Alarm_MatchByDimension(t *testing.T) {
 	}
 }
 
-// TestRelated_VPCE_Alarm_NoMatch verifies that alarms with a different
-// VpcEndpointId dimension return Count=0.
 func TestRelated_VPCE_Alarm_NoMatch(t *testing.T) {
 	alarmRes := resource.Resource{
 		ID: "other-vpce-alarm",
@@ -341,8 +273,6 @@ func TestRelated_VPCE_Alarm_NoMatch(t *testing.T) {
 	}
 }
 
-// TestRelated_VPCE_Alarm_CacheMissNoClients verifies Count=-1 when the alarm
-// cache is empty and no clients are available.
 func TestRelated_VPCE_Alarm_CacheMissNoClients(t *testing.T) {
 	res := vpceSrcInterfaceResource()
 
@@ -354,7 +284,6 @@ func TestRelated_VPCE_Alarm_CacheMissNoClients(t *testing.T) {
 	}
 }
 
-// TestRelated_VPCE_Alarm_EmptyID verifies Count=0 for an empty endpoint ID.
 func TestRelated_VPCE_Alarm_EmptyID(t *testing.T) {
 	res := resource.Resource{ID: "", Fields: map[string]string{}}
 
@@ -366,10 +295,6 @@ func TestRelated_VPCE_Alarm_EmptyID(t *testing.T) {
 	}
 }
 
-// --- Logs checker (Pattern C — nil clients → -1) ---
-
-// TestRelated_VPCE_Logs_NilClients verifies Count=-1 when clients are nil
-// (cannot call DescribeFlowLogs).
 func TestRelated_VPCE_Logs_NilClients(t *testing.T) {
 	res := vpceSrcInterfaceResource()
 
@@ -381,7 +306,6 @@ func TestRelated_VPCE_Logs_NilClients(t *testing.T) {
 	}
 }
 
-// TestRelated_VPCE_Logs_EmptyID verifies Count=0 for an empty endpoint ID.
 func TestRelated_VPCE_Logs_EmptyID(t *testing.T) {
 	res := resource.Resource{ID: "", Fields: map[string]string{}}
 

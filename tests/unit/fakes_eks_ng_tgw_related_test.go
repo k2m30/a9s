@@ -20,7 +20,7 @@ import (
 )
 
 // ---------------------------------------------------------------------------
-// fakeEKSForAMIEC2 — implements EKSAPI for batch-3 tests
+// fakeEKSForAMIEC2 — implements EKSAPI
 // Controllable methods: ListNodegroups, DescribeNodegroup
 // Other methods return safe empty stubs.
 // ---------------------------------------------------------------------------
@@ -52,7 +52,6 @@ func (f *fakeEKSForAMIEC2) DescribeNodegroup(_ context.Context, input *eks.Descr
 	return &eks.DescribeNodegroupOutput{}, nil
 }
 
-// Compile-time check: fakeEKSForAMIEC2 satisfies EKSAPI.
 var _ awsclient.EKSAPI = (*fakeEKSForAMIEC2)(nil)
 
 // newFakeEKSWithNodegroups returns a fakeEKSForAMIEC2 whose ListNodegroups returns
@@ -173,7 +172,6 @@ func (f *fakeIAMForTGW) GetInstanceProfile(_ context.Context, _ *iam.GetInstance
 	return &iam.GetInstanceProfileOutput{InstanceProfile: &iamtypes.InstanceProfile{}}, nil
 }
 
-// Compile-time check: fakeIAMForTGW satisfies IAMAPI.
 var _ awsclient.IAMAPI = (*fakeIAMForTGW)(nil)
 
 // newFakeIAMWithRole returns a fakeIAMForTGW whose GetRole returns a Role with
@@ -236,7 +234,6 @@ func (f *fakeASGForNG) DescribeLifecycleHooks(_ context.Context, _ *autoscaling.
 	return &autoscaling.DescribeLifecycleHooksOutput{}, nil
 }
 
-// Compile-time check: fakeASGForNG satisfies ASGAPI.
 var _ awsclient.ASGAPI = (*fakeASGForNG)(nil)
 
 // newFakeASGWithGroups returns a fakeASGForNG whose DescribeAutoScalingGroups

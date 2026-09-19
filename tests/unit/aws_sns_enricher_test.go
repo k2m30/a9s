@@ -1,15 +1,5 @@
 package unit
 
-// aws_sns_enricher_test.go — Behavioral tests for EnrichSNSSubscriptions.
-//
-// Contract assertions:
-//   - ListSubscriptionsByTopic is called once per SNS resource (keyed by topic ARN).
-//   - Both topics have at least one confirmed subscription → 0 findings.
-//   - topic-1 has no subscriptions (empty slice) → finding with severity "~", "no subscribers".
-//   - topic-1 has subscriptions but all are PendingConfirmation → finding with severity "~", "all pending".
-//   - clients.SNS == nil → (EnricherResult{Findings: non-nil empty}, nil).
-//   - API error for a resource → 0 findings for that resource, Truncated=true, no error returned.
-
 import (
 	"context"
 	"errors"
@@ -25,15 +15,9 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// snsListSubscriptionsByTopicFake implements SNSAPI for enrichment testing.
-// It embeds the aggregate interface and overrides only ListSubscriptionsByTopic.
-// The results map is keyed by TopicArn (from the input) so the fake can serve
-// different responses per resource.
 type snsListSubscriptionsByTopicFake struct {
 	awsclient.SNSAPI
-	// results maps TopicArn → subscriptions. If absent the fake returns errByARN.
-	results map[string][]snstypes.Subscription
-	// errByARN maps TopicArn → error; overrides results when set.
+	results  map[string][]snstypes.Subscription
 	errByARN map[string]error
 }
 
@@ -55,11 +39,8 @@ func (f *snsListSubscriptionsByTopicFake) ListSubscriptionsByTopic(
 	return &sns.ListSubscriptionsByTopicOutput{Subscriptions: subs}, nil
 }
 
-// Compile-time check: snsListSubscriptionsByTopicFake satisfies SNSAPI.
 var _ awsclient.SNSAPI = (*snsListSubscriptionsByTopicFake)(nil)
 
-// snsTopicResources returns a slice of SNS topic Resource stubs with the given names.
-// The topic_arn field is set to a realistic ARN derived from the name.
 func snsTopicResources(names ...string) []resource.Resource {
 	res := make([]resource.Resource, 0, len(names))
 	for _, name := range names {
@@ -76,12 +57,10 @@ func snsTopicResources(names ...string) []resource.Resource {
 	return res
 }
 
-// snsARNFor returns the topic ARN used by snsTopicResources for the given name.
 func snsARNFor(name string) string {
 	return "arn:aws:sns:us-east-1:123456789012:" + name
 }
 
-// confirmedSub returns a confirmed Subscription for the given topic ARN.
 func confirmedSub(topicARN, subARN, protocol, endpoint string) snstypes.Subscription {
 	return snstypes.Subscription{
 		TopicArn:        aws.String(topicARN),
@@ -91,7 +70,6 @@ func confirmedSub(topicARN, subARN, protocol, endpoint string) snstypes.Subscrip
 	}
 }
 
-// pendingSub returns a PendingConfirmation subscription for the given topic ARN.
 func pendingSub(topicARN, protocol, endpoint string) snstypes.Subscription {
 	return snstypes.Subscription{
 		TopicArn:        aws.String(topicARN),
@@ -101,8 +79,6 @@ func pendingSub(topicARN, protocol, endpoint string) snstypes.Subscription {
 	}
 }
 
-// TestEnrichSNSSubscriptions_BothWithSubsProducesNoFindings verifies that when
-// both topics have at least one confirmed subscription no findings are produced.
 func TestEnrichSNSSubscriptions_BothWithSubsProducesNoFindings(t *testing.T) {
 	topic1 := snsARNFor("my-topic-1")
 	topic2 := snsARNFor("my-topic-2")
@@ -131,16 +107,12 @@ func TestEnrichSNSSubscriptions_BothWithSubsProducesNoFindings(t *testing.T) {
 	}
 }
 
-// TestEnrichSNSSubscriptions_OrphanTopicProducesFindingSevTilde verifies that
-// when topic-1 has an empty subscription list a finding with severity "~" and
-// summary containing "no subscribers" is produced for topic-1, and topic-2
-// (with a confirmed sub) produces no finding.
 func TestEnrichSNSSubscriptions_OrphanTopicProducesFindingSevTilde(t *testing.T) {
 	topic1 := snsARNFor("my-topic-1")
 	topic2 := snsARNFor("my-topic-2")
 	fake := &snsListSubscriptionsByTopicFake{
 		results: map[string][]snstypes.Subscription{
-			topic1: {}, // empty — orphan topic
+			topic1: {},
 			topic2: {
 				confirmedSub(topic2, "arn:aws:sns:us-east-1:123456789012:my-topic-2:sub-bbb", "sqs", "arn:aws:sqs:us-east-1:123456789012:queue-b"),
 			},
@@ -169,10 +141,6 @@ func TestEnrichSNSSubscriptions_OrphanTopicProducesFindingSevTilde(t *testing.T)
 	}
 }
 
-// TestEnrichSNSSubscriptions_AllPendingProducesFindingSevTilde verifies that
-// when topic-1 has two subscriptions both in PendingConfirmation state a
-// finding with severity "~" and summary containing "all pending" is produced
-// for topic-1, and topic-2 (with a confirmed sub) produces no finding.
 func TestEnrichSNSSubscriptions_AllPendingProducesFindingSevTilde(t *testing.T) {
 	topic1 := snsARNFor("my-topic-1")
 	topic2 := snsARNFor("my-topic-2")
@@ -210,8 +178,6 @@ func TestEnrichSNSSubscriptions_AllPendingProducesFindingSevTilde(t *testing.T) 
 	}
 }
 
-// TestEnrichSNSSubscriptions_NilClientReturnsEmptyFindingsNoError verifies that
-// when clients.SNS is nil the enricher returns a non-nil empty Findings map and no error.
 func TestEnrichSNSSubscriptions_NilClientReturnsEmptyFindingsNoError(t *testing.T) {
 	clients := &awsclient.ServiceClients{SNS: nil}
 
@@ -227,12 +193,8 @@ func TestEnrichSNSSubscriptions_NilClientReturnsEmptyFindingsNoError(t *testing.
 	}
 }
 
-// TestEnrichSNSSubscriptions_APIErrorMarksRowTruncatedIDNotBadge verifies that
-// when the ListSubscriptionsByTopic call for topic-1 returns an error, the
-// enricher marks that topic's row via TruncatedIDs, produces 0 findings for
-// the failed topic, and does not propagate the error. sns is a "~"-only
-// enricher (IssueCount always 0), so the coverage gap must never
-// lower-bound the aggregate issue badge — Truncated stays false.
+// sns is a "~"-only enricher (IssueCount is always 0), so a coverage gap
+// never lower-bounds the issue badge: Truncated stays false.
 func TestEnrichSNSSubscriptions_APIErrorMarksRowTruncatedIDNotBadge(t *testing.T) {
 	apiErr := errors.New("sns: ListSubscriptionsByTopic throttled")
 	topic1 := snsARNFor("my-topic-1")
@@ -267,15 +229,10 @@ func TestEnrichSNSSubscriptions_APIErrorMarksRowTruncatedIDNotBadge(t *testing.T
 	}
 }
 
-// GetTopicAttributes is the stub half of a partial test double: this fake
-// embeds SNSAPI as a nil interface and implements only the subscription
-// listing, which was the enricher's only call when it was written.
-//
-// The attributes returned are a HEALTHY set, not an empty one. An empty
-// attribute map is not neutral — a missing KmsMasterKeyId means the topic is
-// unencrypted and a missing Policy is read as unknown — so an empty stub
-// would add an encryption finding to every scenario in this file and change
-// what its assertions are measuring.
+// The fake returns a healthy attribute set: an empty map is not neutral — a
+// missing KmsMasterKeyId means the topic is unencrypted and a missing Policy is
+// read as unknown — and would add an encryption finding to every scenario in
+// this file.
 func (f *snsListSubscriptionsByTopicFake) GetTopicAttributes(_ context.Context, in *sns.GetTopicAttributesInput, _ ...func(*sns.Options)) (*sns.GetTopicAttributesOutput, error) {
 	arn := ""
 	if in != nil && in.TopicArn != nil {

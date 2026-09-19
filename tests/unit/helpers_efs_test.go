@@ -47,7 +47,6 @@ func (f *efsMountTargetFake) DescribeMountTargets(
 	return &efs.DescribeMountTargetsOutput{MountTargets: mts}, nil
 }
 
-// Compile-time check: efsMountTargetFake satisfies EFSAPI.
 var _ awsclient.EFSAPI = (*efsMountTargetFake)(nil)
 
 // efsMTFakeFromFixtures builds an efsMountTargetFake from the canonical

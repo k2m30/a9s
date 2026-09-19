@@ -10,18 +10,8 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// TestCache_WrongVersionTypeFile_SkippedButSiblingsSurvive writes a per-type
-// YAML file stamped with a schema version other than cache.SchemaVersion,
-// alongside a well-formed sibling type file, then calls cache.LoadDirForTest and
-// verifies the result is safe: it must not crash, the wrong-version type
-// must not surface via Store.Type, and the sibling known-good type must
-// still load normally. This replaces the round-1
-// TestCache_RejectsUnknownResourceKeys concept (per-type-file cache.LoadDirForTest
-// has no registry cross-check of its own — an unrecognized-but-well-formed
-// type name loads under its own key just like any other; that filtering
-// concept died with the single-file cache.Load implementation). What
-// round-2's C7 actually promises is "wrong-version or unreadable ⇒ no cache
-// for that type only", which is what this test pins instead.
+// A wrong-version or unreadable type file means no cache for that type only;
+// its siblings still load.
 func TestCache_WrongVersionTypeFile_SkippedButSiblingsSurvive(t *testing.T) {
 	tmpDir := t.TempDir()
 	t.Setenv("A9S_CONFIG_FOLDER", tmpDir)
@@ -57,14 +47,8 @@ func TestCache_WrongVersionTypeFile_SkippedButSiblingsSurvive(t *testing.T) {
 	}
 }
 
-// TestCache_LoadDirForTestRoundtrip_AllRegisteredTypes verifies that every
-// top-level resource type short name registered via AllShortNames() survives
-// a Put/SaveType/LoadDirForTest round-trip with identical field values, using
-// the live registry so new resource types added in the future are
-// automatically covered.
-// Bug caught: a newly added resource type whose ShortName contains
-// characters that are mis-sanitized by cache.DirForTest, or a yaml tag omission
-// that silently drops a field on serialize/deserialize.
+// Runs over the live registry so every registered type is covered, including
+// ShortNames cache.DirForTest must sanitize and fields a yaml tag could drop.
 func TestCache_LoadDirForTestRoundtrip_AllRegisteredTypes(t *testing.T) {
 	tmpDir := t.TempDir()
 	t.Setenv("A9S_CONFIG_FOLDER", tmpDir)

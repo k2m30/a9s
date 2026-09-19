@@ -1,16 +1,5 @@
 package unit
 
-// mainmenu_renderbody_truncated_test.go — live-seam replacement for
-// issue236_truncated_zero_nav_test.go's TestIssue236_DisplayShowsZeroPlusForTruncatedZero
-// (022-codebase-cleanup wave 3). MainMenuModel.View()/SetAvailability/
-// SetTruncated/SelectedItem are production-dead (Model.RenderBody(body) is
-// the only reachable render entry — see internal/tui/renderer.go:renderMenu).
-// The cursor-lands-on / Enter-navigates-on truncated-zero business rules
-// from the retired file are already pinned on the controller path by
-// TestMenuIntent_PatchMenuAvailability_TruncatedCount and
-// TestMenuAction_Select_AllowedForTruncatedZero (app_menu_test.go); only the
-// "(0+)" vs bare "(0)" render contract had no live-seam pin.
-
 import (
 	"strings"
 	"testing"

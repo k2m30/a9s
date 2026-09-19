@@ -1,29 +1,13 @@
-// costs_delivery_matrix_test.go — M1: the delivery-state completeness net
-// over messages.CostsLoaded's honest GridResult/anomaly shapes crossed with
-// the frame states that give each combination distinct, observable
-// behavior. package unit_test (headless-only; reuses newCostsController /
-// topDrill / findFetchCostsTask / fullMetricRecord / codexMoveCursorToRow,
-// same helpers costs_review3_test.go and siblings already share).
+// Grid and Anomalies are independent axes at the executor (SkipGrid and
+// SkipAnomalies are separate booleans on FetchCostsPayload), so the
+// {grid}x{anomalies} cross product is real. Failure is not a per-half state:
+// messages.CostsLoaded carries one Err for the whole delivery, and
+// ApplyCostsLoaded returns before reading Grid or Anomalies when Err is set,
+// so Err is its own axis. Both halves skipped is unreachable:
+// ensureCostsShapeFetched never dispatches a fetch with nothing to fetch.
 //
-// Grid and Anomalies are INDEPENDENT axes at the executor (SkipGrid and
-// SkipAnomalies are two separate booleans, FetchCostsPayload), so the
-// {grid}x{anomalies} cross product is real — except for
-// "failed", which is NOT a per-half state: messages.CostsLoaded carries one
-// Err field for the WHOLE delivery (ApplyCostsLoaded returns before ever
-// looking at Grid/Anomalies when ev.Err != nil), so a "grid failed, anomaly
-// fetched" cell does not exist in the current wire shape. Err is tested as
-// its own axis (matching/not-matching frame), not crossed into grid x
-// anomaly. "both skipped" (grid AND anomalies skipped in the same delivery)
-// is marked unreachable: ensureCostsShapeFetched never dispatches a fetch
-// with nothing to fetch.
-//
-// Each of the 8 reachable non-error grid x anomaly combinations is paired
-// with the ONE frame state that makes its distinguishing behavior
-// observable (a full 8x6-frame cross product would mostly re-assert the
-// same "Loading clears, Rows update" shape already pinned per-combination
-// here) — this is the completeness net over the DISTINCT combinations the
-// architecture actually produces, not a mechanical enumeration of every
-// frame against every combination.
+// Each reachable grid x anomaly combination is paired with the one frame
+// state that makes its distinguishing behaviour observable.
 package unit_test
 
 import (
@@ -45,11 +29,6 @@ func m1AnomalyMark(period costs.Period, service string, impact float64) costs.An
 		Dimension: map[costs.Dimension]string{costs.DimensionService: service},
 	}
 }
-
-// ===========================================================================
-// Cell 1 — grid:fetched-with-records x anomalies:fetched-with-marks
-// @ fresh-loading (root shape-miss). Both halves genuinely ran together.
-// ===========================================================================
 
 func TestCostsDeliveryMatrix_Grid_RecordsAndAnomalies_Marks_FreshLoading(t *testing.T) {
 	c := newCostsController(t, fixedCostsNow)
@@ -79,11 +58,8 @@ func TestCostsDeliveryMatrix_Grid_RecordsAndAnomalies_Marks_FreshLoading(t *test
 	}
 }
 
-// ===========================================================================
-// Cell 2 — grid:fetched-with-records x anomalies:fetched-empty
-// @ fresh-loading. Grid data lands; anomalies authoritatively found none —
-// FooterNote must not fabricate an anomaly mention.
-// ===========================================================================
+// Anomalies authoritatively found none, so FooterNote must not mention an
+// anomaly.
 
 func TestCostsDeliveryMatrix_Grid_Records_AnomaliesEmpty_FreshLoading(t *testing.T) {
 	c := newCostsController(t, fixedCostsNow)
@@ -110,12 +86,8 @@ func TestCostsDeliveryMatrix_Grid_Records_AnomaliesEmpty_FreshLoading(t *testing
 	}
 }
 
-// ===========================================================================
-// Cell 3 — grid:fetched-with-records x anomalies:skipped (TTL-fresh)
-// @ warm-covered re-fetch. A same-shape refresh that skips the anomaly slot
-// must leave any existing anomaly FooterNote untouched (never clobbered by
-// the absent anomaly half).
-// ===========================================================================
+// A same-shape refresh that skips the anomaly slot leaves any existing
+// anomaly FooterNote untouched.
 
 func TestCostsDeliveryMatrix_Grid_Records_AnomaliesSkipped_WarmRefresh(t *testing.T) {
 	c := newCostsController(t, fixedCostsNow)
@@ -134,8 +106,7 @@ func TestCostsDeliveryMatrix_Grid_Records_AnomaliesSkipped_WarmRefresh(t *testin
 		t.Fatalf("precondition: first delivery's anomaly did not land in FooterNote, got %q", got)
 	}
 
-	// Second delivery: grid re-fetched with fresh records, anomaly slot
-	// skipped (Anomalies left nil — TTL still fresh, X2's own convention).
+	// Anomalies nil: the anomaly slot is skipped while its TTL is fresh.
 	c.Handle(messages.CostsLoaded{
 		Query:    q,
 		Grid:     costs.GridResult{Fetched: true, Records: []costs.Record{fullMetricRecord(newestCol, "Amazon EC2", 1300.0)}},
@@ -148,13 +119,9 @@ func TestCostsDeliveryMatrix_Grid_Records_AnomaliesSkipped_WarmRefresh(t *testin
 	}
 }
 
-// ===========================================================================
-// Cell 4 — grid:fetched-empty x anomalies:fetched-with-marks
-// @ fallback-eligible-drill. The N3 trigger: grid genuinely re-confirmed
-// zero at an eligible child frame, and separately anomalies fetched marks
-// in the SAME delivery — the fallback must still fire (grid authority is
-// what matters, not whether anomalies also rode along).
-// ===========================================================================
+// A grid re-confirmed zero at an eligible child frame fires the coarser
+// fallback even when anomalies landed marks in the same delivery; grid
+// authority decides it.
 
 func TestCostsDeliveryMatrix_GridEmpty_AnomaliesMarks_FallbackFires(t *testing.T) {
 	c := newCostsController(t, fixedCostsNow)
@@ -190,21 +157,16 @@ func TestCostsDeliveryMatrix_GridEmpty_AnomaliesMarks_FallbackFires(t *testing.T
 	}
 }
 
-// ===========================================================================
-// Cell 5 — grid:fetched-empty x anomalies:skipped @ warm-covered. Grid
-// genuinely re-confirmed zero for an already-warm bucket — MergeCoverage
-// still stamps (an authoritative zero is still authoritative), the row
-// clears, and the untouched anomaly slot leaves any existing note alone.
-// ===========================================================================
+// A grid re-confirmed zero for an already-warm bucket still stamps coverage
+// (an authoritative zero is authoritative), the row clears, and the untouched
+// anomaly slot leaves any existing note alone.
 
 func TestCostsDeliveryMatrix_GridEmpty_AnomaliesSkipped_WarmBucket_StampsCoverage(t *testing.T) {
-	// The seed is fetched STRICTLY EARLIER than fixedCostsNow (still within
-	// the open-period TTL) — MergeCoverage's own
-	// `!existing.FetchedAt.Equal(now)` guard needs two genuinely different
-	// "now" stamps to tell "an earlier warm fetch" from "this same round"
-	// apart; reusing one fixed clock for both deliveries would silently
-	// mask the very zero-clear behavior this cell exists to pin (mirrors
-	// costs_review3_test.go's own P1 R2 setup, same reason).
+	// The seed is fetched strictly earlier than fixedCostsNow, still within the
+	// open-period TTL: MergeCoverage's `!existing.FetchedAt.Equal(now)` guard
+	// needs two different "now" stamps to tell an earlier warm fetch from this
+	// same round, and one fixed clock for both deliveries would mask the
+	// zero-clear.
 	profile := "test-profile-matrix-cell5"
 	t.Setenv("A9S_CONFIG_FOLDER", t.TempDir())
 	seedNow := fixedCostsNow.Add(-2 * time.Hour)
@@ -246,12 +208,8 @@ func TestCostsDeliveryMatrix_GridEmpty_AnomaliesSkipped_WarmBucket_StampsCoverag
 	}
 }
 
-// ===========================================================================
-// Cell 6 — grid:skipped x anomalies:fetched-with-marks @ warm-covered
-// (P1's own canonical cell, placed here as the matrix's authoritative
-// anomaly-only-refresh entry). MergeCoverage must NOT be touched; warm
-// records survive; the new marks land.
-// ===========================================================================
+// An anomaly-only refresh must not touch MergeCoverage: warm records survive
+// and the new marks land.
 
 func TestCostsDeliveryMatrix_GridSkipped_AnomaliesMarks_WarmBucket_NeverClearsGrid(t *testing.T) {
 	c := newCostsController(t, fixedCostsNow)
@@ -285,13 +243,8 @@ func TestCostsDeliveryMatrix_GridSkipped_AnomaliesMarks_WarmBucket_NeverClearsGr
 	}
 }
 
-// ===========================================================================
-// Cell 7 — grid:skipped x anomalies:fetched-empty @ warm-covered. An
-// anomaly-only delivery that authoritatively found ZERO anomalies must
-// clear a stale FooterNote — PutAnomalies runs unconditionally on success,
-// per costs_selfreview_test.go's own X-series pin, placed here as its
-// matrix-cell counterpart.
-// ===========================================================================
+// An anomaly-only delivery that authoritatively found zero anomalies clears a
+// stale FooterNote: PutAnomalies runs unconditionally on success.
 
 func TestCostsDeliveryMatrix_GridSkipped_AnomaliesEmpty_WarmBucket_ClearsStaleNote(t *testing.T) {
 	c := newCostsController(t, fixedCostsNow)
@@ -323,22 +276,12 @@ func TestCostsDeliveryMatrix_GridSkipped_AnomaliesEmpty_WarmBucket_ClearsStaleNo
 	}
 }
 
-// ===========================================================================
-// Cell 8 (unreachable) — grid:skipped x anomalies:skipped. Nothing to
-// fetch: ensureCostsShapeFetched never dispatches a task with both halves
-// skipped, so this delivery shape never occurs in production. Documented
-// rather than silently omitted.
-// ===========================================================================
-
 func TestCostsDeliveryMatrix_GridSkipped_AnomaliesSkipped_Unreachable(t *testing.T) {
 	t.Skip("unreachable: ensureCostsShapeFetched/screen.FetchPlan never dispatches a KindFetchCosts task with SkipGrid=true AND SkipAnomalies=true — there is nothing left for such a delivery to have fetched, so this (grid, anomalies) combination never arrives on the wire")
 }
 
-// ===========================================================================
-// Cell 9 — Err (whole-event failure) @ a drilled child frame that matches
-// what's awaited. Err short-circuits both halves — Grid/Anomalies carry no
-// meaning once Err != nil (ApplyCostsLoaded returns before reading either).
-// ===========================================================================
+// Err short-circuits both halves: ApplyCostsLoaded returns before reading
+// Grid or Anomalies.
 
 func TestCostsDeliveryMatrix_Err_MatchingChildFrame_SetsErrorMsg(t *testing.T) {
 	c := newCostsController(t, fixedCostsNow)
@@ -371,12 +314,8 @@ func TestCostsDeliveryMatrix_Err_MatchingChildFrame_SetsErrorMsg(t *testing.T) {
 	}
 }
 
-// ===========================================================================
-// Cell 10 — Err @ popped-away (the costs screen was fully left before this
-// delivery arrived, cs == nil). ApplyCostsLoaded's own no-cs branch treats
-// Err as a pure no-op — no disk write, no panic, nothing left to apply the
-// error state to.
-// ===========================================================================
+// With the costs screen fully left before the delivery arrives (cs == nil),
+// ApplyCostsLoaded treats Err as a no-op: no disk write, no panic.
 
 func TestCostsDeliveryMatrix_Err_PoppedAway_IsNoOp(t *testing.T) {
 	c := newCostsController(t, fixedCostsNow)

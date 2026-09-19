@@ -1,71 +1,6 @@
-// detail_ports_test.go — live-seam port pins for the DetailModel legacy-view
-// deletion, per specs/022-codebase-cleanup/
-// wave3-map-detail.md's "Unique pins to PORT" list. Every test here exercises
-// the LIVE seam (NewTransientDetail+RenderDetail, or the app.Controller
-// action/footer/search path) so the corresponding legacy-DetailModel-only
-// test can be deleted later without losing coverage. No production code is
-// touched by this file; old test files it supersedes stay untouched.
-//
-// Per-item disposition (see wave3-map-detail.md for the numbered list):
-//  1. HARD BLOCKER — golden RenderDetail(body) output. PORTED below
-//     (Test_RenderDetail_Golden_FieldsAttentionRelatedPanel).
-//  2. Detail bottom-hints (navigable-field / Tab-suppressed-on-auto-show /
-//     CloudTrail). PORTED below onto Controller.buildDetailFooterHints via
-//     the public Snapshot().Footer seam (footer.go:110) — confirmed zero
-//     existing coverage (app_footer_hints_test.go pins menu hints only).
-//  3. Detail search activate/highlight/next-prev. PORTED below onto the live
-//     seam: tui.Model key routing (app_stack.go, keys.Search/SearchNext/
-//     SearchPrev) -> Controller.Apply(ActionSearch/...) -> renderer.go
-//     rs.search.SyncCursor(body.SearchCursor) -> RenderDetail.
-//  4. Section-styling + color-tier goldens. PORTED below directly onto
-//     RenderDetail(body) using hand-built FieldRow slices — detail_fields.go's
-//     renderFromFieldList (the LIVE styling switch) is exercised identically
-//     whether the FieldRow rows came from ct-events, Attention, or a test.
-//     The "cursor-skips-IsSection" sub-case is COVERED, not re-ported: it is
-//     a controller-state invariant (applyDetailActions' skip loop), already
-//     pinned type-agnostically by detail_livepath_migration_test.go's
-//     TestDetailController_MoveDown_SkipsSectionHeadersAndSpacers ("regardless
-//     of whether the section came from the Attention block or a type-specific
-//     projector" — its own docstring).
-//  5. ct-events section headers. PORTED below: catalog_monitoring.go registers
-//     Project: ctevent.Project for "ct-events" (the SAME projector the dead
-//     the TUI field-list builder used), and buildDetailFieldItems
-//     calls td.Project unconditionally — but zero existing controller-path
-//     test asserted the ACTOR/ACTION/CONTEXT section shape survives that
-//     wiring, so this is a real gap, not a duplicate.
-//  6. t-key (ActionCloudTrail) emits ct-events RelatedNavigate from Detail.
-//     PORTED below: grep found zero test references to ActionCloudTrail
-//     anywhere in the repo. ct_events_rightcol_dispatch_test.go's D2/D3
-//     assertions are about a DIFFERENT trigger (selecting an already-visible
-//     related row), already superseded by detail_livepath_migration_test.go
-//     per that file's own docstring — that one is COVERED, but
-//     handleActionCloudTrail's own "t"-key path was untested until now.
-//  7. isFieldNavigable predicate table. COVERED, not re-ported:
-//     detail_navigable_test.go's TestIsFieldNavigable_MatchFound/NoMatch/
-//     UnknownType (lines 184-215) call resource.IsFieldNavigableForTest directly —
-//     a resource-package predicate shared verbatim by both the legacy
-//     views.DetailModel and the live buildDetailFieldItems path (not a
-//     views-package duplicate), so there is no separate port target.
-//  8. Boundary end-clamp (detail_boundary_spec008_test.go's DetailModel j/k
-//     clamp). detail_livepath_migration_test.go (MIG) only covers the
-//     skip-over-sections loop, NOT the edge clamp guards themselves
-//     (ds.FieldCursor>0 / ds.FieldCursor<fieldCount-1 in
-//     applyDetailActions, detail_cursor.go:55,77). PORTED below.
-//  9. Dispatch-on-resize (detail_resize_test.go's narrow->wide
-//     TakePendingRelatedDispatch). NOT PORTED — confirmed architecturally
-//     obsolete, not merely "already covered": Controller.EnsureDetailState
-//     (detail_state.go:57) dispatches KindRelatedCheck unconditionally on
-//     screen entry regardless of width, and buildDetailBody's RelatedVisible
-//     is driven only by DetailState flags (SetDetailRelatedVisible), never by
-//     width — the width gate lives solely in RenderDetail's render-time "if
-//     body.RelatedVisible && m.width >= layout.MinInnerContentWidth" check.
-//     The legacy mechanic existed only to defer a fetch the controller never
-//     defers in the first place, so there is no live behavior left to pin.
-//  10. Wave2 S4/S5 full-detail-sentence + falls-back-to-phrase. PORTED below
-//     directly against buildAttentionSectionDetail's live output
-//     (detail_body.go:330) — app_detail_attention_cursor_test.go only pins
-//     FieldCursor stability across a mixed-severity sort, never the rendered
-//     Detail-sentence row's presence/absence.
+// detail_ports_test.go — detail-view behaviour pinned on the live seam
+// (NewTransientDetail+RenderDetail, or the app.Controller
+// action/footer/search path).
 package unit_test
 
 import (
@@ -93,26 +28,15 @@ import (
 	"github.com/k2m30/a9s/v3/tests/unit/tuitest"
 )
 
-// ---------------------------------------------------------------------------
-// 1. HARD BLOCKER — RenderDetail golden on the NewTransientDetail seam.
-// ---------------------------------------------------------------------------
-
-// wave3RenderDetailGolden was captured from the current, correct
-// RenderDetail(body) output for an EC2 resource with one SevBroken Attention
-// finding (with supporting rows) and a related panel showing one resolved
-// row (VPC, count 1) and one loading row (Security Groups). NO_COLOR is
-// forced so the golden is deterministic across terminals/CI; the one cursor
-// row (FieldCursor defaults to 0, landing on "Architecture" — the
-// alphabetically-first content row after the Attention block) still carries
-// its background-highlight escape because that highlight is applied by a
-// raw wrap independent of the lipgloss color styles NO_COLOR disables — this
-// is real, current behavior, not a test artifact.
-//
-// This is the ONE pin required before View() (and the projection.buildItems/
-// buildLiveBody halves that only exist to reproduce it) can be deleted per
-// wave3-map-detail.md's HARD BLOCKER note: RP/PUR currently only prove
-// RenderDetail == View(), never RenderDetail's own correctness independent
-// of View().
+// wave3RenderDetailGolden is RenderDetail(body) output for an EC2 resource
+// with one SevBroken Attention finding (with supporting rows) and a related
+// panel showing one resolved row (VPC, count 1) and one loading row (Security
+// Groups). NO_COLOR is forced so the golden is deterministic across
+// terminals; the one cursor row (FieldCursor defaults to 0, landing on
+// "Architecture" — the alphabetically-first content row after the Attention
+// block) still carries its background-highlight escape because that
+// highlight is applied by a raw wrap independent of the lipgloss color styles
+// NO_COLOR disables.
 const wave3RenderDetailGolden = " Attention (1)                                                                                             │            RELATED\n     ! Encryption key unavailable                                                                          │  VPC (1)\n         KMS Key: arn:aws:kms:us-east-1:123456789012:key/abc123                                            │  Security Groups\n         Reason: key is pending deletion                                                                   │\n                                                                                                           │\n\x1b[48;2;122;162;247m Architecture:         x86_64                                                                              \x1b[m│\n ImageId:              ami-0a1b2c3d4e5f60001                                                               │\n InstanceId:           i-0abc123def456789a                                                                 │\n KeyName:              prod-keypair                                                                        │\n LaunchTime:           2024-01-15 10:30                                                                    │\n PrivateIpAddress:     10.0.1.100                                                                          │\n PublicIpAddress:      203.0.113.42                                                                        │\n State:                running                                                                             │\n SubnetId:             subnet-0abc12345def67890                                                            │\n VpcId:                vpc-0abc12345def67890                                                               │\n architecture:         x86_64                                                                              │\n availability_zone:    us-east-1a                                                                          │\n iam_instance_profile: acme-ec2-instance-profile                                                           │\n image_id:             ami-0a1b2c3d4e5f60001                                                               │\n instance_id:          i-0abc123def456789a                                                                 │\n instance_type:        t3.medium                                                                           │\n key_name:             prod-keypair                                                                        │\n launch_time:          2024-01-15 10:30                                                                    │\n monitoring:           enabled                                                                             │\n private_ip:           10.0.1.100                                                                          │\n public_ip:            203.0.113.42                                                                        │\n security_groups:      sg-0aaa111111111111a                                                                │\n state:                running                                                                             │\n subnet_id:            subnet-0abc12345def67890                                                            │\n vpc_id:               vpc-0abc12345def67890                                                               │"
 
 func Test_RenderDetail_Golden_FieldsAttentionRelatedPanel(t *testing.T) {
@@ -139,10 +63,6 @@ func Test_RenderDetail_Golden_FieldsAttentionRelatedPanel(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// 2. Detail bottom-hints on the Controller.buildDetailFooterHints seam.
-// ---------------------------------------------------------------------------
-
 // wave3FooterHintEC2 is a minimal RawStruct exposing a VpcId field for the
 // generic fieldpath projector to extract, mirroring detail_navigable_test.go's
 // testNavEC2.
@@ -164,8 +84,7 @@ func wave3NoopRelatedChecker(_ context.Context, _ any, _ resource.Resource, _ re
 
 // Test_FooterHints_Detail_NavigableFieldHint pins that when FieldCursor
 // sits on a navigable field, Snapshot().Footer's first hint is
-// {enter, <target type display name>} — the live equivalent of
-// qa_bottom_hints_test.go's TestBottomHints_Detail_NavigableField.
+// {enter, <target type display name>}.
 func Test_FooterHints_Detail_NavigableFieldHint(t *testing.T) {
 	replaceEC2NavigableFields(t, []resource.NavigableField{
 		{FieldPath: "VpcId", TargetType: "vpc"},
@@ -199,12 +118,7 @@ func Test_FooterHints_Detail_NavigableFieldHint(t *testing.T) {
 
 // Test_Detail_EnterOnNavigableField_TUIKeyRoute_NavigatesToTarget drives
 // the real TUI key route (root tui.Model -> app_stack.go's Enter case) for a
-// navigable field, unlike Test_FooterHints_Detail_NavigableFieldHint
-// above, which only proves the footer HINT text and never presses Enter.
-// core/app/field_select_byid_test.go covers the controller/web seam but
-// also never presses Enter through app_stack.go — no existing test drives
-// this dispatch, so this closes that gap (issue140_scenarios_golden_test.go's
-// citation is repointed to this test below).
+// navigable field and presses Enter.
 func Test_Detail_EnterOnNavigableField_TUIKeyRoute_NavigatesToTarget(t *testing.T) {
 	t.Setenv("A9S_CONFIG_FOLDER", t.TempDir())
 	replaceEC2NavigableFields(t, []resource.NavigableField{
@@ -270,9 +184,7 @@ func Test_Detail_EnterOnNavigableField_TUIKeyRoute_NavigatesToTarget(t *testing.
 // pins that "tab: Cols" is absent while the related panel is only
 // auto-shown (RelatedVisible=true, RelatedUserVisible=false — the default
 // after EnsureDetailState when defs are registered) and present once the
-// user explicitly toggles it on via SetDetailRelatedVisible(true, true) —
-// mirrors DetailModel.BottomHints checking m.rightColVisible, per
-// footer.go:176's comment.
+// user explicitly toggles it on via SetDetailRelatedVisible(true, true).
 func Test_FooterHints_Detail_TabSuppressedOnAutoShow_ThenShownOnExplicitToggle(t *testing.T) {
 	resource.SetRelatedForTest("wave3_footer_hints_related", []resource.RelatedDef{
 		{TargetType: "vpc", DisplayName: "VPC", Checker: wave3NoopRelatedChecker},
@@ -300,8 +212,7 @@ func Test_FooterHints_Detail_TabSuppressedOnAutoShow_ThenShownOnExplicitToggle(t
 
 // Test_FooterHints_Detail_CloudTrailHint pins that the "t: CloudTrail"
 // footer hint appears for a resource type with a registered CloudTrailKey
-// (ec2's "ResourceName:ID") — the live equivalent of qa_bottom_hints_test.go's
-// TestBottomHints_Detail_ShowsCloudTrail.
+// (ec2's "ResourceName:ID").
 func Test_FooterHints_Detail_CloudTrailHint(t *testing.T) {
 	res := resource.Resource{ID: "i-footer-ct-0001", Name: "footer-ct-instance"}
 	c := newDetailController(t, res, "ec2")
@@ -313,11 +224,9 @@ func Test_FooterHints_Detail_CloudTrailHint(t *testing.T) {
 }
 
 // Test_FooterHints_Detail_RightColFocused_ShowsCloudTrail pins that the
-// "t: CloudTrail" hint survives the SEPARATE RelatedFocus branch of
-// buildDetailFooterHints (footer.go:114-148) — a distinct code path from the
-// left-column branch Test_FooterHints_Detail_CloudTrailHint exercises.
-// Live replacement for qa_bottom_hints_test.go's
-// TestBottomHints_Detail_RightColFocused_ShowsCloudTrail.
+// "t: CloudTrail" hint survives the separate RelatedFocus branch of
+// buildDetailFooterHints — a distinct code path from the left-column branch
+// Test_FooterHints_Detail_CloudTrailHint exercises.
 func Test_FooterHints_Detail_RightColFocused_ShowsCloudTrail(t *testing.T) {
 	res := resource.Resource{ID: "i-rhs-focus-0001", Name: "rhs-focus-instance"}
 	c := newDetailController(t, res, "ec2")
@@ -336,19 +245,14 @@ func Test_FooterHints_Detail_RightColFocused_ShowsCloudTrail(t *testing.T) {
 
 // Test_FooterHints_YAML_CloudTrailHint pins that a YAML/text screen's
 // Snapshot().Footer includes {t, CloudTrail} when the screen's ScreenContext
-// resolves to a cached resource with a CloudTrailKey — the live replacement
-// for qa_bottom_hints_test.go's TestBottomHints_YAML_ShowsCloudTrail.
-// buildTextFooterHints (footer.go:88) had zero controller-path test coverage
-// before this pin.
+// resolves to a cached resource with a CloudTrailKey (buildTextFooterHints).
 func Test_FooterHints_YAML_CloudTrailHint(t *testing.T) {
 	c := newTestController(t)
 
 	res := resource.Resource{ID: "i-yaml-ct-0001", Name: "yaml-ct-instance"}
-	// Provenance: CanonicalList declares what this seed always implicitly
-	// meant — the resource must already be in the cache before the YAML
-	// screen is pushed below, exactly as if an earlier top-level ec2 list
-	// had loaded it. This is the only way findCachedResourceByID (footer.go)
-	// can resolve it; no related/filtered/by-ID/child path is exercised here.
+	// The resource must already be in the cache before the YAML screen is
+	// pushed below, as if a top-level ec2 list had loaded it; that is the only
+	// way findCachedResourceByID (footer.go) can resolve it.
 	handlePage(c, messages.ResourcesLoaded{ResourceType: "ec2", Resources: []resource.Resource{res}, Provenance: messages.FetchProvenanceCanonicalList})
 
 	c.ApplyIntents([]runtime.UIIntent{runtime.PushScreen{
@@ -372,10 +276,6 @@ func wave3HasHint(hints []app.KeyHint, key string) bool {
 	return false
 }
 
-// ---------------------------------------------------------------------------
-// 3. Detail search activate/highlight/next-prev on the live seam.
-// ---------------------------------------------------------------------------
-
 // wave3OpenEC2Detail builds a plain (non-demo) root tui.Model, sizes it, and
 // pushes a Detail screen directly for res via messages.Navigate{Target:
 // TargetDetail} — mirrors issue119_scenarios_golden_test.go's
@@ -398,11 +298,7 @@ func wave3OpenEC2Detail(t *testing.T, res resource.Resource) tui.Model {
 // Esc) through the root tui.Model into a Detail screen, exercising
 // app_stack.go's Controller.Apply(ActionSearch/ActionSearchNext/
 // ActionSearchPrev/ActionSearchClear) -> renderer.go's rs.search sync ->
-// RenderDetail — the live replacement for qa_search_views_test.go's
-// TestSearch_DetailView_SlashActivatesSearch /
-// TestSearch_DetailView_TypeQueryHighlightsMatches /
-// TestSearch_DetailView_EscExitsSearch, which drive views.NewDetail directly
-// (a dead path once View()/Update() key handling is deleted).
+// RenderDetail.
 func Test_DetailSearch_LiveSeam_ActivateHighlightNextPrevEsc(t *testing.T) {
 	tuitest.ForceColor(t)
 
@@ -414,10 +310,7 @@ func Test_DetailSearch_LiveSeam_ActivateHighlightNextPrevEsc(t *testing.T) {
 		t.Fatalf("precondition: detail view must show 'running' before search is active; got:\n%s", before)
 	}
 
-	// Activate search with "/".
 	m, _ = tuitest.Step(m, tea.KeyPressMsg{Code: '/', Text: "/"})
-	// Type "running" character by character — mirrors qa_search_views_test.go's
-	// TestSearch_DetailView_TypeQueryHighlightsMatches keystroke pattern.
 	for _, ch := range "running" {
 		m, _ = tuitest.Step(m, tea.KeyPressMsg{Code: ch, Text: string(ch)})
 	}
@@ -431,20 +324,16 @@ func Test_DetailSearch_LiveSeam_ActivateHighlightNextPrevEsc(t *testing.T) {
 		t.Errorf("plain content must still contain %q after search; got:\n%s", "running", activePlain)
 	}
 
-	// SearchNext ("n") must not panic and must keep the view rendering.
 	m, _ = tuitest.Step(m, tea.KeyPressMsg{Code: 'n', Text: "n"})
 	if next := tuitest.Render(m); next == "" {
 		t.Fatal("view rendered empty after SearchNext (\"n\")")
 	}
 
-	// SearchPrev ("N") must not panic either.
 	m, _ = tuitest.Step(m, tea.KeyPressMsg{Code: 'N', Text: "N"})
 	if prev := tuitest.Render(m); prev == "" {
 		t.Fatal("view rendered empty after SearchPrev (\"N\")")
 	}
 
-	// Esc exits search — ActionSearchClear — and the view keeps rendering
-	// content without panicking.
 	m, _ = tuitest.Step(m, tea.KeyPressMsg{Code: tea.KeyEscape})
 	closed := tuitest.Render(m)
 	if closed == "" {
@@ -456,16 +345,10 @@ func Test_DetailSearch_LiveSeam_ActivateHighlightNextPrevEsc(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// 4. Section-styling + color-tier goldens directly on RenderDetail(body).
-// ---------------------------------------------------------------------------
-
-// wave3RenderRows is a small helper that builds a DetailModel via the live
-// NewTransientDetail seam and calls RenderDetail with a hand-built body —
-// used so items 4's sub-cases don't need a full ct-events/Attention fixture,
-// only the FieldRow shapes that trigger each styling branch in
-// detail_fields.go's renderFromFieldList (the LIVE rendering switch RenderDetail
-// delegates to via renderDetailFieldsFromBody).
+// wave3RenderRows builds a DetailModel via the live NewTransientDetail seam
+// and calls RenderDetail with a hand-built body, so each styling branch in
+// detail_fields.go's renderFromFieldList can be driven by FieldRow shapes
+// alone.
 func wave3RenderRows(fields []app.FieldRow, fieldCursor int) string {
 	body := app.DetailBody{Fields: fields, FieldCursor: fieldCursor}
 	vp := viewport.New(viewport.WithWidth(120), viewport.WithHeight(20))
@@ -475,9 +358,7 @@ func wave3RenderRows(fields []app.FieldRow, fieldCursor int) string {
 
 // Test_RenderDetail_SectionHeader_BoldNoColor pins that an IsSection row
 // with an empty ColorTier renders via styles.FindingSectionDefault (bold,
-// NO foreground color) rather than a tier-colored style — the live
-// replacement for views_detail_render_section_test.go's
-// TestDetailRenderSection_BoldUppercase / TestDetailRenderSection_NoColorOnHeader.
+// NO foreground color) rather than a tier-colored style.
 func Test_RenderDetail_SectionHeader_BoldNoColor(t *testing.T) {
 	tuitest.ForceColor(t)
 
@@ -501,9 +382,7 @@ func Test_RenderDetail_SectionHeader_BoldNoColor(t *testing.T) {
 
 // Test_RenderDetail_ColorTier_IsNavigableWinsOverColorTier pins that a
 // top-level FieldRow with IsNavigable=true AND a non-empty ColorTier renders
-// via styles.NavigableField (underline), never via styles.TierColorStyle —
-// the live replacement for views_detail_render_color_tier_test.go's
-// TestDetailRenderColorTier_IsNavigableWinsOverColorTier.
+// via styles.NavigableField (underline), never via styles.TierColorStyle.
 func Test_RenderDetail_ColorTier_IsNavigableWinsOverColorTier(t *testing.T) {
 	tuitest.ForceColor(t)
 
@@ -524,9 +403,7 @@ func Test_RenderDetail_ColorTier_IsNavigableWinsOverColorTier(t *testing.T) {
 // Test_RenderDetail_ColorTier_LabelAlwaysNeutral pins that the label
 // portion of a field row (the "Key:" text) always renders via the neutral
 // styles.DetailKey style regardless of ColorTier — only the value carries
-// tier coloring — the live replacement for views_detail_render_color_tier_test.go's
-// label-neutrality assertion embedded in TestDetailRenderColorTier_CTDanger
-// and friends.
+// tier coloring.
 func Test_RenderDetail_ColorTier_LabelAlwaysNeutral(t *testing.T) {
 	tuitest.ForceColor(t)
 
@@ -546,18 +423,11 @@ func Test_RenderDetail_ColorTier_LabelAlwaysNeutral(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// 5. ct-events section headers on the live buildDetailFieldItems path.
-// ---------------------------------------------------------------------------
-
 // Test_CTEvents_LiveProjector_SectionHeadersPresentInOrder pins that a
 // ct-events resource projected through the live buildDetailFieldItems path
 // (Controller.EnsureDetailState -> buildDetailFieldItems -> td.Project ==
-// ctevent.Project, catalog_monitoring.go:238) still produces IsSection field
-// rows for ACTOR, ACTION, CONTEXT in that order — the live replacement for
-// views_detail_ct_events_test.go's TestDetailViewCTEvents_BasicPath /
-// TestDetailViewCTEvents_SectionOrder. Reuses buildCTEventsResource +
-// minimalCTJSON from views_detail_ct_events_test.go (same package).
+// ctevent.Project) produces IsSection field rows for ACTOR, ACTION, CONTEXT
+// in that order.
 func Test_CTEvents_LiveProjector_SectionHeadersPresentInOrder(t *testing.T) {
 	res := buildCTEventsResource(
 		"abc12345-0000-0000-0000-000000000001",
@@ -603,16 +473,11 @@ func Test_CTEvents_LiveProjector_SectionHeadersPresentInOrder(t *testing.T) {
 	}
 }
 
-// Test_CTEvents_LiveProjector_DataRowsBetweenSections pins the one claim
-// Test_CTEvents_LiveProjector_SectionHeadersPresentInOrder above does
-// NOT cover: that ACTOR and ACTION are not immediately adjacent — i.e. the
-// section actually has content, not just a stack of bare headers. Ported
-// (round-4 follow-up, specs/022-codebase-cleanup) from
-// views_detail_render_section_test.go's TestDetailRenderSection_
-// RealSectionSequence, sub-check "at least one data row between ACTOR and
-// ACTION" (that test's line-count check on rendered output; this checks the
-// live buildDetailFieldItems field-model directly, which is exact where a
-// rendered-line count could be thrown off by wrapping).
+// Test_CTEvents_LiveProjector_DataRowsBetweenSections pins that ACTOR and
+// ACTION are not immediately adjacent — the section has content, not just a
+// stack of bare headers. It checks the buildDetailFieldItems field model
+// directly, which is exact where a rendered-line count could be thrown off by
+// wrapping.
 func Test_CTEvents_LiveProjector_DataRowsBetweenSections(t *testing.T) {
 	res := buildCTEventsResource(
 		"abc12345-0000-0000-0000-000000000002",
@@ -651,23 +516,14 @@ func Test_CTEvents_LiveProjector_DataRowsBetweenSections(t *testing.T) {
 	}
 }
 
-// Test_TierColorStyle_CtEventTiersAreDistinct pins that styles.
-// TierColorStyle — the function detail_fields.go's renderFromFieldList calls
-// for every ColorTier'd field row (styles.TierColorStyle(item.ColorTier).
-// Render(item.Value)) — maps "ct-info"/"ct-attention"/"ct-danger" to 3
-// distinct, non-neutral styles. Ported (round-4 follow-up, specs/022-
-// codebase-cleanup) from views_detail_render_color_tier_test.go's
-// TestDetailRenderColorTier_CTInfo/CTAttention/CTDanger: those tests built a
-// full ct-events fixture + DetailModel render + ANSI-line-scanning helpers to
-// indirectly prove this same claim. TierColorStyle is a pure, exported
-// function (internal/tui/styles/styles.go) — testing it directly is a strict
-// superset (proves the 3 tiers are MUTUALLY distinct, not just individually
-// non-default) with none of the fragile rendering machinery. The renderer's
-// OWN wiring of ColorTier -> TierColorStyle(...).Render(...) is covered
-// separately by Test_RenderDetail_ColorTier_IsNavigableWinsOverColorTier
-// and Test_RenderDetail_ColorTier_LabelAlwaysNeutral above (using "ct-
-// danger"/"!" as representative non-empty ColorTier values — the renderer
-// branch is tier-string-agnostic).
+// Test_TierColorStyle_CtEventTiersAreDistinct pins that
+// styles.TierColorStyle — the function detail_fields.go's renderFromFieldList
+// calls for every ColorTier'd field row — maps
+// "ct-info"/"ct-attention"/"ct-danger" to 3 mutually distinct, non-neutral
+// styles. The renderer's wiring of ColorTier -> TierColorStyle(...).Render(...)
+// is covered by Test_RenderDetail_ColorTier_IsNavigableWinsOverColorTier and
+// Test_RenderDetail_ColorTier_LabelAlwaysNeutral; that branch is
+// tier-string-agnostic.
 func Test_TierColorStyle_CtEventTiersAreDistinct(t *testing.T) {
 	tuitest.ForceColor(t)
 
@@ -686,16 +542,10 @@ func Test_TierColorStyle_CtEventTiersAreDistinct(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// 6. "t" key (ActionCloudTrail) dispatch from a Detail screen.
-// ---------------------------------------------------------------------------
-
 // Test_ActionCloudTrail_Detail_DispatchesCtEventsFetchFiltered pins that
 // Controller.Apply(ActionCloudTrail) on a Detail screen for an ec2 resource
 // (CloudTrailKey "ResourceName:ID") dispatches a KindFetchFiltered task
-// scoped to "ct-events" carrying the BuildCloudTrailFilter-derived filter —
-// handleActionCloudTrail (actions_view.go:294) had zero test references
-// anywhere in the repo before this pin.
+// scoped to "ct-events" carrying the BuildCloudTrailFilter-derived filter.
 func Test_ActionCloudTrail_Detail_DispatchesCtEventsFetchFiltered(t *testing.T) {
 	res := resource.Resource{ID: "i-cloudtrail-key-0001", Name: "cloudtrail-key-instance"}
 	c := newDetailController(t, res, "ec2")
@@ -742,17 +592,8 @@ func Test_ActionCloudTrail_NoCloudTrailKey_DispatchesNothing(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// 8. Boundary end-clamp on ActionMoveDown/ActionMoveUp.
-// ---------------------------------------------------------------------------
-
 // Test_DetailController_MoveDown_ClampsAtLastField pins the boundary
-// guard in applyDetailActions (detail_cursor.go:77,
-// "if ds.FieldCursor < fieldCount-1") — the live replacement for
-// detail_boundary_spec008_test.go's TestDetail_008_JAtLastField_CursorClamped
-// / TestDetail_008_JAtLastField_10Fields, which drive the legacy DetailModel
-// j/k Update path. detail_livepath_migration_test.go only pins the
-// skip-over-sections loop, never this edge clamp.
+// guard in applyDetailActions ("if ds.FieldCursor < fieldCount-1").
 func Test_DetailController_MoveDown_ClampsAtLastField(t *testing.T) {
 	c := newDetailController(t, detailParityEC2Resource(), "ec2")
 
@@ -781,10 +622,7 @@ func Test_DetailController_MoveDown_ClampsAtLastField(t *testing.T) {
 }
 
 // Test_DetailController_MoveUp_ClampsAtFirstField pins the symmetric
-// guard for ActionMoveUp (detail_cursor.go:55, "if ds.FieldCursor > 0") —
-// the live replacement for detail_boundary_spec008_test.go's
-// TestDetail_008_KAtFirstField_CursorClamped /
-// TestDetail_008_KAtFirstField_MultipleKPresses.
+// guard for ActionMoveUp ("if ds.FieldCursor > 0").
 func Test_DetailController_MoveUp_ClampsAtFirstField(t *testing.T) {
 	c := newDetailController(t, detailParityEC2Resource(), "ec2")
 
@@ -801,11 +639,6 @@ func Test_DetailController_MoveUp_ClampsAtFirstField(t *testing.T) {
 		t.Errorf("FieldCursor after 5x ActionMoveUp at the top boundary = %d, want clamped at 0", got)
 	}
 }
-
-// ---------------------------------------------------------------------------
-// 10. Wave2 S4/S5 — full Detail sentence renders alongside Phrase, and
-//     falls back to Phrase-only when Detail is empty.
-// ---------------------------------------------------------------------------
 
 // wave3AttentionRowsForCode returns the Path=="Attention" IndentLevel==1
 // FieldRow(s) for the given finding phrase, in the order buildAttentionEntries
@@ -839,8 +672,8 @@ func wave3AttentionRowsForCode(body *app.DetailBody, phraseSubstr string) []app.
 
 // Test_DetailAttention_RendersFullDetailSentence_AlongsidePhrase pins
 // that when Finding.Detail is non-empty, buildAttentionSectionDetail
-// (detail_body.go:330) emits further Attention sub-rows carrying the full S5
-// operator sentence, in addition to the S4 Phrase row.
+// (detail_body.go) emits further Attention sub-rows carrying the full
+// operator sentence, in addition to the Phrase row.
 func Test_DetailAttention_RendersFullDetailSentence_AlongsidePhrase(t *testing.T) {
 	// Read the definition rather than build the sentence here: catalog.Detail
 	// is the one owner, and a literal copy in this test would silently
@@ -887,8 +720,7 @@ func Test_DetailAttention_RendersFullDetailSentence_AlongsidePhrase(t *testing.T
 
 // Test_DetailAttention_FallsBackToPhrase_WhenDetailEmpty pins that when
 // Finding.Detail == "", only the phrase row is emitted — no stray empty
-// detail row — the live replacement for wave2_risk_text_s4_s5_test.go's
-// TestWave2_DetailAttention_FallsBackToPhrase_WhenDetailEmpty.
+// detail row.
 func Test_DetailAttention_FallsBackToPhrase_WhenDetailEmpty(t *testing.T) {
 	res := resource.Resource{ID: "i-nodep-wave3-1", Name: "worker-nodetail-wave3"}
 	c := newDetailController(t, res, "ec2")
@@ -909,20 +741,6 @@ func Test_DetailAttention_FallsBackToPhrase_WhenDetailEmpty(t *testing.T) {
 		t.Fatalf("expected exactly 1 Attention row (phrase only, no Detail sentence) when Finding.Detail is empty, got %d: %+v", len(rows), rows)
 	}
 }
-
-// ---------------------------------------------------------------------------
-// 18. Survivors relocated from detail_render_parity_test.go (Scope C, wave3
-// detail-family cleanup, specs/022-codebase-cleanup): that file's byte-parity
-// comparison tests (View() == RenderDetail(body)) became meaningless once
-// View() was scheduled for deletion — TestWave3_RenderDetail_Golden_
-// FieldsAttentionRelatedPanel above is the required replacement pin per
-// wave3-map-detail.md's HARD BLOCKER note, and it already depends on the
-// helpers below. Rather than leave a near-empty detail_render_parity_test.go
-// behind, or duplicate these helpers, they're relocated here alongside their
-// only other callers (detail_livepath_migration_test.go,
-// detail_controller_scroll_follow_test.go, app_detail_attention_cursor_test.go,
-// app_related_cursor_skip_test.go — same package, unaffected by the move).
-// ---------------------------------------------------------------------------
 
 // newDetailController builds a Controller with a ScreenDetail on the stack for
 // the given resource and type, ready to call Snapshot().Body.Detail.
@@ -970,7 +788,7 @@ func detailParityEC2Resource() resource.Resource {
 	}
 }
 
-// detailParityBrokenFinding returns a SevBroken finding for parity testing.
+// detailParityBrokenFinding returns a SevBroken finding.
 func detailParityBrokenFinding() *domain.Finding {
 	return &domain.Finding{
 		Code:     "kms.key-unavailable",
@@ -990,11 +808,7 @@ func detailParityAttentionDetail() *domain.AttentionDetail {
 	}
 }
 
-// Test_RenderDetail_RelatedPanel_ScrollExceedsRowCount is ported from
-// detail_render_parity_test.go's TestDetailRenderParity_RelatedPanel_
-// ScrollExceedsRowCount (Scope C) onto the NewTransientDetail seam (that test
-// only ever used views.NewDetail(...) to reach m.RenderDetail(body); it never
-// asserted View() parity). Pins a real production panic: when the related
+// Test_RenderDetail_RelatedPanel_ScrollExceedsRowCount: when the related
 // panel's row count shrinks (e.g. a re-render after rows are filtered or
 // reloaded) while RelatedScroll still points past the new end,
 // renderRelatedPanel must clamp the scroll window instead of slicing
@@ -1036,14 +850,6 @@ func Test_RenderDetail_RelatedPanel_ScrollExceedsRowCount(t *testing.T) {
 		t.Errorf("expected clamped related panel to still show row %q, got:\n%s", "vpc", got)
 	}
 }
-
-// ---------------------------------------------------------------------------
-// 19. Detail footer-hint exact shape: Controller.buildDetailFooterHints,
-// surfaced via Snapshot().Footer. Unlike TestWave3_FooterHints_Detail_* above
-// (which only assert a single hint's presence), these two pin the FULL
-// exact-order hint list for a plain unregistered type with/without related
-// defs.
-// ---------------------------------------------------------------------------
 
 func Test_DetailFooterHints_PlainField_NoRelated(t *testing.T) {
 	res := resource.Resource{ID: "test-id", Name: "test-resource"}
@@ -1098,17 +904,13 @@ func Test_DetailFooterHints_PlainField_WithRelated(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// 20. Detail cursor identity on finding CLEAR: Controller.applyFindingToState's
-// FieldCursor delta-adjustment (core/app/detail_state.go) is pinned for the
-// ADD direction by app_detail_attention_cursor_test.go's
+// Test_DetailCursor_ClearFinding_PreservesCursorIdentity: when a finding is
+// removed and the Attention block shrinks, applyFindingToState's FieldCursor
+// delta-adjustment (core/app/detail_state.go) keeps FieldCursor on the same
+// logical field rather than shifting it onto a different row. The ADD
+// direction is pinned by app_detail_attention_cursor_test.go's
 // TestApplyDetailFinding_CursorStaysOnSameFieldAcrossMixedSeverityAttentionSort
-// (same package — reuses its fieldRowAt helper). This pins the CLEAR/shrink
-// direction: when a finding is removed and the Attention block shrinks,
-// FieldCursor must stay on the same logical field, not shift onto a
-// different row. RenderDetail(body) is a pure function of one immutable
-// DetailBody snapshot (FieldCursor already final by construction), so there
-// is no second mutable paint step that can race with cursor relocation.
+// (same package — reuses its fieldRowAt helper).
 func Test_DetailCursor_ClearFinding_PreservesCursorIdentity(t *testing.T) {
 	res := resource.Resource{
 		ID:   "db-2",
@@ -1160,17 +962,6 @@ func Test_DetailCursor_ClearFinding_PreservesCursorIdentity(t *testing.T) {
 			preCursor, preRow.Key, preRow.Path, postCursor, postRow.Key, postRow.Path)
 	}
 }
-
-// ---------------------------------------------------------------------------
-// 5. ct-events render-level ports — live-seam replacements for
-//    views_detail_ct_events_test.go (022-codebase-cleanup wave 3, DetailModel
-//    cluster, now deleted). Section-order/severity/target-navigability pins
-//    already have MORE precise pure-logic equivalents (ctevent_sections_test.go,
-//    ctevent_target_test.go) and were deleted rather than ported. These 5
-//    render-only behaviors have no pure-logic equivalent — they depend on
-//    buildDetailFieldItems' fallback/error wiring and the RenderDetail frame
-//    composition, so they stay pinned on the live NewTransientDetail seam.
-// ---------------------------------------------------------------------------
 
 // minimalCTJSON is the minimum valid CloudTrail event JSON for a Management
 // AwsApiCall. Uses synthetic account ID 111111111111 (no real data).
@@ -1226,11 +1017,10 @@ func wave3RenderDetailFor(t *testing.T, res resource.Resource, resourceType stri
 	return m.RenderDetail(*body)
 }
 
-// Test_CTEvents_NoRawJSON_FallsBackToGenericFields is the live-seam
-// replacement for TestDetailViewCTEvents_NoRawJSON_RendersFlatFields: a bare
-// ct-events stub (no CloudTrailEvent JSON — e.g. a cached drill-in stub)
-// must fall back to the generic Fields projector via buildDetailFieldItems'
-// "sections empty -> generic(r)" branch, not render "No detail data available".
+// Test_CTEvents_NoRawJSON_FallsBackToGenericFields: a bare ct-events stub
+// (no CloudTrailEvent JSON — e.g. a cached drill-in stub) must fall back to
+// the generic Fields projector via buildDetailFieldItems' "sections empty ->
+// generic(r)" branch, not render "No detail data available".
 func Test_CTEvents_NoRawJSON_FallsBackToGenericFields(t *testing.T) {
 	res := resource.Resource{
 		ID:   "evt-fallback-000",
@@ -1257,11 +1047,10 @@ func Test_CTEvents_NoRawJSON_FallsBackToGenericFields(t *testing.T) {
 	}
 }
 
-// Test_CTEvents_BrokenRawJSON_SurfacesExplicitError is the live-seam
-// replacement for TestDetailViewCTEvents_BrokenRawJSON_SurfacesExplicitError
-// (#280): a non-empty but unparseable CloudTrailEvent JSON blob must surface
-// ctevent.Project's explicit "unable to parse" error section rather than
-// silently degrading to the flat Fields path.
+// Test_CTEvents_BrokenRawJSON_SurfacesExplicitError: a non-empty but
+// unparseable CloudTrailEvent JSON blob must surface ctevent.Project's
+// explicit "unable to parse" error section rather than silently degrading to
+// the flat Fields path.
 func Test_CTEvents_BrokenRawJSON_SurfacesExplicitError(t *testing.T) {
 	broken := `{"eventVersion":"1.08","eventName":` // truncated — parser should error
 	ct := cloudtrailtypes.Event{
@@ -1277,10 +1066,9 @@ func Test_CTEvents_BrokenRawJSON_SurfacesExplicitError(t *testing.T) {
 	}
 }
 
-// Test_CTEvents_NonCTEventsUnaffected is the live-seam replacement for
-// TestDetailViewCTEvents_NonCTEventsUnaffected: an ec2 resource's detail
-// render must not contain ct-events section labels — the ctevent.Project
-// branch is gated strictly on resourceType == "ct-events".
+// Test_CTEvents_NonCTEventsUnaffected: an ec2 resource's detail render must
+// not contain ct-events section labels — the ctevent.Project branch is gated
+// strictly on resourceType == "ct-events".
 func Test_CTEvents_NonCTEventsUnaffected(t *testing.T) {
 	res := resource.Resource{
 		ID:   "i-0aabbccdd11223344",
@@ -1300,10 +1088,8 @@ func Test_CTEvents_NonCTEventsUnaffected(t *testing.T) {
 	}
 }
 
-// Test_CTEvents_FrameBorderPresent is the live-seam replacement for
-// TestDetailViewCTEvents_Regression_FrameBorder: a regression guard for the
-// hasSectionItems() bypass bug where section-based field lists skipped the
-// frame wrapper entirely (no │ border character in the output).
+// Test_CTEvents_FrameBorderPresent: a section-based field list renders
+// inside the frame wrapper (│ border present).
 func Test_CTEvents_FrameBorderPresent(t *testing.T) {
 	ct := cloudtrailtypes.Event{
 		EventId:         new("abc12345-0000-0000-0000-000000000009"),
@@ -1318,18 +1104,11 @@ func Test_CTEvents_FrameBorderPresent(t *testing.T) {
 	}
 }
 
-// Test_CTEvents_RelatedRightColumnVisibleOnWideTerminal: the RELATED
-// right-column panel must be composed into the render for a ct-events detail
-// on a wide terminal, relying on production's real
-// resource.GetRelated("ct-events") registration (no test-only defs).
-// ---------------------------------------------------------------------------
-// 21. Scalar NavID extraction: the live path is projection.buildItems via
-// buildDetailFieldItems (detail_body.go), which populates the NavID-from-value
-// post-processing on app.FieldRow for top-level scalar navigable fields as
-// well as YAML sub-fields (IsSubField=true), so a Lambda Role ARN's NavID is
-// the bare role name and navigation does not use the full ARN as the target
-// ID.
-// ---------------------------------------------------------------------------
+// The live NavID path is projection.buildItems via buildDetailFieldItems
+// (detail_body.go), which applies NavID-from-value on app.FieldRow for
+// top-level scalar navigable fields as well as YAML sub-fields
+// (IsSubField=true), so a Lambda Role ARN's NavID is the bare role name
+// rather than the full ARN.
 
 func wave3LambdaViewConfig() *config.ViewsConfig {
 	return &config.ViewsConfig{
@@ -1357,9 +1136,6 @@ func wave3FindFieldRow(fields []app.FieldRow, pathOrKey string) *app.FieldRow {
 	return nil
 }
 
-// Test_DetailFieldItems_ScalarNavigableField_AppliesNavIDFromValue is the
-// live-seam replacement for detail_scalar_navid_test.go's
-// TestBuildFieldList_ScalarNavigableField_AppliesNavIDFromValue.
 func Test_DetailFieldItems_ScalarNavigableField_AppliesNavIDFromValue(t *testing.T) {
 	const roleARN = "arn:aws:iam::123456789012:role/my-lambda-role"
 	const wantNavID = "my-lambda-role"
@@ -1410,9 +1186,6 @@ func Test_DetailFieldItems_ScalarNavigableField_AppliesNavIDFromValue(t *testing
 	}
 }
 
-// Test_DetailFieldItems_ScalarNavigableField_NoExtractor_NavIDEmpty is
-// the live-seam replacement for detail_scalar_navid_test.go's
-// TestBuildFieldList_ScalarNavigableField_NoExtractor_NavIDEmpty.
 func Test_DetailFieldItems_ScalarNavigableField_NoExtractor_NavIDEmpty(t *testing.T) {
 	const subnetID = "subnet-0aaa111111111111a"
 
@@ -1462,15 +1235,11 @@ func Test_DetailFieldItems_ScalarNavigableField_NoExtractor_NavIDEmpty(t *testin
 	}
 }
 
-// ---------------------------------------------------------------------------
-// 22. Attention color-cap rule: capTierToRowBucketDetail +
-// ResourceTypeDef.ResolveColor (core/app/detail_body.go), unexported so not
-// directly callable from tests/unit — exercised end-to-end instead via the
-// public ApplyDetailFinding + Snapshot().Body.Detail seam. Pins the
-// universal rule: a `!` severity tier caps to `~` unless the row's own S2
-// color bucket is Broken, so the detail view never contradicts the list
-// row's severity.
-// ---------------------------------------------------------------------------
+// capTierToRowBucketDetail and ResourceTypeDef.ResolveColor
+// (core/app/detail_body.go) are unexported, so the Attention color cap is
+// exercised through ApplyDetailFinding + Snapshot().Body.Detail. A `!`
+// severity tier caps to `~` unless the row's own color bucket is Broken, so
+// the detail view never contradicts the list row's severity.
 
 func wave3AttentionPhraseRowColorTier(t *testing.T, body *app.DetailBody, phraseSubstr string) string {
 	t.Helper()
@@ -1482,7 +1251,7 @@ func wave3AttentionPhraseRowColorTier(t *testing.T, body *app.DetailBody, phrase
 }
 
 // Test_AttentionColorCap_BrokenSeverity_CapsToWarnOnHealthyBucket pins
-// the cap direction: a SevBroken finding ("!" tier) on a resource whose S2
+// the cap direction: a SevBroken finding ("!" tier) on a resource whose
 // color bucket is Healthy (dbc status "") must render capped to "~".
 func Test_AttentionColorCap_BrokenSeverity_CapsToWarnOnHealthyBucket(t *testing.T) {
 	res := resource.Resource{ID: "dbc-cap-healthy", Fields: map[string]string{"status": ""}}
@@ -1501,9 +1270,9 @@ func Test_AttentionColorCap_BrokenSeverity_CapsToWarnOnHealthyBucket(t *testing.
 }
 
 // Test_AttentionColorCap_BrokenSeverity_StaysBrokenOnBrokenBucket pins
-// the non-cap direction: the same SevBroken finding on a resource whose S2
-// color bucket is ALSO Broken (dbc status "failed: cluster operation") must
-// stay "!" — capping only kicks in when it would contradict a less-severe row.
+// the non-cap direction: the same SevBroken finding on a resource whose
+// color bucket is also Broken (dbc status "failed: cluster operation") must
+// stay "!" — capping only applies when it would contradict a less-severe row.
 func Test_AttentionColorCap_BrokenSeverity_StaysBrokenOnBrokenBucket(t *testing.T) {
 	// The row's colour bucket is decided by its findings, so the Broken bucket
 	// this test needs has to be a finding rather than a status string.

@@ -13,10 +13,6 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// ---------------------------------------------------------------------------
-// Route Table fetcher tests
-// ---------------------------------------------------------------------------
-
 func TestFetchRouteTables_ParsesMultipleRouteTables(t *testing.T) {
 	mock := &mockEC2DescribeRouteTablesClient{
 		output: &ec2.DescribeRouteTablesOutput{
@@ -62,7 +58,6 @@ func TestFetchRouteTables_ParsesMultipleRouteTables(t *testing.T) {
 		t.Fatalf("expected 2 resources, got %d", len(resources))
 	}
 
-	// Verify first route table
 	r0 := resources[0]
 	if r0.ID != "rtb-0001" {
 		t.Errorf("resource[0].ID: expected %q, got %q", "rtb-0001", r0.ID)
@@ -77,7 +72,6 @@ func TestFetchRouteTables_ParsesMultipleRouteTables(t *testing.T) {
 		t.Errorf("resource[0].Fields[\"is_main\"]: expected %q, got %q", "true", r0.Fields["is_main"])
 	}
 
-	// Verify Fields on all resources
 	requiredFields := []string{"route_table_id", "name", "vpc_id", "routes_count", "associations_count"}
 	for i, r := range resources {
 		for _, key := range requiredFields {
@@ -87,7 +81,6 @@ func TestFetchRouteTables_ParsesMultipleRouteTables(t *testing.T) {
 		}
 	}
 
-	// Verify specific field values on first route table
 	if r0.Fields["route_table_id"] != "rtb-0001" {
 		t.Errorf("resource[0].Fields[\"route_table_id\"]: expected %q, got %q", "rtb-0001", r0.Fields["route_table_id"])
 	}
@@ -104,7 +97,6 @@ func TestFetchRouteTables_ParsesMultipleRouteTables(t *testing.T) {
 		t.Errorf("resource[0].Fields[\"associations_count\"]: expected %q, got %q", "1", r0.Fields["associations_count"])
 	}
 
-	// Verify second route table (no Name tag, not main)
 	r1 := resources[1]
 	if r1.ID != "rtb-0002" {
 		t.Errorf("resource[1].ID: expected %q, got %q", "rtb-0002", r1.ID)

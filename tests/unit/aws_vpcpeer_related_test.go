@@ -1,24 +1,5 @@
 package unit_test
 
-// aws_vpcpeer_related_test.go — related-resource checker tests for vpc-peer
-// (EC2 VPC Peering Connections) (docs/resources/vpc-peer.md §2,
-// docs/resources/vpc-peer-impl-plan.md §1 "related_targets"). Checkers live
-// in core/aws/vpcpeer_related.go.
-//
-// Three pivots: rtb (cache-scan by Routes[].VpcPeeringConnectionId — the
-// house fleet cache-scan convention, same as lt's checkLTEC2: cache ABSENT
-// is Unknown, cache PRESENT and typed is trusted enough to scan even when
-// truncated, rendering "N+" — the honest lower bound the RelatedEnter arbiter
-// already handles like any other truncated count), vpc (symmetric
-// CACHE-MEMBERSHIP GATE — pivot only for whichever side's VpcId is present
-// in the loaded local "vpc" cache), and ct-events (universal
-// ctEventsCheckerFor("vpc-peer") pivot). sg is explicitly excluded
-// (docs/resources/vpc-peer.md §2).
-//
-// checkerByTarget is shared package-scope test tooling, defined in
-// aws_iam_policies_related_test.go. collectAllPages is shared package-scope
-// test tooling, defined in helpers_external_test.go.
-
 import (
 	"context"
 	"reflect"
@@ -35,10 +16,8 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// vpcPeerResourceByID fetches the real demo page via
-// FetchVpcPeeringConnectionsPage and returns the Resource with the given id,
-// failing the test if absent. vpc-peer is a single-call type with no
-// degraded-row story, so a non-nil error always fails the fetch.
+// vpc-peer is a single-call type with no degraded rows, so any error fails
+// the fetch.
 func vpcPeerResourceByID(t *testing.T, id string) resource.Resource {
 	t.Helper()
 	result, err := awsclient.FetchVpcPeeringConnectionsPage(context.Background(), fakes.NewEC2(), "")
@@ -54,11 +33,8 @@ func vpcPeerResourceByID(t *testing.T, id string) resource.Resource {
 	return resource.Resource{}
 }
 
-// vpcPeerRTBCache builds an "rtb" ResourceCache entry from the REAL demo rtb
-// fixtures (the actual shipped fixture graph — ec2.go's RouteTables — rather
-// than a synthetic stand-in), so the graph-root count tests validate the
-// real cross-references confirmed in docs/resources/vpc-peer-impl-plan.md §2:
-// two routes into ProdPeerSharedID, one blackholed route into
+// vpcPeerRTBCache builds an "rtb" cache entry from the shipped demo route
+// tables: two routes into ProdPeerSharedID, one blackholed route into
 // WarnPeerBlackholeID, none into WarnPeerNoRouteID.
 func vpcPeerRTBCache(t *testing.T) resource.ResourceCache {
 	t.Helper()
@@ -73,10 +49,8 @@ func vpcPeerRTBCache(t *testing.T) resource.ResourceCache {
 	}
 }
 
-// vpcPeerVPCCache builds a "vpc" ResourceCache entry from the REAL demo vpc
-// fixtures (ec2.go's Vpcs), so the vpc gate test validates against the actual
-// local-vpc membership set: fixtProdVPCID is a member, the cross-account
-// remote VPC (vpcPeerRemoteVpcID, unexported in fixtures) never is.
+// vpcPeerVPCCache builds a "vpc" cache entry from the demo VPCs:
+// fixtProdVPCID is a member; the cross-account remote VPC is not.
 func vpcPeerVPCCache(t *testing.T) resource.ResourceCache {
 	t.Helper()
 	rows, err := collectAllPages(func(token string) (resource.FetchResult, error) {
@@ -89,10 +63,6 @@ func vpcPeerVPCCache(t *testing.T) resource.ResourceCache {
 		"vpc": resource.ResourceCacheEntry{Resources: rows},
 	}
 }
-
-// ---------------------------------------------------------------------------
-// Registration
-// ---------------------------------------------------------------------------
 
 func TestRelated_VpcPeer_Registered(t *testing.T) {
 	defs := resource.GetRelated("vpc-peer")
@@ -134,11 +104,6 @@ func TestRelated_VpcPeer_SGNotRegistered(t *testing.T) {
 		}
 	}
 }
-
-// ---------------------------------------------------------------------------
-// rtb — graph-root count 2 (ProdPeerSharedID: rtb-0aaa111111111111a and
-// rtb-0ccc333333333333c both route into it).
-// ---------------------------------------------------------------------------
 
 func TestRelated_VpcPeer_GraphRootRTBCount(t *testing.T) {
 	res := vpcPeerResourceByID(t, fixtures.ProdPeerSharedID)
@@ -203,11 +168,9 @@ func TestRelated_VpcPeer_RTB_AbsentCacheUnknown(t *testing.T) {
 	}
 }
 
-// A truncated-but-typed rtb cache is trusted enough to scan (the house
-// fleet convention pinned by TestRelated_LT_EC2_TruncatedCacheResolvedNotUnknown):
-// State stays RelatedResolved, Count/ResourceIDs report the honest partial
-// scan, and Truncated=true carries through so the row renders "N+" — never
-// RelatedUnknown just because the cache happens to be truncated.
+// A truncated but typed rtb cache is scanned: State stays RelatedResolved,
+// Count and ResourceIDs report the partial scan, and Truncated carries through
+// so the row renders "N+".
 func TestRelated_VpcPeer_RTB_TruncatedCacheResolvedNotUnknown(t *testing.T) {
 	res := vpcPeerResourceByID(t, fixtures.ProdPeerSharedID)
 	cache := vpcPeerRTBCache(t)
@@ -228,12 +191,8 @@ func TestRelated_VpcPeer_RTB_TruncatedCacheResolvedNotUnknown(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// vpc — symmetric CACHE-MEMBERSHIP GATE. ProdPeerSharedID's requester side
-// (fixtProdVPCID) is a local vpc cache member; the accepter side is a
-// cross-account remote VPC never present in the local cache — only the
-// local side becomes a pivot entry.
-// ---------------------------------------------------------------------------
+// The vpc pivot is a membership gate: only a side whose VpcId is in the local
+// vpc cache becomes an entry, so a cross-account accepter never does.
 
 func TestRelated_VpcPeer_GraphRootVPCGate(t *testing.T) {
 	res := vpcPeerResourceByID(t, fixtures.ProdPeerSharedID)
@@ -252,10 +211,8 @@ func TestRelated_VpcPeer_GraphRootVPCGate(t *testing.T) {
 	}
 }
 
-// The gate is symmetric — it must never assume "requester is always local".
-// A synthetic vpc cache containing ONLY the (normally-remote) accepter-side
-// VpcId proves the checker resolves whichever side is actually present, not
-// a hardcoded side.
+// The gate is symmetric: it resolves whichever side is in the cache and never
+// assumes the requester is the local side.
 func TestRelated_VpcPeer_VPCGate_SymmetricNotRequesterHardcoded(t *testing.T) {
 	res := vpcPeerResourceByID(t, fixtures.ProdPeerSharedID)
 	accepterVpcID := aws.ToString(res.RawStruct.(*ec2types.VpcPeeringConnection).AccepterVpcInfo.VpcId)
@@ -306,11 +263,6 @@ func TestRelated_VpcPeer_VPC_AbsentCacheUnknown(t *testing.T) {
 		t.Errorf("State = %v, want RelatedUnknown (no vpc cache entry at all)", result.State())
 	}
 }
-
-// ---------------------------------------------------------------------------
-// ct-events — universal ctEventsCheckerFor("vpc-peer") pivot: deferred,
-// server-side FetchFilter, drillable.
-// ---------------------------------------------------------------------------
 
 func TestRelated_VpcPeer_CtEvents_Drillable(t *testing.T) {
 	res := vpcPeerResourceByID(t, fixtures.ProdPeerSharedID)

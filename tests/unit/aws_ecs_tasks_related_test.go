@@ -29,8 +29,6 @@ func ecsTaskCheckerByTarget(t *testing.T, target string) resource.RelatedChecker
 	return nil
 }
 
-// --- ECS Service checker (Pattern F — Group field) ---
-
 func TestRelated_ECSTask_Service_FromGroup(t *testing.T) {
 	checker := ecsTaskCheckerByTarget(t, "ecs-svc")
 	task := ecstypes.Task{
@@ -106,8 +104,6 @@ func TestRelated_ECSTask_Service_InvalidRawStruct(t *testing.T) {
 	}
 }
 
-// --- ECS Cluster checker (Pattern F — ClusterArn field with ARN fallback) ---
-
 func TestRelated_ECSTask_Cluster_FromArn(t *testing.T) {
 	checker := ecsTaskCheckerByTarget(t, "ecs")
 	task := ecstypes.Task{
@@ -134,7 +130,6 @@ func TestRelated_ECSTask_Cluster_FromArn(t *testing.T) {
 
 func TestRelated_ECSTask_Cluster_NilArn(t *testing.T) {
 	checker := ecsTaskCheckerByTarget(t, "ecs")
-	// No ClusterArn on the struct — fall back to Fields["cluster"]
 	task := ecstypes.Task{}
 	res := resource.Resource{
 		ID: "abc123",
@@ -173,18 +168,12 @@ func TestRelated_ECSTask_Cluster_NoCluster(t *testing.T) {
 	}
 }
 
-// --- Secrets checker (Pattern C — Fields["secret_arns"] cross-referenced
-// against the already-loaded secrets cache, per ecs-task.md:84. The real
-// ecs-task fetcher's RawStruct is ecstypes.Task — DescribeTasks never
-// returns a TaskDefinition — so the join result is only available via
-// Fields["secret_arns"], populated by the fetcher's ecsJoinTaskDefinition
-// join over ContainerDefinitions[].Secrets[].ValueFrom /
-// RepositoryCredentials.CredentialsParameter, filtered to the
-// secretsmanager ARN prefix.) ---
+// The ecs-task RawStruct is ecstypes.Task (DescribeTasks returns no
+// TaskDefinition), so secrets come from Fields["secret_arns"], which the
+// fetcher joins from ContainerDefinitions[].Secrets[].ValueFrom and
+// RepositoryCredentials.CredentialsParameter; the checker cross-references
+// them against the loaded secrets cache.
 
-// TestRelated_ECSTask_Secrets_Match verifies that secretsmanager ARNs in
-// Fields["secret_arns"] are cross-referenced against the loaded secrets
-// cache and returned as ResourceIDs.
 func TestRelated_ECSTask_Secrets_Match(t *testing.T) {
 	const smARN1 = "arn:aws:secretsmanager:us-east-1:123456789012:secret:db-password-AbcXyz"
 	const smARN2 = "arn:aws:secretsmanager:us-east-1:123456789012:secret:api-key-XyzAbc"
@@ -222,8 +211,6 @@ func TestRelated_ECSTask_Secrets_Match(t *testing.T) {
 	}
 }
 
-// TestRelated_ECSTask_Secrets_Empty verifies that an empty
-// Fields["secret_arns"] produces Count=0.
 func TestRelated_ECSTask_Secrets_Empty(t *testing.T) {
 	res := resource.Resource{
 		ID:        "my-task-def:5",
@@ -239,10 +226,6 @@ func TestRelated_ECSTask_Secrets_Empty(t *testing.T) {
 	}
 }
 
-// TestRelated_ECSTask_Secrets_ARNAbsentFromLoadedCache verifies that an ARN
-// present in Fields["secret_arns"] but absent from the loaded secrets cache
-// is not counted — the checker must cross-reference, not trust the field
-// blindly (ecs-task.md:84).
 func TestRelated_ECSTask_Secrets_ARNAbsentFromLoadedCache(t *testing.T) {
 	const smARN = "arn:aws:secretsmanager:us-east-1:123456789012:secret:stale-deleted-AbcXyz"
 	res := resource.Resource{
@@ -263,13 +246,6 @@ func TestRelated_ECSTask_Secrets_ARNAbsentFromLoadedCache(t *testing.T) {
 	}
 }
 
-// --- SSM checker (Pattern C — Fields["ssm_param_names"] cross-referenced
-// against the already-loaded ssm cache, per ecs-task.md:96. Same join as
-// Secrets above, filtered to the ssm ARN prefix / bare parameter name.) ---
-
-// TestRelated_ECSTask_SSM_Match verifies that parameter names in
-// Fields["ssm_param_names"] are cross-referenced against the loaded ssm
-// cache and returned as ResourceIDs.
 func TestRelated_ECSTask_SSM_Match(t *testing.T) {
 	const param1 = "prod/db/host"
 	const param2 = "prod/api/key"
@@ -307,8 +283,6 @@ func TestRelated_ECSTask_SSM_Match(t *testing.T) {
 	}
 }
 
-// TestRelated_ECSTask_SSM_Empty verifies that an empty
-// Fields["ssm_param_names"] produces Count=0.
 func TestRelated_ECSTask_SSM_Empty(t *testing.T) {
 	res := resource.Resource{
 		ID:        "my-task-def:5",
@@ -324,9 +298,6 @@ func TestRelated_ECSTask_SSM_Empty(t *testing.T) {
 	}
 }
 
-// TestRelated_ECSTask_SSM_NameAbsentFromLoadedCache verifies that a name
-// present in Fields["ssm_param_names"] but absent from the loaded ssm cache
-// is not counted (ecs-task.md:96).
 func TestRelated_ECSTask_SSM_NameAbsentFromLoadedCache(t *testing.T) {
 	res := resource.Resource{
 		ID:        "my-task-def:5",
@@ -345,10 +316,6 @@ func TestRelated_ECSTask_SSM_NameAbsentFromLoadedCache(t *testing.T) {
 		t.Errorf("Count = %d, want 0 (parameter name not present in loaded ssm cache)", result.Count())
 	}
 }
-
-// ---------------------------------------------------------------------------
-// checkECSTaskAlarm — cache-based, TaskId or TaskArn dimension contains taskID
-// ---------------------------------------------------------------------------
 
 func TestRelated_ECSTask_Alarm_MatchByTaskIdDimension(t *testing.T) {
 	taskID := "abc123def456"
@@ -439,10 +406,6 @@ func TestRelated_ECSTask_Alarm_NilCache(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// checkECSTaskCTEvents — cache-based, ResourceName contains taskID
-// ---------------------------------------------------------------------------
-
 func TestRelated_ECSTask_CTEvents_Match(t *testing.T) {
 	taskID := "abc123def456"
 	evRes := resource.Resource{
@@ -517,10 +480,6 @@ func TestRelated_ECSTask_CTEvents_NilCache(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// checkECSTaskEC2 — the container instance's Ec2InstanceId
-// ---------------------------------------------------------------------------
-
 // The container-instance UUID is not an EC2 instance ID, and without an ECS
 // client the instance behind it is unknown.
 func TestRelated_ECSTask_EC2_MatchFromContainerInstanceArn(t *testing.T) {
@@ -576,10 +535,6 @@ func TestRelated_ECSTask_EC2_InvalidRawStruct(t *testing.T) {
 		t.Errorf("Count = %d, want -1 (invalid RawStruct)", result.Count())
 	}
 }
-
-// ---------------------------------------------------------------------------
-// checkECSTaskECR — ECR repo names from container image URIs
-// ---------------------------------------------------------------------------
 
 func TestRelated_ECSTask_ECR_MatchSingleRepo(t *testing.T) {
 	task := ecstypes.Task{
@@ -653,10 +608,6 @@ func TestRelated_ECSTask_ECR_StripsTagFromRepo(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// checkECSTaskENI — ENI IDs from task attachments (awsvpc mode)
-// ---------------------------------------------------------------------------
-
 func TestRelated_ECSTask_ENI_MatchFromAttachment(t *testing.T) {
 	task := ecstypes.Task{
 		Attachments: []ecstypes.Attachment{
@@ -715,10 +666,6 @@ func TestRelated_ECSTask_ENI_AttachmentWrongType(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// checkECSTaskSubnet — subnet IDs from task attachments (awsvpc mode)
-// ---------------------------------------------------------------------------
-
 func TestRelated_ECSTask_Subnet_MatchFromAttachment(t *testing.T) {
 	task := ecstypes.Task{
 		Attachments: []ecstypes.Attachment{
@@ -767,15 +714,9 @@ func TestRelated_ECSTask_Subnet_InvalidRawStruct(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// checkECSTaskSG — Task -> ENI -> SG cross-reference (ecs-task.md:90): derive
-// the task's ENI id from task.Attachments, read Fields["security_groups"] on
-// the matched eni cache row, then cross-reference the sg cache by ID. No
-// extra API call beyond what the eni cache already consumed.
-// ---------------------------------------------------------------------------
+// SGs resolve Task -> ENI (task.Attachments) -> Fields["security_groups"] on
+// the eni cache row -> sg cache, with no API call beyond the eni cache's.
 
-// TestRelated_ECSTask_SG_ViaENICrossReference verifies that SG IDs are
-// resolved through the task's ENI attachment, not read directly off Task.
 func TestRelated_ECSTask_SG_ViaENICrossReference(t *testing.T) {
 	task := ecstypes.Task{
 		Attachments: []ecstypes.Attachment{
@@ -814,8 +755,6 @@ func TestRelated_ECSTask_SG_ViaENICrossReference(t *testing.T) {
 	}
 }
 
-// TestRelated_ECSTask_SG_NoAttachmentsReturnsZero verifies Count=0 when the
-// task has no ENI attachment at all (e.g. bridge/host networking).
 func TestRelated_ECSTask_SG_NoAttachmentsReturnsZero(t *testing.T) {
 	task := ecstypes.Task{}
 	res := resource.Resource{ID: "task-abc", RawStruct: task}

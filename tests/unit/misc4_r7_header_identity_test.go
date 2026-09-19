@@ -2,13 +2,9 @@
 
 package unit_test
 
-// misc4_r7_header_identity_test.go — misc4 row 7.
-//
-// The header's error arm reserved all but six columns for the message, which
-// left the frame renderer nothing to put the left side in: the profile and
-// region were truncated away. "Which account am I looking at" outranks the
-// text of one failure, and it is the question the operator cannot answer from
-// anywhere else on the screen.
+// The header's error slot leaves room for the profile and region: "which
+// account am I looking at" outranks the text of one failure, and the operator
+// cannot answer it from anywhere else on the screen.
 
 import (
 	"strings"
@@ -46,8 +42,7 @@ func TestHeaderKeepsAccountIdentityUnderALongError(t *testing.T) {
 	}
 }
 
-// TestHeaderShowsAShortErrorWhole pins that capping the error slot did not
-// start truncating messages that always fitted.
+// TestHeaderShowsAShortErrorWhole pins that a short error renders whole.
 func TestHeaderShowsAShortErrorWhole(t *testing.T) {
 	header := misc4HeaderLine(t, 120, "Error: load failed")
 	if !strings.Contains(header, "Error: load failed") {

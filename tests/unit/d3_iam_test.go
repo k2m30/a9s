@@ -1,10 +1,5 @@
 package unit
 
-// d3_iam_test.go — rows 1, 2, 3, 4 and 12: a swallowed key error, rows that
-// restate their phrase, policy-document attribute names used as labels, a
-// drilled role that cannot report what the listed one does, and three policy
-// decoders that disagree about a literal '+'.
-
 import (
 	"context"
 	"errors"
@@ -31,8 +26,6 @@ const (
 	d3CodePolicyAdmin   domain.FindingCode = "iam-policy.admin-star"
 	d3CodeRoleInline    domain.FindingCode = "role.inline-privilege-escalation"
 )
-
-// --- rows 1 and 2: the iam-user enricher ------------------------------------
 
 // d3UserFake serves the user enricher. Every user has a console password and
 // no MFA device unless said otherwise, so the rows under test are reachable
@@ -134,10 +127,10 @@ func d3EnrichUsersErr(t *testing.T, fake *d3UserFake, rs []resource.Resource) (a
 		&awsclient.ServiceClients{IAM: fake, Region: "us-east-1"}, rs, nil)
 }
 
-// TestD3KeyLastUsedErrorMarksTheUserUnknown pins row 1: a GetAccessKeyLastUsed
-// that fails leaves the key's idleness unknown, so the user must read as
-// unknown rather than clean. Swallowing the error is how a user with a
-// forgotten key renders healthy.
+// TestD3KeyLastUsedErrorMarksTheUserUnknown: a GetAccessKeyLastUsed that
+// fails leaves the key's idleness unknown, so the user must read as unknown
+// rather than clean. Swallowing the error is how a user with a forgotten key
+// renders healthy.
 func TestD3KeyLastUsedErrorMarksTheUserUnknown(t *testing.T) {
 	fake := &d3UserFake{
 		withMFA: map[string]bool{"acme-batch-user": true, "acme-ci-user": true},
@@ -171,9 +164,9 @@ func TestD3KeyLastUsedErrorMarksTheUserUnknown(t *testing.T) {
 		catalog.Phrase(d3CodeUserKeyUnused), domain.SevWarn, "wave2")
 }
 
-// TestD3UserRowsDoNotRestateTheirPhrase pins row 2: a supporting row exists to
-// add the fact the phrase leaves out. A row that repeats the phrase word for
-// word costs a line and tells the operator nothing.
+// TestD3UserRowsDoNotRestateTheirPhrase: a supporting row exists to add the
+// fact the phrase leaves out. A row that repeats the phrase word for word
+// costs a line and tells the operator nothing.
 func TestD3UserRowsDoNotRestateTheirPhrase(t *testing.T) {
 	fake := &d3UserFake{
 		keys: map[string][]iamtypes.AccessKeyMetadata{
@@ -207,8 +200,6 @@ func TestD3UserRowsDoNotRestateTheirPhrase(t *testing.T) {
 	})
 }
 
-// --- row 3: the policy enricher's labels ------------------------------------
-
 type d3PolicyFake struct {
 	awsclient.IAMAPI
 	docs map[string]string
@@ -239,9 +230,9 @@ func (f *d3PolicyFake) GetPolicyVersion(
 
 var _ awsclient.IAMAPI = (*d3PolicyFake)(nil)
 
-// TestD3AdminPolicyRowsUsePlainWords pins row 3: the two supporting rows on an
-// admin policy are read by an operator, so their labels are words rather than
-// the attribute names the policy document happens to use.
+// TestD3AdminPolicyRowsUsePlainWords: the two supporting rows on an admin
+// policy are read by an operator, so their labels are words rather than the
+// attribute names the policy document happens to use.
 func TestD3AdminPolicyRowsUsePlainWords(t *testing.T) {
 	const arn = "arn:aws:iam::123456789012:policy/acme-break-glass"
 	fake := &d3PolicyFake{docs: map[string]string{
@@ -290,8 +281,6 @@ func TestD3PrivEscStatusReadsAsWords(t *testing.T) {
 		t.Errorf("risk = %q, want %q", got, "privilege escalation")
 	}
 }
-
-// --- row 4: a drilled role reports what a listed one does -------------------
 
 const d3InlinePrivEscDoc = `{"Version":"2012-10-17","Statement":[` +
 	`{"Effect":"Allow","Action":"iam:CreateLoginProfile","Resource":"*"}]}`
@@ -342,10 +331,10 @@ func (f *d3RoleFake) GetRolePolicy(
 
 var _ awsclient.IAMAPI = (*d3RoleFake)(nil)
 
-// TestD3DrilledRoleCarriesTheSameFindingsAsTheListedOne pins row 4: the same
-// role must read the same whether it arrived in a list page or was opened
-// from another view. A finding that only one path can compute makes the
-// verdict depend on how the operator navigated.
+// TestD3DrilledRoleCarriesTheSameFindingsAsTheListedOne: the same role must
+// read the same whether it arrived in a list page or was opened from another
+// view. A finding that only one path can compute makes the verdict depend on
+// how the operator navigated.
 func TestD3DrilledRoleCarriesTheSameFindingsAsTheListedOne(t *testing.T) {
 	const name = "acme-pipeline-builder-role"
 	created := time.Now().Add(-365 * 24 * time.Hour)
@@ -386,18 +375,14 @@ func TestD3DrilledRoleCarriesTheSameFindingsAsTheListedOne(t *testing.T) {
 		catalog.Phrase(d3CodeRoleInline), domain.SevBroken, "wave1")
 }
 
-// --- row 12: one decoder ----------------------------------------------------
-
 // d3PlusDoc carries a literal '+' inside a resource ARN. Path-style
 // unescaping keeps it; query-style turns it into a space, which is how the
 // same document comes out differently depending on which site read it.
 const d3PlusDoc = `{"Version":"2012-10-17","Statement":[{"Effect":"Allow",` +
 	`"Action":"s3:GetObject","Resource":"arn:aws:s3:::acme-reports/q1+q2/*"}]}`
 
-// TestD3PolicyDocumentDecodesIdenticallyEverywhere pins row 12: a document
-// with a literal '+' must read the same at every site that decodes one.
-// Today the role fetcher unescapes query-style and turns the '+' into a
-// space, so the same trust policy reads differently there than in iampolicy.
+// TestD3PolicyDocumentDecodesIdenticallyEverywhere: a document with a
+// literal '+' must read the same at every site that decodes one.
 func TestD3PolicyDocumentDecodesIdenticallyEverywhere(t *testing.T) {
 	encoded := url.PathEscape(d3PlusDoc)
 	const want = "acme-reports/q1+q2/*"

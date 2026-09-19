@@ -1,6 +1,3 @@
-// aws_related_checker_mechanism_test.go pins the related-panel checker
-// mechanism quoted from the golden per-type specs in docs/resources/*.md,
-// driven on realistic data.
 package unit_test
 
 import (
@@ -22,18 +19,10 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// ---------------------------------------------------------------------------
-// 1. checkECSSvcELB — ecs-svc.md:66
-//
-// "resolve via Service.LoadBalancers[].TargetGroupArn -> the already-loaded
-// tg list -> TargetGroup.LoadBalancerArns[] -> cross-reference the
-// already-loaded elb list by LoadBalancer.LoadBalancerArn"
-//
-// At HEAD the final step matches elbRes.ID (a bare LB *name*, per
-// core/aws/elb.go's `ID: lbName`) against the LoadBalancerArns set (full
-// ARNs) — an ID/ARN type mismatch that can never match on real data. The
-// correct mechanism cross-references Fields["load_balancer_arn"].
-// ---------------------------------------------------------------------------
+// checkECSSvcELB resolves Service.LoadBalancers[].TargetGroupArn → the tg
+// list → TargetGroup.LoadBalancerArns[] → elb rows by
+// Fields["load_balancer_arn"]. An elb row's ID is the bare LB name, never an
+// ARN.
 
 func TestECSSvc_Related_ELB_MatchesByLoadBalancerArnField(t *testing.T) {
 	tgArn := "arn:aws:elasticloadbalancing:us-east-1:123456789012:targetgroup/checkout-tg/abc123"
@@ -81,19 +70,9 @@ func TestECSSvc_Related_ELB_MatchesByLoadBalancerArnField(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// 2. checkLambdaTG — lambda.md:169
-//
-// "cross-reference the tg list -- for each TG with TargetType==lambda, call
-// DescribeTargetHealth and match Targets[].Id==FunctionArn."
-//
-// At HEAD the checker never calls DescribeTargetHealth at all — it matches
-// on Fields["lambda_function_name"] / Fields["target_arn"] suffix, fields
-// the tg fetcher does not populate for Lambda targets. On realistic data
-// (TG with TargetType==lambda, no lambda_function_name field) this always
-// returns Count:0 even when DescribeTargetHealth would report the function
-// as a live target.
-// ---------------------------------------------------------------------------
+// checkLambdaTG calls DescribeTargetHealth for each tg with
+// TargetType==lambda and matches Targets[].Id against the FunctionArn; the tg
+// fetcher carries no function name for a Lambda target.
 
 type fakeELBv2TargetHealth struct {
 	healthByTG map[string][]elbv2types.TargetHealthDescription
@@ -206,31 +185,11 @@ func TestLambda_Related_TG_InstanceTargetTypeSkipsDescribeTargetHealth(t *testin
 	}
 }
 
-// NOTE: checkLambdaENI (lambda.md:84, "cross-reference the eni list --
-// match RequesterId=='AWS Lambda VPC ENI' / Description starting with 'AWS
-// Lambda VPC ENI-<FunctionName>-'") requires BOTH the requester_id gate and
-// the description prefix. Regression coverage for the two-field mechanism
-// (including the requester_id-missing negative case) lives in
-// aws_lambda_related_extra_test.go's TestRelated_Lambda_ENI_* tests, not
-// here.
+// checkLambdaECR reads Code.ImageUri from GetFunction: ListFunctions and
+// FunctionConfiguration do not carry it.
 
-// ---------------------------------------------------------------------------
-// 4. checkLambdaECR — lambda.md:72
-//
-// "PackageType==Image; the image URI is returned by GetFunction under
-// Code.ImageUri (not on ListFunctions/FunctionConfiguration). Parse the
-// repository name from the URI ... and cross-reference the ecr list."
-//
-// At HEAD the checker reads res.Fields["image_uri"], which is never
-// populated by the lambda fetcher (ListFunctions does not carry ImageUri),
-// so this pivot is permanently State: RelatedUnknown for every real Image-package
-// function. The correct mechanism calls GetFunction for this one function.
-// ---------------------------------------------------------------------------
-
-// fakeLambdaGetFunctionAPI implements the aws.LambdaAPI surface, serving a
-// single named function's Code.ImageUri from GetFunction — the call
-// checkLambdaECR must make per spec, since ImageUri is not present on
-// ListFunctions/FunctionConfiguration.
+// fakeLambdaGetFunctionAPI serves one named function's Code.ImageUri from
+// GetFunction.
 type fakeLambdaGetFunctionAPI struct {
 	functionName string
 	imageURI     string
@@ -320,19 +279,9 @@ func TestLambda_Related_ECR_ZipPackageReturnsZeroNoGetFunctionCall(t *testing.T)
 	}
 }
 
-// ---------------------------------------------------------------------------
-// 5. checkLambdaCF — lambda.md:42
-//
-// "cross-reference cf distribution config -- match
-// DefaultCacheBehavior.LambdaFunctionAssociations[].LambdaFunctionARN and
-// each CacheBehaviors[].LambdaFunctionAssociations[] against the function's
-// versioned ARN."
-//
-// At HEAD the checker matches cfRes.Fields["lambda_function_arn"] against
-// the function's UNVERSIONED ARN exactly. Real CloudFront associations
-// always reference a versioned ARN (":function:name:N"), so an exact
-// unversioned-ARN match never fires on real data.
-// ---------------------------------------------------------------------------
+// checkLambdaCF matches CloudFront LambdaFunctionAssociations against the
+// function's versioned ARN: a CloudFront association always references
+// ":function:name:N".
 
 func TestLambda_Related_CF_MatchesVersionedArnPrefix(t *testing.T) {
 	fnArn := "arn:aws:lambda:us-east-1:123456789012:function:my-fn"
@@ -365,19 +314,11 @@ func TestLambda_Related_CF_MatchesVersionedArnPrefix(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// 6. ECS task role/secrets/ssm/sg — ecs-task.md:78/84/96/90
-//
-// The real ECS-task fetcher stores RawStruct = ecstypes.Task (confirmed by
-// checkECSTaskService/Cluster asserting ecstypes.Task), never
-// ecstypes.TaskDefinition. checkECSTaskSecrets/checkECSTaskSSM at HEAD
-// unconditionally return Count:0 whenever RawStruct is ecstypes.Task — a
-// silent-zero on every real task. Per the DescribeTaskDefinition join the
-// fetcher will additionally emit Fields["task_role"], ["execution_role"],
-// ["secret_arns"], ["ssm_param_names"].
-// checkECSTaskSG at HEAD ignores the cache entirely and always returns 0;
-// spec ecs-task.md:90 requires a Task -> ENI -> SG cross-reference.
-// ---------------------------------------------------------------------------
+// The ECS-task fetcher stores RawStruct = ecstypes.Task, never a
+// TaskDefinition. Roles, secrets and SSM parameters come from the
+// DescribeTaskDefinition join as Fields["task_role"], ["execution_role"],
+// ["secret_arns"] and ["ssm_param_names"]. The SG pivot cross-references
+// Task → ENI → SG.
 
 func mechanismECSTaskFixture(id string) ecstypes.Task {
 	return ecstypes.Task{
@@ -388,15 +329,8 @@ func mechanismECSTaskFixture(id string) ecstypes.Task {
 	}
 }
 
-// TestECSTask_Related_Role_CrossReferencesLoadedRoleCache verifies the
-// checker actually "cross-reference[s] the already-loaded role list by ARN"
-// (ecs-task.md:79) rather than blindly trusting any ARN-shaped value in
-// Fields["task_role"]/["execution_role"]. At HEAD the checker ignores its
-// cache argument entirely (see the discarded "_ resource.ResourceCache"
-// parameter in checkECSTaskRole) and always reports both roles as found —
-// even a stale/garbage ARN with no matching entry in the role cache is
-// counted. A real cross-reference must not report a role that the loaded
-// role list does not contain.
+// A role ARN counts only when the loaded role list contains it: a stale ARN
+// (a role deleted after the task started) names no related role.
 func TestECSTask_Related_Role_CrossReferencesLoadedRoleCache(t *testing.T) {
 	task := mechanismECSTaskFixture("abc123")
 	taskRes := resource.Resource{
@@ -409,8 +343,6 @@ func TestECSTask_Related_Role_CrossReferencesLoadedRoleCache(t *testing.T) {
 		},
 	}
 
-	// Only the task role exists in the loaded role cache — the execution
-	// role ARN is stale (e.g. the role was deleted after the task started).
 	cache := resource.ResourceCache{
 		"role": resource.ResourceCacheEntry{
 			Resources: []resource.Resource{
@@ -524,21 +456,9 @@ func TestECSTask_Related_SG_ViaTaskENISecurityGroupCrossRef(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// 7. checkEC2Backup — ec2.md:49
-//
-// "cross-reference the already-loaded backup list; match by backup-plan
-// selection tags present on Instance.Tags[] or by ARN via
-// backup:ListProtectedResources."
-//
-// At HEAD checkEC2Backup unconditionally returns Count:0 (see the "we
-// conservatively report Count:0 here" comment in ec2_related_extra.go) even
-// when a loaded backup plan's Fields["resources"]/["not_resources"] ARN
-// pattern lists (populated by FetchBackupPlansPage's
-// enumerateBackupPlanResources join) cover this instance's ARN. The correct
-// mechanism cross-references those already-loaded selection ARNs, mirroring
-// BackupPlanCoversARN's semantics used elsewhere in the same package.
-// ---------------------------------------------------------------------------
+// checkEC2Backup matches the loaded backup plans' Fields["resources"] and
+// ["not_resources"] ARN patterns against the instance ARN, with
+// BackupPlanCoversARN semantics.
 
 func TestEC2_Related_Backup_MatchesLoadedPlanSelectionARN(t *testing.T) {
 	instanceARN := "arn:aws:ec2:us-east-1:123456789012:instance/i-0abc123def456"
@@ -588,22 +508,13 @@ func mechanismEC2CheckerByTarget(t *testing.T, target string) resource.RelatedCh
 	return nil
 }
 
-// ---------------------------------------------------------------------------
-// 8. Fakes — demo mode must serve real data for two checkers, or the panel
-// silently shows zero:
-//
-//   - checkLambdaCFN (lambda.md aws:cloudformation:stack-name tag) needs
-//     LambdaFake.ListTags to serve per-function tags.
-//   - checkECSSvcSFN (ecs:runTask state-machine cross-ref) needs
-//     SFNFake.DescribeStateMachine to return a Definition.
-// ---------------------------------------------------------------------------
+// Demo mode must serve real data for these checkers, or the panel reads
+// zero: checkLambdaCFN needs LambdaFake.ListTags to serve per-function tags,
+// and checkECSSvcSFN needs SFNFake.DescribeStateMachine to return a
+// Definition.
 
 func TestFakes_LambdaListTags_ServesCloudFormationStackNameTag(t *testing.T) {
 	fake := fakes.NewLambda()
-	// api-gateway-authorizer / acme-eks-cluster is the real fixture wiring
-	// (core/demo/fixtures/lambda.go: Tags["api-gateway-authorizer"] =
-	// {"aws:cloudformation:stack-name": "acme-eks-cluster"}, acme-eks-cluster
-	// being a real cfn.go stack fixture) — not a synthetic pair.
 	fnArn := "arn:aws:lambda:us-east-1:123456789012:function:api-gateway-authorizer"
 
 	out, err := fake.ListTags(context.Background(), nil)

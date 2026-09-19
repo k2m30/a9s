@@ -1,18 +1,5 @@
 package unit_test
 
-// aws_redis_related_test.go — related-panel checker tests for the redis resource type.
-//
-// POST-PHASE-7 CONTRACT: all resource.Resource values use
-//   RawStruct: elasticachetypes.ReplicationGroup{...}
-//
-// Checkers that still read CacheCluster (pre-phase-7 code) will fail with
-// Count=-1 (wrong RawStruct type). These failures are EXPECTED until phase 7
-// updates the checkers (checkRedisSG, checkRedisSNS, checkRedisLogs,
-// checkRedisCFN, checkRedisSubnet, checkRedisVPC) to cast RawStruct to
-// ReplicationGroup and call DescribeCacheClusters(MemberClusters[0]) for
-// per-cluster fields. checkRedisCtEvents does not exist yet.
-// checkRedisSecrets currently returns hard-coded Count=0.
-
 import (
 	"context"
 	"testing"
@@ -30,25 +17,15 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// ---------------------------------------------------------------------------
-// Mock — full ElastiCacheAPI (needed by CFN, KMS, SG, SNS, subnet, vpc)
-// ---------------------------------------------------------------------------
-
-// mockElastiCacheFullAPI implements ElastiCacheAPI for related-checker tests.
-// Each field controls the response for one operation; unset fields return empty outputs.
 type mockElastiCacheFullAPI struct {
-	// DescribeCacheClusters response (for SG, SNS, subnet-group chain)
-	cacheClustersOutput *elasticache.DescribeCacheClustersOutput
-	cacheClustersErr    error
-	// DescribeReplicationGroups response (for KMS, secrets)
+	cacheClustersOutput     *elasticache.DescribeCacheClustersOutput
+	cacheClustersErr        error
 	replicationGroupsOutput *elasticache.DescribeReplicationGroupsOutput
 	replicationGroupsErr    error
-	// DescribeCacheSubnetGroups response (for subnet, vpc)
 	cacheSubnetGroupsOutput *elasticache.DescribeCacheSubnetGroupsOutput
 	cacheSubnetGroupsErr    error
-	// ListTagsForResource response (for CFN)
-	listTagsOutput *elasticache.ListTagsForResourceOutput
-	listTagsErr    error
+	listTagsOutput          *elasticache.ListTagsForResourceOutput
+	listTagsErr             error
 }
 
 func (m *mockElastiCacheFullAPI) DescribeCacheClusters(
@@ -95,10 +72,6 @@ func (m *mockElastiCacheFullAPI) ListTagsForResource(
 	return m.listTagsOutput, m.listTagsErr
 }
 
-// ---------------------------------------------------------------------------
-// Helper — checkerByTarget for redis
-// ---------------------------------------------------------------------------
-
 func redisCheckerByTarget(t *testing.T, target string) resource.RelatedChecker {
 	t.Helper()
 	for _, def := range resource.GetRelated("redis") {
@@ -113,12 +86,6 @@ func redisCheckerByTarget(t *testing.T, target string) resource.RelatedChecker {
 	return nil
 }
 
-// ---------------------------------------------------------------------------
-// Helper — graph-root ReplicationGroup resource (post-phase-7 RawStruct)
-// ---------------------------------------------------------------------------
-
-// redisGraphRoot builds the canonical prod-redis-sessions resource.
-// RawStruct is elasticachetypes.ReplicationGroup per post-phase-7 contract.
 func redisGraphRoot() resource.Resource {
 	return resource.Resource{
 		ID:   "prod-redis-sessions",
@@ -153,10 +120,6 @@ func redisGraphRoot() resource.Resource {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// Registration completeness
-// ---------------------------------------------------------------------------
-
 func TestRelated_Redis_Registered(t *testing.T) {
 	defs := resource.GetRelated("redis")
 	if len(defs) == 0 {
@@ -167,8 +130,8 @@ func TestRelated_Redis_Registered(t *testing.T) {
 		displayName string
 		hasChecker  bool
 	}
-	// 10 pivots registered per docs/resources/redis.md §2 (universal ct-events
-	// pivot plus the 9 type-specific targets).
+	// The universal ct-events pivot plus the 9 type-specific targets
+	// (docs/resources/redis.md).
 	expected := map[string]expectation{
 		"alarm":     {"CW Alarms", true},
 		"cfn":       {"CloudFormation", true},
@@ -201,12 +164,6 @@ func TestRelated_Redis_Registered(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// alarm — reverse-scan by CacheClusterId dimension
-// ---------------------------------------------------------------------------
-
-// TestRelated_Redis_Alarm verifies that alarms whose CacheClusterId dimension
-// matches one of the RG's MemberClusters are returned.
 func TestRelated_Redis_Alarm(t *testing.T) {
 	alarmRes := resource.Resource{
 		ID:     "redis-cpu-alarm",
@@ -250,16 +207,8 @@ func TestRelated_Redis_Alarm(t *testing.T) {
 	}
 }
 
-// TestRelated_Redis_Alarm_NilCache_ReturnsUnknown pins the canonical
-// nil-cache contract from docs/related-resources-engine.md §7: a nil alarm
-// cache (cache miss — the "alarm" key is entirely absent, not present with
-// IsTruncated=true) is not a proven zero and must resolve to
-// UnknownRelated("alarm") — the same contract checkSQSAlarm already honors.
-//
-// checkRedisAlarms (core/aws/redis_related.go:52-56) currently diverges: it
-// returns relatedResultTrunc("alarm", nil, true) instead — a false
-// proven-zero-with-truncation. This test is expected to FAIL until that
-// divergence is fixed (by hand or by the alarmIDsByDimension extraction).
+// A nil alarm cache (the "alarm" key absent) is not a proven zero, so the
+// pivot resolves to UnknownRelated("alarm").
 func TestRelated_Redis_Alarm_NilCache_ReturnsUnknown(t *testing.T) {
 	checker := redisCheckerByTarget(t, "alarm")
 	result := checker(context.Background(), nil, redisGraphRoot(), resource.ResourceCache{})
@@ -269,14 +218,6 @@ func TestRelated_Redis_Alarm_NilCache_ReturnsUnknown(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// cfn — tag-based via ListTagsForResource on RG ARN
-// ---------------------------------------------------------------------------
-
-// TestRelated_Redis_CFN verifies that the CFN stack matching the
-// aws:cloudformation:stack-name tag on the RG is returned.
-// NOTE: current checkRedisCFN casts RawStruct to CacheCluster; after phase 7
-// it will accept ReplicationGroup. This test targets the post-phase-7 contract.
 func TestRelated_Redis_CFN(t *testing.T) {
 	clients := &awsclient.ServiceClients{
 		ElastiCache: &mockElastiCacheFullAPI{
@@ -308,15 +249,6 @@ func TestRelated_Redis_CFN(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// ct-events — reverse-scan by ResourceName matching ReplicationGroupId
-// ---------------------------------------------------------------------------
-
-// TestRelated_Redis_CtEvents verifies that CloudTrail events whose ResourceName
-// matches the ReplicationGroupId are returned.
-// NOTE: checkRedisCtEvents does not exist in the pre-phase-7 code; this test
-// will fail with "ct-events related checker for ct-events not found" until
-// phase 7 registers the checker.
 func TestRelated_Redis_CtEvents(t *testing.T) {
 	ctEventRes := resource.Resource{
 		ID:   "abc123-evt-id",
@@ -348,14 +280,6 @@ func TestRelated_Redis_CtEvents(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// kms — forward-lookup from KmsKeyId ARN (last-segment match)
-// ---------------------------------------------------------------------------
-
-// TestRelated_Redis_KMS verifies that the KMS key whose ID matches the
-// last ARN segment of ReplicationGroup.KmsKeyId is returned.
-// NOTE: current checkRedisKMS calls redisReplicationGroup() which reads
-// CacheCluster.ReplicationGroupId; after phase 7 it reads from RawStruct RG directly.
 func TestRelated_Redis_KMS(t *testing.T) {
 	const keyID = "11111111-1111-1111-1111-111111111111"
 	clients := &awsclient.ServiceClients{
@@ -382,7 +306,6 @@ func TestRelated_Redis_KMS(t *testing.T) {
 	}
 }
 
-// TestRelated_Redis_KMS_NoKey verifies Count=0 when KmsKeyId is empty.
 func TestRelated_Redis_KMS_NoKey(t *testing.T) {
 	clients := &awsclient.ServiceClients{
 		ElastiCache: &mockElastiCacheFullAPI{
@@ -390,14 +313,13 @@ func TestRelated_Redis_KMS_NoKey(t *testing.T) {
 				ReplicationGroups: []elasticachetypes.ReplicationGroup{
 					{
 						ReplicationGroupId: aws.String("staging-redis"),
-						KmsKeyId:           nil, // no KMS key
+						KmsKeyId:           nil,
 					},
 				},
 			},
 		},
 	}
 
-	// Build a resource without KmsKeyId in the RG.
 	src := resource.Resource{
 		ID:   "staging-redis",
 		Name: "staging-redis",
@@ -418,15 +340,6 @@ func TestRelated_Redis_KMS_NoKey(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// logs — read LogDeliveryConfigurations from RG/CacheCluster
-// ---------------------------------------------------------------------------
-
-// TestRelated_Redis_Logs verifies that the CW log group named in
-// LogDeliveryConfigurations.DestinationDetails.CloudWatchLogsDetails.LogGroup
-// is matched against the logs cache.
-// NOTE: current checkRedisLogs reads CacheCluster.LogDeliveryConfigurations;
-// after phase 7 it reads from the ReplicationGroup.LogDeliveryConfigurations.
 func TestRelated_Redis_Logs(t *testing.T) {
 	const logGroupName = "/aws/elasticache/redis/prod-redis-sessions/slow-log"
 	logRes := resource.Resource{
@@ -449,15 +362,12 @@ func TestRelated_Redis_Logs(t *testing.T) {
 	}
 }
 
-// TestRelated_Redis_Logs_NoConfig verifies Count=0 when the RG has no
-// LogDeliveryConfigurations.
 func TestRelated_Redis_Logs_NoConfig(t *testing.T) {
 	cache := resource.ResourceCache{
 		"logs": resource.ResourceCacheEntry{Resources: []resource.Resource{
 			{ID: "/aws/elasticache/redis/other-group/slow-log"},
 		}},
 	}
-	// RG with no log delivery config.
 	src := resource.Resource{
 		ID:     "dev-redis-nologs",
 		Name:   "dev-redis-nologs",
@@ -476,14 +386,6 @@ func TestRelated_Redis_Logs_NoConfig(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// secrets — tag-based + name-based cross-reference
-// ---------------------------------------------------------------------------
-
-// TestRelated_Redis_Secrets_NameMatch verifies that a secret named
-// "<rgID>/auth-token" is matched (naming convention).
-// NOTE: current checkRedisSecrets returns hard-coded Count=0. This test
-// will fail until phase 7 implements tag/name cross-reference.
 func TestRelated_Redis_Secrets_NameMatch(t *testing.T) {
 	secretRes := resource.Resource{
 		ID:     "prod-redis-sessions/auth-token",
@@ -518,9 +420,6 @@ func TestRelated_Redis_Secrets_NameMatch(t *testing.T) {
 	}
 }
 
-// TestRelated_Redis_Secrets_TagMatch verifies that a secret tagged with
-// "elasticache:replication-group-id=<rgID>" is matched.
-// NOTE: same phase-7 dependency as NameMatch test above.
 func TestRelated_Redis_Secrets_TagMatch(t *testing.T) {
 	secretRes := resource.Resource{
 		ID:     "arn:aws:secretsmanager:us-east-1:123456789012:secret:redis-auth-token",
@@ -558,8 +457,6 @@ func TestRelated_Redis_Secrets_TagMatch(t *testing.T) {
 	}
 }
 
-// TestRelated_Redis_Secrets_NoMatch verifies Count=0 when no secret matches
-// either the naming convention or the tag.
 func TestRelated_Redis_Secrets_NoMatch(t *testing.T) {
 	secretRes := resource.Resource{
 		ID:     "unrelated-secret",
@@ -597,13 +494,6 @@ func TestRelated_Redis_Secrets_NoMatch(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// sg — reads SecurityGroups from CacheCluster via DescribeCacheClusters(MemberClusters[0])
-// ---------------------------------------------------------------------------
-
-// TestRelated_Redis_SG verifies that security groups from the primary member
-// cluster are returned. The sg cache is pre-populated so checkRedisSG's
-// redisRelatedResources call takes the cache path (no live EC2 API needed).
 func TestRelated_Redis_SG(t *testing.T) {
 	clients := &awsclient.ServiceClients{
 		ElastiCache: &mockElastiCacheFullAPI{
@@ -620,7 +510,6 @@ func TestRelated_Redis_SG(t *testing.T) {
 		},
 	}
 
-	// Pre-populate sg cache so FetchRelatedTarget takes the cache path.
 	sgRes := resource.Resource{
 		ID:     "sg-redis-prod-a",
 		Name:   "sg-redis-prod-a",
@@ -641,15 +530,6 @@ func TestRelated_Redis_SG(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// sns — reads NotificationConfiguration.TopicArn from CacheCluster
-// ---------------------------------------------------------------------------
-
-// TestRelated_Redis_SNS verifies that the SNS topic the primary member
-// cluster's NotificationConfiguration.TopicArn names is returned. Uses
-// DescribeCacheClusters(MemberClusters[0]) path (phase 7). The sns cache is
-// pre-populated so FetchRelatedTarget takes the cache path.
-//
 // sns rows are keyed by topic ARN; a row keyed by the bare topic name is no
 // row the sns fetcher produces, so it is not counted.
 func TestRelated_Redis_SNS(t *testing.T) {
@@ -692,14 +572,6 @@ func TestRelated_Redis_SNS(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// subnet — DescribeCacheClusters + DescribeCacheSubnetGroups chain
-// ---------------------------------------------------------------------------
-
-// TestRelated_Redis_Subnet verifies that subnets from the RG's subnet group
-// (resolved via two extra API calls) are returned.
-// NOTE: current checkRedisSubnet reads CacheCluster from RawStruct directly;
-// after phase 7 it will call DescribeCacheClusters(MemberClusters[0]) first.
 func TestRelated_Redis_Subnet(t *testing.T) {
 	clients := &awsclient.ServiceClients{
 		ElastiCache: &mockElastiCacheFullAPI{
@@ -740,11 +612,6 @@ func TestRelated_Redis_Subnet(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// vpc — same call chain as subnet; reads CacheSubnetGroup.VpcId
-// ---------------------------------------------------------------------------
-
-// TestRelated_Redis_VPC verifies that the VPC hosting the subnet group is returned.
 func TestRelated_Redis_VPC(t *testing.T) {
 	clients := &awsclient.ServiceClients{
 		ElastiCache: &mockElastiCacheFullAPI{
@@ -781,12 +648,6 @@ func TestRelated_Redis_VPC(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// §0b.2 — ct-events tightening: exact match, ARN match, no substring overmatch,
-//          no EventSource-only fallback match
-// ---------------------------------------------------------------------------
-
-// prodRedisSessionsRG returns a bare resource for "prod-redis-sessions" RG.
 func prodRedisSessionsRG() resource.Resource {
 	return resource.Resource{
 		ID:   "prod-redis-sessions",
@@ -821,8 +682,6 @@ func prodRedisSessionsSubRG() resource.Resource {
 	}
 }
 
-// TestRelated_Redis_CtEvents_ExactIDMatch verifies that a CloudTrail event whose
-// Resources[0].ResourceName exactly equals the ReplicationGroupId is counted.
 func TestRelated_Redis_CtEvents_ExactIDMatch(t *testing.T) {
 	ctEvent := resource.Resource{
 		ID:   "evt-exact-id",
@@ -853,8 +712,6 @@ func TestRelated_Redis_CtEvents_ExactIDMatch(t *testing.T) {
 	}
 }
 
-// TestRelated_Redis_CtEvents_ARNMatch verifies that a CloudTrail event whose
-// Resources[0].ResourceName equals the RG ARN is counted.
 func TestRelated_Redis_CtEvents_ARNMatch(t *testing.T) {
 	const rgARN = "arn:aws:elasticache:us-east-1:123456789012:replicationgroup:prod-redis-sessions"
 	ctEvent := resource.Resource{
@@ -886,11 +743,9 @@ func TestRelated_Redis_CtEvents_ARNMatch(t *testing.T) {
 	}
 }
 
-// TestRelated_Redis_CtEvents_SubstringDoesNotOvermatch is the §0b.2 bug
-// regression pin. An event naming "prod-redis-sessions-sessions" must NOT match
-// the "prod-redis-sessions" RG (substring overmatch via strings.Contains).
+// A ResourceName matches exactly: the "prod-redis-sessions" RG must not
+// claim an event naming "prod-redis-sessions-sessions".
 func TestRelated_Redis_CtEvents_SubstringDoesNotOvermatch(t *testing.T) {
-	// Event names "prod-redis-sessions-sessions" — the longer RG.
 	ctEvent := resource.Resource{
 		ID:   "evt-sub-name",
 		Name: "ModifyReplicationGroup",
@@ -914,24 +769,20 @@ func TestRelated_Redis_CtEvents_SubstringDoesNotOvermatch(t *testing.T) {
 
 	checker := redisCheckerByTarget(t, "ct-events")
 
-	// "prod-redis-sessions" must NOT match — its ID is a substring of the event's ResourceName.
 	resultShort := checker(context.Background(), nil, prodRedisSessionsRG(), cache)
 	if resultShort.Count() != 0 {
 		t.Errorf("prod-redis-sessions: Count = %d, want 0 (substring overmatch — event names a different RG)", resultShort.Count())
 	}
 
-	// "prod-redis-sessions-sessions" MUST match — its ID is an exact match.
 	resultLong := checker(context.Background(), nil, prodRedisSessionsSubRG(), cache)
 	if resultLong.Count() < 1 {
 		t.Errorf("prod-redis-sessions-sessions: Count = %d, want >= 1 (exact match)", resultLong.Count())
 	}
 }
 
-// TestRelated_Redis_CtEvents_ElastiCacheSourceAloneDoesNotMatch verifies that
-// an event with EventSource=elasticache.amazonaws.com but no matching ResourceName
-// does NOT count for this RG. The EventSource-only fallback is the §0b.2 bug.
+// An elasticache.amazonaws.com EventSource alone does not tie an event to
+// this RG.
 func TestRelated_Redis_CtEvents_ElastiCacheSourceAloneDoesNotMatch(t *testing.T) {
-	// Event with the right EventSource but Resources[] naming a DIFFERENT RG.
 	ctEvent := resource.Resource{
 		ID:   "evt-other-rg",
 		Name: "CreateReplicationGroup",
@@ -962,17 +813,8 @@ func TestRelated_Redis_CtEvents_ElastiCacheSourceAloneDoesNotMatch(t *testing.T)
 	}
 }
 
-// ---------------------------------------------------------------------------
-// §0b.3 — NeedsTargetCache assertion for kms and vpc entries
-// ---------------------------------------------------------------------------
-
-// TestRelated_Redis_Registration_KMSVPCNoTargetCache verifies that the kms and
-// vpc RelatedDefs are registered with NeedsTargetCache==false (they are
-// field-only checkers that do not scan any target type's resource cache).
-// All other entries must have NeedsTargetCache==true.
+// kms and vpc are field-only checkers that scan no target cache.
 func TestRelated_Redis_Registration_KMSVPCNoTargetCache(t *testing.T) {
-	// Expected NeedsTargetCache per target type.
-	// kms and vpc are field-only: no cache scan required.
 	wantNeedsCache := map[string]bool{
 		"alarm":     true,
 		"cfn":       true,
@@ -991,7 +833,6 @@ func TestRelated_Redis_Registration_KMSVPCNoTargetCache(t *testing.T) {
 		t.Fatal("no related defs registered for redis")
 	}
 
-	// Index defs by target type for lookup.
 	byTarget := make(map[string]resource.RelatedDef, len(defs))
 	for _, d := range defs {
 		byTarget[d.TargetType] = d
@@ -1009,17 +850,9 @@ func TestRelated_Redis_Registration_KMSVPCNoTargetCache(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// PIN 1 — Truncated cache regression pins (redis checkers)
-// ---------------------------------------------------------------------------
-// These tests assert that when the target cache is marked IsTruncated=true
-// the checker returns Truncated=true. Pre-fix code used `relatedResult`
-// instead of `truncatedResultRedis`, yielding Truncated=false and losing
-// the signal that the count may be understated.
+// A truncated target cache makes the result Truncated: the count may be
+// understated.
 
-// TestRelated_Redis_Alarm_TruncatedCacheWithMatches_ReturnsTruncated
-// verifies that checkRedisAlarm sets Truncated=true when the alarm cache is
-// truncated and at least one alarm matches a MemberCluster dimension.
 func TestRelated_Redis_Alarm_TruncatedCacheWithMatches_ReturnsTruncated(t *testing.T) {
 	matchingAlarm := resource.Resource{
 		ID:     "matching-alarm",
@@ -1062,9 +895,6 @@ func TestRelated_Redis_Alarm_TruncatedCacheWithMatches_ReturnsTruncated(t *testi
 	}
 }
 
-// TestRelated_Redis_Alarm_TruncatedCacheNoMatches_ReturnsTruncatedResult
-// verifies that checkRedisAlarm returns Count=0, Truncated=true when the
-// alarm cache is truncated but no alarm matches.
 func TestRelated_Redis_Alarm_TruncatedCacheNoMatches_ReturnsTruncatedResult(t *testing.T) {
 	noMatchAlarm := resource.Resource{
 		ID:     "unrelated-alarm",
@@ -1093,9 +923,6 @@ func TestRelated_Redis_Alarm_TruncatedCacheNoMatches_ReturnsTruncatedResult(t *t
 	}
 }
 
-// TestRelated_Redis_Logs_TruncatedCacheWithMatches_ReturnsTruncated
-// verifies that checkRedisLogs sets Truncated=true when the logs cache is
-// truncated and the log group matches the RG's LogDeliveryConfigurations.
 func TestRelated_Redis_Logs_TruncatedCacheWithMatches_ReturnsTruncated(t *testing.T) {
 	const logGroupName = "/aws/elasticache/redis/prod-redis-sessions/slow-log"
 	logRes := resource.Resource{

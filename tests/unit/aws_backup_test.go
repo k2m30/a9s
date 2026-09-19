@@ -1,12 +1,3 @@
-// aws_backup_test.go — fetcher behavior + default list column shape.
-//
-// Covers:
-//   - TEST: healthy_plan_no_jobs_is_silent (U1, U7f)
-//   - TEST: plan_with_zero_jobs_ever_is_still_healthy (U1, U7f)
-//   - TEST: list_view_carries_exactly_one_status_column_backed_by_status_key (U10)
-//   - TestBackup_Fetcher_MapsHealthyPlanFields — field-mapping contract.
-//   - TestBackup_Fetcher_ResourceIssuesEmptyForAllFixtures — U7f invariant for all 8 fixtures.
-//   - TestBackup_Fetcher_NilPlanID_Skipped — nil BackupPlanId does not panic.
 package unit
 
 import (
@@ -26,10 +17,6 @@ import (
 	"github.com/k2m30/a9s/v3/core/resource"
 )
 
-// ---------------------------------------------------------------------------
-// minimal mock — BackupListBackupPlansAPI only (used in nil-plan-id test)
-// ---------------------------------------------------------------------------
-
 type backupPlanListMock struct {
 	output *backup.ListBackupPlansOutput
 	err    error
@@ -39,13 +26,8 @@ func (m *backupPlanListMock) ListBackupPlans(_ context.Context, _ *backup.ListBa
 	return m.output, m.err
 }
 
-// ---------------------------------------------------------------------------
-// TEST: healthy_plan_no_jobs_is_silent (U1, U7f)
-// ---------------------------------------------------------------------------
-
-// TestBackup_Fetcher_HealthyPlan_StatusIsEmpty verifies that every plan
-// returned by the fetcher has Status == "" and Issues == nil/empty.
-// Spec §3.1: "No Wave 1 signals" — the list API is config-only.
+// TestBackup_Fetcher_HealthyPlan_NoWave1Findings: the list API is config-only,
+// so no plan returned by the fetcher carries a wave-1 finding.
 func TestBackup_Fetcher_HealthyPlan_NoWave1Findings(t *testing.T) {
 	fake := fakes.NewBackup()
 	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
@@ -65,14 +47,9 @@ func TestBackup_Fetcher_HealthyPlan_NoWave1Findings(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// TEST: plan_with_zero_jobs_ever_is_still_healthy
-// ---------------------------------------------------------------------------
-
 // TestBackup_Fetcher_NeverRanPlan_IsHealthy verifies that plan-never-ran
 // (LastExecutionDate == nil, zero jobs ever) returns as a healthy resource
 // with blank Status and empty last_execution field.
-// Spec §4: "A plan that has *never* run is also Healthy by this rule."
 func TestBackup_Fetcher_NeverRanPlan_IsHealthy(t *testing.T) {
 	fake := fakes.NewBackup()
 	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
@@ -99,10 +76,6 @@ func TestBackup_Fetcher_NeverRanPlan_IsHealthy(t *testing.T) {
 		t.Fatalf("plan-never-ran (%s) not found in fetcher output", fixtures.NeverRanPlanID)
 	}
 }
-
-// ---------------------------------------------------------------------------
-// TestBackup_Fetcher_MapsHealthyPlanFields
-// ---------------------------------------------------------------------------
 
 // TestBackup_Fetcher_MapsHealthyPlanFields verifies field mapping for the
 // healthy daily plan fixture. Asserts exact field values from the fixture file.
@@ -139,12 +112,10 @@ func TestBackup_Fetcher_MapsHealthyPlanFields(t *testing.T) {
 			t.Fatalf("Fields[plan_id] mismatch: got %q, want %q", r.Fields["plan_id"], fixtures.HealthyDailyPlanID)
 		}
 
-		// LastExecutionDate fixture = 2026-04-22T02:00:00Z → "2026-04-22 02:00"
 		if r.Fields["last_execution"] != "2026-04-22 02:00" {
 			t.Fatalf("Fields[last_execution] must be formatted '2006-01-02 15:04': got %q", r.Fields["last_execution"])
 		}
 
-		// resources CSV: healthy plan's selection covers HealthyBucketARN + EFS ARN.
 		if r.Fields["resources"] == "" {
 			t.Fatal("Fields[resources] must be non-empty — fetcher enumerates plan selections")
 		}
@@ -161,14 +132,9 @@ func TestBackup_Fetcher_MapsHealthyPlanFields(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// TestBackup_Fetcher_ResourceIssuesEmptyForAllFixtures (U7f)
-// ---------------------------------------------------------------------------
-
-// TestBackup_Fetcher_ResourceIssuesEmptyForAllFixtures asserts the U7f
-// invariant: every plan returned by FetchBackupPlans has an empty Issues slice.
-// Spec §3.1 explicitly states "No Wave 1 signals" — the fetcher must never
-// populate Resource.Issues for any backup plan, regardless of job state.
+// TestBackup_Fetcher_ResourceIssuesEmptyForAllFixtures: the list API is
+// config-only, so FetchBackupPlans never populates Resource.Issues for any
+// backup plan, regardless of job state.
 func TestBackup_Fetcher_ResourceIssuesEmptyForAllFixtures(t *testing.T) {
 	fake := fakes.NewBackup()
 	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
@@ -177,9 +143,8 @@ func TestBackup_Fetcher_ResourceIssuesEmptyForAllFixtures(t *testing.T) {
 	if err != nil {
 		t.Fatalf("FetchBackupPlans returned error: %v", err)
 	}
-	// 9 since w7 added plan-fleet-wide, the blanket selection that makes every
-	// demo row explicitly covered by a backup plan except the four that
-	// witness "not covered by a backup plan".
+	// plan-fleet-wide is the blanket selection that covers every demo row except
+	// the four that show "not covered by a backup plan".
 	if len(resources) != 9 {
 		t.Fatalf("expected 9 fixture plans (impl-plan §2 plus plan-fleet-wide); update this count if fixtures change: got %d", len(resources))
 	}
@@ -192,10 +157,6 @@ func TestBackup_Fetcher_ResourceIssuesEmptyForAllFixtures(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// TestBackup_Fetcher_NilPlanID_Skipped
-// ---------------------------------------------------------------------------
-
 // TestBackup_Fetcher_NilPlanID_Skipped verifies that a BackupPlansListMember
 // with BackupPlanId == nil does not cause a panic. The fetcher must handle nil
 // IDs defensively. The valid plan must still appear in output.
@@ -204,7 +165,6 @@ func TestBackup_Fetcher_NilPlanID_Skipped(t *testing.T) {
 		output: &backup.ListBackupPlansOutput{
 			BackupPlansList: []backuptypes.BackupPlansListMember{
 				{
-					// BackupPlanId intentionally nil.
 					BackupPlanName: aws.String("orphan-plan-no-id"),
 				},
 				{
@@ -215,7 +175,6 @@ func TestBackup_Fetcher_NilPlanID_Skipped(t *testing.T) {
 		},
 	}
 
-	// Must not panic.
 	resources, err := collectAllPages(func(token string) (resource.FetchResult, error) {
 		return awsclient.FetchBackupPlansPage(context.Background(), mock, token)
 	})
@@ -235,19 +194,7 @@ func TestBackup_Fetcher_NilPlanID_Skipped(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// TEST: list_view_carries_exactly_one_status_column_backed_by_status_key (U10)
-// ---------------------------------------------------------------------------
-
-// TestBackup_DefaultListColumns_OneStatusColumn verifies the default backup
-// list view column contract (spec §4 S4, U10):
-//   - Exactly one column keyed "status".
-//   - No column keyed "last_status" (banned old column).
-//   - No jargon column titles from the banned set.
-//   - Identity columns Plan Name, Plan ID, Created, Last Execution are present.
-//
-// This test will FAIL against the pre-rewrite defaults_backup.go which uses
-// "Last Status"/"last_status" — that is intentional (TDD red phase).
+// TestBackup_DefaultListColumns_OneStatusColumn verifies the default backup list view column contract.
 func TestBackup_DefaultListColumns_OneStatusColumn(t *testing.T) {
 	viewDef := config.DefaultViewDef("backup")
 	cols := viewDef.List
@@ -255,7 +202,6 @@ func TestBackup_DefaultListColumns_OneStatusColumn(t *testing.T) {
 		t.Fatal("default backup list columns must not be empty")
 	}
 
-	// Exactly one column keyed "status".
 	statusCount := 0
 	for _, col := range cols {
 		if col.Key == "status" {
@@ -267,14 +213,12 @@ func TestBackup_DefaultListColumns_OneStatusColumn(t *testing.T) {
 			statusCount, cols)
 	}
 
-	// No column keyed "last_status".
 	for _, col := range cols {
 		if col.Key == "last_status" {
 			t.Fatal("column keyed 'last_status' is banned per spec §4 — replace with 'status'")
 		}
 	}
 
-	// No jargon titles.
 	banned := []string{
 		"Last Status", "CIS", "Flags", "Policy", "Issues",
 		"NOBKP", "UNENC", "PUB", "NOPROT",
@@ -287,7 +231,6 @@ func TestBackup_DefaultListColumns_OneStatusColumn(t *testing.T) {
 		}
 	}
 
-	// Required identity columns must be present.
 	required := []string{"Plan Name", "Plan ID", "Created", "Last Execution"}
 	titleSet := make(map[string]bool, len(cols))
 	for _, col := range cols {
@@ -300,29 +243,21 @@ func TestBackup_DefaultListColumns_OneStatusColumn(t *testing.T) {
 	}
 }
 
-// Compile-time guard that fakes.BackupFake satisfies awsclient.BackupAPI.
 var _ awsclient.BackupAPI = fakes.NewBackup()
 
-// ---------------------------------------------------------------------------
-// PIN 4 — enumerateBackupPlanResources fail-closed regression pins
-// ---------------------------------------------------------------------------
-// These tests exercise the fail-closed contract of enumerateBackupPlanResources
-// (backup.go). Pre-fix code returned partial data when GetBackupSelection
-// failed, which could drop NotResources exclusions and yield false-positive
-// backup coverage. Post-fix code returns ("","") on any error.
-//
-// The function is unexported; it is exercised indirectly via FetchBackupPlans
-// by providing a mock that implements both BackupListBackupSelectionsAPI and
-// BackupGetBackupSelectionAPI — the fetcher type-asserts at call time.
+// enumerateBackupPlanResources is fail-closed: any GetBackupSelection error
+// yields ("", ""), because partial data could drop NotResources exclusions and
+// report false-positive backup coverage. The function is unexported and is
+// exercised through FetchBackupPlans with a mock implementing both
+// BackupListBackupSelectionsAPI and BackupGetBackupSelectionAPI, which the
+// fetcher type-asserts at call time.
 
 // backupFullMock implements BackupListBackupPlansAPI, BackupListBackupSelectionsAPI,
 // and BackupGetBackupSelectionAPI so FetchBackupPlansPage can type-assert all
 // three interfaces from a single mock value.
 type backupFullMock struct {
-	// ListBackupPlans response
-	plansOutput *backup.ListBackupPlansOutput
-	plansErr    error
-	// ListBackupSelections response
+	plansOutput      *backup.ListBackupPlansOutput
+	plansErr         error
 	selectionsOutput *backup.ListBackupSelectionsOutput
 	selectionsErr    error
 	// GetBackupSelection response — same response returned for every selection ID
@@ -343,10 +278,6 @@ func (m *backupFullMock) GetBackupSelection(_ context.Context, _ *backup.GetBack
 // TestBackup_EnumerateSelection_FailClosedOnGetError verifies that when
 // GetBackupSelection returns an error for any selection, Fields["resources"]
 // and Fields["not_resources"] are both empty strings ("fail-closed").
-//
-// Pre-fix: partial data was returned for the selections that succeeded before
-// the error, which could omit NotResources exclusions and cause false-positive
-// backup coverage in related-panel checkers.
 func TestBackup_EnumerateSelection_FailClosedOnGetError(t *testing.T) {
 	selID := "sel-abc123"
 	mock := &backupFullMock{

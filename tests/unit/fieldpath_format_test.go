@@ -9,7 +9,7 @@ import (
 )
 
 // ---------------------------------------------------------------------------
-// T005 — FormatValue tests
+// FormatValue tests
 // ---------------------------------------------------------------------------
 
 // Named string type for testing named-type extraction.
@@ -145,7 +145,7 @@ func TestFormatValue_Int64(t *testing.T) {
 }
 
 func TestFormatValue_ZeroTime(t *testing.T) {
-	var ts time.Time // zero value
+	var ts time.Time
 	val := reflect.ValueOf(ts)
 
 	got := fieldpath.FormatValue(val)
